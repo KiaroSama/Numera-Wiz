@@ -21,18 +21,30 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install the selected toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt,clippy
+      - name: Install Linux GUI build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
       - name: Resolve reproducible dependency closure
         run: cargo generate-lockfile
       - name: Compile and run ordinary regressions
         run: cargo test --workspace --all-targets
       - name: Lint implementation
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Build the desktop composition
+        run: cargo build -p numera-wiz --features desktop
+      - name: Check shared browser UI dependency closure
+        if: runner.os == 'Linux'
+        run: cargo check -p nw-ui --target wasm32-unknown-unknown
       - name: Verify preserved research hashes
         run: cargo run -p xtask -- verify-research
       - name: Generate current contracts
         run: cargo run -p xtask -- schemas
       - name: Prepare formatting evidence
-        run: cargo fmt --all
+        if: always()
+        shell: bash
+        run: |
+          cargo fmt --all
+          git diff --binary -- crates apps xtask > formatting.patch
       - name: Save dependency and generated evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -40,5 +52,6 @@ jobs:
           name: development-evidence-${{ matrix.os }}
           path: |
             Cargo.lock
+            formatting.patch
             docs/generated/
           if-no-files-found: error

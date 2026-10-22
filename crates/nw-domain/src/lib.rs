@@ -22,3 +22,5 @@ impl DomainError {
     pub fn field(mut self, field: &str) -> Self { self.field = Some(field.into()); self }
 }
 pub type Result<T> = std::result::Result<T, DomainError>;
+
+pub mod records;
