@@ -44,6 +44,24 @@ fn schemas(root:&Path) -> Result<()> {
 fn release_gate(root:&Path) -> Result<()> {
     let ledger:serde_json::Value=serde_json::from_slice(&fs::read(root.join("docs/development/completion.json"))?)?;
     let rows=ledger["records"].as_array().context("completion records")?;
+    for (prefix,count) in [("R",22),("F",15),("CD",34),("WP",12)] {
+        for index in 1..=count {
+            let id=format!("{prefix}{index:02}");
+            let matches=rows.iter().filter(|row|row["subject_id"]==id).count();
+            if matches!=1 {bail!("Release requires exactly one evidence record for {id}");}
+        }
+    }
+    for row in rows.iter().filter(|row|row["status"]=="qualified") {
+        let evidence=row["evidence"].as_array().context("Qualified record requires actual evidence")?;
+        if evidence.is_empty(){bail!("Qualified record has no evidence: {}",row["subject_id"]);}
+        for item in evidence {
+            let run=item["ci_run_url"].as_str().context("Actual CI run URL required")?;
+            if !run.starts_with("https://github.com/KiaroSama/Numera-Wiz/actions/runs/"){bail!("Invalid CI evidence origin");}
+            let hash=item["artifact_sha256"].as_str().context("Exact artifact hash required")?;
+            if hash.len()!=64 || !hash.bytes().all(|b|b.is_ascii_hexdigit()) || hash=="0".repeat(64){bail!("Invalid artifact hash");}
+            if item["asserted_domain"].as_str().is_none_or(str::is_empty) || item["observed_outcome"].as_str().is_none_or(str::is_empty){bail!("Evidence requires domain and observed outcome");}
+        }
+    }
     let pending=rows.iter().filter(|row|row["status"]!="qualified").count();
     if pending>0 {tracing::warn!(pending,"WARNING: Required release evidence remains incomplete");bail!("Release blocked by {pending} incomplete requirement/workflow records");}
     if rows.is_empty() {bail!("An empty ledger cannot qualify a release");}

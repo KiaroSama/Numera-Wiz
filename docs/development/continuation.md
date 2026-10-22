@@ -20,7 +20,9 @@ The expanded development workspace compiled/tests passed on Linux/macOS at commi
 932c1ce5cdc327c63385a975acc75407b26c8ca2; Windows had conditional dead-code lint
 findings, now corrected. The first real FFmpeg fixture build completed but exposed
 a missing wrapped_avframe decoder for lavfi fixture generation; the configuration
-now enables it. New raw-JSON/CLI/stdio/HTTP tests require their next actual CI run.
+now enables it. The actual CPU media test passed in run 39874893026.
+The new raw-JSON/CLI/stdio/HTTP tests and store primitives must retain their own
+actual CI results; no result is inferred from the earlier domain tests.
 
 Next executable step: inspect/fix the current hosted native/WASM/media results,
 retain the final resolved lockfile and apply the exact CI formatting patch, then

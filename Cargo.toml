@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/nw-domain", "crates/nw-platform", "crates/nw-engine", "crates/nw-service", "crates/nw-ui", "apps/numera-wiz", "xtask"]
+members = ["crates/nw-domain", "crates/nw-platform", "crates/nw-engine", "crates/nw-service", "crates/nw-store", "crates/nw-ui", "apps/numera-wiz", "xtask"]
 default-members = ["apps/numera-wiz", "xtask"]
 
 [workspace.package]
