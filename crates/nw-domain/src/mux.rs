@@ -36,8 +36,8 @@ pub enum NoMatch { SkipFile, AllowEmpty, Reject }
 pub struct Selection { pub selector: Selector, pub no_match: NoMatch }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
-pub enum TagPatch { Keep, Set { value: String }, Clear }
-impl Default for TagPatch { fn default() -> Self { Self::Keep } }
+#[derive(Default)]
+pub enum TagPatch { #[default] Keep, Set { value: String }, Clear }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StreamTagPatch {
@@ -140,7 +140,7 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
     for patch in &intent.stream_tag_patches {
         if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 { return Err(DomainError::new("RESOURCE_LIMIT", "Tag matcher is too large")); }
         for value in [&patch.language, &patch.title] {
-            if let TagPatch::Set { value } = value { if value.len() > 4096 || value.contains('\0') { return Err(DomainError::new("VALIDATION_ERROR", "Tag values must be bounded and contain no NUL")); } }
+            if let TagPatch::Set { value } = value && (value.len() > 4096 || value.contains('\0')) { return Err(DomainError::new("VALIDATION_ERROR", "Tag values must be bounded and contain no NUL")); }
         }
     }
     let mut kept = Vec::new();

@@ -1,0 +1,28 @@
+[package]
+name = "numera-wiz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[lints]
+workspace = true
+[features]
+default = []
+desktop = ["dep:nw-ui", "dep:eframe"]
+[dependencies]
+nw-domain.workspace = true
+nw-platform.workspace = true
+nw-service.workspace = true
+nw-ui = { workspace = true, optional = true }
+eframe = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+clap.workspace = true
+tokio.workspace = true
+axum.workspace = true
+rmcp.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+subtle = "2.6"
