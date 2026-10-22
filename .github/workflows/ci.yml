@@ -1,0 +1,44 @@
+name: Rust CI
+on:
+  push:
+    branches: ['implementation/**', main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install the selected toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt,clippy
+      - name: Resolve reproducible dependency closure
+        run: cargo generate-lockfile
+      - name: Compile and run ordinary regressions
+        run: cargo test --workspace --all-targets
+      - name: Lint implementation
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Verify preserved research hashes
+        run: cargo run -p xtask -- verify-research
+      - name: Generate current contracts
+        run: cargo run -p xtask -- schemas
+      - name: Prepare formatting evidence
+        run: cargo fmt --all
+      - name: Save dependency and generated evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: development-evidence-${{ matrix.os }}
+          path: |
+            Cargo.lock
+            docs/generated/
+          if-no-files-found: error

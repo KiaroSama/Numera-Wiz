@@ -1,0 +1,202 @@
+[
+  {
+    "path": "nv-codec-headers_README",
+    "url": "https://raw.githubusercontent.com/FFmpeg/nv-codec-headers/0a6fba9a2820628b8103464f4c8753ee05838baa/README",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "nv-codec-headers_dynlink_loader.h",
+    "url": "https://raw.githubusercontent.com/FFmpeg/nv-codec-headers/0a6fba9a2820628b8103464f4c8753ee05838baa/include/ffnvcodec/dynlink_loader.h",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AMF_LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/AMF/57ee0cfb0e1a08d9041f77435653794c1b012be0/LICENSE.txt",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AMF_Factory.h",
+    "url": "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/AMF/57ee0cfb0e1a08d9041f77435653794c1b012be0/amf/public/include/core/Factory.h",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AMF_README.md",
+    "url": "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/AMF/57ee0cfb0e1a08d9041f77435653794c1b012be0/README.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "libvpl_LICENSE",
+    "url": "https://raw.githubusercontent.com/intel/libvpl/main/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "libvpl_README.md",
+    "url": "https://raw.githubusercontent.com/intel/libvpl/main/README.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "libvpl_INSTALL.md",
+    "url": "https://raw.githubusercontent.com/intel/libvpl/main/INSTALL.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "vpl-gpu-rt_LICENSE",
+    "url": "https://raw.githubusercontent.com/intel/vpl-gpu-rt/main/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "vpl-gpu-rt_README.md",
+    "url": "https://raw.githubusercontent.com/intel/vpl-gpu-rt/main/README.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "zimg_COPYING",
+    "url": "https://raw.githubusercontent.com/sekrit-twc/zimg/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "rubberband_README.md",
+    "url": "https://raw.githubusercontent.com/breakfastquay/rubberband/default/README.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "rubberband_COMPILING.md",
+    "url": "https://raw.githubusercontent.com/breakfastquay/rubberband/default/COMPILING.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "repos_FFmpeg_nv-codec-headers_commits_n13.0.19.1",
+    "url": "https://api.github.com/repos/FFmpeg/nv-codec-headers/commits/n13.0.19.1",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "FFmpeg_nv-codec-headers_n13.0.19.1_README",
+    "url": "https://raw.githubusercontent.com/FFmpeg/nv-codec-headers/n13.0.19.1/README",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "FFmpeg_nv-codec-headers_n12.1.14.0_README",
+    "url": "https://raw.githubusercontent.com/FFmpeg/nv-codec-headers/n12.1.14.0/README",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "videolan_x265_master_COPYING",
+    "url": "https://raw.githubusercontent.com/videolan/x265/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "xiph_opus_main_COPYING",
+    "url": "https://raw.githubusercontent.com/xiph/opus/main/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "webmproject_libvpx_main_LICENSE",
+    "url": "https://raw.githubusercontent.com/webmproject/libvpx/main/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "webmproject_libvpx_main_PATENTS",
+    "url": "https://raw.githubusercontent.com/webmproject/libvpx/main/PATENTS",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "videolan_dav1d_master_COPYING",
+    "url": "https://raw.githubusercontent.com/videolan/dav1d/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "libass_libass_master_COPYING",
+    "url": "https://raw.githubusercontent.com/libass/libass/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "harfbuzz_harfbuzz_main_COPYING",
+    "url": "https://raw.githubusercontent.com/harfbuzz/harfbuzz/main/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "fribidi_fribidi_master_COPYING",
+    "url": "https://raw.githubusercontent.com/fribidi/fribidi/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "FreeType_freetype_master_LICENSE.TXT",
+    "url": "https://raw.githubusercontent.com/FreeType/freetype/master/LICENSE.TXT",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "fontconfig_fontconfig_main_COPYING",
+    "url": "https://raw.githubusercontent.com/fontconfig/fontconfig/main/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "ggml-org_whisper.cpp_master_LICENSE",
+    "url": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AOMediaCodec_SVT-AV1_main_Docs_System-Requirements.md",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/SVT-AV1/main/Docs/System-Requirements.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AOMediaCodec_SVT-AV1_main_LICENSE.md",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/SVT-AV1/main/LICENSE.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "AOMediaCodec_SVT-AV1_main_PATENTS.md",
+    "url": "https://raw.githubusercontent.com/AOMediaCodec/SVT-AV1/main/PATENTS.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "ggml-org_whisper.cpp_master_README.md",
+    "url": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/README.md",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "microsoft_onnxruntime_main_LICENSE",
+    "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/main/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "openvinotoolkit_openvino_master_LICENSE",
+    "url": "https://raw.githubusercontent.com/openvinotoolkit/openvino/master/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "tensorflow_tensorflow_master_LICENSE",
+    "url": "https://raw.githubusercontent.com/tensorflow/tensorflow/master/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "pytorch_pytorch_main_LICENSE",
+    "url": "https://raw.githubusercontent.com/pytorch/pytorch/main/LICENSE",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "intel_libva_master_COPYING",
+    "url": "https://raw.githubusercontent.com/intel/libva/master/COPYING",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "intel_libvpl_main_libvpl_CMakeLists.txt",
+    "url": "https://raw.githubusercontent.com/intel/libvpl/main/libvpl/CMakeLists.txt",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "x264_x264.h",
+    "url": "https://github.com/mirror/x264/blob/master/x264.h",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "x265_x265.h",
+    "url": "https://github.com/videolan/x265/blob/master/source/x265.h",
+    "retrieved": "2026-10-21"
+  },
+  {
+    "path": "rav1e_LICENSE",
+    "url": "https://github.com/xiph/rav1e/blob/master/LICENSE",
+    "retrieved": "2026-10-21"
+  }
+]

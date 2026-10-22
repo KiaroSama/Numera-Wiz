@@ -1,0 +1,14 @@
+name: Bug report
+description: Report a reproducible Numera Wiz defect
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Build, platform and redacted reproduction
+      description: Do not include credentials or private media.

@@ -1,0 +1,12 @@
+/target/
+/dist/
+*.log
+*.nwiz
+*.redb
+*.redb.lock
+.env
+.env.*
+/data/
+/runtime/
+/components/bin/
+/spec-kit/

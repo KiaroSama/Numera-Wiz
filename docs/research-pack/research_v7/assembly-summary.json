@@ -1,0 +1,12 @@
+{
+  "artifact": "Numera-Wiz-Implementation-Mandate-EN.md",
+  "revision": "7.0",
+  "words": 98194,
+  "bytes": 772543,
+  "lines": 4396,
+  "capability_annex_present": true,
+  "muxcls_annex_present": true,
+  "minimum_main_bytes": 500000,
+  "minimum_main_bytes_satisfied": true,
+  "status": "document_assembly_only_not_application_validation"
+}

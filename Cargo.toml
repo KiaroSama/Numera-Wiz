@@ -1,0 +1,51 @@
+[workspace]
+resolver = "3"
+members = ["crates/nw-domain", "xtask"]
+default-members = ["crates/nw-domain", "xtask"]
+
+[workspace.package]
+version = "0.1.0-dev"
+edition = "2024"
+rust-version = "1.99.1"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/KiaroSama/Numera-Wiz"
+
+[workspace.dependencies]
+nw-domain = { path = "crates/nw-domain" }
+nw-platform = { path = "crates/nw-platform" }
+nw-engine = { path = "crates/nw-engine" }
+nw-store = { path = "crates/nw-store" }
+nw-service = { path = "crates/nw-service" }
+nw-ui = { path = "crates/nw-ui" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
+schemars = "1.1"
+thiserror = "2.0"
+anyhow = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+clap = { version = "4", features = ["derive"] }
+axum = { version = "0.8", features = ["json"] }
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls"] }
+rmcp = { version = "=3.6.0", features = ["server", "transport-io", "transport-streamable-http-server", "schemars"] }
+redb = "=4.4.0"
+fs2 = "0.4"
+tempfile = "3"
+eframe = { version = "=0.36.2", default-features = false, features = ["default_fonts", "glow"] }
+ehttp = { version = "0.6", features = ["json"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+await_holding_lock = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

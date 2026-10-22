@@ -1,0 +1,13 @@
+{
+  "pinned_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "manual_files": 48,
+  "leaf_sections": 1962,
+  "body_status": {
+    "actual_read": 1962
+  },
+  "actual_read_lines": 67566,
+  "total_lines": 67566,
+  "missing": [],
+  "runtime_qualification": "Not performed. All application builds and ordinary media tests are reserved for CI.",
+  "scope": "All 48 top-level Texinfo manual sources at the pinned release; not a claim to have read every API source file, wiki article, or future manual revision."
+}

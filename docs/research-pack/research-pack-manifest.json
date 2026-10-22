@@ -1,0 +1,4043 @@
+{
+  "schema_version": 1,
+  "revision": "7.0",
+  "created_at": "2026-10-22T21:43:36.081615+00:00",
+  "scope": "Implementation directive and source/manual research; no runtime qualification",
+  "files": [
+    {
+      "path": "Numera-Wiz-Implementation-Mandate-EN.md",
+      "bytes": 772543,
+      "sha256": "126c8aa8aa7f874802a09600040a1986cff650ad70b70f58f30a441d87fbef06"
+    },
+    {
+      "path": "README.md",
+      "bytes": 11285,
+      "sha256": "134b3f94c23895ed78bb148802137c776e74c361daf5da36e4639b732222107f"
+    },
+    {
+      "path": "handoff/00-front-matter-and-fixed-requirements.md",
+      "bytes": 17536,
+      "sha256": "c79bafd215525b4889db8ca3a6a41b075d7130c1739d4f141c1a334c129d09a3"
+    },
+    {
+      "path": "handoff/01-1-workflow-and-research.md",
+      "bytes": 10516,
+      "sha256": "f895a601f8b9578d322e63ed85a7f026cd66fbac8152ac9b56bbcc2f8a8f810a"
+    },
+    {
+      "path": "handoff/02-2-functional-scope-and-migration.md",
+      "bytes": 27483,
+      "sha256": "02a9a4eb5a09d04d089dfbf25728af963772af8016a6cc62495c5358ec1d4bed"
+    },
+    {
+      "path": "handoff/03-3-editing-and-command-domains.md",
+      "bytes": 35387,
+      "sha256": "d6ce82e24a4e750fd4711df5500e458c44ff46d2359cb6dc9ec0ebc6927aaa73"
+    },
+    {
+      "path": "handoff/04-4-engine-ownership-and-durable-state.md",
+      "bytes": 68771,
+      "sha256": "3455086ec6963b1e11becb53df36411879c26a04a079cb012ba0711d85a937c5"
+    },
+    {
+      "path": "handoff/05-5-domain-model-and-interface-contracts.md",
+      "bytes": 96791,
+      "sha256": "01c780f92cebe1e2f50c2b880a76cfd658c6bc1613804533f0884adf912b00f4"
+    },
+    {
+      "path": "handoff/06-6-ffmpeg-execution-and-preview.md",
+      "bytes": 84145,
+      "sha256": "60d31255f2192964726dbb92b3dc2755b4f310a73ce4092f13a72ef3ef5617fc"
+    },
+    {
+      "path": "handoff/07-7-shared-editor-and-shortcuts.md",
+      "bytes": 25051,
+      "sha256": "081c25e8ae0d39f8a7a30f55de945a272e52143426f063b447ad2a5392c0d42c"
+    },
+    {
+      "path": "handoff/08-8-resources-security-distribution-and-ci.md",
+      "bytes": 59022,
+      "sha256": "4b920452c461cf23e17e8bc6e2c1fd8d6cf7a43a701fa48ce8a30160c71fed6c"
+    },
+    {
+      "path": "handoff/09-9-implementation-sequence.md",
+      "bytes": 5644,
+      "sha256": "788faca4fe8922126235dc13b7b419f983c1bb9a10b54196bf8f46665fd622bc"
+    },
+    {
+      "path": "handoff/10-10-additional-project-research.md",
+      "bytes": 6051,
+      "sha256": "0cf5dd64622d7ceb099a14ecb4641fdb1f11b11d1a6f9d89d4b009c8d05933ae"
+    },
+    {
+      "path": "handoff/11-11-work-packages-traceability-and-acceptance.md",
+      "bytes": 48019,
+      "sha256": "d953d44dd86996de6cf72470d3e8a1a8363fda13f9f13ed6ce1a301c87b86395"
+    },
+    {
+      "path": "handoff/12-annex-a-complete-ffmwiz-behavior.md",
+      "bytes": 86106,
+      "sha256": "86712f36140999edf618aed313c8d8f8d151cea2abfa6ed0667a7be9febcaffa"
+    },
+    {
+      "path": "handoff/13-annex-b-donor-capability-decisions.md",
+      "bytes": 149099,
+      "sha256": "4a0bead935b0672d6455426e0fc5405cebb351a665a0d388a38bbc2e1bd50ff3"
+    },
+    {
+      "path": "handoff/14-annex-c-source-command-closure.md",
+      "bytes": 20276,
+      "sha256": "cb841f3c2517882cc2c1cc29fd398cdd4fbb71b8d2fae3bdfb742304c5cbe4d2"
+    },
+    {
+      "path": "handoff/15-annex-d-complete-muxcls-rust-rewrite.md",
+      "bytes": 37772,
+      "sha256": "47d01bdd33a2c9d852d0d5a484aa8a092c52572ffc6168061776a8a6ad7378fa"
+    },
+    {
+      "path": "handoff/START-HERE.md",
+      "bytes": 4892,
+      "sha256": "0e59e0f15c40c2f2967f168512686493c01dfba36b614728b4479a91c6e97219"
+    },
+    {
+      "path": "handoff/section-manifest.json",
+      "bytes": 7196,
+      "sha256": "b598134d089cce63a3caf8f4dabac5050f5b349e2baf8e58225ae1534c77954b"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AMF_Factory.h",
+      "bytes": 6140,
+      "sha256": "3b5ded5f33a4d429fdda9f94e844510c0517f641cff838a8d2641f74542aed5e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AMF_LICENSE.txt",
+      "bytes": 1717,
+      "sha256": "e2fdc723dea1f17bcdbc9b2ad27de39e0ea5379f77de1bdf923281cfcc97c11e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AMF_README.md",
+      "bytes": 8478,
+      "sha256": "8dd771dd72ad16d75c2077de6880716dac9099cfc01da1a76b0427d43174e133"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AOMediaCodec_SVT-AV1_main_Docs_System-Requirements.md",
+      "bytes": 1539,
+      "sha256": "141051c90cd93d1b28dd86ce0f9d4c28f36deef92ffe9011b82d5fff0e4304dc"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AOMediaCodec_SVT-AV1_main_LICENSE.md",
+      "bytes": 1710,
+      "sha256": "fcb53348d7c8980b1ce822292c5cd9db9541df702adbebf709a59d33a0b7580e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/AOMediaCodec_SVT-AV1_main_PATENTS.md",
+      "bytes": 5768,
+      "sha256": "aa0a82017c1f09d039c9a599bb11c643ef35f9579c1ce6bc469a4f0b5eb17499"
+    },
+    {
+      "path": "research_v2/build-profile-sources/FFmpeg_nv-codec-headers_n12.1.14.0_README",
+      "bytes": 209,
+      "sha256": "cc41f4a6e6f97704d1776ab52228ab25d358bd1eac1138cefdbe29e0d570b94a"
+    },
+    {
+      "path": "research_v2/build-profile-sources/FFmpeg_nv-codec-headers_n13.0.19.1_README",
+      "bytes": 204,
+      "sha256": "a50c3d832984d5eb86ea5f6504a6deb73c9475d6a72f25033862aa88be6e0f32"
+    },
+    {
+      "path": "research_v2/build-profile-sources/FreeType_freetype_master_LICENSE.TXT",
+      "bytes": 2150,
+      "sha256": "2065b486aa1063b2a5494f80f0d9ff6b20fc8c5da3c914165983f3c71cdb02da"
+    },
+    {
+      "path": "research_v2/build-profile-sources/fontconfig_fontconfig_main_COPYING",
+      "bytes": 8617,
+      "sha256": "ceec0e8614bf53bf9d850922250a024445b7b02c675489aa2d4daee70e67bf1e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/fribidi_fribidi_master_COPYING",
+      "bytes": 26420,
+      "sha256": "730aca838484e53c7c4838873de0cf2f77fc08f27b18f3f20ab775a52687042a"
+    },
+    {
+      "path": "research_v2/build-profile-sources/ggml-org_whisper.cpp_master_LICENSE",
+      "bytes": 1079,
+      "sha256": "4a55764a48c9ebf73b1a7866faedfc60e702d870697d886c8bc2557f96f82775"
+    },
+    {
+      "path": "research_v2/build-profile-sources/ggml-org_whisper.cpp_master_README.md",
+      "bytes": 40989,
+      "sha256": "69f6b7ea864b114e38b9221f14d1a80c552814eeb8c5562494870662ec303bb5"
+    },
+    {
+      "path": "research_v2/build-profile-sources/harfbuzz_harfbuzz_main_COPYING",
+      "bytes": 1972,
+      "sha256": "fb2c274f596a283e164207a2669afc4c731d5032ea1b679cc5db79b20848052c"
+    },
+    {
+      "path": "research_v2/build-profile-sources/intel_libva_master_COPYING",
+      "bytes": 1131,
+      "sha256": "7f07723705690efc846fa08ec9fc998d50cbfc4b01b2f5dcdc65b8df514b2588"
+    },
+    {
+      "path": "research_v2/build-profile-sources/intel_libvpl_main_libvpl_CMakeLists.txt",
+      "bytes": 7002,
+      "sha256": "109e4d061dd68d6a950685214cb1e71c0c52f8625c8245a69954919909ba0c37"
+    },
+    {
+      "path": "research_v2/build-profile-sources/libass_libass_master_COPYING",
+      "bytes": 756,
+      "sha256": "5b8f4c4d9e98e4a62e505209a41c2557e4ae55ab451e6828552fb1f5f2dffb10"
+    },
+    {
+      "path": "research_v2/build-profile-sources/libvpl_INSTALL.md",
+      "bytes": 1825,
+      "sha256": "016de13dfe052d906551527dd991b9b1746edd460f0d0a292a319c9d499a0565"
+    },
+    {
+      "path": "research_v2/build-profile-sources/libvpl_LICENSE",
+      "bytes": 1075,
+      "sha256": "6af3204f35d007ec4d19cd1a45d8786f7ac8f27714577d540e41f1c24f5cb6c7"
+    },
+    {
+      "path": "research_v2/build-profile-sources/libvpl_README.md",
+      "bytes": 6562,
+      "sha256": "46d195dae52c832f677d4a80aaadf9f14e59b90b33060ffa7b3c086446e817a6"
+    },
+    {
+      "path": "research_v2/build-profile-sources/microsoft_onnxruntime_main_LICENSE",
+      "bytes": 1074,
+      "sha256": "7a69ec43a422a470ab5505c2ad13e0574b19f0a85a5a67a3048c60b4bc2938e7"
+    },
+    {
+      "path": "research_v2/build-profile-sources/nv-codec-headers_README",
+      "bytes": 202,
+      "sha256": "1e0b4853be5b6852986728a9fe1a2f13b6a41caa95cf1a5568685b412e26b0ff"
+    },
+    {
+      "path": "research_v2/build-profile-sources/nv-codec-headers_dynlink_loader.h",
+      "bytes": 24898,
+      "sha256": "4334313c66a120a110b6e742658c701874414d3183f492cf8fb5b4a1d53ece2c"
+    },
+    {
+      "path": "research_v2/build-profile-sources/openvinotoolkit_openvino_master_LICENSE",
+      "bytes": 11358,
+      "sha256": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c"
+    },
+    {
+      "path": "research_v2/build-profile-sources/pytorch_pytorch_main_LICENSE",
+      "bytes": 3465,
+      "sha256": "237be3635434a4a4098a9f59270518bf5cb89c49363cbb7bdd0e761128a00489"
+    },
+    {
+      "path": "research_v2/build-profile-sources/rav1e_LICENSE",
+      "bytes": 1333,
+      "sha256": "a45a302898d0d80736117e91cf824ca7813e72036f0629ade0c73bbb1612ae52"
+    },
+    {
+      "path": "research_v2/build-profile-sources/repos_FFmpeg_nv-codec-headers_commits_n13.0.19.1",
+      "bytes": 8799,
+      "sha256": "7514833a7954bb3f5e1a826740b29f47d27ae13ab69ad4520763332c1159b2de"
+    },
+    {
+      "path": "research_v2/build-profile-sources/rubberband_COMPILING.md",
+      "bytes": 22512,
+      "sha256": "3cdbd208cef735384259774bd5dfe0fdc4235885d09efd46cc56bdf17b34392e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/rubberband_README.md",
+      "bytes": 8101,
+      "sha256": "12248dddca98a60770a80e6c7861767262e025568bee3d70110a9b5333f576ab"
+    },
+    {
+      "path": "research_v2/build-profile-sources/source-index.json",
+      "bytes": 6824,
+      "sha256": "820f484b58dd4d05f231bcd3f5502c89ab0fad38ad849fc3dc7bf6b158c00854"
+    },
+    {
+      "path": "research_v2/build-profile-sources/tensorflow_tensorflow_master_LICENSE",
+      "bytes": 13576,
+      "sha256": "14a7f854f6586eec9154c552ae5e873b8f1b9f0ea287c52eaf9cbe87f30901c0"
+    },
+    {
+      "path": "research_v2/build-profile-sources/videolan_dav1d_master_COPYING",
+      "bytes": 1318,
+      "sha256": "d07ce47a6e5e64ade0c43a30b16910e93506247f2df173810ca0837ff9bf16f6"
+    },
+    {
+      "path": "research_v2/build-profile-sources/videolan_x265_master_COPYING",
+      "bytes": 18121,
+      "sha256": "0daef7961f72671c6bbdf2afc64cb3001597bfb626a5f2882214f0736da9a532"
+    },
+    {
+      "path": "research_v2/build-profile-sources/vpl-gpu-rt_LICENSE",
+      "bytes": 1062,
+      "sha256": "ef1a74ded35bcaaf6a606909f3a8b464113a70e651ada06b6958330ec6675d5e"
+    },
+    {
+      "path": "research_v2/build-profile-sources/vpl-gpu-rt_README.md",
+      "bytes": 7807,
+      "sha256": "21438b1aef9b8a45737a4a6639abbb2dfa4b9adda6f05a876330722a29da9a35"
+    },
+    {
+      "path": "research_v2/build-profile-sources/webmproject_libvpx_main_LICENSE",
+      "bytes": 1538,
+      "sha256": "03bea5a981153664539c9fdf870da60deecb9705fb8620bddbe9323f8b3c9fd2"
+    },
+    {
+      "path": "research_v2/build-profile-sources/webmproject_libvpx_main_PATENTS",
+      "bytes": 1437,
+      "sha256": "a88b1a12d736c67661658b634fc09a8f3bf63f4fdacd58fcf6f9459a2f818688"
+    },
+    {
+      "path": "research_v2/build-profile-sources/x264_x264.h",
+      "bytes": 48926,
+      "sha256": "2421b2afcde8dfaeb914cf2f50e6eb4df1ebfb62a906333052d76be878a439f1"
+    },
+    {
+      "path": "research_v2/build-profile-sources/x265_x265.h",
+      "bytes": 103060,
+      "sha256": "08f4676ae0a6e569afb0acd6d16bc9b512119d27c5b7885492967bdfbd69656b"
+    },
+    {
+      "path": "research_v2/build-profile-sources/xiph_opus_main_COPYING",
+      "bytes": 1946,
+      "sha256": "c94aa97f19e313d8f38c58271f077ba20902abca792a8f491b8fe2efdea4cfb4"
+    },
+    {
+      "path": "research_v2/build-profile-sources/zimg_COPYING",
+      "bytes": 485,
+      "sha256": "992c720940396663b52389eea4c6a7409dd26b55ab3bfcd3a17f5da8b6d2a3c9"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/COPYING.GPLv2",
+      "bytes": 18092,
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/COPYING.GPLv3",
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/COPYING.LGPLv2.1",
+      "bytes": 26517,
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/COPYING.LGPLv3",
+      "bytes": 7651,
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/LICENSE.md",
+      "bytes": 4346,
+      "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/compat_cuda_cuda_runtime.h",
+      "bytes": 6877,
+      "sha256": "3bd5351f717b42b4d1246691e870768231c657da9d5795627fab7ca6df7e7155"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/configure",
+      "bytes": 311304,
+      "sha256": "5b281b249ad5ad859030b4da0a24ec105b5abff7b3d87a65b302df8bf5fd9833"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc-manifest.json",
+      "bytes": 60818,
+      "sha256": "bd83728adb3389d733ded31ded57a6a04131de96ebf5757fe74b0a4586be086f"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_authors.texi",
+      "bytes": 403,
+      "sha256": "fb5fac6dd8f7474033e933814491a8297d8723c52be4dcbcc82eef9c4f008dd2"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_bitstream_filters.texi",
+      "bytes": 32582,
+      "sha256": "29de3d86573538d348b0be5c35c784ccba95c4f41896f088f7b76aeb89b2fc20"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_codecs.texi",
+      "bytes": 25689,
+      "sha256": "a6d8697c6847d5f1d5b2e34edfec900064c52425091fe5fa9ab0d75c23ea2c46"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_community.texi",
+      "bytes": 8190,
+      "sha256": "cfc63c474573fa734d8966bb158e55c6a53fc978923f1ceef9f9cf0d135d575b"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_decoders.texi",
+      "bytes": 20948,
+      "sha256": "242db22415822bcf09e891e6063b1fcbe3760b4670cfc601bca110afe87776c8"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_demuxers.texi",
+      "bytes": 44051,
+      "sha256": "d8dfe0ac1ea18fc30d85471a11d6b1a9641c997706cce0407020e87629de9491"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_developer.texi",
+      "bytes": 45328,
+      "sha256": "26549522babfb7af744059d68077440064de6693ee6ff8c41b53ea3c36534e4c"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_devices.texi",
+      "bytes": 815,
+      "sha256": "c399576ab8e09931445713c962c25471699f33c8cef359d5d5ce2015650ff050"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_drawvg-reference.texi",
+      "bytes": 67260,
+      "sha256": "0e500136012ea70c935907a55b4dafbc7d4f8c9404674791c66571b92f43828a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_encoders.texi",
+      "bytes": 139231,
+      "sha256": "3dc2f777ab802bc087705a41b44fc0c70dee9989a2cf8a0e8c2b33287c06e644"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_faq.texi",
+      "bytes": 25900,
+      "sha256": "88bbf6e78d9e9effabdafc095a1194502e09e2cf4a3534fd16f2d6acfa224487"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_fate.texi",
+      "bytes": 9855,
+      "sha256": "07b49cf2c33b20d04b828166ce569f6d7d57e4b2791b113bcd6b134e7960ecba"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-bitstream-filters.texi",
+      "bytes": 879,
+      "sha256": "59fcee9ec319ff62a0ec9930aeec8f0f50782a9773487ba55e0999c6fb6f7ab8"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-codecs.texi",
+      "bytes": 708,
+      "sha256": "11f90289b4c0b234019c566459d9b1787dcac9b0357905464630910d6b443661"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-devices.texi",
+      "bytes": 711,
+      "sha256": "e93369b9c48f095a0274da1ec771a8b53f4f096924128e7e3b1c614b9898b03a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-filters.texi",
+      "bytes": 710,
+      "sha256": "faea65ae2f9670f5aad620fff18bbddf9c7e96ba88fb335f973907d1cab71ba8"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-formats.texi",
+      "bytes": 726,
+      "sha256": "7d5c644af0da0481720a3cc7a0eebaf96a361ab2ff9a60aab5ffa2471c1d5a19"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-protocols.texi",
+      "bytes": 723,
+      "sha256": "32c0cf1045aab88639ae82c2302b830720be3a7b167c80650a1e885fb79efda5"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-resampler.texi",
+      "bytes": 883,
+      "sha256": "5e1cf89af0ba868832c24beee39a59e998dd2324c79909fe48b59ca1c7c7674b"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-scaler.texi",
+      "bytes": 837,
+      "sha256": "35392efb228c8e6695a9d3d19cd71e695ef7ea2dd0bd243a1c990abd406e011f"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg-utils.texi",
+      "bytes": 712,
+      "sha256": "39e9be347e6dfa9aa8aa88e409b3c7e393b668e25e748fb1043a4c0cff9274cc"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffmpeg.texi",
+      "bytes": 139582,
+      "sha256": "c845782067f5e6291a5aefc6e567bbeba107107ffa771f75d4c5bf70c5ee3d91"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffplay.texi",
+      "bytes": 10165,
+      "sha256": "94c1a468402f6f3be51ae8dbd5834b5f300c0945d06143e4a61d4e79bf9c75a7"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_ffprobe.texi",
+      "bytes": 21757,
+      "sha256": "9f28004a19dcba2f854595ac96f122dbd44fd82119944456f209fd990e0c58a9"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_fftools-common-opts.texi",
+      "bytes": 15369,
+      "sha256": "567a15a6eb6c3fcaa516ff93abf20b338e4bf1398e1b2524e1883ff7895f3519"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_filters.texi",
+      "bytes": 949519,
+      "sha256": "65661cccd35c02e12894f674b706df8e465fd6862cf0aa64db7d3383271e5a9e"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_formats.texi",
+      "bytes": 10791,
+      "sha256": "01eaac2ca2dc8c6240f1cef30db8700bd98101beb3b2a46ebd7ca906d9acb885"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_general.texi",
+      "bytes": 214,
+      "sha256": "abf058dc4502a49ebc3185579806ce9224a7f1373d3560df5930894f146bb0bd"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_general_contents.texi",
+      "bytes": 68987,
+      "sha256": "4569ace25b4c6f6947dd58ce770524f6f4107593e7a64c1458e75292d778c526"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_git-howto.texi",
+      "bytes": 13442,
+      "sha256": "aeaced97ff2709f2c4ca829054712787658e63ff9d583eb48f2752ba124db182"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_indevs.texi",
+      "bytes": 49624,
+      "sha256": "0deb468a38fdfe18db7a61c9b8d7d9153cae96598baea08af6ae2e47b0f7fc23"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libavcodec.texi",
+      "bytes": 1130,
+      "sha256": "a80d4706d21388e5832d9ab2078fdd6c0c21dcd5de69f5018e17f7bc214ebb86"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libavdevice.texi",
+      "bytes": 991,
+      "sha256": "a6b4adf5464bb27ddf9120bb593382d86b220a1d844975177ce41d3d3b50066d"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libavfilter.texi",
+      "bytes": 1040,
+      "sha256": "2ab8b642f54084d106a6c54466ab99d09bf146b03044bfe08b4e7a10acb9dceb"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libavformat.texi",
+      "bytes": 1089,
+      "sha256": "df61fa8ac18bc913851e97ddd666cd10c75b9e6af8c91741fe0adb126ce5536b"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libavutil.texi",
+      "bytes": 1363,
+      "sha256": "5a654e8ee602cea2a081ff022459135920413ab37d1648e94d5cafe4537ccf95"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libswresample.texi",
+      "bytes": 1878,
+      "sha256": "052a858e69aa6ced2642fb3b6e024a4a4a8eb3246a948c2e208c4645d9e9fb0d"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_libswscale.texi",
+      "bytes": 1531,
+      "sha256": "f9ec10486841c682be1bfac491372eebb0a51a122510ed7fcd3db33548fa6465"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_mailing-list-faq.texi",
+      "bytes": 13148,
+      "sha256": "7ba38b8b16e6b94d6054d64da6dfa17738c874b693d85fe8ee9f62b36b7ac0f6"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_metadata.texi",
+      "bytes": 2466,
+      "sha256": "1a9e61c62d9f82f1f2bec283eeb35471a319e1886bb664303d4c10d7e6e70875"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_muxers.texi",
+      "bytes": 141719,
+      "sha256": "81d092c67f16221178c6ec8c1b1332c764bfe0147023ade0aa72175c8b98f302"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_nut.texi",
+      "bytes": 4545,
+      "sha256": "7164e76d02547123fdb12982bcc443105fb6220b979b6883d4a84c132f4994b5"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_outdevs.texi",
+      "bytes": 13121,
+      "sha256": "102210c02844d9f873b0c2785e84d5940653ef38390d71ff63e21de84e859faa"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_platform.texi",
+      "bytes": 11679,
+      "sha256": "a5c72d479dd33a39a2d08fe78a9817ee22e0bc7fdaf91b4f73724dc0df421c5a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_protocols.texi",
+      "bytes": 76573,
+      "sha256": "9bc84820073cf7cedc7b26bda62a805e963bdae7f20974ee27ed49d0b42e3ead"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_resampler.texi",
+      "bytes": 7444,
+      "sha256": "493e3ae03901dc63ca4282c19f081817ab631b887fd0017b77fc0ba1f6e7aaf9"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_scaler.texi",
+      "bytes": 5471,
+      "sha256": "05ef7135691a63b1bc02b7bc1a292111de04cda37435e657b2cc05528c390fe3"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/doc_utils.texi",
+      "bytes": 23837,
+      "sha256": "2eca333c720c88b04934d72d10a60b3b1e4650666ab657fa9a029697b39df3a2"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/ffbuild_common.mak",
+      "bytes": 7183,
+      "sha256": "4cfa39b9f824cd17559297f45f71f25f5e552402aba255721f2111964dfb28ae"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/fftools_ffmpeg.c",
+      "bytes": 31504,
+      "sha256": "35c7594ebc71119f0bd1c8ea9490905be5b80afc1bb10a41bc0a6dd9defe5cb7"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/fftools_ffplay.c",
+      "bytes": 145318,
+      "sha256": "eb93ecaca9658caddda5adf1d291c1bbe0014f0ab28f09ea97dfd68ea25943eb"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavcodec_amfenc.c",
+      "bytes": 29156,
+      "sha256": "eb4041acea821ca2ad58c01a061f0dcde03d0b3673e96ae8863f9c2a31c31add"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavcodec_nvenc.c",
+      "bytes": 115813,
+      "sha256": "72bb256ab1665d407b468d6eab7756672fe257bef87a2dcae79b0ec1b731f39c"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavcodec_nvenc_h264.c",
+      "bytes": 25519,
+      "sha256": "6db726ee68e41dae73821777a4917798cc1be946b04efe1080863f82756af3b7"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavcodec_nvenc_hevc.c",
+      "bytes": 25077,
+      "sha256": "3caf11b3279dd9370aaaf03f260c87eb542609d472bddb68e7f4a33d611ea425"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavcodec_videotoolboxenc.c",
+      "bytes": 105407,
+      "sha256": "60f43ca0c482473420d53dde58d386c29a2a3c4595bd62f3f4c7714c72a38e5a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_Makefile",
+      "bytes": 44687,
+      "sha256": "12829bb7b6446098cf7fc9e6453a901e2f9b3cb08b4b8294f2c5c1888d70d0c8"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_af_atempo.c",
+      "bytes": 38465,
+      "sha256": "96b40923aa3d12da6a8a0b093faf36f58c5b9f011a960acb6c6907fe67b7a1b0"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_af_loudnorm.c",
+      "bytes": 33908,
+      "sha256": "b754ec59c513206fa8cc9930150c0ad2b833bf8ccdd03be63bf0860ac298e93a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_af_volume.c",
+      "bytes": 16897,
+      "sha256": "8d90a2ee5d6cf7d531b5f0947949d34b707889ac309d9d17d9cf74a8b1dcef67"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_af_whisper.c",
+      "bytes": 19387,
+      "sha256": "322a8d54baa69b74f91552ad809a43ad0e3934632b256adf2123e4325a3b85d6"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_avf_concat.c",
+      "bytes": 16169,
+      "sha256": "e99383e459aba4a97a936b999f19856061cafc6ca165276fdc39b165e4fae9ec"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_cuda_load_helper.c",
+      "bytes": 1664,
+      "sha256": "d79837b4ba9db5277344409537479d23eeefee358a1f7e040a33c715ac095f0b"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_cuda_load_helper.h",
+      "bytes": 1121,
+      "sha256": "da91bb083f4727433f7b31bec9cbaf049a31d7258d7c1e5fb674e8e50b7792ed"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_f_reverse.c",
+      "bytes": 9569,
+      "sha256": "aaed4072cc4c07b846f1343d766900c853a1d2b5860def3138d15f088e75d866"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_f_sendcmd.c",
+      "bytes": 20321,
+      "sha256": "3e16db7c16a59f2c654f452bd3e3060f9db9ced7bad458291ab9573d431c9849"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_f_zmq.c",
+      "bytes": 7463,
+      "sha256": "c19bb06173a92edd67fcfe786b25e854f210c453104a47e603d9143ea81edf9e"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_vf_dnn_processing.c",
+      "bytes": 13404,
+      "sha256": "af23fbf4c7bf3b02d47dad2ab0d0f35d4c010ec9d60a060b6ff9941790244762"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_vf_tonemap.c",
+      "bytes": 11082,
+      "sha256": "a69de9095e49cf6412349c93f463b9972e5acef23881e111c16e4389296cb417"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_vf_xfade.c",
+      "bytes": 162533,
+      "sha256": "efc4b9d81b6da2da8d18a97a88235f624858947b0958209899775f60a367d560"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavutil_hwcontext_amf.c",
+      "bytes": 31513,
+      "sha256": "e8a9038c0e3ee0daad163ba6c7d21a92f9c0711af99ee7e9295bfff16446287e"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavutil_hwcontext_cuda.c",
+      "bytes": 18224,
+      "sha256": "28f5c490587d585a54e49f1c4bc106bb57b6c4857bd82ab41a54d136fc5844c3"
+    },
+    {
+      "path": "research_v2/ffmwiz-source-inventory.json",
+      "bytes": 421530,
+      "sha256": "acf01d4d56d21921c4d15855e33ad7ce477c785b2f439cf020b691aee7641d10"
+    },
+    {
+      "path": "research_v2/ffmwiz-workflow-baseline.json",
+      "bytes": 30937,
+      "sha256": "39805d4d60ac7a021997fb23e8906463512e2f2d8f4a931eead33a4e455baa81"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/Cargo.toml",
+      "bytes": 8890,
+      "sha256": "11b8c2b3c50b92aba1f4bd9b62a84deaad33e3e7ed77e143178717605a041f66"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/LICENSE-APACHE",
+      "bytes": 10175,
+      "sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/LICENSE-MIT",
+      "bytes": 1104,
+      "sha256": "19b2a83382cda3839e8bfd4244d38bff950c71462c1cfd7719a644129e08f7c0"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/NOTICE",
+      "bytes": 1275,
+      "sha256": "ecb1a9242ed7f5781b9d82fe8b718bfc88f6826519b3ec5c9a91436a05de1544"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/Cargo.toml",
+      "bytes": 710,
+      "sha256": "f1be5e45a3ca76be469692729d4ad3f34adc11686853d4c2fb7be9a5bdfd47dc"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/audio_fx.rs",
+      "bytes": 44426,
+      "sha256": "7ab8937f00dda79ee81a724aebc4c3d6e1d6377b71e1109d902849f4952b97e7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/blur2.rs",
+      "bytes": 39999,
+      "sha256": "25a328fe79a0bd99ea422c9453964cba02f958fff001036eed135185a86151de"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/blur3.rs",
+      "bytes": 17442,
+      "sha256": "b5f2dc481c4ac932c3e01b44a510e81725e1d8f3a167b76ad57237c00364a6b6"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/camera_tracker.rs",
+      "bytes": 16279,
+      "sha256": "2af425c3188a9c5356dc2da92b426d66390045b4f6ed76a5640453d99763958f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/card3d.rs",
+      "bytes": 21039,
+      "sha256": "7c013a90ed4c0c72dc40d64e32636b16309489fa774980b312ea7aa461275b36"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/catalog.rs",
+      "bytes": 13312,
+      "sha256": "93a272a9086e17ce8b50a731f2aff8dd79485b212fe65843350161affa4ae1ed"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel.rs",
+      "bytes": 29967,
+      "sha256": "38959196c2acefd6ac3153bd3f706ba68973c85b39bdf395a6975490cf57617a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel2.rs",
+      "bytes": 19354,
+      "sha256": "865dba18f643a5988387a2a238d9f7849251dcd9de1058c3c1fe9c1b46b6c999"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel3d.rs",
+      "bytes": 43147,
+      "sha256": "221867fabe30b5498703cd7ec8a79806cbe89d1cd1e12fc923c4d94535f6974a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color2.rs",
+      "bytes": 54897,
+      "sha256": "ac5044b6d6d899ec364f861e20e8698f8841550fe5805adeabe36ced0d3b0846"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color3.rs",
+      "bytes": 52842,
+      "sha256": "a198325bf3ce03b1e34d4bd9dec3ffd351f2b4b63c67035a0bd11e3b9ba1a603"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color_fx.rs",
+      "bytes": 71004,
+      "sha256": "546be2fb1fac1663710a8d89909a5df8c5a81ccfbecfd9466fc377e87c6109e7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/controls.rs",
+      "bytes": 2813,
+      "sha256": "23af82e0dcba5fb41639b763d03f8cf96d760f190086e83713180342df82a81e"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort.rs",
+      "bytes": 27444,
+      "sha256": "417a37c5ac7d746143ee8946437337684f4277a6ef3d30737fb478e51e21e35f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort2.rs",
+      "bytes": 50856,
+      "sha256": "701ce40c7246f87e094202b5b4ac36b26765b5afad2bcff7e198a5593288d17f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort3.rs",
+      "bytes": 58306,
+      "sha256": "1485fd84f2ef752b9248a4b32ee0e65d8b072b3be8b5dff787cd24bb04693edf"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort4.rs",
+      "bytes": 36135,
+      "sha256": "4928ba5d4e93695965a3180761b8920c4c5c456834643d38967aaab93ca3fa07"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/face_track.rs",
+      "bytes": 2232,
+      "sha256": "eae578806ecf16870a4380c4d30418e9c2041507d8ee317f7fb7a8d17a3dc1af"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/fidelity.rs",
+      "bytes": 2417,
+      "sha256": "606ecf0a7a85a518e86ae25b5c03dfb84dc7a74ae119ed67bcce932f4025ff18"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate.rs",
+      "bytes": 23603,
+      "sha256": "00c02476a9d120a39c70331a18efc33558dd3b1c11fe6437e7e19a9c3bbb2566"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate2.rs",
+      "bytes": 72299,
+      "sha256": "0593555eaa361272d5aac67e4cb7b028d84e0d8bec538c251b99c32d109ce763"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate3.rs",
+      "bytes": 109597,
+      "sha256": "ce6cb28cb99fb7677881ac1e2ca245a259ca577027b4acd89f30f95f9eafc961"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keying.rs",
+      "bytes": 35111,
+      "sha256": "bcf9ce2042a95aee20feeb5c5dd9121cc14dcf10060f722de91aed5615583aed"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keying2.rs",
+      "bytes": 32135,
+      "sha256": "05f8da530d62882b6cf3eed04f66135a9b1ee3203ece5205a6b351b7390b3d23"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keylight.rs",
+      "bytes": 33460,
+      "sha256": "baba8352af7d9fbc9c53da90a3b9b48b61d8040af3d4cfa0facefd15f0878524"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/lib.rs",
+      "bytes": 57301,
+      "sha256": "9b2c3f264b56459fd862da8388c1c46442a0e1a3e5d574fc4bcb83a97d9044f2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/matte.rs",
+      "bytes": 20972,
+      "sha256": "9b4a5e207b64f84ff2f5e43a49c4e96a453d85013137cf53488ff23911ec713e"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/migrate.rs",
+      "bytes": 38969,
+      "sha256": "b9a7d906b64c77dab3e393da2b65a9d43791f7f202d4729dc756525807000889"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/misc.rs",
+      "bytes": 31043,
+      "sha256": "d3e54a153b24b3f4f56a3031b7406214d06c8ae072f1044539eb0c854001a0f9"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/mocha_shape.rs",
+      "bytes": 9684,
+      "sha256": "50523e325baac5ccc84358953b38f8952953ce6da4520941e6713cc059fd652b"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise.rs",
+      "bytes": 47509,
+      "sha256": "7aecd13fa8ea131f081fe1496631ebf78df7379e8c0f6b7cd2709469b10f2a39"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise2.rs",
+      "bytes": 15856,
+      "sha256": "50e0e2c8234a12ec451453fbe4b4c5c3866e288d912caa524f6b154736a2c127"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise3.rs",
+      "bytes": 31056,
+      "sha256": "14145ae4f210c7b7e0fdef3f15a5e549e0947416143426bd842371a1dbd8e87c"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/object_matte.rs",
+      "bytes": 32904,
+      "sha256": "4b62663e45d6fa0b31bebc4aa563192a88d4652cedb65e7c363d0e8fc07bdc22"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/obsolete.rs",
+      "bytes": 7471,
+      "sha256": "306f4f542b78abcb1265a23ca5408cd20a017651b09475431e611802d42187d3"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/ocio.rs",
+      "bytes": 79750,
+      "sha256": "34b31eb7848fc0ad679fce26f77081d6d4d213c5a2c3b2d4a27b7a10f9b30391"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/ocio_config.rs",
+      "bytes": 73429,
+      "sha256": "09e2a1692c32e59a8f59e350f98493f5f80159ca0d08fda3f7298cecb0368c0f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/paint.rs",
+      "bytes": 35255,
+      "sha256": "1eee4096801dcd7a655f4297311ac6c48dc145e4e623ccc374c04cd1534d7ddb"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/perspective.rs",
+      "bytes": 25379,
+      "sha256": "fd0d7752b7abd2f2e3447496ca69fad4ef0218b97a88ce2d43e72d5478ebd71b"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/perspective2.rs",
+      "bytes": 12629,
+      "sha256": "01d4c5873e6e9c1c0860f52c8af723f0f02633b0e576e285e5c179278eb99908"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/plugin.rs",
+      "bytes": 13693,
+      "sha256": "5532b727bbd6ea340234cc376a7b9909eab9769d2ab422115db44dd0ac873fe2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/psim.rs",
+      "bytes": 3715,
+      "sha256": "3ad0aa6f669553ffa2acc1b141611e69e750a01781d571b8d7e9a40ca0739087"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/arap.rs",
+      "bytes": 11969,
+      "sha256": "a22043550530a172939a26363116d50118df8df4469e53f404769a5eda4169fd"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/mesh.rs",
+      "bytes": 22424,
+      "sha256": "6b50886629a78ebde4873bb6815e02305f5e4bf1290f817fc54835036a0205f7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/mod.rs",
+      "bytes": 20983,
+      "sha256": "8c5ad68ca026285efe89db101df29de70ca336cd184a472d7e3132f81bee8cad"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/roto.rs",
+      "bytes": 33753,
+      "sha256": "f8e19574ce89b78566d44d7ba1f5b68250cb4aa353d400f4c686aee4175f4b71"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim.rs",
+      "bytes": 93389,
+      "sha256": "5cc96e1f51d4ffdde971bac1498a4a009656214076a84ec58463937d636cdc9c"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim2.rs",
+      "bytes": 133265,
+      "sha256": "8bd5251788009015fff8a4169a1db9769d3960404e91cbb118f0c8bfd5b966d1"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim3.rs",
+      "bytes": 68678,
+      "sha256": "3b94eeda5909e84de9f51dd1b497ee8b32320c1de9dcb632073ecfefcefbdd1a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/stylize2.rs",
+      "bytes": 46078,
+      "sha256": "470215b65d85f74cbc83513dc7e7be96b91cbb61495131e4e7da52b5202a897a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/stylize3.rs",
+      "bytes": 27088,
+      "sha256": "7c053b20ad45be3dab0bc0ef3d00a6a1a342ceea6495ecc0092c26fe4d5b91d2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/textfx.rs",
+      "bytes": 58552,
+      "sha256": "b2f3258591136b9d2b3d4c33f89e1738733a4f25cfdf1df52f9b959333b9edea"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/time_fx.rs",
+      "bytes": 54626,
+      "sha256": "88a7beec97c596e585ffefa6b7775f6de8ad3052b26b85855f5470b6043efeec"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/transition.rs",
+      "bytes": 40369,
+      "sha256": "af4848d329752fd71390470711ce56ed82d9f6b52456b7a450d8d6fa28254161"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/transition2.rs",
+      "bytes": 20686,
+      "sha256": "651f7ccca4f4f483749b1f05eaffe0801d4cd46b0505423f9dbb4164a053ab07"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/util.rs",
+      "bytes": 29296,
+      "sha256": "fc9150b1149335c26853682c541a0774d6ca6c1ee86a49a07a590e54f7fb7deb"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/utility.rs",
+      "bytes": 18504,
+      "sha256": "54e0647d70aac7064113bdbcbabbb0f91d0aadff362c9c03e554d271be3db683"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/utility2.rs",
+      "bytes": 2930,
+      "sha256": "3c0e4fbd558ec47f7e526932b9d7c1fee24b2225011aa09cd29a21cb489f85b7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/vr.rs",
+      "bytes": 60573,
+      "sha256": "50e087e4fcecc0f7ef6df145d048937cec98132c5b0a0adeab357bb6317aea2a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/warp_stab.rs",
+      "bytes": 25979,
+      "sha256": "c8418129a6f9b6d97b6466eb853fe695acd86d8fdb0fbe2e3ebaa753335ffcc4"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/docs/effects.md",
+      "bytes": 24622,
+      "sha256": "dfdcc48a51c6f2878c62fe117e42e36bb6742ecf3787476994b16718a472626a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/FFmWiz.py",
+      "bytes": 35151,
+      "sha256": "d591839c713d38ad168f647a3a834ac45589c3af8a0275cb895ab6bc090397ee"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/LICENSE",
+      "bytes": 35150,
+      "sha256": "e57f1c320b8cf8798a7d2ff83a6f9e06a33a03585f6e065fea97f1d86db84052"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/config.env.example",
+      "bytes": 20001,
+      "sha256": "4f3181fb0b37548249e0ca1557968d26462dda3a7baacea0854b16fd4718cd01"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/__init__.py",
+      "bytes": 241,
+      "sha256": "82b056275d72ae175799d1ca802d2f8c6573af87f85fb092bd6f7d3bea31a10d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/appio.py",
+      "bytes": 19428,
+      "sha256": "e862d2cad87a55b1650909c64dcc7846e041b168c2665918ae99700419873068"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/__init__.py",
+      "bytes": 135,
+      "sha256": "6ec40ce8d53a5bbba7ff27079a324fdad64157aeb7caa82614e2488ed2df254e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/artifacts.py",
+      "bytes": 12532,
+      "sha256": "bf56e71fdc2851942ce76fdbf58e36a377b5863657f121ced1e18e61996b6eac"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/colors.py",
+      "bytes": 4415,
+      "sha256": "7ca27cebde8813d0a95dca3bb60d8cfa7e0a89fbe603eb2f37c225a386a9d05e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants.py",
+      "bytes": 32874,
+      "sha256": "d6a2417635e8e5de2ad9bef88355c04bb18be90eb10eacd2bc43e3d15210104f"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_codecs.py",
+      "bytes": 5226,
+      "sha256": "d6c518c342bbf6d3f97e2233be222618b4df4b770a14f8e06f93e1b74ebb115d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_composite.py",
+      "bytes": 2217,
+      "sha256": "b9cdabf76a2d52090bf22b52547f7b91535a32028c523314dccd645b45cb8578"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_config_template.py",
+      "bytes": 20389,
+      "sha256": "eeb082ca79abe566bcd69ba19a548e0864d1ee9961a034fafb60ed7e7a5ceb0d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_extensions.py",
+      "bytes": 1101,
+      "sha256": "9f420c90955c13cff54b5052d01febf8a652bc686695666048bde115595defbe"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_ffmpeg_options.py",
+      "bytes": 5343,
+      "sha256": "1531212303e1c975d5d9c303aca3105f186ac6128e9b644af593c0a5feeded0c"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_look.py",
+      "bytes": 2481,
+      "sha256": "639aa5709f9cbe16383e2ff54d42f3ab80a3157d6e23f3d407647233c2c7fce3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/constants_tables.py",
+      "bytes": 4194,
+      "sha256": "0fd45ff258d36ad1644c62b53d2f5e86700bbde76d13db47a8bb4627fe450302"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/exceptions.py",
+      "bytes": 1182,
+      "sha256": "eaf9cb8f397d07786f028b9a1895933e540c90d00f9e849f04138bb772748f5e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/core/timeline.py",
+      "bytes": 8175,
+      "sha256": "eeb89ad0c9957f595673c79b5768949537bbbfce3d36997570c3b4252adc015d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/encoding.py",
+      "bytes": 38760,
+      "sha256": "3449f0bf64684799b9c9e756c1f4cd5fa09cfa2a3a236df9022990f42fef92bb"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/metadata.py",
+      "bytes": 29964,
+      "sha256": "e5a5b77c734f28fecc7ae87d4a12ddbb78d06d60bf4ccd762f85a5627f269b17"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/modes.py",
+      "bytes": 31538,
+      "sha256": "b2bd8d83c4158da1a60e3d7e06c4cc21ab87ef34e0e34c6df36223217d5ca52a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/modes_b.py",
+      "bytes": 11157,
+      "sha256": "7fce44be12218c6433bbef0c1b5a266d22b02224e9470572bbc6693286282204"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/modes_join.py",
+      "bytes": 20680,
+      "sha256": "ec320147a9d8839e0673ed15d24d5ce2746a58b7f1e09511d141dd0ec9694d4c"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/modes_mediainfo.py",
+      "bytes": 29095,
+      "sha256": "b32ecbd98dacc5936c4fc0ada93201a63e1e53436e75a1a8f823555f573b4764"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/modes_transform.py",
+      "bytes": 11718,
+      "sha256": "6fa8a842c56d2384d3f6705acb44c905a6a5ea2c5385e522fa100f46c645914a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/__init__.py",
+      "bytes": 156,
+      "sha256": "4549489045bb0b156c14248923bc3dc8307f4c9d7ffdecab0467967f8b5d998e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/app.py",
+      "bytes": 10911,
+      "sha256": "a719996892c327fe1401e76a060431c27dbe4302a8058fc2fac15c1e1f61b573"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/colors.py",
+      "bytes": 7728,
+      "sha256": "6f93b5145c17a583e33baa25051e89f3cbd041cb3e503c02c4daf3a515fa8e49"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/constants.py",
+      "bytes": 1848,
+      "sha256": "ebea58ac42ac8a65eb48db9c02a4c8860a1e52c2c8f2e1292e24c07c91d6a847"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/copying.py",
+      "bytes": 12321,
+      "sha256": "a3ce0b2e5dbeb9a162fc787aa751011363cbaaa9ce68e049d8808cac6ee4e211"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/logsetup.py",
+      "bytes": 4191,
+      "sha256": "d13f121ead4e1e9340f3ccb9d5d7e2ad8a2964b8efef17cad6e6b4e289551d6c"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/media.py",
+      "bytes": 15114,
+      "sha256": "f5378cf5aff277de2ff9607595fbb2d2a2020236fa9ff647638a4da611371662"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/metadata_edits.py",
+      "bytes": 9870,
+      "sha256": "9d1a67d536d54538a824244f3c8f75e7f04834f65fd35e71992bbf8010b59b87"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/models.py",
+      "bytes": 5673,
+      "sha256": "c1e6dc0b7aa8bc62130ec2d8d0b7b2751828d3b5b255cc0feb7bcc22edb2035a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/muxlogic.py",
+      "bytes": 9286,
+      "sha256": "ea3902cfc6d7d39cd5c2440f5eb5f9661bd59c0c929543e86e5c62b12f1552d9"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/output.py",
+      "bytes": 9235,
+      "sha256": "488958f6ee01c4fe74c64e0930d0bf98ea643e1de5817e00361d175fc109145a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/processing.py",
+      "bytes": 18724,
+      "sha256": "2ddf38e6c6e3d53cbfdaa90f8c7c6ed5cbb682c094887fab493a80095a91e89d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/progressview.py",
+      "bytes": 15918,
+      "sha256": "dc0d3347846b61ab12285596b848b27cff9c0898dbf5d014735bd670e29a5675"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/prompts.py",
+      "bytes": 10878,
+      "sha256": "b4b2e7345937077e0c8a28e3e49741c3181ec7f881132f34d33c4af91bbfcb76"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/reporting.py",
+      "bytes": 14824,
+      "sha256": "821cf717b635092fd6f470cfa7c5585c26464a38f455889ad36ea2e0f443a539"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/selection.py",
+      "bytes": 23136,
+      "sha256": "6568c294ab6c8af37f08f4c6bbcff5182139fc42852873b39761343ff5594a06"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/muxcleanup/textutil.py",
+      "bytes": 10386,
+      "sha256": "20282f49689d332656dfa0eeb35e3348cbb6928065e83956912e1b0e2a03e109"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/reverse_pipeline.py",
+      "bytes": 38556,
+      "sha256": "1f9a0c76844bcf0af14899f952036cf16fef27d86665d12618751e8718b3fbd0"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/reverse_pipeline_sources.py",
+      "bytes": 6496,
+      "sha256": "7d2e9456c2f315ba78212fa1c2e6f4f922d1965f46b6a1b8dddd90578fdca0fc"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/reverse_stages.py",
+      "bytes": 37441,
+      "sha256": "09abd64528c1d528337a2e6b53137d10c6f5dbedfd680265c27f6cbbbb63c0ae"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/runner.py",
+      "bytes": 4332,
+      "sha256": "6a3340103dcec8f7c28ed44c47cbf127a597033c1289284d4057a657f945d2a9"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/runtime.py",
+      "bytes": 35840,
+      "sha256": "dfdbf2b7b5a84e7d37600f1fcec2ea0b770048d23456c08f2518f9f00b45f11a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/runtime_render.py",
+      "bytes": 11810,
+      "sha256": "f683d62948b03e3d73679eb61e5da64a4363f81845476c193ee013e36966649d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/services.py",
+      "bytes": 29625,
+      "sha256": "e82c344e4beb6bc3839d99097f764a42af3c7a3d8b653e39a15a1377503b7928"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/services_b.py",
+      "bytes": 22711,
+      "sha256": "fe032eb94d374f164db322a5a2d33b544cbbee45a792a6632d66a093dac60398"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_audio.py",
+      "bytes": 14341,
+      "sha256": "2a80729ee175ff02319926dd7c2ff8e34d50e34e3556e5ede004dafa5cbdfca7"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_color_range.py",
+      "bytes": 1912,
+      "sha256": "7c7f8db12f51388f5a8798fbe6aace62ef1d7b4cf9105bdb94cb1d6eb202f74d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_command_grammar.py",
+      "bytes": 6313,
+      "sha256": "86595949eb7d9c1c539547373a45a2ffa0f022f62eeec9f914b76212bdec9e4b"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_command_io.py",
+      "bytes": 17781,
+      "sha256": "c517cb1980a6dec9813a17ff12f4ba9931565b8ccf54e0bbcff8641db3ca3694"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_encode_opts.py",
+      "bytes": 9208,
+      "sha256": "b76eae5675933a26e60fd047f05b760308c04b1f5c0d5c84c2b04f969a5d7acc"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_ffmpeg_url.py",
+      "bytes": 8848,
+      "sha256": "3c3a0034b8e1967371222395d242b78248337373bffd98e6757b55cb7ab8eda7"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_filters.py",
+      "bytes": 11380,
+      "sha256": "9db66f62d29e6649c744e3376171fe94f608b141f402ec08641a434e9c8e9fc8"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_metadata.py",
+      "bytes": 11351,
+      "sha256": "a0e751c8292a2bf4db4a25bdeb62788d4b5330cc741bfc00e21aa76f436cdc15"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_misc.py",
+      "bytes": 24456,
+      "sha256": "b82464a649baf32d9f3d027fbe04bde1dcf3f6ceb03d232b275340448a1a7940"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_misc_b.py",
+      "bytes": 26534,
+      "sha256": "d58c3be1368a2b927ecd1276b3fe015d2c848b82e9f68c4130e06223ae33c893"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_naming.py",
+      "bytes": 7814,
+      "sha256": "c93a6d8df4e4a984afd8d7dcf3342048963dd9b01120c5e0b8179160c2ad9daa"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_paths.py",
+      "bytes": 8018,
+      "sha256": "100b1c6e50572be5f2b8e7f175c0218242345ab17b96ec992da3c0c29af22561"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_probe.py",
+      "bytes": 14440,
+      "sha256": "41b0a1ed1b4eab09c8650d3033a9bcca939f9a7e7507f2851f2a0c28e1d0568d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_split.py",
+      "bytes": 21837,
+      "sha256": "660d86978365d89daf172c6e6ee50b8dca5a5d8f3a50d8df7f745885bd6a3307"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_streams.py",
+      "bytes": 10181,
+      "sha256": "1a1978cef743761a1c6675d20d654cb4c0029123d601265d04efd95dd20a9397"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L00_text.py",
+      "bytes": 2317,
+      "sha256": "7be5830d12cf49de192970de74310f847d4f8b31b58e0f76a5dadedd93e112ec"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_audio.py",
+      "bytes": 11619,
+      "sha256": "218aa948e41be450af10035ba32238900b74779e3683ab653f823002baa9c2b3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_color_range.py",
+      "bytes": 4401,
+      "sha256": "c669f8e51e20f77f16e6ff58160121eec4e78df7b5a5b6430dd7ac20a7e05873"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_cover.py",
+      "bytes": 13278,
+      "sha256": "6a9dde81a5e4cedf9b8efbf1574a2e994a2e6b0f79eee79768f8f9ab8f4361cc"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_encode_opts.py",
+      "bytes": 5694,
+      "sha256": "3bc488c273b862399f1e2b3ed666918e814fe4c86e47a356bc22dc7bf5ebe95a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_filters.py",
+      "bytes": 15347,
+      "sha256": "bc31b4c7027d4149840479b4076e27cc8f312cf3fa5f1ef9854b7d5e54e359b6"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_metadata.py",
+      "bytes": 5394,
+      "sha256": "73dfab3b67a030a0f5850051f91ac5f120623e22e3eb3a54ff6d65062626ff5a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_misc.py",
+      "bytes": 23672,
+      "sha256": "944dbff025da7cf55c542deb1487098b23b4481d77b4424dc28ad7522bc7e559"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_naming.py",
+      "bytes": 2226,
+      "sha256": "bd9cda2df0d5ecd0ddf06ffbcfb5772e03e9215cf36b8b7b9c575eb5bc801963"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_paths.py",
+      "bytes": 6059,
+      "sha256": "b226d77e1a2f0c44227171a83b3c86a4c9ac559ef9a5f10aaf3faf56fc4049d3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_split.py",
+      "bytes": 2193,
+      "sha256": "ca4c5c911ba9cfa943a376166bb86a23e7bb670a532d5531246dc75ab8a42117"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_streams.py",
+      "bytes": 10575,
+      "sha256": "669476bca28ee6c25236e04a3a1685da3ce683ecf7ca5a9aa42af5d324190a40"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_subtitles.py",
+      "bytes": 23536,
+      "sha256": "75241ad02d319fcb9f495343b80d6c21a78aa2f889f29b09b8e605aecd739a8f"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L01_text.py",
+      "bytes": 2624,
+      "sha256": "6daca4b578b5dd624ceb963b38973c89b04bdab7e17a06ee845c4d98190767c3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L02.py",
+      "bytes": 28658,
+      "sha256": "55cecb44425b67c582fd9c472fa70e26eba80c222fac8d3ddff823edf353e884"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L02_encoder_policy.py",
+      "bytes": 8361,
+      "sha256": "a1f803a04aae1fe0fd6f228242ef6e1e0e49ea4f3f64939d60a0620c8c82706d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L02_media_info.py",
+      "bytes": 6533,
+      "sha256": "9d67f5f7c739868c8de4410f1e072091380b598dd38371e84623542ed88acb0e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L03.py",
+      "bytes": 16891,
+      "sha256": "486e38acf37e124798ae36ffa6902f21300aa3ac37aa21d517f47bb5c9ce5b8d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L04.py",
+      "bytes": 8056,
+      "sha256": "7eed765a6a7c66620a6d338b6bab127f78f84932da16062dc135bb3f717ca639"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L05.py",
+      "bytes": 4591,
+      "sha256": "10b2c0c7101a34fcba25d4c86ea75b5adfe17835e04524f23a2c961211faa40c"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L06.py",
+      "bytes": 5730,
+      "sha256": "dc0cd27e58f8db78cf4404d8bb2c07be70b7514ae997b398937c576d3e1821c8"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/L07.py",
+      "bytes": 3001,
+      "sha256": "fafe3b9a85786ea232a8c4ee34764ea11adcc9f7a0ae0a0411da0f153b3f9612"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/__init__.py",
+      "bytes": 364,
+      "sha256": "ebc526ce5634ce807706786413301544f7739e7c4e285892c469dda8785fa396"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext00.py",
+      "bytes": 30680,
+      "sha256": "6c8e33cc241390425d642723ddb21406fe419452f1f6898703edfb21a905bbd9"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext00_join_audio.py",
+      "bytes": 21237,
+      "sha256": "309d823150ffb47d00f6462823458a1b9427feaf12573083202b093472d92d6a"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext00b.py",
+      "bytes": 21694,
+      "sha256": "947065865082f57991d9d5aaeb2ec5f033bb434d9b0ceaaf5b5b45da7ac73c43"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext00c.py",
+      "bytes": 22762,
+      "sha256": "b614997025a0efe86f486dc60c01946e8789aaf4d02729e7504c16beb8d7d384"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext00d.py",
+      "bytes": 26158,
+      "sha256": "66caae3b5db99104eafc9fdb121d39aa8753bf4c4cbde4607737f7286374e608"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext01.py",
+      "bytes": 21783,
+      "sha256": "793990e5f20404985038cee4eb036ece495578f24a3c39466ac9e0be922a0fa6"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext01b.py",
+      "bytes": 25942,
+      "sha256": "f32cf9222c5f855cbbb917948ce442180ac5b5838386927eb6c0dec70b685cfb"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext01c.py",
+      "bytes": 21554,
+      "sha256": "0833a1d66172d6448a269081678753efe0277ea3c0d4a97539bd17bdd00bb5f3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext01d.py",
+      "bytes": 30735,
+      "sha256": "171457adb0a879022c5a7dd638517e6d9379daf232defd915d98988a7c784ae1"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext02.py",
+      "bytes": 17352,
+      "sha256": "e5de88e9fff5e7fee1d53adfb0513d66f998bfd9f04ddbda54c77d509291e717"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext03.py",
+      "bytes": 4345,
+      "sha256": "ebdd13f026091c3ed36eaf84efbe365a293d7a6a6d5e8c209aaaa8bee43fc202"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext04.py",
+      "bytes": 26109,
+      "sha256": "57db97d4de3293e2b31b6e5c872d8fbf8cb1154cf34c8853abca4941abc2bcea"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext04_inspect.py",
+      "bytes": 12076,
+      "sha256": "9169c278ccc75b4bf93af3eb2071716bad0f7e55734db0ff36aeeb5be2657b91"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext04b.py",
+      "bytes": 32984,
+      "sha256": "d4741b36723713a7767178cbf6da1cbd973263558834183edd065cf46219824d"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext04c.py",
+      "bytes": 27057,
+      "sha256": "09960ac686ad06d67b247726e9f87d1db6c86ef56bbfd80495b8371e2e7815d0"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext04c_run.py",
+      "bytes": 15100,
+      "sha256": "aed9dce05b585054c49f77b1db306605a664d84849531fe432f1debf8badfc73"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext05.py",
+      "bytes": 14294,
+      "sha256": "81dc4d711d65e2c0b522e7ba740749c49f4c79cbabdc10b6eaa2d9c1639f5af4"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext06.py",
+      "bytes": 6303,
+      "sha256": "e320a56a270bfcecb985ac6ccbac2c8b440a5bb4df2292359ca3b973ba58cf05"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext07.py",
+      "bytes": 9795,
+      "sha256": "6744d0e3b6da969b13c1b115387cb9d9eec06950cb52714f766b43a1e51b65f0"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext08.py",
+      "bytes": 31939,
+      "sha256": "077eafb8bc35a407bb1a3b723bd4a4dad4e7d8e3ca194c822ea9e9a65c96dbed"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext09.py",
+      "bytes": 14821,
+      "sha256": "8a4cdd70f25eac5bd90d186340176aed3a05e2158727532d1bc1f133515b5543"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext10.py",
+      "bytes": 15869,
+      "sha256": "1fffc2e3c7b915e260ab0d5f38cfb0376d93e52d3fc9934634f709d4718c90eb"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext11.py",
+      "bytes": 14244,
+      "sha256": "b1d5a88ac59c1db7c6db49b2d15839e444e0ffa40c387a284d09550a430fe288"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/support/ext12.py",
+      "bytes": 5877,
+      "sha256": "7c3c51b031f27214fe9f1d0bf322d84b08b88a7577450e032eb80f3617dd9a5e"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/trackmanager.py",
+      "bytes": 36464,
+      "sha256": "9b830f2de3e4291737950a57f4ffcd59a10b22953f066b3485686d7eeb7cce9b"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard.py",
+      "bytes": 5394,
+      "sha256": "107c7f0d7be990084ee4bc6d3e5bf9c62dd23f4f329c3b0ada3a9afa694e94ae"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_b.py",
+      "bytes": 21666,
+      "sha256": "f8e96bca3dd2d06d3fb9efb11a1d7d939f410feec41f4e5ff2261e4df5adcbcc"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_base.py",
+      "bytes": 23920,
+      "sha256": "5a59c242baed1749f97455298376977eec1b09fdb8f93ef4fe9ad17962a9d348"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build.py",
+      "bytes": 39008,
+      "sha256": "e20924ee30887e1139bd01fed9b88b0940f1447d8360a6e270d54c4a1e8c4cbc"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build_b.py",
+      "bytes": 29600,
+      "sha256": "299158826202c9e6e8bed25f2cc24012669ac67f5160e2f763b7b1a273ba8c34"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build_c.py",
+      "bytes": 27921,
+      "sha256": "a7c5e5a212018af75b2883367dfda7f9d77b1634b948b89b5f95bcf30c63b0ce"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build_filters.py",
+      "bytes": 20414,
+      "sha256": "4bf1c45746ae4d7029acf0fc89808be78c05b4acb84ac7f2bde6e6443c7e2775"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build_split_outputs.py",
+      "bytes": 14037,
+      "sha256": "aa74bdbed2157824fe0bfb2d14ddb317b31c8598ac04b48dc608d443e7f109b6"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_build_subtitles.py",
+      "bytes": 36512,
+      "sha256": "1374478fee66693670211ace84446568e3d743231b8e902d459cb4d444667f62"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_composite.py",
+      "bytes": 10322,
+      "sha256": "bfb0ccf61169e4700fb11fc71ab05d6c79ea53aff29dd19cfa8b5e02d0f3fef3"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_flow.py",
+      "bytes": 20875,
+      "sha256": "7e1484fbcbbc2f607ddabd4ab92bf598e288109829e0065eb18c7a1aa8bf02fe"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_flow_b.py",
+      "bytes": 41365,
+      "sha256": "90ef8e210071f96250d993728616137e0ac57473095e819469e43718026c0502"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_look.py",
+      "bytes": 1822,
+      "sha256": "ee47172298c6306ba5878c408fbcd844016d1739e4da4fe79875cc8e70c2bda6"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_quick.py",
+      "bytes": 8380,
+      "sha256": "cff7e0d939e612fe9ed99fd88d97965e2919c10f453799dbe0248fe2f8c210be"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_raw.py",
+      "bytes": 15896,
+      "sha256": "996c91e5d3e8cad13f6ca53dc8bd11c266d2800a69f5267a55115963170ad022"
+    },
+    {
+      "path": "research_v2/sources/ffmwiz/ffmwiz/wizard_steps.py",
+      "bytes": 34390,
+      "sha256": "534a5a0afa40918c9ce621b8881c1cf3421be122985ed1b71ae1c40bc5f0bb84"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/Cargo.toml",
+      "bytes": 4407,
+      "sha256": "b8a3dc68880440e3643337781e3aa24e97e66afa8ce20b05c40809406dd3120d"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/LICENSE-APACHE",
+      "bytes": 10175,
+      "sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/LICENSE-MIT",
+      "bytes": 1102,
+      "sha256": "e58c3dbf2c77ba8630250430930152cf2fdf1176a2f3f859a060d650b860fb40"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/NOTICE",
+      "bytes": 1297,
+      "sha256": "badb93e8471c0c54808b018c8a434c320ba767d7c3afbb1b3aeb4a2ad8fa593e"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/audio-dsp/src/effects/mod.rs",
+      "bytes": 12711,
+      "sha256": "e9f457119eceae18d56c02c492558926622bb3c74c8c610fb5d2249d1dc5ae9e"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/edit/src/lib.rs",
+      "bytes": 50440,
+      "sha256": "52f81ee226904321684d0d914f715b2a84de884736eecdc1f5af3efb3bd3e4c6"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/Cargo.toml",
+      "bytes": 1818,
+      "sha256": "b4ab07faec2c4a90dab3d02bde163ef8b156d0148c0ffdc4371e314011ca691c"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/captions.rs",
+      "bytes": 28129,
+      "sha256": "cc80a6dfdd5a2e7c80b7eef3c6edc38a0c585e724ed1693cd2c7089a9df0a96f"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/color.rs",
+      "bytes": 24650,
+      "sha256": "74d71fbe26aabd1406387fcc756b2a16f380bc62821931b824c4bbdc36d80c0f"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/commands.rs",
+      "bytes": 234711,
+      "sha256": "f290dca4cb815f023683a8e5f89891a164eaa2c59a6ba56e938c512b17b097ba"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/essential_sound.rs",
+      "bytes": 23025,
+      "sha256": "87d4c3d7dd16dfd25388e82180cad4c727e55dc7569379679378c2d11042f826"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/export_tools.rs",
+      "bytes": 54231,
+      "sha256": "c6f5df72c343ab5becf04641d285fe3765f265009effb9b58b915434f6529cf4"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/graphic_templates.rs",
+      "bytes": 59337,
+      "sha256": "a07ab253a92291b747d36afacf1b233e19e290533c27913bcc00eb2f3bd021dd"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/graphics.rs",
+      "bytes": 59364,
+      "sha256": "dd9bda65ef1d366e5de1f0fa9ec63d4e48d42e86e5c35568ff1f7570ac4ce4ff"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/keyboard.rs",
+      "bytes": 46344,
+      "sha256": "6164b41a513e117c068a6c838703a2c19b34e3ec878a0351ecc6b87f7bab49bd"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/lib.rs",
+      "bytes": 56837,
+      "sha256": "3f335842c16c4f57b64c902dbd520c3e553be15372b5121b70c26f9d49353757"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/masks.rs",
+      "bytes": 34792,
+      "sha256": "77c91821803d48b5a50ebe4580353576204d5987abee9791cbe0cd8f9b61d6c5"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/media_browser.rs",
+      "bytes": 31649,
+      "sha256": "611cb9c7dd23eb173d9a956f0dc1a521853904d7595833d3c0eed12638f2c9d7"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/mixer.rs",
+      "bytes": 60614,
+      "sha256": "aaf896ad88b37040c8d9607784cfa6fe4606de162c3c00196acda76aa6196044"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/multicam.rs",
+      "bytes": 56029,
+      "sha256": "a0a593a50e210f983d4510e18be45c974496191746f662ffedb43c1d5c1e78ec"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/narration.rs",
+      "bytes": 25616,
+      "sha256": "a59ad297d5015440cf1344a743839dabdb36083dfdf301699e2fa1950ab40180"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/panels.rs",
+      "bytes": 17350,
+      "sha256": "05221eb93011166ec866b39e0c917289423017a80055b5429715ec6534038154"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/paste_media.rs",
+      "bytes": 6218,
+      "sha256": "09d0d9dfdeb0e97399c1fab1acbc018fc50d854a906ffc18156ab157875ae47b"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/presets.rs",
+      "bytes": 25685,
+      "sha256": "4cc10443e79758eb73671fe3e72f72c347325495a2bf4abbd9d1d16575bfc34c"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/project_manager.rs",
+      "bytes": 17538,
+      "sha256": "8a0c1e5d44a165da28ad4a268b7b0b82f975cc3ac4344852e0ddc0abb7ded97d"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/project_panel.rs",
+      "bytes": 53955,
+      "sha256": "79767b592b400c73f8dfa595e678405c10aacf3fbe760d0bdbad009c926040a5"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/proxies.rs",
+      "bytes": 29541,
+      "sha256": "d4db9d676a31eda254be438bc8e942bba0d1ebd4887ae739b3902f330f990228"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/relink.rs",
+      "bytes": 30895,
+      "sha256": "561b7ff87c60302063c805c16c09bc33259e5d00246b6fd1360feb93118458bb"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/remix.rs",
+      "bytes": 13501,
+      "sha256": "adcdd77dbb03f8696df7e82a7e17f91aaf3510d49d493bb6974112cadd262aed"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/scopes.rs",
+      "bytes": 6378,
+      "sha256": "b5227157bc1253b4899452dfdbe21dcd76738a3cb2de8d743173cb6abd57be5a"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/settings.rs",
+      "bytes": 82550,
+      "sha256": "cd12b95c2b1711f4f0e1b77e25049467304fc37f5d1b813cbdf84cb8a1858df9"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/shortcut_presets.rs",
+      "bytes": 19420,
+      "sha256": "13caff636db64f9072468328c393684319dcf8d1cf6bd8cfd165885c0e8fb377"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/shortcuts.rs",
+      "bytes": 46993,
+      "sha256": "fe4c8e0af6eb08a171599fc3a76386c52aafab013971f7a06081d9ab49da9eac"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/transcript.rs",
+      "bytes": 21506,
+      "sha256": "c40679d8876f6c76ff3ce6e03593f03d8832744d79f5deff4784a64592efa51f"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/engine/src/voiceover.rs",
+      "bytes": 23960,
+      "sha256": "b6bf95f788160140dd0b0de2a1ee1aa7497ad8ed7894a5dc8b110ad4c11db9a2"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/format/src/atomic.rs",
+      "bytes": 3555,
+      "sha256": "231aa71907335568b2c7527052881cdd3e00829d8db591413cb9d61dc8b6b395"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/effect.rs",
+      "bytes": 38416,
+      "sha256": "6208ac6d3d22cae5d75983da0e2cb8704799316df85b7cb6057d6cd516029085"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/effect/audio.rs",
+      "bytes": 29280,
+      "sha256": "3b57b5464e67412259326ccad143596f265e0647014bf1620d1bd9597c4e8936"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/effect/vfx.rs",
+      "bytes": 57149,
+      "sha256": "c576ef4c4a581a60ff8d98ad5ea78a9fda6119f9dedfc190e50ed7252f066b12"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/graphic.rs",
+      "bytes": 23291,
+      "sha256": "d6ed12ef72c0e5dea644157ba648d209e2992c55a5c8f35fa9cb0e88afe44c39"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/keyframe.rs",
+      "bytes": 14798,
+      "sha256": "91c5838ff735a3712d76de39505e589982f03abc505325d74b940a8be356a59e"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/lib.rs",
+      "bytes": 94212,
+      "sha256": "051441ca699df3c2935664e80235363285b21e426830612ff3aee7b893ad0573"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/project/src/vtransition.rs",
+      "bytes": 24817,
+      "sha256": "abcda41bf48cd47804e9318cc7844d399e883de1e3295c92919457dcd633728a"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/render/src/effects.rs",
+      "bytes": 67623,
+      "sha256": "185e16c2c3f2cde37381f3645fc805d3bfca6068708ad27a7d03981e172b94e6"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/render/src/transitions/dissolve.rs",
+      "bytes": 4637,
+      "sha256": "5c3a3f550715971e98ec5684a20228239f6e9e150bf3f34fc8b3217a9a3bcd84"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/render/src/transitions/mod.rs",
+      "bytes": 15738,
+      "sha256": "17efb819e2a136c3851f01fbbb9b8e08220699b25fc648c879beab1901de06fc"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/render/src/transitions/motion.rs",
+      "bytes": 32268,
+      "sha256": "29b6330eab5d6823a660d6d855f88b6e053ede3612f8063a84f45dbac04f01d3"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/render/src/transitions/wipe.rs",
+      "bytes": 10984,
+      "sha256": "0ec70c6cc611812899ccfe47c49455d8435cd456be8e0ff715b414b1beebaac7"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/Cargo.toml",
+      "bytes": 2308,
+      "sha256": "6c760b4f26f68142bfad032fd38109a82219ec506b45166389f271349da66f30"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/dock.rs",
+      "bytes": 43126,
+      "sha256": "289f781102ae0aa3d38fca2e5b36b9e236af3fec98cfe2a8e506dce04ae1f818"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/dock_shared.rs",
+      "bytes": 6130,
+      "sha256": "6880b64582eb069452d71be374dd4beaf6cacc09735ec742ac89a25910bdbfc5"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/frames.rs",
+      "bytes": 46501,
+      "sha256": "34b679daa4941c33c2f5399cbe7a6f6a0cd925cee3683c3a5b74f12a78959e4e"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/lib.rs",
+      "bytes": 141948,
+      "sha256": "318b62ed5b7d7fa1f0688f87bb5b1bd8f959707e1ead5ce7606a5ee28a52a2fe"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/menus.rs",
+      "bytes": 58370,
+      "sha256": "7c7c9c1490019aec0aea1323b697a5e73274d74161c76f9b88097e1e81f82880"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/panels/keyboard.rs",
+      "bytes": 28989,
+      "sha256": "8f10ce71190b69e80fa3708c5865d487305aa8d15465811628c9d062f86d3956"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/state.rs",
+      "bytes": 37072,
+      "sha256": "2911e9669537f5ccbdbecc11e5fc68f3afe887ce12584b9a4f57e9e68a68c0ad"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/crates/ui-egui/src/theme.rs",
+      "bytes": 35683,
+      "sha256": "c3cb2299547f7e85d751852712b6f0938031e06086e1fe903f42016fc633da41"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/docs/architecture.md",
+      "bytes": 65387,
+      "sha256": "77f5f13091fa93bf169e2328943cd606edbdd5ffc7c0620d4b2be243b0ba12c0"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/docs/keyboard.md",
+      "bytes": 7151,
+      "sha256": "e7a3ebea4543126423c290a516e5952525646fbfbe1304f688621f4fa24c35c4"
+    },
+    {
+      "path": "research_v2/sources/filmcraft/docs/web.md",
+      "bytes": 8933,
+      "sha256": "68355a0b1506593d4e806ff50f230cf30fab710a9be4b2fbfd7781c646beaff4"
+    },
+    {
+      "path": "research_v2/sources/vidonex/LICENSE",
+      "bytes": 1072,
+      "sha256": "c9a958ef6b0a58a7e84a710440557df0c8a0550ef1b765333d39e3a11467eb3b"
+    },
+    {
+      "path": "research_v2/sources/vidonex/compiler/compiler.go",
+      "bytes": 11743,
+      "sha256": "19f4276430982f1ffac1bf049a4f38b7a4d87d13976b7fff38d9db414b54cfbd"
+    },
+    {
+      "path": "research_v2/sources/vidonex/compiler/emitter_cli.go",
+      "bytes": 2287,
+      "sha256": "537fac9621afd41a07bf5bfd72b152db3097a4deb8f2e5bd4eaa7ac1af59c019"
+    },
+    {
+      "path": "research_v2/sources/vidonex/compiler/normalizer.go",
+      "bytes": 3996,
+      "sha256": "b1151c6826e7ef7cf5e4d22c0da4faca9d3983f33e3d104cd69924026becf7c1"
+    },
+    {
+      "path": "research_v2/sources/vidonex/compiler/planner.go",
+      "bytes": 30207,
+      "sha256": "42768805ddbfd2776ae76332efb11571a9392c37f019e916b028aabbb97184ba"
+    },
+    {
+      "path": "research_v2/sources/vidonex/docs/FILTERGRAPH_IR.md",
+      "bytes": 2736,
+      "sha256": "b5195614ff4b0a8a5bd73f56b63dcfbe735eb7778362a7c329b5e0c3f52c5088"
+    },
+    {
+      "path": "research_v3/effectcraft-source-analysis-manifest-v3.json",
+      "bytes": 12959,
+      "sha256": "464e0b8944bf510d002e0c36fa3a596f1c77d6b9835a4ed5731bc7efa28746da"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/fftools_ffmpeg_filter.c",
+      "bytes": 113952,
+      "sha256": "85a5f5fec249430381d43ecbda28170ee6f4f2b86adfd5991c23cfeb1d57e273"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/fftools_ffmpeg_opt.c",
+      "bytes": 86585,
+      "sha256": "9b452dd88d471954e745fa9b74e4d501ae7438e4dde0228b0031bd9e4b08940b"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/fftools_ffmpeg_sched.c",
+      "bytes": 75996,
+      "sha256": "7b5451d2be2eb4fde4c030b46626ea266e7f261611d3391c4f24a1b3a2d695a2"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/fftools_thread_queue.c",
+      "bytes": 6610,
+      "sha256": "44c8c9df1d0defd7eb9becee10fb5fba1b42cf0125cfe180ed4a53b9fe5eb479"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavcodec_exr.c",
+      "bytes": 77609,
+      "sha256": "12e82e6a6373f0327e66f03c3aeec1e8490e5ebd29ea51b7cb8a4ec4a0c6980c"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavcodec_rawenc.c",
+      "bytes": 3126,
+      "sha256": "3104d187bbdd7f1d3b7d9f609f0508d42616c9e062431872fe581766b3d24071"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_af_amix.c",
+      "bytes": 20160,
+      "sha256": "88ec30e4ffdb71f59167cf73e5a0c6881950ee423e73bee0f07239fe2ae812cb"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_af_volume.c",
+      "bytes": 16896,
+      "sha256": "c3fc6a3591038eadaddb1d095bef296d5fc91b1c6d138ca846a86436e0945a67"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_f_sidedata.c",
+      "bytes": 10547,
+      "sha256": "f41254b4484a76da5f2e75bc3e76ef61ced848b11c50b1cfc753d465a8a52ad4"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_f_zmq.c",
+      "bytes": 7462,
+      "sha256": "3753249ee251e77a04149e29e255cbfeb6df667f74d5b072a8b911681c75adfb"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_vf_floodfill.c",
+      "bytes": 14582,
+      "sha256": "c12bf956d96ffb94f3d125d5c885cfbdb66ce8eb745bbb0e6279677facf2dc71"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_vf_geq.c",
+      "bytes": 21321,
+      "sha256": "ec00991bb6dd6e0869aa76c46f8511a06ed3aaf2134b676a41a664e74509db97"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_vf_scale.c",
+      "bytes": 50642,
+      "sha256": "3efdf8a46613c3545f50887f6dbb5a9c95ce8d38d7312f9ee544ae4453be3079"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_vf_xfade.c",
+      "bytes": 162533,
+      "sha256": "efc4b9d81b6da2da8d18a97a88235f624858947b0958209899775f60a367d560"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavfilter_vf_zscale.c",
+      "bytes": 52495,
+      "sha256": "0f891efc5d0f4f60a90b10619ed19119dd0f69079b55ef26fa874a0ed8a6f523"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavformat_file.c",
+      "bytes": 19692,
+      "sha256": "ea64c460b843ecd7ff4d72ba4b2b24c5ff738d71bfef2621ed3e86c3fa477d04"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavformat_nut.c",
+      "bytes": 17201,
+      "sha256": "88836e14c554b13aaa5cea89ba5206204329e0e80cc12c1e500c69a3439f9e77"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavformat_nutdec.c",
+      "bytes": 43994,
+      "sha256": "d0d4b0aa1d03ff18af1a63f555d19a27895af526b77f845349acbaf1b5b107f1"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavformat_nutenc.c",
+      "bytes": 41883,
+      "sha256": "ff4195551175987c4ad9f7b4aed1f394d588d0f3fe752d69c6a8aa095029d7da"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavformat_tls_openssl.c",
+      "bytes": 31928,
+      "sha256": "0567d5c8204c80a61074065a5044abea1f972694d41b60cbcd03dd89d05b677f"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libavutil_file_open.c",
+      "bytes": 4968,
+      "sha256": "67c5c007f53735f9d6fdd64fd18c5d1098b792b6eac6a1111b8dfe02f653a0bf"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libswscale_swscale.h",
+      "bytes": 28916,
+      "sha256": "3c3c7c2aec2494f4881e8fed8baf01ef0db8c08e7c01a3300946ea3bb102a162"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/libswscale_utils.c",
+      "bytes": 90937,
+      "sha256": "41f863d372aa3683de5e4877d02b59cd8e749b1bb8619539b967cb553eebf91d"
+    },
+    {
+      "path": "research_v3/ffmpeg-source/manifest.json",
+      "bytes": 10485,
+      "sha256": "a71f0825912891bf4f085f2fba670c1072e763e5ea44b44b061decc4d1fc0040"
+    },
+    {
+      "path": "research_v3/protocol-source-manifest.json",
+      "bytes": 3812,
+      "sha256": "aa2d2c75b1c80a0b59d25f75d4dac3338f2bfcc55465810ae96692364df9cc09"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__aeval.c",
+      "bytes": 16209,
+      "sha256": "f0c77d3bcb26bf860f7981b18c4ba15946da5a3b5d8c94cb1bccbb193dbcaa49"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__af_afftfilt.c",
+      "bytes": 14122,
+      "sha256": "4d0f269b65a5f5f69acc8eadeb3f74c60cc42c397a2c8d2c2e939d008c953186"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__af_aiir.c",
+      "bytes": 59453,
+      "sha256": "aa9b4d5e3a26d4e90ef8fb861f244ffcfdb0eb694614fb837771ef89b0c9b3fd"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__vf_floodfill.c",
+      "bytes": 14582,
+      "sha256": "c12bf956d96ffb94f3d125d5c885cfbdb66ce8eb745bbb0e6279677facf2dc71"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__vf_geq.c",
+      "bytes": 21321,
+      "sha256": "ec00991bb6dd6e0869aa76c46f8511a06ed3aaf2134b676a41a664e74509db97"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-libavfilter__vf_morpho.c",
+      "bytes": 33640,
+      "sha256": "0d084d5811d3a6df6c8a6deffdb755ab7379e42c948ad1e610b7044afeceaa52"
+    },
+    {
+      "path": "research_v3/requirements-ffmpeg-primitive-source-manifest.json",
+      "bytes": 2082,
+      "sha256": "1f787b12509a50c06ced80fff071d74c94788271e8afaf62f449086c40fd0670"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__biquad.rs",
+      "bytes": 8959,
+      "sha256": "ad6c9d7891e356286b71477bd3bafd6d2077ac683381075cf13eed41dec068b4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__channels.rs",
+      "bytes": 16803,
+      "sha256": "6f439d9dcd15a1361965ffae91a5d0c8b55bc08e85eec3c3258abc43f925fb55"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__design.rs",
+      "bytes": 24867,
+      "sha256": "73104808cee8d56e88e1376e619417fb994f296d2e6417db01141bcc3bd1281f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__ducking.rs",
+      "bytes": 9823,
+      "sha256": "bf514efd5321fcc0d2c44f16895feaa746ea66f31e18628545e38732b3671768"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__channel.rs",
+      "bytes": 10898,
+      "sha256": "ced957c01970ec3ddbe4569291a94395d90879914d9b74bd42905c26ec8df524"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__declick.rs",
+      "bytes": 8043,
+      "sha256": "0fe8b3a6cef3e28dfd177acea5d902a56d644e0e8fdd2a57185fc8dde571e89c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__dynamics.rs",
+      "bytes": 20306,
+      "sha256": "080b74e2de7c084f5c6e8887bf05d823b77811964d6a2dd65789f773dbfee30e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__eq.rs",
+      "bytes": 21111,
+      "sha256": "6727678a59c2c9f9e94690b2183362963fb36285d8e22f337c8ac153b51d9a5a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__essential.rs",
+      "bytes": 30433,
+      "sha256": "b410fc1e6be1206f4830d557f8a28299eac947bb4a9c3b326056499843542580"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__filters.rs",
+      "bytes": 27736,
+      "sha256": "d8e1b14099c0caead5f2926b7023f2667b4109c2d972724669f280b620a4b9b5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__modulation.rs",
+      "bytes": 21305,
+      "sha256": "b3f009f1c44ae472f9513cccb0a740f381ad4f7f2bbecd4f85d331c555533bc1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__multiband.rs",
+      "bytes": 23434,
+      "sha256": "6af26da535d9324f4d9f1cfca40a9db15309b73928054b2870da7e5cf92fbe7e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__pitch.rs",
+      "bytes": 8828,
+      "sha256": "6275c15f3768f5bb5700d0c1654a5ce4392639b20f6bf4191946eec1ac094993"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__restoration.rs",
+      "bytes": 12577,
+      "sha256": "bd461bdb01691b11151cd4f83b604b0828240a0dc183f486a81141c488181863"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__reverbs.rs",
+      "bytes": 19714,
+      "sha256": "63fca5413b78b7e8342462cc254804d5a1826978db880542570cd3cb4f957966"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__special.rs",
+      "bytes": 34932,
+      "sha256": "cd939e4759f189ff71eb55cdeac2059b3aa42b0502f847239531e299997fbedd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__stft.rs",
+      "bytes": 3233,
+      "sha256": "f9c7e697cd09f3f63502efa638a7146264c7384d66f20be567867c08c5c0c957"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__time.rs",
+      "bytes": 19212,
+      "sha256": "ad383fa1bf755b3ad20bbc3753ffb57127191252233a4e30446ba19bbd273086"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__util.rs",
+      "bytes": 6796,
+      "sha256": "aa46de8a6b073f24cabb1e88c14dfce545a5d469621650948cb6ba188c87e59b"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__fft.rs",
+      "bytes": 3580,
+      "sha256": "e4df0e2538648efa768684a0fda229e47768c5ab1297a1d320cfbaa28ac39582"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__lib.rs",
+      "bytes": 10961,
+      "sha256": "de0760423456ee9fa63aae58a80e3bf04b8c9a1fd610cbc61a10e85b9273c9a2"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__loudness.rs",
+      "bytes": 26888,
+      "sha256": "a715c03b1e9302ac1633b0c131a0c165a33b24abc291e265f5a96f70f79820ba"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__oversample.rs",
+      "bytes": 4650,
+      "sha256": "ae97e405d2a24b8d0458a44595671e76bbcb3f94d2ea3e43cba7d3b69f218ff7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__remix.rs",
+      "bytes": 36737,
+      "sha256": "e7a84ded9176c1e94e8b1261244375829ff223e0b22b6e817d7476a6238f514f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__resample.rs",
+      "bytes": 7685,
+      "sha256": "766027a9a34918f20a79ba90877189bc44e8426662b57ee057f85bc642df36e5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__smooth.rs",
+      "bytes": 2877,
+      "sha256": "cf4959ea99233f48b8ddfed019dbfb5fc2816b7336743a6ec4f8a61009f0fb08"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__sync.rs",
+      "bytes": 21301,
+      "sha256": "c0f03f5ef3bf91f8babb5bf712701aca6f78c5c45bdabdbae452f110e40b4059"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__burn.rs",
+      "bytes": 15208,
+      "sha256": "7822add1c74aceedf08f5c02693818526e3d3091648e8c5fbab2c3e70e9d5fc7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__cea608.rs",
+      "bytes": 7573,
+      "sha256": "2f3badd891e75be84319de05be5400fd756714424afe936d172e19590bdf1f57"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__lib.rs",
+      "bytes": 16402,
+      "sha256": "000739d631989d3886772c48a091c166a2fa6c3f0145aa34aa600d3a0128903a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__mcc.rs",
+      "bytes": 26608,
+      "sha256": "a8346f8bfeeb289e9f3d4ca4bd50af1c2cb89fb75fc646b5e3d50b8601ce9053"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__scc.rs",
+      "bytes": 20493,
+      "sha256": "d5200c494f4f1d2d2ad2392706f7ef281d4bee5431e5136ae7dddca4f41ddf85"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__srt.rs",
+      "bytes": 4726,
+      "sha256": "e5d5299a6b1f83708c61a1c4a8bbfe6c7a8de3ab59f29e7eb03a2e42648fac5f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__stl.rs",
+      "bytes": 17645,
+      "sha256": "aa11b75ddb3d75bbb83e1e0b5e983f9b0f0d66f1795bbfad6f7b6989068b2b44"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__ttml.rs",
+      "bytes": 35934,
+      "sha256": "5dc34ec4d03106bd8b9f51b48194035aa1e698324e80d973197998de3277235d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__captions__src__vtt.rs",
+      "bytes": 7559,
+      "sha256": "fb343dcb4d126b541ec0505ce0f6aa07a276583c67bb7ae436bff0eec88b600a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__grade.rs",
+      "bytes": 8268,
+      "sha256": "81e25d621062fd3fa5f4307ba687eeeba349082dc4620effb76a307ea7258d0c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__lib.rs",
+      "bytes": 12291,
+      "sha256": "72bdcbe32c1d0c25d867e9ee564b2662778d104e642ba46fb84a01d48044b3c3"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__log.rs",
+      "bytes": 13107,
+      "sha256": "bfda734d73721a23b4ab17be876af991aa2475af18f3923172be8fd10a4727f4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__lut.rs",
+      "bytes": 29598,
+      "sha256": "04afed93200b6a5979b5e53fba89106869d93b3dde3b65a9270e72014b3df098"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__spaces.rs",
+      "bytes": 16174,
+      "sha256": "c149b7cd94d049cc7aafa208769c0189faad3238a701c7a5c78d1dcaa0819cac"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__color__src__transform.rs",
+      "bytes": 24445,
+      "sha256": "ace89501783a5228cd1c40f3b7184a1ad2e1a2e4bce43cdc731e213545da2894"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__captions.rs",
+      "bytes": 16287,
+      "sha256": "a812733fa60c8f00f6cd54d48936d9a53ffe06c3fb11f6b5f37d30440fa06196"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__frame_size.rs",
+      "bytes": 9734,
+      "sha256": "f855c98863b3affc1d2b06bed2eea11b8c2b4d008de392b2390b0fbeb088471f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__multicam.rs",
+      "bytes": 8625,
+      "sha256": "14ce9b40a4f7388d18244b8e85a15c27c423ebc8e9d52db746ca095c1c369dc7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__through.rs",
+      "bytes": 10516,
+      "sha256": "3954fc8cf1c3233da64fd76226cdaae3638c4b9a141634d625cd0687bc81346d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__transcript.rs",
+      "bytes": 16192,
+      "sha256": "4d4804683a2c04f55776556aafc1404f19db683e87735ee9ff0129e1330edab4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__edit__src__transitions.rs",
+      "bytes": 18049,
+      "sha256": "afdcf4062f4bd4af9c42b0f929812d1e5a134a55be8811fdbfc488f630a62055"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__aaf_omf.rs",
+      "bytes": 21493,
+      "sha256": "f37bbb8301544bda05e1f25367b7cc4a462f37ed38c099cd34591ba46e10228d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__autosave.rs",
+      "bytes": 42178,
+      "sha256": "ffb6c09c07d4b7bfcdd741aa5a08a0f40624228cbfe4c29808708fb3a0582e38"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__clip_ops.rs",
+      "bytes": 80165,
+      "sha256": "4b755497914f561965826d63ac09f9444c103883d44a27455f97555399c6c3f6"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__demo.rs",
+      "bytes": 9521,
+      "sha256": "80161af8c5e2a30920b61e7763adfd1f66fdb4cc92082768f0581b4cf783ef26"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__doc_path.rs",
+      "bytes": 3016,
+      "sha256": "1d7e41e76883a085d249d46e1c2f12510bfd602825b1a1f1be66444a209ebfd4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__interchange.rs",
+      "bytes": 7974,
+      "sha256": "a985f9792e65fee4d85f16050f698bf2b91a2e90121368fd0ecbba84f3629a92"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__keyframe_move.rs",
+      "bytes": 10372,
+      "sha256": "feba40ab80196dfa72841fc72b9047f452d531a0ea9cdcff435f8cf04ccdd3f5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__marker_export.rs",
+      "bytes": 14024,
+      "sha256": "0b8863b2fe51be6af4e6af42e44da5188f94af4907ee6ec0a11761106652a6e7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__media_pool.rs",
+      "bytes": 43520,
+      "sha256": "8191793fa45c1a4112795b7976a70957cde7070a87b4e5568cb8b1d9e8d94603"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__media_watch.rs",
+      "bytes": 7594,
+      "sha256": "a802074a3ff0fcf4238de9e8077edcf3570773fcf33dedec7e77202e5134bb78"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__perf.rs",
+      "bytes": 5479,
+      "sha256": "2efb6a690b9f68314cf5ba20e037916309c46c1b3de8cd9d24141bd1685c79ad"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__previews.rs",
+      "bytes": 39467,
+      "sha256": "be46739ef5f338bc4a9c2fa818bd18214fed3a3fe7ff9fa3509ccfd22416624f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__project_tools.rs",
+      "bytes": 66613,
+      "sha256": "2fa3f7fb439d60c752972609c1ebc04696c050cda4a2b2b622943e8bf48540d4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__scene_detect.rs",
+      "bytes": 14833,
+      "sha256": "423e7f90eef6b3b2cfbfb9141807404a88deadf948b36f5f362bec1f3e398a5f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__sequence_extras.rs",
+      "bytes": 24874,
+      "sha256": "efac8afa007a2a181eb36835671a3dcb128b7da3f864bff0b2d61503101e39fd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__sequence_tools.rs",
+      "bytes": 50227,
+      "sha256": "c91a33583b3e7ad6f58e1ff46356e29616a419fd2a69557f9447ccbabeffe8aa"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__source_monitor.rs",
+      "bytes": 19649,
+      "sha256": "f0459012b24d6d3b0de23870a56096974f71718a3cdb4d83c506174409166bfd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__sync.rs",
+      "bytes": 9971,
+      "sha256": "de9f9eb41ab10db3b54abcc69963ed6ce5ad42d9175a85eb00d2822055052958"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__engine__src__trim.rs",
+      "bytes": 26483,
+      "sha256": "9511749c70739482a70afeb4a35245625317b7814b3bbbd869374a7712bdc3d8"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__geom__src__lib.rs",
+      "bytes": 6549,
+      "sha256": "1f0864f4bfdbf26f6e9e1b0ae053b7524fd36e76fff8aac90007443d59660177"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__aaf__ids.rs",
+      "bytes": 12539,
+      "sha256": "e51d55cdcbdbc4bf45e8243a90f1ec36355cb9396a5559559ae2667681a1a739"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__aaf__mod.rs",
+      "bytes": 4557,
+      "sha256": "c834ec0f916b27d9b00e308a0a4fd425114a9295acbed3eb500124160896542d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__aaf__read.rs",
+      "bytes": 31415,
+      "sha256": "0397187879f9763e72d97293da6436a6a1427d1deb79d016b0136a04ed81b3cd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__aaf__store.rs",
+      "bytes": 21161,
+      "sha256": "27d013901ef0f4dc1df8c59d8ada0b7bfffac7a0a40348268f4017c4eca2964a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__aaf__write.rs",
+      "bytes": 31777,
+      "sha256": "581942e64ea56ff4ad417cd842b9ec58e5db1a9f041826117af68b4916845c12"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__ale.rs",
+      "bytes": 11830,
+      "sha256": "9b794a7a7631b9acae482716929093a358136a60864f1debac196a5156632074"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__common.rs",
+      "bytes": 26246,
+      "sha256": "affbd78cf672174e2f12afcaa6c4a50b19e206622ddc88bb838fca39301eb169"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__comp.rs",
+      "bytes": 42330,
+      "sha256": "bb1d42040617ccd4085d58c89c0afbf6ff498f301c71b460a74597b1b4af96c1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__edl.rs",
+      "bytes": 42542,
+      "sha256": "ae1875f6bb80159d730961ec6f50f3fd0dbbb3504ca89b4508628824dfde4203"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__essence.rs",
+      "bytes": 9902,
+      "sha256": "8a6e83cc835a4e3cc850bb3f3c7318c44f9507203e64b12cad3b52b0e42cc527"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__fcp7.rs",
+      "bytes": 66090,
+      "sha256": "bc28ae2bbe9e86bcc517d91bf355e13384051c45b9933dfccf80274702c5ccd4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__fcpxml.rs",
+      "bytes": 55677,
+      "sha256": "dc9f153840b5c9d82ea22c838691ce0a12d859ed86a785722351316cbae4f0c5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__lib.rs",
+      "bytes": 20954,
+      "sha256": "b4d35760a41beccb7a730dc07b4add5a7a29435e64c0580253223e41f4851edd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__omf__bento.rs",
+      "bytes": 13898,
+      "sha256": "6a8b3e190397c6e663f7dc9808a760dcf07191bbd8c50dfe8eba05e2da0e8e02"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__omf__mod.rs",
+      "bytes": 3288,
+      "sha256": "c9bdc6a3c2d8865664fbad6c198ae4a4cd117510a11d2c9429521b80c00453da"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__omf__read.rs",
+      "bytes": 19700,
+      "sha256": "45e44677a63af0a44574659da0228f0171ff63d56b55a7fdfab5e93bde29bfe0"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__omf__write.rs",
+      "bytes": 17941,
+      "sha256": "713001cda42b210951e8f1d9fa9dce149e3e44f6a1c1518fd4043b318112cdb1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__otio.rs",
+      "bytes": 37502,
+      "sha256": "68349f260128eceadd3157acac84db4086f52de09d033122cfd3f6c7d812c0d0"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__wav.rs",
+      "bytes": 7637,
+      "sha256": "1b4e36c689474a1c7203bab2fb70d45a849f8300dcaf22ea72f8c977cb1746e8"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__interchange__src__xml.rs",
+      "bytes": 5203,
+      "sha256": "a862269f6e7a2ab16b493b9f545964b5b69750460adc9674ef17f63c9d38ea40"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__caption.rs",
+      "bytes": 11847,
+      "sha256": "85253391aa4527b82c5982b2a13d936b8875bef958721bf39ee76cbb9557f8e8"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__essential.rs",
+      "bytes": 34573,
+      "sha256": "e47f07d04571b487ea9ec4174fa6961b133672e4ba5355bb0219ea100f892243"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__find.rs",
+      "bytes": 10284,
+      "sha256": "cb5f86505dae4ad3ed23483f2e45e5e0da75908dc6aef5bc3979bba6890701ca"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__graphic_design.rs",
+      "bytes": 26023,
+      "sha256": "011511eee09a67b5f6676d80a10d41919c2ab477e5086e4d70f0e095f3aa19e1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__gtemplate.rs",
+      "bytes": 32149,
+      "sha256": "a8d21eeb398760aa0b17783199ca092b0502eb1c2d96a667e4bd4198bb78cf9d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__mask.rs",
+      "bytes": 24324,
+      "sha256": "fee80e7ab0c640ebd2123dd3f1354e99b981acff1426aacdc34572c3350440a5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__mixer.rs",
+      "bytes": 25170,
+      "sha256": "f729e2d89a67666d6dc522b4ac288a1e465643c151e2948229f67e5e80a69bad"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__multicam.rs",
+      "bytes": 8327,
+      "sha256": "07224827785fd4bcde30250facfe4d3edad524a0dafd379c092bcbd06fd6b557"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__narration.rs",
+      "bytes": 5037,
+      "sha256": "42c391052a00266b3f62f8dbe9abc8dc868bb32854f4c54156b4a572015b9014"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__project__src__transcript.rs",
+      "bytes": 6755,
+      "sha256": "17e33198d08747288648296c234d55f755eb2ca3aef962359cb25eb1c0d0d0bc"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__audio.rs",
+      "bytes": 23557,
+      "sha256": "30f5d9dc63e48d4405096170b98ee25c15a25d5302c7a416bcbe2973124cc48f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__audio_fx.rs",
+      "bytes": 22400,
+      "sha256": "6b9609a79f32fac87db6fec4769c884474e3be0f17a961cca5e2076c98772d52"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__blend.rs",
+      "bytes": 10040,
+      "sha256": "44b65219756108487163e31db8ba4ff3fdbeb5bb842e5d08f915922a6f9222fc"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__color_match.rs",
+      "bytes": 17569,
+      "sha256": "e387c1fcbfe81ba531d00799b03992bd53fed58ba3d832dda970b68d3ef7017a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__colorman.rs",
+      "bytes": 10474,
+      "sha256": "e1320cb1757f27d77ca57a72a04f9a18a2a26fdd47f5ac0023fd76088ae4e3bf"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__flow.rs",
+      "bytes": 26311,
+      "sha256": "bd9cd57793b7679f4f11dd431d094c7d1e104e4d31c72310530200acf3a313a1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__gpufx.rs",
+      "bytes": 51498,
+      "sha256": "207f0ee3b29c2b0b7105a8f206b3935ab4f27129684e6bad7cf17795198de48d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__graphic_clip.rs",
+      "bytes": 43622,
+      "sha256": "8581c20d3dde550411e809c403b093e84259c462168a9e727add5354b1612dca"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__graphics.rs",
+      "bytes": 3744,
+      "sha256": "ff66de1388739eaccb9caed5a068f3de4ce6c831d22c5a455aa7bd739e7533d7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__image.rs",
+      "bytes": 7826,
+      "sha256": "846004212031e20a89c383dd028a8a153d2eb2cae50591c1377baf35d866c97e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__lib.rs",
+      "bytes": 33434,
+      "sha256": "8e0abb1870f0c67bb167bbba495664ead9d7eb12e312153576675f6ab2648519"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__lumetri_presets.rs",
+      "bytes": 13303,
+      "sha256": "5683e8826e2a641e3365a49809d5e4abf9539ee84f30300d01c41c7bbc154eca"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__luts.rs",
+      "bytes": 6839,
+      "sha256": "711a8e91c0dd60ed76fddce25568c9c82e3978e60b3939b7dad0833f134c3b9f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__mask.rs",
+      "bytes": 12614,
+      "sha256": "66473726ecdec5cc35fa8a1d5f58c7caf01929f5faa103372f90b3e9ad7ad73c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__mixer.rs",
+      "bytes": 38165,
+      "sha256": "c075fbf0c1600da765186a681a715480327d0e458c25c5036d735f5c3fd14e06"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__multicam.rs",
+      "bytes": 8016,
+      "sha256": "aec3f023eb2fdf64ca1f2990d3d4b235838b1d240987fd0bb80bfb813730b27e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__offline.rs",
+      "bytes": 5599,
+      "sha256": "5b733612ed8f7bab805869c615bcc63b6ca0cf66c75bf378a5d364a3e20ab926"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__plan.rs",
+      "bytes": 27904,
+      "sha256": "d2720e1ee91d33a175e18240b0604e078547792611fcfab4efcb0999810bd82b"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__preview.rs",
+      "bytes": 23060,
+      "sha256": "385af6b3408653168961b5794285e1e3dd817ae15fbf070a298b5f2f677a1243"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__remix.rs",
+      "bytes": 9060,
+      "sha256": "177d987d942ffdbd8c9b54a0e0d0bd1240571d2bab3e795f93b433ae76b82070"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__scene.rs",
+      "bytes": 9794,
+      "sha256": "55ceb328de894f1ac845737bbe986a12ce2d7b15ba08a201ece5caee4898d9b7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__track.rs",
+      "bytes": 20055,
+      "sha256": "0292812f27499478190b9f8269f2a699a75d74ecc06adb40f170910f102e7e35"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__transitions__cards.rs",
+      "bytes": 4032,
+      "sha256": "1ce9b9eeaf99196a733c3cb34d75621371d3fac2bf8eaa854d4511879f30fcf9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__transitions__grunge.rs",
+      "bytes": 10282,
+      "sha256": "da41577f890bf27cca652d2dc0bf2dd38934d5f54758b6f50f2461eb5c7c2c4a"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__transitions__legacy.rs",
+      "bytes": 10445,
+      "sha256": "470a41c297964c3f8802815c7ab371774d659422ed9e16024e18e61420ceab48"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__transitions__lights.rs",
+      "bytes": 12244,
+      "sha256": "590cbfc87a6e7419d30b0afc9c3c7cc51696e9303e336185361c3de418524b31"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__transitions__special.rs",
+      "bytes": 8890,
+      "sha256": "88fb5b79990533e6fb805f80e7f1a7e396d775bd68cbf7d2e59116d58aa300e9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__blur.rs",
+      "bytes": 7651,
+      "sha256": "ba0fb47e3197ed35cfd8adf09e88c99c2eabc1423d9fb596519c0b2d59d2f28e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__color.rs",
+      "bytes": 15309,
+      "sha256": "425639d21025b2708a1413675321c9551deba144d1a66beca3073e5532c73d88"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__distort.rs",
+      "bytes": 23956,
+      "sha256": "ecbddac98f182656610f95ad786afa0dd6d309a7a84dc32fbbc38f511e29d01f"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__immersive.rs",
+      "bytes": 19030,
+      "sha256": "6102a57bea849b1b512b43dc38747ec319b6e835014fe6c559a72f0c97df88fe"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__lights.rs",
+      "bytes": 15494,
+      "sha256": "eafeda1866971c13377b882df229a961bc73cc03464b69250bd089294738d4f2"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__mod.rs",
+      "bytes": 21451,
+      "sha256": "44f91abf40ece6c8537e1c0c6df6ca78886c6c416014818ecdd92ee3fccf6cf1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__stylize.rs",
+      "bytes": 32883,
+      "sha256": "35dfb478cda62802b7905f80a30b9dd2165e83f949d07a8867a3e5df53d26d1b"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__temporal.rs",
+      "bytes": 17975,
+      "sha256": "7ef13bc905435c462b1114b5855ff538ff0c1801afe83e6191347c9b25c29fcb"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__render__src__vfx__text.rs",
+      "bytes": 4154,
+      "sha256": "85f064da8beff18a33ed79c24e4b114a03ad1dec5879f571c91bac872218f973"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__audio_fx_editor.rs",
+      "bytes": 24737,
+      "sha256": "4e92c91712b3d73469a7a2aee641b1667a13acda3248cfc525ef30f494c5b23d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__clip_dialogs.rs",
+      "bytes": 34048,
+      "sha256": "10e0a4b67c81c51d91d47292407a69cb30d16ee99f23f481ad9449d4912adea3"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__color_dialogs.rs",
+      "bytes": 6420,
+      "sha256": "fd241189ef389a4c9cee07fa889165143bd9c4cd55fc07cca9954983a78f2751"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__dialogs.rs",
+      "bytes": 24470,
+      "sha256": "175fafaf42074e1280330770c17a3e57b3f8cc1ef848156ab13ae4a1f72a61a9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__effect_controls.rs",
+      "bytes": 90932,
+      "sha256": "9e54ddcb24a4fb65be29e7ade4bf430beafccc934da395e3e45dcb9578508abc"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__effect_controls_selection.rs",
+      "bytes": 13303,
+      "sha256": "53580b9347100ec8db8d4d11bdcdd8666a027e234a3382306b77b6fc83b9bd67"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__effects.rs",
+      "bytes": 15375,
+      "sha256": "aa95d003a43109d09bd24d0f465321274e415431255d480f60ed85b3e4498423"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__essential_sound.rs",
+      "bytes": 33970,
+      "sha256": "b8cee58527ff3e83d9f521ef38860235821ced8d2400f69503aeb36d8aea1a4c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__events.rs",
+      "bytes": 11419,
+      "sha256": "171bbbdfd61be3e1b3c2ad1f6a984de422f72c734fb93fb4d5a47eb2eb9e7604"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__export_mode.rs",
+      "bytes": 77973,
+      "sha256": "1419255be2a8ac98fc4016ad4efe47093f63da50d5ff0705d73e7faca8836bc6"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__file_dialogs.rs",
+      "bytes": 6926,
+      "sha256": "3cf1a3c170cce18accd9f8632e7ac480fcfbee34db13432e070754079f204031"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__frame_export.rs",
+      "bytes": 13671,
+      "sha256": "eaf9c340c834b692eed469a0f4ab2ae298dce5c47c242c38224032674f02038b"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__graphics.rs",
+      "bytes": 95185,
+      "sha256": "e50505c2b277c63dcff944723c43f85d258d7e5551f99d4e5404ffffb7e1797d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__graphics_templates.rs",
+      "bytes": 38215,
+      "sha256": "3dfc61889b404f204b82d5c751056ae3f5fa37ecec3b098c36cce0092d287b2c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__import_mode.rs",
+      "bytes": 6381,
+      "sha256": "d39fe941b4b47066e5237f39f9c3c623be7b346c23661cbb1273903fbe7f5000"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__interchange_export.rs",
+      "bytes": 9631,
+      "sha256": "2aa2fbb4542116a6d5f5dd15ce724ad9c418b7ac86e3018fb7a5da90f36545c0"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__lumetri.rs",
+      "bytes": 32938,
+      "sha256": "b8e21129ecb1c734372674edd4f238f2aaa49590f891bfacd2462341eae7e49c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__masks.rs",
+      "bytes": 41188,
+      "sha256": "ba00c7142fc72221978c015b752374863409f7cf8ae56d3ff0e4baeda08afedd"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__media_browser.rs",
+      "bytes": 42243,
+      "sha256": "34a87e5acd83b89d5c533feb068f3bdc74546d1269463e3577442c367dc74dde"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__media_dialogs.rs",
+      "bytes": 31683,
+      "sha256": "96ba7236a6e3f609e7cd8e0468e53f13aabcf2d243d5b5c9bccf3db8e8382ac2"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__menu_dialogs.rs",
+      "bytes": 51979,
+      "sha256": "546b65408b834f4c136acb570b4fe84b93075152de2f7d4cabbb45969e5c69c9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__metadata.rs",
+      "bytes": 7057,
+      "sha256": "703c07d36b755b5d03d9ed9ccd0fab617673bf713cacb4f47e1e95b952b982b0"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__meters.rs",
+      "bytes": 15424,
+      "sha256": "2394f4e7eb5e271c585a137e21bc95bbdb882f032541d830ec7a406619993830"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__misc.rs",
+      "bytes": 10352,
+      "sha256": "484050e1be0bd5ccdd37108e80e17eebfa72ead8056d16c196cc7842d2ef4e7c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__mixer.rs",
+      "bytes": 60824,
+      "sha256": "442c09445dd8dd37af82866b76e5064e7862c1f3abbd7ba2110e87f3b7d024de"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__mod.rs",
+      "bytes": 16397,
+      "sha256": "f20c25176b57b38cf7a0154920a68c24a773abbeea89d20c31984935d938e365"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__monitor.rs",
+      "bytes": 60161,
+      "sha256": "bed0082088a7ee6ddf400b1655a976dda4fb143ea487763c1d264e6919462d3b"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__monitor_view.rs",
+      "bytes": 46062,
+      "sha256": "f580f04e71f9a3d54a173c160c6d28a2b18658105743ccb840945632bfb0ddf7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__multicam.rs",
+      "bytes": 27974,
+      "sha256": "91bf2695d12428398d704162e3306fa06fc2e5479098f498fe49cb0953541af9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__notes.rs",
+      "bytes": 2268,
+      "sha256": "373584f0dc7d62a97ebf2d0e61f3b9bd5f00e9e4284a6b2f89cc845f963c8d1d"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__panel_state.rs",
+      "bytes": 8659,
+      "sha256": "5da3bb0b4d1db57964f440ca3366dbdd1b9b509e446d343373ff0a07986f7d71"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__presets.rs",
+      "bytes": 6838,
+      "sha256": "e494062e200ffc768ab2f6bf7fed72fc4fdf60ee814c62034a60d1127fcf1fc3"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__project.rs",
+      "bytes": 47947,
+      "sha256": "7cc231b0ff8e6ac193cb0dbeebccc407cb227b1ba7accad6cde51f95cf372372"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__project_dialogs.rs",
+      "bytes": 12297,
+      "sha256": "cb73425cbd5bdbff1f35315c0cadf8ed15cbb5a73348cabdd93d94f3cc92b3c8"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__project_views.rs",
+      "bytes": 61365,
+      "sha256": "def1e967c3fe49bd7cb7cf33401489893eb85d27f8b8c46a1eb59aacaea9a169"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__reference.rs",
+      "bytes": 8410,
+      "sha256": "d1a3ea7a44ab2abc0ba894a8174ce826111b9795b2465e74ac5431174d164d82"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__remix.rs",
+      "bytes": 4874,
+      "sha256": "6b9d2e26fad87d2ec0372be9e17faa21950d846a76f00828c9799c89d3d2d1c9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__scopes.rs",
+      "bytes": 26959,
+      "sha256": "1b7dd4ac7cc95262d4220d1868d5dbd77f3f4c1b01988fe3c26c7ed713e76011"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__sequence_settings.rs",
+      "bytes": 30903,
+      "sha256": "66af1cd95de3cf445e333467f06fb7ce8271bba390809b462d5e63a251dccdd0"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__settings.rs",
+      "bytes": 56000,
+      "sha256": "5b4e9866a832aa205b6114d24a5d85b95682698a03ff7f8b40ee1430e7649c39"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__shortcuts_dialog.rs",
+      "bytes": 37258,
+      "sha256": "46773036a23084f36f50482334a282c4ed5a731c59196545f8ddfc9339013ab7"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__source_drag.rs",
+      "bytes": 3797,
+      "sha256": "442fcaf0374cd68567bee2e5dd135d4434904484a14191d0d5a1b8589ff52ef4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__source_range.rs",
+      "bytes": 10376,
+      "sha256": "3c89fb1c39f997e72654a8f9e5e445fd784d5111c24c1237695092352962f421"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__text.rs",
+      "bytes": 41391,
+      "sha256": "36dae31314bd4e0ace5f96afbcc7a99271f87ec82f5f7bb89e8b62ffa0ac2df3"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timecode.rs",
+      "bytes": 8902,
+      "sha256": "1d1778bddd1751861c00c82e3edbd5a840be6133038d233524b01938aa690b49"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timeline.rs",
+      "bytes": 178631,
+      "sha256": "8d51cb4323cc6279887a6a94f8708e97126b5ef29ce55ee412f32fc12eb4c917"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timeline_automation.rs",
+      "bytes": 11252,
+      "sha256": "2c31585d565d56b25c2af362366cf8af1beb8f47a0dd536a2dfc02272aeaa78e"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timeline_captions.rs",
+      "bytes": 12813,
+      "sha256": "1e8e1c10714af9eaa77610d337b8e35353ed1d7d4051326f129c6dbd1aad17dc"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timeline_hit.rs",
+      "bytes": 22662,
+      "sha256": "249ad726aa63607939f1f362763da2a730b90994f34b4024ea65a2df9c937237"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__timeline_volume.rs",
+      "bytes": 18454,
+      "sha256": "27ad639a73c8ce85d4cdff1995a59b318760b65c9d4744d206f9880a30b4fde9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__tools.rs",
+      "bytes": 11845,
+      "sha256": "2b29312a1694987d1927d9791693f7bd223018410e88fb1fd478640aa12a4fd3"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__transcript_cache.rs",
+      "bytes": 4281,
+      "sha256": "a46550dbd252cacc950fe97e3c2ee7d935a93ff50e87a4456e4386ffaf55f32c"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__transform_handles.rs",
+      "bytes": 23993,
+      "sha256": "4367938db15a5a9f5342cce246b5d8d6de0ffce4e7798aa03b97c2a1f45c4d65"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__transition_controls.rs",
+      "bytes": 28918,
+      "sha256": "307383e839aa2c89b058f824fd78680c4a123a37540b000dd6403230f53f5b86"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__trim_monitor.rs",
+      "bytes": 19728,
+      "sha256": "d67aeab456e08251b1490476471dff7bf0cd0efd8878c8eff30856e394764cc9"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__tts.rs",
+      "bytes": 21442,
+      "sha256": "c8c9bea8828310ce326465a6914bea320e1bb534ad38b2f84c776ad5b0bca7f4"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__voiceover.rs",
+      "bytes": 15644,
+      "sha256": "ba8f3f80bc18e67ee6ef012f575ea42eefb2d64c52397226632b3c49878568f1"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-crates__ui-egui__src__panels__workspaces.rs",
+      "bytes": 12037,
+      "sha256": "07ecf7b09daa45bd2b284fcda755d86f3682aac28a1bd44964096eef04678cb5"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-effect-source-manifest.json",
+      "bytes": 34080,
+      "sha256": "9dc6c1106d1a84f2219db24896d42130e818ea8b495d380a2775a47911cf3dad"
+    },
+    {
+      "path": "research_v3/requirements-filmcraft-source-manifest.json",
+      "bytes": 82932,
+      "sha256": "b6dc61459471b78a392822e49c1c16945edd2426b28da5fc5c9006015fb2d8fb"
+    },
+    {
+      "path": "research_v3/source-extras/color_blend.rs",
+      "bytes": 19264,
+      "sha256": "f7c4ba62d8342be85274f420485c904998f4864c3778fe89763963e0c91763c0"
+    },
+    {
+      "path": "research_v3/source-extras/color_lib.rs",
+      "bytes": 8707,
+      "sha256": "9ebda22fff5dbe035ab804bdfb728e09c59970cfc55b4fe8f45ee9cb51984a53"
+    },
+    {
+      "path": "research_v3/source-extras/raster_blur.rs",
+      "bytes": 10807,
+      "sha256": "9a7d312e1d3be03fd987db479312a36d989d8def1b135f96b0438d7fd279bdbb"
+    },
+    {
+      "path": "research_v3/source-extras/raster_lib.rs",
+      "bytes": 12737,
+      "sha256": "1f304c1edea8bca3d329fc67b4829226174c701c5e0ad8a0b4a39b32031ef7d3"
+    },
+    {
+      "path": "research_v3/source-extras/track_face.rs",
+      "bytes": 59576,
+      "sha256": "972bbf42ec402896659c7244cc23804a5e655433b2e2ec44361e7c344837d106"
+    },
+    {
+      "path": "research_v3/sources/filmcraft-Cargo.lock",
+      "bytes": 181963,
+      "sha256": "877e2ce2c0741fe359f57975fef929c04bd0002ebce548d32394683a29734ef4"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-Cargo.toml",
+      "bytes": 2983,
+      "sha256": "101c183ca61f8543fd477e64b78fca72a24f5dd0d2ca76e6adf687b8aab26c54"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-db.rs",
+      "bytes": 171331,
+      "sha256": "5a11af67fb8c7c4936533b849475c6a4964bd52f72423fcdfbf0c90669ee5876"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-release.json",
+      "bytes": 3890,
+      "sha256": "ccb77c3c493860171fcf0b1f9978c00bd144757161a42247e7ce1db74583bf34"
+    },
+    {
+      "path": "research_v3/sources/redb-LICENSE-APACHE",
+      "bytes": 11358,
+      "sha256": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c"
+    },
+    {
+      "path": "research_v3/sources/redb-LICENSE-MIT",
+      "bytes": 1062,
+      "sha256": "493315a4e2070843f78b0c10de9ace79fd9eccda99d527767360f2e4b3850bd9"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-Cargo.toml",
+      "bytes": 14125,
+      "sha256": "2e7626ce3296dbd607f33c2ce8dbe338df5dbbc7ffd716972c51165f0a6ee7b8"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-release.json",
+      "bytes": 4935,
+      "sha256": "62e0ffcef38e263e93d60365931019ec38e9e4b6f4de6bcf757e95fae6e0844c"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-workspace.toml",
+      "bytes": 843,
+      "sha256": "ac4ca0071b4b3d57b21ff8b9d8126cccbaf5c989c70d79eae1c6251723145731"
+    },
+    {
+      "path": "research_v3/sources/rmcp-LICENSE",
+      "bytes": 12228,
+      "sha256": "4b802970ed0a9ed99b49d821e85907b4fad6ed61199c4d513df29a0720e9d93b"
+    },
+    {
+      "path": "research_v4/ffmpeg-reading-summary.json",
+      "bytes": 512,
+      "sha256": "1b0b5735900548c294823ec272c850a39cc871ead4011b410bdf470f94951de2"
+    },
+    {
+      "path": "research_v4/ffmpeg-section-reading-ledger.json",
+      "bytes": 1131981,
+      "sha256": "3b652793a514152f7508cb1dce9eca57ee6b4faf82beec2dc6888094401f8616"
+    },
+    {
+      "path": "research_v4/manual-evidence-validation.json",
+      "bytes": 231,
+      "sha256": "2ee2bafd84680f48222c915bdf0aa1e142cb4c9d58b705f644ac26d77208f1a8"
+    },
+    {
+      "path": "research_v4/manual-findings-agent.md",
+      "bytes": 29516,
+      "sha256": "1093e1a4a0749cbd428d57479a57f6d72e7277f7295dbd33ef3e1bf6d5d6c556"
+    },
+    {
+      "path": "research_v4/manual-findings-root.md",
+      "bytes": 10672,
+      "sha256": "8034c04e53ed229ca18b7fe7ad380fc0e510e3b56ce2322c69d3a639833007e9"
+    },
+    {
+      "path": "research_v4/manual-reading-events-agent-extra.json",
+      "bytes": 78309,
+      "sha256": "b26ff1d35a70d9cfe7f670d13578d2ca755a089a5d2a5c06213850b7bfa3c492"
+    },
+    {
+      "path": "research_v4/manual-reading-events-agent.json",
+      "bytes": 10294,
+      "sha256": "5eb3724cbb0421b05d695a54b0ac349d0e81c637b4b033d39fc0a1eca1fc3037"
+    },
+    {
+      "path": "research_v4/manual-reading-events-root.json",
+      "bytes": 41746,
+      "sha256": "004250f76cb15e506a48b41263a3077f2b5286a66a708a297c7bcd2f3d170d9d"
+    },
+    {
+      "path": "research_v4/vf_drawvg_review_source.c",
+      "bytes": 81443,
+      "sha256": "640ece920f4ee01bd3c47f5092948e26206515b93b128e65564a0b4d85fe75ba"
+    },
+    {
+      "path": "research_v4/vf_varblur_review_source.c",
+      "bytes": 16465,
+      "sha256": "0eef982f0170a9bf23c137e7ed2df686dbb06676b526947b062c801024e68812"
+    },
+    {
+      "path": "research_v5/execution-review.md",
+      "bytes": 15759,
+      "sha256": "ad5412b0a22c5b9720f15d31226a2e2e1a9871b8ebcf0d672fa4ca4f260eaeaa"
+    },
+    {
+      "path": "research_v5/light-noise-corrections.json",
+      "bytes": 51054,
+      "sha256": "b1e51d253b73c6fb2ce2b904151ade789b742cd1ed9756eb367d5daf58dd4ff6"
+    },
+    {
+      "path": "research_v5/light-noise-review.md",
+      "bytes": 13037,
+      "sha256": "4b1211ce8b28fe7b01c80a98db6f2a176ad7b7d73d178cef42351c3d2e15fe98"
+    },
+    {
+      "path": "research_v5/media-review.md",
+      "bytes": 27578,
+      "sha256": "ebb58a8b6631ff9afeed92801f8e845213aa6acdd7143fa47c786f140107db3d"
+    },
+    {
+      "path": "research_v5/requirement-review.md",
+      "bytes": 10685,
+      "sha256": "73ec888c85c3116bd21d1d859e7fac6a6fab6e42192a772de0213051acd4d952"
+    },
+    {
+      "path": "research_v5/review-resolution-ledger.md",
+      "bytes": 11747,
+      "sha256": "5bc21d314dc6161adea25e34e5d123f6751f105ab5339631ab1d2b3df532fc5e"
+    },
+    {
+      "path": "research_v5/row-correction-summary.json",
+      "bytes": 1764,
+      "sha256": "a104bdd1ffbc63ca2376766e21c47302d911b81db880843d4eff6474423f36f2"
+    },
+    {
+      "path": "research_v7/acceptance-scenario-index.csv",
+      "bytes": 55045,
+      "sha256": "a9c2df8b041f1c774b7ff502fe0be8d3ea11fafea68b148e50422466dfe4d632"
+    },
+    {
+      "path": "research_v7/acceptance-scenario-index.md",
+      "bytes": 8953,
+      "sha256": "3b75dcd85a26adeb569487ad67f760f939310b33e22913d2b9addccfc838b001"
+    },
+    {
+      "path": "research_v7/architecture-blueprint.md",
+      "bytes": 35757,
+      "sha256": "ca3718b00b2c1f7a8583e625aa34a0a62318b63cf554cef8268b0e7880bd09ca"
+    },
+    {
+      "path": "research_v7/assembly-summary.json",
+      "bytes": 340,
+      "sha256": "71d1372e4888f2f40afde9de688f12461488f64817fdf58b7692168b0a3d82ee"
+    },
+    {
+      "path": "research_v7/build-protocol-contract.md",
+      "bytes": 19887,
+      "sha256": "8d4db928c1cd62e3fc75c589f379e7b9acf00de3d9ede9e55b6bbbb5494c7a8a"
+    },
+    {
+      "path": "research_v7/build-protocol-review.md",
+      "bytes": 11037,
+      "sha256": "c12386b4551aa222c92b324c23a48699860bf0bda48f48f01f9cf0036d17e690"
+    },
+    {
+      "path": "research_v7/command-field-corrections.json",
+      "bytes": 1590,
+      "sha256": "d2ea0f51df348d94b03a542270ee450236593975fd30508e4b48d97e41309d62"
+    },
+    {
+      "path": "research_v7/command-functional-mapping-final-summary.json",
+      "bytes": 1180,
+      "sha256": "eac8c6249ab20299d33120ce5e6d7c16fbb4bc2eb55c132dc96eae9f79b725c3"
+    },
+    {
+      "path": "research_v7/command-functional-mapping-final.csv",
+      "bytes": 1848540,
+      "sha256": "8a232aec464c54a78e9a1aca4a68122b701e8ed798d3a6dc81dc67846483e44e"
+    },
+    {
+      "path": "research_v7/command-functional-mapping-final.md",
+      "bytes": 20007,
+      "sha256": "a21e187b476abd100bfd3ffc1c78e04d55d3be522b24165c0e08790a9cb1f550"
+    },
+    {
+      "path": "research_v7/cross-donor-capability-aliases-summary.json",
+      "bytes": 844,
+      "sha256": "d50f3656119f832a21d7019ee6ae3ff50e239ddcf89993cc4e8cb393b584aab4"
+    },
+    {
+      "path": "research_v7/cross-donor-capability-aliases.csv",
+      "bytes": 310707,
+      "sha256": "12320936e896be18b57ae968ea57121d1e8195650f20eb35dd2d532d18f7193d"
+    },
+    {
+      "path": "research_v7/cross-donor-capability-aliases.md",
+      "bytes": 7531,
+      "sha256": "4286df2db2429688a79852039b09ed4d3ff3c48256fb9527b80d2e66eb38c465"
+    },
+    {
+      "path": "research_v7/deep-research-disposition.md",
+      "bytes": 13207,
+      "sha256": "752fbddeec304b7099e10da187ef5ac440c563372a7b92c8177ce5b31b2ce7c9"
+    },
+    {
+      "path": "research_v7/deep-research-media-triage.md",
+      "bytes": 4987,
+      "sha256": "2a93b37817a9b8d2c3c9cc10e8e348557b2d86de311e541b19d7e660d33e462d"
+    },
+    {
+      "path": "research_v7/deep-research-report.md",
+      "bytes": 34381,
+      "sha256": "d4822d0cf8108cbcd48b7924eb587d02798f0b37c3a2c338e7cfe46e50e02502"
+    },
+    {
+      "path": "research_v7/deep-research-run.json",
+      "bytes": 5461,
+      "sha256": "579393f44d2a20185f729dfae07d845078427abbf52b7cf979983dabd4ac536a"
+    },
+    {
+      "path": "research_v7/deep-research-security-triage.md",
+      "bytes": 10840,
+      "sha256": "d8f343df3f2a84d20763e64c4881929de062110ab1d307087ff5b78a49121ec2"
+    },
+    {
+      "path": "research_v7/delivery-closure-review.md",
+      "bytes": 8333,
+      "sha256": "01d3353cbd3a3217543ee063239d75cd7e9a76ab0d411b39f3bb7e9dad1a2be2"
+    },
+    {
+      "path": "research_v7/document-validation.json",
+      "bytes": 14677,
+      "sha256": "4c89f8376621edbd00e47716b37a6997020a46b271a24fa5af06b9e62a28eca9"
+    },
+    {
+      "path": "research_v7/donor-commands-coverage-v7.csv",
+      "bytes": 1848540,
+      "sha256": "8a232aec464c54a78e9a1aca4a68122b701e8ed798d3a6dc81dc67846483e44e"
+    },
+    {
+      "path": "research_v7/donor-coverage-v7-README.md",
+      "bytes": 1850,
+      "sha256": "34110b2be306ce75cfd86c1c867717e942a0347cc50de8f2eb4d7dc61c661a72"
+    },
+    {
+      "path": "research_v7/donor-coverage-v7-summary.json",
+      "bytes": 1447,
+      "sha256": "f38771a75a6538a9f30b2eef2d1889069de26b255b5e49e23f1c4ac808685bb2"
+    },
+    {
+      "path": "research_v7/donor-effects-coverage-v7.csv",
+      "bytes": 1931200,
+      "sha256": "b7553895b2d715ad3beae6bc2f694257f1b94cbb97da0a33df4b29a04060360c"
+    },
+    {
+      "path": "research_v7/effectcraft-functional-mapping-final-summary.json",
+      "bytes": 532,
+      "sha256": "837a4a46fca85ce4f3293d03947dcc3e65bdc695a0e423478d51fa97b0bef30f"
+    },
+    {
+      "path": "research_v7/effectcraft-functional-mapping-final.csv",
+      "bytes": 840206,
+      "sha256": "4e06a30d9c4237ec85a3697576d2b4804ba755b0f199e4d59c6948fbdbff2b8c"
+    },
+    {
+      "path": "research_v7/effectcraft-functional-mapping-final.md",
+      "bytes": 100302,
+      "sha256": "beee13182c209b1fa43486f3f7f6fb392ebc8e02f82b4dc5ff0d3d37e95ccf57"
+    },
+    {
+      "path": "research_v7/effectcraft-source-descriptors.json",
+      "bytes": 2142706,
+      "sha256": "9133d6947d5cbd44164fcd2f29cf1e63b90a8eaa30e68e99e0e27f496fd682f6"
+    },
+    {
+      "path": "research_v7/filmcraft-functional-mapping-final.csv",
+      "bytes": 828117,
+      "sha256": "4ee40184d251dca203651c2907e7578c561a187687d75ad7501affdcf55946a6"
+    },
+    {
+      "path": "research_v7/filmcraft-functional-mapping-final.md",
+      "bytes": 55539,
+      "sha256": "4ce08e97563b6c9dbdb3b6dc80cb30602ad31f760fa96c35ec838d17f0d16c3e"
+    },
+    {
+      "path": "research_v7/filmcraft-source-commands.json",
+      "bytes": 344827,
+      "sha256": "dc79337d44c786b037dabe5c18ecfac9cfeb3ea6912f761d3dc0d189590f1ed5"
+    },
+    {
+      "path": "research_v7/filmcraft-source-descriptors.json",
+      "bytes": 516081,
+      "sha256": "ad347a37ef913a99d6bbfc30748dfab34cb78761e6fed5edc22201ddb317f454"
+    },
+    {
+      "path": "research_v7/filmcraft-track-target-source-supplement.json",
+      "bytes": 9479,
+      "sha256": "8ac4e9e31af6d13a390657e8e09b28787424ac43afcb341120b006ee41dc0d21"
+    },
+    {
+      "path": "research_v7/handoff-index-summary.json",
+      "bytes": 363,
+      "sha256": "cc2ded0999da5822157f0e97864e768d21f2b9a262fd502fa2f5f2a3c3751047"
+    },
+    {
+      "path": "research_v7/integration-cross-review.md",
+      "bytes": 8832,
+      "sha256": "64735112375f8c81d0c262c8e944c9678d060c2e6081908871740cc2573591a0"
+    },
+    {
+      "path": "research_v7/media-closure-review.md",
+      "bytes": 11312,
+      "sha256": "812b30774dae1946a6d7d823317c244b5ca8146d97f59be4a2abcf51504990a9"
+    },
+    {
+      "path": "research_v7/media-feasibility-contract.md",
+      "bytes": 15430,
+      "sha256": "102c28eaff89c0b1607a71f6c75c61757a5d92c98eb521f512cba55f3e6e7938"
+    },
+    {
+      "path": "research_v7/media-feasibility-review.md",
+      "bytes": 13993,
+      "sha256": "426a48d3c00e407fe295d73ccf05b780a152b86e990c432db8ec03e2b152a1bc"
+    },
+    {
+      "path": "research_v7/muxcls-coverage.csv",
+      "bytes": 31913,
+      "sha256": "ccca66b4dd3cf9b8621621330c148d516ced4d5b5f241b6aa91da9762783e118"
+    },
+    {
+      "path": "research_v7/muxcls-rewrite-contract.md",
+      "bytes": 37502,
+      "sha256": "3a16f8e4f09efdbadddd8c3bcc7f936b9a2afefcaff593e1903198a43e741e27"
+    },
+    {
+      "path": "research_v7/muxcls-source-review.md",
+      "bytes": 25105,
+      "sha256": "6c19a8ca6e9f9d6c691d873f9b65990e8283ef134b05ff8be35b57316ffc3313"
+    },
+    {
+      "path": "research_v7/muxcls-sources/commit.json",
+      "bytes": 7026,
+      "sha256": "e1f8c60019f4e26534e6e41efe7b536b0f70eca567b77270cba11467adce4355"
+    },
+    {
+      "path": "research_v7/muxcls-sources/default-ref.json",
+      "bytes": 369,
+      "sha256": "737d737561958c922405d291825b1bfa6c60124b8084ad26eec4ec4fc7d43033"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded-source-inventory.json",
+      "bytes": 389654,
+      "sha256": "eb1668072c3349b3f65f514a101afe4ec16234039b6f6e4d03b3a1ab2de0b4af"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/FFmWiz.py",
+      "bytes": 35151,
+      "sha256": "d591839c713d38ad168f647a3a834ac45589c3af8a0275cb895ab6bc090397ee"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/LICENSE",
+      "bytes": 35150,
+      "sha256": "e57f1c320b8cf8798a7d2ff83a6f9e06a33a03585f6e065fea97f1d86db84052"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/__init__.py",
+      "bytes": 156,
+      "sha256": "4549489045bb0b156c14248923bc3dc8307f4c9d7ffdecab0467967f8b5d998e"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/app.py",
+      "bytes": 10911,
+      "sha256": "a719996892c327fe1401e76a060431c27dbe4302a8058fc2fac15c1e1f61b573"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/colors.py",
+      "bytes": 7728,
+      "sha256": "6f93b5145c17a583e33baa25051e89f3cbd041cb3e503c02c4daf3a515fa8e49"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/constants.py",
+      "bytes": 1848,
+      "sha256": "ebea58ac42ac8a65eb48db9c02a4c8860a1e52c2c8f2e1292e24c07c91d6a847"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/copying.py",
+      "bytes": 12321,
+      "sha256": "a3ce0b2e5dbeb9a162fc787aa751011363cbaaa9ce68e049d8808cac6ee4e211"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/logsetup.py",
+      "bytes": 4191,
+      "sha256": "d13f121ead4e1e9340f3ccb9d5d7e2ad8a2964b8efef17cad6e6b4e289551d6c"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/media.py",
+      "bytes": 15114,
+      "sha256": "f5378cf5aff277de2ff9607595fbb2d2a2020236fa9ff647638a4da611371662"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/metadata_edits.py",
+      "bytes": 9870,
+      "sha256": "9d1a67d536d54538a824244f3c8f75e7f04834f65fd35e71992bbf8010b59b87"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/models.py",
+      "bytes": 5673,
+      "sha256": "c1e6dc0b7aa8bc62130ec2d8d0b7b2751828d3b5b255cc0feb7bcc22edb2035a"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/muxlogic.py",
+      "bytes": 9286,
+      "sha256": "ea3902cfc6d7d39cd5c2440f5eb5f9661bd59c0c929543e86e5c62b12f1552d9"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/output.py",
+      "bytes": 9235,
+      "sha256": "488958f6ee01c4fe74c64e0930d0bf98ea643e1de5817e00361d175fc109145a"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/processing.py",
+      "bytes": 18724,
+      "sha256": "2ddf38e6c6e3d53cbfdaa90f8c7c6ed5cbb682c094887fab493a80095a91e89d"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/progressview.py",
+      "bytes": 15918,
+      "sha256": "dc0d3347846b61ab12285596b848b27cff9c0898dbf5d014735bd670e29a5675"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/prompts.py",
+      "bytes": 10878,
+      "sha256": "b4b2e7345937077e0c8a28e3e49741c3181ec7f881132f34d33c4af91bbfcb76"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/reporting.py",
+      "bytes": 14824,
+      "sha256": "821cf717b635092fd6f470cfa7c5585c26464a38f455889ad36ea2e0f443a539"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/selection.py",
+      "bytes": 23136,
+      "sha256": "6568c294ab6c8af37f08f4c6bbcff5182139fc42852873b39761343ff5594a06"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/textutil.py",
+      "bytes": 10386,
+      "sha256": "20282f49689d332656dfa0eeb35e3348cbb6928065e83956912e1b0e2a03e109"
+    },
+    {
+      "path": "research_v7/muxcls-sources/embedded/ffmwiz/support/ext00b.py",
+      "bytes": 21694,
+      "sha256": "947065865082f57991d9d5aaeb2ec5f033bb434d9b0ceaaf5b5b45da7ac73c43"
+    },
+    {
+      "path": "research_v7/muxcls-sources/manifest.json",
+      "bytes": 71352,
+      "sha256": "89ec4be5f1f1aa559534ad5dae5a5ab821eeda6dec977a443eba59afcdd37951"
+    },
+    {
+      "path": "research_v7/muxcls-sources/repository.json",
+      "bytes": 146,
+      "sha256": "782219d1d898eddd52b80e426daa67babeb5b1f9c42ec68138031372a6549554"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone-vs-embedded.patch",
+      "bytes": 13116,
+      "sha256": "f15e4cb7912848f3c7d5315c0524cf67e2d02c129e92b826e6e492b32e4c2ace"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/ISSUE_TEMPLATE/bug_report.md",
+      "bytes": 855,
+      "sha256": "ae9a7bea39322805725318e7c8be44b406bd85b5fd6b276f2371390199592a30"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/ISSUE_TEMPLATE/config.yml",
+      "bytes": 201,
+      "sha256": "1ef1f0486a7cf077a5420c88aef95e1d10edfea0f4e142b7e0e5b85ec5eb13ff"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/ISSUE_TEMPLATE/feature_request.md",
+      "bytes": 535,
+      "sha256": "27ccc90b0dd2da8a50441b5469cd22b15c27fdc4f9c41230cd2e695d650f50b7"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/dependabot.yml",
+      "bytes": 372,
+      "sha256": "e0d3f2e18a79a27e7cd712cd89504af48983150fe3d2254652a8459dfe25089a"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/pull_request_template.md",
+      "bytes": 577,
+      "sha256": "535c5f04dbec9c51c9678f2b236d0ef69c78c8627cc7e0a59d3156b2977eb6ee"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/workflows/codeql.yml",
+      "bytes": 1220,
+      "sha256": "128cd2263861b15ec595cdb76049b36b334314e2f3b5a50fd843ce2e5577d5fc"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.github/workflows/tests.yml",
+      "bytes": 8295,
+      "sha256": "3d5cb739adb989c35d7820604795d1d2ff66a40c38f300559e803369d746c4eb"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/.gitignore",
+      "bytes": 1733,
+      "sha256": "9e7051bd78a576bbdcefc6931f0abcc5d88b400f2249124be8aec4d28f2060a5"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/ATTRIBUTION.md",
+      "bytes": 360,
+      "sha256": "03b9effbca5b8a8425117ae668930212c03ee7b7a07a02552ac48a730dc4f7d1"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/CHANGELOG.md",
+      "bytes": 26018,
+      "sha256": "b85ce6d62061aff12568d16ec08cec6019ab28d679fa40204de348d19663cdd7"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/CONTRIBUTING.md",
+      "bytes": 3463,
+      "sha256": "f196ffac7a629f4db9613eef663db4be33c789c6159b7efb447b1bb9b4a0fc72"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/GITHUB_RELEASE_NOTES.md",
+      "bytes": 4607,
+      "sha256": "b81ff0e2d1e0e34864b575d7db291b7ec69a35a48c0011329d34924ad9759e74"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/Install-MuxClsCommand.ps1",
+      "bytes": 4062,
+      "sha256": "eb92bee3d1924268478453ebcf3240954e82a50f7feef5689c299e6c2c33055b"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/LICENSE",
+      "bytes": 1067,
+      "sha256": "c4e1d1995f6c54655b016002d4f53b9f405d1dc35cd0a10e2b833b4f6e0b0c6a"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/MuxCls.py",
+      "bytes": 1185,
+      "sha256": "f43cfc0254979c36304805a3da9c4c36dbe5d36c83e6e9ad26d08e839bb56006"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/README.md",
+      "bytes": 22384,
+      "sha256": "dbc52d96147992b275c7eec65db535fc63c6c78f0d4b0a86153804b99b17cb55"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/SECURITY.md",
+      "bytes": 1098,
+      "sha256": "20969e527bfef5dbbd29a5ff3ae8239f502c30c2923243913a60d275a78697a7"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/docs/MANUAL_QA.html",
+      "bytes": 78913,
+      "sha256": "fbca2863f5f686064b4cd5fb27e47153f9a81f672759adf98f96d5a2ddee2ce3"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/__init__.py",
+      "bytes": 128,
+      "sha256": "6dfa12fcf5dd8f1b77a897119f9fbb5d8d1529a27ab21646b7fbc27f73ffbf6c"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/app.py",
+      "bytes": 10211,
+      "sha256": "48c73f007ed83c18bf6ba528e9b705bc94483c74ff70c44fe5563bca9fe6906c"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/colors.py",
+      "bytes": 6876,
+      "sha256": "f7c30368cf8ffec3f50e34b2dda5342a33c840e381bde4b1cfbf6160a5237da9"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/constants.py",
+      "bytes": 1795,
+      "sha256": "85f68239dd4d6db17b8df4d74a62393f95cffcda1ff6dfce80a5ae0d2203834f"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/copying.py",
+      "bytes": 12268,
+      "sha256": "0b9ae7c46983c8f334c0983021abc4335f93cbbe2989017694080ddb49d83f5d"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/logsetup.py",
+      "bytes": 4128,
+      "sha256": "2537b8652e57d473e138555d38875e30dc54d716f202037e183a0e59bcd308f8"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/media.py",
+      "bytes": 13646,
+      "sha256": "86e624aacc92f98cb6f59c733776807b44b1278dfbbbb8903ec315ff3b35de45"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/metadata_edits.py",
+      "bytes": 9817,
+      "sha256": "64292de0fd3e05bba5f4822ce1e2130bf1507a0a88d32757dd413143d1e6715a"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/models.py",
+      "bytes": 5620,
+      "sha256": "0d270294c0bb0af3c052a3f259d563c1247baf27fcdc82dadfd8bc1fce3d57d6"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+      "bytes": 9233,
+      "sha256": "a1862d39b1c5f6d476b00d60fc2221983fee1e03b37b23f71c23127ea241f1d3"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/output.py",
+      "bytes": 9182,
+      "sha256": "4888abde47c891d7f2c88e7c334c9500c63ce94c6affb8d8d4425f62954aa652"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/processing.py",
+      "bytes": 18671,
+      "sha256": "ea722a0274f2abc883daab3c9385e0031610aed6a6839fef71f058b3611a6f56"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/progressview.py",
+      "bytes": 15865,
+      "sha256": "713f4e1c643a550310b834372cc09d8edd735b04f7065de3c71e687b9d0705ee"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/prompts.py",
+      "bytes": 10825,
+      "sha256": "ca9b77a9f74c775016ef1143e69add526176b38c266b1e576678e406473f58a0"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/reporting.py",
+      "bytes": 14771,
+      "sha256": "8292a321e1f9c0f87efdfd5ca09a63451c9d914868601c8c9afedae72a09e486"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/selection.py",
+      "bytes": 23083,
+      "sha256": "e0b68e29dc0008879e41b19de83a3ddad17749f4fec070902a2de05372b39adc"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/muxcls/textutil.py",
+      "bytes": 10333,
+      "sha256": "f07764e1918248ad8e7bd663db3862bce18b4392754b5716589dde2888950583"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/pytest.ini",
+      "bytes": 52,
+      "sha256": "4551307f5b1a58adb7ec215d513089ba670b1737b81ada5a5863afe796d67343"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/requirements-dev.txt",
+      "bytes": 736,
+      "sha256": "ee45b546eb7c15589aee510ec10983f066438dd18321a086c95e39b341dc1bef"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/ruff.toml",
+      "bytes": 2192,
+      "sha256": "1e9f43160f880567a87c95b7db4c4f4aaeb0e541c1d0d341eb104c218dd7eb7d"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/run.ps1",
+      "bytes": 1728,
+      "sha256": "a1d76ea48866d9542c1f7c2952739761133cbdee821a9440dcf07d5793757655"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/conftest.py",
+      "bytes": 816,
+      "sha256": "54a1b8f79f1c2138efaa22c5c231b8de4b45af9287dd96eb271254f95a6ecb06"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_app_flow.py",
+      "bytes": 9216,
+      "sha256": "9aa0b583fea6cec06bf13da644f9838bacfbc39cc55e90d5d8759840b3ec7359"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_copying.py",
+      "bytes": 14633,
+      "sha256": "ee4597888187a5c7a1e7c6abf34bb082cf538fe25b8f8ecbd36762e9723cc7b2"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_demo_ui.py",
+      "bytes": 3744,
+      "sha256": "717fad9d2a275b68028fc452466faf281fd7f2efa838559567763f9a42ea41c9"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_installer_profile.py",
+      "bytes": 5357,
+      "sha256": "08375720d4824adcf8a4bc206446d8f9feacb2ae61a01d8090d8ae24ae2b35a4"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_logging_completeness.py",
+      "bytes": 9000,
+      "sha256": "9df1db4e930d9ff13eeac5bf5f53d299bc6951fe29a5e921f7d69e37fbfad461"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_models.py",
+      "bytes": 6353,
+      "sha256": "2ac51a87e09060e376355dc5d7edf92343337012bf69466145a87dba2d061bd4"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_muxlogic.py",
+      "bytes": 8941,
+      "sha256": "057481f9f3a4fd8a1ec9590d70f9bd4c5e84a3a271938b1c40644390d642b58b"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_output_paths.py",
+      "bytes": 7536,
+      "sha256": "1a50800cea2cadefeac58a762aacc11a29cbb3bce26b944397dbb0b9679e5b73"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_process_control.py",
+      "bytes": 3350,
+      "sha256": "bee14db5e88633a70e4d1d3433e2a0afe148450ad484f08a0ddc20924f0d82f6"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_processing_e2e.py",
+      "bytes": 10340,
+      "sha256": "9090137d8c4363abf2a03793b157e922c131548d9a5dd22c93ffdc553ad0f442"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_processing_rules.py",
+      "bytes": 13410,
+      "sha256": "422605aa0bfd13f8406e0af52a8341a859b30b9a0a4106a8be154779b6517954"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_progressview.py",
+      "bytes": 11333,
+      "sha256": "9d71989a9f8864116089e0472d6ddb6719fda2002c0b0bb3e07db6a56350e6af"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_prompts.py",
+      "bytes": 6750,
+      "sha256": "de72ad48a72bbfe45b9f1ca59249ae91375705e059248f497d7884b090b957ce"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_runtime_dependencies.py",
+      "bytes": 3524,
+      "sha256": "7f0e9180677f4b804a897ec739ca14574c0efbedf5c9873490900cf76909cc87"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_selection_advanced.py",
+      "bytes": 10159,
+      "sha256": "d546f5354f872c90f88260cce9bd6e0e28c4d38c1b874e50ddecc2cc3096b3c3"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_selection_exact.py",
+      "bytes": 6186,
+      "sha256": "17e77705995348468f6371cd3c7d5f9892545c408cf2d56164d0647ef74f79e0"
+    },
+    {
+      "path": "research_v7/muxcls-sources/standalone/tests/test_selection_logic.py",
+      "bytes": 3594,
+      "sha256": "b420f1136d3d40226605918f174960e14d9a98c81e1abcc64a24186156092431"
+    },
+    {
+      "path": "research_v7/muxcls-sources/tree.json",
+      "bytes": 18384,
+      "sha256": "05fc753a0c37d8907c96740f382ae96e8733bd3670b8e1440029eca97f46b15d"
+    },
+    {
+      "path": "research_v7/object-access-contract.md",
+      "bytes": 10592,
+      "sha256": "c572ce429e6e78e6567e69396fce5794064fc6b0c307eb2b48159cb268810fff"
+    },
+    {
+      "path": "research_v7/object-access-review.md",
+      "bytes": 1542,
+      "sha256": "168dfde41c75a60be8bda03af5c2db7d45193877ed370db69683ca5ccfd549ed"
+    },
+    {
+      "path": "research_v7/product-closure-review.md",
+      "bytes": 11738,
+      "sha256": "995182441b2888f39658a221334c29327bf865bec625d0197b1cfb59b378f14b"
+    },
+    {
+      "path": "research_v7/product-implementation-contract.md",
+      "bytes": 20119,
+      "sha256": "c5c75262ec21c2692079b4d35e5fbf01d2d97523ab1228ec7cd5468545048d1e"
+    },
+    {
+      "path": "research_v7/product-implementation-review.md",
+      "bytes": 12579,
+      "sha256": "e642626e36bce4f73907a7d904774dec09f6542e90019b0762d83c6567136784"
+    },
+    {
+      "path": "research_v7/requirements-traceability.csv",
+      "bytes": 9731,
+      "sha256": "232511ebcf15401d294d07a350d14b4515b0fc84aada1d40787adcc24dac98ff"
+    },
+    {
+      "path": "research_v7/requirements-traceability.md",
+      "bytes": 9117,
+      "sha256": "ca2e2e2bbef0707ea5ae14601d2417ce8cadaeee4cf7c8a686f0eb0343b925cb"
+    },
+    {
+      "path": "research_v7/review-resolution-ledger.csv",
+      "bytes": 13727,
+      "sha256": "9cf8d32976b3df42c92207b316c40765188986c33d66e52abee3e5b2a00582a2"
+    },
+    {
+      "path": "research_v7/review-resolution-ledger.md",
+      "bytes": 11507,
+      "sha256": "8a7c233c1ffbe1bde097324f61c3a49a7b09788a2ecff0ba8585cd18af4d80dc"
+    },
+    {
+      "path": "research_v7/security-sources/commit-01044d04536eec6e2f5f48ef404cf45d15feb461.json",
+      "bytes": 2677,
+      "sha256": "dea4948cc5cc32e15332af6a11ec569273dd5ce1cc2f67c51b2a1e93b2817c37"
+    },
+    {
+      "path": "research_v7/security-sources/commit-191715f0232cee64402c3e7733f28ff4061224b6.json",
+      "bytes": 2677,
+      "sha256": "31410336da45b074d3d5a00ebd2b6e2ab27dcd6f45215053bc5c18e50635168b"
+    },
+    {
+      "path": "research_v7/security-sources/commit-ea9e85e54981b8402368d0f21648836d6738f1b1.json",
+      "bytes": 1957,
+      "sha256": "9b40cd8002138e2bd9c6dbef6fead11605bb900db036965f159945ba40a6fabc"
+    },
+    {
+      "path": "research_v7/security-sources/ffmpeg-9.0.2-libavformat-hls.c",
+      "bytes": 111499,
+      "sha256": "fd08aae89dc14520501ffa231597a0e47dd959e3fa62d264d2dbfb8298bcaaa9"
+    },
+    {
+      "path": "research_v7/security-sources/ffmpeg-9.0.2-libavformat-rtsp.c",
+      "bytes": 108720,
+      "sha256": "7ed3d7cd85feee1a63737054dbf9d2e7294f8a9e7851aaf72c829082987b4495"
+    },
+    {
+      "path": "research_v7/security-sources/manifest.json",
+      "bytes": 3936,
+      "sha256": "0f080132a017af7691de3b670f7efcbf2648081303e0f962f568ddd704927646"
+    },
+    {
+      "path": "research_v7/sources.lock.json",
+      "bytes": 3360,
+      "sha256": "e86ecdf5541548ddb5c652697adf05c8233f32405733f4efb97a5bb02137bad6"
+    },
+    {
+      "path": "research_v7/temporal-correction-summary.json",
+      "bytes": 2170,
+      "sha256": "2d85d81daed9e5a3a5abdcc871dd9e2456dbfdad787092a14fb56b1a3bbc8ba6"
+    },
+    {
+      "path": "research_v7/temporal-field-corrections.json",
+      "bytes": 22639,
+      "sha256": "f5b15ecde395969bfec6bdb796ecc669ae41fa6d8ccfe55db6e59a031a8e732b"
+    }
+  ]
+}

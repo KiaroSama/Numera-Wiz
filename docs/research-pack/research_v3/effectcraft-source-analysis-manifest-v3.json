@@ -1,0 +1,331 @@
+{
+  "source_revision": "9db7f3b21700fd821f215782ed1c82afe077880f",
+  "method": "all specs descriptor functions statically interpreted; render functions selectively source-reviewed; no whole-repository semantic-completion claim",
+  "sources": [
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/audio_fx.rs",
+      "bytes": 44426,
+      "sha256": "7ab8937f00dda79ee81a724aebc4c3d6e1d6377b71e1109d902849f4952b97e7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/blur2.rs",
+      "bytes": 39999,
+      "sha256": "25a328fe79a0bd99ea422c9453964cba02f958fff001036eed135185a86151de"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/blur3.rs",
+      "bytes": 17442,
+      "sha256": "b5f2dc481c4ac932c3e01b44a510e81725e1d8f3a167b76ad57237c00364a6b6"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/camera_tracker.rs",
+      "bytes": 16279,
+      "sha256": "2af425c3188a9c5356dc2da92b426d66390045b4f6ed76a5640453d99763958f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/card3d.rs",
+      "bytes": 21039,
+      "sha256": "7c013a90ed4c0c72dc40d64e32636b16309489fa774980b312ea7aa461275b36"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/catalog.rs",
+      "bytes": 13312,
+      "sha256": "93a272a9086e17ce8b50a731f2aff8dd79485b212fe65843350161affa4ae1ed"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel.rs",
+      "bytes": 29967,
+      "sha256": "38959196c2acefd6ac3153bd3f706ba68973c85b39bdf395a6975490cf57617a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel2.rs",
+      "bytes": 19354,
+      "sha256": "865dba18f643a5988387a2a238d9f7849251dcd9de1058c3c1fe9c1b46b6c999"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/channel3d.rs",
+      "bytes": 43147,
+      "sha256": "221867fabe30b5498703cd7ec8a79806cbe89d1cd1e12fc923c4d94535f6974a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color2.rs",
+      "bytes": 54897,
+      "sha256": "ac5044b6d6d899ec364f861e20e8698f8841550fe5805adeabe36ced0d3b0846"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color3.rs",
+      "bytes": 52842,
+      "sha256": "a198325bf3ce03b1e34d4bd9dec3ffd351f2b4b63c67035a0bd11e3b9ba1a603"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/color_fx.rs",
+      "bytes": 71004,
+      "sha256": "546be2fb1fac1663710a8d89909a5df8c5a81ccfbecfd9466fc377e87c6109e7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/controls.rs",
+      "bytes": 2813,
+      "sha256": "23af82e0dcba5fb41639b763d03f8cf96d760f190086e83713180342df82a81e"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort.rs",
+      "bytes": 27444,
+      "sha256": "417a37c5ac7d746143ee8946437337684f4277a6ef3d30737fb478e51e21e35f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort2.rs",
+      "bytes": 50856,
+      "sha256": "701ce40c7246f87e094202b5b4ac36b26765b5afad2bcff7e198a5593288d17f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort3.rs",
+      "bytes": 58306,
+      "sha256": "1485fd84f2ef752b9248a4b32ee0e65d8b072b3be8b5dff787cd24bb04693edf"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/distort4.rs",
+      "bytes": 36135,
+      "sha256": "4928ba5d4e93695965a3180761b8920c4c5c456834643d38967aaab93ca3fa07"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/face_track.rs",
+      "bytes": 2232,
+      "sha256": "eae578806ecf16870a4380c4d30418e9c2041507d8ee317f7fb7a8d17a3dc1af"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/fidelity.rs",
+      "bytes": 2417,
+      "sha256": "606ecf0a7a85a518e86ae25b5c03dfb84dc7a74ae119ed67bcce932f4025ff18"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate.rs",
+      "bytes": 23603,
+      "sha256": "00c02476a9d120a39c70331a18efc33558dd3b1c11fe6437e7e19a9c3bbb2566"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate2.rs",
+      "bytes": 72299,
+      "sha256": "0593555eaa361272d5aac67e4cb7b028d84e0d8bec538c251b99c32d109ce763"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/generate3.rs",
+      "bytes": 109597,
+      "sha256": "ce6cb28cb99fb7677881ac1e2ca245a259ca577027b4acd89f30f95f9eafc961"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keying.rs",
+      "bytes": 35111,
+      "sha256": "bcf9ce2042a95aee20feeb5c5dd9121cc14dcf10060f722de91aed5615583aed"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keying2.rs",
+      "bytes": 32135,
+      "sha256": "05f8da530d62882b6cf3eed04f66135a9b1ee3203ece5205a6b351b7390b3d23"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/keylight.rs",
+      "bytes": 33460,
+      "sha256": "baba8352af7d9fbc9c53da90a3b9b48b61d8040af3d4cfa0facefd15f0878524"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/lib.rs",
+      "bytes": 57301,
+      "sha256": "9b2c3f264b56459fd862da8388c1c46442a0e1a3e5d574fc4bcb83a97d9044f2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/matte.rs",
+      "bytes": 20972,
+      "sha256": "9b4a5e207b64f84ff2f5e43a49c4e96a453d85013137cf53488ff23911ec713e"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/migrate.rs",
+      "bytes": 38969,
+      "sha256": "b9a7d906b64c77dab3e393da2b65a9d43791f7f202d4729dc756525807000889"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/misc.rs",
+      "bytes": 31043,
+      "sha256": "d3e54a153b24b3f4f56a3031b7406214d06c8ae072f1044539eb0c854001a0f9"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/mocha_shape.rs",
+      "bytes": 9684,
+      "sha256": "50523e325baac5ccc84358953b38f8952953ce6da4520941e6713cc059fd652b"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise.rs",
+      "bytes": 47509,
+      "sha256": "7aecd13fa8ea131f081fe1496631ebf78df7379e8c0f6b7cd2709469b10f2a39"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise2.rs",
+      "bytes": 15856,
+      "sha256": "50e0e2c8234a12ec451453fbe4b4c5c3866e288d912caa524f6b154736a2c127"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/noise3.rs",
+      "bytes": 31056,
+      "sha256": "14145ae4f210c7b7e0fdef3f15a5e549e0947416143426bd842371a1dbd8e87c"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/object_matte.rs",
+      "bytes": 32904,
+      "sha256": "4b62663e45d6fa0b31bebc4aa563192a88d4652cedb65e7c363d0e8fc07bdc22"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/obsolete.rs",
+      "bytes": 7471,
+      "sha256": "306f4f542b78abcb1265a23ca5408cd20a017651b09475431e611802d42187d3"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/ocio.rs",
+      "bytes": 79750,
+      "sha256": "34b31eb7848fc0ad679fce26f77081d6d4d213c5a2c3b2d4a27b7a10f9b30391"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/ocio_config.rs",
+      "bytes": 73429,
+      "sha256": "09e2a1692c32e59a8f59e350f98493f5f80159ca0d08fda3f7298cecb0368c0f"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/paint.rs",
+      "bytes": 35255,
+      "sha256": "1eee4096801dcd7a655f4297311ac6c48dc145e4e623ccc374c04cd1534d7ddb"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/perspective.rs",
+      "bytes": 25379,
+      "sha256": "fd0d7752b7abd2f2e3447496ca69fad4ef0218b97a88ce2d43e72d5478ebd71b"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/perspective2.rs",
+      "bytes": 12629,
+      "sha256": "01d4c5873e6e9c1c0860f52c8af723f0f02633b0e576e285e5c179278eb99908"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/plugin.rs",
+      "bytes": 13693,
+      "sha256": "5532b727bbd6ea340234cc376a7b9909eab9769d2ab422115db44dd0ac873fe2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/psim.rs",
+      "bytes": 3715,
+      "sha256": "3ad0aa6f669553ffa2acc1b141611e69e750a01781d571b8d7e9a40ca0739087"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/arap.rs",
+      "bytes": 11969,
+      "sha256": "a22043550530a172939a26363116d50118df8df4469e53f404769a5eda4169fd"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/mesh.rs",
+      "bytes": 22424,
+      "sha256": "6b50886629a78ebde4873bb6815e02305f5e4bf1290f817fc54835036a0205f7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/puppet/mod.rs",
+      "bytes": 20983,
+      "sha256": "8c5ad68ca026285efe89db101df29de70ca336cd184a472d7e3132f81bee8cad"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/roto.rs",
+      "bytes": 33753,
+      "sha256": "f8e19574ce89b78566d44d7ba1f5b68250cb4aa353d400f4c686aee4175f4b71"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim.rs",
+      "bytes": 93389,
+      "sha256": "5cc96e1f51d4ffdde971bac1498a4a009656214076a84ec58463937d636cdc9c"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim2.rs",
+      "bytes": 133265,
+      "sha256": "8bd5251788009015fff8a4169a1db9769d3960404e91cbb118f0c8bfd5b966d1"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/sim3.rs",
+      "bytes": 68678,
+      "sha256": "3b94eeda5909e84de9f51dd1b497ee8b32320c1de9dcb632073ecfefcefbdd1a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/stylize2.rs",
+      "bytes": 46078,
+      "sha256": "470215b65d85f74cbc83513dc7e7be96b91cbb61495131e4e7da52b5202a897a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/stylize3.rs",
+      "bytes": 27088,
+      "sha256": "7c053b20ad45be3dab0bc0ef3d00a6a1a342ceea6495ecc0092c26fe4d5b91d2"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/textfx.rs",
+      "bytes": 58552,
+      "sha256": "b2f3258591136b9d2b3d4c33f89e1738733a4f25cfdf1df52f9b959333b9edea"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/time_fx.rs",
+      "bytes": 54626,
+      "sha256": "88a7beec97c596e585ffefa6b7775f6de8ad3052b26b85855f5470b6043efeec"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/transition.rs",
+      "bytes": 40369,
+      "sha256": "af4848d329752fd71390470711ce56ed82d9f6b52456b7a450d8d6fa28254161"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/transition2.rs",
+      "bytes": 20686,
+      "sha256": "651f7ccca4f4f483749b1f05eaffe0801d4cd46b0505423f9dbb4164a053ab07"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/util.rs",
+      "bytes": 29296,
+      "sha256": "fc9150b1149335c26853682c541a0774d6ca6c1ee86a49a07a590e54f7fb7deb"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/utility.rs",
+      "bytes": 18504,
+      "sha256": "54e0647d70aac7064113bdbcbabbb0f91d0aadff362c9c03e554d271be3db683"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/utility2.rs",
+      "bytes": 2930,
+      "sha256": "3c0e4fbd558ec47f7e526932b9d7c1fee24b2225011aa09cd29a21cb489f85b7"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/vr.rs",
+      "bytes": 60573,
+      "sha256": "50e087e4fcecc0f7ef6df145d048937cec98132c5b0a0adeab357bb6317aea2a"
+    },
+    {
+      "path": "research_v2/sources/effectcraft/crates/effects/src/warp_stab.rs",
+      "bytes": 25979,
+      "sha256": "c8418129a6f9b6d97b6466eb853fe695acd86d8fdb0fbe2e3ebaa753335ffcc4"
+    },
+    {
+      "path": "research_v3/source-extras/color_blend.rs",
+      "bytes": 19264,
+      "sha256": "f7c4ba62d8342be85274f420485c904998f4864c3778fe89763963e0c91763c0"
+    },
+    {
+      "path": "research_v3/source-extras/color_lib.rs",
+      "bytes": 8707,
+      "sha256": "9ebda22fff5dbe035ab804bdfb728e09c59970cfc55b4fe8f45ee9cb51984a53"
+    },
+    {
+      "path": "research_v3/source-extras/raster_blur.rs",
+      "bytes": 10807,
+      "sha256": "9a7d312e1d3be03fd987db479312a36d989d8def1b135f96b0438d7fd279bdbb"
+    },
+    {
+      "path": "research_v3/source-extras/raster_lib.rs",
+      "bytes": 12737,
+      "sha256": "1f304c1edea8bca3d329fc67b4829226174c701c5e0ad8a0b4a39b32031ef7d3"
+    },
+    {
+      "path": "research_v3/source-extras/track_face.rs",
+      "bytes": 59576,
+      "sha256": "972bbf42ec402896659c7244cc23804a5e655433b2e2ec44361e7c344837d106"
+    }
+  ]
+}
