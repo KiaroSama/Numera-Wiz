@@ -4,7 +4,7 @@ use rmcp::{ErrorData,RoleServer,ServerHandler,model::*,service::RequestContext};
 use std::{borrow::Cow,sync::Arc};
 #[derive(Clone)]
 pub struct Bridge{stdio:bool}
-impl Bridge{pub fn stdio()->Self{Self{stdio:true}}pub fn http()->Self{Self{stdio:false}}}
+impl Bridge{pub fn stdio()->Self{Self{stdio:true}}#[cfg(any(not(windows),feature="desktop"))] pub fn http()->Self{Self{stdio:false}}}
 fn tool(name:&str)->Option<Tool>{
     if !ACTIVE_COMMANDS.contains(&name){return None;}
     let descriptor=commands::descriptor(name)?;
