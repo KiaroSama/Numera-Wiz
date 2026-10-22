@@ -39,3 +39,21 @@ source checks extend the supplied completed research without replacing coding.
 The input pack's reading ledger belongs to its original researchers. This session
 has read selected mandate sections and affected MuxCls/MCP/UI sources. The remaining
 full-corpus reading and every media/package/GPU qualification stay explicitly open.
+
+## Process ownership
+Decision: process-wrap 10.0.1 supplies Unix process groups and Windows Job Objects
+through safe Tokio wrappers. Independent I/O drainers retain fixed byte budgets;
+cancel/deadline paths kill the owned containment and await bounded reaping.
+Rationale: avoid handwritten platform FFI and direct-child-only cancellation.
+Source: https://github.com/watchexec/process-wrap/tree/v10.0.1 .
+Limits: owner-crash windows, escaped descendants and independent whole-tree proof
+remain real qualification gates. processkit was inspected as an alternative; its
+process-group fallback does not provide full membership proof either. No library
+name is treated as evidence of unconditional no-orphan behavior.
+
+## Real fixture profile correction
+The CI-built n9.0.2 source profile initially omitted wrapped_avframe decoding,
+which lavfi video fixture generation requires. The actual media job failed before
+producing source media. Enabling that decoder fixed the concrete failure; run
+39874893026 subsequently passed real full-byte-copy and remux order/tag assertions.
+This limited CPU fixture profile is not the complete standard runtime profile.
