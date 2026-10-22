@@ -1,7 +1,7 @@
 name: Rust CI
 on:
   push:
-    branches: ['implementation/**', main]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -39,6 +39,15 @@ jobs:
         run: cargo run -p xtask -- verify-research
       - name: Generate current contracts
         run: cargo run -p xtask -- schemas
+      - name: Save development executables
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: numera-wiz-development-${{ matrix.os }}
+          path: |
+            target/debug/numera-wiz
+            target/debug/numera-wiz.exe
+          if-no-files-found: error
       - name: Prepare formatting evidence
         if: always()
         shell: bash
@@ -55,3 +64,32 @@ jobs:
             formatting.patch
             docs/generated/
           if-no-files-found: error
+
+  media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: 946fcce07b6dcd0331c8cc609192aeff5e1924f8
+          path: target/fixture-ffmpeg-src
+      - name: Install toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Build the identified CPU fixture component profile
+        run: cargo run -p xtask -- build-fixture-profile
+      - name: Execute actual media preservation regressions
+        env:
+          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+        run: cargo test -p nw-engine --test media -- --ignored --nocapture
+      - name: Save fixture components and actual configuration
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ffmpeg-development-fixture-profile-linux
+          path: |
+            target/fixture-components/
+            target/fixture-ffmpeg-src/ffbuild/config.log
+            target/fixture-ffmpeg-src/config.h
+          if-no-files-found: warn

@@ -3,7 +3,7 @@ use nw_domain::{DomainError,Result};
 use std::{collections::VecDeque,path::Path,process::Stdio,time::Duration};
 use tokio::{io::{AsyncRead,AsyncReadExt},process::Command};
 use tokio_util::sync::CancellationToken;
-use process_wrap::tokio::{CommandWrap, KillOnDrop};
+use process_wrap::tokio::{ChildWrapper, CommandWrap, KillOnDrop};
 #[cfg(unix)] use process_wrap::tokio::ProcessGroup;
 #[cfg(windows)] use process_wrap::tokio::JobObject;
 
@@ -27,14 +27,16 @@ pub async fn run(program:&Path,args:&[String],deadline:Duration,stdout_limit:usi
     let mut child=owned.spawn().map_err(|e|DomainError::new("PROCESS_LAUNCH_FAILED",e.to_string()))?;
     let stdout=child.stdout().take().ok_or_else(||DomainError::new("PROCESS_CAPTURE_FAILED","stdout was not captured"))?;
     let stderr=child.stderr().take().ok_or_else(||DomainError::new("PROCESS_CAPTURE_FAILED","stderr was not captured"))?;
-    let out_task=tokio::spawn(capture(stdout,stdout_limit,false));let err_task=tokio::spawn(capture(stderr,64*1024,true));
+    let mut out_task=tokio::spawn(capture(stdout,stdout_limit,false));let mut err_task=tokio::spawn(capture(stderr,64*1024,true));
     let result=tokio::select! {
         status=child.wait()=>status.map_err(|e|DomainError::new("PROCESS_WAIT_FAILED",e.to_string())),
-        _=cancel.cancelled()=>{let _=child.start_kill(); let _=tokio::time::timeout(Duration::from_secs(5),child.wait()).await;Err(DomainError::new("CANCELLED","Owned process was cancelled"))},
-        _=tokio::time::sleep(deadline)=>{let _=child.start_kill(); let _=tokio::time::timeout(Duration::from_secs(5),child.wait()).await;Err(DomainError::new("PROCESS_TIMEOUT","Owned process exceeded its finite deadline"))},
+        _=cancel.cancelled()=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("CANCELLED","Owned process was cancelled and reaped")),Err(error)=>Err(error)}},
+        _=tokio::time::sleep(deadline)=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_TIMEOUT","Owned process exceeded its finite deadline and was reaped")),Err(error)=>Err(error)}},
     };
-    let out=tokio::time::timeout(Duration::from_secs(5),out_task).await;
-    let err=tokio::time::timeout(Duration::from_secs(5),err_task).await;
+    let out=tokio::time::timeout(Duration::from_secs(5),&mut out_task).await;
+    if out.is_err(){out_task.abort();}
+    let err=tokio::time::timeout(Duration::from_secs(5),&mut err_task).await;
+    if err.is_err(){err_task.abort();}
     let status=result?;
     let (stdout,total)=out.map_err(|_|DomainError::new("PROCESS_CAPTURE_FAILED","stdout drain deadline exceeded"))?.map_err(|e|DomainError::new("PROCESS_CAPTURE_FAILED",e.to_string()))?.map_err(|e|DomainError::new("PROCESS_CAPTURE_FAILED",e.to_string()))?;
     let (stderr,diagnostic_bytes)=err.map_err(|_|DomainError::new("PROCESS_CAPTURE_FAILED","stderr drain deadline exceeded"))?.map_err(|e|DomainError::new("PROCESS_CAPTURE_FAILED",e.to_string()))?.map_err(|e|DomainError::new("PROCESS_CAPTURE_FAILED",e.to_string()))?;
@@ -42,4 +44,11 @@ pub async fn run(program:&Path,args:&[String],deadline:Duration,stdout_limit:usi
     let output=RunOutput{stdout,stderr_tail:String::from_utf8_lossy(&stderr).into_owned(),exit_code:status.code(),diagnostic_bytes};
     if !status.success(){return Err(DomainError::new("PROCESS_FAILED",format!("Child exit {:?}; bounded diagnostics: {}",output.exit_code,output.stderr_tail)));}
     tracing::debug!(diagnostic_bytes,"Process exited successfully; output still requires semantic verification");Ok(output)
+}
+
+async fn terminate(child:&mut Box<dyn ChildWrapper>)->Result<()> {
+    tracing::warn!("Terminating the owned process group/job object");
+    child.start_kill().map_err(|e|DomainError::new("TREE_TERMINATION_UNCERTAIN",e.to_string()))?;
+    tokio::time::timeout(Duration::from_secs(5),child.wait()).await.map_err(|_|DomainError::new("TREE_TERMINATION_UNCERTAIN","Reap deadline exceeded"))?.map_err(|e|DomainError::new("TREE_TERMINATION_UNCERTAIN",e.to_string()))?;
+    Ok(())
 }

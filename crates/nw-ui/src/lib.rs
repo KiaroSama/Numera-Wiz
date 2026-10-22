@@ -18,6 +18,7 @@ impl WizApp {
     }
     fn send(&mut self,ctx:&egui::Context){
         if self.busy{return;}
+        if self.request.len()>256*1024{self.response="Request exceeds 256 KiB".into();return;}
         let request=match serde_json::from_str::<Request>(&self.request){Ok(value)=>value,Err(error)=>{self.response=format!("Invalid request: {error}");return;}};
         if let Err(error)=request.validate(){self.response=error.to_string();return;}
         let body=match serde_json::to_vec(&request){Ok(value)=>value,Err(error)=>{self.response=error.to_string();return;}};
@@ -48,10 +49,10 @@ impl eframe::App for WizApp {
         egui::Panel::bottom("progress").default_size(75.0).show(ui,|ui|{ui.label(if self.busy{"Waiting for the local engine…"}else{"Ready"});ui.label("No complete media editor or portable release is claimed by this development view.");});
         egui::CentralPanel::default().show(ui,|ui|{
             ui.heading("Command inspector");ui.label("Canonical request");
-            egui::ScrollArea::vertical().id_salt("request").max_height(260.0).show(ui,|ui|{ui.add(egui::TextEdit::multiline(&mut self.request).code_editor().desired_rows(12).desired_width(f32::INFINITY));});
+            egui::ScrollArea::vertical().id_salt("request").max_height(260.0).show(ui,|ui|{ui.add(egui::TextEdit::multiline(&mut self.request).char_limit(65536).code_editor().desired_rows(12).desired_width(f32::INFINITY));});
             if ui.add_enabled(!self.busy,egui::Button::new("Run query")).clicked(){self.send(ui.ctx());}
             ui.separator();ui.label("Authoritative response");
-            egui::ScrollArea::vertical().id_salt("response").show(ui,|ui|{ui.add(egui::TextEdit::multiline(&mut self.response).code_editor().desired_rows(18).desired_width(f32::INFINITY));});
+            egui::ScrollArea::vertical().id_salt("response").show(ui,|ui|{ui.add(egui::TextEdit::multiline(&mut self.response).interactive(false).code_editor().desired_rows(18).desired_width(f32::INFINITY));});
         });
     }
 }
@@ -65,6 +66,8 @@ mod web {
         #[wasm_bindgen(constructor)]
         pub fn new()->Self{Self{runner:eframe::WebRunner::new()}}
         pub async fn start(&self,canvas:web_sys::HtmlCanvasElement,endpoint:String,bearer:String)->Result<(),JsValue>{
+            let origin=web_sys::window().ok_or_else(||JsValue::from_str("Window unavailable"))?.location().origin()?;
+            if endpoint!=origin{return Err(JsValue::from_str("The browser client only sends credentials to its exact paired origin"));}
             self.runner.start(canvas,eframe::WebOptions{renderer:eframe::Renderer::Glow,..Default::default()},Box::new(move|cc|Ok(Box::new(super::WizApp::new(cc,endpoint,bearer))))).await
         }
         pub fn destroy(&self){self.runner.destroy();}

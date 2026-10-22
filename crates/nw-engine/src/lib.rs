@@ -61,7 +61,11 @@ impl Engine {
         let staging=tempfile::Builder::new().prefix(".numera-owned-").suffix(".mkv").tempfile_in(parent).map_err(io_error)?;
         let staging_name=files::path_text(staging.path())?;
         let args=plan.argv_template.iter().map(|v|if v=="@owned_staging@"{staging_name.clone()}else{v.clone()}).collect::<Vec<_>>();
-        nw_platform::process::run(Path::new(&self.ffmpeg.path),&args,Duration::from_secs(10800),8*1024*1024,cancel.clone()).await?;
+        if let Err(error)=nw_platform::process::run(Path::new(&self.ffmpeg.path),&args,Duration::from_secs(10800),8*1024*1024,cancel.clone()).await {
+            let (_,retained)=staging.keep().map_err(|e|io_error(e.error))?;
+            tracing::warn!(staging=%retained.display(),"Owned staging retained after process failure; no output was published");
+            return Err(error);
+        }
         staging.as_file().sync_all().map_err(io_error)?;
         if staging.as_file().metadata().map_err(io_error)?.len()==0{return Err(DomainError::new("VERIFICATION_FAILED","This attempt produced no new staging bytes"));}
         let observed=self.probe(staging.path(),cancel.clone()).await?;

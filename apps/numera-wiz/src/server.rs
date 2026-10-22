@@ -1,10 +1,15 @@
-use anyhow::{Result,bail};
-#[cfg(not(windows))] use anyhow::Context;
+#[cfg(windows)]
+pub async fn serve(_port:u16,_token_file:std::path::PathBuf)->anyhow::Result<()> {anyhow::bail!("WINDOWS_ACL_QUALIFICATION_PENDING: direct HTTP token-file creation requires the user-restricted ACL adapter; use stdio discovery in this development build")}
+#[cfg(any(not(windows),feature="desktop"))]
+mod http {
+use anyhow::Result;
+#[cfg(not(windows))] use anyhow::{Context,bail};
 use axum::{Router,Json,extract::{State,DefaultBodyLimit,Request},http::{StatusCode,header},middleware::{self,Next},response::{IntoResponse,Response},routing::{get,post}};
 use nw_domain::commands;
 use nw_service::{CommandService,Principal};
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig,StreamableHttpService,session::local::LocalSessionManager};
-use std::{path::PathBuf,sync::Arc,time::{Duration,Instant}};
+use std::{sync::Arc,time::{Duration,Instant}};
+#[cfg(not(windows))] use std::path::PathBuf;
 #[cfg(not(windows))] use std::io::Write;
 use subtle::ConstantTimeEq;
 use tokio::{net::TcpListener,sync::Semaphore};
@@ -38,8 +43,6 @@ fn router(auth:Auth)->Router {
         .layer(middleware::from_fn_with_state(auth,authenticate))
 }
 fn auth(port:u16,principal:Principal)->Auth{Auth{bearer:random_bearer(),host:format!("127.0.0.1:{port}"),origin:format!("http://127.0.0.1:{port}"),principal,expires:Instant::now()+Duration::from_secs(8*3600),slots:Arc::new(Semaphore::new(16))}}
-#[cfg(windows)]
-pub async fn serve(_port:u16,_token_file:PathBuf)->Result<()> {bail!("WINDOWS_ACL_QUALIFICATION_PENDING: direct HTTP token-file creation requires the user-restricted ACL adapter; use stdio discovery in this development build")}
 #[cfg(not(windows))]
 pub async fn serve(port:u16,token_file:PathBuf)->Result<()> {
     if port==0{bail!("Public port must be explicit and nonzero; default is 1578");}
@@ -63,3 +66,7 @@ pub async fn native_session()->Result<(String,String,tokio::task::JoinHandle<()>
     let task=tokio::spawn(async move{if let Err(error)=axum::serve(listener,router(state)).await{tracing::error!(%error,"Native development query service stopped");}});
     Ok((format!("http://127.0.0.1:{port}"),bearer,task))
 }
+
+}
+#[cfg(not(windows))] pub use http::serve;
+#[cfg(feature="desktop")] pub use http::native_session;

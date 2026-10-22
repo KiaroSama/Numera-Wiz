@@ -8,6 +8,7 @@ license.workspace = true
 workspace = true
 [dependencies]
 nw-domain.workspace = true
+nw-platform.workspace = true
 serde_json.workspace = true
 schemars.workspace = true
 sha2.workspace = true

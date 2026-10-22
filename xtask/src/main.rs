@@ -3,7 +3,7 @@ use anyhow::{Context, Result, bail};
 use sha2::{Digest,Sha256};
 use std::{fs, path::{Path,PathBuf}};
 fn main() -> std::process::ExitCode {
-    tracing_subscriber::fmt().with_writer(std::io::stderr).with_ansi(false).with_max_level(tracing::Level::DEBUG).init();
+    nw_platform::init_logging();
     match run() { Ok(()) => {tracing::info!("Automation completed");std::process::ExitCode::SUCCESS},Err(error) => {tracing::error!(%error,"Automation failed");std::process::ExitCode::FAILURE} }
 }
 fn run() -> Result<()> {
@@ -15,6 +15,7 @@ fn run() -> Result<()> {
         "verify-research" => verify_research(root),
         "schemas" => schemas(root),
         "release-gate" => release_gate(root),
+        "build-fixture-profile" => build_fixture_profile(root),
         "help" => {println!("xtask verify-research | schemas | release-gate");Ok(())},
         _ => bail!("Unknown task: {task}"),
     }
@@ -47,4 +48,15 @@ fn release_gate(root:&Path) -> Result<()> {
     if pending>0 {tracing::warn!(pending,"WARNING: Required release evidence remains incomplete");bail!("Release blocked by {pending} incomplete requirement/workflow records");}
     if rows.is_empty() {bail!("An empty ledger cannot qualify a release");}
     Ok(())
+}
+
+fn build_fixture_profile(root:&Path)->Result<()> {
+    if std::env::var("GITHUB_ACTIONS").as_deref()!=Ok("true"){bail!("This source build belongs in GitHub CI");}
+    let source=root.join("target/fixture-ffmpeg-src");let output=root.join("target/fixture-components");
+    let flags=["--disable-doc","--disable-debug","--disable-network","--disable-autodetect","--disable-everything","--disable-x86asm","--enable-ffmpeg","--enable-ffprobe","--enable-protocol=file,pipe","--enable-demuxer=matroska,wav,srt","--enable-muxer=matroska,null","--enable-encoder=ffv1,pcm_s16le","--enable-decoder=ffv1,pcm_s16le,subrip","--enable-indev=lavfi","--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample","--enable-swscale","--enable-swresample"];
+    let mut configure=std::process::Command::new("sh");configure.current_dir(&source).arg("configure").args(flags).arg(format!("--prefix={}",output.display()));
+    tracing::info!(argv=?configure,"Preparing the CI-only FFmpeg fixture build");
+    if !configure.status()?.success(){bail!("FFmpeg fixture configure failed");}
+    for arguments in [["-j2"].as_slice(),["install"].as_slice()]{let mut make=std::process::Command::new("make");make.current_dir(&source).args(arguments);tracing::info!(argv=?make,"Running fixture build stage");if !make.status()?.success(){bail!("FFmpeg fixture build stage failed");}}
+    tracing::warn!("WARNING: This limited fixture component profile is not the required standard distribution profile");Ok(())
 }

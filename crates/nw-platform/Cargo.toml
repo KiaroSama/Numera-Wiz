@@ -17,5 +17,6 @@ tracing-subscriber.workspace = true
 tempfile.workspace = true
 fs2.workspace = true
 process-wrap = { version = "=10.0.1", default-features = false, features = ["tokio1", "process-group", "job-object", "kill-on-drop"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 [dev-dependencies]
 tempfile.workspace = true
