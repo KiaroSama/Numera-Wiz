@@ -36,7 +36,7 @@ async fn run()->Result<()> {
             let input:Box<dyn Read>=match file{Some(path)=>Box::new(std::fs::File::open(path)?),None=>Box::new(std::io::stdin())};
             let mut bytes=Vec::new();input.take(256*1024+1).read_to_end(&mut bytes)?;
             if bytes.len()>256*1024{bail!("Request exceeds 256 KiB");}
-            print_response(serde_json::from_slice(&bytes)?)
+            print_response(nw_domain::commands::decode_request(&bytes)?)
         },
         Some(Mode::Doctor)=>{
             tracing::warn!("WARNING: Complete runtime, portable payload and GPU qualification remain pending");

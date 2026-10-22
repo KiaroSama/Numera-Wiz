@@ -15,8 +15,10 @@ Read the [authoritative revision 7 mandate](docs/research-pack/Numera-Wiz-Implem
 The full research pack is preserved with original hashes. Offline FFmpeg manual
 sources and licenses are under `docs/vendor/ffmpeg/n9.0.2`.
 
-Current code includes exact rational time, strict command DTOs and the shared
-MuxCls selection/ordering/metadata resolver with meaningful regressions. Hosted
+Current code includes exact rational time, strict command DTOs, the shared MuxCls
+resolver, bounded process/file/media foundations, real CLI and official MCP adapters,
+and a shared native/WASM development query UI. [Current manuals](docs/manuals/CLI.md)
+describe the actual admitted scope. Hosted
 Windows/Linux/macOS CI builds/tests the actual workspace and verifies source
 provenance. This does not claim completion of the full MuxCls rewrite, F01-F15,
 editing, five-surface parity, offline portable packaging or GPU qualification.

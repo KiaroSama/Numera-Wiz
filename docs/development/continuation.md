@@ -15,8 +15,16 @@ transformation or owner GPU run has been executed. Full scope and artifact gates
 remain open in tasks.md. Current source tree is a development candidate, not a
 complete portable media product. Consult completion.json for explicit statuses.
 
-Next executable step: push this internal foundation to the implementation branch,
-inspect/fix its hosted three-platform compilation/lint/provenance results, retain
-the resolved lockfile, then implement T010-T020 and close E03-E06 together. Preserve
+Current review: draft PR #1. The domain suite passed on all three hosted targets.
+The expanded development workspace compiled/tests passed on Linux/macOS at commit
+932c1ce5cdc327c63385a975acc75407b26c8ca2; Windows had conditional dead-code lint
+findings, now corrected. The first real FFmpeg fixture build completed but exposed
+a missing wrapped_avframe decoder for lavfi fixture generation; the configuration
+now enables it. New raw-JSON/CLI/stdio/HTTP tests require their next actual CI run.
+
+Next executable step: inspect/fix the current hosted native/WASM/media results,
+retain the final resolved lockfile and apply the exact CI formatting patch, then
+implement the protected owner/redb/authorization/publication integration T010-T020
+and close E03-E06 together. Preserve
 actual result/run/artifact identities when updating evidence; do not restart a
 whole donor survey. Owner GPU testing waits for matching CI-built artifacts.

@@ -25,6 +25,12 @@ async fn authenticate(State(auth):State<Auth>,mut request:Request,next:Next)->Re
     if !bool::from(supplied.as_bytes().ct_eq(auth.bearer.as_bytes())){return (StatusCode::UNAUTHORIZED,"Bearer authentication required").into_response();}
     if request.headers().contains_key("Mcp-Session-Id"){return (StatusCode::BAD_REQUEST,"This development endpoint uses stateless MCP; session IDs are not authorization").into_response();}
     let _permit=match auth.slots.clone().try_acquire_owned(){Ok(value)=>value,Err(_)=>return (StatusCode::SERVICE_UNAVAILABLE,"Request capacity exceeded").into_response()};
+    if request.method()==axum::http::Method::POST {
+        let (parts,body)=request.into_parts();
+        let bytes=match axum::body::to_bytes(body,256*1024).await{Ok(value)=>value,Err(_)=>return (StatusCode::PAYLOAD_TOO_LARGE,"Request exceeds the admitted byte budget").into_response()};
+        if commands::decode_json(&bytes).is_err(){return (StatusCode::BAD_REQUEST,"Invalid or ambiguous JSON request").into_response();}
+        request=Request::from_parts(parts,axum::body::Body::from(bytes));
+    }
     request.extensions_mut().insert(auth.principal);
     match tokio::time::timeout(Duration::from_secs(20),next.run(request)).await{Ok(response)=>response,Err(_)=>(StatusCode::REQUEST_TIMEOUT,"Request deadline exceeded").into_response()}
 }
@@ -65,6 +71,24 @@ pub async fn native_session()->Result<(String,String,tokio::task::JoinHandle<()>
     let listener=TcpListener::bind((std::net::Ipv4Addr::LOCALHOST,0)).await?;let port=listener.local_addr()?.port();let state=auth(port,Principal::LocalUser);let bearer=state.bearer.clone();
     let task=tokio::spawn(async move{if let Err(error)=axum::serve(listener,router(state)).await{tracing::error!(%error,"Native development query service stopped");}});
     Ok((format!("http://127.0.0.1:{port}"),bearer,task))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn actual_http_checks_host_origin_bearer_and_principal(){
+        let listener=TcpListener::bind((std::net::Ipv4Addr::LOCALHOST,0)).await.unwrap();let port=listener.local_addr().unwrap().port();let state=auth(port,Principal::DiscoveryAgent);let credential=state.bearer.clone();
+        let task=tokio::spawn(async move{axum::serve(listener,router(state)).await.unwrap();});
+        let client=reqwest::Client::new();let endpoint=format!("http://127.0.0.1:{port}");
+        assert_eq!(client.get(format!("{endpoint}/health")).send().await.unwrap().status(),StatusCode::UNAUTHORIZED);
+        assert_eq!(client.get(format!("{endpoint}/health")).bearer_auth(&credential).header("Origin","null").send().await.unwrap().status(),StatusCode::FORBIDDEN);
+        assert_eq!(client.get(format!("{endpoint}/health")).bearer_auth(&credential).header("Host","evil.example").send().await.unwrap().status(),StatusCode::FORBIDDEN);
+        let fixture:commands::Request=serde_json::from_str(include_str!("../tests/fixtures/clean-resolve.json")).unwrap();
+        let denied:commands::Response=client.post(format!("{endpoint}/api/v1/commands")).bearer_auth(&credential).json(&fixture).send().await.unwrap().json().await.unwrap();assert_eq!(denied.error.unwrap().code,"PERMISSION_DENIED");
+        let duplicate=client.post(format!("{endpoint}/api/v1/commands")).bearer_auth(&credential).header("Content-Type","application/json").body(r#"{"params":{"index":0,"index":1}}"#).send().await.unwrap();assert_eq!(duplicate.status(),StatusCode::BAD_REQUEST);
+        task.abort();
+    }
 }
 
 }

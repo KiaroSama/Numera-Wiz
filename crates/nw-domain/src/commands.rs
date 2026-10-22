@@ -93,3 +93,35 @@ mod tests {
     #[test]
     fn duplicate_context_is_rejected() { assert!(parse::<PathInput>(serde_json::json!({"path":"a","project_id":"wrong"})).is_err()); }
 }
+
+/// Parse bounded JSON without silently accepting duplicate object members.
+pub fn decode_json(bytes:&[u8])->Result<Value>{
+    if bytes.len()>256*1024{return Err(DomainError::new("RESOURCE_LIMIT","JSON request exceeds 256 KiB"));}
+    #[derive(Debug)] struct Strict(Value);
+    impl<'de> Deserialize<'de> for Strict {
+        fn deserialize<D:serde::Deserializer<'de>>(deserializer:D)->std::result::Result<Self,D::Error>{
+            struct Visitor;
+            impl<'de> serde::de::Visitor<'de> for Visitor {
+                type Value=Strict;
+                fn expecting(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result{f.write_str("JSON with unique object members")}
+                fn visit_bool<E:serde::de::Error>(self,v:bool)->std::result::Result<Strict,E>{Ok(Strict(Value::Bool(v)))}
+                fn visit_i64<E:serde::de::Error>(self,v:i64)->std::result::Result<Strict,E>{Ok(Strict(v.into()))}
+                fn visit_u64<E:serde::de::Error>(self,v:u64)->std::result::Result<Strict,E>{Ok(Strict(v.into()))}
+                fn visit_f64<E:serde::de::Error>(self,v:f64)->std::result::Result<Strict,E>{serde_json::Number::from_f64(v).map(|n|Strict(Value::Number(n))).ok_or_else(||E::custom("Nonfinite JSON number"))}
+                fn visit_str<E:serde::de::Error>(self,v:&str)->std::result::Result<Strict,E>{Ok(Strict(Value::String(v.into())))}
+                fn visit_string<E:serde::de::Error>(self,v:String)->std::result::Result<Strict,E>{Ok(Strict(Value::String(v)))}
+                fn visit_unit<E:serde::de::Error>(self)->std::result::Result<Strict,E>{Ok(Strict(Value::Null))}
+                fn visit_seq<A:serde::de::SeqAccess<'de>>(self,mut seq:A)->std::result::Result<Strict,A::Error>{let mut values=Vec::new();while let Some(Strict(value))=seq.next_element()?{values.push(value);}Ok(Strict(Value::Array(values)))}
+                fn visit_map<A:serde::de::MapAccess<'de>>(self,mut map:A)->std::result::Result<Strict,A::Error>{let mut values=serde_json::Map::new();while let Some(key)=map.next_key::<String>()?{if values.contains_key(&key){return Err(serde::de::Error::custom("Duplicate JSON object member"));}let Strict(value)=map.next_value()?;values.insert(key,value);}Ok(Strict(Value::Object(values)))}
+            }
+            deserializer.deserialize_any(Visitor)
+        }
+    }
+    serde_json::from_slice::<Strict>(bytes).map(|v|v.0).map_err(|e|DomainError::new("VALIDATION_ERROR",e.to_string()))
+}
+pub fn decode_request(bytes:&[u8])->Result<Request>{parse(decode_json(bytes)?)}
+#[cfg(test)]
+mod strict_json_tests{
+    #[test]
+    fn duplicate_nested_parameters_are_not_last_writer_wins(){assert!(super::decode_json(br#"{"params":{"index":0,"index":1}}"#).is_err());assert!(super::decode_json(br#"{"params":{"index":0}}"#).is_ok());}
+}
