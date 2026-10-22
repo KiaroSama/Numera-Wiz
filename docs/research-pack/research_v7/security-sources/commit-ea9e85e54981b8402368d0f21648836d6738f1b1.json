@@ -1,0 +1,33 @@
+{
+  "sha": "ea9e85e54981b8402368d0f21648836d6738f1b1",
+  "message": "avformat/rtsp: Explicitly check protocol\n\nFixes: redirect to non rtsp protocol\nFixes: YWH-PGM40646-41\n\nFound-by: BapToutatis\n\nSigned-off-by: Michael Niedermayer <michael@niedermayer.cc>",
+  "url": "https://api.github.com/repos/FFmpeg/FFmpeg/commits/ea9e85e54981b8402368d0f21648836d6738f1b1",
+  "html_url": "https://github.com/FFmpeg/FFmpeg/commit/ea9e85e54981b8402368d0f21648836d6738f1b1",
+  "diff": "@@ -1919,7 +1919,8 @@ int ff_rtsp_connect(AVFormatContext *s)\n     } else if (!strcmp(proto, \"satip\")) {\n         av_strlcpy(proto, \"rtsp\", sizeof(proto));\n         rt->server_type = RTSP_SERVER_SATIP;\n-    }\n+    } else if (strcmp(proto, \"rtsp\"))\n+        return AVERROR_INVALIDDATA;\n \n     if (*auth) {\n         av_strlcpy(rt->auth, auth, sizeof(rt->auth));",
+  "files": [
+    {
+      "filename": "libavformat/rtsp.c",
+      "patch": "@@ -1919,7 +1919,8 @@ int ff_rtsp_connect(AVFormatContext *s)\n     } else if (!strcmp(proto, \"satip\")) {\n         av_strlcpy(proto, \"rtsp\", sizeof(proto));\n         rt->server_type = RTSP_SERVER_SATIP;\n-    }\n+    } else if (strcmp(proto, \"rtsp\"))\n+        return AVERROR_INVALIDDATA;\n \n     if (*auth) {\n         av_strlcpy(rt->auth, auth, sizeof(rt->auth));"
+    }
+  ],
+  "repository_full_name": "FFmpeg/FFmpeg",
+  "comments": null,
+  "author": {
+    "login": "michaelni",
+    "name": null,
+    "email": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/729390?v=4",
+    "id": 729390
+  },
+  "committer": {
+    "login": "michaelni",
+    "name": null,
+    "email": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/729390?v=4",
+    "id": 729390
+  },
+  "created_at": "2026-03-06T02:37:19Z",
+  "git_author_email": null,
+  "display_url": "https://github.com/FFmpeg/FFmpeg/commit/ea9e85e54981b8402368d0f21648836d6738f1b1",
+  "display_title": "avformat/rtsp: Explicitly check protocol"
+}

@@ -1,0 +1,95 @@
+//! Canonical envelopes and headless discovery; no UI registration is required.
+use crate::{DomainError, Result, mux::{CleanIntent, Stream}};
+use schemars::{JsonSchema, schema_for};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CommandRef { pub id: String, pub version: u32 }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectRef { pub id: String, pub expected_revision: Option<String> }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Request {
+    pub api_version: u32,
+    pub request_id: String,
+    pub command: CommandRef,
+    #[serde(default)] pub project: Option<ProjectRef>,
+    #[serde(default)] pub replay_scope: Option<String>,
+    #[serde(default)] pub idempotency_key: Option<String>,
+    pub params: Value,
+}
+impl Request {
+    pub fn query(id: &str, params: Value) -> Self { Self { api_version:1,request_id:"local".into(),command:CommandRef{id:id.into(),version:1},project:None,replay_scope:None,idempotency_key:None,params } }
+    pub fn validate(&self) -> Result<()> {
+        if self.api_version != 1 || self.command.version != 1 { return Err(DomainError::new("UNSUPPORTED_VERSION", "Only application and command version 1 is admitted")); }
+        if self.request_id.is_empty() || self.request_id.len() > 128 { return Err(DomainError::new("VALIDATION_ERROR", "request_id must contain 1-128 bytes")); }
+        if self.project.is_some() { return Err(DomainError::new("CAPABILITY_UNAVAILABLE", "Project commands have not reached their implementation gate")); }
+        if descriptor(&self.command.id).is_none() { return Err(DomainError::new("UNKNOWN_COMMAND", "Command is not registered")); }
+        if !self.params.is_object() { return Err(DomainError::new("VALIDATION_ERROR", "params must be an object")); } Ok(())
+    }
+    pub fn structural_digest(&self) -> String {
+        use sha2::{Digest,Sha256};
+        let canonical = serde_json::json!({"api_version":self.api_version,"command":self.command,"project":self.project,"params":self.params});
+        hex::encode(Sha256::digest(serde_json::to_vec(&canonical).expect("JSON value serializes")))
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Response { pub request_id:String,pub ok:bool,#[serde(skip_serializing_if="Option::is_none")] pub result:Option<Value>,#[serde(skip_serializing_if="Option::is_none")] pub error:Option<DomainError>,#[serde(skip_serializing_if="Option::is_none")] pub receipt_id:Option<String> }
+impl Response {
+    pub fn success(id:&str, result:impl Serialize) -> Self { Self { request_id:id.into(),ok:true,result:Some(serde_json::to_value(result).expect("serializable result")),error:None,receipt_id:None } }
+    pub fn error(id:&str,error:DomainError) -> Self { Self { request_id:id.into(),ok:false,result:None,error:Some(error),receipt_id:None } }
+}
+#[derive(Debug,Clone,Copy,Serialize,Deserialize,JsonSchema)]
+#[serde(rename_all="snake_case")]
+pub enum StateClass { Query, Bootstrap, DurableMutation }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+pub struct Descriptor { pub id:String,pub version:u32,pub label:String,pub state_class:StateClass,pub qualification:String,pub params_schema:Value }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Empty {}
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PathInput { pub path:String }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct IdInput { pub id:String }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveInput { pub streams:Vec<Stream>,pub intent:CleanIntent }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CleanInput { pub asset_id:String,pub output:String,pub intent:CleanIntent }
+#[derive(Debug,Clone,Serialize,Deserialize,JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubmitInput { pub plan_id:String,pub plan_hash:String }
+pub fn registry() -> Vec<Descriptor> {
+    macro_rules! row { ($id:literal,$label:literal,$class:ident,$params:ty) => { Descriptor { id:$id.into(),version:1,label:$label.into(),state_class:StateClass::$class,qualification:"development_only; five-surface/package qualification pending".into(),params_schema:serde_json::to_value(schema_for!($params)).expect("schema") } } }
+    vec![
+        row!("commands.list","Discover implemented development commands",Query,Empty),
+        row!("commands.schema","Inspect a command parameter schema",Query,IdInput),
+        row!("access.replay_scope.create","Create own bounded replay scope",Bootstrap,Empty),
+        row!("media.probe","Probe an explicitly authorized native input",Query,PathInput),
+        row!("assets.register","Register a source identity",DurableMutation,PathInput),
+        row!("streams.clean.resolve","Resolve MuxCls selection without I/O",Query,ResolveInput),
+        row!("streams.clean","Plan cleanup of a registered asset",Query,CleanInput),
+        row!("plans.inspect","Inspect a frozen cleanup plan",Query,IdInput),
+        row!("jobs.submit","Accept the reviewed plan exactly once",DurableMutation,SubmitInput),
+        row!("jobs.inspect","Inspect durable execution and verification facts",Query,IdInput),
+        row!("jobs.cancel","Cancel an accepted job before publication",DurableMutation,IdInput),
+    ]
+}
+pub fn descriptor(id:&str) -> Option<Descriptor> { registry().into_iter().find(|d|d.id==id) }
+pub fn parse<T:serde::de::DeserializeOwned>(value:Value) -> Result<T> { serde_json::from_value(value).map_err(|e|DomainError::new("VALIDATION_ERROR",e.to_string())) }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn digest_excludes_correlation_but_not_semantics() {
+        let a=Request::query("media.probe",serde_json::json!({"path":"a"}));let mut b=a.clone();b.request_id="different".into();assert_eq!(a.structural_digest(),b.structural_digest());b.params["path"]=Value::String("b".into());assert_ne!(a.structural_digest(),b.structural_digest());
+    }
+    #[test]
+    fn duplicate_context_is_rejected() { assert!(parse::<PathInput>(serde_json::json!({"path":"a","project_id":"wrong"})).is_err()); }
+}

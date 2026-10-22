@@ -1,0 +1,684 @@
+"""FFmWiz extracted helper tier ext4 (post-services layer).
+
+Imports core, support, and top-level ffmwiz modules; acyclic.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import re
+import math
+import json
+import time
+import shutil
+import subprocess
+import tempfile
+import platform
+import datetime
+import uuid
+import hashlib
+import html
+import csv
+import queue
+import threading
+import concurrent.futures
+from fractions import Fraction
+from pathlib import Path
+from typing import Any, Callable
+from urllib.parse import unquote, urlparse
+
+from ffmwiz.core.constants import *  # noqa: F401,F403
+from ffmwiz.core.colors import *  # noqa: F401,F403
+from ffmwiz.core.exceptions import *  # noqa: F401,F403
+from ffmwiz.core.timeline import *  # noqa: F401,F403
+from ffmwiz.support.L00_audio import *  # noqa: F401,F403
+from ffmwiz.support.L00_color_range import *  # noqa: F401,F403
+from ffmwiz.support.L00_encode_opts import *  # noqa: F401,F403
+from ffmwiz.support.L00_filters import *  # noqa: F401,F403
+from ffmwiz.support.L00_metadata import *  # noqa: F401,F403
+from ffmwiz.support.L00_misc import *  # noqa: F401,F403
+from ffmwiz.support.L00_naming import *  # noqa: F401,F403
+from ffmwiz.support.L00_paths import *  # noqa: F401,F403
+from ffmwiz.support.L00_probe import *  # noqa: F401,F403
+from ffmwiz.support.L00_split import *  # noqa: F401,F403
+from ffmwiz.support.L00_streams import *  # noqa: F401,F403
+from ffmwiz.support.L00_text import *  # noqa: F401,F403
+from ffmwiz.support.L01_audio import *  # noqa: F401,F403
+from ffmwiz.support.L01_color_range import *  # noqa: F401,F403
+from ffmwiz.support.L01_encode_opts import *  # noqa: F401,F403
+from ffmwiz.support.L01_filters import *  # noqa: F401,F403
+from ffmwiz.support.L01_metadata import *  # noqa: F401,F403
+from ffmwiz.support.L01_misc import *  # noqa: F401,F403
+from ffmwiz.support.L01_naming import *  # noqa: F401,F403
+from ffmwiz.support.L01_paths import *  # noqa: F401,F403
+from ffmwiz.support.L01_split import *  # noqa: F401,F403
+from ffmwiz.support.L01_streams import *  # noqa: F401,F403
+from ffmwiz.support.L01_text import *  # noqa: F401,F403
+from ffmwiz.support.L02 import *  # noqa: F401,F403
+from ffmwiz.support.L03 import *  # noqa: F401,F403
+from ffmwiz.support.L04 import *  # noqa: F401,F403
+from ffmwiz.support.L05 import *  # noqa: F401,F403
+from ffmwiz.support.L06 import *  # noqa: F401,F403
+from ffmwiz.support.L07 import *  # noqa: F401,F403
+from ffmwiz.support.ext00 import *  # noqa: F401,F403
+from ffmwiz.support.ext01 import *  # noqa: F401,F403
+from ffmwiz.support.ext02 import *  # noqa: F401,F403
+from ffmwiz.support.ext03 import *  # noqa: F401,F403
+from ffmwiz.appio import *  # noqa: F401,F403
+from ffmwiz import appio  # noqa: F401
+from ffmwiz.runtime import *  # noqa: F401,F403
+from ffmwiz import runtime  # noqa: F401
+from ffmwiz.services import *  # noqa: F401,F403
+from ffmwiz import services  # noqa: F401
+
+from ffmwiz.core.artifacts import (  # noqa: F401
+    EFFECTIVE_SETTINGS_KEY,
+    PLAN_REVISION_KEY,
+)
+from ffmwiz.support.L01_cover import (audio_tool_picture_args,  # noqa: F401
+                                      cover_art_method)
+# The facade back-import was deleted: it carried no name this module does
+# not already get from the lower tiers above, and it made the facade's
+# `__all__` depend on which side was imported first.
+
+
+def build_audio_transform_filter_complex(
+    answers: dict[str, Any],
+    audio_indices: list[int],
+) -> tuple[str, list[str]]:
+    duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+    keep_ranges = normalize_cut_ranges(list(answers.get("audio_cut_keep_ranges") or []), duration)
+    parts: list[str] = []
+    output_labels: list[str] = []
+    for pos, audio_index in enumerate(audio_indices):
+        current_label = f"0:a:{audio_index}"
+        if keep_ranges:
+            source_labels: list[str]
+            if len(keep_ranges) > 1:
+                source_labels = [f"acut{pos}_src{range_idx}" for range_idx in range(len(keep_ranges))]
+                parts.append(
+                    f"[{current_label}]asplit={len(keep_ranges)}"
+                    f"{''.join(f'[{label}]' for label in source_labels)}"
+                )
+                log_info(
+                    f"Inserted asplit={len(keep_ranges)} for multi-range audio trim from "
+                    f"[{current_label}]."
+                )
+            else:
+                source_labels = [current_label]
+            range_labels: list[str] = []
+            for range_idx, (start, end) in enumerate(keep_ranges):
+                label = f"acut{pos}_{range_idx}"
+                range_labels.append(f"[{label}]")
+                parts.append(
+                    f"[{source_labels[range_idx]}]atrim=start={start:.6f}:end={end:.6f},"
+                    f"asetpts=PTS-STARTPTS[{label}]"
+                )
+            if len(keep_ranges) > 1:
+                cut_label = f"acut{pos}"
+                parts.append(f"{''.join(range_labels)}concat=n={len(keep_ranges)}:v=0:a=1[{cut_label}]")
+                current_label = cut_label
+            else:
+                current_label = f"acut{pos}_0"
+        out_label = f"aout{pos}"
+        if (audio_speed_transform_enabled(answers)
+                or loudnorm_transform_enabled(answers)
+                or any(requested_fade_seconds(answers))
+                or build_volume_filter(answers)):
+            parts.append(f"[{current_label}]{build_encode_audio_speed_filter(answers)}[{out_label}]")
+        elif current_label.startswith("0:"):
+            parts.append(f"[{current_label}]anull[{out_label}]")
+        else:
+            parts.append(f"[{current_label}]asetpts=PTS-STARTPTS[{out_label}]")
+        output_labels.append(out_label)
+    return ";".join(parts), output_labels
+
+
+def build_video_speed_reverse_command(answers: dict[str, Any]) -> list[str]:
+    ffmpeg = answers["ffmpeg"]
+    input_path: Path = answers["input_path"]
+    answers["output_collision_suffix"] = speed_suffix(
+        float(answers.get("speed_factor", DEFAULT_SPEED_FACTOR)),
+        bool(answers.get("reverse_video")),
+    )
+    output_path = services.build_output_path(answers)
+    answers["output_path"] = output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    speed = clamp_speed_factor(answers.get("speed_factor", DEFAULT_SPEED_FACTOR))
+    reverse = bool(answers.get("reverse_video"))
+    include_audio = bool(answers.get("include_audio", True)) and bool(answers.get("audio_streams"))
+    audio_count = len(answers.get("audio_streams") or [])
+
+    cmd: list[str] = [ffmpeg, "-y" if OVERWRITE_OUTPUT else "-n", "-i", str(input_path)]
+    cmd.extend(["-map", "0:v:0"])
+    cmd.extend(["-sn", "-dn"])
+    cmd.extend(["-filter:v", build_video_speed_filter(speed, reverse)])
+    cmd.extend(VIDEO_SPEED_OUTPUT_TIMING_ARGS)
+    cmd.extend(["-c:v", "libx264", "-preset", CPU_PRESET, "-crf", "18", "-pix_fmt", cpu_pixel_format_for_output(answers)])
+    if include_audio:
+        labels: list[str] = []
+        parts: list[str] = []
+        for index in range(audio_count):
+            label = f"aspd{index}"
+            labels.append(label)
+            parts.append(f"[0:a:{index}]{build_audio_speed_filter(speed, reverse)}[{label}]")
+        cmd.extend(["-filter_complex", ";".join(parts)])
+        for label in labels:
+            cmd.extend(["-map", f"[{label}]"])
+        cmd.extend(["-c:a", DEFAULT_AUDIO_CODEC, "-b:a", f"{DEFAULT_SPEED_AUDIO_BITRATE_KBPS}k"])
+        channels = resolve_audio_channels(answers)
+        if channels:
+            cmd.extend(["-ac", str(channels)])
+    else:
+        cmd.append("-an")
+    if answers["output_ext"].lower() in MP4_LIKE_EXTS and MOVFLAGS:
+        cmd.extend(["-movflags", MOVFLAGS])
+    cmd.append(str(output_path))
+    log_info(
+        f"Video speed/reverse command built: speed={speed}; reverse={reverse}; "
+        f"include_audio={include_audio}; output={output_path}"
+    )
+    return cmd
+
+
+def run_segmented_reverse_video_speed(answers: dict[str, Any]) -> tuple[int, float]:
+    duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+    if duration <= 0:
+        return runtime.run_ffmpeg_with_progress(
+            answers["cmd"],
+            total_duration=None,
+            label="Video Speed / Reverse",
+        )
+    output_path = Path(answers["output_path"])
+    speed = clamp_speed_factor(answers.get("speed_factor", DEFAULT_SPEED_FACTOR))
+    # The SHARED budget, not a flat 60 s: this mode called the splitter with no
+    # size at all, and 60 s of 4K30 is 20.9 GiB of decoded frames -- the exact
+    # promise the message makes is the one it broke (B06).
+    #
+    # The shared PLAN OBJECT, not a second calculation from the probe. The local
+    # copy resolved its own descriptor and printed the result with
+    # `f"{seconds:.0f}s"`, which renders every legitimate subsecond window as
+    # nothing: 233 ms at 8K60 10-bit and 8 ms at 16K120 12-bit 4:4:4 were both
+    # announced as `0s` (D15). It also dropped the RATE on the way to the
+    # splitter, and the splitter's rate-less 1 ms floor is coarser than one
+    # frame above 1000 fps -- 15360x8640 at 1200 fps yuv444p12le measured
+    # 0.001 s = 2 frames = 2.206 GiB against the 2 GiB cap, where the plan's own
+    # single frame is 0.000833 s = 1.353 GiB (D08). Passing the whole plan keeps
+    # its seconds and its fps from drifting apart.
+    # `reverse_stages` DEFINES this; `encoding` only re-exported it, so a test
+    # that patched the definer never reached this caller and a test that
+    # patched `encoding` never reached the pipeline's. Still deferred, because
+    # `reverse_stages` sits above this tier and importing it at module level
+    # would be the cycle this whole repair removed.
+    from ffmwiz import reverse_stages  # higher tier: deferred to avoid a cycle
+    budget = reverse_stages.reverse_segment_plan_for(answers)
+    chunks = L00_split.split_ranges_for_reverse_segments([], duration, budget.seconds,
+                                               fps=budget.fps)
+    if not chunks:
+        return 1, 0.0
+    appio.note(
+        f"Reverse mode uses {len(chunks)} segment(s) of up to "
+        f"{budget.window_text} to avoid buffering the full video in RAM."
+    )
+    if not budget.hard_capped:
+        appio.note("This reverse is BEST-EFFORT, not hard-capped: "
+                   + "; ".join(budget.assumptions))
+    started_at = time.perf_counter()
+    with tempfile.TemporaryDirectory(prefix="ffmwiz_reverse_") as tmpdir_str:
+        tmpdir = Path(tmpdir_str)
+        segment_paths: list[Path] = []
+        segment_ext = output_path.suffix.lstrip(".") or "mp4"
+        for idx, (start, end) in enumerate(chunks, start=1):
+            segment_path = tmpdir / f"reverse_seg_{idx:04d}.{segment_ext}"
+            segment_paths.append(segment_path)
+            cmd = build_video_speed_reverse_segment_command(answers, start, end, segment_path)
+            log_info(f"Reverse segment {idx}/{len(chunks)} command: {command_to_powershell(cmd)}")
+            appio.note(f"Reverse segment {idx}/{len(chunks)}: {seconds_to_ffmpeg_time(start)} -> {seconds_to_ffmpeg_time(end)}")
+            rc, _ = runtime.run_ffmpeg_with_progress(
+                cmd,
+                total_duration=max(0.001, (end - start) / speed),
+                label=f"Reverse segment {idx}/{len(chunks)}",
+            )
+            if rc != 0:
+                return rc, time.perf_counter() - started_at
+        concat_list = tmpdir / "concat.txt"
+        write_concat_list(list(reversed(segment_paths)), concat_list)
+        concat_cmd = build_concat_copy_command(answers["ffmpeg"], concat_list, output_path)
+        log_info("Reverse concat command: " + command_to_powershell(concat_cmd))
+        appio.note("Concatenating reversed segments...")
+        rc, _ = runtime.run_ffmpeg_with_progress(
+            concat_cmd,
+            total_duration=(duration / speed if duration > 0 else None),
+            label="Reverse concat",
+        )
+        return rc, time.perf_counter() - started_at
+
+
+def build_audio_speed_reverse_command(answers: dict[str, Any]) -> list[str]:
+    ffmpeg = answers["ffmpeg"]
+    input_path: Path = answers["input_path"]
+    answers["output_ext"] = resolve_audio_tool_output_ext(answers)
+    answers["output_collision_suffix"] = speed_suffix(
+        float(answers.get("speed_factor", DEFAULT_SPEED_FACTOR)),
+        bool(answers.get("reverse_audio")),
+    )
+    output_path = services.build_output_path(answers)
+    answers["output_path"] = output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    audio_index = int(answers.get("audio_index", 0))
+    speed = clamp_speed_factor(answers.get("speed_factor", DEFAULT_SPEED_FACTOR))
+    reverse = bool(answers.get("reverse_audio"))
+    cmd: list[str] = [
+        ffmpeg,
+        "-y" if OVERWRITE_OUTPUT else "-n",
+        "-i",
+        str(input_path),
+        "-map",
+        f"0:a:{audio_index}",
+        *audio_tool_picture_args(answers, answers["output_ext"]),
+        "-sn",
+        "-dn",
+        "-filter:a",
+        build_audio_speed_filter(speed, reverse),
+    ]
+    cmd.extend(audio_tool_encode_options(
+        answers["output_ext"],
+        bitrate_kbps=resolve_audio_tool_bitrate_kbps(answers),
+        sample_rate=resolve_audio_sample_rate(answers),
+        channels=resolve_audio_tool_channels(answers),
+    ))
+    cmd.append(str(output_path))
+    log_info(
+        f"Audio speed/reverse command built: audio_index={audio_index}; "
+        f"speed={speed}; reverse={reverse}; output={output_path}"
+    )
+    return cmd
+
+
+def audio_cut_stream_copy_available(answers: dict[str, Any]) -> bool:
+    """True when a single-range Audio Cut can be trimmed by stream copy.
+
+    The tool asks for no encode setting, so re-encoding a track the chosen
+    container already accepts only loses quality. An explicit bitrate or sample
+    rate, loudnorm, or a second keep range all mean a filter graph is required.
+    """
+    if len(answers.get("audio_keep_ranges") or []) != 1:
+        return False
+    if loudnorm_transform_enabled(answers):
+        return False
+    if answers.get("audio_bitrate_kbps") not in (None, "", "n", "keep"):
+        return False
+    if answers.get("audio_sample_rate") not in (None, "", "n", "keep"):
+        return False
+    streams = answers.get("audio_streams") or []
+    index = int(answers.get("audio_index", 0))
+    if index >= len(streams):
+        return False
+    output_ext = str(answers.get("output_ext") or resolve_audio_tool_output_ext(answers)).lower().lstrip(".")
+    return output_ext in lossless_audio_copy_ext_choices(str(streams[index].get("codec_name") or ""))
+
+
+def build_audio_cut_command(answers: dict[str, Any]) -> list[str]:
+    ffmpeg = answers["ffmpeg"]
+    input_path: Path = answers["input_path"]
+    answers["output_ext"] = resolve_audio_tool_output_ext(answers)
+    duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+    keep_ranges = normalize_cut_ranges(list(answers.get("audio_keep_ranges") or []), duration)
+    if not keep_ranges:
+        raise ValueError("No valid audio keep ranges were selected.")
+    answers["audio_keep_ranges"] = keep_ranges
+    answers["output_collision_suffix"] = "_AudioCut"
+    output_path = services.build_output_path(answers)
+    answers["output_path"] = output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    audio_index = int(answers.get("audio_index", 0))
+    picture_args = audio_tool_picture_args(answers, answers["output_ext"])
+    stream_copy = bool(answers.get("audio_cut_stream_copy")) and audio_cut_stream_copy_available(answers)
+
+    cmd: list[str] = [ffmpeg, "-y" if OVERWRITE_OUTPUT else "-n"]
+    if len(keep_ranges) == 1:
+        start, end = keep_ranges[0]
+        if start > 0:
+            cmd.extend(["-ss", f"{start:.6f}"])
+        cmd.extend(["-i", str(input_path), "-t", f"{max(0.0, end - start):.6f}"])
+        cmd.extend(["-map", f"0:a:{audio_index}", *picture_args, "-sn", "-dn"])
+    else:
+        cmd.extend(["-i", str(input_path)])
+        parts: list[str] = []
+        labels: list[str] = []
+        source_labels = [f"acut_src{idx}" for idx in range(len(keep_ranges))]
+        parts.append(
+            f"[0:a:{audio_index}]asplit={len(keep_ranges)}"
+            f"{''.join(f'[{label}]' for label in source_labels)}"
+        )
+        log_info(
+            f"Inserted asplit={len(keep_ranges)} for multi-range audio trim from [0:a:{audio_index}]."
+        )
+        for idx, (start, end) in enumerate(keep_ranges):
+            label = f"a{idx}"
+            labels.append(f"[{label}]")
+            parts.append(
+                f"[{source_labels[idx]}]atrim=start={start:.6f}:end={end:.6f},"
+                f"asetpts=PTS-STARTPTS[{label}]"
+            )
+        parts.append(f"{''.join(labels)}concat=n={len(keep_ranges)}:v=0:a=1[a]")
+        cmd.extend(["-filter_complex", ";".join(parts), "-map", "[a]", *picture_args, "-sn", "-dn"])
+
+    if stream_copy:
+        # Input seeking snaps the cut to the nearest audio packet; that is the
+        # price of not re-encoding, and it is what the user was offered.
+        cmd.extend(["-c:a", "copy", "-avoid_negative_ts", "make_zero"])
+    else:
+        cmd.extend(audio_tool_encode_options(
+            answers["output_ext"],
+            bitrate_kbps=resolve_audio_tool_bitrate_kbps(answers),
+            sample_rate=resolve_audio_sample_rate(answers),
+            channels=resolve_audio_tool_channels(answers),
+        ))
+    cmd.append(str(output_path))
+    log_info(
+        f"Audio cut command built: audio_index={audio_index}; ranges={keep_ranges}; "
+        f"stream_copy={stream_copy}; output={output_path}"
+    )
+    return cmd
+
+
+def apply_unified_video_editor_answers(answers: dict[str, Any]) -> None:
+    if not answers.get("_unified_video_editor_used"):
+        return
+    if "_unified_video_speed" in answers or "_unified_reverse_video" in answers:
+        speed = clamp_speed_factor(answers.get("_unified_video_speed", DEFAULT_SPEED_FACTOR))
+        reverse = bool(answers.get("_unified_reverse_video"))
+        answers["video_speed_enabled"] = bool(reverse or abs(speed - 1.0) > 1e-6)
+        answers["video_speed_factor"] = speed
+        answers["reverse_video"] = reverse
+        answers["audio_speed_from_video"] = bool(answers.get("_unified_include_audio"))
+    if "_unified_cut_keep_ranges" in answers:
+        duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+        duration += sum(float(item.get("duration") or 0.0) for item in answers.get("join_input_items") or [])
+        answers["cut_keep_ranges"] = normalize_cut_ranges(answers.get("_unified_cut_keep_ranges") or [], duration)
+
+
+def log_final_normalized_answers(answers: dict[str, Any], cmd: list[str]) -> None:
+    try:
+        input_paths = [str(answers.get("input_path"))]
+        input_paths.extend(str(item.get("path")) for item in answers.get("join_input_items") or [] if item.get("path"))
+        source_duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+        split_points = normalize_separator_points(answers.get("separator_points"), final_processed_duration_for_splits(answers, source_duration))
+        split_intervals = separator_ranges(split_points, final_processed_duration_for_splits(answers, source_duration)) if split_points else []
+        text = " ".join(str(part) for part in cmd)
+        summary = {
+            "input_paths": input_paths,
+            "output_path": str(answers.get("output_path")),
+            "split_output_paths": [str(path) for path in answers.get("split_output_paths") or []],
+            "video_codec": answers.get("video_codec"),
+            "source_bit_depth": describe_video_bit_depth(source_video_stream(answers) or {}),
+            "output_bit_depth": output_video_bit_depth(answers) if output_has_video(answers) else None,
+            "output_cpu_pixel_format": cpu_pixel_format_for_output(answers) if output_has_video(answers) else None,
+            "output_cuda_pixel_format": cuda_pixel_format_for_output(answers) if output_has_video(answers) else None,
+            "audio_codec": answers.get("audio_codec"),
+            "selected_audio_tracks": selected_audio_streams(answers) if answers.get("audio_streams") else [],
+            "additional_video_streams": len(additional_source_video_streams(answers)),
+            "attachment_streams": len(embedded_attachment_streams(answers)),
+            "data_streams": len(source_data_streams(answers)),
+            "keep_source_metadata": source_metadata_keep_enabled(answers),
+            "keep_source_chapters": source_chapters_keep_enabled(answers),
+            "keep_source_subtitles": source_subtitles_keep_enabled(answers),
+            "keep_source_data_streams": source_data_keep_enabled(answers),
+            "keep_source_extra_video_streams": source_extra_video_keep_enabled(answers),
+            "keep_embedded_attachments": bool(answers.get("keep_embedded_attachments")),
+            "crop_enabled": bool(answers.get("crop_enabled")),
+            "crop_margins": {
+                "top": answers.get("crop_top", 0),
+                "left": answers.get("crop_left", 0),
+                "right": answers.get("crop_right", 0),
+                "bottom": answers.get("crop_bottom", 0),
+            },
+            "crop_box_dimensions": answers.get("crop_box_dimensions"),
+            "final_resolution": answers.get("final_resolution"),
+            "fps": answers.get("fps"),
+            "video_speed": encode_video_speed_factor(answers) if video_speed_transform_enabled(answers) else 1.0,
+            "audio_speed": encode_audio_speed_factor(answers) if audio_speed_transform_enabled(answers) else 1.0,
+            "reverse_video": bool(answers.get("reverse_video")),
+            "reverse_audio": encode_audio_reverse_enabled(answers),
+            "split_enabled": bool(split_points),
+            "split_points": split_points,
+            "split_intervals": split_intervals,
+            "loudnorm_enabled": loudnorm_transform_enabled(answers),
+            "loudnorm_target_i": answers.get("loudnorm_target_i"),
+            "loudnorm_measured": answers.get("loudnorm_measured"),
+            "loudnorm_applied_tracks": selected_audio_streams(answers) if loudnorm_transform_enabled(answers) and answers.get("audio_streams") else [],
+            "gpu_requested": bool(answers.get("use_gpu")),
+            "cuda_fast_path": "-hwaccel_output_format cuda" in text and "scale_cuda" in text,
+            "complex_cpu_graph": "-filter_complex" in cmd,
+            "gpu_decode_only": "-hwaccel cuda" in text and "-hwaccel_output_format cuda" not in text,
+            "nvenc_encode": "_nvenc" in text,
+            "nvenc_multipass": normalize_nvenc_multipass_mode(answers.get("nvenc_multipass")),
+            "nvenc_multipass_skip_reason": answers.get("nvenc_multipass_skip_reason"),
+            "scale_cuda_used": "scale_cuda" in text,
+            "hwdownload_used": "hwdownload" in text,
+            "hwupload_cuda_used": "hwupload_cuda" in text,
+        }
+        log_info("Final normalized answers before execution:\n" + json.dumps(summary, ensure_ascii=False, indent=2, default=str))
+    except Exception as exc:
+        log_warn(f"Could not log final normalized answers: {exc}")
+
+
+def run_cpu_two_pass_ffmpeg(
+    cmd: list[str],
+    answers: dict[str, Any],
+    *,
+    total_duration: float | None,
+    progress_output_paths: list[Path],
+) -> tuple[int, float]:
+    first, second, passlog = build_cpu_two_pass_commands(cmd, answers)
+    log_info("CPU two-pass encoding enabled.")
+    log_command("CPU two-pass pass 1", first)
+    log_command("CPU two-pass pass 2", second)
+    try:
+        print(paint("Starting FFmpeg pass 1/2...", Color.GREEN))
+        rc1, elapsed1 = runtime.run_ffmpeg_with_progress(
+            first,
+            total_duration=total_duration,
+            label="FFmpeg encode pass 1/2",
+            initial_detail="CPU two-pass analysis pass",
+        )
+        if rc1 != 0:
+            return rc1, elapsed1
+        print()
+        print(paint("Starting FFmpeg pass 2/2...", Color.GREEN))
+        rc2, elapsed2 = runtime.run_ffmpeg_with_progress(
+            second,
+            total_duration=total_duration,
+            label="FFmpeg encode pass 2/2",
+            initial_detail="CPU two-pass final encode pass",
+            progress_output_paths=progress_output_paths,
+        )
+        return rc2, elapsed1 + elapsed2
+    finally:
+        cleanup_cpu_two_pass_logs(passlog)
+
+
+def _apply_manual_audio_transform(answers: dict[str, Any]) -> None:
+    """Manual (non-GUI) audio transform with prompt-by-prompt Back navigation:
+    optional cuts/lossless-split, then speed, then reverse. Back at the first
+    prompt raises Back (to return to the editor menu); Back at a later prompt
+    returns to the immediately previous prompt."""
+    answers.pop("_audio_transform_split_points", None)
+    duration = services.stream_duration_seconds({}, answers.get("format")) or 0.0
+    keep_ranges: list[tuple[float, float]] = []
+    speed = 1.0
+    reverse = False
+    stage = "cuts_q"
+    while True:
+        if stage == "cuts_q":
+            # Back here propagates to the editor menu.
+            want = appio.ask_yes_no(yn_prompt("Add audio cuts or split into separate files?", False), False)
+            if want:
+                stage = "cut_detail"
+            else:
+                keep_ranges = []
+                stage = "speed"
+        elif stage == "cut_detail":
+            try:
+                kr = services.collect_cut_ranges_terminal(answers, 25.0, duration, allow_split=True)
+            except Back:
+                stage = "cuts_q"
+                continue
+            split_points = answers.pop("_manual_split_points", None)
+            if split_points:
+                # Lossless split: produce multiple files; speed/reverse do not apply.
+                answers["_audio_transform_split_points"] = split_points
+                answers["audio_cut_keep_ranges"] = []
+                answers["audio_speed_enabled"] = False
+                answers["reverse_audio"] = False
+                answers["_audio_transform_noop"] = False
+                log_info(f"Manual audio split points: {split_points}")
+                return
+            keep_ranges = kr
+            if keep_ranges:
+                print(paint(format_audio_ranges_for_summary(keep_ranges, "Audio cuts (keep ranges)"), Color.LIME))
+            stage = "speed"
+        elif stage == "speed":
+            value = appio.ask_raw(
+                appio.question_prompt(
+                    answers,
+                    "Enter audio speed",
+                    "examples: 150% or 1.5x or 1.5 (100% = no change)",
+                    "100%",
+                )
+            )
+            if is_back_value(value):
+                stage = "cuts_q"  # Back -> previous prompt
+                continue
+            if not value:
+                value = "100%"
+            try:
+                speed = parse_speed_factor(value)
+            except ValueError as exc:
+                appio.error(str(exc))
+                continue  # re-ask speed
+            stage = "reverse"
+        else:  # reverse
+            try:
+                reverse = appio.ask_yes_no(yn_prompt("Reverse audio?", False), False)
+            except Back:
+                stage = "speed"  # Back -> previous prompt
+                continue
+            break
+    if not (keep_ranges or reverse or abs(speed - 1.0) > 1e-6):
+        appio.note("No audio transform was selected (no cuts, speed 100%, no reverse).")
+        answers["_audio_transform_noop"] = True
+        return
+    answers["audio_cut_keep_ranges"] = keep_ranges
+    answers["audio_speed_enabled"] = bool(reverse or abs(speed - 1.0) > 1e-6)
+    answers["audio_speed_factor"] = speed
+    answers["reverse_audio"] = reverse
+    answers["_audio_transform_noop"] = False
+    log_info(f"Manual audio transform: cuts={keep_ranges}; speed={speed}; reverse={reverse}")
+
+
+def build_join_audio_encode_command(answers: dict[str, Any], items: list[dict[str, Any]], output_path: Path) -> list[str]:
+    """Audio-only Join re-encode: prepare each input's first audio track with
+    the shared join audio preparation, concat them, and encode to AAC. Used when
+    every joined input is audio-only and stream copy is not possible."""
+    output_path = resolve_output_collision_against_inputs(
+        output_path,
+        [Path(item["path"]) for item in items if item.get("path")],
+        answers.get("output_collision_suffix", "_Encode"),
+    )
+    answers["output_path"] = output_path
+    bitrate = int(answers.get("audio_bitrate_kbps") or DEFAULT_AUDIO_BITRATE_KBPS)
+    cmd: list[str] = [answers["ffmpeg"], "-hide_banner", "-y" if OVERWRITE_OUTPUT else "-n"]
+    for item in items:
+        cmd.extend(["-i", str(item["path"])])
+    filters: list[str] = []
+    inputs: list[str] = []
+    prep = join_audio_prep_filter(join_target_sample_rate(answers),
+                                  join_target_channel_layout(items))
+    for idx, _item in enumerate(items):
+        filters.append(f"[{idx}:a:0]{prep}[a{idx}]")
+        inputs.append(f"[a{idx}]")
+    filters.append(f"{''.join(inputs)}concat=n={len(items)}:v=0:a=1[acat]")
+    # Apply the same transforms the wizard collected to the JOINED audio:
+    # cut trims, then speed/reverse and loudnorm (no-ops for the menu-12 join,
+    # which sets none of these).
+    source_join_duration = sum(float(item.get("duration") or 0.0) for item in items)
+    keep_ranges = normalize_cut_ranges(
+        list(answers.get("cut_keep_ranges") or answers.get("audio_cut_keep_ranges") or []),
+        source_join_duration,
+    )
+    label = append_join_trim_concat_filter(filters, "acat", keep_ranges, "audio", "acut")
+    # No gate: `build_encode_audio_speed_filter` already returns a bare
+    # `asetpts=PTS-STARTPTS` when the job asked for nothing, so the guard this
+    # replaces could only ever agree with it or drop a filter it does emit --
+    # a volume-only or fade-only join lost its gain because the guard named
+    # speed and LoudNorm alone. `ext04b` gates the per-part chain wide for the
+    # same reason.
+    filters.append(f"[{label}]{build_encode_audio_speed_filter(answers)}[a]")
+    cmd.extend([
+        "-filter_complex", ";".join(filters),
+        "-map", "[a]",
+        "-vn", "-sn", "-dn",
+        "-map_metadata", "-1", "-map_chapters", "-1",
+    ])
+    # The output extension comes from input 0, so a hardcoded `-c:a aac` sent
+    # AAC into .flac / .ogg / .opus and the muxer refused the header.
+    join_audio_args, join_audio_note = container_audio_encode_args(
+        output_path.suffix, "aac", bitrate,
+        channels=resolve_audio_channels(answers), sample_rate=join_target_sample_rate(answers))
+    if join_audio_note:
+        appio.note(join_audio_note)
+    cmd.extend(join_audio_args)
+    if output_path.suffix.lower() in {".mp4", ".m4a", ".mov"}:
+        cmd.extend(["-movflags", "+faststart"])
+    cmd.extend(answers.get("raw_ffmpeg_args") or [])
+
+    cmd.append(str(output_path))
+    return cmd
+
+
+__all__ = [
+    'audio_tool_picture_args',  # re-exported from L01_cover
+    'build_audio_transform_filter_complex',
+    'audio_cut_stream_copy_available',
+    'build_video_speed_reverse_command',
+    'run_segmented_reverse_video_speed',
+    'build_audio_speed_reverse_command',
+    'build_audio_cut_command',
+    'apply_unified_video_editor_answers',
+    'log_final_normalized_answers',
+    'run_cpu_two_pass_ffmpeg',
+    '_apply_manual_audio_transform',
+    'build_join_audio_encode_command',
+]
+
+
+# The bounded audio reverse lives in its own module now; re-exported here so
+# every existing `from ffmwiz.support.ext04b import *` keeps working.
+from ffmwiz.support import ext04c  # noqa: E402
+from ffmwiz.support.ext04c import *  # noqa: E402,F401,F403
+from ffmwiz.wizard_raw import build_volume_filter  # noqa: E402,F401
+from ffmwiz.support import L00_split  # noqa: E402,F401  (single patch point)
+__all__ += ext04c.__all__
+
+
+# ext04_inspect holds the inspect-and-report half of this module,
+# split off by responsibility. Bound twice on purpose: the plain name keeps
+# the sibling addressable as a module, and the `_` alias is what
+# tests/test_module_reference_hygiene reads to find re-export pairs. It
+# imports only lower tiers and never reaches back up into here.
+# ext04c_run holds the part of the bounded reverse that RUNS, split off
+# when ext04c reached the size ceiling. Same double binding as below.
+from ffmwiz.support import ext04c_run as _ext04c_run  # noqa: E402
+from ffmwiz.support import ext04c_run  # noqa: E402,F401
+from ffmwiz.support.ext04c_run import *  # noqa: E402,F401,F403
+__all__ = list(__all__) + list(_ext04c_run.__all__)
+
+
+from ffmwiz.support import ext04_inspect as _ext04_inspect  # noqa: E402
+from ffmwiz.support import ext04_inspect  # noqa: E402,F401
+from ffmwiz.support.ext04_inspect import *  # noqa: E402,F401,F403
+__all__ = list(__all__) + list(_ext04_inspect.__all__)

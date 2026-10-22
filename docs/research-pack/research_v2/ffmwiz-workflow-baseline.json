@@ -1,0 +1,802 @@
+{
+  "schema_version": 1,
+  "research_date": "2026-10-21",
+  "donor": "KiaroSama/FFmWiz",
+  "commit": "661a0d240ee29ca7cda496b635ae8c50e43d916b",
+  "evidence_status": "Static source research; no application tests executed. Proposed names and fields are not existing FFmWiz CLI contracts.",
+  "report": "ffmwiz-deep.md",
+  "source_inventory": "ffmwiz-source-inventory.json",
+  "families": [
+    {
+      "family": "F01",
+      "title": "Interactive encode and subordinate outputs",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "media.encode",
+        "timeline.render",
+        "timeline.gif",
+        "timeline.boomerang",
+        "timeline.thumbnail"
+      ],
+      "parameter_fields": [
+        "inputs",
+        "timeline",
+        "video",
+        "audio",
+        "effects",
+        "composition",
+        "stream_policy",
+        "output",
+        "compute",
+        "budget",
+        "expert_options"
+      ],
+      "acceptance_ids": [
+        "F01-A",
+        "F01-B",
+        "F01-C",
+        "F01-D",
+        "F01-E",
+        "F01-F",
+        "F01-G",
+        "F01-H"
+      ],
+      "source_refs": {
+        "S-audio-duplicates": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext09.py#L118-L193",
+        "S-audio-hashes": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00c.py#L354-L442",
+        "S-audio-sparse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext08.py#L157-L197",
+        "S-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build.py#L217-L728",
+        "S-composite": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_composite.py#L46-L156",
+        "S-composite-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_c.py#L203-L435",
+        "S-constants": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/constants.py#L32-L470",
+        "S-encoder-options": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_base.py#L120-L158",
+        "S-flow": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_flow.py#L105-L348",
+        "S-look-constants": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/constants_look.py#L15-L61",
+        "S-look-parser": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_filters.py#L79-L107",
+        "S-loudnorm": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/trackmanager.py#L270-L428",
+        "S-quality": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01c.py#L274-L321",
+        "S-quick": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_quick.py#L63-L127",
+        "S-quick-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_c.py#L448-L577",
+        "S-raw": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_raw.py#L35-L278",
+        "S-wizard-steps": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_steps.py#L96-L778"
+      }
+    },
+    {
+      "family": "F02",
+      "title": "Configuration execution",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "config.import.ffmwiz",
+        "jobs.plan",
+        "jobs.submit"
+      ],
+      "parameter_fields": [
+        "source",
+        "base_directory",
+        "compatibility_profile",
+        "job_document",
+        "plan_id",
+        "plan_hash"
+      ],
+      "acceptance_ids": [
+        "F02-A",
+        "F02-B",
+        "F02-C",
+        "F02-D"
+      ],
+      "source_refs": {
+        "S-config": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/config.env.example#L65-L304",
+        "S-flow": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_flow.py#L105-L348"
+      }
+    },
+    {
+      "family": "F03",
+      "title": "Copy and accurate cuts",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "media.cut"
+      ],
+      "parameter_fields": [
+        "asset",
+        "selection",
+        "strategy",
+        "boundary_policy",
+        "stream_policy",
+        "output"
+      ],
+      "acceptance_ids": [
+        "F03-A",
+        "F03-B",
+        "F03-C",
+        "F03-D"
+      ],
+      "source_refs": {
+        "S-copy-cut": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext07.py#L140-L236",
+        "S-timeline": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/timeline.py#L44-L215"
+      }
+    },
+    {
+      "family": "F04",
+      "title": "Batch encoding",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "batch.plan",
+        "batch.submit"
+      ],
+      "parameter_fields": [
+        "input_root",
+        "assets",
+        "recursion",
+        "include",
+        "exclude",
+        "operation_template",
+        "output_template",
+        "missing_stream_policy",
+        "concurrency",
+        "failure_policy"
+      ],
+      "acceptance_ids": [
+        "F04-A",
+        "F04-B",
+        "F04-C",
+        "F04-D"
+      ],
+      "source_refs": {
+        "S-folder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L451-L585"
+      }
+    },
+    {
+      "family": "F05",
+      "title": "Append tracks",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "streams.add"
+      ],
+      "parameter_fields": [
+        "target",
+        "additions",
+        "conversion",
+        "stream_policy",
+        "output"
+      ],
+      "acceptance_ids": [
+        "F05-A",
+        "F05-B",
+        "F05-C",
+        "F05-D"
+      ],
+      "source_refs": {
+        "S-add": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L626-L683",
+        "S-add-builder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L00_misc_b.py#L542-L574",
+        "S-streams": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_streams.py#L75-L240"
+      }
+    },
+    {
+      "family": "F06",
+      "title": "Extract streams",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "streams.extract"
+      ],
+      "parameter_fields": [
+        "assets",
+        "selector",
+        "per_stream_format",
+        "strategy",
+        "output_template",
+        "missing_stream_policy"
+      ],
+      "acceptance_ids": [
+        "F06-A",
+        "F06-B",
+        "F06-C",
+        "F06-D"
+      ],
+      "source_refs": {
+        "S-extract": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_b.py#L99-L162",
+        "S-extract-jobs": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01b.py#L449-L495",
+        "S-streams": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_streams.py#L75-L240"
+      }
+    },
+    {
+      "family": "F07",
+      "title": "Probe and reports",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "media.probe",
+        "media.report",
+        "media.compare"
+      ],
+      "parameter_fields": [
+        "asset",
+        "detail",
+        "analyses",
+        "output_formats",
+        "budget",
+        "reference",
+        "test",
+        "alignment",
+        "normalization",
+        "metrics"
+      ],
+      "acceptance_ids": [
+        "F07-A",
+        "F07-B",
+        "F07-C",
+        "F07-D",
+        "F07-E"
+      ],
+      "source_refs": {
+        "S-metrics": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04.py#L282-L342",
+        "S-report": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_mediainfo.py#L114-L577",
+        "S-report-csv": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01.py#L312-L456",
+        "S-report-scan": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext09.py#L196-L254"
+      }
+    },
+    {
+      "family": "F08",
+      "title": "Cleanup and remux",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "streams.clean"
+      ],
+      "parameter_fields": [
+        "assets",
+        "audio_selection",
+        "subtitle_selection",
+        "audio_order",
+        "subtitle_order",
+        "stream_tag_patches",
+        "preservation",
+        "output_tree",
+        "copy_non_media",
+        "overwrite",
+        "verify"
+      ],
+      "acceptance_ids": [
+        "F08-A",
+        "F08-B",
+        "F08-C",
+        "F08-D",
+        "F08-E"
+      ],
+      "source_refs": {
+        "S-clean-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/muxlogic.py#L20-L264",
+        "S-clean-edit": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/metadata_edits.py#L87-L230",
+        "S-clean-model": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/models.py#L72-L114",
+        "S-clean-select": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/selection.py#L1-L400"
+      }
+    },
+    {
+      "family": "F09",
+      "title": "Hard subtitles",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "subtitles.burn"
+      ],
+      "parameter_fields": [
+        "timeline",
+        "subtitle",
+        "fonts",
+        "style_policy",
+        "quality_profile",
+        "color_policy",
+        "audio_policy",
+        "output",
+        "compute"
+      ],
+      "acceptance_ids": [
+        "F09-A",
+        "F09-B",
+        "F09-C",
+        "F09-D",
+        "F09-E"
+      ],
+      "source_refs": {
+        "S-ffmpeg-tonemap": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/filters.texi#L24200-L24212",
+        "S-hardsub-audio-policy": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00d.py#L432-L476",
+        "S-hardsub-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_subtitles.py#L101-L260",
+        "S-hardsub-options": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01d.py#L101-L349"
+      }
+    },
+    {
+      "family": "F10",
+      "title": "Video speed and reverse",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "media.retime"
+      ],
+      "parameter_fields": [
+        "timeline",
+        "segments",
+        "audio",
+        "subtitle_timing",
+        "chapters",
+        "encoder_profile",
+        "output",
+        "compute",
+        "budget"
+      ],
+      "acceptance_ids": [
+        "F10-A",
+        "F10-B",
+        "F10-C",
+        "F10-D",
+        "F10-E"
+      ],
+      "source_refs": {
+        "S-reverse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/reverse_pipeline.py#L117-L706",
+        "S-transform": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_transform.py#L99-L200",
+        "S-transform-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04b.py#L85-L387"
+      }
+    },
+    {
+      "family": "F11",
+      "title": "Audio editing",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "audio.edit"
+      ],
+      "parameter_fields": [
+        "asset",
+        "stream",
+        "selection",
+        "pieces",
+        "speed",
+        "reverse",
+        "gain",
+        "normalization",
+        "audio_profile",
+        "cover_policy",
+        "output",
+        "budget"
+      ],
+      "acceptance_ids": [
+        "F11-A",
+        "F11-B",
+        "F11-C",
+        "F11-D",
+        "F11-E"
+      ],
+      "source_refs": {
+        "S-audio-reverse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04c.py#L128-L554",
+        "S-transform": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_transform.py#L99-L200",
+        "S-transform-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04b.py#L85-L387"
+      }
+    },
+    {
+      "family": "F12",
+      "title": "Join",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "media.join"
+      ],
+      "parameter_fields": [
+        "inputs_in_order",
+        "track_mapping",
+        "strategy",
+        "frame_rate_policy",
+        "missing_track_policy",
+        "geometry_policy",
+        "stream_policy",
+        "output_profile"
+      ],
+      "acceptance_ids": [
+        "F12-A",
+        "F12-B",
+        "F12-C",
+        "F12-D",
+        "F12-E"
+      ],
+      "source_refs": {
+        "S-join": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_join.py#L244-L430",
+        "S-join-audio": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00_join_audio.py#L1-L200",
+        "S-join-policy": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01d.py#L361-L471",
+        "S-streams": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_streams.py#L75-L240"
+      }
+    },
+    {
+      "family": "F13",
+      "title": "Metadata and signaling",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "metadata.patch",
+        "disposition.patch",
+        "chapters.inspect",
+        "chapters.export",
+        "chapters.import",
+        "chapters.remove",
+        "cover.add",
+        "cover.replace",
+        "cover.remove",
+        "cover.extract",
+        "video-signaling.inspect",
+        "video-signaling.estimate",
+        "video-signaling.patch"
+      ],
+      "parameter_fields": [
+        "target",
+        "scope",
+        "set",
+        "remove",
+        "stream",
+        "add",
+        "clear_all",
+        "exclusive_default",
+        "chapter_asset",
+        "cover_asset",
+        "signaling"
+      ],
+      "acceptance_ids": [
+        "F13-A",
+        "F13-B",
+        "F13-C",
+        "F13-D",
+        "F13-E"
+      ],
+      "source_refs": {
+        "S-dispositions": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/metadata.py#L195-L267",
+        "S-metadata": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/metadata.py#L141-L553"
+      }
+    },
+    {
+      "family": "F14",
+      "title": "Capability management",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "capabilities.inspect",
+        "capabilities.refresh",
+        "capabilities.clear"
+      ],
+      "parameter_fields": [
+        "scope",
+        "devices",
+        "components",
+        "force",
+        "namespace",
+        "fingerprint"
+      ],
+      "acceptance_ids": [
+        "F14-A",
+        "F14-B",
+        "F14-C",
+        "F14-D",
+        "F14-E"
+      ],
+      "source_refs": {
+        "S-capabilities": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L107-L186",
+        "S-nvidia": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00b.py#L233-L277",
+        "S-capability-identity": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/services.py#L137-L181"
+      }
+    },
+    {
+      "family": "F15",
+      "title": "Track manager",
+      "design_status": "proposed Numera operation names; donor behavior observed separately in report",
+      "operations": [
+        "streams.replace",
+        "streams.remove",
+        "audio.normalize"
+      ],
+      "parameter_fields": [
+        "assets",
+        "remove",
+        "additions",
+        "conversion_policy",
+        "normalization_by_stream",
+        "metadata_policy",
+        "output"
+      ],
+      "acceptance_ids": [
+        "F15-A",
+        "F15-B",
+        "F15-C",
+        "F15-D",
+        "F15-E"
+      ],
+      "source_refs": {
+        "S-track-builder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01b.py#L332-L432",
+        "S-track-manager": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/trackmanager.py#L516-L783"
+      }
+    }
+  ],
+  "config_defaults": [
+    {
+      "key": "input_path",
+      "legacy_default": "",
+      "source_line": 71
+    },
+    {
+      "key": "output_path",
+      "legacy_default": "",
+      "source_line": 77
+    },
+    {
+      "key": "output_format",
+      "legacy_default": "n",
+      "source_line": 83
+    },
+    {
+      "key": "video_codec",
+      "legacy_default": "H265",
+      "source_line": 94
+    },
+    {
+      "key": "use_gpu",
+      "legacy_default": "y",
+      "source_line": 99
+    },
+    {
+      "key": "crop",
+      "legacy_default": "n",
+      "source_line": 105
+    },
+    {
+      "key": "crop_top",
+      "legacy_default": "0",
+      "source_line": 108
+    },
+    {
+      "key": "crop_left",
+      "legacy_default": "0",
+      "source_line": 109
+    },
+    {
+      "key": "crop_right",
+      "legacy_default": "0",
+      "source_line": 110
+    },
+    {
+      "key": "crop_bottom",
+      "legacy_default": "0",
+      "source_line": 111
+    },
+    {
+      "key": "video_bitrate_kbps",
+      "legacy_default": "n",
+      "source_line": 116
+    },
+    {
+      "key": "video_bitrate_mode",
+      "legacy_default": "quality_vbr",
+      "source_line": 121
+    },
+    {
+      "key": "resolution",
+      "legacy_default": "n",
+      "source_line": 128
+    },
+    {
+      "key": "fps",
+      "legacy_default": "n",
+      "source_line": 133
+    },
+    {
+      "key": "video_look",
+      "legacy_default": "n",
+      "source_line": 145
+    },
+    {
+      "key": "video_quick",
+      "legacy_default": "n",
+      "source_line": 154
+    },
+    {
+      "key": "audio_volume",
+      "legacy_default": "n",
+      "source_line": 161
+    },
+    {
+      "key": "raw_ffmpeg_args",
+      "legacy_default": "n",
+      "source_line": 169
+    },
+    {
+      "key": "raw_ffmpeg_valued_args",
+      "legacy_default": "n",
+      "source_line": 177
+    },
+    {
+      "key": "audio_tracks",
+      "legacy_default": "de",
+      "source_line": 187
+    },
+    {
+      "key": "audio_codec",
+      "legacy_default": "aac",
+      "source_line": 193
+    },
+    {
+      "key": "audio_bitrate_kbps",
+      "legacy_default": "n",
+      "source_line": 197
+    },
+    {
+      "key": "audio_sample_rate",
+      "legacy_default": "n",
+      "source_line": 202
+    },
+    {
+      "key": "keep_source_metadata",
+      "legacy_default": "y",
+      "source_line": 212
+    },
+    {
+      "key": "subtitle_tracks",
+      "legacy_default": "none",
+      "source_line": 217
+    },
+    {
+      "key": "keep_embedded_attachments",
+      "legacy_default": "n",
+      "source_line": 222
+    },
+    {
+      "key": "detect_duplicate_audio",
+      "legacy_default": "y",
+      "source_line": 226
+    },
+    {
+      "key": "loudnorm",
+      "legacy_default": "off",
+      "source_line": 237
+    },
+    {
+      "key": "loudnorm_target_i",
+      "legacy_default": "-16",
+      "source_line": 241
+    },
+    {
+      "key": "nvenc_multipass",
+      "legacy_default": "disabled",
+      "source_line": 249
+    },
+    {
+      "key": "cpu_two_pass",
+      "legacy_default": "n",
+      "source_line": 255
+    },
+    {
+      "key": "color_range",
+      "legacy_default": "source",
+      "source_line": 263
+    },
+    {
+      "key": "video_speed",
+      "legacy_default": "n",
+      "source_line": 268
+    },
+    {
+      "key": "reverse_video",
+      "legacy_default": "n",
+      "source_line": 271
+    },
+    {
+      "key": "audio_speed",
+      "legacy_default": "n",
+      "source_line": 275
+    },
+    {
+      "key": "reverse_audio",
+      "legacy_default": "n",
+      "source_line": 279
+    },
+    {
+      "key": "logging_enabled",
+      "legacy_default": "y",
+      "source_line": 288
+    },
+    {
+      "key": "log_retention_days",
+      "legacy_default": "0",
+      "source_line": 292
+    },
+    {
+      "key": "log_level",
+      "legacy_default": "debug",
+      "source_line": 299
+    },
+    {
+      "key": "gui_engine",
+      "legacy_default": "classic",
+      "source_line": 304
+    }
+  ],
+  "fixture_ids": [
+    "MX1",
+    "TM1",
+    "TM2",
+    "PX1",
+    "CL1",
+    "AU1",
+    "CP1",
+    "FS1",
+    "ER1"
+  ],
+  "correction_ids": [
+    "D01",
+    "D02",
+    "D03",
+    "D04",
+    "D05",
+    "D06",
+    "D07",
+    "D08",
+    "D09",
+    "D10",
+    "D11",
+    "D12",
+    "D13",
+    "D14",
+    "D15",
+    "D16",
+    "D17",
+    "D18",
+    "D19",
+    "D20",
+    "D21",
+    "D22"
+  ],
+  "source_refs": {
+    "S-entry": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/FFmWiz.py#L360-L713",
+    "S-flow": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_flow.py#L105-L348",
+    "S-config": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/config.env.example#L65-L304",
+    "S-env-parser": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L00_misc_b.py#L244-L265",
+    "S-config-video": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext08.py#L418-L492",
+    "S-config-audio": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext11.py#L249-L306",
+    "S-config-misc": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00d.py#L134-L238",
+    "S-constants": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/constants.py#L32-L470",
+    "S-encoder-options": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_base.py#L120-L158",
+    "S-wizard-steps": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_steps.py#L96-L778",
+    "S-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build.py#L217-L728",
+    "S-look-constants": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/constants_look.py#L15-L61",
+    "S-look-parser": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_filters.py#L79-L107",
+    "S-raw": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_raw.py#L35-L278",
+    "S-quality": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01c.py#L274-L321",
+    "S-quick": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_quick.py#L63-L127",
+    "S-quick-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_c.py#L448-L577",
+    "S-composite": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_composite.py#L46-L156",
+    "S-composite-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_c.py#L203-L435",
+    "S-copy-cut": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext07.py#L140-L236",
+    "S-folder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L451-L585",
+    "S-add": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L626-L683",
+    "S-add-builder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L00_misc_b.py#L542-L574",
+    "S-streams": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/L01_streams.py#L75-L240",
+    "S-extract": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_b.py#L99-L162",
+    "S-extract-jobs": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01b.py#L449-L495",
+    "S-report": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_mediainfo.py#L114-L577",
+    "S-report-scan": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext09.py#L196-L254",
+    "S-report-csv": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01.py#L312-L456",
+    "S-metrics": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04.py#L282-L342",
+    "S-clean-model": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/models.py#L72-L114",
+    "S-clean-select": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/selection.py#L1-L400",
+    "S-clean-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/muxlogic.py#L20-L264",
+    "S-clean-edit": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/muxcleanup/metadata_edits.py#L87-L230",
+    "S-hardsub-options": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01d.py#L101-L349",
+    "S-hardsub-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/wizard_build_subtitles.py#L101-L260",
+    "S-hardsub-audio-policy": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00d.py#L432-L476",
+    "S-transform": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_transform.py#L99-L200",
+    "S-transform-build": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04b.py#L85-L387",
+    "S-reverse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/reverse_pipeline.py#L117-L706",
+    "S-audio-reverse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext04c.py#L128-L554",
+    "S-join": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes_join.py#L244-L430",
+    "S-join-policy": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01d.py#L361-L471",
+    "S-join-audio": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00_join_audio.py#L1-L200",
+    "S-metadata": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/metadata.py#L141-L553",
+    "S-dispositions": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/metadata.py#L195-L267",
+    "S-capabilities": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/modes.py#L107-L186",
+    "S-nvidia": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00b.py#L233-L277",
+    "S-track-manager": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/trackmanager.py#L516-L783",
+    "S-track-builder": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext01b.py#L332-L432",
+    "S-audio-duplicates": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext09.py#L118-L193",
+    "S-audio-hashes": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext00c.py#L354-L442",
+    "S-audio-sparse": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/support/ext08.py#L157-L197",
+    "S-loudnorm": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/trackmanager.py#L270-L428",
+    "S-ffmpeg-tonemap": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/filters.texi#L24200-L24212",
+    "S-ffmpeg-nvenc": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavcodec/nvenc.c#L805-L852",
+    "S-ffmpeg-nvenc-h264": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavcodec/nvenc_h264.c#L110-L125",
+    "S-ffmpeg-nvenc-hevc": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavcodec/nvenc_hevc.c#L105-L120",
+    "S-capability-identity": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/services.py#L137-L181",
+    "S-timeline": "https://github.com/KiaroSama/FFmWiz/blob/661a0d240ee29ca7cda496b635ae8c50e43d916b/ffmwiz/core/timeline.py#L44-L215"
+  }
+}

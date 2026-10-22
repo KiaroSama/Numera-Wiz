@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "inherited_research_ledger": "../research-pack/research_v4/ffmpeg-section-reading-ledger.json",
+  "inherited_ledger_is_personal_reading": false,
+  "complete_manual_study": "pending",
+  "session_reading": [
+    "handoff/00-front-matter-and-fixed-requirements.md",
+    "handoff/01-1-workflow-and-research.md",
+    "handoff/02-2-functional-scope-and-migration.md lines 1-140",
+    "handoff/04-4-engine-ownership-and-durable-state.md lines 1-200 and selected remaining contracts",
+    "handoff/05-5-domain-model-and-interface-contracts.md selected command/access/edit sections",
+    "handoff/09-9-implementation-sequence.md",
+    "handoff/11-11-work-packages-traceability-and-acceptance.md lines 1-95",
+    "handoff/15-annex-d-complete-muxcls-rust-rewrite.md",
+    "research_v7/muxcls-sources/standalone/muxcls/models.py lines 1-100",
+    "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "revision": "7.0",
+  "scope": "Source-informed functional design and mapping; no application implementation or runtime qualification",
+  "source_effect_records": 610,
+  "source_effect_counts": {
+    "filmcraft": 303,
+    "effectcraft": 307
+  },
+  "effect_design_dispositions": {
+    "composed": 446,
+    "native": 97,
+    "component": 36,
+    "unsupported": 20,
+    "application": 11
+  },
+  "per_donor_design_dispositions": {
+    "filmcraft": {
+      "composed": 235,
+      "native": 52,
+      "component": 15,
+      "unsupported": 1
+    },
+    "effectcraft": {
+      "composed": 211,
+      "unsupported": 19,
+      "native": 45,
+      "component": 21,
+      "application": 11
+    }
+  },
+  "canonical_target_identities_including_unavailable_and_data": 481,
+  "effectcraft_coverage": {
+    "partial": 41,
+    "none": 19,
+    "core": 236,
+    "control": 11
+  },
+  "cross_donor_resolution_counts": {
+    "distinct_capability": 147,
+    "unsupported_semantic_identity": 19,
+    "distinct_context_shared_primitive": 29,
+    "shared_descriptor": 35,
+    "shared_descriptor_with_variants": 54,
+    "split_by_explicit_selector": 1,
+    "typed_project_record": 11
+  },
+  "unassigned_effect_rows": 0,
+  "runtime_qualified_features": 0,
+  "commands": {
+    "source_records": 942,
+    "source_resolved_public_entries": 941,
+    "original_records": 926,
+    "source_verified_target_toggle_supplement": 16,
+    "runtime_verification": "NOT_PERFORMED"
+  }
+}

@@ -1,0 +1,756 @@
+"""FFmWiz wizard cluster (extracted from FFmWiz.py, method الف)."""
+from __future__ import annotations
+from dataclasses import dataclass, field
+
+import os
+import sys
+import re
+import math
+import json
+import time
+import shutil
+import subprocess
+import tempfile
+import platform
+import datetime
+import uuid
+import hashlib
+import html
+import csv
+import logging
+import atexit
+import queue
+import threading
+import concurrent.futures
+from fractions import Fraction
+from pathlib import Path
+from typing import Any, Callable
+from urllib.parse import unquote, urlparse
+
+from ffmwiz.core.constants import *  # noqa: F401,F403
+from ffmwiz.core.artifacts import *  # noqa: F401,F403
+from ffmwiz.core.colors import *  # noqa: F401,F403
+from ffmwiz.core.exceptions import *  # noqa: F401,F403
+from ffmwiz.core.timeline import *  # noqa: F401,F403
+from ffmwiz.support.L00_audio import *  # noqa: F401,F403
+from ffmwiz.support.L00_color_range import *  # noqa: F401,F403
+from ffmwiz.support.L00_encode_opts import *  # noqa: F401,F403
+from ffmwiz.support.L00_filters import *  # noqa: F401,F403
+from ffmwiz.support.L00_metadata import *  # noqa: F401,F403
+from ffmwiz.support.L00_misc import *  # noqa: F401,F403
+from ffmwiz.support.L00_naming import *  # noqa: F401,F403
+from ffmwiz.support.L00_paths import *  # noqa: F401,F403
+from ffmwiz.support.L00_probe import *  # noqa: F401,F403
+from ffmwiz.support.L00_split import *  # noqa: F401,F403
+from ffmwiz.support.L00_streams import *  # noqa: F401,F403
+from ffmwiz.support.L00_text import *  # noqa: F401,F403
+from ffmwiz.support.L01_audio import *  # noqa: F401,F403
+from ffmwiz.support.L01_color_range import *  # noqa: F401,F403
+from ffmwiz.support.L01_encode_opts import *  # noqa: F401,F403
+from ffmwiz.support.L01_filters import *  # noqa: F401,F403
+from ffmwiz.support.L01_metadata import *  # noqa: F401,F403
+from ffmwiz.support.L01_misc import *  # noqa: F401,F403
+from ffmwiz.support.L01_naming import *  # noqa: F401,F403
+from ffmwiz.support.L01_paths import *  # noqa: F401,F403
+from ffmwiz.support.L01_split import *  # noqa: F401,F403
+from ffmwiz.support.L01_streams import *  # noqa: F401,F403
+from ffmwiz.support.L01_subtitles import *  # noqa: F401,F403
+from ffmwiz.support.L01_text import *  # noqa: F401,F403
+from ffmwiz.support.L02 import *  # noqa: F401,F403
+from ffmwiz.support.L03 import *  # noqa: F401,F403
+from ffmwiz.support.L04 import *  # noqa: F401,F403
+from ffmwiz.support.L05 import *  # noqa: F401,F403
+from ffmwiz.support.L06 import *  # noqa: F401,F403
+from ffmwiz.support.L07 import *  # noqa: F401,F403
+from ffmwiz.support.ext00 import *  # noqa: F401,F403
+from ffmwiz.support.ext01 import *  # noqa: F401,F403
+from ffmwiz.support.ext02 import *  # noqa: F401,F403
+from ffmwiz.support.ext03 import *  # noqa: F401,F403
+from ffmwiz.support.ext04 import *  # noqa: F401,F403
+from ffmwiz.support.ext05 import *  # noqa: F401,F403
+from ffmwiz.support.ext06 import *  # noqa: F401,F403
+from ffmwiz.support.ext07 import *  # noqa: F401,F403
+from ffmwiz.support.ext08 import *  # noqa: F401,F403
+from ffmwiz.support.ext09 import *  # noqa: F401,F403
+from ffmwiz.support.ext10 import *  # noqa: F401,F403
+from ffmwiz.support.ext11 import *  # noqa: F401,F403
+from ffmwiz.support.ext12 import *  # noqa: F401,F403
+from ffmwiz.appio import *  # noqa: F401,F403
+from ffmwiz import appio  # noqa: F401
+from ffmwiz.guibridge import *  # noqa: F401,F403
+from ffmwiz.metadata import *  # noqa: F401,F403
+from ffmwiz import metadata  # noqa: F401
+from ffmwiz.runner import *  # noqa: F401,F403
+from ffmwiz.runtime import *  # noqa: F401,F403
+from ffmwiz.services import *  # noqa: F401,F403
+from ffmwiz import services  # noqa: F401
+from ffmwiz.trackmanager import *  # noqa: F401,F403
+
+# The facade star-import was deleted. It made this module unimportable on its
+# own: the facade ends with `__all__ += <this module>.__all__` and reached that
+# line while this module was still on its first statements. Names that live in
+# a sibling are now addressed through that sibling's module object, imported at
+# the BOTTOM of this file where nothing partial is read.
+
+
+def build_video_filter(answers: dict[str, Any], use_gpu_filtering: bool) -> str | None:
+    return build_cuda_video_filter(answers) if use_gpu_filtering else build_cpu_video_filter(answers)
+
+
+
+
+def build_quick_output_stages(answers: dict[str, Any], mode: str,
+                              output_path: Path) -> list[str]:
+    """Plan a GIF, boomerang or thumbnail job, and return its FINAL command.
+
+    The whole ordered plan is recorded on `answers["quick_output_plan"]`, which
+    `encoding.run_quick_output_stages` then executes. ONE list, built once and
+    consumed twice: the executor cannot run a plan the record does not describe,
+    which is the drift the staged reverse had to be repaired for (B04).
+
+    The returned argv is the LAST stage -- the one that writes the file the user
+    named. On its own it is not the whole job, so the note below says so and
+    names every stage.
+    """
+    workdir = artifact_lease(answers).register(
+        Path(tempfile.mkdtemp(prefix="ffmwiz_quick_")))
+    stages: list[tuple[str, list[str]]] = []
+    plan: dict[str, Any] = {"mode": mode, "workdir": workdir,
+                            "output_path": output_path}
+    source: Path = answers["input_path"]
+    # True once a stage has written the picture: the edits are spent, so a GIF
+    # reading that file must not apply them a second time.
+    source_is_prepared = False
+
+    if mode == "thumbnail":
+        stages.append(("Extract the frame",
+                       wizard_build_b.build_thumbnail_command(
+                           answers, source, output_path)))
+
+    if mode == "boomerang":
+        # A GIF boomerang is both features, in the only order that works: the
+        # halves have to be concatenated as video before anything quantises
+        # them, because a palette built from one half is the wrong palette for
+        # the other.
+        gif_after = str(answers.get("output_ext") or "").lower() == "gif"
+        half_ext = INTERMEDIATE_CONTAINER_EXT if gif_after else str(answers["output_ext"])
+        forward = _quick_sub_job(answers, workdir, "boomerang_forward", half_ext)
+        forward_cmd = build_ffmpeg_command(forward)
+        forward_path = Path(forward["output_path"])
+        backward_path = workdir / f"boomerang_reversed.{half_ext}"
+        joined = (workdir / f"boomerang_joined.{half_ext}") if gif_after else output_path
+        concat_list = workdir / "boomerang_concat.txt"
+        # Forward FIRST. The other order gives a clip that plays backwards and
+        # then forwards, which is a different thing and looks like one.
+        # `-stream_loop` is not used for `loop_count` here: it is an INPUT
+        # option on a single `-i`, and this output is a CONCAT of two files.
+        # Repeating the forward/backward PAIR in the list instead plays the
+        # finished boomerang N+1 times, which is what the answer means.
+        plays = 1 + int(answers.get("loop_count") or 0)
+        write_concat_list([forward_path, backward_path] * plays, concat_list)
+        stages.append(("Encode the forward half", [str(part) for part in forward_cmd]))
+        stages.append((
+            "Reverse the forward half in bounded segments",
+            ["<built from the forward half once it exists; runs as a bounded "
+             "segmented reverse, never one full-timeline pass>"]))
+        stages.append(("Concatenate the forward and reversed halves",
+                       [str(part) for part in build_concat_copy_command(
+                           str(answers["ffmpeg"]), concat_list, joined)]))
+        plan.update({"forward_answers": forward, "forward_path": forward_path,
+                     "backward_path": backward_path, "joined_path": joined,
+                     "concat_list": concat_list})
+        source, source_is_prepared = joined, True
+        mode = "gif" if gif_after else mode
+
+    if mode == "gif":
+        palette = workdir / GIF_PALETTE_FILE_NAME
+        for note in wizard_build_b.gif_unsupported_answer_notes(answers):
+            appio.note(note)
+            log_warn(f"GIF output: {note}")
+        stages.append(("Build the GIF palette",
+                       wizard_build_b.build_gif_palette_command(
+                           answers, source, palette, source_is_prepared)))
+        stages.append(("Write the GIF with that palette",
+                       wizard_build_b.build_gif_write_command(
+                           answers, source, palette, output_path,
+                           source_is_prepared)))
+        plan["palette_path"] = palette
+
+    plan["stages"] = stages
+    answers["quick_output_plan"] = plan
+    log_info(f"Quick output plan ({plan['mode']}): {len(stages)} stage(s) in {workdir}")
+    for index, (label, argv) in enumerate(stages, start=1):
+        log_info(f"  stage {index}/{len(stages)} {label}: "
+                 + (argv[0] if argv and str(argv[0]).startswith("<")
+                    else command_to_powershell(argv)))
+    if len(stages) > 1:
+        appio.note(f"This {plan['mode']} job runs as {len(stages)} commands, in order:")
+        for index, (label, _argv) in enumerate(stages, start=1):
+            appio.note(f"  {index}. {label}")
+        appio.note("The command printed below is the LAST of them; the earlier "
+                   "stages write the files it reads.")
+    return [str(part) for part in stages[-1][1]]
+
+
+def _quick_sub_job(answers: dict[str, Any], workdir: Path, stem: str,
+                   ext: str) -> dict[str, Any]:
+    """The same job, aimed at a scratch file and stripped of the quick output.
+
+    Stripped, not merely re-aimed: leaving `quick_output` set would make
+    `build_ffmpeg_command` plan a second quick output for the stage that exists
+    to feed the first one, without end.
+    """
+    job = dict(answers)
+    for key in QUICK_ANSWER_KEYS:
+        job.pop(key, None)
+    for key in ("_output_ext_before_quick", "quick_output_plan", "cmd",
+                "output_path", "separator_points", "separator_jobs",
+                "split_output_paths", "split_part_intervals"):
+        job.pop(key, None)
+    job["output_ext"] = ext
+    job["output_location"] = workdir
+    job["output_name_stem"] = stem
+    job["output_collision_suffix"] = ""
+    return job
+
+
+def build_ffmpeg_command(answers: dict[str, Any]) -> list[str]:
+    # A build is a PLAN BOUNDARY, and this is the only place every caller of
+    # this builder shares. `step_start_now()` reset the resolved map and the
+    # Folder loop did it per item, but `step_start_folder_now()` did not and a
+    # direct call never could, so a request of `copy` carrying a previous
+    # plan's effective `libx265` still built `-c:v libx265` (D14). Deciding it
+    # here means the caller cannot forget: an open plan is adopted, anything
+    # else gets a fresh revision with an empty map.
+    require_plan_revision(answers)
+    # Open the lease FIRST. `dict()` copies the key but shares the object, so a
+    # lease opened here is still the outer job's lease when a Split part or a
+    # reverse segment rebuilds from `dict(answers)`; opened later, the copy gets
+    # one of its own and everything it registers leaks.
+    artifact_lease(answers)
+    # Before the command exists, so the user is told while the settings summary
+    # and the command still agree: a config-retained cpu_two_pass=y reaches a
+    # Join/Split/cut/speed/reverse job the wizard would never have offered it
+    # for, and either fails at pass 2 or is silently run as one pass (F11).
+    _two_pass_off = normalize_cpu_two_pass_selection(answers)
+    if _two_pass_off:
+        appio.note(f"CPU two-pass was turned off for this job: {_two_pass_off}.")
+        log_info(f"CPU two-pass disabled before execution: {_two_pass_off}")
+    ffmpeg = answers["ffmpeg"]
+    input_path: Path = answers["input_path"]
+    output_path = services.build_output_path(answers)
+    answers["output_path"] = output_path
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(f"Could not create output folder: {output_path.parent}. {exc}") from exc
+
+    # A quick output is a different SHAPE of job, not a different set of options
+    # on this one: a GIF is two commands and a boomerang is three, and neither
+    # can be expressed as the single argv the rest of this function builds. It
+    # is intercepted here rather than earlier so the output path, the artifact
+    # lease and the plan revision are already the job's own.
+    quick_mode = wizard_build_b.quick_output_mode(answers)
+    if quick_mode:
+        return build_quick_output_stages(answers, quick_mode, output_path)
+
+    # FFmpeg command rules used here:
+    # - Explicit -map options disable automatic stream selection for this output.
+    # - Streamcopy (-c copy) skips decoding/filtering/encoding and cannot be used
+    #   for a stream that needs crop/fps/scale/color-parameter filters.
+    # - Audio-only outputs disable video/subtitle streams with -vn and -sn.
+    # - MP4-like outputs get mov_text only for text subtitles, plus faststart/tag
+    #   options that are valid for that family of muxers.
+    cmd: list[str] = [ffmpeg, "-y" if OVERWRITE_OUTPUT else "-n"]
+    if answers.get("use_gpu") and answers.get("gpu_available") is False:
+        answers["use_gpu"] = False
+        log_info("GPU disabled automatically because no usable NVIDIA/NVENC GPU was detected.")
+
+    has_video = output_has_video(answers)
+    video_encoder = None
+    tag = None
+    profile = None
+    use_cuda_fast_path = False
+    use_cuda_decode_complex = False
+
+    cut_keep_ranges = list(answers.get("cut_keep_ranges") or [])
+    cut_active = bool(cut_keep_ranges) and has_video
+    single_cut = len(cut_keep_ranges) == 1 and has_video
+    multi_cut = len(cut_keep_ranges) > 1 and has_video
+
+    if has_video:
+        if answers.get("output_ext", "").lower() == "webm" and str(answers.get("video_codec", "")).lower() in {
+            "h264",
+            "h265",
+            "hevc",
+            "mpeg4",
+        }:
+            appio.note("WebM does not support that video codec safely here. VP9 was selected for this output.")
+            # The RESOLVED codec, never the requested one. Overwriting the
+            # request made Back show the fallback instead of the user's own
+            # answer, and left no record that a substitution had happened at
+            # all -- the effective map came out empty (D15).
+            effective_settings(answers)["video_codec"] = "VP9"
+        video_encoder, tag, profile = resolve_video_encoder(answers)
+        if video_encoder == "copy" and video_filters_required(answers):
+            appio.note(
+                "\nWarning: video copy cannot be used with crop/fps/scale/setparams or cuts. "
+                "H265 was selected so filters/cuts can be applied."
+            )
+            effective_settings(answers)["video_codec"] = DEFAULT_VIDEO_CODEC
+            video_encoder, tag, profile = resolve_video_encoder(answers)
+        video_encoder, tag, profile = enforce_bit_depth_compatible_video_encoder(answers, video_encoder, tag, profile)
+
+        use_cuda_fast_path = can_use_cuda_fast_path(answers, video_encoder)
+        use_cuda_decode_complex = should_use_cuda_decode_for_complex_graph(answers, video_encoder, use_cuda_fast_path)
+        if answers.get("use_gpu") and video_encoder != "copy" and not str(video_encoder).endswith("_nvenc"):
+            appio.note("The selected video encoder is not NVENC, so CPU decode/filter/encode will be used for video.")
+        elif multi_cut and answers.get("use_gpu") and str(video_encoder).endswith("_nvenc"):
+            log_info("Multiple cut ranges use CPU trim/concat filter_complex; NVENC encode remains enabled.")
+        elif use_cuda_decode_complex:
+            log_info("Complex CPU filter graph uses CUDA/NVDEC input decode and NVENC final encode.")
+        elif (
+            has_crop(answers)
+            and answers.get("use_gpu")
+            and video_encoder != "copy"
+            and str(video_encoder).endswith("_nvenc")
+            and not use_cuda_fast_path
+        ):
+            codec_name = source_video_codec_name(answers) or "unknown"
+            log_info(
+                "CUDA decoder crop is unavailable for source codec "
+                f"{codec_name}; using CPU crop filter before NVENC encode to avoid stretch."
+            )
+
+        if use_cuda_fast_path:
+            cmd.extend(["-hwaccel", "cuda", "-hwaccel_device", str(GPU_DEVICE_INDEX), "-hwaccel_output_format", "cuda"])
+            cuvid_crop = crop_margins_to_cuvid_crop(answers)
+            if cuvid_crop:
+                cuda_decoder = cuda_decoder_for_source(answers)
+                if cuda_decoder:
+                    cmd.extend(["-c:v", cuda_decoder])
+                cmd.extend(["-crop", cuvid_crop])
+        elif use_cuda_decode_complex:
+            append_cuda_decode_args_for_input(cmd, answers)
+
+    if single_cut:
+        start, end = cut_keep_ranges[0]
+        # The range is on the PICTURE clock; `-ss` counts from the container.
+        # Issuing the picture value raw started the cut early on any file whose
+        # container leads its picture -- a 2.0-4.0 cut of a source with 0.5 s of
+        # audio priming began at picture 1.5 (B08).
+        seek = start + picture_clock_offset(answers)
+        if seek > 0:
+            cmd.extend(["-ss", f"{seek:.6f}"])
+        # -t belongs to the SOURCE INPUT, not to the output. As an output option
+        # it only truncates what the graph already produced, which breaks any
+        # filter that must consume its whole input first: `reverse` read the
+        # ENTIRE file and -t then kept the wrong end of the reversed result
+        # (F01) -- keeping 0-2s of a red/blue clip returned blue. It also broke
+        # slow motion, where a 4 s window at 0.5x wants an 8 s output and an
+        # output -t 4 cut it back to 4 s. Placed here it binds to the source
+        # only; the auxiliary chapter/subtitle inputs come later and are
+        # unaffected, which is what the old "-t after every -i" note was about.
+        cmd.extend(["-t", f"{max(0.0, end - start):.6f}"])
+
+    # `-stream_loop` belongs to the input it repeats, so it goes here rather
+    # than with the output options. See wizard_build_b.append_stream_loop.
+    wizard_build_b.append_stream_loop(cmd, answers)
+    cmd.extend(["-i", str(input_path)])
+
+    # Chapter remapping: if timeline is modified and source has chapters,
+    # generate a metadata file and add it as a second input so -map_chapters
+    # can reference it. The metadata file path is stored for later cleanup.
+    chapter_metadata_inputs = 0
+    if (
+        has_video
+        and source_chapters_keep_enabled(answers)
+        and timeline_is_modified(answers)
+        and not answers.get("separator_points")  # Split path handles its own chapters.
+    ):
+        speed_factor = encode_video_speed_factor(answers) if video_speed_transform_enabled(answers) else 1.0
+        chapter_plan = remap_chapters_for_encode(answers, speed_factor=speed_factor)
+        if chapter_plan.get("mode") == "metadata" and chapter_plan.get("chapters"):
+            chapter_temp_dir = str(artifact_lease(answers).register(
+                Path(tempfile.mkdtemp(prefix="ffmwiz_encode_chapters_"))))
+            answers["_chapter_metadata_temp_dir"] = chapter_temp_dir
+            metadata_path = write_encode_chapter_metadata(chapter_plan, Path(chapter_temp_dir))
+            cmd.extend(["-i", str(metadata_path)])
+            answers["_chapter_metadata_input_index"] = 1
+            chapter_metadata_inputs = 1
+            log_info(f"Chapters: injected metadata input at index 1 ({metadata_path})")
+
+    # Subtitle packets never enter the video/audio filter graph, so a speed,
+    # reverse or multi-range cut left their timestamps on the SOURCE clock: a
+    # 2.500-3.500 s cue stayed put in a 2 s 2x output, and the stale packet
+    # stretched the container to 3.521 s (R03). The rebuilt tracks arrive as
+    # their own inputs, added AFTER the chapter metadata so its index 1 holds.
+    subtitle_retiming = encode_subtitle_retiming_required(answers)
+    # `build_retimed_subtitle_inputs()` EXTRACTS the tracks from
+    # `answers["input_path"]`, which is fine while that path is the user's file
+    # and wrong the moment a staged plan describes a command whose input has
+    # not been written yet: extraction from `joined_forward.mkv` or
+    # `reversed_whole.mkv` found nothing, so the exported plan emitted `-sn`
+    # where the automatic run mapped the retimed track. Measured, planned
+    # against executed reverse segment:
+    #     only in PLAN: ['-sn']
+    #     only in RUN : ['-c:s', '-disposition:s:0', '-metadata:s:s',
+    #                    '1:s:0', 'copy', 'retimed00.srt']
+    # A planner that already built the tracks from the SOURCE files hands them
+    # over here instead; the shape is the same list of dicts, so nothing
+    # downstream changes.
+    prebuilt_retimed = answers.get("_prebuilt_retimed_subtitles")
+    if subtitle_retiming and prebuilt_retimed is not None:
+        retimed_subtitles = list(prebuilt_retimed)
+        log_info(f"Retimed subtitles supplied by the caller: {len(retimed_subtitles)} track(s)")
+    else:
+        retimed_subtitles = wizard_build_b.build_retimed_subtitle_inputs(answers) if subtitle_retiming else []
+    retimed_subtitle_base = 1 + chapter_metadata_inputs
+    for retimed_track in retimed_subtitles:
+        cmd.extend(["-i", str(retimed_track["path"])])
+
+    # Determine audio mapping. When multi-range cuts are active, only one audio
+    # output stream is produced by the filter_complex concat. Pick the first
+    # selected audio in that path.
+    if answers.get("audio_speed_from_video") and answers.get("audio_streams"):
+        audio_indices = (
+            selected_audio_streams(answers)
+            if "audio_tracks" in answers
+            else list(range(len(answers.get("audio_streams") or [])))
+        )
+    else:
+        audio_indices = selected_audio_streams(answers) if answers.get("audio_streams") else []
+    audio_transform_active = bool(audio_indices) and audio_transform_enabled(answers)
+    if multi_cut and audio_cut_transform_enabled(answers):
+        appio.note("Audio waveform cuts are skipped when video multi-range cuts are active.")
+        audio_transform_active = audio_speed_transform_enabled(answers) or loudnorm_transform_enabled(answers)
+    audio_for_cut: int | None = None
+    if multi_cut and audio_indices:
+        audio_for_cut = audio_indices[0]
+        if len(audio_indices) > 1:
+            appio.note(
+                "Cuts active: only the first selected audio track survives the "
+                f"filter_complex concat. Using stream index 0:a:{audio_for_cut}."
+            )
+        audio_indices = [audio_for_cut]
+
+    # `-map 0 -c copy` would carry the SOURCE subtitle packets verbatim, which
+    # is exactly what retiming exists to prevent.
+    full_source_map = not subtitle_retiming and can_use_full_source_map_for_simple_encode(
+        answers,
+        audio_indices,
+        audio_transform_active,
+        multi_cut,
+    )
+
+    if (
+        has_video
+        and video_encoder
+        and video_encoder != "copy"
+        and answers.get("separator_points")
+        and append_single_input_split_outputs(
+            cmd,
+            answers,
+            output_path,
+            video_encoder,
+            tag,
+            profile,
+            audio_indices,
+            audio_transform_active,
+            multi_cut,
+            audio_for_cut,
+            retimed_subtitles,
+        )
+    ):
+        return cmd
+
+    extra_video_count = 0
+    if full_source_map:
+        cmd.extend(["-map", "0"])
+        log_info("Full source stream map enabled for simple encode: -map 0")
+    elif has_video:
+        if multi_cut:
+            cmd.extend(["-map", "[v]"])
+        else:
+            cmd.extend(["-map", "0:v:0"])
+            extra_video_count = append_additional_source_video_maps(cmd, answers)
+
+    if multi_cut and audio_for_cut is not None:
+        cmd.extend(["-map", "[a]"])
+    elif full_source_map:
+        pass
+    elif audio_transform_active and not multi_cut:
+        pass
+    elif not multi_cut:
+        for audio_index in audio_indices:
+            cmd.extend(["-map", f"0:a:{audio_index}"])
+
+    subtitle_indices = [] if (full_source_map or subtitle_retiming) else (
+        selected_subtitle_streams(answers)
+        if has_video and source_subtitles_keep_enabled(answers) and answers.get("subtitle_streams")
+        else []
+    )
+    if multi_cut and subtitle_indices:
+        appio.note("Cuts active: subtitle streams are not mapped through filter_complex and were skipped.")
+        subtitle_indices = []
+    if subtitle_indices:
+        # A subtitle the target container cannot carry must not be MAPPED either:
+        # dropping only `-c:s` still leaves `-map 0:s:N`, and the muxer then
+        # refuses to write the header (AVI rejects every subtitle codec).
+        allowed_subtitles: list[int] = []
+        skipped_subtitles: list[int] = []
+        for subtitle_index in subtitle_indices:
+            codec = str(answers["subtitle_streams"][subtitle_index].get("codec_name", "")).lower()
+            if subtitle_codec_for_container(answers["output_ext"], codec) is None:
+                skipped_subtitles.append(subtitle_index)
+            else:
+                allowed_subtitles.append(subtitle_index)
+        if skipped_subtitles:
+            appio.note(
+                f"Skipped subtitle tracks that .{str(answers['output_ext']).lstrip('.')} "
+                f"cannot store: {skipped_subtitles}"
+            )
+        subtitle_indices = allowed_subtitles
+    for subtitle_index in subtitle_indices:
+        cmd.extend(["-map", f"0:s:{subtitle_index}"])
+    for offset in range(len(retimed_subtitles)):
+        cmd.extend(["-map", f"{retimed_subtitle_base + offset}:s:0"])
+    # The attachment map is NOT emitted here. It has to come after every
+    # packet-bearing map, and the filter-complex audio outputs are mapped
+    # further down -- see the attachment block near the end of this builder.
+    data_mapped = bool(source_data_streams(answers) and source_data_keep_enabled(answers)) if full_source_map else append_source_data_maps(cmd, answers)
+    append_source_metadata_chapter_options(cmd, answers)
+
+    if not full_source_map:
+        append_negative_stream_options(
+            cmd, answers, has_video,
+            subtitle_indices or list(range(len(retimed_subtitles))), data_mapped)
+
+    if has_video and video_encoder:
+        video_bitrate = answers.get("video_bitrate_kbps")
+        if video_encoder == "copy":
+            cmd.extend(["-c:v", "copy"])
+        else:
+            if full_source_map:
+                cmd.extend(["-c", "copy"])
+            if multi_cut:
+                fc = wizard_build_b.build_cut_filter_complex(answers, cut_keep_ranges, audio_for_cut)
+                cmd.extend(["-filter_complex", fc])
+            else:
+                video_filter = build_video_filter(answers, use_gpu_filtering=use_cuda_fast_path)
+                if video_filter:
+                    cmd.extend(["-filter:v:0" if (extra_video_count or full_source_map) else "-filter:v", video_filter])
+            forced_cfr = use_cuda_fast_path and answers.get("fps") is not None
+            if forced_cfr:
+                if extra_video_count or full_source_map:
+                    cmd.extend(["-r:v:0", str(answers["fps"]), "-fps_mode:v:0", "cfr"])
+                else:
+                    cmd.extend(["-r:v", str(answers["fps"]), "-fps_mode:v", "cfr"])
+            elif video_speed_transform_enabled(answers):
+                # A retimed picture needs its own timing kept, or the encoder
+                # drops whatever arrives faster than the SOURCE rate. Skipped
+                # when an explicit output rate was already forced above: two
+                # -fps_mode options on one output is an error, and a rate the
+                # user asked for outranks this.
+                cmd.extend(VIDEO_SPEED_OUTPUT_TIMING_ARGS)
+            cmd.extend(["-c:v:0" if full_source_map else "-c:v", video_encoder])
+
+            if video_encoder.endswith("_nvenc"):
+                cmd.extend(["-preset", NVENC_PRESET, "-tune", NVENC_TUNE, "-rc", NVENC_RC])
+                wizard_base.append_nvenc_multipass_args(cmd, answers, video_encoder)
+                if "hevc" in video_encoder:
+                    cmd.extend(["-profile:v:0" if full_source_map else "-profile:v", hevc_profile_for_output(answers, profile)])
+            elif video_encoder in {"libx264", "libx265"}:
+                cmd.extend(["-preset", CPU_PRESET])
+                if video_encoder == "libx265":
+                    cmd.extend(["-profile:v:0" if full_source_map else "-profile:v", hevc_profile_for_output(answers, "main")])
+            elif video_encoder == "libsvtav1":
+                # SVT-AV1: integer preset + tune=0 (subjective visual quality).
+                cmd.extend(["-preset", SVTAV1_PRESET, "-svtav1-params", SVTAV1_PARAMS])
+
+            if video_bitrate:
+                append_video_bitrate_args(cmd, answers, int(video_bitrate), ":v:0" if full_source_map else ":v")
+            elif answers.get("video_crf") is not None:
+                crf_value = answers["video_crf"]
+                stream_spec = ":v:0" if full_source_map else ":v"
+                if video_encoder.endswith("_nvenc"):
+                    # NVENC constant quality: use constqp rc with -cq:v
+                    cmd[cmd.index("-rc") + 1] = "constqp"
+                    cmd.extend([f"-cq{stream_spec}", str(int(round(crf_value))), f"-b{stream_spec}", "0"])
+                    log_info(f"NVENC constant quality: -rc constqp -cq{stream_spec} {int(round(crf_value))}")
+                else:
+                    # CPU encoder: -crf
+                    cmd.extend(["-crf", f"{crf_value:g}"])
+                    log_info(f"CPU encoder constant quality: -crf {crf_value:g}")
+
+            cmd.extend(color_range_output_args(answers, ":v:0", workflow="build_ffmpeg_command"))
+
+            if tag and answers["output_ext"].lower() in MP4_LIKE_EXTS:
+                cmd.extend(["-tag:v:0" if full_source_map else "-tag:v", tag])
+
+            if extra_video_count:
+                append_additional_source_video_codec_options(cmd, extra_video_count)
+
+    audio_codec_for_stats: str | None = None
+    if audio_indices:
+        if audio_transform_active and not multi_cut:
+            audio_fc, audio_labels = build_audio_transform_filter_complex(answers, audio_indices)
+            cmd.extend(["-filter_complex", audio_fc])
+            for label in audio_labels:
+                cmd.extend(["-map", f"[{label}]"])
+        audio_codec = normalize_audio_codec(
+            answers.get("audio_codec"),
+            default_audio_codec_for_ext(answers.get("output_ext", "")),
+        )
+        audio_codec_for_stats = audio_codec
+        if audio_transform_active and audio_codec == "copy":
+            appio.note("Audio copy cannot be used with audio filters such as speed/reverse, waveform cuts, or LoudNorm. AAC was selected for audio.")
+            audio_codec = DEFAULT_AUDIO_CODEC
+            audio_codec_for_stats = audio_codec
+        # Every constrained container, not just WebM: aac into .flac/.ogg/.opus
+        # was emitted happily and then rejected by the muxer.
+        #
+        # Asking the shared resolver, not the raw allow-list: the list contains
+        # the literal token "copy", so a bare membership test waved `-c:a copy`
+        # through for ANY source codec. A .webm/.flac/.opus output of an AAC
+        # source therefore still emitted `-c:a copy` and died at header write
+        # ("Only VP8 or VP9 or AV1 video and Vorbis or Opus audio ... are
+        # supported for WebM" / "Exactly one FLAC audio stream is required" /
+        # "Unsupported codec id in stream 0"). `container_audio_codec` decides
+        # copy against the SOURCE codec, which is the question that matters.
+        # Every mapped track is checked, because one unstorable track is enough
+        # to fail the mux.
+        container_ext = str(answers.get("output_ext", "")).lower().lstrip(".")
+        source_codecs = [
+            str((answers.get("audio_streams") or [{}])[index].get("codec_name") or "") or None
+            for index in audio_indices
+            if index < len(answers.get("audio_streams") or [])
+        ] or [None]
+        for source_codec in source_codecs:
+            resolved, codec_note = container_audio_codec(container_ext, audio_codec, source_codec)
+            if resolved != audio_codec:
+                if codec_note:
+                    appio.note(codec_note)
+                audio_codec = resolved
+                audio_codec_for_stats = audio_codec
+                break
+        # One write, at the end, of whatever the chain settled on -- the
+        # normalization AND every fallback. `answers["audio_codec"]` stays the
+        # user's request so Back can still show it (D15).
+        effective_settings(answers)["audio_codec"] = audio_codec
+        if audio_codec == "copy":
+            cmd.extend(["-c:a", "copy"])
+        else:
+            if audio_codec == "aac":
+                log_info("AAC audio encoding is CPU-side; video CUDA/NVENC path is unaffected.")
+            cmd.extend(["-c:a", audio_codec])
+            audio_bitrate = answers.get("audio_bitrate_kbps")
+            if audio_bitrate and audio_codec_uses_bitrate(audio_codec):
+                cmd.extend(["-b:a", f"{audio_bitrate}k"])
+            channels = resolve_audio_channels(answers)
+            if channels:
+                cmd.extend(["-ac", str(channels)])
+            _ar = resolve_audio_sample_rate(answers)
+            if _ar:
+                cmd.extend(["-ar", str(_ar)])
+    else:
+        cmd.append("-an")
+
+    output_is_processed = bool(has_video and video_encoder and video_encoder != "copy")
+    output_is_processed = output_is_processed or bool(audio_indices and audio_codec_for_stats and audio_codec_for_stats != "copy")
+    output_is_processed = output_is_processed or bool(
+        (subtitle_indices or retimed_subtitles) and answers["output_ext"].lower() in MP4_LIKE_EXTS)
+    if output_is_processed:
+        video_output_count_for_stats = 0
+        if has_video:
+            video_output_count_for_stats = len(answers.get("video_streams") or []) if full_source_map else 1 + extra_video_count
+        audio_output_count_for_stats = 0
+        if audio_indices:
+            audio_output_count_for_stats = len(answers.get("audio_streams") or []) if full_source_map else len(audio_indices)
+        subtitle_output_count_for_stats = (
+            len(answers.get("subtitle_streams") or []) if full_source_map
+            else len(subtitle_indices) + len(retimed_subtitles))
+        append_clear_reencoded_stream_stat_metadata(
+            cmd,
+            answers,
+            video_output_count=video_output_count_for_stats,
+            audio_output_count=audio_output_count_for_stats,
+            subtitle_output_count=subtitle_output_count_for_stats,
+        )
+
+    if subtitle_indices or retimed_subtitles:
+        # Ask the container what it can carry instead of assuming "copy works
+        # everywhere except MP4". mov_text into mkv, subrip into webm and any
+        # subtitle into avi are all rejected by the muxer at header-write time.
+        source_subtitles = answers.get("subtitle_streams") or []
+        source_codecs = [
+            str((source_subtitles[index] if index < len(source_subtitles) else {}).get("codec_name") or "")
+            for index in subtitle_indices
+        ]
+        # A retimed track is a freshly written SRT, whatever the source codec was.
+        source_codecs.extend(["subrip"] * len(retimed_subtitles))
+        subtitle_args, subtitle_problems = subtitle_codec_args_for_container(
+            answers["output_ext"], source_codecs
+        )
+        for problem in subtitle_problems:
+            log_warn(f"Subtitle/container: {problem}")
+        if subtitle_args:
+            cmd.extend(subtitle_args)
+        append_subtitle_track_metadata(cmd, retimed_subtitles)
+    # Attachments LAST, after every packet-bearing map -- including the
+    # filter-complex audio outputs, which are mapped long after the source
+    # maps. Matroska refuses a packet stream that arrives at a higher output
+    # index than an attachment, so a synchronised reverse of a source carrying
+    # an attachment AND a subtitle emitted
+    #     -map 0:v:0 -map 1:s:0 -map 0:t? ... -filter_complex ... -map [aout0]
+    # and died at the muxer:
+    #     [aost#0:2/copy] Error submitting a packet to the muxer: Invalid argument
+    #     [out#0/matroska] Task finished with error code: -22
+    # The non-synchronised case survived only because its audio is mapped
+    # inline, before the attachment.
+    attachments_mapped = (embedded_attachment_keep_enabled(answers) if full_source_map
+                          else append_embedded_attachment_maps(cmd, answers))
+    if attachments_mapped:
+        append_embedded_attachment_codec_options(cmd, answers)
+    if data_mapped:
+        append_source_data_codec_options(cmd, answers)
+
+    if answers["output_ext"].lower() in MP4_LIKE_EXTS and MOVFLAGS:
+        cmd.extend(["-movflags", MOVFLAGS])
+
+    # Last, immediately before the output path: ffmpeg reads output options in
+    # order, so anything the user adds here can override what the wizard chose
+    # -- which is the point of the escape hatch. The whole command is printed
+    # for review before it runs.
+    cmd.extend(answers.get("raw_ffmpeg_args") or [])
+
+    cmd.append(str(output_path))
+    return cmd
+
+
+__all__ = [
+    'build_ffmpeg_command',
+    'build_quick_output_stages',
+    'build_video_filter',
+]
+
+
+# wizard_build_b holds an overflow slice of this module (split for file size).
+# Bound twice on purpose: the call sites above address it through the module
+# object so a test patching the DEFINING module is seen, and the `_` alias is
+# what tests/test_module_reference_hygiene reads to find re-export pairs.
+# The Split per-part output writer lives in its own module now. Imported at
+# the BOTTOM for the same reason as the sibling below: nothing partial is read.
+from ffmwiz import wizard_build_split_outputs as _wizard_build_split_outputs  # noqa: E402
+from ffmwiz import wizard_build_split_outputs  # noqa: E402,F401
+from ffmwiz.wizard_build_split_outputs import *  # noqa: E402,F401,F403
+__all__ = list(__all__) + list(_wizard_build_split_outputs.__all__)
+
+from ffmwiz import wizard_build_b as _wizard_build_b  # noqa: E402
+from ffmwiz import wizard_build_b  # noqa: E402,F401
+from ffmwiz.wizard_build_b import *  # noqa: E402,F401,F403
+__all__ = list(__all__) + list(_wizard_build_b.__all__)
+
+# wizard_base holds the encode-option builders this module calls; it is a leaf
+# and imports nothing from the wizard facade tier.
+from ffmwiz import wizard_base  # noqa: E402,F401

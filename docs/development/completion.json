@@ -1,0 +1,522 @@
+{
+  "schema_version": 1,
+  "complete_release": "blocked",
+  "records": [
+    {
+      "subject_id": "R01",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R02",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R03",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R04",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R05",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R06",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R07",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R08",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R09",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R10",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R11",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R12",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R13",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R14",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R15",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R16",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R17",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R18",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R19",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R20",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R21",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R22",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F01",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F02",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F03",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F04",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F05",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F06",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F07",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F08",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F09",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F10",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F11",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F12",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F13",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F14",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F15",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD01",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD02",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD03",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD04",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD05",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD06",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD07",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD08",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD09",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD10",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD11",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD12",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD13",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD14",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD15",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD16",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD17",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD18",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD19",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD20",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD21",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD22",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD23",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD24",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD25",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD26",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD27",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD28",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD29",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD30",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD31",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD32",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD33",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD34",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP01",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP02",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP03",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP04",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP05",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP06",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP07",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP08",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP09",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP10",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP11",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP12",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "domain.exact_time",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/time.rs"
+      ],
+      "evidence": []
+    },
+    {
+      "subject_id": "muxcls.selection",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/mux.rs"
+      ],
+      "evidence": []
+    }
+  ]
+}

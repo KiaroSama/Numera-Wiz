@@ -1,0 +1,575 @@
+{
+  "revision": "7.0",
+  "scope": "Document, source-inventory and packaging-input integrity only; no application, media, browser, protocol or GPU runtime execution",
+  "main_artifact": "Numera-Wiz-Implementation-Mandate-EN.md",
+  "main_sha256": "126c8aa8aa7f874802a09600040a1986cff650ad70b70f58f30a441d87fbef06",
+  "main_bytes": 772543,
+  "main_words": 98194,
+  "checks": [
+    {
+      "check": "all_610_source_effect_rows_unique",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "filmcraft_effect_source_set_exact",
+      "passed": true,
+      "details": {
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "check": "effectcraft_effect_source_set_exact",
+      "passed": true,
+      "details": {
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "check": "effect_design_fields_complete",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "effect_dispositions_final",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "canonical_target_identity_reconciliation",
+      "passed": true,
+      "details": 481
+    },
+    {
+      "check": "all_effect_rows_remain_runtime_unqualified",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_source_effect_ids_present_in_main",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_296_alias_proposals_unique",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_942_source_command_rows_unique",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "command_source_set_exact",
+      "passed": true,
+      "details": {
+        "source_records": 942,
+        "mapping_records": 942
+      }
+    },
+    {
+      "check": "command_fields_complete",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "command_targets_final",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_34_command_domains",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "command_copy_identical",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "R_coverage_in_main",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "F_coverage_in_main",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "CD_coverage_in_main",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "E_coverage_in_main",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "no_assembly_placeholders",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "main_has_all_four_annexes",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "main_meets_500_kb_deliverable_requirement",
+      "passed": true,
+      "details": {
+        "minimum_bytes": 500000,
+        "actual_bytes": 772543
+      }
+    },
+    {
+      "check": "fences_balanced",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "json_examples_parse",
+      "passed": true,
+      "details": {
+        "blocks": 5,
+        "errors": []
+      }
+    },
+    {
+      "check": "document_map_anchors_resolve",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "markdown_table_column_consistency",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "primary_link_syntax",
+      "passed": true,
+      "details": {
+        "unique_urls": 256,
+        "live_network_revalidation": "Not claimed by this document check; pinned retrieval/source evidence is separate."
+      }
+    },
+    {
+      "check": "critical_integrated_contracts_present",
+      "passed": true,
+      "details": {
+        "literal_research_directive": true,
+        "portable_repo_identity": true,
+        "gpl_later": true,
+        "mcp_bridge": true,
+        "http_default_port": true,
+        "same_ui": true,
+        "accepted_job_authorization": true,
+        "replay_expiry": true,
+        "browser_editor_lease": true,
+        "nut_nonnegative_origin": true,
+        "job_publication_fence": true,
+        "metric_input_role": true,
+        "literal_text": true,
+        "varblur_identity": true,
+        "vector_precision": true,
+        "ci_owner_harness": true,
+        "parity_first_slice": true,
+        "gpu_preferred_default": true,
+        "real_browser_matrix": true,
+        "scope_bootstrap": true,
+        "active_request_lifetime": true,
+        "shared_destination_claim": true,
+        "no_replace_publication": true,
+        "volatile_control_class": true,
+        "durable_control_class": true,
+        "bounded_control_ack": true,
+        "agent_caller_profile": true,
+        "agent_token_target_profile": true,
+        "synchronous_powershell_json": true,
+        "synchronous_powershell_human": true,
+        "envelope_context_mapping": true,
+        "native_future_frame_rule": true,
+        "command_ack_correlation": true,
+        "command_encoded_byte_limits": true
+      }
+    },
+    {
+      "check": "manual_evidence_validation_present",
+      "passed": true,
+      "details": "Full recorded-body/hash/range check is separately retained; this check does not simulate reading."
+    },
+    {
+      "check": "shared_route_consistency_color_emboss",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "shared_route_consistency_four_color_gradient",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "shared_route_consistency_gradient",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "filmcraft_spatial_relief_not_pointwise_template",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "filmcraft_edge_and_alpha_masks_explicit",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "filmcraft_gradients_use_spatial_generation",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "no_blanket_command_surface_receipt_contract",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "settings_revision_field_is_resource_specific",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "gesture_commit_has_project_precondition",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "profile_flags_have_single_authority_meaning",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "no_stale_exhaustive_color_family_assurance",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "no_current_map_reference_to_archived_v4_descriptors",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "no_active_reference_to_excluded_v6_contracts",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "filmcraft_reviewed_light_noise_fields_integrated",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "effectcraft_reviewed_light_noise_fields_integrated",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "noise_alias_preserves_different_overflow_modes",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "reviewed_color_family_has_actual_spatial_temporal_routes",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "shared_light_and_guide_contracts_defined",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "bounded_review_row_counts_preserved",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "only_reviewed_v7_field_changes_filmcraft-functional-mapping-final.csv",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "only_reviewed_v7_field_changes_effectcraft-functional-mapping-final.csv",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "only_reviewed_v7_field_changes_cross-donor-capability-aliases.csv",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "only_reviewed_v7_field_changes_command-functional-mapping-final.csv",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_original_requests_and_clarifications_mapped",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "traceability_required_fields_complete",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "traceability_has_no_runtime_promotion",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_cross_domain_scenarios_indexed",
+      "passed": true,
+      "details": 63
+    },
+    {
+      "check": "explicit_muxcls_acceptance_present",
+      "passed": true,
+      "details": [
+        "MX7-J01",
+        "MX7-J02",
+        "MX7-J03",
+        "MX7-J04",
+        "MX7-J05",
+        "MX7-J06",
+        "MX7-J07",
+        "MX7-J08",
+        "MX7-J09",
+        "MX7-J10",
+        "MX7-J11",
+        "MX7-J12"
+      ]
+    },
+    {
+      "check": "muxcls_module_and_behavior_ledger_complete",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "muxcls_status_is_source_review_only",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "muxcls_complete_production_reading_recorded",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "muxcls_pinned_source_archive_integrity",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "scenario_assertions_match_main",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_statuses_remain_unqualified",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_references_valid_requirement_ids",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_references_valid_ffmwiz_family_ids",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_references_valid_command_domain_ids",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_references_valid_work_package_ids",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "scenario_references_valid_ci_gate_ids",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "traceability_references_valid",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "all_39_primary_findings_have_resolution_and_acceptance",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "seven_integration_findings_retained",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "v6_selected_contracts_integrated",
+      "passed": true,
+      "details": {
+        "managed_assets_owned_separately": true,
+        "rollback_generation_is_gc_root": true,
+        "typed_render_contract": true,
+        "half_open_sample_selection": true,
+        "source_clock_default": true,
+        "fixed_timeline_transition": true,
+        "independent_transition_oracle": true,
+        "caption_clock_owner": true,
+        "no_double_caption_map": true,
+        "sample_gain_accuracy": true,
+        "native_state_not_invented": true,
+        "immutable_retry_states": true,
+        "owner_compatibility": true,
+        "port_conflict": true,
+        "store_rollback_boundary": true,
+        "actual_client_token_delivery": true,
+        "packaged_capability_closure": true,
+        "required_release_evidence": true,
+        "owner_report_import": true,
+        "fixed_performance_workloads": true,
+        "workpackage_foundation_dependency": true,
+        "continuation": true
+      }
+    },
+    {
+      "check": "superseded_conflicting_clauses_removed",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "main_has_section_11_and_work_packages",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "no_non_ascii_digits_in_authored_mandate",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "v7_selected_contracts_integrated",
+      "passed": true,
+      "details": {
+        "bounded_editor_projection": true,
+        "complete_shortcut_registration": true,
+        "future_semantic_nodes": true,
+        "sequence_time_policy": true,
+        "sequence_geometry_policy": true,
+        "agent_observation": true,
+        "actual_observed_time": true,
+        "temporal_processed_prefix": true,
+        "temporal_clip_clock": true,
+        "format_change_policy": true,
+        "reinit_observation_settings": true,
+        "presentation_contract": true,
+        "selected_wasm_policy": true,
+        "probe_seekable_descriptor": true,
+        "mcp_wire_budget": true,
+        "artifact_chunks": true,
+        "object_rights": true,
+        "operational_profile_defaults": true,
+        "transferred_plan_authority": true,
+        "restricted_receipt_result": true,
+        "published_artifact_identity": true,
+        "automation_logging": true,
+        "architecture_dependency_graph": true,
+        "architecture_module_ownership": true,
+        "architecture_typed_records": true,
+        "architecture_dispatch_order": true,
+        "architecture_store_recovery": true,
+        "pure_shortcut_owner": true,
+        "retired_command_replay": true,
+        "scoped_bootstrap_allowed": true,
+        "muxcls_explicit_annex": true,
+        "muxcls_pinned_source": true
+      }
+    },
+    {
+      "check": "temporal_mapping_has_correct_prefix_and_clock",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "sequence_mapping_removes_undefined_retime_policy",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "projection_parameters_match_selected_schema",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "powershell_examples_support_four_level_stderr_logging",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "actual_deep_research_record_is_honest",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "deep_research_disposition_available",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "supplementary_security_source_integrity",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "section_views_bound_to_same_main",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "section_views_integrity",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "section_views_reconstruct_full_authoritative_text",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "markdown_reference_labels_resolve",
+      "passed": true,
+      "details": []
+    },
+    {
+      "check": "markdown_reference_targets_not_conflicting",
+      "passed": true,
+      "details": {}
+    }
+  ],
+  "passed": true,
+  "application_tests_run": false,
+  "gpu_tests_run": false
+}

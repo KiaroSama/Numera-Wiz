@@ -1,0 +1,33 @@
+{
+  "sha": "01044d04536eec6e2f5f48ef404cf45d15feb461",
+  "message": "avformat/hls: Enforce protocol checks when opening child playlists\n\nFix: vulnerability:019f3b84-903b-75fb-a8de-fad1c2d7e99c\nThe parse_playlist() path for opening a new child playlist (in == NULL)\ndirectly called c->ctx->io_open(), bypassing the protocol whitelist and\nfile-extension checks that open_url() enforces. This allowed child URLs\nfrom a master playlist to use protocols other than file/http/data or to\nhave disallowed extensions.\n\nRoute the !in branch through open_url() so that all child playlists are\nsubject to the same security policy as segment URLs.\n\nFixes a security bypass in HLS master playlist parsing.\n\nFound-by: depthfirst\nSigned-off-by: Steven Liu <lq@chinaffmpeg.org>\n(cherry picked from commit 23602df9cd1b485c45ba6f533d3b85569de3f323)\nSigned-off-by: Michael Niedermayer <michael@niedermayer.cc>",
+  "url": "https://api.github.com/repos/FFmpeg/FFmpeg/commits/01044d04536eec6e2f5f48ef404cf45d15feb461",
+  "html_url": "https://github.com/FFmpeg/FFmpeg/commit/01044d04536eec6e2f5f48ef404cf45d15feb461",
+  "diff": "@@ -857,7 +857,7 @@ static int parse_playlist(HLSContext *c, const char *url,\n         if (c->http_persistent)\n             av_dict_set(&opts, \"multiple_requests\", \"1\", 0);\n \n-        ret = c->ctx->io_open(c->ctx, &in, url, AVIO_FLAG_READ, &opts);\n+        ret = open_url(c->ctx, &in, url, &opts, NULL, NULL);\n         av_dict_free(&opts);\n         if (ret < 0)\n             return ret;",
+  "files": [
+    {
+      "filename": "libavformat/hls.c",
+      "patch": "@@ -857,7 +857,7 @@ static int parse_playlist(HLSContext *c, const char *url,\n         if (c->http_persistent)\n             av_dict_set(&opts, \"multiple_requests\", \"1\", 0);\n \n-        ret = c->ctx->io_open(c->ctx, &in, url, AVIO_FLAG_READ, &opts);\n+        ret = open_url(c->ctx, &in, url, &opts, NULL, NULL);\n         av_dict_free(&opts);\n         if (ret < 0)\n             return ret;"
+    }
+  ],
+  "repository_full_name": "FFmpeg/FFmpeg",
+  "comments": null,
+  "author": {
+    "login": "T-bagwell",
+    "name": null,
+    "email": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/3014247?v=4",
+    "id": 3014247
+  },
+  "committer": {
+    "login": "michaelni",
+    "name": null,
+    "email": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/729390?v=4",
+    "id": 729390
+  },
+  "created_at": "2026-08-02T00:47:29Z",
+  "git_author_email": null,
+  "display_url": "https://github.com/FFmpeg/FFmpeg/commit/01044d04536eec6e2f5f48ef404cf45d15feb461",
+  "display_title": "avformat/hls: Enforce protocol checks when opening child playlists"
+}

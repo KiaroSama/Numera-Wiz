@@ -1,0 +1,41 @@
+{
+  "revision": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "files": [
+    {
+      "path": "libavfilter/aeval.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__aeval.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/aeval.c",
+      "sha256": "f0c77d3bcb26bf860f7981b18c4ba15946da5a3b5d8c94cb1bccbb193dbcaa49"
+    },
+    {
+      "path": "libavfilter/vf_geq.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__vf_geq.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_geq.c",
+      "sha256": "ec00991bb6dd6e0869aa76c46f8511a06ed3aaf2134b676a41a664e74509db97"
+    },
+    {
+      "path": "libavfilter/vf_floodfill.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__vf_floodfill.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_floodfill.c",
+      "sha256": "c12bf956d96ffb94f3d125d5c885cfbdb66ce8eb745bbb0e6279677facf2dc71"
+    },
+    {
+      "path": "libavfilter/af_aiir.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__af_aiir.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/af_aiir.c",
+      "sha256": "aa9b4d5e3a26d4e90ef8fb861f244ffcfdb0eb694614fb837771ef89b0c9b3fd"
+    },
+    {
+      "path": "libavfilter/vf_morpho.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__vf_morpho.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_morpho.c",
+      "sha256": "0d084d5811d3a6df6c8a6deffdb755ab7379e42c948ad1e610b7044afeceaa52"
+    },
+    {
+      "path": "libavfilter/af_afftfilt.c",
+      "local_path": "research_v3/requirements-ffmpeg-libavfilter__af_afftfilt.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/af_afftfilt.c",
+      "sha256": "4d0f269b65a5f5f69acc8eadeb3f74c60cc42c397a2c8d2c2e939d008c953186"
+    }
+  ]
+}
