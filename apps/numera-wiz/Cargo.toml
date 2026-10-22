@@ -26,3 +26,6 @@ uuid.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
 subtle = "2.6"
+[dev-dependencies]
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+reqwest.workspace = true

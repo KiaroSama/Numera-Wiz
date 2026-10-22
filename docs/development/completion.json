@@ -507,7 +507,19 @@
       "modules": [
         "crates/nw-domain/src/time.rs"
       ],
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "unit",
+          "commit": "5bc606743cc8621347f3fc1e6eb391bc57d2eea7",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39872550273",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "domain unit assertions passed; overall run failed at later Clippy step"
+        }
+      ]
     },
     {
       "subject_id": "muxcls.selection",
@@ -516,7 +528,19 @@
       "modules": [
         "crates/nw-domain/src/mux.rs"
       ],
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "unit",
+          "commit": "5bc606743cc8621347f3fc1e6eb391bc57d2eea7",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39872550273",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "domain unit assertions passed; overall run failed at later Clippy step"
+        }
+      ]
     }
   ]
 }

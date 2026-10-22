@@ -53,7 +53,7 @@ fn release_gate(root:&Path) -> Result<()> {
 fn build_fixture_profile(root:&Path)->Result<()> {
     if std::env::var("GITHUB_ACTIONS").as_deref()!=Ok("true"){bail!("This source build belongs in GitHub CI");}
     let source=root.join("target/fixture-ffmpeg-src");let output=root.join("target/fixture-components");
-    let flags=["--disable-doc","--disable-debug","--disable-network","--disable-autodetect","--disable-everything","--disable-x86asm","--enable-ffmpeg","--enable-ffprobe","--enable-protocol=file,pipe","--enable-demuxer=matroska,wav,srt","--enable-muxer=matroska,null","--enable-encoder=ffv1,pcm_s16le","--enable-decoder=ffv1,pcm_s16le,subrip","--enable-indev=lavfi","--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample","--enable-swscale","--enable-swresample"];
+    let flags=["--disable-doc","--disable-debug","--disable-network","--disable-autodetect","--disable-everything","--disable-x86asm","--enable-ffmpeg","--enable-ffprobe","--enable-protocol=file,pipe","--enable-demuxer=matroska,wav,srt","--enable-muxer=matroska,null","--enable-encoder=ffv1,pcm_s16le","--enable-decoder=ffv1,pcm_s16le,subrip,wrapped_avframe","--enable-indev=lavfi","--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample","--enable-swscale","--enable-swresample"];
     let mut configure=std::process::Command::new("sh");configure.current_dir(&source).arg("configure").args(flags).arg(format!("--prefix={}",output.display()));
     tracing::info!(argv=?configure,"Preparing the CI-only FFmpeg fixture build");
     if !configure.status()?.success(){bail!("FFmpeg fixture configure failed");}
