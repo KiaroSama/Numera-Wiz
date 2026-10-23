@@ -24,6 +24,8 @@ jobs:
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
+      - name: Check source formatting
+        run: cargo fmt --all -- --check
       - name: Compile and run ordinary regressions
         run: cargo test --locked --workspace --all-targets
       - name: Lint implementation

@@ -141,7 +141,9 @@ pub struct CleanResolution {
 pub fn normalize_language(value: &str) -> String {
     let text = value.trim().to_lowercase();
     match text.as_str() {
-        "" | "unknown" | "unk" | "undefined" | "none" | "null" | "n/a" | "und" => "und".into(),
+        "" | "unknown" | "unk" | "undefined" | "uknown" | "*uknown" | "none" | "null" | "n/a" | "und" => {
+            "und".into()
+        }
         _ => text,
     }
 }
@@ -531,6 +533,25 @@ mod tests {
         assert_eq!(resolve(&source, &rules).unwrap().action, CleanAction::Remux);
         rules.audio_selection.selector = Selector::Languages { values: vec![] };
         assert!(resolve(&source, &rules).is_err());
+    }
+    #[test]
+    fn donor_unknown_language_labels_remain_selectable() {
+        let source = vec![
+            stream(0, StreamKind::Video, "und"),
+            stream(1, StreamKind::Audio, " *UkNoWn "),
+            stream(2, StreamKind::Audio, "uknown"),
+        ];
+        let mut rules = intent();
+        rules.audio_selection.selector = Selector::Languages {
+            values: vec!["und".into()],
+        };
+        let result = resolve(&source, &rules).unwrap();
+        assert_eq!(result.action, CleanAction::CopyUnchanged);
+        assert_eq!(
+            result.streams.iter().map(|s| s.index).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert_eq!(result.streams[1].tags["language"], " *UkNoWn ");
     }
     #[test]
     fn no_op_copy_and_metadata_only_remux_are_distinct() {
