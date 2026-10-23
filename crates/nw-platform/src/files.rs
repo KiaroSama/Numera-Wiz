@@ -291,11 +291,7 @@ mod tests {
         let root=tempfile::tempdir().unwrap();let original=root.path().join("reviewed");let outside=root.path().join("outside");fs::create_dir(&original).unwrap();fs::create_dir(&outside).unwrap();
         let expected=path_text(&output_path(&original.join("result.mkv")).unwrap()).unwrap();fs::rename(&original,root.path().join("moved")).unwrap();
         #[cfg(unix)] std::os::unix::fs::symlink(&outside,&original).unwrap();
-        #[cfg(windows)] {
-            let system=std::path::PathBuf::from(std::env::var_os("SystemRoot").expect("Windows system directory"));
-            let result=std::process::Command::new(system.join("System32/cmd.exe")).args(["/D","/C","mklink","/J"]).arg(&original).arg(&outside).output().unwrap();
-            assert!(result.status.success(),"The hosted NTFS junction fixture could not be created");
-        }
+        #[cfg(windows)] std::os::windows::fs::symlink_dir(&outside,&original).expect("Create the hosted Windows directory-symlink fixture");
 
         assert_eq!(revalidate_output(&expected).unwrap_err().code,"TARGET_CHANGED");assert!(!outside.join("result.mkv").exists());assert!(!root.path().join("moved/result.mkv").exists());
     }

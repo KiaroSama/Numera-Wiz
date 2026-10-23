@@ -107,3 +107,29 @@ listener lifetime and credential audiences are separate from private jobs; one-u
 proofs must also bind their original listener lifetime. Full staging-intent crash
 recovery, source admission, packet/timing preservation and current access-model
 obligations remain open in T010-T023.
+
+
+Run [40036274278](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40036274278)
+on 2deef857b8942fe4384128bed589ce7996a5719b passed the real Chrome human
+Choose media -> streamed intake -> Review -> Run -> Succeeded journey, with
+independent source/output byte equality. Its retained screenshot/manifest under
+`docs/development/evidence/` identifies the exact narrow boundary and exclusions.
+Native Linux/ARM macOS/Intel macOS checks and CPU CLI/SDK media passed; Windows
+stopped at the command-based junction fixture. That fixture now uses Rust's
+standard directory-symlink API and still must pass before native UI CI can run.
+The new native UI job uses the matching desktop executable, Xvfb/Openbox and actual
+window input, initially proving native source registration and capturing the form.
+Continue through native review/Run/output checks after observing its screenshots.
+
+Current changes protect application/component folders from media destinations,
+set the process working directory explicitly, and recheck current source/output
+path authority at start/fence. The owned exports namespace remains writable.
+These checks do not close cross-root destination leases, parent directory identity
+or the complete staging/crash contract. Those remain explicit T010-T023 work.
+Read models still need bounded summaries/snapshot pagination instead of full
+256-record lists. Quotas are not completed retention/GC. Credential clock rollback
+and concurrent clock observations need an injected clock/acceptance-time design;
+do not use a stale request timestamp as proof that the system clock rolled back.
+Remux still needs full streamed packet/timestamp/extradata/side-data verification;
+current lowering normalizes the common start with copyts/start_at_zero, which the
+chosen preservation oracle must state and check. Full manual coverage remains open.

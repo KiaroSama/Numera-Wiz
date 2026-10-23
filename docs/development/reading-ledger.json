@@ -44,6 +44,196 @@
         "Complete the included manual bodies separately.",
         "Qualify full packet/timestamp/decoded preservation and exact observation against actual fixtures."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_nut.texi",
+      "sha256": "7164e76d02547123fdb12982bcc443105fb6220b979b6883d4a84c132f4994b5",
+      "lines": [
+        1,
+        159
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "The wrapper describes PIPE/BROADCAST variants and codec tags, not the complete NUT bitstream specification.",
+        "PIPE omits syncpoints; BROADCAST assumes synchronized endpoint clocks and cannot supply the application render clock by itself."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-formats.texi",
+      "sha256": "7d5c644af0da0481720a3cc7a0eebaf96a361ab2ff9a60aab5ffa2471c1d5a19",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes formats.texi; the included format/demuxer/muxer bodies require separate study."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-protocols.texi",
+      "sha256": "32c0cf1045aab88639ae82c2302b830720be3a7b167c80650a1e885fb79efda5",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes protocols.texi; it is not coverage of individual protocol behaviors."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-devices.texi",
+      "sha256": "e93369b9c48f095a0274da1ec771a8b53f4f096924128e7e3b1c614b9898b03a",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes devices.texi; device permission, buffering and timing rules remain separate dependencies."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-codecs.texi",
+      "sha256": "11f90289b4c0b234019c566459d9b1787dcac9b0357905464630910d6b443661",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes codecs.texi; compiled codec availability and encoder-specific controls must be qualified separately."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-bitstream-filters.texi",
+      "sha256": "59fcee9ec319ff62a0ec9930aeec8f0f50782a9773487ba55e0999c6fb6f7ab8",
+      "lines": [
+        1,
+        46
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "Bitstream filters modify encoded data without decoding. Packet-copy verification must declare framing/header transformations separately.",
+        "The included bitstream_filters.texi body is not credited by the wrapper read."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-filters.texi",
+      "sha256": "faea65ae2f9670f5aad620fff18bbddf9c7e96ba88fb335f973907d1cab71ba8",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "The filter wrapper includes filters.texi; it supplies no per-filter semantic or parameter-domain qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_protocols.texi",
+      "sha256": "9bc84820073cf7cedc7b26bda62a805e963bdae7f20974ee27ed49d0b42e3ead",
+      "lines": [
+        1,
+        520
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Partial body only",
+      "interpretation": [
+        "protocol_whitelist restricts protocols, including nested protocols; it does not implement application filesystem-root grants.",
+        "file truncates existing outputs by default, so only owned staging may be handed to a replacing FFmpeg output.",
+        "file/fd blocksize affects termination reaction; follow ignores the reported file size and needs an independent termination policy.",
+        "async/cache wrappers introduce background I/O or temporary storage; they are not admitted implicitly by the file-only media profile."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T016",
+        "T023"
+      ],
+      "unresolved": [
+        "Read lines 521-2408 separately.",
+        "Close secondary-reference admission before source probing."
+      ]
     }
   ]
 }

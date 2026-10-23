@@ -48,6 +48,7 @@ pub struct Service {
     pub epoch: String,
     engine: Option<Engine>,
     root: PathBuf,
+    code_roots: Vec<PathBuf>,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
     origins: Mutex<HashMap<String, u64>>,
@@ -140,10 +141,15 @@ impl Service {
             Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?),
             None => None,
         };
+        let executable=std::env::current_exe().map_err(files::io_error)?;
+        let mut code_roots=vec![std::fs::canonicalize(executable.parent().ok_or_else(||DomainError::new("COMPONENT_UNAVAILABLE","Application directory is required"))?).map_err(files::io_error)?];
+        if let Some(engine)=&engine{for component in [&engine.ffmpeg,&engine.ffprobe]{code_roots.push(Path::new(&component.path).parent().ok_or_else(||DomainError::new("COMPONENT_UNAVAILABLE","Component directory is required"))?.to_owned());}}
+        code_roots.sort();code_roots.dedup();
         let (events, _) = broadcast::channel(128);
         let service = Arc::new(Self {
             store: Arc::new(store),
             root: selected_root,
+            code_roots,
             epoch: Uuid::new_v4().to_string(),
             engine,
             mutation: Mutex::new(()),
@@ -261,6 +267,7 @@ impl Service {
                 "Protected owner namespaces and managed objects are not media output targets",
             ));
         }
+        if write && !canonical.starts_with(self.root.join("exports")) && self.code_roots.iter().any(|root|canonical.starts_with(root)) {return Err(DomainError::new("PATH_DENIED","Application and component folders cannot receive media exports. Choose another destination."));}
         if !write && context.profile.is_some() && canonical.starts_with(self.root.join("assets")) {
             self.managed_read(context, &canonical)?;
         }
@@ -848,6 +855,7 @@ impl Service {
                     return Ok(None);
                 }
                 start.store.execution_allowed(&job_id)?;
+                start.validate_job_paths(&job)?;
                 start
                     .store
                     .transition_job(&job_id, JobState::Queued, JobState::Running)
@@ -941,6 +949,13 @@ impl Service {
         }
         Ok(())
     }
+    fn validate_job_paths(&self,job:&Job)->Result<()> {
+        let authorization:ExecutionAuthorization=self.store.get(&named("job-auth",&job.id)?)?.ok_or_else(||DomainError::new("PERMISSION_DENIED","Durable execution authority is missing"))?;
+        let context=Context{principal:authorization.principal,profile:authorization.profile};
+        self.path(&context,Path::new(&job.plan.source.identity.path),false)?;
+        self.path(&context,Path::new(&job.plan.output),true)?;
+        files::revalidate_output(&job.plan.output)?;Ok(())
+    }
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         match event {
@@ -956,7 +971,10 @@ impl Service {
                 self.store
                     .transition_job(id, JobState::Running, JobState::Verifying)?;
             }
-            ExecutionEvent::Fence(publication) => self.store.publication_fence(&publication)?,
+            ExecutionEvent::Fence(publication) => {
+                self.validate_job_paths(&self.store.inspect_job(id)?)?;
+                self.store.publication_fence(&publication)?;
+            },
             ExecutionEvent::Published(artifact, verification) => {
                 self.store.published(id, artifact, verification)?;
             }
@@ -1168,4 +1186,14 @@ mod tests {
                 .is_err()
         );
     }
+    #[tokio::test]
+    async fn broad_owner_authority_cannot_publish_media_into_component_namespaces(){
+        let root=tempfile::tempdir().unwrap();
+        let programs=root.path().join("programs");std::fs::create_dir(&programs).unwrap();let a=programs.join("ffmpeg");let b=programs.join("ffprobe");std::fs::write(&a,b"unexecuted path-policy fixture").unwrap();std::fs::write(&b,b"unexecuted path-policy fixture").unwrap();
+        let service=Service::open(root.path().join("data"),Some((a,b))).await.unwrap();
+        assert_eq!(service.path(&service.owner(),&programs.join("untrusted-output.mkv"),true).unwrap_err().code,"PATH_DENIED");
+        assert!(service.path(&service.owner(),&std::fs::canonicalize(root.path().join("data/exports")).unwrap().join("allowed.mkv"),true).is_ok());
+        assert!(!programs.join("untrusted-output.mkv").exists());
+    }
+
 }

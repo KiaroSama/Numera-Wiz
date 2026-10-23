@@ -542,7 +542,10 @@ mod tests {
     #[ignore = "Actual Chrome runtime test runs only in the hosted browser job"]
     async fn packaged_browser_boots_shared_wasm_under_the_enforced_policy() {
         use base64::Engine as _;
-        assert!(std::env::var_os("NW_FIXTURE_COMPONENTS").is_some(),"The actual UI media journey requires the matching CI-built fixture components");
+        assert!(
+            std::env::var_os("NW_FIXTURE_COMPONENTS").is_some(),
+            "The actual UI media journey requires the matching CI-built fixture components"
+        );
         use std::process::Stdio;
         let driver_path =
             std::env::var_os("NW_CHROMEDRIVER").expect("CI supplies its identified ChromeDriver");
@@ -785,11 +788,51 @@ mod tests {
             )
             .unwrap();
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":1180,"y":409},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
-            let start=Instant::now();let job=loop {let jobs=fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap();if let Some(job)=jobs.into_iter().next() && job.state.terminal(){break job;}assert!(start.elapsed()<Duration::from_secs(30),"Shared Run control did not produce an observed terminal job");tokio::time::sleep(Duration::from_millis(100)).await;};
-            assert_eq!(job.state,nw_domain::records::JobState::Succeeded);let artifact=job.artifact.as_ref().expect("A verified published artifact is required");assert_eq!(std::fs::read(&artifact.path).unwrap(),std::fs::read(&media.source).unwrap());
+            let start = Instant::now();
+            let job = loop {
+                let jobs = fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Job>("job/", 128)
+                    .unwrap();
+                if let Some(job) = jobs.into_iter().next()
+                    && job.state.terminal()
+                {
+                    break job;
+                }
+                assert!(
+                    start.elapsed() < Duration::from_secs(30),
+                    "Shared Run control did not produce an observed terminal job"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            };
+            assert_eq!(job.state, nw_domain::records::JobState::Succeeded);
+            let artifact = job
+                .artifact
+                .as_ref()
+                .expect("A verified published artifact is required");
+            assert_eq!(
+                std::fs::read(&artifact.path).unwrap(),
+                std::fs::read(&media.source).unwrap()
+            );
             std::fs::write(directory.join("media-output.json"),serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"state":job.state,"artifact":artifact,"verification":job.verification,"oracle":"Full independent source/output byte equality after actual shared UI file selection, review and Run"})).unwrap()).unwrap();
-            tokio::time::sleep(Duration::from_millis(1200)).await;let screenshot=driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;std::fs::write(directory.join("completed-workspace.png"),base64::engine::general_purpose::STANDARD.decode(screenshot.as_str().unwrap()).unwrap()).unwrap();
-
+            tokio::time::sleep(Duration::from_millis(1200)).await;
+            let screenshot = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("completed-workspace.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(screenshot.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
         }
         std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal, actual UI file intake, frozen plan review and byte-verified published output under real CSP/MIME","not_qualified":["media playback","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
         driver(
