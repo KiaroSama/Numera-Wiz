@@ -282,13 +282,41 @@ impl Service {
         std::fs::remove_file(&ready.staging).map_err(files::io_error)?;
         Ok(ready)
     }
-    pub(super) fn managed_read(&self,context:&Context,path:&Path)->Result<()> {
-        let text=files::path_text(path)?;
-        let key=format!("managed-read/{}/{}",hex::encode(Sha256::digest(text.as_bytes())),context.principal);
-        if self.store.get::<bool>(&key)?==Some(true){return Ok(());}
-        if let Some(profile)=self.policy(context)?{for id in profile.objects {if let Some(asset)=self.store.get::<Asset>(&named("asset",&id)?)? && asset.identity.path==text {return Ok(());}}}
-        for upload in self.store.list::<Upload>("upload/",128)?{if upload.principal==context.principal && upload.phase=="ready" && upload.expires>nw_platform::epoch_seconds() && upload.sealed.as_ref().is_some_and(|identity|identity.path==text){return Ok(());}}
-        Err(DomainError::new("PERMISSION_DENIED","A managed filename is not an asset-read capability for this principal"))
+    pub(super) fn managed_read(&self, context: &Context, path: &Path) -> Result<()> {
+        let text = files::path_text(path)?;
+        let key = format!(
+            "managed-read/{}/{}",
+            hex::encode(Sha256::digest(text.as_bytes())),
+            context.principal
+        );
+        if self.store.get::<bool>(&key)? == Some(true) {
+            return Ok(());
+        }
+        if let Some(profile) = self.policy(context)? {
+            for id in profile.objects {
+                if let Some(asset) = self.store.get::<Asset>(&named("asset", &id)?)?
+                    && asset.identity.path == text
+                {
+                    return Ok(());
+                }
+            }
+        }
+        for upload in self.store.list::<Upload>("upload/", 128)? {
+            if upload.principal == context.principal
+                && upload.phase == "ready"
+                && upload.expires > nw_platform::epoch_seconds()
+                && upload
+                    .sealed
+                    .as_ref()
+                    .is_some_and(|identity| identity.path == text)
+            {
+                return Ok(());
+            }
+        }
+        Err(DomainError::new(
+            "PERMISSION_DENIED",
+            "A managed filename is not an asset-read capability for this principal",
+        ))
     }
     pub(super) fn resolve_upload(&self, context: &Context, id: &str) -> Result<(PathBuf, String)> {
         self.upload_allowed(context)?;
@@ -350,8 +378,8 @@ mod tests {
         assert!(path.starts_with(std::fs::canonicalize(root.path().join("assets")).unwrap()));
         assert_eq!(std::fs::read(&path).unwrap(), b"abcdef");
         assert!(service.resolve_upload(&owner, &ticket.upload_id).is_err());
-        assert!(service.managed_read(&browser,&path).is_ok());
-        assert!(service.managed_read(&agent,&path).is_err());
+        assert!(service.managed_read(&browser, &path).is_ok());
+        assert!(service.managed_read(&agent, &path).is_err());
         assert!(service.begin_upload(&browser, &ticket.upload_id).is_err());
         let truncated = service.create_upload(&browser, input.clone()).unwrap();
         let mut writer = service

@@ -16,14 +16,30 @@ fn valid_key(key: &str) -> Result<()> {
     }
     Ok(())
 }
-fn execution_policy(profile:&AccessProfile,authorization:&ExecutionAuthorization,job:&Job)->Result<()> {
+fn execution_policy(
+    profile: &AccessProfile,
+    authorization: &ExecutionAuthorization,
+    job: &Job,
+) -> Result<()> {
     use std::path::Path;
-    let source=&job.plan.source;
-    if !profile.enabled || profile.principal!=authorization.principal || !profile.commands.contains("jobs.submit")
-        || (source.creator!=authorization.principal && !profile.objects.contains(&source.id))
-        || !profile.read_roots.iter().any(|root|Path::new(&source.identity.path).starts_with(root))
-        || !profile.write_roots.iter().any(|root|Path::new(&job.plan.output).starts_with(root)) {
-        return Err(DomainError::new("PERMISSION_DENIED","Current execution command, object or path authority was revoked"));
+    let source = &job.plan.source;
+    if !profile.enabled
+        || profile.principal != authorization.principal
+        || !profile.commands.contains("jobs.submit")
+        || (source.creator != authorization.principal && !profile.objects.contains(&source.id))
+        || !profile
+            .read_roots
+            .iter()
+            .any(|root| Path::new(&source.identity.path).starts_with(root))
+        || !profile
+            .write_roots
+            .iter()
+            .any(|root| Path::new(&job.plan.output).starts_with(root))
+    {
+        return Err(DomainError::new(
+            "PERMISSION_DENIED",
+            "Current execution command, object or path authority was revoked",
+        ));
     }
     Ok(())
 }
@@ -272,8 +288,8 @@ impl Store {
                 self.get(&format!("profile/{name}"))?.ok_or_else(|| {
                     DomainError::new("PERMISSION_DENIED", "Execution profile removed")
                 })?;
-            let job=self.inspect_job(id)?;
-            execution_policy(&profile,&authorization,&job)?;
+            let job = self.inspect_job(id)?;
+            execution_policy(&profile, &authorization, &job)?;
         }
         Ok(())
     }
@@ -324,7 +340,7 @@ impl Store {
                         })?;
                     decode(value.value())?
                 };
-                execution_policy(&profile,&authorization,&job)?;
+                execution_policy(&profile, &authorization, &job)?;
             }
             job.state = JobState::Publishing;
             table

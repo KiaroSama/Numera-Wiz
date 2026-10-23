@@ -18,8 +18,9 @@ sources and licenses are under `docs/vendor/ffmpeg/n9.0.2`.
 Current code includes exact rational time, strict command DTOs, the shared MuxCls
 resolver, a protected single-owner service, durable asset/plan/job acceptance and
 receipt replay, explicit access profiles, bounded process/file/media execution,
-publication journals and real CLI/official MCP adapters. The native/WASM development
-UI is being connected to the same service. [Current manuals](docs/manuals/CLI.md)
+publication journals and real CLI/official MCP adapters. The shared native/WASM
+workspace has working media intake, cleanup forms, plan review and job controls.
+CI builds hash-addressed same-source browser assets and checks actual Chrome boot. [Current manuals](docs/manuals/CLI.md)
 describe the actual admitted scope. Hosted
 Windows/Linux/macOS CI builds/tests the actual workspace and verifies source
 provenance. This does not claim completion of the full MuxCls rewrite, F01-F15,

@@ -99,7 +99,7 @@ impl ServerHandler for Bridge {
                     result=client.request(&canonical)=>result.map_err(|_|ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None))?,
                     _=context.ct.cancelled()=>commands::Response::error(&canonical.request_id,nw_domain::DomainError::new("CANCELLED","MCP request cancelled; retain durable request identity to inspect a possibly accepted mutation")),
                 }
-            },
+            }
             Backend::Http(service) => {
                 let principal = context
                     .extensions

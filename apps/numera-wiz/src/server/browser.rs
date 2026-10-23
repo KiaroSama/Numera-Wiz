@@ -591,7 +591,8 @@ mod tests {
             "One-use proof must leave the address before WASM loads"
         );
         tokio::time::sleep(Duration::from_millis(500)).await;
-        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/browser-evidence");
+        let directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/browser-evidence");
         std::fs::create_dir_all(&directory).unwrap();
         let screenshot = driver(
             &client,
