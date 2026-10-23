@@ -181,7 +181,7 @@ impl WizApp {
         Ok(intent)
     }
     pub(super) fn cleanup(&mut self, ui: &mut egui::Ui, asset: &Asset) {
-        ui.strong(file_name(&asset.identity.path));
+        ui.strong(if asset.display_name.is_empty() {file_name(&asset.identity.path)} else {&asset.display_name});
         egui::ScrollArea::vertical().id_salt("cleanup-form").show(ui,|ui| {
             egui::CollapsingHeader::new("Original stream inventory").default_open(true).show(ui,|ui| {
                 let first = self.stream_page.saturating_mul(64);

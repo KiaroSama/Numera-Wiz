@@ -690,8 +690,15 @@ mod tests {
         let store = Store::open(root.path()).unwrap();
         let request = request(store.issue_scope("alice", 100).unwrap());
         let record = ("unit/side-effect".into(), serde_json::json!(true));
-        let oversized = serde_json::json!({"payload":"x".repeat(nw_domain::commands::MAX_RESULT_BYTES)});
-        assert_eq!(store.commit("alice", &request, 100, oversized, &[record]).unwrap_err().code, "RESOURCE_LIMIT");
+        let oversized =
+            serde_json::json!({"payload":"x".repeat(nw_domain::commands::MAX_RESULT_BYTES)});
+        assert_eq!(
+            store
+                .commit("alice", &request, 100, oversized, &[record])
+                .unwrap_err()
+                .code,
+            "RESOURCE_LIMIT"
+        );
         assert!(store.get::<bool>("unit/side-effect").unwrap().is_none());
         assert!(store.replay("alice", &request, 100).unwrap().is_none());
     }
@@ -701,13 +708,22 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let store = Store::open(root.path()).unwrap();
         for page in 0..2 {
-            let records=(0..64).map(|index|(format!("profile/unit-{}",page*64+index),serde_json::json!(true))).collect::<Vec<_>>();
+            let records = (0..64)
+                .map(|index| {
+                    (
+                        format!("profile/unit-{}", page * 64 + index),
+                        serde_json::json!(true),
+                    )
+                })
+                .collect::<Vec<_>>();
             store.internal_batch(&records).unwrap();
         }
-        assert_eq!(store.put("profile/one-too-many",&true).unwrap_err().code,"RESOURCE_LIMIT");
-        store.put("profile/unit-0",&false).unwrap();
-        assert_eq!(store.get::<bool>("profile/unit-0").unwrap(),Some(false));
+        assert_eq!(
+            store.put("profile/one-too-many", &true).unwrap_err().code,
+            "RESOURCE_LIMIT"
+        );
+        store.put("profile/unit-0", &false).unwrap();
+        assert_eq!(store.get::<bool>("profile/unit-0").unwrap(), Some(false));
         assert!(store.get::<bool>("profile/one-too-many").unwrap().is_none());
     }
-
 }
