@@ -77,7 +77,7 @@ fn named(prefix: &str, id: &str) -> Result<String> {
 }
 impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
-        let root=std::fs::canonicalize(root).map_err(files::io_error)?;
+        let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
         let store = tokio::task::spawn_blocking(move || {
             let protected =
@@ -110,7 +110,27 @@ impl Service {
         if store.get::<AccessProfile>("profile/browser")?.is_none() {
             let assets = nw_platform::security::private_directory(&selected_root.join("assets"))?;
             let exports = nw_platform::security::private_directory(&selected_root.join("exports"))?;
-            store.put("profile/browser", &AccessProfile {id:"browser".into(),name:"browser".into(),principal:Uuid::new_v4().to_string(),revision:1,enabled:true,client_sessions:true,commands:commands::ACTIVE_COMMANDS.iter().filter(|id|!id.starts_with("access.profiles") && **id!="access.credentials.issue").map(|id|(*id).into()).collect(),objects:BTreeSet::new(),read_roots:vec![files::path_text(&assets)?],write_roots:vec![files::path_text(&exports)?]})?;
+            store.put(
+                "profile/browser",
+                &AccessProfile {
+                    id: "browser".into(),
+                    name: "browser".into(),
+                    principal: Uuid::new_v4().to_string(),
+                    revision: 1,
+                    enabled: true,
+                    client_sessions: true,
+                    commands: commands::ACTIVE_COMMANDS
+                        .iter()
+                        .filter(|id| {
+                            !id.starts_with("access.profiles") && **id != "access.credentials.issue"
+                        })
+                        .map(|id| (*id).into())
+                        .collect(),
+                    objects: BTreeSet::new(),
+                    read_roots: vec![files::path_text(&assets)?],
+                    write_roots: vec![files::path_text(&exports)?],
+                },
+            )?;
         }
         let engine = match components {
             Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?),
@@ -119,7 +139,7 @@ impl Service {
         let (events, _) = broadcast::channel(128);
         let service = Arc::new(Self {
             store: Arc::new(store),
-            root:selected_root,
+            root: selected_root,
             epoch: Uuid::new_v4().to_string(),
             engine,
             mutation: Mutex::new(()),
@@ -131,9 +151,12 @@ impl Service {
             events,
         });
         let recovering = service.clone();
-        tokio::task::spawn_blocking(move || {recovering.recover_uploads()?;recovering.recover()})
-            .await
-            .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
+        tokio::task::spawn_blocking(move || {
+            recovering.recover_uploads()?;
+            recovering.recover()
+        })
+        .await
+        .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
         for job in service.store.list::<Job>("job/", 10000)? {
             if job.state == JobState::Queued {
                 service.schedule(job.id)?;
@@ -147,8 +170,16 @@ impl Service {
             profile: None,
         }
     }
-    pub fn client_lease_allowed(&self, context:&Context)->Result<()> {
-        if let Some(profile)=self.policy(context)? && !profile.client_sessions {return Err(DomainError::new("PERMISSION_DENIED","This profile does not admit editor-client leases"));} Ok(())
+    pub fn client_lease_allowed(&self, context: &Context) -> Result<()> {
+        if let Some(profile) = self.policy(context)?
+            && !profile.client_sessions
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "This profile does not admit editor-client leases",
+            ));
+        }
+        Ok(())
     }
     pub fn busy(&self) -> bool {
         self.pending.load(Ordering::Acquire) != 0 || self.requests.available_permits() < 16
@@ -511,15 +542,26 @@ impl Service {
                 value(&runtime.block_on(self.engine()?.probe(&path, cancellation.clone()))?)?
             }
             "assets.register" => {
-                let input:nw_domain::ingest::RegisterInput=commands::parse(params)?;
-                let (path,display_name)=match (input.path,input.upload_id) {
-                    (Some(path),None)=>(self.path(&context,Path::new(&path),false)?,String::new()),
-                    (None,Some(id))=>self.resolve_upload(&context,&id)?,
-                    _=>return Err(DomainError::new("VALIDATION_ERROR","Select exactly one native path or verified upload_id")),
+                let input: nw_domain::ingest::RegisterInput = commands::parse(params)?;
+                let (path, display_name) = match (input.path, input.upload_id) {
+                    (Some(path), None) => {
+                        (self.path(&context, Path::new(&path), false)?, String::new())
+                    }
+                    (None, Some(id)) => self.resolve_upload(&context, &id)?,
+                    _ => {
+                        return Err(DomainError::new(
+                            "VALIDATION_ERROR",
+                            "Select exactly one native path or verified upload_id",
+                        ));
+                    }
                 };
-                let mut asset=runtime.block_on(self.engine()?.register(path,context.principal.clone(),cancellation.clone()))?;
-                asset.display_name=display_name;
-                self.path(&context,Path::new(&asset.identity.path),false)?;
+                let mut asset = runtime.block_on(self.engine()?.register(
+                    path,
+                    context.principal.clone(),
+                    cancellation.clone(),
+                ))?;
+                asset.display_name = display_name;
+                self.path(&context, Path::new(&asset.identity.path), false)?;
                 return self.store.commit(
                     &context.principal,
                     &request,
@@ -540,13 +582,49 @@ impl Service {
                 )?
             }
             "assets.output_suggest" => {
-                let input:IdInput=commands::parse(params)?;
-                let asset:Asset=self.store.get(&named("asset",&input.id)?)?.ok_or_else(||DomainError::new("OBJECT_NOT_FOUND","Asset does not exist"))?;
-                self.object(&context,&asset.id,&asset.creator)?;
-                let parent=if let Some(policy)=&policy{policy.write_roots.first().map(PathBuf::from).ok_or_else(||DomainError::new("PATH_DENIED","Select an output grant before planning"))?}else{Path::new(&asset.identity.path).parent().ok_or_else(||DomainError::new("PATH_DENIED","Source parent unavailable"))?.to_owned()};
-                let label=if asset.display_name.is_empty(){&asset.identity.path}else{&asset.display_name};
-                let stem=Path::new(label).file_stem().and_then(|value|value.to_str()).unwrap_or("media").chars().filter(|ch|ch.is_alphanumeric() || *ch=='-' || *ch=='_').take(80).collect::<String>();
-                let output=self.path(&context,&parent.join(format!("{stem}-clean-{}.mkv",Uuid::new_v4().simple())),true)?;
+                let input: IdInput = commands::parse(params)?;
+                let asset: Asset = self
+                    .store
+                    .get(&named("asset", &input.id)?)?
+                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Asset does not exist"))?;
+                self.object(&context, &asset.id, &asset.creator)?;
+                let parent = if let Some(policy) = &policy {
+                    policy
+                        .write_roots
+                        .first()
+                        .map(PathBuf::from)
+                        .ok_or_else(|| {
+                            DomainError::new(
+                                "PATH_DENIED",
+                                "Select an output grant before planning",
+                            )
+                        })?
+                } else {
+                    Path::new(&asset.identity.path)
+                        .parent()
+                        .ok_or_else(|| {
+                            DomainError::new("PATH_DENIED", "Source parent unavailable")
+                        })?
+                        .to_owned()
+                };
+                let label = if asset.display_name.is_empty() {
+                    &asset.identity.path
+                } else {
+                    &asset.display_name
+                };
+                let stem = Path::new(label)
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("media")
+                    .chars()
+                    .filter(|ch| ch.is_alphanumeric() || *ch == '-' || *ch == '_')
+                    .take(80)
+                    .collect::<String>();
+                let output = self.path(
+                    &context,
+                    &parent.join(format!("{stem}-clean-{}.mkv", Uuid::new_v4().simple())),
+                    true,
+                )?;
                 json!({"output":files::path_text(&output)?})
             }
             "streams.clean" => {

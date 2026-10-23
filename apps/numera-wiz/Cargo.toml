@@ -37,6 +37,7 @@ http-body = "1"
 bytes = "1"
 rfd = { version = "=0.17.2", optional = true }
 [dev-dependencies]
+base64 = "=0.22.1"
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 reqwest.workspace = true
 

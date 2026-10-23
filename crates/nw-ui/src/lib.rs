@@ -278,7 +278,7 @@ impl WizApp {
         if let Err(error) = parsed {
             self.error = Some(format!("Invalid owner response: {error}"));
         }
-        if let Some((id, params, action)) = self.deferred.take() {
+        if matches!(received.action,Action::Scope) && let Some((id, params, action)) = self.deferred.take() {
             self.mutate(&id, params, action, ctx);
         } else if matches!(
             received.action,

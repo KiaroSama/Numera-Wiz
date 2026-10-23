@@ -222,12 +222,17 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "assets.list",
-    "assets.output_suggest",
+            "assets.output_suggest",
             "List authorized registered assets",
             Query,
             Empty
         ),
-        row!("assets.output_suggest","Suggest an authorized new cleanup output",Query,IdInput),
+        row!(
+            "assets.output_suggest",
+            "Suggest an authorized new cleanup output",
+            Query,
+            IdInput
+        ),
         row!("jobs.list", "List authorized retained jobs", Query, Empty),
         row!(
             "commands.list",
@@ -486,6 +491,9 @@ pub fn active_registry() -> Vec<Descriptor> {
 }
 pub fn registry_fingerprint() -> String {
     use sha2::{Digest, Sha256};
-    let value = canonical_order(serde_json::to_value(active_registry()).expect("registry serializes"));
-    hex::encode(Sha256::digest(serde_json::to_vec(&value).expect("registry serializes")))
+    let value =
+        canonical_order(serde_json::to_value(active_registry()).expect("registry serializes"));
+    hex::encode(Sha256::digest(
+        serde_json::to_vec(&value).expect("registry serializes"),
+    ))
 }
