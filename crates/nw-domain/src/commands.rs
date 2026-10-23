@@ -183,6 +183,11 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
+        row!("access.profiles.put", "Create or revise an explicit access profile", DurableMutation, crate::access::ProfileInput),
+        row!("access.profiles.list", "Inspect configured access profiles", Query, Empty),
+        row!("access.credentials.issue", "Issue a scoped credential", Bootstrap, crate::access::CredentialInput),
+        row!("assets.list", "List authorized registered assets", Query, Empty),
+        row!("jobs.list", "List authorized retained jobs", Query, Empty),
         row!(
             "commands.list",
             "Discover implemented development commands",
@@ -369,7 +374,12 @@ mod strict_json_tests {
 }
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
-pub const ACTIVE_COMMANDS: &[&str] = &["commands.list", "commands.schema", "streams.clean.resolve"];
+pub const ACTIVE_COMMANDS: &[&str] = &[
+    "commands.list", "commands.schema", "streams.clean.resolve",
+    "access.replay_scope.create", "access.profiles.put", "access.profiles.list",
+    "access.credentials.issue", "media.probe", "assets.register", "assets.list",
+    "streams.clean", "plans.inspect", "jobs.submit", "jobs.inspect", "jobs.list", "jobs.cancel",
+];
 pub fn active_registry() -> Vec<Descriptor> {
     registry()
         .into_iter()

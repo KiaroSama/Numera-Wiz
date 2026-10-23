@@ -15,6 +15,7 @@ use uuid::Uuid;
 const RECORDS: TableDefinition<&str, &[u8]> = TableDefinition::new("versioned_records");
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
+mod records;
 fn storage(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("STORAGE_ERROR", error.to_string())
 }
@@ -49,6 +50,8 @@ struct Scope {
 struct Receipt {
     digest: String,
     response: Response,
+    #[serde(default)]
+    expires_at: u64,
 }
 pub struct Store {
     db: Database,
@@ -301,6 +304,7 @@ impl Store {
                     encode(&Receipt {
                         digest,
                         response: response.clone(),
+                        expires_at: scope.expires_at.parse().map_err(storage)?,
                     })?
                     .as_slice(),
                 )

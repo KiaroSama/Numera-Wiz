@@ -12,6 +12,7 @@ desktop = ["dep:nw-ui", "dep:eframe"]
 [dependencies]
 nw-domain.workspace = true
 nw-platform.workspace = true
+nw-store.workspace = true
 nw-service.workspace = true
 nw-ui = { workspace = true, optional = true }
 eframe = { workspace = true, optional = true }
@@ -25,6 +26,11 @@ rmcp.workspace = true
 uuid.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
+reqwest.workspace = true
+tokio-util.workspace = true
+sha2.workspace = true
+hex.workspace = true
+tempfile.workspace = true
 subtle = "2.6"
 [dev-dependencies]
 rmcp = { workspace = true, features = ["client", "transport-child-process"] }

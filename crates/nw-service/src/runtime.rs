@@ -1,0 +1,312 @@
+//! The owner is the sole command authority, durable acceptor and scheduler.
+use nw_domain::{DomainError, Result, access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication}, commands::{self, CleanInput, Empty, IdInput, PathInput, Request, Response, StateClass, SubmitInput}, records::{Asset, Job, JobState, Plan}};
+use nw_engine::{Engine, ExecutionEvent, Observer};
+use nw_platform::files;
+use nw_store::Store;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{collections::{BTreeSet, HashMap}, path::{Path, PathBuf}, sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}}};
+use tokio::sync::{Semaphore, broadcast};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Context {
+    pub principal: String,
+    pub profile: Option<String>,
+}
+#[derive(Serialize, Deserialize)]
+struct Credential {
+    context: Context,
+    epoch: String,
+    expires: u64,
+}
+pub struct Service {
+    pub store: Arc<Store>,
+    pub epoch: String,
+    engine: Option<Engine>,
+    mutation: Mutex<()>,
+    requests: Arc<Semaphore>,
+    heavy: Arc<Semaphore>,
+    pending: Arc<AtomicUsize>,
+    cancellations: Mutex<HashMap<String, CancellationToken>>,
+    events: broadcast::Sender<String>,
+}
+fn lock_error() -> DomainError { DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned") }
+fn value(input: &impl Serialize) -> Result<Value> { serde_json::to_value(input).map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string())) }
+fn named(prefix: &str, id: &str) -> Result<String> {
+    if id.is_empty() || id.len() > 128 || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte)) {
+        return Err(DomainError::new("VALIDATION_ERROR", "Invalid bounded object identifier"));
+    }
+    Ok(format!("{prefix}/{id}"))
+}
+impl Service {
+    pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
+        let store = tokio::task::spawn_blocking(move || {
+            let protected = nw_platform::security::private_directory(&root.join("state/generations/1"))?;
+            Store::open(&protected)
+        }).await.map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
+        if store.get::<AccessProfile>("profile/agent")?.is_none() {
+            store.put("profile/agent", &AccessProfile { id: "agent".into(), name: "agent".into(), principal: Uuid::new_v4().to_string(), revision: 1, enabled: true, commands: BTreeSet::from(["commands.list".into(), "commands.schema".into(), "access.replay_scope.create".into()]), objects: BTreeSet::new(), read_roots: vec![], write_roots: vec![] })?;
+        }
+        let engine = match components { Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?), None => None };
+        let (events, _) = broadcast::channel(128);
+        let service = Arc::new(Self { store: Arc::new(store), epoch: Uuid::new_v4().to_string(), engine, mutation: Mutex::new(()), requests: Arc::new(Semaphore::new(16)), heavy: Arc::new(Semaphore::new(1)), pending: Arc::new(AtomicUsize::new(0)), cancellations: Mutex::new(HashMap::new()), events });
+        let recovering = service.clone();
+        tokio::task::spawn_blocking(move || recovering.recover()).await.map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
+        for job in service.store.list::<Job>("job/", 10000)? {
+            if job.state == JobState::Queued { service.schedule(job.id)?; }
+        }
+        Ok(service)
+    }
+    pub fn owner(&self) -> Context { Context { principal: format!("owner-{}", self.store.root_id()), profile: None } }
+    pub fn busy(&self) -> bool { self.pending.load(Ordering::Acquire) != 0 || self.requests.available_permits() < 16 }
+    pub fn subscribe(&self) -> broadcast::Receiver<String> { self.events.subscribe() }
+    pub fn profile_context(&self, name: &str) -> Result<Context> {
+        let profile: AccessProfile = self.store.get(&named("profile", name)?)?.ok_or_else(|| DomainError::new("PROFILE_NOT_FOUND", "Explicit access profile does not exist"))?;
+        if !profile.enabled { return Err(DomainError::new("PERMISSION_DENIED", "Access profile is revoked")); }
+        Ok(Context { principal: profile.principal, profile: Some(profile.id) })
+    }
+    fn policy(&self, context: &Context) -> Result<Option<AccessProfile>> {
+        match &context.profile {
+            None if context.principal == self.owner().principal => Ok(None),
+            Some(name) => {
+                let profile: AccessProfile = self.store.get(&named("profile", name)?)?.ok_or_else(|| DomainError::new("PERMISSION_DENIED", "Access profile is missing"))?;
+                if !profile.enabled || profile.principal != context.principal { return Err(DomainError::new("PERMISSION_DENIED", "Access profile is revoked or mismatched")); }
+                Ok(Some(profile))
+            }
+            None => Err(DomainError::new("PERMISSION_DENIED", "Owner authority cannot be selected by a caller")),
+        }
+    }
+    fn object(&self, context: &Context, id: &str, creator: &str) -> Result<()> {
+        if let Some(profile) = self.policy(context)? && context.principal != creator && !profile.objects.contains(id) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Object rights are independent of path grants"));
+        }
+        Ok(())
+    }
+    fn path(&self, context: &Context, path: &Path, write: bool) -> Result<PathBuf> {
+        let canonical = if write { files::output_path(path)? } else { files::source_path(path)? };
+        if let Some(profile) = self.policy(context)? {
+            let roots = if write { profile.write_roots } else { profile.read_roots };
+            if !roots.iter().any(|root| canonical.starts_with(Path::new(root))) { return Err(DomainError::new("PATH_DENIED", "Current profile has no grant for this native path")); }
+        }
+        Ok(canonical)
+    }
+    fn engine(&self) -> Result<&Engine> { self.engine.as_ref().ok_or_else(|| DomainError::new("COMPONENT_UNAVAILABLE", "No admitted FFmpeg/ffprobe component profile is installed")) }
+    pub fn authenticate(&self, token: &str) -> Result<Context> {
+        if token.len() > 256 { return Err(DomainError::new("AUTHENTICATION_REQUIRED", "Invalid credential")); }
+        let key = format!("credential/{}", hex::encode(Sha256::digest(token.as_bytes())));
+        let credential: Credential = self.store.get(&key)?.ok_or_else(|| DomainError::new("AUTHENTICATION_REQUIRED", "Credential is missing or revoked"))?;
+        if credential.epoch != self.epoch || nw_platform::epoch_seconds() >= credential.expires { return Err(DomainError::new("AUTHENTICATION_REQUIRED", "Credential expired or owner epoch changed")); }
+        self.policy(&credential.context)?;
+        Ok(credential.context)
+    }
+    pub fn credential(&self, name: &str) -> Result<String> {
+        let context = self.profile_context(name)?;
+        if self.store.list::<Credential>("credential/", 256)?.iter().filter(|credential| credential.context.principal == context.principal && credential.epoch == self.epoch && credential.expires > nw_platform::epoch_seconds()).count() >= 32 { return Err(DomainError::new("RESOURCE_LIMIT", "Profile credential quota reached")); }
+        let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        let key = format!("credential/{}", hex::encode(Sha256::digest(token.as_bytes())));
+        self.store.put(&key, &Credential { context, epoch: self.epoch.clone(), expires: nw_platform::epoch_seconds() + 8 * 3600 })?;
+        Ok(token)
+    }
+    pub async fn dispatch(self: &Arc<Self>, context: Context, request: Request) -> Response {
+        let id = request.request_id.clone();
+        let _permit = match self.requests.clone().try_acquire_owned() { Ok(permit) => permit, Err(_) => return Response::error(&id, DomainError::new("RESOURCE_LIMIT", "Owner request capacity reached")) };
+        let service = self.clone();
+        match tokio::task::spawn_blocking(move || service.dispatch_sync(context, request)).await {
+            Ok(Ok(response)) => response,
+            Ok(Err(error)) => Response::error(&id, error),
+            Err(error) => Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string())),
+        }
+    }
+    fn dispatch_sync(self: &Arc<Self>, context: Context, request: Request) -> Result<Response> {
+        request.validate()?;
+        let descriptor = commands::descriptor(&request.command.id).ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
+        let policy = self.policy(&context)?;
+        let durable = matches!(descriptor.state_class, StateClass::DurableMutation);
+        let _guard = if durable { Some(self.mutation.lock().map_err(|_| lock_error())?) } else { None };
+        let now = nw_platform::epoch_seconds();
+        if durable && let Some(response) = self.store.replay(&context.principal, &request, now)? { return Ok(response); }
+        if let Some(profile) = &policy && !profile.commands.contains(&request.command.id) { return Err(DomainError::new("PERMISSION_DENIED", "Command is outside the explicit profile allowlist")); }
+        if !durable && (request.idempotency_key.is_some() || request.replay_scope.is_some()) { return Err(DomainError::new("VALIDATION_ERROR", "Query/bootstrap does not accept durable mutation identity")); }
+        let runtime = tokio::runtime::Handle::current();
+        let params = request.params.clone();
+        let result = match request.command.id.as_str() {
+            "commands.list" | "commands.schema" | "streams.clean.resolve" => {
+                return Ok(super::CommandService.dispatch(super::Principal::LocalUser, request));
+            }
+            "access.replay_scope.create" => { let _: Empty = commands::parse(params)?; json!({"replay_scope":self.store.issue_scope(&context.principal, now)?,"expires_in_seconds":604800}) }
+            "access.credentials.issue" => {
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Credential issuance requires native owner authority")); }
+                let input: CredentialInput = commands::parse(params)?;
+                json!({"bearer":self.credential(&input.profile)?,"profile":input.profile,"expires_in_seconds":28800})
+            }
+            "access.profiles.list" => {
+                let _: Empty = commands::parse(params)?;
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Policy inspection requires owner authority")); }
+                value(&self.store.list::<AccessProfile>("profile/", 128)?)?
+            }
+            "access.profiles.put" => {
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Only the native owner can change access profiles")); }
+                let input: ProfileInput = commands::parse(params)?;
+                let key = named("profile", &input.name)?;
+                if input.name == "agent" { return Err(DomainError::new("PERMISSION_DENIED", "The default discovery profile is immutable; create a named operating profile")); }
+                if input.commands.len() > 128 || input.objects.len() > 256 || input.read_roots.len() > 32 || input.write_roots.len() > 32 || input.commands.iter().any(|id| commands::descriptor(id).is_none() || id.starts_with("access.profiles") || id == "access.credentials.issue") { return Err(DomainError::new("VALIDATION_ERROR", "Profile rights exceed the admitted bounded policy")); }
+                let old: Option<AccessProfile> = self.store.get(&key)?;
+                if old.as_ref().map(|profile| profile.revision) != input.expected_revision { return Err(DomainError::new("STALE_REVISION", "Profile revision changed or create/update intent is incorrect")); }
+                let roots = |paths: Vec<String>| -> Result<Vec<String>> { paths.into_iter().map(|path| { let path = std::fs::canonicalize(path).map_err(files::io_error)?; if !path.is_dir() { return Err(DomainError::new("PATH_DENIED", "Grant roots must be existing directories")); } files::path_text(&path) }).collect() };
+                let profile = AccessProfile { id: input.name.clone(), name: input.name, principal: old.as_ref().map(|profile| profile.principal.clone()).unwrap_or_else(|| Uuid::new_v4().to_string()), revision: old.as_ref().map_or(1, |profile| profile.revision + 1), enabled: input.enabled, commands: input.commands, objects: input.objects, read_roots: roots(input.read_roots)?, write_roots: roots(input.write_roots)? };
+                return self.store.commit(&context.principal, &request, now, value(&profile)?, &[(key, value(&profile)?)]);
+            }
+            "media.probe" => {
+                let input: PathInput = commands::parse(params)?;
+                let path = self.path(&context, Path::new(&input.path), false)?;
+                value(&runtime.block_on(self.engine()?.probe(&path, CancellationToken::new()))?)?
+            }
+            "assets.register" => {
+                let input: PathInput = commands::parse(params)?;
+                let path = self.path(&context, Path::new(&input.path), false)?;
+                let asset = runtime.block_on(self.engine()?.register(path, context.principal.clone(), CancellationToken::new()))?;
+                self.path(&context, Path::new(&asset.identity.path), false)?;
+                return self.store.commit(&context.principal, &request, now, value(&asset)?, &[(named("asset", &asset.id)?, value(&asset)?)]);
+            }
+            "assets.list" => {
+                let _: Empty = commands::parse(params)?;
+                value(&self.store.list::<Asset>("asset/", 256)?.into_iter().filter(|asset| self.object(&context, &asset.id, &asset.creator).is_ok()).collect::<Vec<_>>())?
+            }
+            "streams.clean" => {
+                let input: CleanInput = commands::parse(params)?;
+                let asset: Asset = self.store.get(&named("asset", &input.asset_id)?)?.ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Asset does not exist"))?;
+                self.object(&context, &asset.id, &asset.creator)?;
+                self.path(&context, Path::new(&asset.identity.path), false)?;
+                let output = self.path(&context, Path::new(&input.output), true)?;
+                let plan = self.engine()?.clean_plan(asset, &output, &input.intent, &context.principal)?;
+                self.store.put(&named("plan", &plan.id)?, &plan)?;
+                value(&plan)?
+            }
+            "plans.inspect" => {
+                let input: IdInput = commands::parse(params)?;
+                let plan: Plan = self.store.get(&named("plan", &input.id)?)?.ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Plan does not exist"))?;
+                self.object(&context, &plan.id, &plan.creator)?;
+                value(&plan)?
+            }
+            "jobs.submit" => {
+                let input: SubmitInput = commands::parse(params)?;
+                let plan: Plan = self.store.get(&named("plan", &input.plan_id)?)?.ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Plan does not exist"))?;
+                self.object(&context, &plan.id, &plan.creator)?;
+                self.object(&context, &plan.source.id, &plan.source.creator)?;
+                if plan.hash != input.plan_hash || plan.creator != context.principal || plan.expires_at.parse::<u64>().unwrap_or(0) <= now { return Err(DomainError::new("INVALID_PLAN", "Plan hash, creator or expiry does not match the reviewed submission")); }
+                self.path(&context, Path::new(&plan.source.identity.path), false)?;
+                self.path(&context, Path::new(&plan.output), true)?;
+                files::revalidate(&plan.source.identity, &CancellationToken::new())?;
+                if self.pending.load(Ordering::Acquire) >= 128 { return Err(DomainError::new("RESOURCE_LIMIT", "Durable job queue budget reached")); }
+                let id = Uuid::new_v4().to_string();
+                let job = Job { id: id.clone(), creator: context.principal.clone(), plan, state: JobState::Queued, prepared_argv: None, artifact: None, verification: None, error: None };
+                let authorization = ExecutionAuthorization { principal: context.principal.clone(), profile: context.profile, revision: policy.as_ref().map_or(0, |profile| profile.revision) };
+                let response = self.store.commit(&context.principal, &request, now, json!({"job_id":id,"state":"queued"}), &[(named("job", &id)?, value(&job)?), (named("job-auth", &id)?, value(&authorization)?)])?;
+                self.schedule(id)?;
+                return Ok(response);
+            }
+            "jobs.inspect" => {
+                let input: IdInput = commands::parse(params)?;
+                let job = self.store.inspect_job(&input.id)?;
+                self.object(&context, &job.id, &job.creator)?;
+                value(&job)?
+            }
+            "jobs.list" => {
+                let _: Empty = commands::parse(params)?;
+                value(&self.store.list::<Job>("job/", 256)?.into_iter().filter(|job| self.object(&context, &job.id, &job.creator).is_ok()).collect::<Vec<_>>())?
+            }
+            "jobs.cancel" => {
+                let input: IdInput = commands::parse(params)?;
+                let mut job = self.store.inspect_job(&input.id)?;
+                self.object(&context, &job.id, &job.creator)?;
+                if job.state == JobState::Publishing { return Err(DomainError::new("CANCELLATION_TOO_LATE", "The durable publication fence has committed")); }
+                if job.state == JobState::Queued { job.state = JobState::Cancelled; }
+                let response = self.store.commit(&context.principal, &request, now, json!({"job_id":job.id,"state":job.state,"cancel_requested":!job.state.terminal()}), &[(named("cancel", &job.id)?, json!(true)), (named("job", &job.id)?, value(&job)?)])?;
+                if let Some(token) = self.cancellations.lock().map_err(|_| lock_error())?.get(&job.id) { token.cancel(); }
+                return Ok(response);
+            }
+            _ => return Err(DomainError::new("UNKNOWN_COMMAND", "Registered operation has no handler")),
+        };
+        Ok(Response::success(&request.request_id, result))
+    }
+    fn schedule(self: &Arc<Self>, id: String) -> Result<()> {
+        let token = CancellationToken::new();
+        self.cancellations.lock().map_err(|_| lock_error())?.insert(id.clone(), token.clone());
+        self.pending.fetch_add(1, Ordering::AcqRel);
+        let service = self.clone();
+        tokio::spawn(async move {
+            let _pending = Pending(service.pending.clone());
+            let _permit = match service.heavy.clone().acquire_owned().await { Ok(permit) => permit, Err(_) => return };
+            let start = service.clone(); let job_id = id.clone();
+            let started = tokio::task::spawn_blocking(move || {
+                let _guard = start.mutation.lock().map_err(|_| lock_error())?;
+                let job = start.store.inspect_job(&job_id)?;
+                if job.state.terminal() { return Ok(None); }
+                start.store.execution_allowed(&job_id)?;
+                start.store.transition_job(&job_id, JobState::Queued, JobState::Running).map(Some)
+            }).await;
+            let outcome = match started {
+                Ok(Ok(Some(job))) => {
+                    let observer_service = service.clone(); let observer_id = id.clone();
+                    let observer: Observer = Arc::new(move |event| {
+                        let service = observer_service.clone(); let id = observer_id.clone();
+                        Box::pin(async move { tokio::task::spawn_blocking(move || service.execution_event(&id, event)).await.map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))? })
+                    });
+                    match service.engine() { Ok(engine) => engine.execute_observed(&job.plan, token, &id, observer).await.map(|_| ()), Err(error) => Err(error) }
+                }
+                Ok(Ok(None)) => Ok(()),
+                Ok(Err(error)) => Err(error),
+                Err(error) => Err(DomainError::new("WORKER_FAILED", error.to_string())),
+            };
+            let finish = service.clone(); let finish_id = id.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                let _guard = finish.mutation.lock().map_err(|_| lock_error())?;
+                let job = finish.store.inspect_job(&finish_id)?;
+                if !job.state.terminal() {
+                    if job.state == JobState::Publishing { finish.reconcile(&job)?; }
+                    else { finish.store.update_job(&finish_id, |job| { match outcome { Ok(()) => { job.state = JobState::Skipped; job.verification = Some("Explicit no-match policy produced no artifact".into()); }, Err(error) => { job.state = if error.code == "CANCELLED" { JobState::Cancelled } else { JobState::Failed }; job.error = Some(error); } } Ok(()) })?; }
+                }
+                finish.cancellations.lock().map_err(|_| lock_error())?.remove(&finish_id);
+                let _ = finish.events.send(finish_id);
+                Ok::<_, DomainError>(())
+            }).await;
+        });
+        Ok(())
+    }
+    fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
+        let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+        match event {
+            ExecutionEvent::Prepared(argv) => { self.store.execution_allowed(id)?; self.store.update_job(id, |job| { job.prepared_argv = Some(argv); Ok(()) })?; }
+            ExecutionEvent::Verifying => { self.store.execution_allowed(id)?; self.store.transition_job(id, JobState::Running, JobState::Verifying)?; }
+            ExecutionEvent::Fence(publication) => self.store.publication_fence(&publication)?,
+            ExecutionEvent::Published(artifact, verification) => { self.store.published(id, artifact, verification)?; }
+        }
+        let _ = self.events.send(id.into());
+        Ok(())
+    }
+    fn reconcile(&self, job: &Job) -> Result<()> {
+        let publication: Option<Publication> = self.store.get(&named("publication", &job.id)?)?;
+        if let Some(publication) = publication && Path::new(&publication.output).try_exists().map_err(files::io_error)? && Path::new(&publication.proof).try_exists().map_err(files::io_error)? && files::same_object(Path::new(&publication.proof), Path::new(&publication.output))? {
+            let actual = files::identity(Path::new(&publication.output), &CancellationToken::new())?;
+            if actual.sha256 == publication.identity.sha256 && actual.bytes == publication.identity.bytes {
+                self.store.published(&job.id, actual, publication.verified)?;
+                std::fs::remove_file(publication.proof).map_err(files::io_error)?;
+                return Ok(());
+            }
+        }
+        self.store.update_job(&job.id, |job| { job.state = JobState::Interrupted; job.error = Some(DomainError::new("PUBLICATION_UNCONFIRMED", "Owned hard-link identity and verified bytes did not prove publication; unrelated outputs were preserved")); Ok(()) })?;
+        Ok(())
+    }
+    fn recover(&self) -> Result<()> {
+        for job in self.store.list::<Job>("job/", 10000)? {
+            if job.state == JobState::Publishing { self.reconcile(&job)?; }
+            else if !job.state.terminal() && job.state != JobState::Queued { self.store.update_job(&job.id, |job| { job.state = JobState::Interrupted; job.error = Some(DomainError::new("OWNER_INTERRUPTED", "Owner stopped during execution; no PID was reused and no filename was assumed to be an artifact")); Ok(()) })?; }
+        }
+        Ok(())
+    }
+}
+struct Pending(Arc<AtomicUsize>);
+impl Drop for Pending { fn drop(&mut self) { self.0.fetch_sub(1, Ordering::AcqRel); } }

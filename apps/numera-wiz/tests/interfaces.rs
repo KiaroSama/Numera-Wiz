@@ -5,7 +5,9 @@ use std::process::Command;
 fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
+    let data = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
+        .arg("--data-dir").arg(data.path())
         .args(["request", "--file"])
         .arg(path)
         .output()
@@ -27,10 +29,12 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
 #[tokio::test]
 async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
-    command.arg("bridge");
+    let data = tempfile::tempdir().unwrap();
+    command.arg("--data-dir").arg(data.path()).arg("bridge");
     let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
     let tools = client.list_all_tools().await.unwrap();
-    assert_eq!(tools.len(), 3);
+    assert!(tools.iter().any(|tool| tool.name == "jobs.submit"));
+    assert!(!tools.iter().any(|tool| tool.name == "shell.execute"));
     let listed = client
         .call_tool(
             CallToolRequestParams::new("commands.list")

@@ -3,6 +3,8 @@ use nw_domain::{
     DomainError,
     commands::{self, Empty, IdInput, Request, ResolveInput, Response},
 };
+mod runtime;
+pub use runtime::{Context, Service};
 
 pub use nw_domain::commands::ACTIVE_COMMANDS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +90,7 @@ mod tests {
             .as_array()
             .unwrap()
             .clone();
-        assert_eq!(commands.len(), 3);
-        assert!(!commands.iter().any(|c| c["id"] == "jobs.submit"));
+        assert!(commands.iter().any(|c| c["id"] == "jobs.submit"));
+        assert!(!commands.iter().any(|c| c["id"] == "shell.execute"));
     }
 }

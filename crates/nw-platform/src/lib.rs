@@ -1,5 +1,6 @@
 //! Native boundary: identity, no-replace publication and bounded process I/O.
 pub mod files;
+pub mod security;
 pub mod logging;
 pub mod process;
 use std::time::{SystemTime, UNIX_EPOCH};
