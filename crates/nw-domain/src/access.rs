@@ -31,6 +31,7 @@ pub struct ProfileInput {
 #[serde(deny_unknown_fields)]
 pub struct CredentialInput {
     pub profile: String,
+    pub port: Option<u16>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionAuthorization {

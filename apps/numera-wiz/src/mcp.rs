@@ -1,14 +1,27 @@
 use nw_domain::commands::{self, Request};
-use nw_service::{ACTIVE_COMMANDS, Service, Context};
+use nw_service::{ACTIVE_COMMANDS, Context, Service};
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use std::{borrow::Cow, sync::Arc};
 #[derive(Clone)]
-pub struct Bridge { backend: Backend }
+pub struct Bridge {
+    backend: Backend,
+}
 #[derive(Clone)]
-enum Backend { Native(crate::client::NativeClient), Http(Arc<Service>) }
+enum Backend {
+    Native(crate::client::NativeClient),
+    Http(Arc<Service>),
+}
 impl Bridge {
-    pub fn stdio(client: crate::client::NativeClient) -> Self { Self { backend: Backend::Native(client) } }
-    pub fn http(service: Arc<Service>) -> Self { Self { backend: Backend::Http(service) } }
+    pub fn stdio(client: crate::client::NativeClient) -> Self {
+        Self {
+            backend: Backend::Native(client),
+        }
+    }
+    pub fn http(service: Arc<Service>) -> Self {
+        Self {
+            backend: Backend::Http(service),
+        }
+    }
 }
 fn tool(name: &str) -> Option<Tool> {
     if !ACTIVE_COMMANDS.contains(&name) {
@@ -56,20 +69,46 @@ impl ServerHandler for Bridge {
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
         let mut args = request.arguments.unwrap_or_default();
-        let metadata = args.remove("context").unwrap_or_else(|| serde_json::json!({}));
+        let metadata = args
+            .remove("context")
+            .unwrap_or_else(|| serde_json::json!({}));
         #[derive(serde::Deserialize, Default)]
         #[serde(deny_unknown_fields)]
-        struct Metadata { request_id: Option<String>, replay_scope: Option<String>, idempotency_key: Option<String> }
-        let metadata: Metadata = commands::parse(metadata).map_err(|_| ErrorData::invalid_params("Invalid canonical command context", None))?;
-        if args.len() != 1 || !args.contains_key("params") { return Err(ErrorData::invalid_params("Expected typed params and optional canonical context", None)); }
+        struct Metadata {
+            request_id: Option<String>,
+            replay_scope: Option<String>,
+            idempotency_key: Option<String>,
+        }
+        let metadata: Metadata = commands::parse(metadata)
+            .map_err(|_| ErrorData::invalid_params("Invalid canonical command context", None))?;
+        if args.len() != 1 || !args.contains_key("params") {
+            return Err(ErrorData::invalid_params(
+                "Expected typed params and optional canonical context",
+                None,
+            ));
+        }
         let mut canonical = Request::query(request.name.as_ref(), args["params"].clone());
-        if let Some(id) = metadata.request_id { canonical.request_id = id; }
+        if let Some(id) = metadata.request_id {
+            canonical.request_id = id;
+        }
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
         let response = match &self.backend {
-            Backend::Native(client) => client.request(&canonical).await.map_err(|_| ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity", None))?,
+            Backend::Native(client) => client.request(&canonical).await.map_err(|_| {
+                ErrorData::internal_error(
+                    "Owner attachment/request failed; retain durable retry identity",
+                    None,
+                )
+            })?,
             Backend::Http(service) => {
-                let principal = context.extensions.get::<axum::http::request::Parts>().and_then(|parts| parts.extensions.get::<Context>()).cloned().ok_or_else(|| ErrorData::invalid_request("Authenticated request context is missing", None))?;
+                let principal = context
+                    .extensions
+                    .get::<axum::http::request::Parts>()
+                    .and_then(|parts| parts.extensions.get::<Context>())
+                    .cloned()
+                    .ok_or_else(|| {
+                        ErrorData::invalid_request("Authenticated request context is missing", None)
+                    })?;
                 service.dispatch(principal, canonical).await
             }
         };

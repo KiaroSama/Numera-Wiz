@@ -9,11 +9,11 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path, PathBuf},
-    time::Duration,
-    sync::Arc,
     future::Future,
+    path::{Path, PathBuf},
     pin::Pin,
+    sync::Arc,
+    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -25,7 +25,8 @@ pub enum ExecutionEvent {
     Fence(nw_domain::access::Publication),
     Published(FileIdentity, String),
 }
-pub type Observer = Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+pub type Observer =
+    Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 const FORMATS: &str = "mov,matroska,webm,avi,wav,flac,mp3,ogg";
 #[derive(Clone)]
@@ -149,7 +150,16 @@ impl Engine {
         plan: &Plan,
         cancel: CancellationToken,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
-        self.execute_observed(plan, cancel, "untracked", Arc::new(|_| Box::pin(async { Ok(()) }))).await
+        if plan.expires_at.parse::<u64>().unwrap_or(0) <= nw_platform::epoch_seconds() {
+            return Err(DomainError::new("PLAN_EXPIRED", "Review a fresh plan before accepting execution"));
+        }
+        self.execute_observed(
+            plan,
+            cancel,
+            "untracked",
+            Arc::new(|_| Box::pin(async { Ok(()) })),
+        )
+        .await
     }
     pub async fn execute_observed(
         &self,
@@ -170,12 +180,6 @@ impl Engine {
                 "Execution engine does not match the reviewed component identities",
             ));
         }
-        if plan.expires_at.parse::<u64>().unwrap_or(0) < nw_platform::epoch_seconds() {
-            return Err(DomainError::new(
-                "PLAN_EXPIRED",
-                "Review a fresh plan; expired plans are not silently replanned",
-            ));
-        }
         let source = plan.source.identity.clone();
         let ffmpeg = plan.ffmpeg.clone();
         let ffprobe = plan.ffprobe.clone();
@@ -194,14 +198,32 @@ impl Engine {
                 None,
             )),
             CleanAction::CopyUnchanged => {
-                observer(ExecutionEvent::Prepared(vec!["rust:verified-byte-copy".into(), plan.source.identity.path.clone(), plan.output.clone()])).await?;
+                observer(ExecutionEvent::Prepared(vec![
+                    "rust:verified-byte-copy".into(),
+                    plan.source.identity.path.clone(),
+                    plan.output.clone(),
+                ]))
+                .await?;
                 let source = plan.source.identity.clone();
                 let output = PathBuf::from(&plan.output);
                 let token = cancel.clone();
-                let (staging, actual) = blocking(move || files::prepare_verified_copy(&source, &output, &token)).await?;
+                let (staging, actual) =
+                    blocking(move || files::prepare_verified_copy(&source, &output, &token))
+                        .await?;
                 observer(ExecutionEvent::Verifying).await?;
-                let verification = "Full byte SHA-256 and length verified before no-replace publication".to_owned();
-                let artifact = publish(staging, actual, plan, job_id, verification.clone(), cancel, observer).await?;
+                let verification =
+                    "Full byte SHA-256 and length verified before no-replace publication"
+                        .to_owned();
+                let artifact = publish(
+                    staging,
+                    actual,
+                    plan,
+                    job_id,
+                    verification.clone(),
+                    cancel,
+                    observer,
+                )
+                .await?;
                 Ok((Some(artifact), verification, None))
             }
             CleanAction::Remux => self.remux(plan, cancel, job_id, observer).await,
@@ -271,7 +293,16 @@ impl Engine {
                 "Cancelled before publication fence",
             ));
         }
-        let artifact = publish(staging, actual, plan, job_id, plan.verification_scope.clone(), cancel, observer).await?;
+        let artifact = publish(
+            staging,
+            actual,
+            plan,
+            job_id,
+            plan.verification_scope.clone(),
+            cancel,
+            observer,
+        )
+        .await?;
         Ok((Some(artifact), plan.verification_scope.clone(), Some(args)))
     }
 }
@@ -285,20 +316,46 @@ async fn publish(
     observer: Observer,
 ) -> Result<FileIdentity> {
     let output = PathBuf::from(&plan.output);
-    let parent = output.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
-    if cancel.is_cancelled() { return Err(DomainError::new("CANCELLED", "Cancelled before publication fence")); }
+    let parent = output
+        .parent()
+        .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
+    if cancel.is_cancelled() {
+        return Err(DomainError::new(
+            "CANCELLED",
+            "Cancelled before publication fence",
+        ));
+    }
     let proof = parent.join(format!(".numera-proof-{}", Uuid::new_v4()));
     std::fs::hard_link(staging.path(), &proof).map_err(io_error)?;
-    #[cfg(unix)] std::fs::File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
-    let artifact = FileIdentity { path: plan.output.clone(), bytes: actual.bytes, sha256: actual.sha256 };
-    let journal = nw_domain::access::Publication { job_id: job_id.into(), proof: files::path_text(&proof)?, output: plan.output.clone(), identity: artifact.clone(), verified: verification.clone(), published: false };
+    #[cfg(unix)]
+    std::fs::File::open(parent)
+        .and_then(|file| file.sync_all())
+        .map_err(io_error)?;
+    let artifact = FileIdentity {
+        path: plan.output.clone(),
+        bytes: actual.bytes,
+        sha256: actual.sha256,
+    };
+    let journal = nw_domain::access::Publication {
+        job_id: job_id.into(),
+        proof: files::path_text(&proof)?,
+        output: plan.output.clone(),
+        identity: artifact.clone(),
+        verified: verification.clone(),
+        published: false,
+    };
     if let Err(error) = observer(ExecutionEvent::Fence(journal)).await {
         let _ = staging.keep();
         return Err(error);
     }
     // The committed fence is the cancellation boundary. Recovery retains the hard-link proof until durable acknowledgement.
-    staging.persist_noclobber(&output).map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
-    #[cfg(unix)] std::fs::File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
+    staging
+        .persist_noclobber(&output)
+        .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
+    #[cfg(unix)]
+    std::fs::File::open(parent)
+        .and_then(|file| file.sync_all())
+        .map_err(io_error)?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
     std::fs::remove_file(&proof).map_err(io_error)?;
     Ok(artifact)

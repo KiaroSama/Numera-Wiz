@@ -31,8 +31,8 @@ impl WizApp {
         if self.busy {
             return;
         }
-        if self.request.len() > 256 * 1024 {
-            self.response = "Request exceeds 256 KiB".into();
+        if self.request.len() > nw_domain::commands::MAX_COMMAND_BYTES {
+            self.response = "Request exceeds 1 MiB".into();
             return;
         }
         let request = match nw_domain::commands::decode_request(self.request.as_bytes()) {
@@ -117,7 +117,7 @@ impl eframe::App for WizApp {
                 .show(ui, |ui| {
                     ui.add(
                         egui::TextEdit::multiline(&mut self.request)
-                            .char_limit(65536)
+                            .char_limit(nw_domain::commands::MAX_COMMAND_BYTES)
                             .code_editor()
                             .desired_rows(12)
                             .desired_width(f32::INFINITY),

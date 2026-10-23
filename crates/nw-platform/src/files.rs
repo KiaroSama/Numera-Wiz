@@ -155,10 +155,24 @@ pub fn verified_copy_expected(
     let output = output_path(destination)?;
     #[cfg(unix)]
     let parent = output.parent().expect("validated parent");
-    if cancel.is_cancelled() { return Err(DomainError::new("CANCELLED", "Copy cancelled before publication fence")); }
-    staging.persist_noclobber(&output).map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
-    #[cfg(unix)] File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
-    Ok(FileIdentity { path: path_text(&output)?, bytes: actual.bytes, sha256: actual.sha256 })
+    if cancel.is_cancelled() {
+        return Err(DomainError::new(
+            "CANCELLED",
+            "Copy cancelled before publication fence",
+        ));
+    }
+    staging
+        .persist_noclobber(&output)
+        .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
+    #[cfg(unix)]
+    File::open(parent)
+        .and_then(|file| file.sync_all())
+        .map_err(io_error)?;
+    Ok(FileIdentity {
+        path: path_text(&output)?,
+        bytes: actual.bytes,
+        sha256: actual.sha256,
+    })
 }
 pub fn prepare_verified_copy(
     expected: &FileIdentity,

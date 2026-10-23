@@ -7,6 +7,9 @@ use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub const MAX_COMMAND_BYTES: usize = 1024 * 1024;
+pub const MAX_RESULT_BYTES: usize = 256 * 1024;
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CommandRef {
@@ -85,8 +88,19 @@ impl Request {
         use sha2::{Digest, Sha256};
         let canonical = serde_json::json!({"api_version":self.api_version,"command":self.command,"project":self.project,"params":self.params});
         hex::encode(Sha256::digest(
-            serde_json::to_vec(&canonical).expect("JSON value serializes"),
+            serde_json::to_vec(&canonical_order(canonical)).expect("JSON value serializes"),
         ))
+    }
+}
+fn canonical_order(value: Value) -> Value {
+    match value {
+        Value::Object(object) => {
+            let mut pairs = object.into_iter().collect::<Vec<_>>();
+            pairs.sort_by(|left, right| left.0.cmp(&right.0));
+            Value::Object(pairs.into_iter().map(|(key, value)| (key, canonical_order(value))).collect())
+        }
+        Value::Array(values) => Value::Array(values.into_iter().map(canonical_order).collect()),
+        scalar => scalar,
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -183,10 +197,30 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("access.profiles.put", "Create or revise an explicit access profile", DurableMutation, crate::access::ProfileInput),
-        row!("access.profiles.list", "Inspect configured access profiles", Query, Empty),
-        row!("access.credentials.issue", "Issue a scoped credential", Bootstrap, crate::access::CredentialInput),
-        row!("assets.list", "List authorized registered assets", Query, Empty),
+        row!(
+            "access.profiles.put",
+            "Create or revise an explicit access profile",
+            DurableMutation,
+            crate::access::ProfileInput
+        ),
+        row!(
+            "access.profiles.list",
+            "Inspect configured access profiles",
+            Query,
+            Empty
+        ),
+        row!(
+            "access.credentials.issue",
+            "Issue a scoped credential",
+            Bootstrap,
+            crate::access::CredentialInput
+        ),
+        row!(
+            "assets.list",
+            "List authorized registered assets",
+            Query,
+            Empty
+        ),
         row!("jobs.list", "List authorized retained jobs", Query, Empty),
         row!(
             "commands.list",
@@ -282,6 +316,23 @@ mod tests {
 
 /// Parse bounded JSON without silently accepting duplicate object members.
 pub fn decode_json(bytes: &[u8]) -> Result<Value> {
+    if bytes.len() > MAX_COMMAND_BYTES { return Err(DomainError::new("RESOURCE_LIMIT", "JSON command exceeds 1 MiB")); }
+    let (mut depth, mut quoted, mut escaped) = (0usize, false, false);
+    for byte in bytes {
+        if quoted {
+            if escaped { escaped = false; }
+            else if *byte == b'\\' { escaped = true; }
+            else if *byte == b'"' { quoted = false; }
+        } else {
+            match byte {
+                b'"' => quoted = true,
+                b'[' | b'{' => { depth += 1; if depth > 64 { return Err(DomainError::new("RESOURCE_LIMIT", "JSON nesting exceeds 64 levels")); } }
+                b']' | b'}' => depth = depth.saturating_sub(1),
+                _ => {},
+            }
+        }
+    }
+
     if bytes.len() > 256 * 1024 {
         return Err(DomainError::new(
             "RESOURCE_LIMIT",
@@ -367,6 +418,13 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request> {
 #[cfg(test)]
 mod strict_json_tests {
     #[test]
+    fn structural_depth_budget_ignores_brackets_in_strings() {
+        let too_deep = format!("{}0{}", "[".repeat(65), "]".repeat(65));
+        assert_eq!(super::decode_json(too_deep.as_bytes()).unwrap_err().code, "RESOURCE_LIMIT");
+        let quoted = serde_json::to_vec(&serde_json::json!({"literal":"[".repeat(100)})).unwrap();
+        assert!(super::decode_json(&quoted).is_ok());
+    }
+    #[test]
     fn duplicate_nested_parameters_are_not_last_writer_wins() {
         assert!(super::decode_json(br#"{"params":{"index":0,"index":1}}"#).is_err());
         assert!(super::decode_json(br#"{"params":{"index":0}}"#).is_ok());
@@ -375,10 +433,22 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
-    "commands.list", "commands.schema", "streams.clean.resolve",
-    "access.replay_scope.create", "access.profiles.put", "access.profiles.list",
-    "access.credentials.issue", "media.probe", "assets.register", "assets.list",
-    "streams.clean", "plans.inspect", "jobs.submit", "jobs.inspect", "jobs.list", "jobs.cancel",
+    "commands.list",
+    "commands.schema",
+    "streams.clean.resolve",
+    "access.replay_scope.create",
+    "access.profiles.put",
+    "access.profiles.list",
+    "access.credentials.issue",
+    "media.probe",
+    "assets.register",
+    "assets.list",
+    "streams.clean",
+    "plans.inspect",
+    "jobs.submit",
+    "jobs.inspect",
+    "jobs.list",
+    "jobs.cancel",
 ];
 pub fn active_registry() -> Vec<Descriptor> {
     registry()

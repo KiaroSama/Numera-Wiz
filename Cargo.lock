@@ -2120,9 +2120,11 @@ version = "0.1.0-dev"
 dependencies = [
  "anyhow",
  "axum",
+ "bytes",
  "clap",
  "eframe",
  "hex",
+ "http-body",
  "nw-domain",
  "nw-platform",
  "nw-service",

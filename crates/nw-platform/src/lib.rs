@@ -1,8 +1,8 @@
 //! Native boundary: identity, no-replace publication and bounded process I/O.
 pub mod files;
-pub mod security;
 pub mod logging;
 pub mod process;
+pub mod security;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn epoch_seconds() -> u64 {
