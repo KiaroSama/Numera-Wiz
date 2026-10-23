@@ -151,6 +151,20 @@ pub fn verified_copy_expected(
     destination: &Path,
     cancel: &CancellationToken,
 ) -> Result<FileIdentity> {
+    let (staging, actual) = prepare_verified_copy(expected, destination, cancel)?;
+    let output = output_path(destination)?;
+    #[cfg(unix)]
+    let parent = output.parent().expect("validated parent");
+    if cancel.is_cancelled() { return Err(DomainError::new("CANCELLED", "Copy cancelled before publication fence")); }
+    staging.persist_noclobber(&output).map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
+    #[cfg(unix)] File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
+    Ok(FileIdentity { path: path_text(&output)?, bytes: actual.bytes, sha256: actual.sha256 })
+}
+pub fn prepare_verified_copy(
+    expected: &FileIdentity,
+    destination: &Path,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
     let expected_bytes = expected
         .bytes
         .parse::<u64>()
@@ -198,18 +212,10 @@ pub fn verified_copy_expected(
             "Copy cancelled before publication fence",
         ));
     }
-    staging
-        .persist_noclobber(&output)
-        .map_err(|e| DomainError::new("OUTPUT_COLLISION", e.error.to_string()))?;
-    #[cfg(unix)]
-    File::open(parent)
-        .and_then(|f| f.sync_all())
-        .map_err(io_error)?;
-    Ok(FileIdentity {
-        path: path_text(&output)?,
-        bytes: actual.bytes,
-        sha256: actual.sha256,
-    })
+    Ok((staging, actual))
+}
+pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
+    same_file::is_same_file(first, second).map_err(io_error)
 }
 #[cfg(test)]
 mod tests {

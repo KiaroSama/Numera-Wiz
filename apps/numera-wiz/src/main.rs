@@ -1,10 +1,11 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
 mod mcp;
+mod client;
 mod server;
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use nw_domain::commands::Request;
-use nw_service::{CommandService, Principal};
+use client::NativeClient;
 use std::{io::Read, path::PathBuf};
 
 #[derive(Parser)]
@@ -14,11 +15,17 @@ use std::{io::Read, path::PathBuf};
     about = "Numera Wiz development command interface"
 )]
 struct Args {
+    #[arg(long, global = true)]
+    data_dir: Option<PathBuf>,
+    #[arg(long, global = true)]
+    components_dir: Option<PathBuf>,
     #[command(subcommand)]
     command: Option<Mode>,
 }
 #[derive(Subcommand)]
 enum Mode {
+    #[command(name = "__owner", hide = true)]
+    Owner,
     /// Discover active development commands and their qualification limits.
     Commands,
     /// Submit a bounded canonical JSON query from a file or stdin.
@@ -28,6 +35,8 @@ enum Mode {
     },
     /// Official MCP adapter; default agent access remains discovery-only.
     Bridge {
+        #[arg(long, default_value = "agent")]
+        access_profile: String,
         #[arg(long, default_value = "stdio")]
         transport: String,
         #[arg(long, default_value_t = 1578)]
@@ -37,6 +46,8 @@ enum Mode {
     },
     /// Start a loopback development application API and direct HTTP MCP.
     Serve {
+        #[arg(long, default_value = "agent")]
+        access_profile: String,
         #[arg(long, default_value_t = 1578)]
         port: u16,
         #[arg(long)]
@@ -58,10 +69,17 @@ async fn main() -> std::process::ExitCode {
 }
 async fn run() -> Result<()> {
     let args = Args::parse();
-    tracing::info!("Numera Wiz development entry point started");
+    tracing::info!("Numera Wiz entry point started");
+    let root = args.data_dir.unwrap_or_else(|| std::env::current_exe().expect("executable path").parent().expect("executable directory").to_owned());
+    std::fs::create_dir_all(&root)?;
+    let root = std::fs::canonicalize(root)?;
+    if matches!(&args.command, Some(Mode::Owner)) { return server::run_owner(root, args.components_dir).await; }
+    let profile = match &args.command { Some(Mode::Bridge { access_profile, transport, .. }) if transport == "stdio" => Some(access_profile.clone()), _ => None };
+    let client = NativeClient::new(root, args.components_dir, profile).await?;
     match args.command {
+        Some(Mode::Owner) => unreachable!("owner was dispatched before frontend initialization"),
         Some(Mode::Commands) => {
-            print_response(Request::query("commands.list", serde_json::json!({})))
+            print_response(&client, Request::query("commands.list", serde_json::json!({}))).await
         }
         Some(Mode::Request { file }) => {
             let input: Box<dyn Read> = match file {
@@ -73,7 +91,7 @@ async fn run() -> Result<()> {
             if bytes.len() > 256 * 1024 {
                 bail!("Request exceeds 256 KiB");
             }
-            print_response(nw_domain::commands::decode_request(&bytes)?)
+            print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
         }
         Some(Mode::Doctor) => {
             tracing::warn!(
@@ -91,30 +109,33 @@ async fn run() -> Result<()> {
             transport,
             port,
             token_file,
+            access_profile,
         }) => match transport.as_str() {
             "stdio" => {
                 use rmcp::ServiceExt;
-                let running = mcp::Bridge::stdio().serve(rmcp::transport::stdio()).await?;
+                let running = mcp::Bridge::stdio(client).serve(rmcp::transport::stdio()).await?;
                 running.waiting().await?;
                 Ok(())
             }
             "http" => {
                 server::serve(
+                    client,
                     port,
                     token_file.context(
                         "HTTP bridge requires --token-file; credentials are never printed",
                     )?,
+                    access_profile,
                 )
                 .await
             }
             _ => bail!("Unsupported transport; choose stdio or http"),
         },
-        Some(Mode::Serve { port, token_file }) => server::serve(port, token_file).await,
-        None => desktop().await,
+        Some(Mode::Serve { port, token_file, access_profile }) => server::serve(client, port, token_file, access_profile).await,
+        None => desktop(client).await,
     }
 }
-fn print_response(request: Request) -> Result<()> {
-    let result = CommandService.dispatch(Principal::LocalUser, request);
+async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
+    let result = client.request(&request).await?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.ok {
         bail!("Command returned a domain error; inspect the JSON result");
@@ -122,14 +143,20 @@ fn print_response(request: Request) -> Result<()> {
     Ok(())
 }
 #[cfg(not(feature = "desktop"))]
-async fn desktop() -> Result<()> {
+async fn desktop(_client: NativeClient) -> Result<()> {
     bail!(
         "This CI artifact is headless. Use commands/request/bridge/doctor, or select the separately built desktop artifact."
     )
 }
 #[cfg(feature = "desktop")]
-async fn desktop() -> Result<()> {
-    let (endpoint, bearer, task) = server::native_session().await?;
+async fn desktop(client: NativeClient) -> Result<()> {
+    let record = client.attach().await?;
+    let endpoint = format!("http://127.0.0.1:{}", record.port);
+    let bearer = record.bearer;
+    let lease = uuid::Uuid::new_v4().to_string();
+    client.internal("internal/lease", serde_json::json!({"id":lease})).await?;
+    let heartbeat = client.clone(); let heartbeat_id = lease.clone();
+    let task = tokio::spawn(async move { loop { tokio::time::sleep(std::time::Duration::from_secs(15)).await; if heartbeat.internal("internal/lease", serde_json::json!({"id":heartbeat_id})).await.is_err() { break; } } });
     let result = eframe::run_native(
         "Numera Wiz",
         eframe::NativeOptions {
@@ -140,5 +167,6 @@ async fn desktop() -> Result<()> {
         Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, endpoint, bearer)))),
     );
     task.abort();
+    let _ = client.internal("internal/lease", serde_json::json!({"id":lease,"release":true})).await;
     result.map_err(|e| anyhow::anyhow!("Desktop failed: {e}"))
 }

@@ -51,12 +51,13 @@ pub enum JobState {
     Failed,
     Cancelled,
     Interrupted,
+    Skipped,
 }
 impl JobState {
     pub fn terminal(&self) -> bool {
         matches!(
             self,
-            Self::Succeeded | Self::Failed | Self::Cancelled | Self::Interrupted
+            Self::Succeeded | Self::Failed | Self::Cancelled | Self::Interrupted | Self::Skipped
         )
     }
 }

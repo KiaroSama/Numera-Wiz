@@ -10,6 +10,26 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  formatting:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install formatter
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt
+      - name: Enforce source formatting
+        run: cargo fmt --all -- --check
+      - name: Prepare exact formatter changes
+        if: always()
+        shell: bash
+        run: |
+          cargo fmt --all
+          git diff --binary -- crates apps xtask > formatting.patch
+      - name: Save formatter evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-formatting
+          path: formatting.patch
   checks:
     strategy:
       fail-fast: false
@@ -24,8 +44,6 @@ jobs:
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
-      - name: Check source formatting
-        run: cargo fmt --all -- --check
       - name: Compile and run ordinary regressions
         run: cargo test --locked --workspace --all-targets
       - name: Lint implementation

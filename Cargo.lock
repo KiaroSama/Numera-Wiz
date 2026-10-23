@@ -2122,17 +2122,22 @@ dependencies = [
  "axum",
  "clap",
  "eframe",
+ "hex",
  "nw-domain",
  "nw-platform",
  "nw-service",
+ "nw-store",
  "nw-ui",
  "reqwest",
  "rmcp",
  "schemars",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "subtle",
+ "tempfile",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
@@ -2175,6 +2180,7 @@ dependencies = [
  "hex",
  "nw-domain",
  "process-wrap",
+ "same-file",
  "sha2",
  "tempfile",
  "tokio",
@@ -2187,8 +2193,19 @@ dependencies = [
 name = "nw-service"
 version = "0.1.0-dev"
 dependencies = [
+ "hex",
  "nw-domain",
+ "nw-engine",
+ "nw-platform",
+ "nw-store",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -11,9 +11,21 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     time::Duration,
+    sync::Arc,
+    future::Future,
+    pin::Pin,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub enum ExecutionEvent {
+    Prepared(Vec<String>),
+    Verifying,
+    Fence(nw_domain::access::Publication),
+    Published(FileIdentity, String),
+}
+pub type Observer = Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 const FORMATS: &str = "mov,matroska,webm,avi,wav,flac,mp3,ogg";
 #[derive(Clone)]
@@ -137,6 +149,15 @@ impl Engine {
         plan: &Plan,
         cancel: CancellationToken,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
+        self.execute_observed(plan, cancel, "untracked", Arc::new(|_| Box::pin(async { Ok(()) }))).await
+    }
+    pub async fn execute_observed(
+        &self,
+        plan: &Plan,
+        cancel: CancellationToken,
+        job_id: &str,
+        observer: Observer,
+    ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
         if plan_digest(plan)? != plan.hash {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -173,23 +194,25 @@ impl Engine {
                 None,
             )),
             CleanAction::CopyUnchanged => {
+                observer(ExecutionEvent::Prepared(vec!["rust:verified-byte-copy".into(), plan.source.identity.path.clone(), plan.output.clone()])).await?;
                 let source = plan.source.identity.clone();
                 let output = PathBuf::from(&plan.output);
-                let worker = move || files::verified_copy_expected(&source, &output, &cancel);
-                let identity = blocking(worker).await?;
-                Ok((
-                    Some(identity),
-                    "Full byte SHA-256 and length verified before no-replace publication".into(),
-                    None,
-                ))
+                let token = cancel.clone();
+                let (staging, actual) = blocking(move || files::prepare_verified_copy(&source, &output, &token)).await?;
+                observer(ExecutionEvent::Verifying).await?;
+                let verification = "Full byte SHA-256 and length verified before no-replace publication".to_owned();
+                let artifact = publish(staging, actual, plan, job_id, verification.clone(), cancel, observer).await?;
+                Ok((Some(artifact), verification, None))
             }
-            CleanAction::Remux => self.remux(plan, cancel).await,
+            CleanAction::Remux => self.remux(plan, cancel, job_id, observer).await,
         }
     }
     async fn remux(
         &self,
         plan: &Plan,
         cancel: CancellationToken,
+        job_id: &str,
+        observer: Observer,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
         let output = PathBuf::from(&plan.output);
         let parent = output
@@ -212,6 +235,7 @@ impl Engine {
                 }
             })
             .collect::<Vec<_>>();
+        observer(ExecutionEvent::Prepared(args.clone())).await?;
         if let Err(error) = nw_platform::process::run(
             Path::new(&self.ffmpeg.path),
             &args,
@@ -232,6 +256,7 @@ impl Engine {
                 "This attempt produced no new staging bytes",
             ));
         }
+        observer(ExecutionEvent::Verifying).await?;
         let observed = self.probe(staging.path(), cancel.clone()).await?;
         verify_structure(plan, &observed)?;
         let stage_path = staging.path().to_owned();
@@ -246,23 +271,37 @@ impl Engine {
                 "Cancelled before publication fence",
             ));
         }
-        staging
-            .persist_noclobber(&output)
-            .map_err(|e| DomainError::new("OUTPUT_COLLISION", e.error.to_string()))?;
-        #[cfg(unix)]
-        std::fs::File::open(parent)
-            .and_then(|f| f.sync_all())
-            .map_err(io_error)?;
-        Ok((
-            Some(FileIdentity {
-                path: files::path_text(&output)?,
-                bytes: actual.bytes,
-                sha256: actual.sha256,
-            }),
-            plan.verification_scope.clone(),
-            Some(args),
-        ))
+        let artifact = publish(staging, actual, plan, job_id, plan.verification_scope.clone(), cancel, observer).await?;
+        Ok((Some(artifact), plan.verification_scope.clone(), Some(args)))
     }
+}
+async fn publish(
+    staging: tempfile::NamedTempFile,
+    actual: FileIdentity,
+    plan: &Plan,
+    job_id: &str,
+    verification: String,
+    cancel: CancellationToken,
+    observer: Observer,
+) -> Result<FileIdentity> {
+    let output = PathBuf::from(&plan.output);
+    let parent = output.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
+    if cancel.is_cancelled() { return Err(DomainError::new("CANCELLED", "Cancelled before publication fence")); }
+    let proof = parent.join(format!(".numera-proof-{}", Uuid::new_v4()));
+    std::fs::hard_link(staging.path(), &proof).map_err(io_error)?;
+    #[cfg(unix)] std::fs::File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
+    let artifact = FileIdentity { path: plan.output.clone(), bytes: actual.bytes, sha256: actual.sha256 };
+    let journal = nw_domain::access::Publication { job_id: job_id.into(), proof: files::path_text(&proof)?, output: plan.output.clone(), identity: artifact.clone(), verified: verification.clone(), published: false };
+    if let Err(error) = observer(ExecutionEvent::Fence(journal)).await {
+        let _ = staging.keep();
+        return Err(error);
+    }
+    // The committed fence is the cancellation boundary. Recovery retains the hard-link proof until durable acknowledgement.
+    staging.persist_noclobber(&output).map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
+    #[cfg(unix)] std::fs::File::open(parent).and_then(|file| file.sync_all()).map_err(io_error)?;
+    observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
+    std::fs::remove_file(&proof).map_err(io_error)?;
+    Ok(artifact)
 }
 fn parse_tags(value: &Value) -> BTreeMap<String, String> {
     value
