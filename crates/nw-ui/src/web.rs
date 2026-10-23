@@ -337,7 +337,7 @@ impl Drop for FileSelection {
 async fn choose_file()->Result<web_sys::File,String>{
     use std::rc::Rc;
     let document=web_sys::window().and_then(|window|window.document()).ok_or("Document unavailable")?;
-    let input:web_sys::HtmlInputElement=document.create_element("input").map_err(js_error)?.dyn_into().map_err(js_error)?;
+    let input:web_sys::HtmlInputElement=document.create_element("input").map_err(js_error)?.dyn_into().map_err(|error:web_sys::Element|js_error(error.into()))?;
     input.set_type("file");input.set_id("media-file-input");input.set_hidden(true);input.set_multiple(false);
     let resolver=Rc::new(RefCell::new(None::<js_sys::Function>));let receiver=resolver.clone();
     let promise=js_sys::Promise::new(&mut move|resolve,_reject|{*receiver.borrow_mut()=Some(resolve);});
