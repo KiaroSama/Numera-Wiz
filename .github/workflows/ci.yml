@@ -127,7 +127,7 @@ jobs:
           name: ffmpeg-development-fixture-profile-linux
           path: target
       - name: Install native input and display tools
-        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick libxkbcommon0 libegl1 libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick libxkbcommon0 libxkbcommon-x11-0 libegl1 libgl1-mesa-dri
       - name: Prepare identified executable artifacts
         run: chmod +x target/native-app/numera-wiz target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
       - name: Restore the compiler cache for the matching harness
