@@ -228,15 +228,22 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
     request.extensions_mut().insert(context);
-    let deadline=if request.method()==axum::http::Method::PUT && request.uri().path().starts_with("/api/v1/uploads/"){900}else{130};
-    let response = match tokio::time::timeout(Duration::from_secs(deadline), next.run(request)).await {
-        Ok(response) => response,
-        Err(_) => failure(
-            StatusCode::REQUEST_TIMEOUT,
-            "REQUEST_TIMEOUT",
-            "Bounded request deadline exceeded",
-        ),
+    let deadline = if request.method() == axum::http::Method::PUT
+        && request.uri().path().starts_with("/api/v1/uploads/")
+    {
+        900
+    } else {
+        130
     };
+    let response =
+        match tokio::time::timeout(Duration::from_secs(deadline), next.run(request)).await {
+            Ok(response) => response,
+            Err(_) => failure(
+                StatusCode::REQUEST_TIMEOUT,
+                "REQUEST_TIMEOUT",
+                "Bounded request deadline exceeded",
+            ),
+        };
     let (parts, body) = response.into_parts();
     Response::from_parts(
         parts,

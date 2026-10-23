@@ -72,6 +72,7 @@ jobs:
           path: target/web-ui/
           if-no-files-found: error
   checks:
+    needs: web
     strategy:
       fail-fast: false
       matrix:
@@ -103,8 +104,15 @@ jobs:
         run: cargo test --locked --workspace --exclude nw-platform --all-targets
       - name: Lint implementation
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
-      - name: Build the desktop composition
-        run: cargo build --locked -p numera-wiz --features desktop
+      - name: Load matching immutable UI namespace
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: embedded-web
+          path: target/web-ui
+      - name: Build the desktop composition with its matching browser assets
+        env:
+          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
+        run: cargo build --locked -p numera-wiz --features desktop,embedded-web
       - name: Check shared browser UI dependency closure
         if: runner.os == 'Linux'
         run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown

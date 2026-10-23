@@ -19,6 +19,8 @@ use web_time::Instant;
 enum Action {
     Assets,
     Register,
+    Intake,
+    Output,
     Scope,
     Plan(u64),
     Submit,
@@ -190,8 +192,7 @@ impl WizApp {
             Ok(response) => response,
             Err(error) => {
                 self.error = Some(error);
-                self.status =
-                    "Connection interrupted. Retry retains the original request identity.".into();
+                self.status = if matches!(received.action,Action::Intake){"File intake did not finish. Select the file to try again.".into()}else{"Connection interrupted. Retry retains the original request identity.".into()};
                 return;
             }
         };
@@ -214,11 +215,14 @@ impl WizApp {
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     self.assets = assets.into_iter().map(Arc::new).collect();
                 }
+                Action::Intake => {self.mutate("assets.register",result,Action::Register,ctx);}
+                Action::Output => {self.output=result["output"].as_str().ok_or("Output suggestion missing")?.into();self.changed();}
                 Action::Register => {
                     let asset: Asset =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     self.selected = Some(asset.id.clone());
-                    self.output = cleanup::suggest_output(&asset.identity.path);
+                    self.output.clear();
+                    self.query("assets.output_suggest",json!({"id":asset.id}),Action::Output,ctx);
                     self.assets.retain(|old| old.id != asset.id);
                     self.assets.push(Arc::new(asset));
                     self.stream_page = 0;
@@ -300,7 +304,7 @@ impl WizApp {
             .id_salt("asset-catalog")
             .show(ui, |ui| {
                 for asset in &self.assets {
-                    let name = cleanup::file_name(&asset.identity.path);
+                    let name = if asset.display_name.is_empty(){cleanup::file_name(&asset.identity.path)}else{asset.display_name.as_str()};
                     if ui
                         .selectable_label(self.selected.as_ref() == Some(&asset.id), name)
                         .on_hover_text(&asset.identity.path)
@@ -320,7 +324,8 @@ impl WizApp {
             });
         if let Some(asset) = select {
             self.selected = Some(asset.id.clone());
-            self.output = cleanup::suggest_output(&asset.identity.path);
+            self.output.clear();
+            self.query("assets.output_suggest",json!({"id":asset.id}),Action::Output,ui.ctx());
             self.stream_page = 0;
             self.changed();
         }
@@ -392,6 +397,11 @@ impl eframe::App for WizApp {
             }
             ctx.request_repaint_after(Duration::from_millis(250));
         }
+        #[cfg(target_arch="wasm32")]
+        if !self.waiting && self.pending.is_none() && let Some(file)=ctx.input(|input|input.raw.dropped_files.iter().find_map(|file|file.web_file().cloned())){
+            self.waiting=true;self.error=None;self.status="Uploading media to the local engine…".into();
+            let inbox=self.inbox.clone();let repaint=ctx.clone();self.client.upload_dropped(file,Box::new(move|response|{if let Ok(mut slot)=inbox.lock(){*slot=Some(Received{action:Action::Intake,response});}repaint.request_repaint();}));
+        }
         let dropped = ctx.input(|input| {
             input
                 .raw
@@ -442,9 +452,12 @@ impl eframe::App for WizApp {
             ui.heading("Stream Cleanup");
             ui.label("Inspect the original streams, select what to keep, then review the plan before running it.");
             ui.separator();
+            if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Choose media…")).clicked(){
+                self.waiting=true;self.error=None;self.status="Selecting media…".into();let inbox=self.inbox.clone();let repaint=ui.ctx().clone();self.client.choose_media(Box::new(move|response|{if let Ok(mut slot)=inbox.lock(){*slot=Some(Received{action:Action::Intake,response});}repaint.request_repaint();}));
+            }
             ui.horizontal(|ui| { ui.label("Input"); ui.add(egui::TextEdit::singleline(&mut self.source).hint_text("Absolute path granted to this session").desired_width((ui.available_width()-150.0).max(80.0))); if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.source.trim().is_empty(),egui::Button::new("Add media")).clicked() { self.mutate("assets.register",json!({"path":self.source}),Action::Register,ui.ctx()); } });
             if let Some(asset) = self.selected_asset() { self.cleanup(ui,&asset); }
-            else { ui.add_space(30.0); ui.label("Drop a native file here or enter an authorized input path."); }
+            else { ui.add_space(30.0); ui.label("Choose a file, drop media here, or enter an authorized engine path."); }
             ui.separator();
             ui.label(if self.waiting { "Working with the local engine…" } else { &self.status });
             if let Some(error) = &self.error { ui.colored_label(egui::Color32::from_rgb(237,143,112),error); }

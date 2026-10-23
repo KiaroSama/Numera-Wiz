@@ -116,7 +116,7 @@ mod tests {
         let ticket=service.create_upload(&browser,input.clone()).unwrap();
         assert!(service.begin_upload(&owner,&ticket.upload_id).is_err());
         let mut writer=service.begin_upload(&browser,&ticket.upload_id).unwrap();writer.write(b"abc").await.unwrap();writer.write(b"def").await.unwrap();writer.finish().await.unwrap();
-        let (path,label)=service.resolve_upload(&browser,&ticket.upload_id).unwrap();assert_eq!(label,"../../label.mkv");assert!(path.starts_with(root.path().join("assets")));assert_eq!(std::fs::read(path).unwrap(),b"abcdef");assert!(service.resolve_upload(&owner,&ticket.upload_id).is_err());assert!(service.begin_upload(&browser,&ticket.upload_id).is_err());
+        let (path,label)=service.resolve_upload(&browser,&ticket.upload_id).unwrap();assert_eq!(label,"../../label.mkv");assert!(path.starts_with(std::fs::canonicalize(root.path().join("assets")).unwrap()));assert_eq!(std::fs::read(path).unwrap(),b"abcdef");assert!(service.resolve_upload(&owner,&ticket.upload_id).is_err());assert!(service.begin_upload(&browser,&ticket.upload_id).is_err());
         let truncated=service.create_upload(&browser,input.clone()).unwrap();let mut writer=service.begin_upload(&browser,&truncated.upload_id).unwrap();writer.write(b"abc").await.unwrap();assert!(writer.finish().await.is_err());assert!(service.resolve_upload(&browser,&truncated.upload_id).is_err());
         let wrong=service.create_upload(&browser,input).unwrap();let mut writer=service.begin_upload(&browser,&wrong.upload_id).unwrap();writer.write(b"abcdeg").await.unwrap();assert!(writer.finish().await.is_err());assert!(service.resolve_upload(&browser,&wrong.upload_id).is_err());
     }

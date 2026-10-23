@@ -77,6 +77,7 @@ fn named(prefix: &str, id: &str) -> Result<String> {
 }
 impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
+        let root=std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
         let store = tokio::task::spawn_blocking(move || {
             let protected =
@@ -537,6 +538,16 @@ impl Service {
                         .filter(|asset| self.object(&context, &asset.id, &asset.creator).is_ok())
                         .collect::<Vec<_>>(),
                 )?
+            }
+            "assets.output_suggest" => {
+                let input:IdInput=commands::parse(params)?;
+                let asset:Asset=self.store.get(&named("asset",&input.id)?)?.ok_or_else(||DomainError::new("OBJECT_NOT_FOUND","Asset does not exist"))?;
+                self.object(&context,&asset.id,&asset.creator)?;
+                let parent=if let Some(policy)=&policy{policy.write_roots.first().map(PathBuf::from).ok_or_else(||DomainError::new("PATH_DENIED","Select an output grant before planning"))?}else{Path::new(&asset.identity.path).parent().ok_or_else(||DomainError::new("PATH_DENIED","Source parent unavailable"))?.to_owned()};
+                let label=if asset.display_name.is_empty(){&asset.identity.path}else{&asset.display_name};
+                let stem=Path::new(label).file_stem().and_then(|value|value.to_str()).unwrap_or("media").chars().filter(|ch|ch.is_alphanumeric() || *ch=='-' || *ch=='_').take(80).collect::<String>();
+                let output=self.path(&context,&parent.join(format!("{stem}-clean-{}.mkv",Uuid::new_v4().simple())),true)?;
+                json!({"output":files::path_text(&output)?})
             }
             "streams.clean" => {
                 let input: CleanInput = commands::parse(params)?;

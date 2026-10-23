@@ -8,7 +8,7 @@ license.workspace = true
 workspace = true
 [features]
 default = []
-desktop = ["dep:nw-ui", "dep:eframe"]
+desktop = ["dep:nw-ui", "dep:eframe", "dep:rfd"]
 embedded-web = []
 [dependencies]
 nw-domain.workspace = true
@@ -35,6 +35,7 @@ tempfile.workspace = true
 subtle = "2.6"
 http-body = "1"
 bytes = "1"
+rfd = { version = "=0.17.2", optional = true }
 [dev-dependencies]
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 reqwest.workspace = true

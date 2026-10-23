@@ -222,10 +222,12 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "assets.list",
+    "assets.output_suggest",
             "List authorized registered assets",
             Query,
             Empty
         ),
+        row!("assets.output_suggest","Suggest an authorized new cleanup output",Query,IdInput),
         row!("jobs.list", "List authorized retained jobs", Query, Empty),
         row!(
             "commands.list",
@@ -468,6 +470,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.probe",
     "assets.register",
     "assets.list",
+    "assets.output_suggest",
     "streams.clean",
     "plans.inspect",
     "jobs.submit",
