@@ -11,6 +11,8 @@ pub struct AccessProfile {
     pub principal: String,
     pub revision: u64,
     pub enabled: bool,
+    #[serde(default)]
+    pub client_sessions: bool,
     pub commands: BTreeSet<String>,
     pub objects: BTreeSet<String>,
     pub read_roots: Vec<String>,
@@ -22,6 +24,8 @@ pub struct ProfileInput {
     pub name: String,
     pub expected_revision: Option<u64>,
     pub enabled: bool,
+    #[serde(default)]
+    pub client_sessions: bool,
     pub commands: BTreeSet<String>,
     pub objects: BTreeSet<String>,
     pub read_roots: Vec<String>,

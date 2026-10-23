@@ -1,5 +1,6 @@
 //! One owner process serves private IPC and the explicitly enabled public listener.
 use crate::client::{OwnerRecord, registry_fingerprint};
+mod browser;
 use anyhow::{Context as _, Result};
 use axum::{
     Json, Router,
@@ -44,6 +45,7 @@ pub struct Owner {
     stop: CancellationToken,
     active: Arc<AtomicUsize>,
     slots: Arc<Semaphore>,
+    pairing: Mutex<HashMap<String,browser::Pairing>>,
 }
 #[derive(Clone)]
 struct Auth {
@@ -264,6 +266,7 @@ async fn lease(
     axum::Extension(context): axum::Extension<Context>,
     Json(input): Json<LeaseInput>,
 ) -> Response {
+    if owner.service.client_lease_allowed(&context).is_err(){return failure(StatusCode::FORBIDDEN,"PERMISSION_DENIED","Profile does not admit editor-client leases");}
     if uuid::Uuid::parse_str(&input.id).is_err() {
         return failure(
             StatusCode::BAD_REQUEST,
@@ -304,7 +307,7 @@ async fn lease(
 }
 async fn health(State(owner): State<Arc<Owner>>) -> Json<Value> {
     Json(
-        json!({"product":"Numera Wiz","epoch":owner.record.epoch,"root_id":owner.record.root_id,"build":owner.record.build,"registry":owner.record.registry}),
+        json!({"product":"Numera Wiz","epoch":owner.record.epoch,"root_id":owner.record.root_id,"build":owner.record.build,"registry":owner.record.registry,"ui_source":crate::web_assets::UI_SOURCE}),
     )
 }
 async fn credential(
@@ -362,16 +365,16 @@ fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
                 },
             ),
         )
-        .route("/api/v1/lease", post(lease))
+        .route("/api/v1/lease", post(lease)).route("/api/v1/session", post(health))
         .route("/health", get(health))
         .nest_service("/mcp", mcp);
     if private {
         router = router
             .route("/internal/credential", post(credential))
             .route("/internal/lease", post(lease))
-            .route("/internal/public", post(public));
+            .route("/internal/public", post(public)).route("/internal/pair", post(browser::create_pairing));
     }
-    router
+    let routes = router
         .layer(DefaultBodyLimit::max(commands::MAX_COMMAND_BYTES))
         .layer(middleware::from_fn_with_state(
             Auth {
@@ -382,7 +385,9 @@ fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
             },
             authenticate,
         ))
-        .with_state(owner)
+        .with_state(owner.clone());
+    let routes = if private {routes} else {routes.merge(crate::web_assets::router()).merge(browser::routes(owner.clone()))};
+    routes.layer(middleware::from_fn_with_state(browser::OriginGuard {host:format!("127.0.0.1:{port}"),origin:format!("http://127.0.0.1:{port}")},browser::secure_headers))
 }
 async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>) -> Response {
     if input.port == 0 {
@@ -478,6 +483,7 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
         stop: CancellationToken::new(),
         active: Arc::new(AtomicUsize::new(0)),
         slots: Arc::new(Semaphore::new(32)),
+        pairing: Mutex::new(HashMap::new()),
     });
     let monitoring = owner.clone();
     tokio::spawn(async move {
@@ -506,12 +512,17 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
     tracing::info!("Owner idle grace completed");
     Ok(())
 }
-pub async fn serve(
+pub async fn serve(client:crate::client::NativeClient,port:u16,token_file:PathBuf,profile:String)->Result<()>{
+    serve_browser(client,port,Some(token_file),profile,false).await
+}
+pub async fn serve_browser(
     client: crate::client::NativeClient,
     port: u16,
-    token_file: PathBuf,
+    token_file: Option<PathBuf>,
     profile: String,
+    open_browser: bool,
 ) -> Result<()> {
+    if token_file.is_none() && !open_browser {anyhow::bail!("Choose --open-browser for paired UI or --token-file for a scoped HTTP client");}
     let lease = uuid::Uuid::new_v4().to_string();
     client
         .internal("internal/lease", json!({"id":lease}))
@@ -519,14 +530,15 @@ pub async fn serve(
     let endpoint = client
         .internal("internal/public", json!({"port":port}))
         .await?;
-    let issued = client
-        .internal(
-            "internal/credential",
-            json!({"profile":profile,"port":port}),
-        )
-        .await?;
-    let token = issued["bearer"].as_str().context("Scoped bearer missing")?;
-    nw_platform::security::write_private(&token_file, token.as_bytes(), false)?;
+    if let Some(token_file)=token_file {
+        let issued=client.internal("internal/credential",json!({"profile":profile,"port":port})).await?;
+        let token=issued["bearer"].as_str().context("Scoped bearer missing")?;
+        nw_platform::security::write_private(&token_file,token.as_bytes(),false)?;
+    }
+    if open_browser {
+        let paired=client.internal("internal/pair",json!({"profile":profile})).await?;
+        browser::launch(paired["url"].as_str().context("Pairing URL missing")?).await?;
+    }
     tracing::info!(endpoint=%endpoint["endpoint"],"Scoped HTTP API/MCP ready; credential omitted");
     loop {
         tokio::select! { _ = tokio::signal::ctrl_c() => break, _ = tokio::time::sleep(Duration::from_secs(15)) => { client.internal("internal/lease", json!({"id":lease})).await?; } }
@@ -568,6 +580,7 @@ mod tests {
             stop: CancellationToken::new(),
             active: Arc::new(AtomicUsize::new(0)),
             slots: Arc::new(Semaphore::new(32)),
+        pairing: Mutex::new(HashMap::new()),
         });
         let routes = router(owner, port, false);
         let task = tokio::spawn(async move {

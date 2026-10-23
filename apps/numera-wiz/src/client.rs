@@ -26,10 +26,7 @@ pub struct NativeClient {
     build: String,
 }
 pub fn registry_fingerprint() -> String {
-    use sha2::{Digest, Sha256};
-    hex::encode(Sha256::digest(
-        serde_json::to_vec(&nw_domain::commands::active_registry()).expect("registry serializes"),
-    ))
+    nw_domain::commands::registry_fingerprint()
 }
 impl NativeClient {
     pub async fn new(

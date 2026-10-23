@@ -481,3 +481,8 @@ pub fn active_registry() -> Vec<Descriptor> {
         .filter(|descriptor| ACTIVE_COMMANDS.contains(&descriptor.id.as_str()))
         .collect()
 }
+pub fn registry_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+    let value = canonical_order(serde_json::to_value(active_registry()).expect("registry serializes"));
+    hex::encode(Sha256::digest(serde_json::to_vec(&value).expect("registry serializes")))
+}
