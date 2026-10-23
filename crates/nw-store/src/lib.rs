@@ -684,4 +684,16 @@ mod tests {
             JobState::Publishing
         );
     }
+    #[test]
+    fn oversized_reply_is_rejected_before_any_mutation_or_receipt_commits() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let request = request(store.issue_scope("alice", 100).unwrap());
+        let record = ("unit/side-effect".into(), serde_json::json!(true));
+        let oversized = serde_json::json!({"payload":"x".repeat(nw_domain::commands::MAX_RESULT_BYTES)});
+        assert_eq!(store.commit("alice", &request, 100, oversized, &[record]).unwrap_err().code, "RESOURCE_LIMIT");
+        assert!(store.get::<bool>("unit/side-effect").unwrap().is_none());
+        assert!(store.replay("alice", &request, 100).unwrap().is_none());
+    }
+
 }

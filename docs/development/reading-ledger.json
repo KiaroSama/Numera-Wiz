@@ -16,5 +16,34 @@
     "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
     "research_v7/muxcls-sources/standalone/muxcls/constants.py lines 1-100",
     "research_v7/muxcls-sources/standalone/muxcls/textutil.py lines 1-85"
+  ],
+  "manual_reads": [
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffprobe.texi",
+      "sha256": "9f28004a19dcba2f854595ac96f122dbd44fd82119944456f209fd990e0c58a9",
+      "lines": [
+        1,
+        730
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete wrapper body; included manual files are not credited by this read",
+      "interpretation": [
+        "show_entries selection does not define field order; parse names, not positional columns.",
+        "Packet payload hashing and codec extradata hashing are separate from timing, packet side data and whole-file identity.",
+        "JSON/XML can omit invalid or inapplicable fields. Writers default to replacing invalid strings; preservation-oriented probes should fail on invalid metadata instead.",
+        "read_intervals seeks are not exact; interval duration is anchored to the actual seek point and cannot establish exact preview/sample timing."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T015",
+        "T025"
+      ],
+      "unresolved": [
+        "Complete the included manual bodies separately.",
+        "Qualify full packet/timestamp/decoded preservation and exact observation against actual fixtures."
+      ]
+    }
   ]
 }

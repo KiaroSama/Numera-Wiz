@@ -78,7 +78,8 @@ impl WizApp {
         visuals.window_fill = visuals.panel_fill;
         visuals.extreme_bg_color = egui::Color32::from_rgb(14, 14, 14);
         visuals.selection.bg_fill = egui::Color32::from_rgb(47, 107, 223);
-        cc.egui_ctx.set_visuals(visuals);
+        cc.egui_ctx.set_theme(egui::Theme::Dark);
+        cc.egui_ctx.set_visuals_of(egui::Theme::Dark, visuals);
         let mut app = Self {
             client,
             session,

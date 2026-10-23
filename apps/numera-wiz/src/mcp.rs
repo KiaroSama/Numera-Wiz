@@ -116,11 +116,16 @@ impl ServerHandler for Bridge {
         };
         let value = serde_json::to_value(&response)
             .map_err(|_| ErrorData::internal_error("Response serialization failed", None))?;
-        Ok(if response.ok {
+        let mut result = if response.ok {
             CallToolResult::structured(value)
         } else {
             CallToolResult::structured_error(value)
-        }
-        .into())
+        };
+        result.content = vec![Content::text(if response.ok {
+            "Command completed. Typed result is in structuredContent."
+        } else {
+            "Command failed. Typed error is in structuredContent."
+        })];
+        Ok(result.into())
     }
 }

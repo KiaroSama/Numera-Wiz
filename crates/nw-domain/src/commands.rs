@@ -120,6 +120,14 @@ pub struct Response {
     pub receipt_id: Option<String>,
 }
 impl Response {
+    pub fn bounded(self) -> Self {
+        if serde_json::to_vec(&self).is_ok_and(|bytes| bytes.len() <= MAX_RESULT_BYTES) {
+            self
+        } else {
+            Self::error(&self.request_id, DomainError::new("RESOURCE_LIMIT", "Result exceeds the bounded projection; request a narrower page"))
+        }
+    }
+
     pub fn success(id: &str, result: impl Serialize) -> Self {
         Self {
             request_id: id.into(),
