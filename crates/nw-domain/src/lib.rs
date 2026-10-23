@@ -17,9 +17,17 @@ pub struct DomainError {
 }
 impl DomainError {
     pub fn new(code: &str, message: impl Into<String>) -> Self {
-        Self { code: code.into(), message: message.into(), field: None, retryable: false }
+        Self {
+            code: code.into(),
+            message: message.into(),
+            field: None,
+            retryable: false,
+        }
     }
-    pub fn field(mut self, field: &str) -> Self { self.field = Some(field.into()); self }
+    pub fn field(mut self, field: &str) -> Self {
+        self.field = Some(field.into());
+        self
+    }
 }
 pub type Result<T> = std::result::Result<T, DomainError>;
 
