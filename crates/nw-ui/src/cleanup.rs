@@ -127,7 +127,7 @@ fn selection(
 }
 fn tag(
     ui: &mut egui::Ui,
-    id: impl std::hash::Hash,
+    id: impl std::hash::Hash + std::fmt::Debug,
     label: &str,
     mode: &mut usize,
     text: &mut String,
