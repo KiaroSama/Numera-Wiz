@@ -9,7 +9,7 @@ pub(super) struct Pairing {
     profile: String,
     origin: String,
     expires: Instant,
-    listener_stop:CancellationToken,
+    listener_stop: CancellationToken,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -75,12 +75,12 @@ pub(super) async fn create_pairing(
             "Use a same-build application with embedded browser assets",
         );
     }
-    let Some((port,listener_stop)) = owner
+    let Some((port, listener_stop)) = owner
         .public
         .lock()
         .await
         .as_ref()
-        .map(|listener| (listener.port,listener.stop.clone()))
+        .map(|listener| (listener.port, listener.stop.clone()))
     else {
         return failure(
             StatusCode::CONFLICT,
@@ -140,7 +140,8 @@ async fn exchange(
             "Proof was consumed or expired",
         );
     };
-    if proof.listener_stop.is_cancelled() || proof.expires <= Instant::now()
+    if proof.listener_stop.is_cancelled()
+        || proof.expires <= Instant::now()
         || headers
             .get(header::ORIGIN)
             .and_then(|value| value.to_str().ok())
@@ -492,11 +493,27 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn old_pairing_proof_cannot_reactivate_when_the_same_origin_reopens(){
-        let fixture=fixture().await;let old=pairing(&fixture).await;let proof=old.split("#pair=").nth(1).unwrap().to_owned();
-        {let mut listener=fixture.owner.public.lock().await;let listener=listener.as_mut().unwrap();listener.stop.cancel();listener.stop=CancellationToken::new();}
-        let response=reqwest::Client::builder().no_proxy().build().unwrap().post(format!("{}/api/v1/pairing/exchange",fixture.endpoint)).header(header::ORIGIN,&fixture.endpoint).json(&json!({"proof":proof})).send().await.unwrap();
-        assert_eq!(response.status(),StatusCode::UNAUTHORIZED);
+    async fn old_pairing_proof_cannot_reactivate_when_the_same_origin_reopens() {
+        let fixture = fixture().await;
+        let old = pairing(&fixture).await;
+        let proof = old.split("#pair=").nth(1).unwrap().to_owned();
+        {
+            let mut listener = fixture.owner.public.lock().await;
+            let listener = listener.as_mut().unwrap();
+            listener.stop.cancel();
+            listener.stop = CancellationToken::new();
+        }
+        let response = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap()
+            .post(format!("{}/api/v1/pairing/exchange", fixture.endpoint))
+            .header(header::ORIGIN, &fixture.endpoint)
+            .json(&json!({"proof":proof}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
     async fn driver(
         client: &reqwest::Client,
@@ -631,10 +648,31 @@ mod tests {
         std::fs::write(directory.join("shared-workspace.png"), bytes).unwrap();
         if std::env::var_os("NW_FIXTURE_COMPONENTS").is_some() {
             let media = media_fixture::generate().await;
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/goog/cdp/execute"),json!({"cmd":"Page.setInterceptFileChooserDialog","params":{"enabled":true}})).await;
+            driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/goog/cdp/execute"),
+                json!({"cmd":"Page.setInterceptFileChooserDialog","params":{"enabled":true}}),
+            )
+            .await;
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":0,"origin":"viewport","x":320,"y":94},{"type":"pause","duration":150},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let after_click=driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;std::fs::write(directory.join("file-chooser-workspace.png"),base64::engine::general_purpose::STANDARD.decode(after_click.as_str().unwrap()).unwrap()).unwrap();
+            let after_click = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("file-chooser-workspace.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(after_click.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             let start = Instant::now();
             let input = loop {
                 let response = client
@@ -710,8 +748,12 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":570},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+            let start=Instant::now();loop {if !fixture.owner.service.store.list::<nw_domain::records::Plan>("plan/",128).unwrap().is_empty(){break;}assert!(start.elapsed()<Duration::from_secs(15),"Shared review control did not create its frozen plan");tokio::time::sleep(Duration::from_millis(100)).await;}
+            tokio::time::sleep(Duration::from_millis(500)).await;let screenshot=driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;std::fs::write(directory.join("reviewed-workspace.png"),base64::engine::general_purpose::STANDARD.decode(screenshot.as_str().unwrap()).unwrap()).unwrap();
+
         }
-        std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal and rendered workspace under real CSP/MIME","not_qualified":["media playback","UI-created media output","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
+        std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal, actual UI file intake and frozen plan review under real CSP/MIME","not_qualified":["media playback","UI-created media output","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
         driver(
             &client,
             &base,

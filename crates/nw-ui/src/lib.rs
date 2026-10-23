@@ -20,7 +20,7 @@ enum Action {
     Assets,
     Register,
     Intake,
-    Output,
+    Output(u64),
     Scope,
     Plan(u64),
     Submit,
@@ -51,6 +51,7 @@ pub struct WizApp {
     selected: Option<String>,
     source: String,
     output: String,
+    output_needed:bool,
     intent: CleanIntent,
     patches: Vec<cleanup::PatchForm>,
     audio_mode: usize,
@@ -72,14 +73,17 @@ impl WizApp {
         client: Arc<dyn CommandClient>,
         session: String,
     ) -> Self {
+        Self::with_context(&cc.egui_ctx,client,session)
+    }
+    fn with_context(ctx:&egui::Context,client:Arc<dyn CommandClient>,session:String)->Self {
         let mut visuals = egui::Visuals::dark();
         // Presentation colors follow the pinned FilmCraft theme; processing stays in the owner.
         visuals.panel_fill = egui::Color32::from_rgb(29, 29, 29);
         visuals.window_fill = visuals.panel_fill;
         visuals.extreme_bg_color = egui::Color32::from_rgb(14, 14, 14);
         visuals.selection.bg_fill = egui::Color32::from_rgb(47, 107, 223);
-        cc.egui_ctx.set_theme(egui::Theme::Dark);
-        cc.egui_ctx.set_visuals_of(egui::Theme::Dark, visuals);
+        ctx.set_theme(egui::Theme::Dark);
+        ctx.set_visuals_of(egui::Theme::Dark, visuals);
         let mut app = Self {
             client,
             session,
@@ -95,6 +99,7 @@ impl WizApp {
             selected: None,
             source: String::new(),
             output: String::new(),
+            output_needed:false,
             intent: CleanIntent {
                 audio_selection: Selection {
                     selector: Selector::All,
@@ -123,7 +128,7 @@ impl WizApp {
             stream_page: 0,
             inspect: String::new(),
         };
-        app.query("assets.list", json!({}), Action::Assets, &cc.egui_ctx);
+        app.query("assets.list", json!({}), Action::Assets, ctx);
         app
     }
     fn selected_asset(&self) -> Option<Arc<Asset>> {
@@ -131,6 +136,15 @@ impl WizApp {
             .iter()
             .find(|asset| self.selected.as_ref() == Some(&asset.id))
             .cloned()
+    }
+    fn select_asset(&mut self,asset:&Asset,ctx:&egui::Context){
+        self.selected=Some(asset.id.clone());self.output.clear();self.output_needed=true;self.stream_page=0;self.changed();ctx.request_repaint();
+    }
+    fn schedule_output(&mut self,ctx:&egui::Context){
+        if self.output_needed && !self.waiting && self.pending.is_none() && let Some(asset)=self.selected_asset(){
+            self.output_needed=false;
+            self.query("assets.output_suggest",json!({"id":asset.id}),Action::Output(self.generation),ctx);
+        }
     }
     fn changed(&mut self) {
         self.generation = self.generation.wrapping_add(1);
@@ -223,28 +237,18 @@ impl WizApp {
                 Action::Intake => {
                     self.mutate("assets.register", result, Action::Register, ctx);
                 }
-                Action::Output => {
-                    self.output = result["output"]
-                        .as_str()
-                        .ok_or("Output suggestion missing")?
-                        .into();
-                    self.changed();
+                Action::Output(generation) => {
+                    if generation==self.generation {
+                        self.output=result["output"].as_str().ok_or("Output suggestion missing")?.into();
+                        self.changed();
+                    }
                 }
                 Action::Register => {
                     let asset: Asset =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
-                    self.selected = Some(asset.id.clone());
-                    self.output.clear();
-                    self.query(
-                        "assets.output_suggest",
-                        json!({"id":asset.id}),
-                        Action::Output,
-                        ctx,
-                    );
+                    self.select_asset(&asset,ctx);
                     self.assets.retain(|old| old.id != asset.id);
                     self.assets.push(Arc::new(asset));
-                    self.stream_page = 0;
-                    self.changed();
                     self.status = "Media registered. Review stream selection and output.".into();
                 }
                 Action::Scope => {
@@ -347,18 +351,10 @@ impl WizApp {
                 }
             });
         if let Some(asset) = select {
-            self.selected = Some(asset.id.clone());
-            self.output.clear();
-            self.query(
-                "assets.output_suggest",
-                json!({"id":asset.id}),
-                Action::Output,
-                ui.ctx(),
-            );
-            self.stream_page = 0;
-            self.changed();
+            self.select_asset(&asset,ui.ctx());
         }
     }
+
     fn jobs(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.heading("Jobs");
@@ -417,6 +413,7 @@ impl WizApp {
 impl eframe::App for WizApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
+        self.schedule_output(ctx);
         if !self.waiting
             && self.pending.is_none()
             && self.jobs.iter().any(|job| !job.state.terminal())
@@ -527,3 +524,33 @@ impl eframe::App for WizApp {
 }
 #[cfg(target_arch = "wasm32")]
 mod web;
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nw_domain::records::{FileIdentity,MediaProbe};
+    use std::collections::VecDeque;
+    #[derive(Default)]
+    struct Port {waiting:Mutex<VecDeque<(Request,Reply)>>}
+    impl CommandClient for Port {
+        fn send(&self,request:Request,reply:Reply){self.waiting.lock().unwrap().push_back((request,reply));}
+        fn choose_media(&self,_reply:Reply){panic!("This controller test does not invoke the platform file picker");}
+    }
+    impl Port {
+        fn complete(&self,result:Value)->Request {
+            let (request,reply)=self.waiting.lock().unwrap().pop_front().expect("Expected pending owner request");reply(Ok(Response::success(&request.request_id,result)));request
+        }
+    }
+    fn asset(id:&str)->Arc<Asset>{Arc::new(Asset{id:id.into(),creator:"controller-unit".into(),display_name:id.into(),identity:FileIdentity{path:format!("/controller-unit/{id}.mkv"),bytes:"0".into(),sha256:"00".repeat(32)},probe:MediaProbe{streams:vec![],format:"synthetic-controller-unit".into(),global_tags:Default::default(),chapters:json!([]),verification_scope:"No actual media in this controller test".into()}})}
+    #[test]
+    fn delayed_suggestion_preserves_the_current_selection_and_manual_output(){
+        let ctx=egui::Context::default();let port=Arc::new(Port::default());let mut app=WizApp::with_context(&ctx,port.clone(),"unit".into());
+        port.complete(json!([]));app.receive(&ctx);port.complete(json!([]));app.receive(&ctx);
+        let a=asset("a");let b=asset("b");app.assets=vec![a.clone(),b.clone()];
+        app.select_asset(&a,&ctx);app.schedule_output(&ctx);app.select_asset(&b,&ctx);
+        let first=port.complete(json!({"output":"/controller-unit/a-output.mkv"}));assert_eq!(first.params["id"],"a");app.receive(&ctx);assert!(app.output.is_empty());
+        app.schedule_output(&ctx);let second=port.complete(json!({"output":"/controller-unit/b-output.mkv"}));assert_eq!(second.params["id"],"b");app.receive(&ctx);assert_eq!(app.output,"/controller-unit/b-output.mkv");
+        app.select_asset(&a,&ctx);app.schedule_output(&ctx);app.output="/controller-unit/manually-selected.mkv".into();app.changed();port.complete(json!({"output":"/controller-unit/a-output.mkv"}));app.receive(&ctx);assert_eq!(app.output,"/controller-unit/manually-selected.mkv");assert!(app.plan.is_none());
+    }
+}
