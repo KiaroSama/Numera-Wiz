@@ -153,6 +153,12 @@ impl Store {
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             check_clock(&table, now)?;
+            let quota_key = format!("scope-rate/{}", hex::encode(Sha256::digest(principal.as_bytes())));
+            let current: Option<(u64, u32)> = table.get(quota_key.as_str()).map_err(storage)?.map(|value| decode(value.value())).transpose()?;
+            let window = now / 3600;
+            let count = current.filter(|(previous, _)| *previous == window).map_or(0, |(_, count)| count);
+            if count >= 32 { return Err(DomainError::new("RESOURCE_LIMIT", "Replay-scope bootstrap is limited to 32 scopes per principal per hour")); }
+            table.insert(quota_key.as_str(), encode(&(window, count + 1))?.as_slice()).map_err(storage)?;
             table
                 .insert("meta/clock", now.to_string().as_bytes())
                 .map_err(storage)?;

@@ -7,7 +7,8 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
     let data = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
-        .arg("--data-dir").arg(data.path())
+        .arg("--data-dir")
+        .arg(data.path())
         .args(["request", "--file"])
         .arg(path)
         .output()

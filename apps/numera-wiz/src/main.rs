@@ -1,11 +1,11 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
-mod mcp;
 mod client;
+mod mcp;
 mod server;
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use nw_domain::commands::Request;
 use client::NativeClient;
+use nw_domain::commands::Request;
 use std::{io::Read, path::PathBuf};
 
 #[derive(Parser)]
@@ -70,16 +70,35 @@ async fn main() -> std::process::ExitCode {
 async fn run() -> Result<()> {
     let args = Args::parse();
     tracing::info!("Numera Wiz entry point started");
-    let root = args.data_dir.unwrap_or_else(|| std::env::current_exe().expect("executable path").parent().expect("executable directory").to_owned());
+    let root = args.data_dir.unwrap_or_else(|| {
+        std::env::current_exe()
+            .expect("executable path")
+            .parent()
+            .expect("executable directory")
+            .to_owned()
+    });
     std::fs::create_dir_all(&root)?;
     let root = std::fs::canonicalize(root)?;
-    if matches!(&args.command, Some(Mode::Owner)) { return server::run_owner(root, args.components_dir).await; }
-    let profile = match &args.command { Some(Mode::Bridge { access_profile, transport, .. }) if transport == "stdio" => Some(access_profile.clone()), _ => None };
+    if matches!(&args.command, Some(Mode::Owner)) {
+        return server::run_owner(root, args.components_dir).await;
+    }
+    let profile = match &args.command {
+        Some(Mode::Bridge {
+            access_profile,
+            transport,
+            ..
+        }) if transport == "stdio" => Some(access_profile.clone()),
+        _ => None,
+    };
     let client = NativeClient::new(root, args.components_dir, profile).await?;
     match args.command {
         Some(Mode::Owner) => unreachable!("owner was dispatched before frontend initialization"),
         Some(Mode::Commands) => {
-            print_response(&client, Request::query("commands.list", serde_json::json!({}))).await
+            print_response(
+                &client,
+                Request::query("commands.list", serde_json::json!({})),
+            )
+            .await
         }
         Some(Mode::Request { file }) => {
             let input: Box<dyn Read> = match file {
@@ -87,9 +106,9 @@ async fn run() -> Result<()> {
                 None => Box::new(std::io::stdin()),
             };
             let mut bytes = Vec::new();
-            input.take(256 * 1024 + 1).read_to_end(&mut bytes)?;
-            if bytes.len() > 256 * 1024 {
-                bail!("Request exceeds 256 KiB");
+            input.take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64).read_to_end(&mut bytes)?;
+            if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
+                bail!("Request exceeds 1 MiB");
             }
             print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
         }
@@ -113,7 +132,9 @@ async fn run() -> Result<()> {
         }) => match transport.as_str() {
             "stdio" => {
                 use rmcp::ServiceExt;
-                let running = mcp::Bridge::stdio(client).serve(rmcp::transport::stdio()).await?;
+                let running = mcp::Bridge::stdio(client)
+                    .serve(rmcp::transport::stdio())
+                    .await?;
                 running.waiting().await?;
                 Ok(())
             }
@@ -130,7 +151,11 @@ async fn run() -> Result<()> {
             }
             _ => bail!("Unsupported transport; choose stdio or http"),
         },
-        Some(Mode::Serve { port, token_file, access_profile }) => server::serve(client, port, token_file, access_profile).await,
+        Some(Mode::Serve {
+            port,
+            token_file,
+            access_profile,
+        }) => server::serve(client, port, token_file, access_profile).await,
         None => desktop(client).await,
     }
 }
@@ -154,9 +179,23 @@ async fn desktop(client: NativeClient) -> Result<()> {
     let endpoint = format!("http://127.0.0.1:{}", record.port);
     let bearer = record.bearer;
     let lease = uuid::Uuid::new_v4().to_string();
-    client.internal("internal/lease", serde_json::json!({"id":lease})).await?;
-    let heartbeat = client.clone(); let heartbeat_id = lease.clone();
-    let task = tokio::spawn(async move { loop { tokio::time::sleep(std::time::Duration::from_secs(15)).await; if heartbeat.internal("internal/lease", serde_json::json!({"id":heartbeat_id})).await.is_err() { break; } } });
+    client
+        .internal("internal/lease", serde_json::json!({"id":lease}))
+        .await?;
+    let heartbeat = client.clone();
+    let heartbeat_id = lease.clone();
+    let task = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            if heartbeat
+                .internal("internal/lease", serde_json::json!({"id":heartbeat_id}))
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
     let result = eframe::run_native(
         "Numera Wiz",
         eframe::NativeOptions {
@@ -167,6 +206,11 @@ async fn desktop(client: NativeClient) -> Result<()> {
         Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, endpoint, bearer)))),
     );
     task.abort();
-    let _ = client.internal("internal/lease", serde_json::json!({"id":lease,"release":true})).await;
+    let _ = client
+        .internal(
+            "internal/lease",
+            serde_json::json!({"id":lease,"release":true}),
+        )
+        .await;
     result.map_err(|e| anyhow::anyhow!("Desktop failed: {e}"))
 }
