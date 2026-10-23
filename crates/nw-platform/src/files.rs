@@ -56,9 +56,14 @@ pub fn output_path(path: &Path) -> Result<PathBuf> {
     Ok(dest)
 }
 /// Re-resolve a frozen destination instead of accepting a changed directory alias.
-pub fn revalidate_output(expected:&str)->Result<PathBuf>{
-    let resolved=output_path(Path::new(expected))?;
-    if resolved!=Path::new(expected){return Err(DomainError::new("TARGET_CHANGED","The reviewed output parent now resolves to another destination"));}
+pub fn revalidate_output(expected: &str) -> Result<PathBuf> {
+    let resolved = output_path(Path::new(expected))?;
+    if resolved != Path::new(expected) {
+        return Err(DomainError::new(
+            "TARGET_CHANGED",
+            "The reviewed output parent now resolves to another destination",
+        ));
+    }
     Ok(resolved)
 }
 pub fn identity(path: &Path, cancel: &CancellationToken) -> Result<FileIdentity> {
@@ -287,13 +292,25 @@ mod tests {
         assert_eq!(fs::read(output).unwrap(), b"old");
     }
     #[test]
-    fn changed_output_parent_alias_is_rejected_without_creating_any_artifact(){
-        let root=tempfile::tempdir().unwrap();let original=root.path().join("reviewed");let outside=root.path().join("outside");fs::create_dir(&original).unwrap();fs::create_dir(&outside).unwrap();
-        let expected=path_text(&output_path(&original.join("result.mkv")).unwrap()).unwrap();fs::rename(&original,root.path().join("moved")).unwrap();
-        #[cfg(unix)] std::os::unix::fs::symlink(&outside,&original).unwrap();
-        #[cfg(windows)] std::os::windows::fs::symlink_dir(&outside,&original).expect("Create the hosted Windows directory-symlink fixture");
+    fn changed_output_parent_alias_is_rejected_without_creating_any_artifact() {
+        let root = tempfile::tempdir().unwrap();
+        let original = root.path().join("reviewed");
+        let outside = root.path().join("outside");
+        fs::create_dir(&original).unwrap();
+        fs::create_dir(&outside).unwrap();
+        let expected = path_text(&output_path(&original.join("result.mkv")).unwrap()).unwrap();
+        fs::rename(&original, root.path().join("moved")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, &original).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&outside, &original)
+            .expect("Create the hosted Windows directory-symlink fixture");
 
-        assert_eq!(revalidate_output(&expected).unwrap_err().code,"TARGET_CHANGED");assert!(!outside.join("result.mkv").exists());assert!(!root.path().join("moved/result.mkv").exists());
+        assert_eq!(
+            revalidate_output(&expected).unwrap_err().code,
+            "TARGET_CHANGED"
+        );
+        assert!(!outside.join("result.mkv").exists());
+        assert!(!root.path().join("moved/result.mkv").exists());
     }
-
 }
