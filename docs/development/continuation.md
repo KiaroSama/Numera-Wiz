@@ -7,17 +7,15 @@ branch `implementation/numera-wiz-v1`. Review is
 Do not merge/close anything, enable auto-merge or publish a release. Main still
 has only GitHub's initial README commit 80ec75ea5a97285276c4173534d1c73de02466ed.
 
-## Implemented development foundation
+## Implemented development state
 
-Official Spec Kit 1.2.2 constitution/spec/plan/tasks and honest convergence records;
-808-member research ZIP content with source hashes; offline FFmpeg manual/license
-sources; checked exact time; strict JSON/envelopes and active command registry;
-pure MuxCls selection/order/original-tag patches; bounded process groups/Job
-Objects and file identity/no-replace copy; conservative internal Matroska cleanup
-planning/execution/verification; redb replay/job primitives; real CLI, official
-stdio MCP and guarded HTTP adapters; shared native/WASM Rust query inspector.
-The live registry contains only `commands.list`, `commands.schema` and
-`streams.clean.resolve`. It does not expose planned media handlers as implemented.
+Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
+808-member research archive with source hashes; checked exact time; strict command
+envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
+scoped access profiles; durable replay, jobs and publication fences; real CLI and
+official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
+The live registry now contains 16 actual owner handlers. This is partial initial
+scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
 
@@ -58,13 +56,22 @@ remux order/tags, receipt/job retry identity and independent object rights. Nati
 and browser UI parity is not inferred. The exact extended Cargo.lock came from
 that CI run and is retained; the one-time dependency resolver was removed.
 
-Continue the current hosted checks: Windows ACL export/verification needs actual
-Windows evidence, and formatter/lint results must remain clean. Current changes
+Run 40025092664 passed Windows ACL tests and full native tests/lint/desktop builds
+on Windows, macOS ARM64 and macOS Intel; Linux native tests/lint/build and real
+media transport journeys also passed. The WASM check exposed a DOM type mismatch,
+which has been corrected. Native GUI interaction and real browser observations
+remain required; compilation is not that evidence. Current changes
 also retain request admission while cancellation finishes; accepted jobs have a
 separate lifetime and token. Do not repeat an entire research survey.
 
-Next connect human media/cleanup/job controls in the shared Rust UI and build its
-real packaged WASM bootstrap, pairing, streaming upload and preview. Finish the
+Human media/cleanup/job controls are connected through the injected common client.
+Current work builds hash-addressed same-source WASM assets using an official
+digest-pinned wasm-bindgen CLI; verifies the embedded namespace; implements exact
+Host/Origin and CSP, one-use origin-bound pairing, bounded browser session leases;
+and adds principal-scoped streaming upload with durable staging intent, length/hash
+verification and managed-object promotion. These additions need their own hosted
+checks and real-browser evidence. Next finish embedding in all development
+executables, file intake controls, preview and actual GUI observations. Finish the
 owner public-listener lifecycle, staged-file/crash fault journeys, bounded history
 and authorization details before checking off T010-T021. Then continue full MuxCls,
 F01-F15, project/editing/effects/interchange and standard portable profile work in

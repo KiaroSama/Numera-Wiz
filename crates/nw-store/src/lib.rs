@@ -447,6 +447,7 @@ mod tests {
             sha256: "00".repeat(32),
         };
         let asset = Asset {
+            display_name: String::new(),
             id: "test-asset".into(),
             creator: "alice".into(),
             identity: identity.clone(),

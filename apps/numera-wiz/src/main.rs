@@ -156,7 +156,12 @@ async fn run() -> Result<()> {
             }
             _ => bail!("Unsupported transport; choose stdio or http"),
         },
-        Some(Mode::Serve {port,token_file,access_profile,open_browser}) => server::serve_browser(client,port,token_file,access_profile,open_browser).await,
+        Some(Mode::Serve {
+            port,
+            token_file,
+            access_profile,
+            open_browser,
+        }) => server::serve_browser(client, port, token_file, access_profile, open_browser).await,
         None => desktop(client).await,
     }
 }
