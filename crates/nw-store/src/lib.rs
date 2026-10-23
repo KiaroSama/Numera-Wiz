@@ -489,6 +489,7 @@ mod tests {
             state: JobState::Queued,
             prepared_argv: None,
             prepared_stages: Vec::new(),
+            owned_staging: None,
             artifact: None,
             verification: None,
             error: None,

@@ -69,8 +69,16 @@ pub struct WizApp {
 }
 impl WizApp {
     fn run_reviewed(&mut self, ctx: &egui::Context) {
-        if !self.waiting && self.pending.is_none() && let Some(plan) = self.plan.clone() {
-            self.mutate("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}), Action::Submit, ctx);
+        if !self.waiting
+            && self.pending.is_none()
+            && let Some(plan) = self.plan.clone()
+        {
+            self.mutate(
+                "jobs.submit",
+                json!({"plan_id":plan.id,"plan_hash":plan.hash}),
+                Action::Submit,
+                ctx,
+            );
         }
     }
     pub fn new(

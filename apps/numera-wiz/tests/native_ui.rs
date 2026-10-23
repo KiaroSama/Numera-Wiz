@@ -194,12 +194,21 @@ async fn journey() {
         {
             break job;
         }
-        assert!(start.elapsed() < Duration::from_secs(30), "Native review/Run controls did not produce a terminal job");
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "Native review/Run controls did not produce a terminal job"
+        );
         tokio::time::sleep(Duration::from_millis(200)).await;
     };
     assert_eq!(job.state, nw_domain::records::JobState::Succeeded);
-    let artifact = job.artifact.as_ref().expect("Native UI must produce a verified artifact");
-    assert_eq!(std::fs::read(&media.source).unwrap(), std::fs::read(&artifact.path).unwrap());
+    let artifact = job
+        .artifact
+        .as_ref()
+        .expect("Native UI must produce a verified artifact");
+    assert_eq!(
+        std::fs::read(&media.source).unwrap(),
+        std::fs::read(&artifact.path).unwrap()
+    );
     assert_eq!(job.plan.source.id, assets[0]["id"].as_str().unwrap());
     std::fs::write(evidence.join("native-output.json"), serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"artifact":artifact,"verification":job.verification,"oracle":"Independent source/output byte equality after native input, Review and Ctrl+Enter Run"})).unwrap()).unwrap();
     tokio::time::sleep(Duration::from_millis(1200)).await;

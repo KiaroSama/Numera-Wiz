@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum ExecutionEvent {
+    StagingIntent(nw_domain::records::StagingIntent),
     Prepared(Vec<String>),
     Verifying,
     Fence(nw_domain::access::Publication),
@@ -142,7 +143,20 @@ impl Engine {
             vec![]
         };
         let now = nw_platform::epoch_seconds();
-        let mut plan=Plan{id:Uuid::new_v4().to_string(),creator:creator.into(),hash:String::new(),source:asset,output:files::path_text(&output)?,ffmpeg:self.ffmpeg.clone(),ffprobe:self.ffprobe.clone(),resolution,argv_template:args,created_at:now.to_string(),expires_at:(now+1800).to_string(),verification_scope:preservation::SCOPE.into()};
+        let mut plan = Plan {
+            id: Uuid::new_v4().to_string(),
+            creator: creator.into(),
+            hash: String::new(),
+            source: asset,
+            output: files::path_text(&output)?,
+            ffmpeg: self.ffmpeg.clone(),
+            ffprobe: self.ffprobe.clone(),
+            resolution,
+            argv_template: args,
+            created_at: now.to_string(),
+            expires_at: (now + 1800).to_string(),
+            verification_scope: preservation::SCOPE.into(),
+        };
         plan.hash = plan_digest(&plan)?;
         Ok(plan)
     }
@@ -202,6 +216,7 @@ impl Engine {
                 None,
             )),
             CleanAction::CopyUnchanged => {
+                let staging = prepare_staging(plan, job_id, &observer).await?;
                 observer(ExecutionEvent::Prepared(vec![
                     "rust:verified-byte-copy".into(),
                     plan.source.identity.path.clone(),
@@ -209,10 +224,9 @@ impl Engine {
                 ]))
                 .await?;
                 let source = plan.source.identity.clone();
-                let output = PathBuf::from(&plan.output);
                 let token = cancel.clone();
                 let (staging, actual) =
-                    blocking(move || files::prepare_verified_copy(&source, &output, &token))
+                    blocking(move || files::copy_into_staging(&source, staging, &token))
                         .await?;
                 observer(ExecutionEvent::Verifying).await?;
                 let verification =
@@ -240,15 +254,7 @@ impl Engine {
         job_id: &str,
         observer: Observer,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
-        let output = PathBuf::from(&plan.output);
-        let parent = output
-            .parent()
-            .ok_or_else(|| DomainError::new("PATH_DENIED", "Missing output parent"))?;
-        let staging = tempfile::Builder::new()
-            .prefix(".numera-owned-")
-            .suffix(".mkv")
-            .tempfile_in(parent)
-            .map_err(io_error)?;
+        let staging = prepare_staging(plan, job_id, &observer).await?;
         let staging_name = files::path_text(staging.path())?;
         let args = plan
             .argv_template
@@ -285,7 +291,15 @@ impl Engine {
         observer(ExecutionEvent::Verifying).await?;
         let observed = self.probe(staging.path(), cancel.clone()).await?;
         verify_structure(plan, &observed)?;
-        let verification = preservation::verify(self, plan, staging.path(), &observed, cancel.clone(), &observer).await?;
+        let verification = preservation::verify(
+            self,
+            plan,
+            staging.path(),
+            &observed,
+            cancel.clone(),
+            &observer,
+        )
+        .await?;
         let stage_path = staging.path().to_owned();
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
@@ -311,6 +325,29 @@ impl Engine {
         Ok((Some(artifact), verification, Some(args)))
     }
 }
+async fn prepare_staging(plan: &Plan, job_id: &str, observer: &Observer) -> Result<tempfile::NamedTempFile> {
+    let output = files::revalidate_output(&plan.output)?;
+    let parent = output.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
+    let directory = parent.join(format!(".numera-job-{}", Uuid::new_v4()));
+    let payload = directory.join("payload.mkv");
+    observer(ExecutionEvent::StagingIntent(nw_domain::records::StagingIntent {
+        job_id: job_id.into(), directory: files::path_text(&directory)?, payload: files::path_text(&payload)?,
+    })).await?;
+    blocking(move || {
+        // The unpredictable workspace is journaled before any directory/file is created.
+        if directory.try_exists().map_err(io_error)? {
+            return Err(DomainError::new("OUTPUT_COLLISION", "Staging workspace already exists"));
+        }
+        let directory = nw_platform::security::private_directory(&directory)?;
+        #[cfg(unix)]
+        std::fs::File::open(directory.parent().expect("Staging parent")).and_then(|file| file.sync_all()).map_err(io_error)?;
+        let file = tempfile::Builder::new().prefix("payload").rand_bytes(0).suffix(".mkv").tempfile_in(&directory).map_err(io_error)?;
+        if file.path() != payload {
+            return Err(DomainError::new("TARGET_CHANGED", "Staging workspace resolved to a different parent"));
+        }
+        Ok(file)
+    }).await
+}
 async fn publish(
     staging: tempfile::NamedTempFile,
     actual: FileIdentity,
@@ -330,10 +367,11 @@ async fn publish(
             "Cancelled before publication fence",
         ));
     }
-    let proof = parent.join(format!(".numera-proof-{}", Uuid::new_v4()));
+    let workspace = staging.path().parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging workspace required"))?.to_owned();
+    let proof = workspace.join(format!(".numera-proof-{}", Uuid::new_v4()));
     std::fs::hard_link(staging.path(), &proof).map_err(io_error)?;
     #[cfg(unix)]
-    std::fs::File::open(parent)
+    std::fs::File::open(&workspace)
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;
     let artifact = FileIdentity {
@@ -363,6 +401,10 @@ async fn publish(
         .map_err(io_error)?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
     std::fs::remove_file(&proof).map_err(io_error)?;
+    // Only the now-empty private workspace is removed; unknown contents are preserved.
+    if let Err(error) = std::fs::remove_dir(&workspace) {
+        tracing::warn!(%error, workspace=%workspace.display(), "Owned empty workspace cleanup remains pending");
+    }
     Ok(artifact)
 }
 fn parse_tags(value: &Value) -> BTreeMap<String, String> {
@@ -421,7 +463,15 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
         .ok_or_else(|| DomainError::new("INVALID_PROBE", "Missing container format"))?
         .into();
     Ok(MediaProbe {
-        stream_details: rows.iter().map(|row| (row["index"].as_u64().unwrap_or(u64::MAX) as u32, row.clone())).collect(),
+        stream_details: rows
+            .iter()
+            .map(|row| {
+                (
+                    row["index"].as_u64().unwrap_or(u64::MAX) as u32,
+                    row.clone(),
+                )
+            })
+            .collect(),
         streams,
         format,
         global_tags: parse_tags(&value["format"]["tags"]),
