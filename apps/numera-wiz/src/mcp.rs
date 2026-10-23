@@ -94,12 +94,12 @@ impl ServerHandler for Bridge {
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
         let response = match &self.backend {
-            Backend::Native(client) => client.request(&canonical).await.map_err(|_| {
-                ErrorData::internal_error(
-                    "Owner attachment/request failed; retain durable retry identity",
-                    None,
-                )
-            })?,
+            Backend::Native(client) => {
+                tokio::select! {
+                    result=client.request(&canonical)=>result.map_err(|_|ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None))?,
+                    _=context.ct.cancelled()=>commands::Response::error(&canonical.request_id,nw_domain::DomainError::new("CANCELLED","MCP request cancelled; retain durable request identity to inspect a possibly accepted mutation")),
+                }
+            },
             Backend::Http(service) => {
                 let principal = context
                     .extensions
