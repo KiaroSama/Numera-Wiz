@@ -222,7 +222,6 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "assets.list",
-            "assets.output_suggest",
             "List authorized registered assets",
             Query,
             Empty

@@ -55,7 +55,7 @@ pub(super) async fn create_pairing(
             "Use a same-build application with embedded browser assets",
         );
     }
-    let Some(port) = *owner.public.lock().await else {
+    let Some(port) = owner.public.lock().await.as_ref().map(|listener|listener.port) else {
         return failure(
             StatusCode::CONFLICT,
             "PUBLIC_LISTENER_REQUIRED",
@@ -133,10 +133,21 @@ async fn exchange(
         _=>failure(StatusCode::UNAUTHORIZED,"PAIRING_INVALID","Selected profile is no longer available"),
     }
 }
+async fn bootstrap_admit(State(owner):State<Arc<Owner>>,request:Request,next:Next)->Response {
+    let permit=match owner.slots.clone().try_acquire_owned(){Ok(permit)=>permit,Err(_)=>return failure(StatusCode::SERVICE_UNAVAILABLE,"RESOURCE_LIMIT","Bootstrap admission capacity reached")};
+    {let _guard=owner.leases.lock().await;if owner.stop.is_cancelled(){return failure(StatusCode::SERVICE_UNAVAILABLE,"OWNER_STOPPING","Reconnect to the active owner");}owner.active.fetch_add(1,Ordering::AcqRel);owner.public_active.fetch_add(1,Ordering::AcqRel);}
+    let work=Work{active:owner.active.clone(),public:Some(owner.public_active.clone()),_permit:permit};
+    let expires=tokio::time::Instant::now()+Duration::from_secs(10);let (parts,body)=request.into_parts();
+    let bytes=match tokio::time::timeout_at(expires,axum::body::to_bytes(body,16384)).await{Ok(Ok(bytes))=>bytes,_=>return failure(StatusCode::PAYLOAD_TOO_LARGE,"RESOURCE_LIMIT","Pairing body limit or deadline exceeded")};
+    if commands::decode_json(&bytes).is_err(){return failure(StatusCode::BAD_REQUEST,"VALIDATION_ERROR","Invalid or ambiguous pairing JSON");}
+    let response=match tokio::time::timeout_at(expires,next.run(Request::from_parts(parts,axum::body::Body::from(bytes)))).await{Ok(response)=>response,Err(_)=>return failure(StatusCode::REQUEST_TIMEOUT,"REQUEST_TIMEOUT","Pairing deadline exceeded")};
+    let (parts,body)=response.into_parts();Response::from_parts(parts,axum::body::Body::new(ActiveBody{deadline:Box::pin(tokio::time::sleep_until(expires)),finished:false,body:Box::pin(body),_work:work}))
+}
 pub(super) fn routes(owner: Arc<Owner>) -> Router {
     Router::new()
         .route("/api/v1/pairing/exchange", post(exchange))
         .layer(DefaultBodyLimit::max(16384))
+        .layer(middleware::from_fn_with_state(owner.clone(),bootstrap_admit))
         .with_state(owner)
 }
 
@@ -182,8 +193,8 @@ mod tests {
     async fn fixture()->Fixture {
         let root=tempfile::tempdir().unwrap();let service=Service::open(root.path().to_owned(),None).await.unwrap();
         let listener=TcpListener::bind((std::net::Ipv4Addr::LOCALHOST,0)).await.unwrap();let port=listener.local_addr().unwrap().port();
-        let owner=Arc::new(Owner {record:OwnerRecord{canonical_root:"test".into(),root_id:service.store.root_id().into(),epoch:service.epoch.clone(),build:"test".into(),registry:registry_fingerprint(),port,bearer:"native-test-bootstrap".into()},service,leases:Mutex::new(HashMap::new()),public:Mutex::new(Some(port)),stop:CancellationToken::new(),active:Arc::new(AtomicUsize::new(0)),slots:Arc::new(Semaphore::new(32)),pairing:Mutex::new(HashMap::new())});
-        let routes=super::super::router(owner.clone(),port,false);let task=tokio::spawn(async move{axum::serve(listener,routes).await.unwrap();});
+        let owner=Arc::new(Owner {record:OwnerRecord{canonical_root:"test".into(),root_id:service.store.root_id().into(),epoch:service.epoch.clone(),build:"test".into(),registry:registry_fingerprint(),port,bearer:"native-test-bootstrap".into()},service,leases:Mutex::new(HashMap::new()),public:Mutex::new(Some(PublicListener{port,stop:CancellationToken::new(),last_used:Instant::now()})),public_active:Arc::new(AtomicUsize::new(0)),stop:CancellationToken::new(),active:Arc::new(AtomicUsize::new(0)),slots:Arc::new(Semaphore::new(32)),pairing:Mutex::new(HashMap::new())});
+        let routes=super::super::router(owner.clone(),port,false,owner.stop.clone());let task=tokio::spawn(async move{axum::serve(listener,routes).await.unwrap();});
         Fixture{owner,endpoint:format!("http://127.0.0.1:{port}"),_root:root,task}
     }
     async fn pairing(fixture:&Fixture)->String {

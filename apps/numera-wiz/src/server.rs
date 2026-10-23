@@ -2,6 +2,8 @@
 use crate::client::{OwnerRecord, registry_fingerprint};
 mod browser;
 mod uploads;
+mod listener;
+use listener::{PublicListener,PublicRoute};
 use anyhow::{Context as _, Result};
 use axum::{
     Json, Router,
@@ -36,13 +38,16 @@ use tokio_util::sync::CancellationToken;
 
 struct Lease {
     principal: String,
+    profile:Option<String>,
+    public:bool,
     expires: Instant,
 }
 pub struct Owner {
     service: Arc<Service>,
     record: OwnerRecord,
     leases: Mutex<HashMap<String, Lease>>,
-    public: Mutex<Option<u16>>,
+    public: Mutex<Option<PublicListener>>,
+    public_active:Arc<AtomicUsize>,
     stop: CancellationToken,
     active: Arc<AtomicUsize>,
     slots: Arc<Semaphore>,
@@ -54,12 +59,15 @@ struct Auth {
     host: String,
     origin: String,
     private: bool,
+    listener_stop:CancellationToken,
 }
 #[derive(Deserialize, Serialize)]
 struct LeaseInput {
     id: String,
     #[serde(default)]
     release: bool,
+    #[serde(default)]
+    public:bool,
 }
 #[derive(Deserialize)]
 struct PublicInput {
@@ -74,14 +82,18 @@ fn failure(status: StatusCode, code: &str, message: &str) -> Response {
 }
 struct Work {
     active: Arc<AtomicUsize>,
+    public:Option<Arc<AtomicUsize>>,
     _permit: OwnedSemaphorePermit,
 }
 impl Drop for Work {
     fn drop(&mut self) {
         self.active.fetch_sub(1, Ordering::AcqRel);
+        if let Some(public)=&self.public{public.fetch_sub(1,Ordering::AcqRel);}
     }
 }
 struct ActiveBody {
+    deadline:std::pin::Pin<Box<tokio::time::Sleep>>,
+    finished:bool,
     body: std::pin::Pin<Box<axum::body::Body>>,
     _work: Work,
 }
@@ -93,10 +105,13 @@ impl http_body::Body for ActiveBody {
         context: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<std::result::Result<http_body::Frame<Self::Data>, Self::Error>>>
     {
-        self.get_mut().body.as_mut().poll_frame(context)
+        let state=self.get_mut();
+        if state.finished{return std::task::Poll::Ready(None);}
+        if std::future::Future::poll(state.deadline.as_mut(),context).is_ready(){state.finished=true;return std::task::Poll::Ready(Some(Err(axum::Error::new(std::io::Error::new(std::io::ErrorKind::TimedOut,"Response stream deadline exceeded")))));}
+        let frame=state.body.as_mut().poll_frame(context);if matches!(frame,std::task::Poll::Ready(None)){state.finished=true;}frame
     }
     fn is_end_stream(&self) -> bool {
-        self.body.is_end_stream()
+        self.finished || self.body.is_end_stream()
     }
     fn size_hint(&self) -> http_body::SizeHint {
         self.body.size_hint()
@@ -174,7 +189,7 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
     };
     {
         let _lease_guard = auth.owner.leases.lock().await;
-        if auth.owner.stop.is_cancelled() {
+        if auth.owner.stop.is_cancelled() || auth.listener_stop.is_cancelled() {
             return failure(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "OWNER_STOPPING",
@@ -182,9 +197,11 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
             );
         }
         auth.owner.active.fetch_add(1, Ordering::AcqRel);
+        if !auth.private{auth.owner.public_active.fetch_add(1,Ordering::AcqRel);}
     }
     let work = Work {
         active: auth.owner.active.clone(),
+        public:(!auth.private).then(||auth.owner.public_active.clone()),
         _permit: permit,
     };
     if request.uri().path().starts_with("/internal/") && context.profile.is_some() {
@@ -228,6 +245,7 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
     request.extensions_mut().insert(context);
+    request.extensions_mut().insert(PublicRoute(!auth.private));
     let deadline = if request.method() == axum::http::Method::PUT
         && request.uri().path().starts_with("/api/v1/uploads/")
     {
@@ -235,8 +253,9 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
     } else {
         130
     };
+    let expires=tokio::time::Instant::now()+Duration::from_secs(deadline);
     let response =
-        match tokio::time::timeout(Duration::from_secs(deadline), next.run(request)).await {
+        match tokio::time::timeout_at(expires, next.run(request)).await {
             Ok(response) => response,
             Err(_) => failure(
                 StatusCode::REQUEST_TIMEOUT,
@@ -248,6 +267,7 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
     Response::from_parts(
         parts,
         axum::body::Body::new(ActiveBody {
+            deadline:Box::pin(tokio::time::sleep_until(expires)),finished:false,
             body: Box::pin(body),
             _work: work,
         }),
@@ -273,6 +293,7 @@ async fn dispatch(
 async fn lease(
     State(owner): State<Arc<Owner>>,
     axum::Extension(context): axum::Extension<Context>,
+    axum::Extension(purpose):axum::Extension<PublicRoute>,
     Json(input): Json<LeaseInput>,
 ) -> Response {
     if owner.service.client_lease_allowed(&context).is_err() {
@@ -314,6 +335,8 @@ async fn lease(
             input.id,
             Lease {
                 principal: context.principal,
+                profile:context.profile,
+                public:purpose.0 || input.public,
                 expires: Instant::now() + Duration::from_secs(90),
             },
         );
@@ -329,6 +352,7 @@ async fn credential(
     State(owner): State<Arc<Owner>>,
     Json(input): Json<nw_domain::access::CredentialInput>,
 ) -> Response {
+    if let Some(port)=input.port && owner.public.lock().await.as_ref().map(|listener|listener.port)!=Some(port){return failure(StatusCode::CONFLICT,"PUBLIC_LISTENER_REQUIRED","Enable the selected listener before issuing its credential");}
     let service = owner.service.clone();
     match tokio::task::spawn_blocking(move || {
         service.credential_for_origin(
@@ -347,7 +371,7 @@ async fn credential(
         ),
     }
 }
-fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
+fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop:CancellationToken) -> Router {
     let host = format!("127.0.0.1:{port}");
     let origin = format!("http://{host}");
     let mut config = StreamableHttpServerConfig::default()
@@ -401,6 +425,7 @@ fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
                 host,
                 origin,
                 private,
+                listener_stop,
             },
             authenticate,
         ))
@@ -429,7 +454,8 @@ async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>)
         );
     }
     let mut active = owner.public.lock().await;
-    if let Some(port) = *active {
+    if let Some(listener) = active.as_ref() {
+        let port=listener.port;
         return if port == input.port {
             Json(json!({"endpoint":format!("http://127.0.0.1:{port}")})).into_response()
         } else {
@@ -450,9 +476,10 @@ async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>)
             );
         }
     };
-    *active = Some(input.port);
-    let routes = router(owner.clone(), input.port, false);
-    let stop = owner.stop.clone();
+    if let Err(error)=owner.service.advance_origin(&format!("http://127.0.0.1:{}",input.port)){return (StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":error}))).into_response();}
+    let stop=owner.stop.child_token();
+    *active = Some(PublicListener{port:input.port,stop:stop.clone(),last_used:Instant::now()});
+    let routes = router(owner.clone(), input.port, false,stop.clone());
     tokio::spawn(async move {
         if let Err(error) = axum::serve(listener, routes)
             .with_graceful_shutdown(stop.cancelled_owned())
@@ -511,32 +538,15 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
         record,
         leases: Mutex::new(HashMap::new()),
         public: Mutex::new(None),
+        public_active:Arc::new(AtomicUsize::new(0)),
         stop: CancellationToken::new(),
         active: Arc::new(AtomicUsize::new(0)),
         slots: Arc::new(Semaphore::new(32)),
         pairing: Mutex::new(HashMap::new()),
     });
-    let monitoring = owner.clone();
-    tokio::spawn(async move {
-        let mut idle = Instant::now();
-        loop {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let mut leases = monitoring.leases.lock().await;
-            leases.retain(|_, lease| lease.expires > Instant::now());
-            if monitoring.service.busy()
-                || monitoring.active.load(Ordering::Acquire) != 0
-                || !leases.is_empty()
-            {
-                idle = Instant::now();
-            }
-            if idle.elapsed() >= Duration::from_secs(15) {
-                monitoring.stop.cancel();
-                break;
-            }
-        }
-    });
+    tokio::spawn(owner.clone().monitor());
     tracing::info!(port,epoch=%owner.record.epoch,"Protected owner ready; credential omitted");
-    axum::serve(listener, router(owner.clone(), port, true))
+    axum::serve(listener, router(owner.clone(), port, true, owner.stop.clone()))
         .with_graceful_shutdown(owner.stop.clone().cancelled_owned())
         .await?;
     // The writer lock remains held until every route/worker reference has drained.
@@ -565,7 +575,7 @@ pub async fn serve_browser(
     }
     let lease = uuid::Uuid::new_v4().to_string();
     client
-        .internal("internal/lease", json!({"id":lease}))
+        .internal("internal/lease", json!({"id":lease,"public":true}))
         .await?;
     let endpoint = client
         .internal("internal/public", json!({"port":port}))
@@ -588,7 +598,7 @@ pub async fn serve_browser(
     }
     tracing::info!(endpoint=%endpoint["endpoint"],"Scoped HTTP API/MCP ready; credential omitted");
     loop {
-        tokio::select! { _ = tokio::signal::ctrl_c() => break, _ = tokio::time::sleep(Duration::from_secs(15)) => { client.internal("internal/lease", json!({"id":lease})).await?; } }
+        tokio::select! { _ = tokio::signal::ctrl_c() => break, _ = tokio::time::sleep(Duration::from_secs(15)) => { client.internal("internal/lease", json!({"id":lease,"public":true})).await?; } }
     }
     let _ = client
         .internal("internal/lease", json!({"id":lease,"release":true}))
@@ -624,12 +634,13 @@ mod tests {
             record,
             leases: Mutex::new(HashMap::new()),
             public: Mutex::new(None),
+        public_active:Arc::new(AtomicUsize::new(0)),
             stop: CancellationToken::new(),
             active: Arc::new(AtomicUsize::new(0)),
             slots: Arc::new(Semaphore::new(32)),
             pairing: Mutex::new(HashMap::new()),
         });
-        let routes = router(owner, port, false);
+        let routes = router(owner.clone(), port, false, owner.stop.clone());
         let task = tokio::spawn(async move {
             axum::serve(listener, routes).await.unwrap();
         });
