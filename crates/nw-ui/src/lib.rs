@@ -35,7 +35,7 @@ impl WizApp {
             self.response = "Request exceeds 256 KiB".into();
             return;
         }
-        let request = match serde_json::from_str::<Request>(&self.request) {
+        let request = match nw_domain::commands::decode_request(self.request.as_bytes()) {
             Ok(value) => value,
             Err(error) => {
                 self.response = format!("Invalid request: {error}");

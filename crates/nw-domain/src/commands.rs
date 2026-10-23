@@ -369,11 +369,7 @@ mod strict_json_tests {
 }
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
-pub const ACTIVE_COMMANDS: &[&str] = &[
-    "commands.list",
-    "commands.schema",
-    "streams.clean.resolve",
-];
+pub const ACTIVE_COMMANDS: &[&str] = &["commands.list", "commands.schema", "streams.clean.resolve"];
 pub fn active_registry() -> Vec<Descriptor> {
     registry()
         .into_iter()

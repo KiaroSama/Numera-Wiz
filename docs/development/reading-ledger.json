@@ -13,6 +13,8 @@
     "handoff/11-11-work-packages-traceability-and-acceptance.md lines 1-95",
     "handoff/15-annex-d-complete-muxcls-rust-rewrite.md",
     "research_v7/muxcls-sources/standalone/muxcls/models.py lines 1-100",
-    "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py"
+    "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+    "research_v7/muxcls-sources/standalone/muxcls/constants.py lines 1-100",
+    "research_v7/muxcls-sources/standalone/muxcls/textutil.py lines 1-85"
   ]
 }

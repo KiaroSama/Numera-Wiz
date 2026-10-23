@@ -541,6 +541,89 @@
           "observed_outcome": "domain unit assertions passed; overall run failed at later Clippy step"
         }
       ]
+    },
+    {
+      "subject_id": "foundation.hosted",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "Cargo.lock",
+        ".github/workflows/ci.yml"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "build",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Locked workspace tests, Clippy and native desktop builds passed on all three targets; Linux shared WASM dependency check passed. No GUI runtime or portable package claim."
+        }
+      ]
+    },
+    {
+      "subject_id": "store.replay_primitives",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-store/src/lib.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "unit",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Restart/replay, principal/root/expiry/clock isolation, schema rejection, owner lock and terminal immutability assertions passed. Not yet integrated into the command owner."
+        }
+      ]
+    },
+    {
+      "subject_id": "transport.development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/interfaces.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "transport",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Actual CLI JSON, official SDK stdio process and loopback HTTP boundary assertions passed. Full HTTP MCP client and operational media parity remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "media.cleanup_fixture",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-engine/tests/media.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "media",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "Actual pinned minimal CPU FFmpeg profile generated a Matroska fixture; byte-identical copy and remux audio order/language/title assertions passed. Not the complete standard distribution or full preservation qualification."
+        }
+      ]
     }
   ]
 }
