@@ -16,6 +16,17 @@ fn valid_key(key: &str) -> Result<()> {
     }
     Ok(())
 }
+fn execution_policy(profile:&AccessProfile,authorization:&ExecutionAuthorization,job:&Job)->Result<()> {
+    use std::path::Path;
+    let source=&job.plan.source;
+    if !profile.enabled || profile.principal!=authorization.principal || !profile.commands.contains("jobs.submit")
+        || (source.creator!=authorization.principal && !profile.objects.contains(&source.id))
+        || !profile.read_roots.iter().any(|root|Path::new(&source.identity.path).starts_with(root))
+        || !profile.write_roots.iter().any(|root|Path::new(&job.plan.output).starts_with(root)) {
+        return Err(DomainError::new("PERMISSION_DENIED","Current execution command, object or path authority was revoked"));
+    }
+    Ok(())
+}
 impl Store {
     pub fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
         valid_key(key)?;
@@ -256,20 +267,13 @@ impl Store {
                     "Durable execution authorization missing",
                 )
             })?;
-        if let Some(name) = authorization.profile {
+        if let Some(name) = &authorization.profile {
             let profile: AccessProfile =
                 self.get(&format!("profile/{name}"))?.ok_or_else(|| {
                     DomainError::new("PERMISSION_DENIED", "Execution profile removed")
                 })?;
-            if !profile.enabled
-                || profile.revision != authorization.revision
-                || profile.principal != authorization.principal
-            {
-                return Err(DomainError::new(
-                    "PERMISSION_DENIED",
-                    "Execution authorization was explicitly revoked or revised",
-                ));
-            }
+            let job=self.inspect_job(id)?;
+            execution_policy(&profile,&authorization,&job)?;
         }
         Ok(())
     }
@@ -310,7 +314,7 @@ impl Store {
                     })?;
                 decode(value.value())?
             };
-            if let Some(name) = authorization.profile {
+            if let Some(name) = &authorization.profile {
                 let profile: AccessProfile = {
                     let value = table
                         .get(format!("profile/{name}").as_str())
@@ -320,15 +324,7 @@ impl Store {
                         })?;
                     decode(value.value())?
                 };
-                if !profile.enabled
-                    || profile.revision != authorization.revision
-                    || profile.principal != authorization.principal
-                {
-                    return Err(DomainError::new(
-                        "PERMISSION_DENIED",
-                        "Execution authority revoked before publication",
-                    ));
-                }
+                execution_policy(&profile,&authorization,&job)?;
             }
             job.state = JobState::Publishing;
             table

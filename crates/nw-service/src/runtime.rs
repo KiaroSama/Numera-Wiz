@@ -250,6 +250,8 @@ impl Service {
         } else {
             files::source_path(path)?
         };
+        if ["state","runtime","logs","ingest"].iter().any(|name|canonical.starts_with(self.root.join(name))) || (write && canonical.starts_with(self.root.join("assets"))){return Err(DomainError::new("PATH_DENIED","Protected owner namespaces and managed objects are not media output targets"));}
+        if !write && context.profile.is_some() && canonical.starts_with(self.root.join("assets")){self.managed_read(context,&canonical)?;}
         if let Some(profile) = self.policy(context)? {
             let roots = if write {
                 profile.write_roots
@@ -543,13 +545,15 @@ impl Service {
                     read_roots: roots(input.read_roots)?,
                     write_roots: roots(input.write_roots)?,
                 };
-                return self.store.commit(
+                let response=self.store.commit(
                     &context.principal,
                     &request,
                     nw_platform::epoch_seconds(),
                     value(&profile)?,
                     &[(key, value(&profile)?)],
-                );
+                )?;
+                if let Err(error)=self.cancel_revoked(){tracing::error!(code=%error.code,"Accepted policy change retained; active authority checks will fail closed");}
+                return Ok(response);
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
@@ -582,7 +586,7 @@ impl Service {
                     &request,
                     nw_platform::epoch_seconds(),
                     value(&asset)?,
-                    &[(named("asset", &asset.id)?, value(&asset)?)],
+                    &[(named("asset", &asset.id)?, value(&asset)?),(format!("managed-read/{}/{}",hex::encode(Sha256::digest(asset.identity.path.as_bytes())),context.principal),json!(true))],
                 );
             }
             "assets.list" => {
@@ -718,7 +722,7 @@ impl Service {
                         (named("job-auth", &id)?, value(&authorization)?),
                     ],
                 )?;
-                self.schedule(id)?;
+                if let Err(error)=self.schedule(id){tracing::error!(code=%error.code,"Job acceptance is durable; restart the owner to resume the retained queued job");}
                 return Ok(response);
             }
             "jobs.inspect" => {
@@ -868,6 +872,10 @@ impl Service {
             .await;
         });
         Ok(())
+    }
+    fn cancel_revoked(&self)->Result<()> {
+        let tokens=self.cancellations.lock().map_err(|_|lock_error())?.iter().map(|(id,token)|(id.clone(),token.clone())).collect::<Vec<_>>();
+        for (id,token) in tokens{if self.store.execution_allowed(&id).is_err(){let job=self.store.inspect_job(&id)?;if job.state!=JobState::Publishing && !job.state.terminal(){token.cancel();}}}Ok(())
     }
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;

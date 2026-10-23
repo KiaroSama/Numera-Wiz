@@ -617,4 +617,18 @@ mod tests {
             b"future-version"
         );
     }
+    #[test]
+    fn additive_policy_revisions_preserve_accepted_work_but_revocation_blocks_the_atomic_fence(){
+        use nw_domain::access::{AccessProfile,ExecutionAuthorization,Publication};
+        let root=tempfile::tempdir().unwrap();let store=Store::open(root.path()).unwrap();let path=root.path().to_str().unwrap().to_owned();
+        let mut job=job();job.plan.source.identity.path=root.path().join("source.mkv").to_str().unwrap().into();job.plan.output=root.path().join("result.mkv").to_str().unwrap().into();job.state=JobState::Verifying;
+        let auth=ExecutionAuthorization{principal:"alice".into(),profile:Some("operator".into()),revision:1};
+        let mut policy=AccessProfile{id:"operator".into(),name:"operator".into(),principal:"alice".into(),revision:1,enabled:true,client_sessions:false,commands:std::collections::BTreeSet::from(["jobs.submit".into()]),objects:Default::default(),read_roots:vec![path.clone()],write_roots:vec![path.clone()]};
+        store.put("job/test-job",&job).unwrap();store.put("job-auth/test-job",&auth).unwrap();store.put("profile/operator",&policy).unwrap();assert!(store.execution_allowed("test-job").is_ok());
+        policy.revision=2;policy.commands.insert("jobs.inspect".into());store.put("profile/operator",&policy).unwrap();assert!(store.execution_allowed("test-job").is_ok());
+        let publication=Publication{job_id:"test-job".into(),proof:"unit-journal-proof".into(),output:job.plan.output.clone(),identity:job.plan.source.identity.clone(),verified:"unit authorization journal only".into(),published:false};
+        policy.revision=3;policy.write_roots.clear();store.put("profile/operator",&policy).unwrap();assert!(store.execution_allowed("test-job").is_err());assert!(store.publication_fence(&publication).is_err());assert_eq!(store.inspect_job("test-job").unwrap().state,JobState::Verifying);assert!(store.get::<Publication>("publication/test-job").unwrap().is_none());
+        policy.revision=4;policy.write_roots.push(path);store.put("profile/operator",&policy).unwrap();store.publication_fence(&publication).unwrap();assert_eq!(store.inspect_job("test-job").unwrap().state,JobState::Publishing);
+    }
+
 }
