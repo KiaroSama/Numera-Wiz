@@ -696,4 +696,18 @@ mod tests {
         assert!(store.replay("alice", &request, 100).unwrap().is_none());
     }
 
+    #[test]
+    fn profile_quota_rejects_only_new_records_and_keeps_existing_policy_writable() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        for page in 0..2 {
+            let records=(0..64).map(|index|(format!("profile/unit-{}",page*64+index),serde_json::json!(true))).collect::<Vec<_>>();
+            store.internal_batch(&records).unwrap();
+        }
+        assert_eq!(store.put("profile/one-too-many",&true).unwrap_err().code,"RESOURCE_LIMIT");
+        store.put("profile/unit-0",&false).unwrap();
+        assert_eq!(store.get::<bool>("profile/unit-0").unwrap(),Some(false));
+        assert!(store.get::<bool>("profile/one-too-many").unwrap().is_none());
+    }
+
 }
