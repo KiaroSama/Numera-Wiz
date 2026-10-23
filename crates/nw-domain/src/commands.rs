@@ -124,7 +124,13 @@ impl Response {
         if serde_json::to_vec(&self).is_ok_and(|bytes| bytes.len() <= MAX_RESULT_BYTES) {
             self
         } else {
-            Self::error(&self.request_id, DomainError::new("RESOURCE_LIMIT", "Result exceeds the bounded projection; request a narrower page"))
+            Self::error(
+                &self.request_id,
+                DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Result exceeds the bounded projection; request a narrower page",
+                ),
+            )
         }
     }
 

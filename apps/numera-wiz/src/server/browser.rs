@@ -280,9 +280,12 @@ pub(super) async fn launch(url: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(all(test,feature="embedded-web"))]
-#[allow(dead_code,reason="The shared CI fixture also serves deeper media journeys")]
-#[path="../../../../test-support/media.rs"]
+#[cfg(all(test, feature = "embedded-web"))]
+#[allow(
+    dead_code,
+    reason = "The shared CI fixture also serves deeper media journeys"
+)]
+#[path = "../../../../test-support/media.rs"]
 mod media_fixture;
 
 #[cfg(all(test, feature = "embedded-web"))]
@@ -301,8 +304,13 @@ mod tests {
     }
     async fn fixture() -> Fixture {
         let root = tempfile::tempdir().unwrap();
-        let components=std::env::var_os("NW_FIXTURE_COMPONENTS").map(|path|{let path=std::path::PathBuf::from(path);(path.join("ffmpeg"),path.join("ffprobe"))});
-        let service = Service::open(root.path().to_owned(), components).await.unwrap();
+        let components = std::env::var_os("NW_FIXTURE_COMPONENTS").map(|path| {
+            let path = std::path::PathBuf::from(path);
+            (path.join("ffmpeg"), path.join("ffprobe"))
+        });
+        let service = Service::open(root.path().to_owned(), components)
+            .await
+            .unwrap();
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
             .unwrap();
@@ -612,22 +620,84 @@ mod tests {
             .decode(screenshot.as_str().unwrap())
             .unwrap();
         std::fs::write(directory.join("shared-workspace.png"), bytes).unwrap();
-        if std::env::var_os("NW_FIXTURE_COMPONENTS").is_some(){
-            let media=media_fixture::generate().await;
+        if std::env::var_os("NW_FIXTURE_COMPONENTS").is_some() {
+            let media = media_fixture::generate().await;
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":0,"origin":"viewport","x":320,"y":94},{"type":"pointerDown","button":0},{"type":"pointerUp","button":0}]}]})).await;
-            let start=Instant::now();let input=loop {
-                let response=client.post(format!("{base}{route}/element")).json(&json!({"using":"css selector","value":"#media-file-input"})).send().await.unwrap();
-                if response.status().is_success(){let result:Value=response.json().await.unwrap();break result["value"]["element-6066-11e4-a52e-4f735466cecf"].as_str().unwrap().to_owned();}
-                assert!(start.elapsed()<Duration::from_secs(5),"Shared choose-media control did not create its file input");tokio::time::sleep(Duration::from_millis(100)).await;
+            let start = Instant::now();
+            let input = loop {
+                let response = client
+                    .post(format!("{base}{route}/element"))
+                    .json(&json!({"using":"css selector","value":"#media-file-input"}))
+                    .send()
+                    .await
+                    .unwrap();
+                if response.status().is_success() {
+                    let result: Value = response.json().await.unwrap();
+                    break result["value"]["element-6066-11e4-a52e-4f735466cecf"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned();
+                }
+                assert!(
+                    start.elapsed() < Duration::from_secs(5),
+                    "Shared choose-media control did not create its file input"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
             };
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/element/{input}/value"),json!({"text":media.source.to_str().unwrap()})).await;
-            let start=Instant::now();let asset=loop {
-                let assets=fixture.owner.service.store.list::<nw_domain::records::Asset>("asset/",128).unwrap();if let Some(asset)=assets.into_iter().next(){break asset;}
-                assert!(start.elapsed()<Duration::from_secs(30),"Actual UI file selection did not complete upload and canonical registration");tokio::time::sleep(Duration::from_millis(200)).await;
+            driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/element/{input}/value"),
+                json!({"text":media.source.to_str().unwrap()}),
+            )
+            .await;
+            let start = Instant::now();
+            let asset = loop {
+                let assets = fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Asset>("asset/", 128)
+                    .unwrap();
+                if let Some(asset) = assets.into_iter().next() {
+                    break asset;
+                }
+                assert!(
+                    start.elapsed() < Duration::from_secs(30),
+                    "Actual UI file selection did not complete upload and canonical registration"
+                );
+                tokio::time::sleep(Duration::from_millis(200)).await;
             };
-            assert_eq!(asset.creator,fixture.owner.service.profile_context("browser").unwrap().principal);assert_eq!(std::fs::read(&asset.identity.path).unwrap(),std::fs::read(&media.source).unwrap());
+            assert_eq!(
+                asset.creator,
+                fixture
+                    .owner
+                    .service
+                    .profile_context("browser")
+                    .unwrap()
+                    .principal
+            );
+            assert_eq!(
+                std::fs::read(&asset.identity.path).unwrap(),
+                std::fs::read(&media.source).unwrap()
+            );
             tokio::time::sleep(Duration::from_millis(500)).await;
-            let screenshot=driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;std::fs::write(directory.join("loaded-workspace.png"),base64::engine::general_purpose::STANDARD.decode(screenshot.as_str().unwrap()).unwrap()).unwrap();
+            let screenshot = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("loaded-workspace.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(screenshot.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
         }
         std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal and rendered workspace under real CSP/MIME","not_qualified":["media playback","UI-created media output","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
         driver(

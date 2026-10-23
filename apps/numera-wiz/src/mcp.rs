@@ -121,7 +121,7 @@ impl ServerHandler for Bridge {
         } else {
             CallToolResult::structured_error(value)
         };
-        result.content = vec![Content::text(if response.ok {
+        result.content = vec![ContentBlock::text(if response.ok {
             "Command completed. Typed result is in structuredContent."
         } else {
             "Command failed. Typed error is in structuredContent."

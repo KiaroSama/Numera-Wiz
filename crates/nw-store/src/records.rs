@@ -16,6 +16,16 @@ fn valid_key(key: &str) -> Result<()> {
     }
     Ok(())
 }
+fn record_quota(table:&impl ReadableTable<&'static str,&'static [u8]>,key:&str)->Result<()> {
+    if table.get(key).map_err(storage)?.is_some(){return Ok(());}
+    for (prefix,limit) in [("asset/",4096usize),("job/",4096),("profile/",128),("plan/",512),("receipt/",10000)] {
+        if key.starts_with(prefix){
+            let mut count=0;
+            for row in table.range(prefix..).map_err(storage)?{let (name,_)=row.map_err(storage)?;if !name.value().starts_with(prefix){break;}count+=1;if count>=limit{return Err(DomainError::new("RESOURCE_LIMIT",format!("Retained {prefix} record quota reached; protected history was not evicted")));}}
+            break;
+        }
+    }Ok(())
+}
 fn execution_policy(
     profile: &AccessProfile,
     authorization: &ExecutionAuthorization,
@@ -112,6 +122,7 @@ impl Store {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             for (key, value) in records {
                 valid_key(key)?;
+                record_quota(&table,key)?;
                 table
                     .insert(key.as_str(), encode(value)?.as_slice())
                     .map_err(storage)?;
@@ -205,10 +216,12 @@ impl Store {
             }
             for (record_key, value) in records {
                 valid_key(record_key)?;
+                record_quota(&table,record_key)?;
                 table
                     .insert(record_key.as_str(), encode(value)?.as_slice())
                     .map_err(storage)?;
             }
+            record_quota(&table,&key)?;
             let receipt = Receipt {
                 digest,
                 response: response.clone(),

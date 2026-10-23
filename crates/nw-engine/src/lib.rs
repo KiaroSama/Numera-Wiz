@@ -73,7 +73,7 @@ impl Engine {
             "-show_format",
             "-show_chapters",
             "-of",
-            "json",
+            "json=string_validation=fail",
             "-i",
             &path,
         ]
