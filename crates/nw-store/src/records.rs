@@ -200,6 +200,9 @@ impl Store {
                 response.receipt_id = Some(Uuid::new_v4().to_string());
                 response
             };
+            if serde_json::to_vec(&response).map_err(storage)?.len() > nw_domain::commands::MAX_RESULT_BYTES {
+                return Err(DomainError::new("RESOURCE_LIMIT", "Mutation result exceeds its admitted response budget before acceptance"));
+            }
             for (record_key, value) in records {
                 valid_key(record_key)?;
                 table

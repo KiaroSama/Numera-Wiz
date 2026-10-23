@@ -426,7 +426,7 @@ impl Service {
         })
         .await
         {
-            Ok(Ok(response)) => response,
+            Ok(Ok(response)) => response.bounded(),
             Ok(Err(error)) => Response::error(&id, error),
             Err(error) => {
                 Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string()))
