@@ -13,6 +13,8 @@ pub struct FileIdentity {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MediaProbe {
     pub streams: Vec<Stream>,
+    #[serde(default)]
+    pub stream_details: BTreeMap<u32, serde_json::Value>,
     pub format: String,
     pub global_tags: BTreeMap<String, String>,
     pub chapters: serde_json::Value,
@@ -70,6 +72,8 @@ pub struct Job {
     pub plan: Plan,
     pub state: JobState,
     pub prepared_argv: Option<Vec<String>>,
+    #[serde(default)]
+    pub prepared_stages: Vec<Vec<String>>,
     pub artifact: Option<FileIdentity>,
     pub verification: Option<String>,
     pub error: Option<crate::DomainError>,

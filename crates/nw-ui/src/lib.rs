@@ -68,6 +68,11 @@ pub struct WizApp {
     inspect: String,
 }
 impl WizApp {
+    fn run_reviewed(&mut self, ctx: &egui::Context) {
+        if !self.waiting && self.pending.is_none() && let Some(plan) = self.plan.clone() {
+            self.mutate("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}), Action::Submit, ctx);
+        }
+    }
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         client: Arc<dyn CommandClient>,
@@ -431,6 +436,9 @@ impl eframe::App for WizApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
         self.schedule_output(ctx);
+        if ctx.input(|input| input.modifiers.command && input.key_pressed(egui::Key::Enter)) {
+            self.run_reviewed(ctx);
+        }
         if !self.waiting
             && self.pending.is_none()
             && self.jobs.iter().any(|job| !job.state.terminal())
@@ -582,6 +590,7 @@ mod tests {
                 sha256: "00".repeat(32),
             },
             probe: MediaProbe {
+                stream_details: Default::default(),
                 streams: vec![],
                 format: "synthetic-controller-unit".into(),
                 global_tags: Default::default(),

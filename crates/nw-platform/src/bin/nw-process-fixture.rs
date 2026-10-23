@@ -21,6 +21,12 @@ fn main() -> std::process::ExitCode {
             std::thread::sleep(std::time::Duration::from_secs(20));
             std::process::ExitCode::SUCCESS
         }
+        Some("stream-sleep") => {
+            std::io::stdout().write_all(&[b'x'; 4096]).unwrap();
+            std::io::stdout().flush().unwrap();
+            std::thread::sleep(std::time::Duration::from_secs(20));
+            std::process::ExitCode::SUCCESS
+        }
         Some("failure") => {
             tracing::error!("Deterministic process failure");
             std::process::ExitCode::from(9)

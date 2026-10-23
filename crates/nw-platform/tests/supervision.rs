@@ -33,6 +33,20 @@ async fn cancellation_waits_for_termination_and_reaping() {
     .await;
     assert_eq!(result.unwrap_err().code, "CANCELLED");
 }
+
+#[tokio::test]
+async fn rejected_streamed_stdout_terminates_and_reaps_the_producer() {
+    let source = tempfile::NamedTempFile::new().unwrap();
+    let input = std::fs::File::open(source.path()).unwrap();
+    let start = std::time::Instant::now();
+    let result = nw_platform::process::stream_readonly(
+        fixture(), &["stream-sleep".into()], Duration::from_secs(15), input,
+        Box::new(|_| Err(nw_domain::DomainError::new("VERIFICATION_FAILED", "Rejected deterministic stream record"))),
+        CancellationToken::new(),
+    ).await.unwrap_err();
+    assert_eq!(result.code, "VERIFICATION_FAILED");
+    assert!(start.elapsed() < Duration::from_secs(8));
+}
 #[tokio::test]
 async fn launch_failure_and_child_failure_remain_distinct() {
     let fail = nw_platform::process::run(

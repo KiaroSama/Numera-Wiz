@@ -452,6 +452,7 @@ mod tests {
             creator: "alice".into(),
             identity: identity.clone(),
             probe: MediaProbe {
+                stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-fixture".into(),
                 global_tags: Default::default(),
@@ -487,6 +488,7 @@ mod tests {
             plan,
             state: JobState::Queued,
             prepared_argv: None,
+            prepared_stages: Vec::new(),
             artifact: None,
             verification: None,
             error: None,

@@ -181,12 +181,35 @@ async fn journey() {
     assert_eq!(assets[0]["probe"]["streams"].as_array().unwrap().len(), 3);
     tokio::time::sleep(Duration::from_millis(500)).await;
     screenshot(&window, &evidence.join("native-loaded-workspace.png")).await;
+    click(&window, "331", "570").await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    screenshot(&window, &evidence.join("native-reviewed-workspace.png")).await;
+    input(&["key", "--clearmodifiers", "ctrl+Return"]).await;
+    let start = Instant::now();
+    let job = loop {
+        if let Some(jobs) = query(&root, "jobs.list").await
+            && let Some(job) = jobs.as_array().and_then(|jobs| jobs.first())
+            && let Ok(job) = serde_json::from_value::<nw_domain::records::Job>(job.clone())
+            && job.state.terminal()
+        {
+            break job;
+        }
+        assert!(start.elapsed() < Duration::from_secs(30), "Native review/Run controls did not produce a terminal job");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    assert_eq!(job.state, nw_domain::records::JobState::Succeeded);
+    let artifact = job.artifact.as_ref().expect("Native UI must produce a verified artifact");
+    assert_eq!(std::fs::read(&media.source).unwrap(), std::fs::read(&artifact.path).unwrap());
+    assert_eq!(job.plan.source.id, assets[0]["id"].as_str().unwrap());
+    std::fs::write(evidence.join("native-output.json"), serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"artifact":artifact,"verification":job.verification,"oracle":"Independent source/output byte equality after native input, Review and Ctrl+Enter Run"})).unwrap()).unwrap();
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    screenshot(&window, &evidence.join("native-completed-workspace.png")).await;
     let record: Value = serde_json::from_slice(
         &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
     )
     .unwrap();
     assert_eq!(record["build"], identity.sha256);
-    std::fs::write(evidence.join("native.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":std::env::var("GITHUB_SHA").ok(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"executable":identity,"registry":record["registry"],"renderer":"Glow; LIBGL_ALWAYS_SOFTWARE=1","viewport":[1440,861],"observed":"Real native CI executable, window input, media registration and shared human controls","not_qualified":["native output creation","Windows or macOS native input","preview/playback","full five-surface qualification"]})).unwrap()).unwrap();
+    std::fs::write(evidence.join("native.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":std::env::var("GITHUB_SHA").ok(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"executable":identity,"registry":record["registry"],"renderer":"Glow; LIBGL_ALWAYS_SOFTWARE=1","viewport":[1440,861],"observed":"Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output","not_qualified":["Windows or macOS native input","preview/playback","full five-surface qualification"]})).unwrap()).unwrap();
     input(&["windowactivate", "--sync", &window]).await;
     input(&["key", "--clearmodifiers", "alt+F4"]).await;
     assert!(

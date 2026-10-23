@@ -787,7 +787,7 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":1180,"y":409},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E009}"},{"type":"keyDown","value":"\u{E007}"},{"type":"pause","duration":150},{"type":"keyUp","value":"\u{E007}"},{"type":"keyUp","value":"\u{E009}"}]}]})).await;
             let start = Instant::now();
             let job = loop {
                 let jobs = fixture

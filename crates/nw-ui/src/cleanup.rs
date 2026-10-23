@@ -288,13 +288,9 @@ impl WizApp {
                     )
                     .clicked()
                 {
-                    self.mutate(
-                        "jobs.submit",
-                        json!({"plan_id":plan.id,"plan_hash":plan.hash}),
-                        Action::Submit,
-                        ui.ctx(),
-                    );
+                    self.run_reviewed(ui.ctx());
                 }
+                ui.small("Ctrl/Cmd+Enter runs the reviewed plan.");
             });
     }
 }
