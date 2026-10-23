@@ -397,7 +397,7 @@ impl eframe::App for WizApp {
                 .raw
                 .dropped_files
                 .iter()
-                .find_map(|file| file.path.clone())
+                .find_map(|file| file.path().is_absolute().then(|| file.path().to_owned()))
         });
         if let Some(path) = dropped
             && !self.waiting
