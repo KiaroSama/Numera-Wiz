@@ -80,6 +80,17 @@ async fn actual_copy_and_order_metadata_remux() {
         .clean_plan(asset.clone(), &copy, &rules(), "fixture-owner")
         .unwrap();
     assert_eq!(plan.resolution.action, CleanAction::CopyUnchanged);
+    let mut changed_engine = engine.clone();
+    changed_engine.ffmpeg.sha256 = "different-component".into();
+    assert_eq!(
+        changed_engine
+            .execute(&plan, token.clone())
+            .await
+            .unwrap_err()
+            .code,
+        "COMPONENT_CHANGED"
+    );
+    assert!(!copy.exists());
     let (artifact, verification, _) = engine.execute(&plan, token.clone()).await.unwrap();
     assert!(artifact.is_some());
     assert!(verification.contains("Full byte"));

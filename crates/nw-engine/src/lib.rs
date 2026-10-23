@@ -143,6 +143,12 @@ impl Engine {
                 "Stored plan hash mismatch",
             ));
         }
+        if self.ffmpeg != plan.ffmpeg || self.ffprobe != plan.ffprobe {
+            return Err(DomainError::new(
+                "COMPONENT_CHANGED",
+                "Execution engine does not match the reviewed component identities",
+            ));
+        }
         if plan.expires_at.parse::<u64>().unwrap_or(0) < nw_platform::epoch_seconds() {
             return Err(DomainError::new(
                 "PLAN_EXPIRED",
@@ -167,10 +173,10 @@ impl Engine {
                 None,
             )),
             CleanAction::CopyUnchanged => {
-                let source = PathBuf::from(&plan.source.identity.path);
+                let source = plan.source.identity.clone();
                 let output = PathBuf::from(&plan.output);
-                let identity =
-                    blocking(move || files::verified_copy(&source, &output, &cancel)).await?;
+                let worker = move || files::verified_copy_expected(&source, &output, &cancel);
+                let identity = blocking(worker).await?;
                 Ok((
                     Some(identity),
                     "Full byte SHA-256 and length verified before no-replace publication".into(),
