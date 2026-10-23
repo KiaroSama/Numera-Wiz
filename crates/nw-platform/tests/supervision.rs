@@ -40,10 +40,20 @@ async fn rejected_streamed_stdout_terminates_and_reaps_the_producer() {
     let input = std::fs::File::open(source.path()).unwrap();
     let start = std::time::Instant::now();
     let result = nw_platform::process::stream_readonly(
-        fixture(), &["stream-sleep".into()], Duration::from_secs(15), input,
-        Box::new(|_| Err(nw_domain::DomainError::new("VERIFICATION_FAILED", "Rejected deterministic stream record"))),
+        fixture(),
+        &["stream-sleep".into()],
+        Duration::from_secs(15),
+        input,
+        Box::new(|_| {
+            Err(nw_domain::DomainError::new(
+                "VERIFICATION_FAILED",
+                "Rejected deterministic stream record",
+            ))
+        }),
         CancellationToken::new(),
-    ).await.unwrap_err();
+    )
+    .await
+    .unwrap_err();
     assert_eq!(result.code, "VERIFICATION_FAILED");
     assert!(start.elapsed() < Duration::from_secs(8));
 }

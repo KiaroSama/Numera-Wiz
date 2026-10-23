@@ -74,7 +74,16 @@ pub struct Job {
     pub prepared_argv: Option<Vec<String>>,
     #[serde(default)]
     pub prepared_stages: Vec<Vec<String>>,
+    #[serde(default)]
+    pub owned_staging: Option<StagingIntent>,
     pub artifact: Option<FileIdentity>,
     pub verification: Option<String>,
     pub error: Option<crate::DomainError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct StagingIntent {
+    pub job_id: String,
+    pub directory: String,
+    pub payload: String,
 }

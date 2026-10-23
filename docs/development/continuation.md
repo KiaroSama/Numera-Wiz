@@ -158,3 +158,37 @@ The process supervisor cancels/reaps a producer whose streamed parser rejects
 output, with bounded record/total/deadline limits. Prepared stages are retained
 in job history. These changes await their own CI results; decoded/container
 reframing fallback and unexposed raw side-data identity are still open.
+
+
+Current credential changes serialize token activity reads/updates and sample the
+wall clock inside a session-clock lock. Monotonic elapsed time advances expiry
+even if wall time stalls; an observed backwards wall step blocks scoped credential
+acceptance/issuance for the rest of that owner epoch. Injected-source and exact
+elapsed-time unit cases cover rollback and subsecond accumulation. These changes
+need hosted CI before crediting them. Replay/store clocks are a separate contract.
+The shared Run button and Ctrl/Cmd+Enter shortcut use one reviewed-plan guard and
+canonical submission method; browser/native journeys now exercise that shortcut.
+
+
+New staging work records each accepted attempt's unpredictable private workspace
+and payload path in the durable job before creating either. Copy and remux use
+the same protected workspace; proof hard links now remain inside it rather than
+in the public destination directory. A successful acknowledged publication removes
+only its known proof and now-empty directory; unknown contents are preserved.
+Interrupted/failed work retains its recorded paths for explicit recovery/retention
+work. This closes the prior unjournaled staging-name seam but not all cleanup,
+parent-file-identity, cross-root destination-claim or migration fault obligations.
+Qualify the new path and intent ordering in hosted tests before crediting them.
+
+
+Run [40041324965](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40041324965)
+for candidate head fbea8ef35285c9fd5027e283652dae569ef73c5b compiled CI merge
+ba6f2fea3bffbc4133010dc949790439a63bf224. All four native targets, WASM/embedded
+web, real media/CLI/official SDK and actual Chrome UI succeeded. The actual
+Linux X11 executable also completed native path input -> Review -> Ctrl+Enter
+Run -> Succeeded, asserting independent full source/output byte equality.
+The observed screenshot/report are retained under docs/development/evidence.
+Its formatter gate failed; the exact CI-produced patch is applied in this next
+source revision. Later credential/staging changes require their own CI evidence.
+A brief local environment disconnection recovered with all pending files intact.
+No local build/media/GPU test was performed.

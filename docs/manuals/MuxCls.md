@@ -23,10 +23,13 @@ no-audio-match skip has no produced artifact.
 
 The engine internals implement bounded regular-file probing, source/component
 hashes, immutable no-replace plans, verified Rust byte copying and a conservative
-Matroska remux profile. They are not exposed as a completed media/job interface.
-The remux verifier currently makes structural/tag/disposition/chapter assertions;
-packet/decoded/timing preservation, all containers, folder/companion behavior,
-full durable owner/publication recovery and all five interfaces remain required.
+Matroska remux profile. The shared UI and CLI/MCP adapters call these same development handlers.
+The remux verifier now requires a complete bounded packet read with exact
+rational timestamps, packet hashes/flags, codec/extradata and ffprobe-exposed
+side data alongside structural/tag/disposition/chapter assertions. Decoded
+reframing fallback, unexposed raw side-data identity, all containers, folder/
+companion behavior, full publication recovery and all-interface qualification
+remain required.
 
 ## Qualification boundary
 
@@ -35,7 +38,9 @@ no-match, independent attachments and metadata-only decisions. Native filesystem
 and process regressions exercise new-byte verification, old-output protection,
 flooded independent pipes, cancellation/reaping and distinct launch/child errors.
 The real-media job builds the pinned FFmpeg source into a limited CPU fixture
-profile and checks copy bytes plus actual remux language/order/title outcomes.
+profile and checks copy bytes plus actual remux language/order/title outcomes,
+seekable fd-only probing of a tail-indexed MP4 and rejection of a changed
+interior PCM packet before publication.
 This fixture profile is not the complete standard distribution profile.
 
 Only after every Annex D coverage/acceptance row has actual supported-platform,

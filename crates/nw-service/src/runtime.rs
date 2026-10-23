@@ -1,5 +1,6 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
 mod uploads;
+mod clock;
 use nw_domain::{
     DomainError, Result,
     access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication},
@@ -51,6 +52,7 @@ pub struct Service {
     code_roots: Vec<PathBuf>,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
+    clock: clock::SessionClock,
     origins: Mutex<HashMap<String, u64>>,
     requests: Arc<Semaphore>,
     heavy: Arc<Semaphore>,
@@ -174,6 +176,7 @@ impl Service {
             engine,
             mutation: Mutex::new(()),
             credentials: Mutex::new(()),
+            clock: clock::SessionClock::default(),
             origins: Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
             heavy: Arc::new(Semaphore::new(1)),
@@ -337,6 +340,8 @@ impl Service {
         origin: Option<&str>,
         active: bool,
     ) -> Result<Context> {
+        let _guard = self.credentials.lock().map_err(|_| lock_error())?;
+        let now = self.clock.now()?;
         if token.len() > 256 {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
@@ -353,7 +358,6 @@ impl Service {
                 "Credential is missing or revoked",
             )
         })?;
-        let now = nw_platform::epoch_seconds();
         if credential.epoch != self.epoch
             || now >= credential.expires
             || now.saturating_sub(credential.last_active) >= 7200
@@ -399,7 +403,7 @@ impl Service {
     pub fn credential_for_origin(&self, name: &str, origin: Option<String>) -> Result<String> {
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let context = self.profile_context(name)?;
-        let now = nw_platform::epoch_seconds();
+        let now = self.clock.now()?;
         let mut live = 0;
         for (key, credential) in self.store.rows::<Credential>("credential/", 10000)? {
             if credential.epoch != self.epoch
@@ -790,6 +794,7 @@ impl Service {
                     state: JobState::Queued,
                     prepared_argv: None,
                     prepared_stages: Vec::new(),
+                    owned_staging: None,
                     artifact: None,
                     verification: None,
                     error: None,
@@ -1003,11 +1008,27 @@ impl Service {
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         match event {
+            ExecutionEvent::StagingIntent(intent) => {
+                self.store.execution_allowed(id)?;
+                if intent.job_id != id {
+                    return Err(DomainError::new("INVALID_JOB_TRANSITION", "Staging intent must match its accepted job"));
+                }
+                self.store.update_job(id, |job| {
+                    if job.owned_staging.is_some() {
+                        return Err(DomainError::new("INVALID_JOB_TRANSITION", "An accepted attempt already has staging intent"));
+                    }
+                    job.owned_staging = Some(intent);
+                    Ok(())
+                })?;
+            }
             ExecutionEvent::Prepared(argv) => {
                 self.store.execution_allowed(id)?;
                 self.store.update_job(id, |job| {
                     if job.prepared_stages.len() >= 32 {
-                        return Err(DomainError::new("RESOURCE_LIMIT", "Job prepared-stage budget reached"));
+                        return Err(DomainError::new(
+                            "RESOURCE_LIMIT",
+                            "Job prepared-stage budget reached",
+                        ));
                     }
                     if job.prepared_argv.is_none() {
                         job.prepared_argv = Some(argv.clone());

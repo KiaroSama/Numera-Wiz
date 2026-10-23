@@ -190,13 +190,21 @@ pub fn prepare_verified_copy(
     destination: &Path,
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
+    let output = output_path(destination)?;
+    let parent = output.parent().expect("validated parent");
+    let staging = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
+    copy_into_staging(expected, staging, cancel)
+}
+
+pub fn copy_into_staging(
+    expected: &FileIdentity,
+    mut staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
     let expected_bytes = expected
         .bytes
         .parse::<u64>()
         .map_err(|_| DomainError::new("INVALID_IDENTITY", "Invalid reviewed byte length"))?;
-    let output = output_path(destination)?;
-    let parent = output.parent().expect("validated parent");
-    let mut staging = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
     let mut input = File::open(&expected.path).map_err(io_error)?;
     let mut buffer = vec![0; 4 * 1024 * 1024];
     let mut copied = 0u64;

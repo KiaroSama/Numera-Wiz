@@ -62,7 +62,16 @@ pub async fn run(
     stdout_limit: usize,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
-    run_with_stdin(program, args, deadline, stdout_limit, Stdio::null(), None, cancel).await
+    run_with_stdin(
+        program,
+        args,
+        deadline,
+        stdout_limit,
+        Stdio::null(),
+        None,
+        cancel,
+    )
+    .await
 }
 
 /// Inherit an already-authorized regular file without losing seekability to a pipe.
@@ -75,9 +84,21 @@ pub async fn run_readonly(
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
-        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "A regular input file is required",
+        ));
     }
-    run_with_stdin(program, args, deadline, stdout_limit, Stdio::from(input), None, cancel).await
+    run_with_stdin(
+        program,
+        args,
+        deadline,
+        stdout_limit,
+        Stdio::from(input),
+        None,
+        cancel,
+    )
+    .await
 }
 
 pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
@@ -92,20 +113,45 @@ pub async fn stream_readonly(
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
-        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "A regular input file is required",
+        ));
     }
-    run_with_stdin(program, args, deadline, 0, Stdio::from(input), Some(consumer), cancel).await
+    run_with_stdin(
+        program,
+        args,
+        deadline,
+        0,
+        Stdio::from(input),
+        Some(consumer),
+        cancel,
+    )
+    .await
 }
 
-async fn consume<R: AsyncRead + Unpin>(mut reader: R, mut consumer: ChunkConsumer) -> Result<(Vec<u8>, u64)> {
+async fn consume<R: AsyncRead + Unpin>(
+    mut reader: R,
+    mut consumer: ChunkConsumer,
+) -> Result<(Vec<u8>, u64)> {
     let mut buffer = [0; 8192];
     let mut total = 0u64;
     loop {
-        let count = reader.read(&mut buffer).await.map_err(crate::files::io_error)?;
-        if count == 0 { return Ok((Vec::new(), total)); }
-        total = total.checked_add(count as u64).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Streamed stdout counter overflow"))?;
+        let count = reader
+            .read(&mut buffer)
+            .await
+            .map_err(crate::files::io_error)?;
+        if count == 0 {
+            return Ok((Vec::new(), total));
+        }
+        total = total.checked_add(count as u64).ok_or_else(|| {
+            DomainError::new("RESOURCE_LIMIT", "Streamed stdout counter overflow")
+        })?;
         if total > 4 * 1024 * 1024 * 1024 {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Streamed verification stdout exceeded 4 GiB"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Streamed verification stdout exceeded 4 GiB",
+            ));
         }
         consumer(&buffer[..count])?;
     }
@@ -178,9 +224,13 @@ async fn run_with_stdin(
         let result = if let Some(consumer) = consumer {
             consume(stdout, consumer).await
         } else {
-            capture(stdout, stdout_limit, false).await.map_err(crate::files::io_error)
+            capture(stdout, stdout_limit, false)
+                .await
+                .map_err(crate::files::io_error)
         };
-        if result.is_err() { failed.cancel(); }
+        if result.is_err() {
+            failed.cancel();
+        }
         result
     });
     let mut err_task = tokio::spawn(capture(stderr, 64 * 1024, true));
@@ -200,14 +250,17 @@ async fn run_with_stdin(
     }
     let status = match result {
         Err(error) if error.code == "PROCESS_OUTPUT_REJECTED" => {
-            return Err(out.ok().and_then(|joined| joined.ok()).and_then(|captured| captured.err()).unwrap_or(error));
+            return Err(out
+                .ok()
+                .and_then(|joined| joined.ok())
+                .and_then(|captured| captured.err())
+                .unwrap_or(error));
         }
         other => other?,
     };
     let (stdout, total) = out
         .map_err(|_| DomainError::new("PROCESS_CAPTURE_FAILED", "stdout drain deadline exceeded"))?
-        .map_err(|e| DomainError::new("PROCESS_CAPTURE_FAILED", e.to_string()))?
-        ?;
+        .map_err(|e| DomainError::new("PROCESS_CAPTURE_FAILED", e.to_string()))??;
     let (stderr, diagnostic_bytes) = err
         .map_err(|_| DomainError::new("PROCESS_CAPTURE_FAILED", "stderr drain deadline exceeded"))?
         .map_err(|e| DomainError::new("PROCESS_CAPTURE_FAILED", e.to_string()))?
