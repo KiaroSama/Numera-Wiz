@@ -141,9 +141,8 @@ pub struct CleanResolution {
 pub fn normalize_language(value: &str) -> String {
     let text = value.trim().to_lowercase();
     match text.as_str() {
-        "" | "unknown" | "unk" | "undefined" | "uknown" | "*uknown" | "none" | "null" | "n/a" | "und" => {
-            "und".into()
-        }
+        "" | "unknown" | "unk" | "undefined" | "uknown" | "*uknown" | "none" | "null" | "n/a"
+        | "und" => "und".into(),
         _ => text,
     }
 }
