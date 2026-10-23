@@ -676,9 +676,10 @@ impl Service {
                     .filter(|ch| ch.is_alphanumeric() || *ch == '-' || *ch == '_')
                     .take(80)
                     .collect::<String>();
+                let extension=Path::new(&asset.identity.path).extension().and_then(|value|value.to_str()).filter(|value|value.len()<=12 && value.bytes().all(|byte|byte.is_ascii_alphanumeric())).unwrap_or("mkv");
                 let output = self.path(
                     &context,
-                    &parent.join(format!("{stem}-clean-{}.mkv", Uuid::new_v4().simple())),
+                    &parent.join(format!("{stem}-clean-{}.{extension}", Uuid::new_v4().simple())),
                     true,
                 )?;
                 json!({"output":files::path_text(&output)?})

@@ -14,7 +14,7 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 16 actual owner handlers. This is partial initial
+The live registry now contains 17 actual owner handlers. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -81,3 +81,29 @@ No local source build/media test or owner GPU run has been executed. All ordinar
 validation continues in GitHub CI. Keep one implementation branch and draft PR #1;
 never merge/close, publish a release or claim the full product is complete without
 its actual interface/package/resource/owner evidence.
+
+
+## Hosted evidence after owner/UI integration
+
+Run [40031845966](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40031845966)
+on cc9d7fb9c8db830595c5ca7dfb698fddaf42d09a passed full native tests, Clippy,
+desktop builds with matching embedded WASM, provenance and schema checks on
+Windows, Ubuntu, macOS ARM64 and macOS Intel. Its actual CPU owner/official SDK
+media job also passed, including streamed HTTP intake -> canonical registration
+-> reviewed plan -> verified byte-identical output and cross-principal denial.
+The formatter changes from that run are retained. Its expanded Chrome UI test
+failed at the choose-file step; do not report that journey as qualified. The
+prior real browser boot/teardown evidence remains separately scoped. Current work
+uses Chrome's documented file-chooser interception and frame-separated actual
+pointer events to exercise the input, without invoking a domain handler in place
+of the UI. Continue through plan review, submission and independent output checks.
+
+Current resource guards reject oversized mutation results before their effects
+or receipts commit, avoid duplicate full JSON in MCP text content, and bound
+retained asset/job/profile/plan/receipt counts. Count quotas are backpressure,
+not completed retention, paging or garbage-collection behavior. UTF-8-invalid
+probe metadata now fails instead of silently changing preserved text. Public
+listener lifetime and credential audiences are separate from private jobs; one-use
+proofs must also bind their original listener lifetime. Full staging-intent crash
+recovery, source admission, packet/timing preservation and current access-model
+obligations remain open in T010-T023.
