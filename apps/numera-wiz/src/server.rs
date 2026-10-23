@@ -10,7 +10,6 @@ use axum::{
     routing::{get, post},
 };
 use nw_domain::commands;
-use http_body::Body as _;
 use nw_service::{Context, Service};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
@@ -20,11 +19,17 @@ use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{Arc, atomic::{AtomicUsize, Ordering}},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 use subtle::ConstantTimeEq;
-use tokio::{net::TcpListener, sync::{Mutex, Semaphore, OwnedSemaphorePermit}};
+use tokio::{
+    net::TcpListener,
+    sync::{Mutex, OwnedSemaphorePermit, Semaphore},
+};
 use tokio_util::sync::CancellationToken;
 
 struct Lease {
@@ -64,18 +69,47 @@ fn failure(status: StatusCode, code: &str, message: &str) -> Response {
     )
         .into_response()
 }
-struct Work { active: Arc<AtomicUsize>, _permit: OwnedSemaphorePermit }
-impl Drop for Work { fn drop(&mut self) { self.active.fetch_sub(1, Ordering::AcqRel); } }
-struct ActiveBody { body: std::pin::Pin<Box<axum::body::Body>>, _work: Work }
+struct Work {
+    active: Arc<AtomicUsize>,
+    _permit: OwnedSemaphorePermit,
+}
+impl Drop for Work {
+    fn drop(&mut self) {
+        self.active.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+struct ActiveBody {
+    body: std::pin::Pin<Box<axum::body::Body>>,
+    _work: Work,
+}
 impl http_body::Body for ActiveBody {
     type Data = bytes::Bytes;
     type Error = axum::Error;
-    fn poll_frame(self: std::pin::Pin<&mut Self>, context: &mut std::task::Context<'_>) -> std::task::Poll<Option<std::result::Result<http_body::Frame<Self::Data>, Self::Error>>> { self.get_mut().body.as_mut().poll_frame(context) }
-    fn is_end_stream(&self) -> bool { self.body.is_end_stream() }
-    fn size_hint(&self) -> http_body::SizeHint { self.body.size_hint() }
+    fn poll_frame(
+        self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<std::result::Result<http_body::Frame<Self::Data>, Self::Error>>>
+    {
+        self.get_mut().body.as_mut().poll_frame(context)
+    }
+    fn is_end_stream(&self) -> bool {
+        self.body.is_end_stream()
+    }
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.body.size_hint()
+    }
 }
 async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next) -> Response {
-    let permit = match auth.owner.slots.clone().try_acquire_owned() { Ok(permit) => permit, Err(_) => return failure(StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_LIMIT", "HTTP admission capacity reached") };
+    let permit = match auth.owner.slots.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "RESOURCE_LIMIT",
+                "HTTP admission capacity reached",
+            );
+        }
+    };
 
     if request
         .headers()
@@ -114,9 +148,17 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         auth.owner.service.owner()
     } else {
         let service = auth.owner.service.clone();
-        let origin = if auth.private { None } else { Some(auth.origin.clone()) };
+        let origin = if auth.private {
+            None
+        } else {
+            Some(auth.origin.clone())
+        };
         let active = !request.uri().path().ends_with("/lease") && request.uri().path() != "/health";
-        match tokio::task::spawn_blocking(move || service.authenticate_at(&supplied, origin.as_deref(), active)).await {
+        match tokio::task::spawn_blocking(move || {
+            service.authenticate_at(&supplied, origin.as_deref(), active)
+        })
+        .await
+        {
             Ok(Ok(context)) => context,
             _ => {
                 return failure(
@@ -129,10 +171,19 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
     };
     {
         let _lease_guard = auth.owner.leases.lock().await;
-        if auth.owner.stop.is_cancelled() { return failure(StatusCode::SERVICE_UNAVAILABLE, "OWNER_STOPPING", "Reconnect to a compatible owner"); }
+        if auth.owner.stop.is_cancelled() {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "OWNER_STOPPING",
+                "Reconnect to a compatible owner",
+            );
+        }
         auth.owner.active.fetch_add(1, Ordering::AcqRel);
     }
-    let work = Work { active: auth.owner.active.clone(), _permit: permit };
+    let work = Work {
+        active: auth.owner.active.clone(),
+        _permit: permit,
+    };
     if request.uri().path().starts_with("/internal/") && context.profile.is_some() {
         return failure(
             StatusCode::FORBIDDEN,
@@ -149,7 +200,12 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
     }
     if request.method() == axum::http::Method::POST {
         let (parts, body) = request.into_parts();
-        let bytes = match tokio::time::timeout(Duration::from_secs(10), axum::body::to_bytes(body, commands::MAX_COMMAND_BYTES)).await {
+        let bytes = match tokio::time::timeout(
+            Duration::from_secs(10),
+            axum::body::to_bytes(body, commands::MAX_COMMAND_BYTES),
+        )
+        .await
+        {
             Ok(Ok(bytes)) => bytes,
             _ => {
                 return failure(
@@ -178,8 +234,13 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         ),
     };
     let (parts, body) = response.into_parts();
-    Response::from_parts(parts, axum::body::Body::new(ActiveBody { body: Box::pin(body), _work: work }))
-
+    Response::from_parts(
+        parts,
+        axum::body::Body::new(ActiveBody {
+            body: Box::pin(body),
+            _work: work,
+        }),
+    )
 }
 async fn dispatch(
     State(owner): State<Arc<Owner>>,
@@ -251,7 +312,14 @@ async fn credential(
     Json(input): Json<nw_domain::access::CredentialInput>,
 ) -> Response {
     let service = owner.service.clone();
-    match tokio::task::spawn_blocking(move || service.credential_for_origin(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")))).await {
+    match tokio::task::spawn_blocking(move || {
+        service.credential_for_origin(
+            &input.profile,
+            input.port.map(|port| format!("http://127.0.0.1:{port}")),
+        )
+    })
+    .await
+    {
         Ok(Ok(bearer)) => Json(json!({"bearer":bearer,"expires_in_seconds":28800})).into_response(),
         Ok(Err(error)) => (StatusCode::FORBIDDEN, Json(json!({"error":error}))).into_response(),
         Err(_) => failure(
@@ -418,7 +486,10 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
             tokio::time::sleep(Duration::from_secs(1)).await;
             let mut leases = monitoring.leases.lock().await;
             leases.retain(|_, lease| lease.expires > Instant::now());
-            if monitoring.service.busy() || monitoring.active.load(Ordering::Acquire) != 0 || !leases.is_empty() {
+            if monitoring.service.busy()
+                || monitoring.active.load(Ordering::Acquire) != 0
+                || !leases.is_empty()
+            {
                 idle = Instant::now();
             }
             if idle.elapsed() >= Duration::from_secs(15) {
@@ -449,7 +520,10 @@ pub async fn serve(
         .internal("internal/public", json!({"port":port}))
         .await?;
     let issued = client
-        .internal("internal/credential", json!({"profile":profile,"port":port}))
+        .internal(
+            "internal/credential",
+            json!({"profile":profile,"port":port}),
+        )
         .await?;
     let token = issued["bearer"].as_str().context("Scoped bearer missing")?;
     nw_platform::security::write_private(&token_file, token.as_bytes(), false)?;
@@ -474,7 +548,9 @@ mod tests {
             .await
             .unwrap();
         let port = listener.local_addr().unwrap().port();
-        let token = service.credential_for_origin("agent", Some(format!("http://127.0.0.1:{port}"))).unwrap();
+        let token = service
+            .credential_for_origin("agent", Some(format!("http://127.0.0.1:{port}")))
+            .unwrap();
         let record = OwnerRecord {
             canonical_root: "unit".into(),
             root_id: service.store.root_id().into(),

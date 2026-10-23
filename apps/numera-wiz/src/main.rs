@@ -106,7 +106,9 @@ async fn run() -> Result<()> {
                 None => Box::new(std::io::stdin()),
             };
             let mut bytes = Vec::new();
-            input.take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64).read_to_end(&mut bytes)?;
+            input
+                .take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)?;
             if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
                 bail!("Request exceeds 1 MiB");
             }

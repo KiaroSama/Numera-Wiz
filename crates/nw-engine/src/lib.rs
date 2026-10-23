@@ -151,7 +151,10 @@ impl Engine {
         cancel: CancellationToken,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
         if plan.expires_at.parse::<u64>().unwrap_or(0) <= nw_platform::epoch_seconds() {
-            return Err(DomainError::new("PLAN_EXPIRED", "Review a fresh plan before accepting execution"));
+            return Err(DomainError::new(
+                "PLAN_EXPIRED",
+                "Review a fresh plan before accepting execution",
+            ));
         }
         self.execute_observed(
             plan,
