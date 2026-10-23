@@ -109,7 +109,11 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
     }
     let bytes = bytes?;
     let utf16 = bytes.starts_with(&[0xff, 0xfe]) || bytes.get(1) == Some(&0);
-    let offset = if bytes.starts_with(&[0xff, 0xfe]) { 2 } else { 0 };
+    let offset = if bytes.starts_with(&[0xff, 0xfe]) {
+        2
+    } else {
+        0
+    };
     let text = if utf16 {
         String::from_utf16(
             &bytes[offset..]
@@ -150,13 +154,24 @@ fn check_dacl(text: &str, sid: &str) -> Result<()> {
                 parts[5]
             )));
         }
-        if current && (parts[2] == "FA" || parts[2].strip_prefix("0x").is_some_and(|mask| u32::from_str_radix(mask, 16) == Ok(0x1f01ff))) {
+        if current
+            && (parts[2] == "FA"
+                || parts[2]
+                    .strip_prefix("0x")
+                    .is_some_and(|mask| u32::from_str_radix(mask, 16) == Ok(0x1f01ff)))
+        {
             own = true;
         }
         entries += 1;
     }
     if !own || entries == 0 {
-        return Err(denied(format!("Current user full-control ACL was not verified (entries={entries}); ACL evidence: {}", text.chars().take(512).flat_map(char::escape_debug).collect::<String>())));
+        return Err(denied(format!(
+            "Current user full-control ACL was not verified (entries={entries}); ACL evidence: {}",
+            text.chars()
+                .take(512)
+                .flat_map(char::escape_debug)
+                .collect::<String>()
+        )));
     }
     Ok(())
 }
