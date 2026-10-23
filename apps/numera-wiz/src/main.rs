@@ -178,7 +178,10 @@ async fn desktop(_client: NativeClient) -> Result<()> {
 #[cfg(feature = "desktop")]
 async fn desktop(client: NativeClient) -> Result<()> {
     client.attach().await?;
-    let port: std::sync::Arc<dyn nw_ui::CommandClient> = std::sync::Arc::new(NativeUiClient { client:client.clone(), runtime:tokio::runtime::Handle::current() });
+    let port: std::sync::Arc<dyn nw_ui::CommandClient> = std::sync::Arc::new(NativeUiClient {
+        client: client.clone(),
+        runtime: tokio::runtime::Handle::current(),
+    });
     let session = uuid::Uuid::new_v4().simple().to_string();
     let lease = uuid::Uuid::new_v4().to_string();
     client
@@ -218,11 +221,20 @@ async fn desktop(client: NativeClient) -> Result<()> {
 }
 
 #[cfg(feature = "desktop")]
-struct NativeUiClient { client:NativeClient, runtime:tokio::runtime::Handle }
+struct NativeUiClient {
+    client: NativeClient,
+    runtime: tokio::runtime::Handle,
+}
 #[cfg(feature = "desktop")]
 impl nw_ui::CommandClient for NativeUiClient {
-    fn send(&self, request:Request, reply:nw_ui::Reply) {
-        let client=self.client.clone();
-        self.runtime.spawn(async move {let response=client.request(&request).await.map_err(|error|error.to_string());reply(response);});
+    fn send(&self, request: Request, reply: nw_ui::Reply) {
+        let client = self.client.clone();
+        self.runtime.spawn(async move {
+            let response = client
+                .request(&request)
+                .await
+                .map_err(|error| error.to_string());
+            reply(response);
+        });
     }
 }

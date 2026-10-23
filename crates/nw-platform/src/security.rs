@@ -116,8 +116,16 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
     };
     let text = if utf16 {
         let (words, remainder) = bytes[offset..].as_chunks::<2>();
-        if !remainder.is_empty() { return Err(denied("Invalid odd-byte UTF-16 ACL evidence")); }
-        String::from_utf16(&words.iter().map(|word|u16::from_le_bytes(*word)).collect::<Vec<_>>()).map_err(io_error)?
+        if !remainder.is_empty() {
+            return Err(denied("Invalid odd-byte UTF-16 ACL evidence"));
+        }
+        String::from_utf16(
+            &words
+                .iter()
+                .map(|word| u16::from_le_bytes(*word))
+                .collect::<Vec<_>>(),
+        )
+        .map_err(io_error)?
     } else {
         String::from_utf8(bytes).map_err(io_error)?
     };

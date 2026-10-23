@@ -1,60 +1,193 @@
 //! Human controls lower into the same typed cleanup intent as machine adapters.
 use crate::{Action, WizApp};
 use eframe::egui;
-use nw_domain::{mux::{CleanIntent, NoMatch, Selector, StreamKind, StreamTagPatch, TagPatch}, records::Asset};
+use nw_domain::{
+    mux::{CleanIntent, NoMatch, Selector, StreamKind, StreamTagPatch, TagPatch},
+    records::Asset,
+};
 use serde_json::json;
 
-pub fn file_name(path: &str) -> &str { path.rsplit(['/', '\\']).next().unwrap_or(path) }
+pub fn file_name(path: &str) -> &str {
+    path.rsplit(['/', '\\']).next().unwrap_or(path)
+}
 pub fn suggest_output(path: &str) -> String {
-    let split = path.rfind(['/', '\\']).map_or(0, |at|at + 1);
-    let (directory,name) = path.split_at(split);
-    match name.rsplit_once('.') { Some((stem,extension)) => format!("{directory}{stem}.cleaned.{extension}"), None => format!("{directory}{name}.cleaned.mkv") }
+    let split = path.rfind(['/', '\\']).map_or(0, |at| at + 1);
+    let (directory, name) = path.split_at(split);
+    match name.rsplit_once('.') {
+        Some((stem, extension)) => format!("{directory}{stem}.cleaned.{extension}"),
+        None => format!("{directory}{name}.cleaned.mkv"),
+    }
 }
 #[derive(Default)]
-pub struct PatchForm { kind:usize, indices:String, languages:String, language_mode:usize, language:String, title_mode:usize, title:String }
-fn indices(text:&str) -> Result<Vec<u32>,String> {
-    text.split(',').map(str::trim).filter(|value|!value.is_empty()).map(|value|value.parse::<u32>().map_err(|_|format!("Invalid original stream index: {value}"))).collect()
+pub struct PatchForm {
+    kind: usize,
+    indices: String,
+    languages: String,
+    language_mode: usize,
+    language: String,
+    title_mode: usize,
+    title: String,
 }
-fn values(text:&str) -> Vec<String> { text.split(',').map(str::trim).filter(|value|!value.is_empty()).map(str::to_owned).collect() }
-fn selector(mode:usize,text:&str) -> Result<Selector,String> {
-    Ok(match mode { 0 => Selector::All, 1 => Selector::None, 2 => Selector::Languages {values:values(text)}, 3 => Selector::SourceIndices { values:indices(text)? }, _ => Selector::TitleContainsAny {values:text.lines().map(str::trim).filter(|value|!value.is_empty()).map(str::to_owned).collect()} })
+fn indices(text: &str) -> Result<Vec<u32>, String> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| format!("Invalid original stream index: {value}"))
+        })
+        .collect()
 }
-fn selection(ui:&mut egui::Ui, id:&str, mode:&mut usize, text:&mut String, no_match:&mut NoMatch) -> bool {
+fn values(text: &str) -> Vec<String> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+fn selector(mode: usize, text: &str) -> Result<Selector, String> {
+    Ok(match mode {
+        0 => Selector::All,
+        1 => Selector::None,
+        2 => Selector::Languages {
+            values: values(text),
+        },
+        3 => Selector::SourceIndices {
+            values: indices(text)?,
+        },
+        _ => Selector::TitleContainsAny {
+            values: text
+                .lines()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+                .collect(),
+        },
+    })
+}
+fn selection(
+    ui: &mut egui::Ui,
+    id: &str,
+    mode: &mut usize,
+    text: &mut String,
+    no_match: &mut NoMatch,
+) -> bool {
     let mut changed = false;
-    let choices = ["All tracks","No tracks","Exact language codes","Original stream indices","Title contains"];
+    let choices = [
+        "All tracks",
+        "No tracks",
+        "Exact language codes",
+        "Original stream indices",
+        "Title contains",
+    ];
     ui.horizontal(|ui| {
-        egui::ComboBox::from_id_salt(id).selected_text(choices[*mode]).show_ui(ui,|ui| { for (index,label) in choices.iter().enumerate() { changed |= ui.selectable_value(mode,index,*label).changed(); } });
-        if *mode > 1 { changed |= ui.add(egui::TextEdit::singleline(text).char_limit(4096).hint_text(if *mode == 3 {"Indices: 0, 2, 5"} else if *mode == 2 {"Codes: eng, fas, und"} else {"Original title contains"})).changed(); }
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(choices[*mode])
+            .show_ui(ui, |ui| {
+                for (index, label) in choices.iter().enumerate() {
+                    changed |= ui.selectable_value(mode, index, *label).changed();
+                }
+            });
+        if *mode > 1 {
+            changed |=
+                ui.add(egui::TextEdit::singleline(text).char_limit(4096).hint_text(
+                    if *mode == 3 {
+                        "Indices: 0, 2, 5"
+                    } else if *mode == 2 {
+                        "Codes: eng, fas, und"
+                    } else {
+                        "Original title contains"
+                    },
+                ))
+                .changed();
+        }
     });
     ui.horizontal(|ui| {
         ui.small("When the requested selection matches nothing:");
-        egui::ComboBox::from_id_salt((id,"no-match")).selected_text(match no_match {NoMatch::SkipFile=>"Skip file",NoMatch::AllowEmpty=>"Allow empty",NoMatch::Reject=>"Reject"}).show_ui(ui,|ui| {
-            changed |= ui.selectable_value(no_match,NoMatch::SkipFile,"Skip file").changed();
-            changed |= ui.selectable_value(no_match,NoMatch::AllowEmpty,"Allow empty").changed();
-            changed |= ui.selectable_value(no_match,NoMatch::Reject,"Reject").changed();
-        });
+        egui::ComboBox::from_id_salt((id, "no-match"))
+            .selected_text(match no_match {
+                NoMatch::SkipFile => "Skip file",
+                NoMatch::AllowEmpty => "Allow empty",
+                NoMatch::Reject => "Reject",
+            })
+            .show_ui(ui, |ui| {
+                changed |= ui
+                    .selectable_value(no_match, NoMatch::SkipFile, "Skip file")
+                    .changed();
+                changed |= ui
+                    .selectable_value(no_match, NoMatch::AllowEmpty, "Allow empty")
+                    .changed();
+                changed |= ui
+                    .selectable_value(no_match, NoMatch::Reject, "Reject")
+                    .changed();
+            });
     });
     changed
 }
-fn tag(ui:&mut egui::Ui,id:impl std::hash::Hash,label:&str,mode:&mut usize,text:&mut String)->bool {
+fn tag(
+    ui: &mut egui::Ui,
+    id: impl std::hash::Hash,
+    label: &str,
+    mode: &mut usize,
+    text: &mut String,
+) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(label);
-        egui::ComboBox::from_id_salt(id).selected_text(["Keep","Set","Clear"][*mode]).show_ui(ui,|ui| { for (index,label) in ["Keep","Set","Clear"].iter().enumerate() {changed |= ui.selectable_value(mode,index,*label).changed();} });
-        if *mode == 1 {changed |= ui.add(egui::TextEdit::singleline(text).char_limit(4096).desired_width(200.0)).changed();}
-    }); changed
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(["Keep", "Set", "Clear"][*mode])
+            .show_ui(ui, |ui| {
+                for (index, label) in ["Keep", "Set", "Clear"].iter().enumerate() {
+                    changed |= ui.selectable_value(mode, index, *label).changed();
+                }
+            });
+        if *mode == 1 {
+            changed |= ui
+                .add(
+                    egui::TextEdit::singleline(text)
+                        .char_limit(4096)
+                        .desired_width(200.0),
+                )
+                .changed();
+        }
+    });
+    changed
 }
-fn patch(mode:usize,text:&str)->TagPatch { match mode {1=>TagPatch::Set{value:text.into()},2=>TagPatch::Clear,_=>TagPatch::Keep} }
+fn patch(mode: usize, text: &str) -> TagPatch {
+    match mode {
+        1 => TagPatch::Set { value: text.into() },
+        2 => TagPatch::Clear,
+        _ => TagPatch::Keep,
+    }
+}
 impl WizApp {
-    fn normalized_intent(&self) -> Result<CleanIntent,String> {
+    fn normalized_intent(&self) -> Result<CleanIntent, String> {
         let mut intent = self.intent.clone();
-        intent.audio_selection.selector = selector(self.audio_mode,&self.audio_values)?;
-        intent.subtitle_selection.selector = selector(self.subtitle_mode,&self.subtitle_values)?;
-        intent.audio_order = indices(&self.audio_order)?; intent.subtitle_order = indices(&self.subtitle_order)?;
-        intent.stream_tag_patches = self.patches.iter().map(|form| Ok(StreamTagPatch { kind:if form.kind == 0 {StreamKind::Audio} else {StreamKind::Subtitle}, source_indices:indices(&form.indices)?, original_languages:values(&form.languages), language:patch(form.language_mode,&form.language), title:patch(form.title_mode,&form.title) })).collect::<Result<Vec<_>,String>>()?;
+        intent.audio_selection.selector = selector(self.audio_mode, &self.audio_values)?;
+        intent.subtitle_selection.selector = selector(self.subtitle_mode, &self.subtitle_values)?;
+        intent.audio_order = indices(&self.audio_order)?;
+        intent.subtitle_order = indices(&self.subtitle_order)?;
+        intent.stream_tag_patches = self
+            .patches
+            .iter()
+            .map(|form| {
+                Ok(StreamTagPatch {
+                    kind: if form.kind == 0 {
+                        StreamKind::Audio
+                    } else {
+                        StreamKind::Subtitle
+                    },
+                    source_indices: indices(&form.indices)?,
+                    original_languages: values(&form.languages),
+                    language: patch(form.language_mode, &form.language),
+                    title: patch(form.title_mode, &form.title),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         Ok(intent)
     }
-    pub(super) fn cleanup(&mut self,ui:&mut egui::Ui,asset:&Asset) {
+    pub(super) fn cleanup(&mut self, ui: &mut egui::Ui, asset: &Asset) {
         ui.strong(file_name(&asset.identity.path));
         egui::ScrollArea::vertical().id_salt("cleanup-form").show(ui,|ui| {
             egui::CollapsingHeader::new("Original stream inventory").default_open(true).show(ui,|ui| {
@@ -115,19 +248,56 @@ impl WizApp {
             }
         });
     }
-    pub(super) fn plan_panel(&mut self, ui:&mut egui::Ui) {
+    pub(super) fn plan_panel(&mut self, ui: &mut egui::Ui) {
         ui.heading("Plan review");
-        let Some(plan) = self.plan.clone() else {ui.label("Prepare a plan after selecting streams and an output. Running a job requires this review.");return;};
-        egui::ScrollArea::vertical().id_salt("plan-review").show(ui,|ui| {
-            ui.strong(format!("{:?}",plan.resolution.action));
-            ui.label("Source");ui.label(&plan.source.identity.path);
-            ui.label("Destination");ui.label(&plan.output);
-            ui.separator();
-            for outcome in &plan.resolution.outcomes {ui.label(match outcome.output_index { Some(index)=>format!("Source {} → output {}",outcome.source_index,index),None=>format!("Source {} removed",outcome.source_index) });ui.small(&outcome.reason);}
-            for warning in &plan.resolution.warnings {ui.colored_label(egui::Color32::from_rgb(237,177,99),warning);}
-            ui.separator();ui.label(&plan.verification_scope);
-            egui::CollapsingHeader::new("Invocation and identity").show(ui,|ui| {ui.small(format!("Plan {}",plan.id));ui.monospace(&plan.hash);for argument in &plan.argv_template{ui.monospace(argument);}});
-            if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Run reviewed plan")).clicked() {self.mutate("jobs.submit",json!({"plan_id":plan.id,"plan_hash":plan.hash}),Action::Submit,ui.ctx());}
-        });
+        let Some(plan) = self.plan.clone() else {
+            ui.label("Prepare a plan after selecting streams and an output. Running a job requires this review.");
+            return;
+        };
+        egui::ScrollArea::vertical()
+            .id_salt("plan-review")
+            .show(ui, |ui| {
+                ui.strong(format!("{:?}", plan.resolution.action));
+                ui.label("Source");
+                ui.label(&plan.source.identity.path);
+                ui.label("Destination");
+                ui.label(&plan.output);
+                ui.separator();
+                for outcome in &plan.resolution.outcomes {
+                    ui.label(match outcome.output_index {
+                        Some(index) => {
+                            format!("Source {} → output {}", outcome.source_index, index)
+                        }
+                        None => format!("Source {} removed", outcome.source_index),
+                    });
+                    ui.small(&outcome.reason);
+                }
+                for warning in &plan.resolution.warnings {
+                    ui.colored_label(egui::Color32::from_rgb(237, 177, 99), warning);
+                }
+                ui.separator();
+                ui.label(&plan.verification_scope);
+                egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
+                    ui.small(format!("Plan {}", plan.id));
+                    ui.monospace(&plan.hash);
+                    for argument in &plan.argv_template {
+                        ui.monospace(argument);
+                    }
+                });
+                if ui
+                    .add_enabled(
+                        !self.waiting && self.pending.is_none(),
+                        egui::Button::new("Run reviewed plan"),
+                    )
+                    .clicked()
+                {
+                    self.mutate(
+                        "jobs.submit",
+                        json!({"plan_id":plan.id,"plan_hash":plan.hash}),
+                        Action::Submit,
+                        ui.ctx(),
+                    );
+                }
+            });
     }
 }
