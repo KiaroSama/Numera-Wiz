@@ -1,6 +1,7 @@
 //! One owner process serves private IPC and the explicitly enabled public listener.
 use crate::client::{OwnerRecord, registry_fingerprint};
 mod browser;
+mod uploads;
 use anyhow::{Context as _, Result};
 use axum::{
     Json, Router,
@@ -45,7 +46,7 @@ pub struct Owner {
     stop: CancellationToken,
     active: Arc<AtomicUsize>,
     slots: Arc<Semaphore>,
-    pairing: Mutex<HashMap<String,browser::Pairing>>,
+    pairing: Mutex<HashMap<String, browser::Pairing>>,
 }
 #[derive(Clone)]
 struct Auth {
@@ -227,7 +228,8 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
     request.extensions_mut().insert(context);
-    let response = match tokio::time::timeout(Duration::from_secs(130), next.run(request)).await {
+    let deadline=if request.method()==axum::http::Method::PUT && request.uri().path().starts_with("/api/v1/uploads/"){900}else{130};
+    let response = match tokio::time::timeout(Duration::from_secs(deadline), next.run(request)).await {
         Ok(response) => response,
         Err(_) => failure(
             StatusCode::REQUEST_TIMEOUT,
@@ -266,7 +268,13 @@ async fn lease(
     axum::Extension(context): axum::Extension<Context>,
     Json(input): Json<LeaseInput>,
 ) -> Response {
-    if owner.service.client_lease_allowed(&context).is_err(){return failure(StatusCode::FORBIDDEN,"PERMISSION_DENIED","Profile does not admit editor-client leases");}
+    if owner.service.client_lease_allowed(&context).is_err() {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Profile does not admit editor-client leases",
+        );
+    }
     if uuid::Uuid::parse_str(&input.id).is_err() {
         return failure(
             StatusCode::BAD_REQUEST,
@@ -365,14 +373,18 @@ fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
                 },
             ),
         )
-        .route("/api/v1/lease", post(lease)).route("/api/v1/session", post(health))
+        .route("/api/v1/uploads", post(uploads::create))
+        .route("/api/v1/uploads/{id}", axum::routing::put(uploads::receive))
+        .route("/api/v1/lease", post(lease))
+        .route("/api/v1/session", post(health))
         .route("/health", get(health))
         .nest_service("/mcp", mcp);
     if private {
         router = router
             .route("/internal/credential", post(credential))
             .route("/internal/lease", post(lease))
-            .route("/internal/public", post(public)).route("/internal/pair", post(browser::create_pairing));
+            .route("/internal/public", post(public))
+            .route("/internal/pair", post(browser::create_pairing));
     }
     let routes = router
         .layer(DefaultBodyLimit::max(commands::MAX_COMMAND_BYTES))
@@ -386,8 +398,20 @@ fn router(owner: Arc<Owner>, port: u16, private: bool) -> Router {
             authenticate,
         ))
         .with_state(owner.clone());
-    let routes = if private {routes} else {routes.merge(crate::web_assets::router()).merge(browser::routes(owner.clone()))};
-    routes.layer(middleware::from_fn_with_state(browser::OriginGuard {host:format!("127.0.0.1:{port}"),origin:format!("http://127.0.0.1:{port}")},browser::secure_headers))
+    let routes = if private {
+        routes
+    } else {
+        routes
+            .merge(crate::web_assets::router())
+            .merge(browser::routes(owner.clone()))
+    };
+    routes.layer(middleware::from_fn_with_state(
+        browser::OriginGuard {
+            host: format!("127.0.0.1:{port}"),
+            origin: format!("http://127.0.0.1:{port}"),
+        },
+        browser::secure_headers,
+    ))
 }
 async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>) -> Response {
     if input.port == 0 {
@@ -512,8 +536,13 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
     tracing::info!("Owner idle grace completed");
     Ok(())
 }
-pub async fn serve(client:crate::client::NativeClient,port:u16,token_file:PathBuf,profile:String)->Result<()>{
-    serve_browser(client,port,Some(token_file),profile,false).await
+pub async fn serve(
+    client: crate::client::NativeClient,
+    port: u16,
+    token_file: PathBuf,
+    profile: String,
+) -> Result<()> {
+    serve_browser(client, port, Some(token_file), profile, false).await
 }
 pub async fn serve_browser(
     client: crate::client::NativeClient,
@@ -522,7 +551,11 @@ pub async fn serve_browser(
     profile: String,
     open_browser: bool,
 ) -> Result<()> {
-    if token_file.is_none() && !open_browser {anyhow::bail!("Choose --open-browser for paired UI or --token-file for a scoped HTTP client");}
+    if token_file.is_none() && !open_browser {
+        anyhow::bail!(
+            "Choose --open-browser for paired UI or --token-file for a scoped HTTP client"
+        );
+    }
     let lease = uuid::Uuid::new_v4().to_string();
     client
         .internal("internal/lease", json!({"id":lease}))
@@ -530,13 +563,20 @@ pub async fn serve_browser(
     let endpoint = client
         .internal("internal/public", json!({"port":port}))
         .await?;
-    if let Some(token_file)=token_file {
-        let issued=client.internal("internal/credential",json!({"profile":profile,"port":port})).await?;
-        let token=issued["bearer"].as_str().context("Scoped bearer missing")?;
-        nw_platform::security::write_private(&token_file,token.as_bytes(),false)?;
+    if let Some(token_file) = token_file {
+        let issued = client
+            .internal(
+                "internal/credential",
+                json!({"profile":profile,"port":port}),
+            )
+            .await?;
+        let token = issued["bearer"].as_str().context("Scoped bearer missing")?;
+        nw_platform::security::write_private(&token_file, token.as_bytes(), false)?;
     }
     if open_browser {
-        let paired=client.internal("internal/pair",json!({"profile":profile})).await?;
+        let paired = client
+            .internal("internal/pair", json!({"profile":profile}))
+            .await?;
         browser::launch(paired["url"].as_str().context("Pairing URL missing")?).await?;
     }
     tracing::info!(endpoint=%endpoint["endpoint"],"Scoped HTTP API/MCP ready; credential omitted");
@@ -580,7 +620,7 @@ mod tests {
             stop: CancellationToken::new(),
             active: Arc::new(AtomicUsize::new(0)),
             slots: Arc::new(Semaphore::new(32)),
-        pairing: Mutex::new(HashMap::new()),
+            pairing: Mutex::new(HashMap::new()),
         });
         let routes = router(owner, port, false);
         let task = tokio::spawn(async move {

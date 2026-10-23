@@ -1,4 +1,5 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
+mod uploads;
 use nw_domain::{
     DomainError, Result,
     access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication},
@@ -44,6 +45,7 @@ pub struct Service {
     pub store: Arc<Store>,
     pub epoch: String,
     engine: Option<Engine>,
+    root: PathBuf,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
     requests: Arc<Semaphore>,
@@ -116,6 +118,7 @@ impl Service {
         let (events, _) = broadcast::channel(128);
         let service = Arc::new(Self {
             store: Arc::new(store),
+            root:selected_root,
             epoch: Uuid::new_v4().to_string(),
             engine,
             mutation: Mutex::new(()),
@@ -127,7 +130,7 @@ impl Service {
             events,
         });
         let recovering = service.clone();
-        tokio::task::spawn_blocking(move || recovering.recover())
+        tokio::task::spawn_blocking(move || {recovering.recover_uploads()?;recovering.recover()})
             .await
             .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
         for job in service.store.list::<Job>("job/", 10000)? {
@@ -507,14 +510,15 @@ impl Service {
                 value(&runtime.block_on(self.engine()?.probe(&path, cancellation.clone()))?)?
             }
             "assets.register" => {
-                let input: PathInput = commands::parse(params)?;
-                let path = self.path(&context, Path::new(&input.path), false)?;
-                let asset = runtime.block_on(self.engine()?.register(
-                    path,
-                    context.principal.clone(),
-                    cancellation.clone(),
-                ))?;
-                self.path(&context, Path::new(&asset.identity.path), false)?;
+                let input:nw_domain::ingest::RegisterInput=commands::parse(params)?;
+                let (path,display_name)=match (input.path,input.upload_id) {
+                    (Some(path),None)=>(self.path(&context,Path::new(&path),false)?,String::new()),
+                    (None,Some(id))=>self.resolve_upload(&context,&id)?,
+                    _=>return Err(DomainError::new("VALIDATION_ERROR","Select exactly one native path or verified upload_id")),
+                };
+                let mut asset=runtime.block_on(self.engine()?.register(path,context.principal.clone(),cancellation.clone()))?;
+                asset.display_name=display_name;
+                self.path(&context,Path::new(&asset.identity.path),false)?;
                 return self.store.commit(
                     &context.principal,
                     &request,
@@ -888,6 +892,7 @@ mod tests {
         let service = Service::open(root.path().join("data"), None).await.unwrap();
         let owner = service.owner();
         let asset = Asset {
+            display_name: String::new(),
             id: "owned-asset".into(),
             creator: owner.principal.clone(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),

@@ -33,3 +33,5 @@ pub type Result<T> = std::result::Result<T, DomainError>;
 
 pub mod access;
 pub mod records;
+
+pub mod ingest;

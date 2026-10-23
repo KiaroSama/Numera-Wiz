@@ -103,6 +103,7 @@ impl Engine {
         let expected = initial.clone();
         blocking(move || files::revalidate(&expected, &cancel)).await?;
         Ok(Asset {
+            display_name: String::new(),
             id: Uuid::new_v4().to_string(),
             creator,
             identity: initial,

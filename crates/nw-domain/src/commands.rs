@@ -253,9 +253,9 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "assets.register",
-            "Register a source identity",
+            "Register a native source or verified intake",
             DurableMutation,
-            PathInput
+            crate::ingest::RegisterInput
         ),
         row!(
             "streams.clean.resolve",

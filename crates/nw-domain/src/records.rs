@@ -20,6 +20,8 @@ pub struct MediaProbe {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Asset {
+    #[serde(default)]
+    pub display_name: String,
     pub id: String,
     pub creator: String,
     pub identity: FileIdentity,
