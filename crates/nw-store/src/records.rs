@@ -28,9 +28,14 @@ impl Store {
             .transpose()
     }
     pub fn list<T: DeserializeOwned>(&self, prefix: &str, limit: usize) -> Result<Vec<T>> {
-        self.rows(prefix, limit).map(|rows| rows.into_iter().map(|(_, value)| value).collect())
+        self.rows(prefix, limit)
+            .map(|rows| rows.into_iter().map(|(_, value)| value).collect())
     }
-    pub fn rows<T: DeserializeOwned>(&self, prefix: &str, limit: usize) -> Result<Vec<(String, T)>> {
+    pub fn rows<T: DeserializeOwned>(
+        &self,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<(String, T)>> {
         valid_key(prefix)?;
         if limit == 0 || limit > 10000 {
             return Err(DomainError::new(
@@ -59,7 +64,10 @@ impl Store {
     pub fn remove(&self, key: &str) -> Result<()> {
         valid_key(key)?;
         let write = self.db.begin_write().map_err(storage)?;
-        { let mut table = write.open_table(RECORDS).map_err(storage)?; table.remove(key).map_err(storage)?; }
+        {
+            let mut table = write.open_table(RECORDS).map_err(storage)?;
+            table.remove(key).map_err(storage)?;
+        }
         write.commit().map_err(storage)
     }
     pub fn put(&self, key: &str, value: &impl Serialize) -> Result<()> {

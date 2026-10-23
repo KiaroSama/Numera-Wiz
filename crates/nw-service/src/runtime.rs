@@ -227,8 +227,15 @@ impl Service {
             )
         })
     }
-    pub fn authenticate(&self, token: &str) -> Result<Context> { self.authenticate_at(token, None, true) }
-    pub fn authenticate_at(&self, token: &str, origin: Option<&str>, active: bool) -> Result<Context> {
+    pub fn authenticate(&self, token: &str) -> Result<Context> {
+        self.authenticate_at(token, None, true)
+    }
+    pub fn authenticate_at(
+        &self,
+        token: &str,
+        origin: Option<&str>,
+        active: bool,
+    ) -> Result<Context> {
         if token.len() > 256 {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
@@ -246,27 +253,47 @@ impl Service {
             )
         })?;
         let now = nw_platform::epoch_seconds();
-        if credential.epoch != self.epoch || now >= credential.expires || now.saturating_sub(credential.last_active) >= 7200 || credential.origin.as_deref() != origin {
+        if credential.epoch != self.epoch
+            || now >= credential.expires
+            || now.saturating_sub(credential.last_active) >= 7200
+            || credential.origin.as_deref() != origin
+        {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
                 "Credential expired or owner epoch changed",
             ));
         }
         self.policy(&credential.context)?;
-        if active && now > credential.last_active { credential.last_active = now; self.store.put(&key, &credential)?; }
+        if active && now > credential.last_active {
+            credential.last_active = now;
+            self.store.put(&key, &credential)?;
+        }
         Ok(credential.context)
     }
-    pub fn credential(&self, name: &str) -> Result<String> { self.credential_for_origin(name, None) }
+    pub fn credential(&self, name: &str) -> Result<String> {
+        self.credential_for_origin(name, None)
+    }
     pub fn credential_for_origin(&self, name: &str, origin: Option<String>) -> Result<String> {
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let context = self.profile_context(name)?;
         let now = nw_platform::epoch_seconds();
         let mut live = 0;
         for (key, credential) in self.store.rows::<Credential>("credential/", 10000)? {
-            if credential.epoch != self.epoch || credential.expires <= now || now.saturating_sub(credential.last_active) >= 7200 { self.store.remove(&key)?; }
-            else if credential.context.principal == context.principal { live += 1; }
+            if credential.epoch != self.epoch
+                || credential.expires <= now
+                || now.saturating_sub(credential.last_active) >= 7200
+            {
+                self.store.remove(&key)?;
+            } else if credential.context.principal == context.principal {
+                live += 1;
+            }
         }
-        if live >= 32 { return Err(DomainError::new("RESOURCE_LIMIT", "Profile credential quota reached")); }
+        if live >= 32 {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Profile credential quota reached",
+            ));
+        }
         let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         let key = format!(
             "credential/{}",
@@ -769,7 +796,13 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
-    async fn mutate(service: &Arc<Service>, context: &Context, scope: &str, id: &str, params: Value) -> Response {
+    async fn mutate(
+        service: &Arc<Service>,
+        context: &Context,
+        scope: &str,
+        id: &str,
+        params: Value,
+    ) -> Response {
         let mut request = Request::query(id, params);
         request.replay_scope = Some(scope.into());
         request.idempotency_key = Some(Uuid::new_v4().to_string());
@@ -780,9 +813,16 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let service = Service::open(root.path().to_owned(), None).await.unwrap();
         let owner = service.owner();
-        let scope = service.store.issue_scope(&owner.principal, nw_platform::epoch_seconds()).unwrap();
-        let mut create = Request::query("access.profiles.put", json!({"name":"operator","expected_revision":null,"enabled":true,"commands":["commands.list"],"objects":[],"read_roots":[],"write_roots":[]}));
-        create.replay_scope = Some(scope.clone()); create.idempotency_key = Some("stable-create".into());
+        let scope = service
+            .store
+            .issue_scope(&owner.principal, nw_platform::epoch_seconds())
+            .unwrap();
+        let mut create = Request::query(
+            "access.profiles.put",
+            json!({"name":"operator","expected_revision":null,"enabled":true,"commands":["commands.list"],"objects":[],"read_roots":[],"write_roots":[]}),
+        );
+        create.replay_scope = Some(scope.clone());
+        create.idempotency_key = Some("stable-create".into());
         let accepted = service.dispatch(owner.clone(), create.clone()).await;
         assert!(accepted.ok, "{:?}", accepted.error);
         let token = service.credential("operator").unwrap();
@@ -794,44 +834,120 @@ mod tests {
         assert_eq!(accepted.receipt_id, replay.receipt_id);
         assert_eq!(replay.result.unwrap()["revision"], 1);
         let current: AccessProfile = service.store.get("profile/operator").unwrap().unwrap();
-        assert_eq!(current.revision, 2); assert!(!current.enabled); assert_eq!(current.principal, principal);
+        assert_eq!(current.revision, 2);
+        assert!(!current.enabled);
+        assert_eq!(current.principal, principal);
         create.params["enabled"] = json!(false);
-        assert_eq!(service.dispatch(owner, create).await.error.unwrap().code, "IDEMPOTENCY_CONFLICT");
+        assert_eq!(
+            service.dispatch(owner, create).await.error.unwrap().code,
+            "IDEMPOTENCY_CONFLICT"
+        );
     }
     #[tokio::test]
     async fn file_grants_and_object_rights_are_checked_independently() {
         let root = tempfile::tempdir().unwrap();
-        let source = root.path().join("source.bin"); std::fs::write(&source, b"unit fixture").unwrap();
+        let source = root.path().join("source.bin");
+        std::fs::write(&source, b"unit fixture").unwrap();
         let service = Service::open(root.path().join("data"), None).await.unwrap();
         let owner = service.owner();
-        let asset = Asset { id:"owned-asset".into(), creator:owner.principal.clone(), identity:files::identity(&source, &CancellationToken::new()).unwrap(), probe:nw_domain::records::MediaProbe { streams:vec![], format:"unit-only".into(), global_tags:Default::default(), chapters:json!([]), verification_scope:"authorization fixture only".into() } };
-        service.store.put("asset/owned-asset", &asset).unwrap();
-        let scope = service.store.issue_scope(&owner.principal, nw_platform::epoch_seconds()).unwrap();
-        let profile = json!({"name":"reader","expected_revision":null,"enabled":true,"commands":["assets.list","streams.clean"],"objects":[],"read_roots":[root.path().to_str().unwrap()],"write_roots":[root.path().to_str().unwrap()]});
-        assert!(mutate(&service, &owner, &scope, "access.profiles.put", profile).await.ok);
-        let reader = service.profile_context("reader").unwrap();
-        assert_eq!(service.dispatch(reader.clone(), Request::query("assets.list", json!({}))).await.result.unwrap(), json!([]));
-        let intent = nw_domain::mux::CleanIntent {
-            audio_selection: nw_domain::mux::Selection { selector: nw_domain::mux::Selector::All, no_match: nw_domain::mux::NoMatch::SkipFile },
-            subtitle_selection: nw_domain::mux::Selection { selector: nw_domain::mux::Selector::All, no_match: nw_domain::mux::NoMatch::AllowEmpty },
-            audio_order: vec![], subtitle_order: vec![], stream_tag_patches: vec![], preservation: nw_domain::mux::Preservation::default(),
+        let asset = Asset {
+            id: "owned-asset".into(),
+            creator: owner.principal.clone(),
+            identity: files::identity(&source, &CancellationToken::new()).unwrap(),
+            probe: nw_domain::records::MediaProbe {
+                streams: vec![],
+                format: "unit-only".into(),
+                global_tags: Default::default(),
+                chapters: json!([]),
+                verification_scope: "authorization fixture only".into(),
+            },
         };
-        let params = json!({"asset_id":asset.id,"output":root.path().join("out.mkv"),"intent":intent});
-        assert_eq!(service.dispatch(reader.clone(), Request::query("streams.clean", params.clone())).await.error.unwrap().code, "PERMISSION_DENIED");
+        service.store.put("asset/owned-asset", &asset).unwrap();
+        let scope = service
+            .store
+            .issue_scope(&owner.principal, nw_platform::epoch_seconds())
+            .unwrap();
+        let profile = json!({"name":"reader","expected_revision":null,"enabled":true,"commands":["assets.list","streams.clean"],"objects":[],"read_roots":[root.path().to_str().unwrap()],"write_roots":[root.path().to_str().unwrap()]});
+        assert!(
+            mutate(&service, &owner, &scope, "access.profiles.put", profile)
+                .await
+                .ok
+        );
+        let reader = service.profile_context("reader").unwrap();
+        assert_eq!(
+            service
+                .dispatch(reader.clone(), Request::query("assets.list", json!({})))
+                .await
+                .result
+                .unwrap(),
+            json!([])
+        );
+        let intent = nw_domain::mux::CleanIntent {
+            audio_selection: nw_domain::mux::Selection {
+                selector: nw_domain::mux::Selector::All,
+                no_match: nw_domain::mux::NoMatch::SkipFile,
+            },
+            subtitle_selection: nw_domain::mux::Selection {
+                selector: nw_domain::mux::Selector::All,
+                no_match: nw_domain::mux::NoMatch::AllowEmpty,
+            },
+            audio_order: vec![],
+            subtitle_order: vec![],
+            stream_tag_patches: vec![],
+            preservation: nw_domain::mux::Preservation::default(),
+        };
+        let params =
+            json!({"asset_id":asset.id,"output":root.path().join("out.mkv"),"intent":intent});
+        assert_eq!(
+            service
+                .dispatch(
+                    reader.clone(),
+                    Request::query("streams.clean", params.clone())
+                )
+                .await
+                .error
+                .unwrap()
+                .code,
+            "PERMISSION_DENIED"
+        );
         assert!(mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"reader","expected_revision":1,"enabled":true,"commands":["streams.clean"],"objects":["owned-asset"],"read_roots":[],"write_roots":[]})).await.ok);
-        assert_eq!(service.dispatch(reader, Request::query("streams.clean", params)).await.error.unwrap().code, "PATH_DENIED");
+        assert_eq!(
+            service
+                .dispatch(reader, Request::query("streams.clean", params))
+                .await
+                .error
+                .unwrap()
+                .code,
+            "PATH_DENIED"
+        );
     }
     #[tokio::test]
     async fn public_credentials_are_bound_to_origin_and_owner_epoch() {
         let root = tempfile::tempdir().unwrap();
         let first = Service::open(root.path().to_owned(), None).await.unwrap();
-        let token = first.credential_for_origin("agent", Some("http://127.0.0.1:1578".into())).unwrap();
-        let principal = first.authenticate_at(&token, Some("http://127.0.0.1:1578"), true).unwrap().principal;
+        let token = first
+            .credential_for_origin("agent", Some("http://127.0.0.1:1578".into()))
+            .unwrap();
+        let principal = first
+            .authenticate_at(&token, Some("http://127.0.0.1:1578"), true)
+            .unwrap()
+            .principal;
         assert!(first.authenticate(&token).is_err());
-        assert!(first.authenticate_at(&token, Some("http://127.0.0.1:1579"), true).is_err());
+        assert!(
+            first
+                .authenticate_at(&token, Some("http://127.0.0.1:1579"), true)
+                .is_err()
+        );
         drop(first);
         let second = Service::open(root.path().to_owned(), None).await.unwrap();
-        assert_eq!(second.profile_context("agent").unwrap().principal, principal);
-        assert!(second.authenticate_at(&token, Some("http://127.0.0.1:1578"), true).is_err());
+        assert_eq!(
+            second.profile_context("agent").unwrap().principal,
+            principal
+        );
+        assert!(
+            second
+                .authenticate_at(&token, Some("http://127.0.0.1:1578"), true)
+                .is_err()
+        );
     }
 }

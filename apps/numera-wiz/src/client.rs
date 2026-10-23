@@ -104,8 +104,11 @@ impl NativeClient {
                 }
             }
             let lock_root = self.root.join("state/generations/1");
-            let may_spawn = !lock_root.try_exists()? || nw_platform::files::RootLock::acquire(&lock_root).is_ok();
-            if may_spawn && spawned.is_none_or(|instant| instant.elapsed() >= Duration::from_secs(1)) {
+            let may_spawn = !lock_root.try_exists()?
+                || nw_platform::files::RootLock::acquire(&lock_root).is_ok();
+            if may_spawn
+                && spawned.is_none_or(|instant| instant.elapsed() >= Duration::from_secs(1))
+            {
                 let mut command = tokio::process::Command::new(std::env::current_exe()?);
                 command.arg("--data-dir").arg(&self.root);
                 if let Some(components) = &self.components {
@@ -182,7 +185,9 @@ impl NativeClient {
                     return Ok(serde_json::from_value(bounded_json(response).await?)?);
                 }
                 Ok(response)
-                    if (response.status() == reqwest::StatusCode::UNAUTHORIZED || response.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE) && attempt == 0 => {}
+                    if (response.status() == reqwest::StatusCode::UNAUTHORIZED
+                        || response.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE)
+                        && attempt == 0 => {}
                 Ok(response) => bail!("Owner request returned HTTP {}", response.status()),
                 Err(error) if attempt != 0 => return Err(error.into()),
                 Err(_) => {}

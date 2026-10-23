@@ -35,5 +35,5 @@ subtle = "2.6"
 http-body = "1"
 bytes = "1"
 [dev-dependencies]
-rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 reqwest.workspace = true

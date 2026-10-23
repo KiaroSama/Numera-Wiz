@@ -97,7 +97,12 @@ fn canonical_order(value: Value) -> Value {
         Value::Object(object) => {
             let mut pairs = object.into_iter().collect::<Vec<_>>();
             pairs.sort_by(|left, right| left.0.cmp(&right.0));
-            Value::Object(pairs.into_iter().map(|(key, value)| (key, canonical_order(value))).collect())
+            Value::Object(
+                pairs
+                    .into_iter()
+                    .map(|(key, value)| (key, canonical_order(value)))
+                    .collect(),
+            )
         }
         Value::Array(values) => Value::Array(values.into_iter().map(canonical_order).collect()),
         scalar => scalar,
@@ -316,19 +321,36 @@ mod tests {
 
 /// Parse bounded JSON without silently accepting duplicate object members.
 pub fn decode_json(bytes: &[u8]) -> Result<Value> {
-    if bytes.len() > MAX_COMMAND_BYTES { return Err(DomainError::new("RESOURCE_LIMIT", "JSON command exceeds 1 MiB")); }
+    if bytes.len() > MAX_COMMAND_BYTES {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "JSON command exceeds 1 MiB",
+        ));
+    }
     let (mut depth, mut quoted, mut escaped) = (0usize, false, false);
     for byte in bytes {
         if quoted {
-            if escaped { escaped = false; }
-            else if *byte == b'\\' { escaped = true; }
-            else if *byte == b'"' { quoted = false; }
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                quoted = false;
+            }
         } else {
             match byte {
                 b'"' => quoted = true,
-                b'[' | b'{' => { depth += 1; if depth > 64 { return Err(DomainError::new("RESOURCE_LIMIT", "JSON nesting exceeds 64 levels")); } }
+                b'[' | b'{' => {
+                    depth += 1;
+                    if depth > 64 {
+                        return Err(DomainError::new(
+                            "RESOURCE_LIMIT",
+                            "JSON nesting exceeds 64 levels",
+                        ));
+                    }
+                }
                 b']' | b'}' => depth = depth.saturating_sub(1),
-                _ => {},
+                _ => {}
             }
         }
     }
@@ -420,7 +442,10 @@ mod strict_json_tests {
     #[test]
     fn structural_depth_budget_ignores_brackets_in_strings() {
         let too_deep = format!("{}0{}", "[".repeat(65), "]".repeat(65));
-        assert_eq!(super::decode_json(too_deep.as_bytes()).unwrap_err().code, "RESOURCE_LIMIT");
+        assert_eq!(
+            super::decode_json(too_deep.as_bytes()).unwrap_err().code,
+            "RESOURCE_LIMIT"
+        );
         let quoted = serde_json::to_vec(&serde_json::json!({"literal":"[".repeat(100)})).unwrap();
         assert!(super::decode_json(&quoted).is_ok());
     }

@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           cargo fmt --all
-          git diff --binary -- crates apps xtask > formatting.patch
+          git diff --binary -- crates apps xtask test-support > formatting.patch
       - name: Save formatter evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -44,8 +44,10 @@ jobs:
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
+      - name: Check platform boundaries before the application build
+        run: cargo test --locked -p nw-platform --all-targets
       - name: Compile and run ordinary regressions
-        run: cargo test --locked --workspace --all-targets
+        run: cargo test --locked --workspace --exclude nw-platform --all-targets
       - name: Lint implementation
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Build the desktop composition
@@ -71,7 +73,7 @@ jobs:
         shell: bash
         run: |
           cargo fmt --all
-          git diff --binary -- crates apps xtask > formatting.patch
+          git diff --binary -- crates apps xtask test-support > formatting.patch
       - name: Save dependency and generated evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -95,12 +97,24 @@ jobs:
           path: target/fixture-ffmpeg-src
       - name: Install toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Resolve the extended transport test dependency closure
+        run: cargo update --workspace
+      - name: Save resolved dependency closure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resolved-dependencies
+          path: Cargo.lock
       - name: Build the identified CPU fixture component profile
         run: cargo run --locked -p xtask -- build-fixture-profile
       - name: Execute actual media preservation regressions
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
         run: cargo test --locked -p nw-engine --test media -- --ignored --nocapture
+      - name: Exercise actual owner and official SDK transport media parity
+        env:
+          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+        run: cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture
       - name: Save fixture components and actual configuration
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -108,9 +108,11 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
         return Err(denied("Cannot verify the Windows DACL"));
     }
     let bytes = bytes?;
-    let text = if bytes.starts_with(&[0xff, 0xfe]) {
+    let utf16 = bytes.starts_with(&[0xff, 0xfe]) || bytes.get(1) == Some(&0);
+    let offset = if bytes.starts_with(&[0xff, 0xfe]) { 2 } else { 0 };
+    let text = if utf16 {
         String::from_utf16(
-            &bytes[2..]
+            &bytes[offset..]
                 .chunks_exact(2)
                 .map(|v| u16::from_le_bytes([v[0], v[1]]))
                 .collect::<Vec<_>>(),
@@ -125,18 +127,37 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
 fn check_dacl(text: &str, sid: &str) -> Result<()> {
     let mut own = false;
     let mut entries = 0;
-    for entry in text.lines().filter(|line| line.starts_with("D:")).flat_map(|line| line.split('(').skip(1)) {
-        let entry = entry.split(')').next().ok_or_else(|| denied("Invalid ACL evidence"))?;
+    for entry in text
+        .lines()
+        .filter_map(|line| line.find("D:").map(|at| &line[at..]))
+        .flat_map(|line| line.split('(').skip(1))
+    {
+        let entry = entry
+            .split(')')
+            .next()
+            .ok_or_else(|| denied("Invalid ACL evidence"))?;
         let parts = entry.split(';').collect::<Vec<_>>();
-        if parts.len() != 6 || parts[0] != "A" { return Err(denied("Unsupported ACL entry in protected directory")); }
+        if parts.len() != 6 || parts[0] != "A" {
+            return Err(denied("Unsupported ACL entry in protected directory"));
+        }
         // Windows may serialize the current local Administrator SID using its LA alias.
-        let current = parts[5] == sid || (parts[5] == "LA" && sid.starts_with("S-1-5-21-") && sid.ends_with("-500"));
+        let current = parts[5] == sid
+            || (parts[5] == "LA" && sid.starts_with("S-1-5-21-") && sid.ends_with("-500"));
         let privileged = ["SY", "BA", "S-1-5-18", "S-1-5-32-544"].contains(&parts[5]);
-        if !current && !privileged { return Err(denied(format!("Directory has a disallowed ACL trustee {}; choose a protected root", parts[5]))); }
-        if current && ["FA", "0x1f01ff"].contains(&parts[2]) { own = true; }
+        if !current && !privileged {
+            return Err(denied(format!(
+                "Directory has a disallowed ACL trustee {}; choose a protected root",
+                parts[5]
+            )));
+        }
+        if current && (parts[2] == "FA" || parts[2].strip_prefix("0x").is_some_and(|mask| u32::from_str_radix(mask, 16) == Ok(0x1f01ff))) {
+            own = true;
+        }
         entries += 1;
     }
-    if !own || entries == 0 { return Err(denied("Current user full-control ACL was not verified")); }
+    if !own || entries == 0 {
+        return Err(denied(format!("Current user full-control ACL was not verified (entries={entries}); ACL evidence: {}", text.chars().take(512).flat_map(char::escape_debug).collect::<String>())));
+    }
     Ok(())
 }
 
@@ -191,7 +212,13 @@ mod tests {
     fn local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user() {
         assert!(check_dacl("D:PAI(A;OICI;FA;;;LA)", "S-1-5-21-1-2-3-500").is_ok());
         assert!(check_dacl("D:PAI(A;OICI;FA;;;LA)", "S-1-5-21-1-2-3-1001").is_err());
-        assert!(check_dacl("D:PAI(A;OICI;FA;;;S-1-5-21-1-2-3-1001)(A;;FR;;;WD)", "S-1-5-21-1-2-3-1001").is_err());
+        assert!(
+            check_dacl(
+                "D:PAI(A;OICI;FA;;;S-1-5-21-1-2-3-1001)(A;;FR;;;WD)",
+                "S-1-5-21-1-2-3-1001"
+            )
+            .is_err()
+        );
     }
     #[test]
     fn credentials_are_protected_and_existing_exports_are_preserved() {
