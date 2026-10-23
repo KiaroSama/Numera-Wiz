@@ -10,6 +10,22 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  dependency-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install selected resolver
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Resolve workspace edges without upgrading unrelated packages
+        run: cargo update --workspace
+      - name: Save the exact resolved closure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resolved-dependencies
+          path: Cargo.lock
+      - name: Enforce the committed lockfile
+        run: git diff --exit-code -- Cargo.lock
   formatting:
     runs-on: ubuntu-24.04
     steps:
