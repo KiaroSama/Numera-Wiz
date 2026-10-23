@@ -231,6 +231,12 @@ struct NativeUiClient {
 }
 #[cfg(feature = "desktop")]
 impl nw_ui::CommandClient for NativeUiClient {
+    fn choose_media(&self,reply:nw_ui::Reply){
+        match rfd::FileDialog::new().set_title("Add media to Numera Wiz").pick_file(){
+            Some(path)=>reply(nw_platform::files::path_text(&path).map(|path|nw_domain::commands::Response::success("intake",serde_json::json!({"path":path}))).map_err(|error|error.to_string())),
+            None=>reply(Err("File selection cancelled".into())),
+        }
+    }
     fn send(&self, request: Request, reply: nw_ui::Reply) {
         let client = self.client.clone();
         self.runtime.spawn(async move {

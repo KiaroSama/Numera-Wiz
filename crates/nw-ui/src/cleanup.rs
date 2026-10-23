@@ -10,14 +10,7 @@ use serde_json::json;
 pub fn file_name(path: &str) -> &str {
     path.rsplit(['/', '\\']).next().unwrap_or(path)
 }
-pub fn suggest_output(path: &str) -> String {
-    let split = path.rfind(['/', '\\']).map_or(0, |at| at + 1);
-    let (directory, name) = path.split_at(split);
-    match name.rsplit_once('.') {
-        Some((stem, extension)) => format!("{directory}{stem}.cleaned.{extension}"),
-        None => format!("{directory}{name}.cleaned.mkv"),
-    }
-}
+
 #[derive(Default)]
 pub struct PatchForm {
     kind: usize,
