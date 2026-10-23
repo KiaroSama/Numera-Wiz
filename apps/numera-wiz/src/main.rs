@@ -177,9 +177,9 @@ async fn desktop(_client: NativeClient) -> Result<()> {
 }
 #[cfg(feature = "desktop")]
 async fn desktop(client: NativeClient) -> Result<()> {
-    let record = client.attach().await?;
-    let endpoint = format!("http://127.0.0.1:{}", record.port);
-    let bearer = record.bearer;
+    client.attach().await?;
+    let port: std::sync::Arc<dyn nw_ui::CommandClient> = std::sync::Arc::new(NativeUiClient { client:client.clone(), runtime:tokio::runtime::Handle::current() });
+    let session = uuid::Uuid::new_v4().simple().to_string();
     let lease = uuid::Uuid::new_v4().to_string();
     client
         .internal("internal/lease", serde_json::json!({"id":lease}))
@@ -205,7 +205,7 @@ async fn desktop(client: NativeClient) -> Result<()> {
             viewport: eframe::egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0]),
             ..Default::default()
         },
-        Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, endpoint, bearer)))),
+        Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, port, session)))),
     );
     task.abort();
     let _ = client
@@ -215,4 +215,14 @@ async fn desktop(client: NativeClient) -> Result<()> {
         )
         .await;
     result.map_err(|e| anyhow::anyhow!("Desktop failed: {e}"))
+}
+
+#[cfg(feature = "desktop")]
+struct NativeUiClient { client:NativeClient, runtime:tokio::runtime::Handle }
+#[cfg(feature = "desktop")]
+impl nw_ui::CommandClient for NativeUiClient {
+    fn send(&self, request:Request, reply:nw_ui::Reply) {
+        let client=self.client.clone();
+        self.runtime.spawn(async move {let response=client.request(&request).await.map_err(|error|error.to_string());reply(response);});
+    }
 }
