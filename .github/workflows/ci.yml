@@ -24,21 +24,19 @@ jobs:
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
-      - name: Resolve reproducible dependency closure
-        run: cargo generate-lockfile
       - name: Compile and run ordinary regressions
-        run: cargo test --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets
       - name: Lint implementation
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Build the desktop composition
-        run: cargo build -p numera-wiz --features desktop
+        run: cargo build --locked -p numera-wiz --features desktop
       - name: Check shared browser UI dependency closure
         if: runner.os == 'Linux'
-        run: cargo check -p nw-ui --target wasm32-unknown-unknown
+        run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown
       - name: Verify preserved research hashes
-        run: cargo run -p xtask -- verify-research
+        run: cargo run --locked -p xtask -- verify-research
       - name: Generate current contracts
-        run: cargo run -p xtask -- schemas
+        run: cargo run --locked -p xtask -- schemas
       - name: Save development executables
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -78,11 +76,11 @@ jobs:
       - name: Install toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
       - name: Build the identified CPU fixture component profile
-        run: cargo run -p xtask -- build-fixture-profile
+        run: cargo run --locked -p xtask -- build-fixture-profile
       - name: Execute actual media preservation regressions
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
-        run: cargo test -p nw-engine --test media -- --ignored --nocapture
+        run: cargo test --locked -p nw-engine --test media -- --ignored --nocapture
       - name: Save fixture components and actual configuration
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
