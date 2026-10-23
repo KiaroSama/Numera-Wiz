@@ -789,6 +789,7 @@ impl Service {
                     plan,
                     state: JobState::Queued,
                     prepared_argv: None,
+                    prepared_stages: Vec::new(),
                     artifact: None,
                     verification: None,
                     error: None,
@@ -1005,7 +1006,13 @@ impl Service {
             ExecutionEvent::Prepared(argv) => {
                 self.store.execution_allowed(id)?;
                 self.store.update_job(id, |job| {
-                    job.prepared_argv = Some(argv);
+                    if job.prepared_stages.len() >= 32 {
+                        return Err(DomainError::new("RESOURCE_LIMIT", "Job prepared-stage budget reached"));
+                    }
+                    if job.prepared_argv.is_none() {
+                        job.prepared_argv = Some(argv.clone());
+                    }
+                    job.prepared_stages.push(argv);
                     Ok(())
                 })?;
             }
@@ -1134,6 +1141,7 @@ mod tests {
             creator: owner.principal.clone(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),
             probe: nw_domain::records::MediaProbe {
+                stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-only".into(),
                 global_tags: Default::default(),

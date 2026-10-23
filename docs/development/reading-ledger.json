@@ -234,6 +234,31 @@
         "Read lines 521-2408 separately.",
         "Close secondary-reference admission before source probing."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_demuxers.texi",
+      "sha256": "d8dfe0ac1ea18fc30d85471a11d6b1a9641c997706cce0407020e87629de9491",
+      "lines": [
+        867,
+        936
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Partial MOV options body only",
+      "interpretation": [
+        "MOV enable_drefs and use_absolute_path are disabled by default and must remain reserved planner options.",
+        "The ordinary probe inherits a read-only regular file on descriptor 0, selects fd-only access and a content-admitted demuxer.",
+        "Backward seeks through a tail-indexed MP4 require actual component/runtime evidence; a pipe is not equivalent."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T016"
+      ],
+      "unresolved": [
+        "Complete the rest of the demuxer manual separately.",
+        "Qualify dependency resolvers and native package fd behavior on every required target."
+      ]
     }
   ]
 }

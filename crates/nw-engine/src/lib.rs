@@ -1,4 +1,6 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
+mod admission;
+mod preservation;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -28,7 +30,6 @@ pub enum ExecutionEvent {
 pub type Observer =
     Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
-const FORMATS: &str = "mov,matroska,webm,avi,wav,flac,mp3,ogg";
 #[derive(Clone)]
 pub struct Engine {
     pub ffmpeg: FileIdentity,
@@ -55,8 +56,8 @@ impl Engine {
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {
         let canonical = files::source_path(path)?;
-        let path = files::path_text(&canonical)?;
-        let args = [
+        let input = blocking(move || admission::open(&canonical)).await?;
+        let mut args = [
             "-v",
             "error",
             "-max_alloc",
@@ -65,25 +66,24 @@ impl Engine {
             "5242880",
             "-analyzeduration",
             "5000000",
-            "-protocol_whitelist",
-            "file",
-            "-format_whitelist",
-            FORMATS,
             "-show_streams",
             "-show_format",
             "-show_chapters",
+            "-show_data_hash",
+            "sha256",
             "-of",
             "json=string_validation=fail",
-            "-i",
-            &path,
         ]
         .map(String::from)
         .to_vec();
-        let result = nw_platform::process::run(
+        args.extend(input.options());
+        args.extend(["-i".into(), "fd:".into()]);
+        let result = nw_platform::process::run_readonly(
             Path::new(&self.ffprobe.path),
             &args,
             Duration::from_secs(120),
             4 * 1024 * 1024,
+            input.file,
             cancel,
         )
         .await?;
@@ -142,7 +142,7 @@ impl Engine {
             vec![]
         };
         let now = nw_platform::epoch_seconds();
-        let mut plan=Plan{id:Uuid::new_v4().to_string(),creator:creator.into(),hash:String::new(),source:asset,output:files::path_text(&output)?,ffmpeg:self.ffmpeg.clone(),ffprobe:self.ffprobe.clone(),resolution,argv_template:args,created_at:now.to_string(),expires_at:(now+1800).to_string(),verification_scope:"Full byte digest for unchanged copy; stream/codec/tag/disposition/chapter structure for remux. Packet/decoded/timing preservation qualification remains pending.".into()};
+        let mut plan=Plan{id:Uuid::new_v4().to_string(),creator:creator.into(),hash:String::new(),source:asset,output:files::path_text(&output)?,ffmpeg:self.ffmpeg.clone(),ffprobe:self.ffprobe.clone(),resolution,argv_template:args,created_at:now.to_string(),expires_at:(now+1800).to_string(),verification_scope:preservation::SCOPE.into()};
         plan.hash = plan_digest(&plan)?;
         Ok(plan)
     }
@@ -285,6 +285,7 @@ impl Engine {
         observer(ExecutionEvent::Verifying).await?;
         let observed = self.probe(staging.path(), cancel.clone()).await?;
         verify_structure(plan, &observed)?;
+        let verification = preservation::verify(self, plan, staging.path(), &observed, cancel.clone(), &observer).await?;
         let stage_path = staging.path().to_owned();
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
@@ -302,12 +303,12 @@ impl Engine {
             actual,
             plan,
             job_id,
-            plan.verification_scope.clone(),
+            verification.clone(),
             cancel,
             observer,
         )
         .await?;
-        Ok((Some(artifact), plan.verification_scope.clone(), Some(args)))
+        Ok((Some(artifact), verification, Some(args)))
     }
 }
 async fn publish(
@@ -420,6 +421,7 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
         .ok_or_else(|| DomainError::new("INVALID_PROBE", "Missing container format"))?
         .into();
     Ok(MediaProbe {
+        stream_details: rows.iter().map(|row| (row["index"].as_u64().unwrap_or(u64::MAX) as u32, row.clone())).collect(),
         streams,
         format,
         global_tags: parse_tags(&value["format"]["tags"]),
@@ -508,6 +510,7 @@ fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
     Ok(())
 }
 fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<String>> {
+    let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
     let mut args = [
         "-hide_banner",
         "-nostdin",
@@ -518,16 +521,21 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<S
         "67108864",
         "-y",
         "-copyts",
-        "-start_at_zero",
+        "-avoid_negative_ts",
+        "disabled",
         "-protocol_whitelist",
         "file",
         "-format_whitelist",
-        FORMATS,
-        "-i",
-        &asset.identity.path,
+        demuxer,
+        "-f",
+        demuxer,
     ]
     .map(String::from)
     .to_vec();
+    if demuxer == "mov" {
+        args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
+    }
+    args.extend(["-i".into(), asset.identity.path.clone()]);
     for stream in &resolution.streams {
         args.extend(["-map".into(), format!("0:{}", stream.index)]);
     }

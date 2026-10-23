@@ -133,3 +133,28 @@ do not use a stale request timestamp as proof that the system clock rolled back.
 Remux still needs full streamed packet/timestamp/extradata/side-data verification;
 current lowering normalizes the common start with copyts/start_at_zero, which the
 chosen preservation oracle must state and check. Full manual coverage remains open.
+
+
+Run [40040317384](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40040317384)
+on f89332c799f110fa7d53ceda8c236fff4b9dc968 passed formatter/lock gates, all
+four native test/lint/embedded-desktop targets, actual CPU owner/SDK media and
+Chrome Choose -> Review -> Run -> verified byte-copy. Its native X11 job passed real window input and media registration after adding
+the missing libxkbcommon-x11 runtime. Its screenshots are observed; native output
+creation is not inferred from this registration-only journey. The previous run's native app never opened because that library was
+absent; compilation was not evidence of a working window.
+
+Current source replaces ordinary path-based probes with a content-admitted
+read-only regular file inherited as descriptor 0 and fd-only access. MOV external
+track/absolute reference options remain disabled. A tail-indexed Unicode-path MP4
+and disguised manifest case are added to the real CI media test. This does not
+complete required manifest/sequence/network resolvers, file-access canary evidence
+or all packaged target qualification. Those remain T014 work.
+
+Remux verification now incrementally frames bounded packet JSON, maintains
+per-stream SHA-256 ledgers, compares exact rational PTS/DTS/duration under an
+explicit original-clock policy, codec/extradata and ffprobe-exposed side data.
+It rejects a changed interior PCM byte even when container structure is valid.
+The process supervisor cancels/reaps a producer whose streamed parser rejects
+output, with bounded record/total/deadline limits. Prepared stages are retained
+in job history. These changes await their own CI results; decoded/container
+reframing fallback and unexposed raw side-data identity are still open.
