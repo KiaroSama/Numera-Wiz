@@ -75,9 +75,11 @@ pub async fn run(
             "An explicit absolute executable is required",
         ));
     }
-    tracing::info!(program=%program.display(),argv=?args,"stage.prepared");
+    let cwd=program.parent().ok_or_else(||DomainError::new("COMPONENT_UNAVAILABLE","Executable parent directory is required"))?;
+    tracing::info!(program=%program.display(),cwd=%cwd.display(),argv=?args,"stage.prepared");
     let mut command = Command::new(program);
     command
+        .current_dir(cwd)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
