@@ -298,19 +298,118 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
 
     // Browser intake bytes use their own bounded route; canonical registration/job
     // acceptance still uses the same official SDK and durable receipt contracts.
-    let browser=cli.query("access.credentials.issue",json!({"profile":"browser","port":port})).await;
-    let bearer=browser["bearer"].as_str().unwrap();let client=reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).build().unwrap();let endpoint=format!("http://127.0.0.1:{port}");
-    let fixture_bytes=std::fs::read(&media.source).unwrap();
-    let ticket:Value=client.post(format!("{endpoint}/api/v1/uploads")).bearer_auth(bearer).json(&json!({"display_name":"Browser original.mkv","bytes":fixture_bytes.len().to_string()})).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
-    let completed:Value=client.put(format!("{endpoint}/api/v1/uploads/{}",ticket["upload_id"].as_str().unwrap())).bearer_auth(bearer).header("Content-Type","application/octet-stream").body(fixture_bytes.clone()).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();assert_eq!(completed["upload_id"],ticket["upload_id"]);
-    let transport=StreamableHttpClientTransport::with_client(client.clone(),StreamableHttpClientTransportConfig::with_uri(format!("{endpoint}/mcp")).auth_header(bearer));let browser=().serve(transport).await.unwrap();
-    let browser_scope=call!(browser,"access.replay_scope.create",json!({}),json!({}))["replay_scope"].as_str().unwrap().to_owned();
-    let identity=json!({"replay_scope":browser_scope,"idempotency_key":"register-browser-intake"});
-    let asset=call!(browser,"assets.register",json!({"upload_id":ticket["upload_id"]}),identity.clone());let retry=call!(browser,"assets.register",json!({"upload_id":ticket["upload_id"]}),identity);assert_eq!(asset["id"],retry["id"]);assert_eq!(asset["display_name"],"Browser original.mkv");
-    let denied:Value=client.post(format!("{endpoint}/api/v1/commands")).bearer_auth(&token).json(&Request::query("media.probe",json!({"path":asset["identity"]["path"]}))).send().await.unwrap().json().await.unwrap();assert_eq!(denied["ok"],false);assert_eq!(denied["error"]["code"],"PERMISSION_DENIED");
-    let destination=call!(browser,"assets.output_suggest",json!({"id":asset["id"]}),json!({}));
-    let plan=call!(browser,"streams.clean",json!({"asset_id":asset["id"],"output":destination["output"],"intent":fixture::rules()}),json!({}));
-    let accepted=call!(browser,"jobs.submit",json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),json!({"replay_scope":browser_scope,"idempotency_key":"submit-browser-intake"}));let job=cli.completed(accepted["job_id"].as_str().unwrap()).await;assert_eq!(job["state"],"succeeded");assert_eq!(std::fs::read(destination["output"].as_str().unwrap()).unwrap(),fixture_bytes);browser.cancel().await.unwrap();
+    let browser = cli
+        .query(
+            "access.credentials.issue",
+            json!({"profile":"browser","port":port}),
+        )
+        .await;
+    let bearer = browser["bearer"].as_str().unwrap();
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let endpoint = format!("http://127.0.0.1:{port}");
+    let fixture_bytes = std::fs::read(&media.source).unwrap();
+    let ticket: Value = client
+        .post(format!("{endpoint}/api/v1/uploads"))
+        .bearer_auth(bearer)
+        .json(
+            &json!({"display_name":"Browser original.mkv","bytes":fixture_bytes.len().to_string()}),
+        )
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let completed: Value = client
+        .put(format!(
+            "{endpoint}/api/v1/uploads/{}",
+            ticket["upload_id"].as_str().unwrap()
+        ))
+        .bearer_auth(bearer)
+        .header("Content-Type", "application/octet-stream")
+        .body(fixture_bytes.clone())
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(completed["upload_id"], ticket["upload_id"]);
+    let transport = StreamableHttpClientTransport::with_client(
+        client.clone(),
+        StreamableHttpClientTransportConfig::with_uri(format!("{endpoint}/mcp"))
+            .auth_header(bearer),
+    );
+    let browser = ().serve(transport).await.unwrap();
+    let browser_scope =
+        call!(browser, "access.replay_scope.create", json!({}), json!({}))["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+    let identity =
+        json!({"replay_scope":browser_scope,"idempotency_key":"register-browser-intake"});
+    let asset = call!(
+        browser,
+        "assets.register",
+        json!({"upload_id":ticket["upload_id"]}),
+        identity.clone()
+    );
+    let retry = call!(
+        browser,
+        "assets.register",
+        json!({"upload_id":ticket["upload_id"]}),
+        identity
+    );
+    assert_eq!(asset["id"], retry["id"]);
+    assert_eq!(asset["display_name"], "Browser original.mkv");
+    let denied: Value = client
+        .post(format!("{endpoint}/api/v1/commands"))
+        .bearer_auth(&token)
+        .json(&Request::query(
+            "media.probe",
+            json!({"path":asset["identity"]["path"]}),
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(denied["ok"], false);
+    assert_eq!(denied["error"]["code"], "PERMISSION_DENIED");
+    let destination = call!(
+        browser,
+        "assets.output_suggest",
+        json!({"id":asset["id"]}),
+        json!({})
+    );
+    let plan = call!(
+        browser,
+        "streams.clean",
+        json!({"asset_id":asset["id"],"output":destination["output"],"intent":fixture::rules()}),
+        json!({})
+    );
+    let accepted = call!(
+        browser,
+        "jobs.submit",
+        json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        json!({"replay_scope":browser_scope,"idempotency_key":"submit-browser-intake"})
+    );
+    let job = cli.completed(accepted["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "succeeded");
+    assert_eq!(
+        std::fs::read(destination["output"].as_str().unwrap()).unwrap(),
+        fixture_bytes
+    );
+    browser.cancel().await.unwrap();
     server.kill().await.unwrap();
     server.wait().await.unwrap();
 }

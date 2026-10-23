@@ -29,7 +29,7 @@ enum Mode {
     Owner,
     /// Discover active development commands and their qualification limits.
     Commands,
-    /// Submit a bounded canonical JSON query from a file or stdin.
+    /// Submit a bounded canonical JSON request from a file or stdin.
     Request {
         #[arg(long)]
         file: Option<PathBuf>,
@@ -124,7 +124,7 @@ async fn run() -> Result<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(
-                    &serde_json::json!({"product":"Numera Wiz","version":env!("CARGO_PKG_VERSION"),"scope":"development command/resolver; media owner integration pending","media_gpu_initialized":false,"portable_release":"not_qualified","default_mcp_profile":"discovery_only","default_http_port":1578})
+                    &serde_json::json!({"product":"Numera Wiz","version":env!("CARGO_PKG_VERSION"),"scope":"development cleanup owner and shared workspace","media_gpu_initialized":false,"portable_release":"not_qualified","default_mcp_profile":"discovery_only","default_http_port":1578})
                 )?
             );
             Ok(())

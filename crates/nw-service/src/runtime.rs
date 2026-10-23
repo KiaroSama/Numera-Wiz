@@ -41,7 +41,7 @@ struct Credential {
     #[serde(default)]
     origin: Option<String>,
     #[serde(default)]
-    audience:u64,
+    audience: u64,
 }
 pub struct Service {
     pub store: Arc<Store>,
@@ -50,7 +50,7 @@ pub struct Service {
     root: PathBuf,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
-    origins:Mutex<HashMap<String,u64>>,
+    origins: Mutex<HashMap<String, u64>>,
     requests: Arc<Semaphore>,
     heavy: Arc<Semaphore>,
     pending: Arc<AtomicUsize>,
@@ -80,6 +80,7 @@ fn named(prefix: &str, id: &str) -> Result<String> {
 }
 impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
+        std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
         let store = tokio::task::spawn_blocking(move || {
@@ -147,7 +148,7 @@ impl Service {
             engine,
             mutation: Mutex::new(()),
             credentials: Mutex::new(()),
-            origins:Mutex::new(HashMap::new()),
+            origins: Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
             heavy: Arc::new(Semaphore::new(1)),
             pending: Arc::new(AtomicUsize::new(0)),
@@ -250,8 +251,19 @@ impl Service {
         } else {
             files::source_path(path)?
         };
-        if ["state","runtime","logs","ingest"].iter().any(|name|canonical.starts_with(self.root.join(name))) || (write && canonical.starts_with(self.root.join("assets"))){return Err(DomainError::new("PATH_DENIED","Protected owner namespaces and managed objects are not media output targets"));}
-        if !write && context.profile.is_some() && canonical.starts_with(self.root.join("assets")){self.managed_read(context,&canonical)?;}
+        if ["state", "runtime", "logs", "ingest"]
+            .iter()
+            .any(|name| canonical.starts_with(self.root.join(name)))
+            || (write && canonical.starts_with(self.root.join("assets")))
+        {
+            return Err(DomainError::new(
+                "PATH_DENIED",
+                "Protected owner namespaces and managed objects are not media output targets",
+            ));
+        }
+        if !write && context.profile.is_some() && canonical.starts_with(self.root.join("assets")) {
+            self.managed_read(context, &canonical)?;
+        }
         if let Some(profile) = self.policy(context)? {
             let roots = if write {
                 profile.write_roots
@@ -308,7 +320,7 @@ impl Service {
             || now >= credential.expires
             || now.saturating_sub(credential.last_active) >= 7200
             || credential.origin.as_deref() != origin
-            || credential.audience!=self.origin_generation(origin)?
+            || credential.audience != self.origin_generation(origin)?
         {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
@@ -322,13 +334,26 @@ impl Service {
         }
         Ok(credential.context)
     }
-    fn origin_generation(&self,origin:Option<&str>)->Result<u64>{
-        let generations=self.origins.lock().map_err(|_|lock_error())?;Ok(origin.and_then(|origin|generations.get(origin)).copied().unwrap_or(0))
+    fn origin_generation(&self, origin: Option<&str>) -> Result<u64> {
+        let generations = self.origins.lock().map_err(|_| lock_error())?;
+        Ok(origin
+            .and_then(|origin| generations.get(origin))
+            .copied()
+            .unwrap_or(0))
     }
-    pub fn advance_origin(&self,origin:&str)->Result<()> {
-        let mut generations=self.origins.lock().map_err(|_|lock_error())?;
-        if generations.len()>=128 && !generations.contains_key(origin){return Err(DomainError::new("RESOURCE_LIMIT","Public audience transition quota reached; restart after work drains"));}
-        let generation=generations.entry(origin.into()).or_default();*generation=generation.checked_add(1).ok_or_else(||DomainError::new("RESOURCE_LIMIT","Audience generation exhausted"))?;Ok(())
+    pub fn advance_origin(&self, origin: &str) -> Result<()> {
+        let mut generations = self.origins.lock().map_err(|_| lock_error())?;
+        if generations.len() >= 128 && !generations.contains_key(origin) {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Public audience transition quota reached; restart after work drains",
+            ));
+        }
+        let generation = generations.entry(origin.into()).or_default();
+        *generation = generation
+            .checked_add(1)
+            .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Audience generation exhausted"))?;
+        Ok(())
     }
     pub fn credential(&self, name: &str) -> Result<String> {
         self.credential_for_origin(name, None)
@@ -342,7 +367,7 @@ impl Service {
             if credential.epoch != self.epoch
                 || credential.expires <= now
                 || now.saturating_sub(credential.last_active) >= 7200
-                || credential.audience!=self.origin_generation(credential.origin.as_deref())?
+                || credential.audience != self.origin_generation(credential.origin.as_deref())?
             {
                 self.store.remove(&key)?;
             } else if credential.context.principal == context.principal {
@@ -367,7 +392,7 @@ impl Service {
                 epoch: self.epoch.clone(),
                 expires: now + 8 * 3600,
                 last_active: now,
-                audience:self.origin_generation(origin.as_deref())?,
+                audience: self.origin_generation(origin.as_deref())?,
                 origin,
             },
         )?;
@@ -545,14 +570,16 @@ impl Service {
                     read_roots: roots(input.read_roots)?,
                     write_roots: roots(input.write_roots)?,
                 };
-                let response=self.store.commit(
+                let response = self.store.commit(
                     &context.principal,
                     &request,
                     nw_platform::epoch_seconds(),
                     value(&profile)?,
                     &[(key, value(&profile)?)],
                 )?;
-                if let Err(error)=self.cancel_revoked(){tracing::error!(code=%error.code,"Accepted policy change retained; active authority checks will fail closed");}
+                if let Err(error) = self.cancel_revoked() {
+                    tracing::error!(code=%error.code,"Accepted policy change retained; active authority checks will fail closed");
+                }
                 return Ok(response);
             }
             "media.probe" => {
@@ -586,7 +613,17 @@ impl Service {
                     &request,
                     nw_platform::epoch_seconds(),
                     value(&asset)?,
-                    &[(named("asset", &asset.id)?, value(&asset)?),(format!("managed-read/{}/{}",hex::encode(Sha256::digest(asset.identity.path.as_bytes())),context.principal),json!(true))],
+                    &[
+                        (named("asset", &asset.id)?, value(&asset)?),
+                        (
+                            format!(
+                                "managed-read/{}/{}",
+                                hex::encode(Sha256::digest(asset.identity.path.as_bytes())),
+                                context.principal
+                            ),
+                            json!(true),
+                        ),
+                    ],
                 );
             }
             "assets.list" => {
@@ -722,7 +759,9 @@ impl Service {
                         (named("job-auth", &id)?, value(&authorization)?),
                     ],
                 )?;
-                if let Err(error)=self.schedule(id){tracing::error!(code=%error.code,"Job acceptance is durable; restart the owner to resume the retained queued job");}
+                if let Err(error) = self.schedule(id) {
+                    tracing::error!(code=%error.code,"Job acceptance is durable; restart the owner to resume the retained queued job");
+                }
                 return Ok(response);
             }
             "jobs.inspect" => {
@@ -873,9 +912,23 @@ impl Service {
         });
         Ok(())
     }
-    fn cancel_revoked(&self)->Result<()> {
-        let tokens=self.cancellations.lock().map_err(|_|lock_error())?.iter().map(|(id,token)|(id.clone(),token.clone())).collect::<Vec<_>>();
-        for (id,token) in tokens{if self.store.execution_allowed(&id).is_err(){let job=self.store.inspect_job(&id)?;if job.state!=JobState::Publishing && !job.state.terminal(){token.cancel();}}}Ok(())
+    fn cancel_revoked(&self) -> Result<()> {
+        let tokens = self
+            .cancellations
+            .lock()
+            .map_err(|_| lock_error())?
+            .iter()
+            .map(|(id, token)| (id.clone(), token.clone()))
+            .collect::<Vec<_>>();
+        for (id, token) in tokens {
+            if self.store.execution_allowed(&id).is_err() {
+                let job = self.store.inspect_job(&id)?;
+                if job.state != JobState::Publishing && !job.state.terminal() {
+                    token.cancel();
+                }
+            }
+        }
+        Ok(())
     }
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
