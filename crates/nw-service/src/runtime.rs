@@ -75,6 +75,7 @@ fn named(prefix: &str, id: &str) -> Result<String> {
 }
 impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
+        let selected_root = root.clone();
         let store = tokio::task::spawn_blocking(move || {
             let protected =
                 nw_platform::security::private_directory(&root.join("state/generations/1"))?;
@@ -91,6 +92,7 @@ impl Service {
                     principal: Uuid::new_v4().to_string(),
                     revision: 1,
                     enabled: true,
+                    client_sessions: false,
                     commands: BTreeSet::from([
                         "commands.list".into(),
                         "commands.schema".into(),
@@ -101,6 +103,11 @@ impl Service {
                     write_roots: vec![],
                 },
             )?;
+        }
+        if store.get::<AccessProfile>("profile/browser")?.is_none() {
+            let assets = nw_platform::security::private_directory(&selected_root.join("assets"))?;
+            let exports = nw_platform::security::private_directory(&selected_root.join("exports"))?;
+            store.put("profile/browser", &AccessProfile {id:"browser".into(),name:"browser".into(),principal:Uuid::new_v4().to_string(),revision:1,enabled:true,client_sessions:true,commands:commands::ACTIVE_COMMANDS.iter().filter(|id|!id.starts_with("access.profiles") && **id!="access.credentials.issue").map(|id|(*id).into()).collect(),objects:BTreeSet::new(),read_roots:vec![files::path_text(&assets)?],write_roots:vec![files::path_text(&exports)?]})?;
         }
         let engine = match components {
             Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?),
@@ -135,6 +142,9 @@ impl Service {
             principal: format!("owner-{}", self.store.root_id()),
             profile: None,
         }
+    }
+    pub fn client_lease_allowed(&self, context:&Context)->Result<()> {
+        if let Some(profile)=self.policy(context)? && !profile.client_sessions {return Err(DomainError::new("PERMISSION_DENIED","This profile does not admit editor-client leases"));} Ok(())
     }
     pub fn busy(&self) -> bool {
         self.pending.load(Ordering::Acquire) != 0 || self.requests.available_permits() < 16
@@ -477,6 +487,7 @@ impl Service {
                         .unwrap_or_else(|| Uuid::new_v4().to_string()),
                     revision: old.as_ref().map_or(1, |profile| profile.revision + 1),
                     enabled: input.enabled,
+                    client_sessions: input.client_sessions,
                     commands: input.commands,
                     objects: input.objects,
                     read_roots: roots(input.read_roots)?,

@@ -2,6 +2,7 @@
 mod client;
 mod mcp;
 mod server;
+mod web_assets;
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use client::NativeClient;
@@ -46,12 +47,14 @@ enum Mode {
     },
     /// Start a loopback development application API and direct HTTP MCP.
     Serve {
-        #[arg(long, default_value = "agent")]
+        #[arg(long, default_value = "browser")]
         access_profile: String,
         #[arg(long, default_value_t = 1578)]
         port: u16,
         #[arg(long)]
-        token_file: PathBuf,
+        token_file: Option<PathBuf>,
+        #[arg(long)]
+        open_browser: bool,
     },
     /// Report current scope without initializing a media GPU or display.
     Doctor,
@@ -153,11 +156,7 @@ async fn run() -> Result<()> {
             }
             _ => bail!("Unsupported transport; choose stdio or http"),
         },
-        Some(Mode::Serve {
-            port,
-            token_file,
-            access_profile,
-        }) => server::serve(client, port, token_file, access_profile).await,
+        Some(Mode::Serve {port,token_file,access_profile,open_browser}) => server::serve_browser(client,port,token_file,access_profile,open_browser).await,
         None => desktop(client).await,
     }
 }

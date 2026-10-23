@@ -1,5 +1,6 @@
 //! Repository automation. Ordinary validation is executed by hosted CI.
 use anyhow::{Context, Result, bail};
+mod web;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -30,6 +31,7 @@ fn run() -> Result<()> {
         "schemas" => schemas(root),
         "release-gate" => release_gate(root),
         "build-fixture-profile" => build_fixture_profile(root),
+        "build-web" => web::build(root),
         "help" => {
             println!("xtask verify-research | schemas | release-gate");
             Ok(())

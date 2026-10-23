@@ -46,6 +46,31 @@ jobs:
         with:
           name: source-formatting
           path: formatting.patch
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Restore WASM compilation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+            target/wasm32-unknown-unknown
+          key: web-1.99.1-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'xtask/**/*.rs') }}
+          restore-keys: web-1.99.1-${{ hashFiles('Cargo.lock') }}-
+      - name: Install native automation and WASM toolchains
+        run: rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
+      - name: Build same-source shared browser application
+        run: cargo run --locked -p xtask -- build-web
+      - name: Save immutable web namespace and provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: embedded-web
+          path: target/web-ui/
+          if-no-files-found: error
   checks:
     strategy:
       fail-fast: false
