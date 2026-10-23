@@ -312,26 +312,26 @@ impl Service {
         Ok(token)
     }
     pub async fn dispatch(self: &Arc<Self>, context: Context, request: Request) -> Response {
+        self.dispatch_cancel(context, request, CancellationToken::new()).await
+    }
+    pub async fn dispatch_cancel(self: &Arc<Self>, context: Context, request: Request, cancellation: CancellationToken) -> Response {
         let id = request.request_id.clone();
-        let _permit = match self.requests.clone().try_acquire_owned() {
+        let permit = match self.requests.clone().try_acquire_owned() {
             Ok(permit) => permit,
-            Err(_) => {
-                return Response::error(
-                    &id,
-                    DomainError::new("RESOURCE_LIMIT", "Owner request capacity reached"),
-                );
-            }
+            Err(_) => return Response::error(&id, DomainError::new("RESOURCE_LIMIT", "Owner request capacity reached")),
         };
+        let _cancel_on_disconnect = cancellation.clone().drop_guard();
         let service = self.clone();
-        match tokio::task::spawn_blocking(move || service.dispatch_sync(context, request)).await {
+        match tokio::task::spawn_blocking(move || {
+            let _work_permit = permit;
+            service.dispatch_sync(context, request, cancellation)
+        }).await {
             Ok(Ok(response)) => response,
             Ok(Err(error)) => Response::error(&id, error),
-            Err(error) => {
-                Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string()))
-            }
+            Err(error) => Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string())),
         }
     }
-    fn dispatch_sync(self: &Arc<Self>, context: Context, request: Request) -> Result<Response> {
+    fn dispatch_sync(self: &Arc<Self>, context: Context, request: Request, cancellation: CancellationToken) -> Result<Response> {
         request.validate()?;
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
@@ -360,6 +360,7 @@ impl Service {
                 "Query/bootstrap does not accept durable mutation identity",
             ));
         }
+        if cancellation.is_cancelled() { return Err(DomainError::new("CANCELLED", "Request cancelled before new acceptance")); }
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
@@ -467,7 +468,7 @@ impl Service {
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
                 let path = self.path(&context, Path::new(&input.path), false)?;
-                value(&runtime.block_on(self.engine()?.probe(&path, CancellationToken::new()))?)?
+                value(&runtime.block_on(self.engine()?.probe(&path, cancellation.clone()))?)?
             }
             "assets.register" => {
                 let input: PathInput = commands::parse(params)?;
@@ -475,7 +476,7 @@ impl Service {
                 let asset = runtime.block_on(self.engine()?.register(
                     path,
                     context.principal.clone(),
-                    CancellationToken::new(),
+                    cancellation.clone(),
                 ))?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 return self.store.commit(
@@ -540,7 +541,7 @@ impl Service {
                 }
                 self.path(&context, Path::new(&plan.source.identity.path), false)?;
                 self.path(&context, Path::new(&plan.output), true)?;
-                files::revalidate(&plan.source.identity, &CancellationToken::new())?;
+                files::revalidate(&plan.source.identity, &cancellation)?;
                 if self.pending.load(Ordering::Acquire) >= 128 {
                     return Err(DomainError::new(
                         "RESOURCE_LIMIT",

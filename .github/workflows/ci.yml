@@ -97,14 +97,6 @@ jobs:
           path: target/fixture-ffmpeg-src
       - name: Install toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
-      - name: Resolve the extended transport test dependency closure
-        run: cargo update --workspace
-      - name: Save resolved dependency closure
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: resolved-dependencies
-          path: Cargo.lock
       - name: Build the identified CPU fixture component profile
         run: cargo run --locked -p xtask -- build-fixture-profile
       - name: Execute actual media preservation regressions

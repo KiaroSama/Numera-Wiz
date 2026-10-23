@@ -39,22 +39,38 @@ executables and the minimal Linux media fixture profile are not portable release
 packages. The saved repository screenshot proves the review branch/public state,
 not a running GUI or a completed application.
 
-## Required next work
+## Active continuation
 
-Continue T010-T020 together: protected owner/runtime discovery and native client
-attachment; integrate redb acceptance/replay, independent object/path authorization,
-scheduler and publication/recovery journals; then expose actual probe/plan/job
-operations consistently on all five surfaces. Keep T021 open until the integrated
-CPU slice passes real five-surface output assertions. Preserve primitive regression
-coverage while replacing process-local dispatch. Do not restart a whole donor survey.
+The owner/store/media path is now connected. Native CLI and stdio adapters resolve
+one protected runtime record, attach only to the same binary/registry identity,
+and use its authenticated private HTTP endpoint. Named access profiles retain
+stable principals; the default agent remains discovery-only. The owner accepts
+assets/jobs with scoped durable receipts, independently checks object/path rights,
+schedules one heavy job, and commits publication fences with hard-link proofs.
+The selected HTTP listener remains explicit and shared. Scoped tokens bind origin
+and epoch, with expiry, idle limits and revocation checks. Request work and response
+bodies have finite admission/lifetime guards. All remain under qualification.
 
-Known open gates include Windows HTTP token-file ACL handling; operational access
-profiles/revocation; complete packet/timing/metadata preservation verification and
-crash-safe publication; browser packaging/pairing/upload/preview; complete MuxCls,
-F01-F15, editing/effects/interchange; the standard offline component distribution;
-full manual reading and manuals; resource/package tests; and matching owner GPU
-harness qualification. These remain required, not accepted scope reductions.
+[Run 40020532431](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40020532431)
+passed the actual CLI + official SDK stdio + direct HTTP media journey, including
+both initialize and 2026 discover lifecycle profiles. It asserted copy identity,
+remux order/tags, receipt/job retry identity and independent object rights. Native
+and browser UI parity is not inferred. The exact extended Cargo.lock came from
+that CI run and is retained; the one-time dependency resolver was removed.
 
-The full task ledger and completion.json remain authoritative about unfinished
-work. This branch is an initial implementation, not the requested complete product.
-Owner GPU runs wait for matching CI-built artifacts and the implemented harness.
+Continue the current hosted checks: Windows ACL export/verification needs actual
+Windows evidence, and formatter/lint results must remain clean. Current changes
+also retain request admission while cancellation finishes; accepted jobs have a
+separate lifetime and token. Do not repeat an entire research survey.
+
+Next connect human media/cleanup/job controls in the shared Rust UI and build its
+real packaged WASM bootstrap, pairing, streaming upload and preview. Finish the
+owner public-listener lifecycle, staged-file/crash fault journeys, bounded history
+and authorization details before checking off T010-T021. Then continue full MuxCls,
+F01-F15, project/editing/effects/interchange and standard portable profile work in
+the existing task ledger. Remaining work is required, not an accepted scope cut.
+
+No local source build/media test or owner GPU run has been executed. All ordinary
+validation continues in GitHub CI. Keep one implementation branch and draft PR #1;
+never merge/close, publish a release or claim the full product is complete without
+its actual interface/package/resource/owner evidence.

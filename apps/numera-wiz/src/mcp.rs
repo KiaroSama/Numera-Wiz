@@ -109,7 +109,7 @@ impl ServerHandler for Bridge {
                     .ok_or_else(|| {
                         ErrorData::invalid_request("Authenticated request context is missing", None)
                     })?;
-                service.dispatch(principal, canonical).await
+                service.dispatch_cancel(principal, canonical, context.ct.clone()).await
             }
         };
         let value = serde_json::to_value(&response)

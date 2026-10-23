@@ -624,6 +624,27 @@
           "observed_outcome": "Actual pinned minimal CPU FFmpeg profile generated a Matroska fixture; byte-identical copy and remux audio order/language/title assertions passed. Not the complete standard distribution or full preservation qualification."
         }
       ]
+    },
+    {
+      "subject_id": "pipeline.owner_machine_transports",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/owner_media.rs",
+        "crates/nw-service/src/runtime.rs",
+        "crates/nw-store/src/records.rs"
+      ],
+      "evidence": [
+        {
+          "boundary": "transport_media",
+          "commit": "5e8d01d65c5f4caab26024c4520a783f0f9e185a",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40020532431",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "Actual separate owner process, CLI and official SDK stdio and HTTP initialize/discover clients passed real asset/plan/job copy/remux, retry identity and independent object-right assertions. The media job passed; matrix jobs stopped on the deliberately unresolved extended lockfile, now retained from that run. GUI/browser and package boundaries remain open."
+        }
+      ]
     }
   ]
 }

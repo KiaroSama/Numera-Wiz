@@ -16,8 +16,10 @@ The full research pack is preserved with original hashes. Offline FFmpeg manual
 sources and licenses are under `docs/vendor/ffmpeg/n9.0.2`.
 
 Current code includes exact rational time, strict command DTOs, the shared MuxCls
-resolver, bounded process/file/media foundations, real CLI and official MCP adapters,
-and a shared native/WASM development query UI. [Current manuals](docs/manuals/CLI.md)
+resolver, a protected single-owner service, durable asset/plan/job acceptance and
+receipt replay, explicit access profiles, bounded process/file/media execution,
+publication journals and real CLI/official MCP adapters. The native/WASM development
+UI is being connected to the same service. [Current manuals](docs/manuals/CLI.md)
 describe the actual admitted scope. Hosted
 Windows/Linux/macOS CI builds/tests the actual workspace and verifies source
 provenance. This does not claim completion of the full MuxCls rewrite, F01-F15,
