@@ -192,7 +192,11 @@ impl WizApp {
             Ok(response) => response,
             Err(error) => {
                 self.error = Some(error);
-                self.status = if matches!(received.action,Action::Intake){"File intake did not finish. Select the file to try again.".into()}else{"Connection interrupted. Retry retains the original request identity.".into()};
+                self.status = if matches!(received.action, Action::Intake) {
+                    "File intake did not finish. Select the file to try again.".into()
+                } else {
+                    "Connection interrupted. Retry retains the original request identity.".into()
+                };
                 return;
             }
         };
@@ -215,14 +219,27 @@ impl WizApp {
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     self.assets = assets.into_iter().map(Arc::new).collect();
                 }
-                Action::Intake => {self.mutate("assets.register",result,Action::Register,ctx);}
-                Action::Output => {self.output=result["output"].as_str().ok_or("Output suggestion missing")?.into();self.changed();}
+                Action::Intake => {
+                    self.mutate("assets.register", result, Action::Register, ctx);
+                }
+                Action::Output => {
+                    self.output = result["output"]
+                        .as_str()
+                        .ok_or("Output suggestion missing")?
+                        .into();
+                    self.changed();
+                }
                 Action::Register => {
                     let asset: Asset =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     self.selected = Some(asset.id.clone());
                     self.output.clear();
-                    self.query("assets.output_suggest",json!({"id":asset.id}),Action::Output,ctx);
+                    self.query(
+                        "assets.output_suggest",
+                        json!({"id":asset.id}),
+                        Action::Output,
+                        ctx,
+                    );
                     self.assets.retain(|old| old.id != asset.id);
                     self.assets.push(Arc::new(asset));
                     self.stream_page = 0;
@@ -278,7 +295,9 @@ impl WizApp {
         if let Err(error) = parsed {
             self.error = Some(format!("Invalid owner response: {error}"));
         }
-        if matches!(received.action,Action::Scope) && let Some((id, params, action)) = self.deferred.take() {
+        if matches!(received.action, Action::Scope)
+            && let Some((id, params, action)) = self.deferred.take()
+        {
             self.mutate(&id, params, action, ctx);
         } else if matches!(
             received.action,
@@ -304,7 +323,11 @@ impl WizApp {
             .id_salt("asset-catalog")
             .show(ui, |ui| {
                 for asset in &self.assets {
-                    let name = if asset.display_name.is_empty(){cleanup::file_name(&asset.identity.path)}else{asset.display_name.as_str()};
+                    let name = if asset.display_name.is_empty() {
+                        cleanup::file_name(&asset.identity.path)
+                    } else {
+                        asset.display_name.as_str()
+                    };
                     if ui
                         .selectable_label(self.selected.as_ref() == Some(&asset.id), name)
                         .on_hover_text(&asset.identity.path)
@@ -325,7 +348,12 @@ impl WizApp {
         if let Some(asset) = select {
             self.selected = Some(asset.id.clone());
             self.output.clear();
-            self.query("assets.output_suggest",json!({"id":asset.id}),Action::Output,ui.ctx());
+            self.query(
+                "assets.output_suggest",
+                json!({"id":asset.id}),
+                Action::Output,
+                ui.ctx(),
+            );
             self.stream_page = 0;
             self.changed();
         }
@@ -397,10 +425,34 @@ impl eframe::App for WizApp {
             }
             ctx.request_repaint_after(Duration::from_millis(250));
         }
-        #[cfg(target_arch="wasm32")]
-        if !self.waiting && self.pending.is_none() && let Some(file)=ctx.input(|input|input.raw.dropped_files.iter().find_map(|file|file.web_file().cloned())){
-            self.waiting=true;self.error=None;self.status="Uploading media to the local engine…".into();
-            let inbox=self.inbox.clone();let repaint=ctx.clone();self.client.upload_dropped(file,Box::new(move|response|{if let Ok(mut slot)=inbox.lock(){*slot=Some(Received{action:Action::Intake,response});}repaint.request_repaint();}));
+        #[cfg(target_arch = "wasm32")]
+        if !self.waiting
+            && self.pending.is_none()
+            && let Some(file) = ctx.input(|input| {
+                input
+                    .raw
+                    .dropped_files
+                    .iter()
+                    .find_map(|file| file.web_file().cloned())
+            })
+        {
+            self.waiting = true;
+            self.error = None;
+            self.status = "Uploading media to the local engine…".into();
+            let inbox = self.inbox.clone();
+            let repaint = ctx.clone();
+            self.client.upload_dropped(
+                file,
+                Box::new(move |response| {
+                    if let Ok(mut slot) = inbox.lock() {
+                        *slot = Some(Received {
+                            action: Action::Intake,
+                            response,
+                        });
+                    }
+                    repaint.request_repaint();
+                }),
+            );
         }
         let dropped = ctx.input(|input| {
             input

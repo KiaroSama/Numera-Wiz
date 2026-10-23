@@ -40,6 +40,8 @@ struct Credential {
     last_active: u64,
     #[serde(default)]
     origin: Option<String>,
+    #[serde(default)]
+    audience:u64,
 }
 pub struct Service {
     pub store: Arc<Store>,
@@ -48,6 +50,7 @@ pub struct Service {
     root: PathBuf,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
+    origins:Mutex<HashMap<String,u64>>,
     requests: Arc<Semaphore>,
     heavy: Arc<Semaphore>,
     pending: Arc<AtomicUsize>,
@@ -144,6 +147,7 @@ impl Service {
             engine,
             mutation: Mutex::new(()),
             credentials: Mutex::new(()),
+            origins:Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
             heavy: Arc::new(Semaphore::new(1)),
             pending: Arc::new(AtomicUsize::new(0)),
@@ -302,6 +306,7 @@ impl Service {
             || now >= credential.expires
             || now.saturating_sub(credential.last_active) >= 7200
             || credential.origin.as_deref() != origin
+            || credential.audience!=self.origin_generation(origin)?
         {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
@@ -315,6 +320,14 @@ impl Service {
         }
         Ok(credential.context)
     }
+    fn origin_generation(&self,origin:Option<&str>)->Result<u64>{
+        let generations=self.origins.lock().map_err(|_|lock_error())?;Ok(origin.and_then(|origin|generations.get(origin)).copied().unwrap_or(0))
+    }
+    pub fn advance_origin(&self,origin:&str)->Result<()> {
+        let mut generations=self.origins.lock().map_err(|_|lock_error())?;
+        if generations.len()>=128 && !generations.contains_key(origin){return Err(DomainError::new("RESOURCE_LIMIT","Public audience transition quota reached; restart after work drains"));}
+        let generation=generations.entry(origin.into()).or_default();*generation=generation.checked_add(1).ok_or_else(||DomainError::new("RESOURCE_LIMIT","Audience generation exhausted"))?;Ok(())
+    }
     pub fn credential(&self, name: &str) -> Result<String> {
         self.credential_for_origin(name, None)
     }
@@ -327,6 +340,7 @@ impl Service {
             if credential.epoch != self.epoch
                 || credential.expires <= now
                 || now.saturating_sub(credential.last_active) >= 7200
+                || credential.audience!=self.origin_generation(credential.origin.as_deref())?
             {
                 self.store.remove(&key)?;
             } else if credential.context.principal == context.principal {
@@ -351,6 +365,7 @@ impl Service {
                 epoch: self.epoch.clone(),
                 expires: now + 8 * 3600,
                 last_active: now,
+                audience:self.origin_generation(origin.as_deref())?,
                 origin,
             },
         )?;

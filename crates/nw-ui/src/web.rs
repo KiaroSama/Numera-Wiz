@@ -10,16 +10,27 @@ struct BrowserClient {
     bearer: String,
 }
 impl CommandClient for BrowserClient {
-    fn choose_media(&self,reply:Reply){
-        let origin=self.origin.clone();let bearer=self.bearer.clone();
-        wasm_bindgen_futures::spawn_local(async move{
-            let result=match choose_file().await{Ok(file)=>upload_file(&origin,&bearer,file).await,Err(error)=>Err(error)};
-            reply(result.map(|params|commands::Response::success("intake",params)));
+    fn choose_media(&self, reply: Reply) {
+        let origin = self.origin.clone();
+        let bearer = self.bearer.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = match choose_file().await {
+                Ok(file) => upload_file(&origin, &bearer, file).await,
+                Err(error) => Err(error),
+            };
+            reply(result.map(|params| commands::Response::success("intake", params)));
         });
     }
-    fn upload_dropped(&self,file:web_sys::File,reply:Reply){
-        let origin=self.origin.clone();let bearer=self.bearer.clone();
-        wasm_bindgen_futures::spawn_local(async move{reply(upload_file(&origin,&bearer,file).await.map(|params|commands::Response::success("intake",params)));});
+    fn upload_dropped(&self, file: web_sys::File, reply: Reply) {
+        let origin = self.origin.clone();
+        let bearer = self.bearer.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            reply(
+                upload_file(&origin, &bearer, file)
+                    .await
+                    .map(|params| commands::Response::success("intake", params)),
+            );
+        });
     }
     fn send(&self, request: Request, reply: Reply) {
         let origin = self.origin.clone();
@@ -66,10 +77,27 @@ pub async fn fetch_json(
     bearer: Option<&str>,
     bytes: Vec<u8>,
 ) -> Result<serde_json::Value, String> {
-    let body=js_sys::Uint8Array::from(bytes.as_slice());
-    fetch_value(origin,route,bearer,"POST",body.as_ref(),"application/json",130000).await
+    let body = js_sys::Uint8Array::from(bytes.as_slice());
+    fetch_value(
+        origin,
+        route,
+        bearer,
+        "POST",
+        body.as_ref(),
+        "application/json",
+        130000,
+    )
+    .await
 }
-async fn fetch_value(origin:&str,route:&str,bearer:Option<&str>,method:&str,body:&JsValue,content_type:&str,timeout:i32)->Result<serde_json::Value,String>{
+async fn fetch_value(
+    origin: &str,
+    route: &str,
+    bearer: Option<&str>,
+    method: &str,
+    body: &JsValue,
+    content_type: &str,
+    timeout: i32,
+) -> Result<serde_json::Value, String> {
     let window = web_sys::window().ok_or("Browser window unavailable")?;
     if window.location().origin().map_err(js_error)? != origin {
         return Err("Foreign service origins are refused".into());
@@ -329,34 +357,114 @@ impl WebHandle {
     }
 }
 
-
-struct FileSelection {input:web_sys::HtmlInputElement,_changed:Closure<dyn FnMut()>,cancelled:Closure<dyn FnMut()>}
+struct FileSelection {
+    input: web_sys::HtmlInputElement,
+    _changed: Closure<dyn FnMut()>,
+    cancelled: Closure<dyn FnMut()>,
+}
 impl Drop for FileSelection {
-    fn drop(&mut self){self.input.set_onchange(None);let _=self.input.remove_event_listener_with_callback("cancel",self.cancelled.as_ref().unchecked_ref());self.input.remove();}
+    fn drop(&mut self) {
+        self.input.set_onchange(None);
+        let _ = self
+            .input
+            .remove_event_listener_with_callback("cancel", self.cancelled.as_ref().unchecked_ref());
+        self.input.remove();
+    }
 }
-async fn choose_file()->Result<web_sys::File,String>{
+async fn choose_file() -> Result<web_sys::File, String> {
     use std::rc::Rc;
-    let document=web_sys::window().and_then(|window|window.document()).ok_or("Document unavailable")?;
-    let input:web_sys::HtmlInputElement=document.create_element("input").map_err(js_error)?.dyn_into().map_err(|error:web_sys::Element|js_error(error.into()))?;
-    input.set_type("file");input.set_id("media-file-input");input.set_hidden(true);input.set_multiple(false);
-    let resolver=Rc::new(RefCell::new(None::<js_sys::Function>));let receiver=resolver.clone();
-    let promise=js_sys::Promise::new(&mut move|resolve,_reject|{*receiver.borrow_mut()=Some(resolve);});
-    let selected=input.clone();let changed_resolver=resolver.clone();
-    let changed=Closure::new(move||{if let Some(resolve)=changed_resolver.borrow().as_ref(){let file=selected.files().and_then(|files|files.get(0)).map(JsValue::from).unwrap_or(JsValue::NULL);let _=resolve.call1(&JsValue::NULL,&file);}});
-    let cancelled=Closure::new(move||{if let Some(resolve)=resolver.borrow().as_ref(){let _=resolve.call1(&JsValue::NULL,&JsValue::NULL);}});
-    input.set_onchange(Some(changed.as_ref().unchecked_ref()));input.add_event_listener_with_callback("cancel",cancelled.as_ref().unchecked_ref()).map_err(js_error)?;
-    document.body().ok_or("Document body unavailable")?.append_child(&input).map_err(js_error)?;
-    let picker=FileSelection{input,_changed:changed,cancelled};picker.input.click();
-    let value=JsFuture::from(promise).await.map_err(js_error)?;
-    value.dyn_into().map_err(|_|"File selection cancelled".into())
+    let document = web_sys::window()
+        .and_then(|window| window.document())
+        .ok_or("Document unavailable")?;
+    let input: web_sys::HtmlInputElement = document
+        .create_element("input")
+        .map_err(js_error)?
+        .dyn_into()
+        .map_err(|error: web_sys::Element| js_error(error.into()))?;
+    input.set_type("file");
+    input.set_id("media-file-input");
+    input.set_hidden(true);
+    input.set_multiple(false);
+    let resolver = Rc::new(RefCell::new(None::<js_sys::Function>));
+    let receiver = resolver.clone();
+    let promise = js_sys::Promise::new(&mut move |resolve, _reject| {
+        *receiver.borrow_mut() = Some(resolve);
+    });
+    let selected = input.clone();
+    let changed_resolver = resolver.clone();
+    let changed = Closure::new(move || {
+        if let Some(resolve) = changed_resolver.borrow().as_ref() {
+            let file = selected
+                .files()
+                .and_then(|files| files.get(0))
+                .map(JsValue::from)
+                .unwrap_or(JsValue::NULL);
+            let _ = resolve.call1(&JsValue::NULL, &file);
+        }
+    });
+    let cancelled = Closure::new(move || {
+        if let Some(resolve) = resolver.borrow().as_ref() {
+            let _ = resolve.call1(&JsValue::NULL, &JsValue::NULL);
+        }
+    });
+    input.set_onchange(Some(changed.as_ref().unchecked_ref()));
+    input
+        .add_event_listener_with_callback("cancel", cancelled.as_ref().unchecked_ref())
+        .map_err(js_error)?;
+    document
+        .body()
+        .ok_or("Document body unavailable")?
+        .append_child(&input)
+        .map_err(js_error)?;
+    let picker = FileSelection {
+        input,
+        _changed: changed,
+        cancelled,
+    };
+    picker.input.click();
+    let value = JsFuture::from(promise).await.map_err(js_error)?;
+    value
+        .dyn_into()
+        .map_err(|_| "File selection cancelled".into())
 }
-async fn upload_file(origin:&str,bearer:&str,file:web_sys::File)->Result<serde_json::Value,String>{
-    let size=file.size();
-    if !size.is_finite() || size<=0.0 || size>1073741824.0 || size.fract()!=0.0{return Err("Select a nonempty file of at most 1 GiB".into());}
-    let input=serde_json::json!({"display_name":file.name(),"bytes":format!("{size:.0}")});
-    let ticket=fetch_json(origin,"/api/v1/uploads",Some(bearer),serde_json::to_vec(&input).map_err(|error|error.to_string())?).await?;
-    let id=ticket["upload_id"].as_str().filter(|id|id.len()==36 && id.bytes().all(|byte|byte.is_ascii_hexdigit() || byte==b'-')).ok_or("Upload handle missing")?;
-    let completed=fetch_value(origin,&format!("/api/v1/uploads/{id}"),Some(bearer),"PUT",file.as_ref(),"application/octet-stream",900000).await?;
-    if completed["upload_id"]!=id{return Err("Intake completion does not match the admitted handle".into());}
+async fn upload_file(
+    origin: &str,
+    bearer: &str,
+    file: web_sys::File,
+) -> Result<serde_json::Value, String> {
+    let size = file.size();
+    if !size.is_finite() || size <= 0.0 || size > 1073741824.0 || size.fract() != 0.0 {
+        return Err("Select a nonempty file of at most 1 GiB".into());
+    }
+    let input = serde_json::json!({"display_name":file.name(),"bytes":format!("{size:.0}")});
+    let ticket = fetch_json(
+        origin,
+        "/api/v1/uploads",
+        Some(bearer),
+        serde_json::to_vec(&input).map_err(|error| error.to_string())?,
+    )
+    .await?;
+    let id = ticket["upload_id"]
+        .as_str()
+        .filter(|id| {
+            id.len() == 36
+                && id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() || byte == b'-')
+        })
+        .ok_or("Upload handle missing")?;
+    let completed = fetch_value(
+        origin,
+        &format!("/api/v1/uploads/{id}"),
+        Some(bearer),
+        "PUT",
+        file.as_ref(),
+        "application/octet-stream",
+        900000,
+    )
+    .await?;
+    if completed["upload_id"] != id {
+        return Err("Intake completion does not match the admitted handle".into());
+    }
     Ok(serde_json::json!({"upload_id":id}))
 }
