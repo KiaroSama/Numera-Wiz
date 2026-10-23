@@ -27,7 +27,9 @@ Windows/Linux/macOS locked workspace tests, Clippy and desktop builds; Linux WAS
 closure check; preserved source hashes and contract generation; and actual CPU
 FFmpeg copy/remux assertions. The resolved Cargo.lock and CI rustfmt changes are
 retained. Later review fixes add the donor `uknown`/`*uknown` language aliases and
-use the shared duplicate-key-rejecting decoder in the UI. The PR's current checks
+use the shared duplicate-key-rejecting decoder in the UI. Copy publication now
+compares against the plan's reviewed identity, bounds growth to its reviewed
+length and rejects a different execution component identity. The PR's current checks
 identify the evidence for those later changes. Internal evidence in completion.json
 is deliberately tied to the exact already-observed commit, rather than inferred.
 

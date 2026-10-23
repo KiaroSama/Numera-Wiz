@@ -144,11 +144,23 @@ pub fn verified_copy(
     cancel: &CancellationToken,
 ) -> Result<FileIdentity> {
     let expected = identity(source, cancel)?;
+    verified_copy_expected(&expected, destination, cancel)
+}
+pub fn verified_copy_expected(
+    expected: &FileIdentity,
+    destination: &Path,
+    cancel: &CancellationToken,
+) -> Result<FileIdentity> {
+    let expected_bytes = expected
+        .bytes
+        .parse::<u64>()
+        .map_err(|_| DomainError::new("INVALID_IDENTITY", "Invalid reviewed byte length"))?;
     let output = output_path(destination)?;
     let parent = output.parent().expect("validated parent");
     let mut staging = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
-    let mut input = File::open(source).map_err(io_error)?;
+    let mut input = File::open(&expected.path).map_err(io_error)?;
     let mut buffer = vec![0; 4 * 1024 * 1024];
+    let mut copied = 0u64;
     loop {
         if cancel.is_cancelled() {
             return Err(DomainError::new(
@@ -160,6 +172,15 @@ pub fn verified_copy(
         if n == 0 {
             break;
         }
+        copied = copied
+            .checked_add(n as u64)
+            .ok_or_else(|| DomainError::new("SOURCE_CHANGED", "Copy length overflow"))?;
+        if copied > expected_bytes {
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Source exceeds its reviewed byte length",
+            ));
+        }
         staging.write_all(&buffer[..n]).map_err(io_error)?;
     }
     staging.as_file().sync_all().map_err(io_error)?;
@@ -170,7 +191,7 @@ pub fn verified_copy(
             "Full source and staging byte digests differ",
         ));
     }
-    revalidate(&expected, cancel)?;
+    revalidate(expected, cancel)?;
     if cancel.is_cancelled() {
         return Err(DomainError::new(
             "CANCELLED",
@@ -193,6 +214,26 @@ pub fn verified_copy(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reviewed_copy_rejects_replacement_before_copy_and_publishes_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        let output = root.path().join("output.bin");
+        let cancel = CancellationToken::new();
+        fs::write(&source, b"reviewed").unwrap();
+        let expected = identity(&source, &cancel).unwrap();
+        fs::write(&source, b"replaced").unwrap();
+        assert!(verified_copy_expected(&expected, &output, &cancel).is_err());
+        assert!(!output.exists());
+        fs::write(&source, b"longer than the reviewed length").unwrap();
+        assert_eq!(
+            verified_copy_expected(&expected, &output, &cancel)
+                .unwrap_err()
+                .code,
+            "SOURCE_CHANGED"
+        );
+        assert!(!output.exists());
+    }
     #[test]
     fn copy_verifies_new_bytes_and_preserves_existing_destination() {
         let root = tempfile::tempdir().unwrap();
