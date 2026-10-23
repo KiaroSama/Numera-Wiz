@@ -736,6 +736,7 @@ impl Service {
                 }
                 self.path(&context, Path::new(&plan.source.identity.path), false)?;
                 self.path(&context, Path::new(&plan.output), true)?;
+                files::revalidate_output(&plan.output)?;
                 files::revalidate(&plan.source.identity, &cancellation)?;
                 if self.pending.load(Ordering::Acquire) >= 128 {
                     return Err(DomainError::new(

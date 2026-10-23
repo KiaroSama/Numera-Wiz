@@ -194,7 +194,7 @@ impl Engine {
             files::revalidate(&ffprobe, &token)
         })
         .await?;
-        files::output_path(Path::new(&plan.output))?;
+        files::revalidate_output(&plan.output)?;
         match plan.resolution.action {
             CleanAction::Skip => Ok((
                 None,
@@ -319,7 +319,7 @@ async fn publish(
     cancel: CancellationToken,
     observer: Observer,
 ) -> Result<FileIdentity> {
-    let output = PathBuf::from(&plan.output);
+    let output = files::revalidate_output(&plan.output)?;
     let parent = output
         .parent()
         .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
