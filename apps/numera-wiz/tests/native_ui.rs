@@ -1,13 +1,13 @@
 //! Actual CI-built native window and human input, exercised under hosted X11.
 #![cfg(target_os = "linux")]
+#[path = "support/evidence.rs"]
+mod evidence;
 #[allow(
     dead_code,
     reason = "This shared fixture also supports deeper output oracles"
 )]
 #[path = "../../../test-support/media.rs"]
 mod fixture;
-#[path = "support/evidence.rs"]
-mod evidence;
 use evidence::RetainLogs;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
@@ -111,7 +111,10 @@ async fn journey() {
         .expect("Hosted X11 window manager");
     let media = fixture::generate().await;
     let root = media.directory.path().join("native-data");
-    let _owner_logs = RetainLogs { source: root.join("logs"), destination: evidence.join("native-owner-logs") };
+    let _owner_logs = RetainLogs {
+        source: root.join("logs"),
+        destination: evidence.join("native-owner-logs"),
+    };
     let identity =
         nw_platform::files::identity(&executable, &tokio_util::sync::CancellationToken::new())
             .unwrap();

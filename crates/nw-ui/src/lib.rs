@@ -621,7 +621,12 @@ impl eframe::App for WizApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
-        if ui.ctx().input_mut(|input| input.consume_shortcut(&egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Enter))) {
+        if ui.ctx().input_mut(|input| {
+            input.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::Enter,
+            ))
+        }) {
             self.run_reviewed(ui.ctx());
         }
         egui::Panel::top("navigation").show(ui, |ui| {

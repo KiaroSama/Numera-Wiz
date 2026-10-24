@@ -20,10 +20,13 @@ impl Cli {
             .kill_on_drop(true)
             .spawn()
             .unwrap();
-        let output = tokio::time::timeout(self.request_timeout.max(Duration::from_secs(45)), child.wait_with_output())
-            .await
-            .unwrap()
-            .unwrap();
+        let output = tokio::time::timeout(
+            self.request_timeout.max(Duration::from_secs(45)),
+            child.wait_with_output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
         let value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
             panic!(
                 "Human CLI failed: {}",

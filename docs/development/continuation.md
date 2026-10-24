@@ -14,8 +14,8 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 27 actual owner handlers; the three latest
-artifact handlers await their complete integration CI result. This is partial initial
+The live registry now contains 27 actual owner handlers, including the qualified
+development artifact list/manifest/chunk path. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -579,3 +579,33 @@ on failure as well as success. These changes and the large HTTP journey still
 need their own hosted result. The ordinary CLI fixture keeps its prior 40-second
 bound; the large-fixture client allowance is finite 150 seconds around the
 application's own bounded requests. This is not a performance qualification.
+
+
+## Current qualified artifact boundary
+
+Hosted run [40059650873](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40059650873)
+for branch head 3d4787bfb47d129aa45001b553575dedfb9bacac compiled merge source
+03bc79d95464d18516b4db5dcc0ace13aebc75be. All four native targets, WASM,
+real engine/CLI/official MCP media, actual Chrome and native-window copy journeys
+passed. Only formatting failed; its exact artifact patch is applied here.
+The native shortcut now runs in the actual UI input pass; the harness explicitly
+focuses the native window and retains post-key and protected owner diagnostics.
+This passing journey does not establish a single cause for the previous missed
+keyboard submission.
+
+The real Linux headless owner transferred a valid 268633400-byte produced Matroska
+artifact with exact SHA-256 and a measured owner VmHWM of 34388 KiB, under its
+selected 131072 KiB ceiling. Removing job Read and separately revoking one bearer
+interrupted active streams and denied subsequent requests. Client disconnect
+removed the temporary index. Evidence, component identities and scope are in
+`evidence/artifact-http-ci51.json`. Native window metadata and the independent
+byte-equality oracle are in `evidence/native-copy-ci51.json`. Original ZIP digests
+are retained with those reports. These are development/Linux boundaries, not full
+aggregate R20, packaged delivery, other-platform GUI or owner GPU qualification.
+Native/browser Save As, observations, crash-orphan index reconciliation and full
+artifact retention remain required.
+
+Full personal manual coverage is now 46 of 48 preserved bodies; filters and drawvg
+remain. Next implement versioned semantic plan rights/audit separation without
+silently changing historical plan hashes. Continue all open task-ledger obligations;
+no complete-release claim or task closure is inferred from this checkpoint.

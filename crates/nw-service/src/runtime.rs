@@ -730,7 +730,8 @@ impl Service {
             Err(error) => {
                 Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string()))
             }
-        }.bounded();
+        }
+        .bounded();
         tracing::info!(request_id=%id, command=%operation, ok=response.ok, code=response.error.as_ref().map_or("OK", |error| error.code.as_str()), receipt_id=response.receipt_id.as_deref().unwrap_or(""), "command.completed");
         response
     }
