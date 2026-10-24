@@ -1334,3 +1334,38 @@ Typed disabled/finite cleanup policies, full progress/discovery/batch/companion
 work and all other full-product/five-surface/package/resource/manual/owner gates
 remain required. No timeout/progress feature source has been added yet. No task
 checkbox changed; no local build/test/GUI/media or owner GPU run occurred.
+
+
+## Native OS Save As confirmed; headed browser desktop follow-up
+
+Run 40096506818 on 1a7c3f8197ae21574af6a6cd9de3f26eb564782e passed
+all four complete native targets, WASM/lock and the complete actual media suite.
+Large scoped client HWM was 26304 KiB for 268633400 bytes, with confirmed partial
+cancellation and all HTTP revocation/cleanup assertions. Exact compiled merge
+bf0db43829886719f34f701e32a8a352a00942f1 and payload facts remain in
+artifact-http-ci79.json.
+
+The actual native typed destination AND genuine OS Save As picker passed
+independent 197983-byte saved/source equality, retained one producer job and
+closed normally. Its actual OS-saved PNG was personally inspected. Whole-name
+selection fixed the duplicate-extension oracle failure without changing product
+copy semantics. The internal completion record adds this scoped evidence only.
+
+Chrome passed real report input/correlated canonical HTTP response, actual
+report rendering, Review/Run/verified output and opened Output details. Its
+actual manifest and pending-Save PNGs were personally inspected. Save pointer
+input initiated a pending zero-byte client copy, but no visible chooser matching
+^Save was found within 12 seconds. No whole-desktop image was captured in that
+revision and the exact cause remains unknown; no browser Save pass is inferred.
+The next hosted Chrome runs in a fresh DBus session inside Xvfb with desktop
+portal/GTK packages like the successful native job, accepts Save/File/Choose
+chooser titles and retains bounded root-desktop/window-title diagnostics on
+failure. Real OS input, the independent file oracle and existing bounds remain.
+One exact hosted formatter hunk is applied. This follow-up awaits CI.
+
+Complete F01-F15/MuxCls/batches/companions, project/editor/effects/DAG/preview/
+mixer/captions/interchange, command closure, retention/migration, portable
+packages/resources/manuals and matching owner-harness evidence are still
+mandatory. Typed timeout/progress and ordinary composable CLI expansion remain
+design work, with no source yet. No local build/test/GUI/media or owner GPU run
+occurred. Public/single-review-branch/draft/main boundaries remain intact.

@@ -399,11 +399,9 @@ mod tests {
             pairing: Mutex::new(HashMap::new()),
         });
         let observed_reports = Arc::new(Mutex::new(std::collections::VecDeque::new()));
-        let routes = super::super::router(owner.clone(), port, false, owner.stop.clone())
-            .layer(axum::middleware::from_fn_with_state(
-                observed_reports.clone(),
-                observe_reports,
-            ));
+        let routes = super::super::router(owner.clone(), port, false, owner.stop.clone()).layer(
+            axum::middleware::from_fn_with_state(observed_reports.clone(), observe_reports),
+        );
         let task = tokio::spawn(async move {
             axum::serve(listener, routes).await.unwrap();
         });
@@ -595,6 +593,52 @@ mod tests {
             browser_xdo(args).await.status.success(),
             "Browser OS input failed"
         );
+    }
+    async fn browser_desktop_diagnostic(path: &std::path::Path) {
+        use base64::Engine as _;
+        use std::io::Read as _;
+        let status = tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::process::Command::new("/usr/bin/import")
+                .args(["-window", "root"])
+                .arg(path)
+                .kill_on_drop(true)
+                .status(),
+        )
+        .await
+        .expect("Browser desktop capture deadline")
+        .expect("Browser desktop capture");
+        assert!(status.success());
+        let mut png = Vec::new();
+        std::fs::File::open(path)
+            .unwrap()
+            .take(256 * 1024 + 1)
+            .read_to_end(&mut png)
+            .unwrap();
+        if png.len() <= 256 * 1024 {
+            println!(
+                "NW_BROWSER_DESKTOP_FAILURE_IMAGE:{}",
+                base64::engine::general_purpose::STANDARD.encode(png)
+            );
+        }
+        let windows = browser_xdo(&["search", "--onlyvisible", "--name", "."]).await;
+        let mut titles = Vec::new();
+        for id in String::from_utf8_lossy(&windows.stdout).lines().take(32) {
+            if !id.bytes().all(|c| c.is_ascii_digit()) {
+                continue;
+            }
+            let title = browser_xdo(&["getwindowname", id]).await;
+            if title.status.success() {
+                let title: String = String::from_utf8_lossy(&title.stdout)
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(256)
+                    .collect();
+                titles.push(title);
+            }
+        }
+        // This isolated display contains only the test browser and OS dialog.
+        println!("NW_BROWSER_VISIBLE_TITLES:{}", json!(titles));
     }
     async fn driver(
         client: &reqwest::Client,
@@ -1123,7 +1167,7 @@ mod tests {
                     json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":100,"y":381},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
                 let started = Instant::now();
                 let dialog = loop {
-                    let found = browser_xdo(&["search", "--onlyvisible", "--name", "^Save"]).await;
+                    let found = browser_xdo(&["search", "--onlyvisible", "--name", "[Ss]ave|[Ff]ile|[Cc]hoose"]).await;
                     if found.status.success() {
                         let found = String::from_utf8(found.stdout).unwrap();
                         if let Some(window) = found.lines().last() {
@@ -1148,6 +1192,9 @@ mod tests {
                         if bytes.len() <= 256 * 1024 {
                             println!("NW_BROWSER_SAVE_FAILURE_IMAGE:{png}");
                         }
+                        browser_desktop_diagnostic(
+                            &directory.join("browser-save-picker-desktop-timeout.png"),
+                        ).await;
                         panic!("Actual browser Save control did not open its real OS file picker");
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -1177,7 +1224,7 @@ mod tests {
                 .await;
                 browser_input(&["key", "--clearmodifiers", "Return"]).await;
                 tokio::time::sleep(Duration::from_millis(250)).await;
-                if browser_xdo(&["search", "--onlyvisible", "--name", "^Save"])
+                if browser_xdo(&["search", "--onlyvisible", "--name", "[Ss]ave|[Ff]ile|[Cc]hoose"])
                     .await
                     .status
                     .success()
@@ -1211,6 +1258,9 @@ mod tests {
                         if bytes.len() <= 256 * 1024 {
                             println!("NW_BROWSER_SAVE_FAILURE_IMAGE:{png}");
                         }
+                        browser_desktop_diagnostic(
+                            &directory.join("browser-save-desktop-timeout.png"),
+                        ).await;
                         panic!(
                             "Actual browser picker/stream/close did not produce the selected verified bytes"
                         );

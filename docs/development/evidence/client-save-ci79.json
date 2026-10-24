@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "run_id": 40096506818,
+  "branch_head": "1a7c3f8197ae21574af6a6cd9de3f26eb564782e",
+  "jobs": [
+    {
+      "id": 120879775795,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120879775862,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120879775867,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120879775912,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120880221003,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120880221011,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120880221020,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120880221032,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120882955857,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120882955879,
+      "name": "browser",
+      "conclusion": "failure"
+    }
+  ],
+  "asserted": [
+    "four complete native regression/Clippy/desktop targets, WASM and lock",
+    "complete actual engine/CLI/official SDK/lost-response/large copy/cancel/revocation suite",
+    "actual Linux native typed destination and genuine OS Save As picker, independently verified 197983-byte saved/source equality, one producer job and normal close/lease teardown",
+    "actual Chrome report input, correlated canonical response and image, Review/Run/verified producer output and opened Output details"
+  ],
+  "personally_inspected_images": [
+    "native-picker-saved.png",
+    "browser-output-details.png",
+    "browser-save-picker-timeout.png"
+  ],
+  "browser_remaining": {
+    "point": "real Save pointer initiated pending client-copy state, but no matching visible OS picker was found inside 12 seconds",
+    "saved_file_oracle": "not reached",
+    "root_desktop_image": "not captured by this revision",
+    "exact_cause": "not established"
+  },
+  "next_source": [
+    "run headed Chrome under its own DBus session inside the established Xvfb DISPLAY, with desktop portal/GTK setup matching the successful native job",
+    "match Save/File/Choose chooser titles, preserve genuine OS input and independent saved file oracle",
+    "capture bounded full isolated desktop image and visible window titles on failure",
+    "one exact hosted formatter hunk"
+  ],
+  "artifacts": [
+    {
+      "id": 12562060027,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:ead18afe5be6a229b081a291a5a9770eed9e5ba1055df03b5df4279ff50ffb5f",
+      "downloaded": false
+    },
+    {
+      "id": 12561835716,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:e81a341e9ee89cf22760ae58be0fb0de14a69c0d2bb5bf9f03565fba5fffe025",
+      "downloaded": false
+    },
+    {
+      "id": 12561254285,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:78d54914889f7f3b9ca71574f245c7b9ed2b04b764317bcfc39ae79e37be8a92",
+      "downloaded": false
+    },
+    {
+      "id": 12561037683,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:b879a85eb6f3f08b6817f1a4500aeb5edee1bc28cea7adb1a2ecafd881d77485",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "browser Save and other platform/browser variants",
+    "full product/package/resource/manual/owner gates"
+  ]
+}
