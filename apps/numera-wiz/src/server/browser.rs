@@ -1330,85 +1330,236 @@ mod tests {
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),
                 json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E00C}"},{"type":"keyUp","value":"\u{E00C}"}]}]})).await;
             let second_source = media.directory.path().join("browser-second.mkv");
-            let ffmpeg_args = ["-hide_banner","-nostdin","-v","error","-i",media.source.to_str().unwrap(),
-                "-map","0:0","-map","0:1","-c","copy","-f","matroska",second_source.to_str().unwrap()].map(str::to_owned);
-            nw_platform::process::run(&media.bin.join("ffmpeg"),&ffmpeg_args,
-                Duration::from_secs(30),4096,CancellationToken::new()).await.unwrap();
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/goog/cdp/execute"),
-                json!({"cmd":"Page.setInterceptFileChooserDialog","params":{"enabled":true}})).await;
-            browser_click(&client,&base,&route,320,94).await;
+            let ffmpeg_args = [
+                "-hide_banner",
+                "-nostdin",
+                "-v",
+                "error",
+                "-i",
+                media.source.to_str().unwrap(),
+                "-map",
+                "0:0",
+                "-map",
+                "0:1",
+                "-c",
+                "copy",
+                "-f",
+                "matroska",
+                second_source.to_str().unwrap(),
+            ]
+            .map(str::to_owned);
+            nw_platform::process::run(
+                &media.bin.join("ffmpeg"),
+                &ffmpeg_args,
+                Duration::from_secs(30),
+                4096,
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+            driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/goog/cdp/execute"),
+                json!({"cmd":"Page.setInterceptFileChooserDialog","params":{"enabled":true}}),
+            )
+            .await;
+            browser_click(&client, &base, &route, 320, 94).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let selected = driver(&client,&base,reqwest::Method::POST,&format!("{route}/element"),
-                json!({"using":"css selector","value":"input[type=file]"})).await;
-            let selected = selected["element-6066-11e4-a52e-4f735466cecf"].as_str().unwrap();
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/element/{selected}/value"),
-                json!({"text":second_source.to_str().unwrap()})).await;
+            let selected = driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/element"),
+                json!({"using":"css selector","value":"input[type=file]"}),
+            )
+            .await;
+            let selected = selected["element-6066-11e4-a52e-4f735466cecf"]
+                .as_str()
+                .unwrap();
+            driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/element/{selected}/value"),
+                json!({"text":second_source.to_str().unwrap()}),
+            )
+            .await;
             let started = Instant::now();
             loop {
-                if fixture.owner.service.store.list::<nw_domain::records::Asset>("asset/",128).unwrap().len() == 2 { break; }
-                assert!(started.elapsed() < Duration::from_secs(20),"Second browser file intake did not register");
+                if fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Asset>("asset/", 128)
+                    .unwrap()
+                    .len()
+                    == 2
+                {
+                    break;
+                }
+                assert!(
+                    started.elapsed() < Duration::from_secs(20),
+                    "Second browser file intake did not register"
+                );
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
             tokio::time::sleep(Duration::from_millis(700)).await;
-            browser_click(&client,&base,&route,16,94).await;
+            browser_click(&client, &base, &route, 16, 94).await;
             tokio::time::sleep(Duration::from_millis(700)).await;
-            browser_click(&client,&base,&route,16,132).await;
+            browser_click(&client, &base, &route, 16, 132).await;
             tokio::time::sleep(Duration::from_millis(700)).await;
-            browser_click(&client,&base,&route,158,68).await;
+            browser_click(&client, &base, &route, 158, 68).await;
             tokio::time::sleep(Duration::from_millis(700)).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("batch-draft.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
-            browser_click(&client,&base,&route,85,199).await;
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("batch-draft.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
+            browser_click(&client, &base, &route, 85, 199).await;
             let started = Instant::now();
             let batch_plan = loop {
-                let plans = fixture.owner.service.store.list::<nw_domain::batches::BatchPlan>("batch-plan/",128).unwrap();
-                if let Some(plan) = plans.into_iter().next() { break plan; }
+                let plans = fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::batches::BatchPlan>("batch-plan/", 128)
+                    .unwrap();
+                if let Some(plan) = plans.into_iter().next() {
+                    break plan;
+                }
                 if started.elapsed() >= Duration::from_secs(20) {
-                    let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-                    let bytes = base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap();
-                    std::fs::write(directory.join("batch-review-timeout.png"),&bytes).unwrap();
-                    if bytes.len() <= 256*1024 { println!("NW_BROWSER_BATCH_FAILURE_IMAGE:{}",png.as_str().unwrap()); }
+                    let png = driver(
+                        &client,
+                        &base,
+                        reqwest::Method::GET,
+                        &format!("{route}/screenshot"),
+                        Value::Null,
+                    )
+                    .await;
+                    let bytes = base64::engine::general_purpose::STANDARD
+                        .decode(png.as_str().unwrap())
+                        .unwrap();
+                    std::fs::write(directory.join("batch-review-timeout.png"), &bytes).unwrap();
+                    if bytes.len() <= 256 * 1024 {
+                        println!("NW_BROWSER_BATCH_FAILURE_IMAGE:{}", png.as_str().unwrap());
+                    }
                     panic!("Actual shared batch Review did not retain its frozen proposal");
                 }
                 tokio::time::sleep(Duration::from_millis(100)).await;
             };
-            assert_eq!(batch_plan.items.len(),2);
+            assert_eq!(batch_plan.items.len(), 2);
             assert!(batch_plan.items.iter().all(|item| item.error.is_none()));
-            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(),1,
-                "Batch review must not create jobs");
+            assert_eq!(
+                fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Job>("job/", 128)
+                    .unwrap()
+                    .len(),
+                1,
+                "Batch review must not create jobs"
+            );
             tokio::time::sleep(Duration::from_millis(300)).await;
-            browser_click(&client,&base,&route,215,199).await;
+            browser_click(&client, &base, &route, 215, 199).await;
             let started = Instant::now();
             let batch = loop {
-                let batches = fixture.owner.service.store.list::<nw_domain::batches::Batch>("batch/",128).unwrap();
+                let batches = fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::batches::Batch>("batch/", 128)
+                    .unwrap();
                 if let Some(batch) = batches.into_iter().next() {
                     let terminal = batch.members.iter().all(|member| {
-                        member.job_id.as_ref().is_some_and(|id| fixture.owner.service.store.inspect_job(id).unwrap().state.terminal())
+                        member.job_id.as_ref().is_some_and(|id| {
+                            fixture
+                                .owner
+                                .service
+                                .store
+                                .inspect_job(id)
+                                .unwrap()
+                                .state
+                                .terminal()
+                        })
                     });
-                    if terminal { break batch; }
+                    if terminal {
+                        break batch;
+                    }
                 }
                 if started.elapsed() >= Duration::from_secs(30) {
-                    let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-                    let bytes = base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap();
-                    std::fs::write(directory.join("batch-run-timeout.png"),&bytes).unwrap();
-                    if bytes.len() <= 256*1024 { println!("NW_BROWSER_BATCH_FAILURE_IMAGE:{}",png.as_str().unwrap()); }
+                    let png = driver(
+                        &client,
+                        &base,
+                        reqwest::Method::GET,
+                        &format!("{route}/screenshot"),
+                        Value::Null,
+                    )
+                    .await;
+                    let bytes = base64::engine::general_purpose::STANDARD
+                        .decode(png.as_str().unwrap())
+                        .unwrap();
+                    std::fs::write(directory.join("batch-run-timeout.png"), &bytes).unwrap();
+                    if bytes.len() <= 256 * 1024 {
+                        println!("NW_BROWSER_BATCH_FAILURE_IMAGE:{}", png.as_str().unwrap());
+                    }
                     panic!("Actual shared reviewed batch Run did not produce terminal children");
                 }
                 tokio::time::sleep(Duration::from_millis(100)).await;
             };
-            assert_eq!(batch.members.len(),2);
+            assert_eq!(batch.members.len(), 2);
             for member in &batch.members {
-                let child = fixture.owner.service.store.inspect_job(member.job_id.as_ref().unwrap()).unwrap();
-                assert_eq!(child.state,nw_domain::records::JobState::Succeeded);
+                let child = fixture
+                    .owner
+                    .service
+                    .store
+                    .inspect_job(member.job_id.as_ref().unwrap())
+                    .unwrap();
+                assert_eq!(child.state, nw_domain::records::JobState::Succeeded);
                 let artifact = child.artifact.as_ref().unwrap();
-                assert_eq!(std::fs::read(&artifact.path).unwrap(),std::fs::read(&child.plan.source.identity.path).unwrap());
+                assert_eq!(
+                    std::fs::read(&artifact.path).unwrap(),
+                    std::fs::read(&child.plan.source.identity.path).unwrap()
+                );
             }
-            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(),3);
+            assert_eq!(
+                fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Job>("job/", 128)
+                    .unwrap()
+                    .len(),
+                3
+            );
             tokio::time::sleep(Duration::from_millis(1200)).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            let bytes = base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap();
-            std::fs::write(directory.join("batch-completed.png"),&bytes).unwrap();
-            if bytes.len() <= 256*1024 { println!("NW_BROWSER_BATCH_IMAGE:{}",png.as_str().unwrap()); }
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(png.as_str().unwrap())
+                .unwrap();
+            std::fs::write(directory.join("batch-completed.png"), &bytes).unwrap();
+            if bytes.len() <= 256 * 1024 {
+                println!("NW_BROWSER_BATCH_IMAGE:{}", png.as_str().unwrap());
+            }
             std::fs::write(directory.join("batch.json"),serde_json::to_vec_pretty(&json!({
                 "plan_id":batch_plan.id,"plan_hash":batch_plan.hash,"batch_id":batch.id,
                 "members":batch.members,"producer_job_count":3,

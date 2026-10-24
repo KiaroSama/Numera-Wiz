@@ -2,7 +2,10 @@
 use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
-    batches::{BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, FailurePolicy, ItemInput, UnresolvedPolicy},
+    batches::{
+        BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, FailurePolicy, ItemInput,
+        UnresolvedPolicy,
+    },
     views::{AssetSummary, SnapshotPage},
 };
 use serde_json::{Value, json};
@@ -32,10 +35,18 @@ pub(super) struct BatchUi {
 impl Default for BatchUi {
     fn default() -> Self {
         Self {
-            open: false, candidates: Vec::new(), generation: 0,
-            failure: FailurePolicy::RejectAll, unresolved: UnresolvedPolicy::Reject,
-            plan: None, active: None, result: None, history: Vec::new(),
-            cursor: None, snapshot: None, last_poll: Instant::now(),
+            open: false,
+            candidates: Vec::new(),
+            generation: 0,
+            failure: FailurePolicy::RejectAll,
+            unresolved: UnresolvedPolicy::Reject,
+            plan: None,
+            active: None,
+            result: None,
+            history: Vec::new(),
+            cursor: None,
+            snapshot: None,
+            last_poll: Instant::now(),
         }
     }
 }
@@ -51,86 +62,152 @@ impl BatchUi {
 impl WizApp {
     pub(super) fn batch_select(&mut self, asset: &AssetSummary, included: bool) {
         if included {
-            if self.batch.contains(&asset.id) { return; }
+            if self.batch.contains(&asset.id) {
+                return;
+            }
             if self.batch.candidates.len() >= nw_domain::batches::MAX_BATCH_ITEMS {
                 self.error = Some("A batch contains at most 64 explicit candidates; no files were silently omitted.".into());
                 return;
             }
             self.batch.candidates.push(Candidate {
-                asset_id: asset.id.clone(), name: asset.display_name.clone(),
-                output: String::new(), needs_output: true,
+                asset_id: asset.id.clone(),
+                name: asset.display_name.clone(),
+                output: String::new(),
+                needs_output: true,
             });
         } else {
-            self.batch.candidates.retain(|item| item.asset_id != asset.id);
+            self.batch
+                .candidates
+                .retain(|item| item.asset_id != asset.id);
         }
         self.batch.invalidate();
     }
     pub(super) fn schedule_batch(&mut self, ctx: &egui::Context) {
-        if self.waiting || self.pending.is_some() { return; }
-        if let Some(index) = self.batch.candidates.iter().position(|item| item.needs_output) {
+        if self.waiting || self.pending.is_some() {
+            return;
+        }
+        if let Some(index) = self
+            .batch
+            .candidates
+            .iter()
+            .position(|item| item.needs_output)
+        {
             let item = &mut self.batch.candidates[index];
             item.needs_output = false;
             let id = item.asset_id.clone();
-            self.query("assets.output_suggest", json!({"id":id}),
-                Action::BatchOutput(self.batch.generation,index), ctx);
+            self.query(
+                "assets.output_suggest",
+                json!({"id":id}),
+                Action::BatchOutput(self.batch.generation, index),
+                ctx,
+            );
             return;
         }
         if self.batch.active.is_some()
-            && self.batch.result.as_ref().is_none_or(|result| !result.complete) {
+            && self
+                .batch
+                .result
+                .as_ref()
+                .is_none_or(|result| !result.complete)
+        {
             if self.batch.last_poll.elapsed() >= Duration::from_secs(1) {
                 self.batch.last_poll = Instant::now();
-                self.query("batches.inspect", json!({"id":self.batch.active}), Action::BatchInspect, ctx);
+                self.query(
+                    "batches.inspect",
+                    json!({"id":self.batch.active}),
+                    Action::BatchInspect,
+                    ctx,
+                );
             }
             ctx.request_repaint_after(Duration::from_millis(250));
         }
     }
     pub(super) fn batch_history_expired(&mut self) {
-        self.batch.history.clear(); self.batch.cursor = None; self.batch.snapshot = None;
+        self.batch.history.clear();
+        self.batch.cursor = None;
+        self.batch.snapshot = None;
     }
     pub(super) fn run_reviewed_batch(&mut self, ctx: &egui::Context) {
-        if !self.waiting && self.pending.is_none()
-            && let Some(plan) = self.batch.plan.clone() {
-            self.mutate("batches.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}), Action::BatchSubmit, ctx);
+        if !self.waiting
+            && self.pending.is_none()
+            && let Some(plan) = self.batch.plan.clone()
+        {
+            self.mutate(
+                "batches.submit",
+                json!({"plan_id":plan.id,"plan_hash":plan.hash}),
+                Action::BatchSubmit,
+                ctx,
+            );
         }
     }
     fn review_batch(&mut self, ctx: &egui::Context) {
         let input = self.normalized_intent().and_then(|intent| {
             let input = CleanBatchInput {
-                items:self.batch.candidates.iter().map(|item| ItemInput {
-                    asset_id:item.asset_id.clone(), output:item.output.clone(),
-                }).collect(),
-                intent, file_times:self.file_times, execution_limits:self.execution_limits.clone(),
-                failure_policy:self.batch.failure, unresolved_policy:self.batch.unresolved,
+                items: self
+                    .batch
+                    .candidates
+                    .iter()
+                    .map(|item| ItemInput {
+                        asset_id: item.asset_id.clone(),
+                        output: item.output.clone(),
+                    })
+                    .collect(),
+                intent,
+                file_times: self.file_times,
+                execution_limits: self.execution_limits.clone(),
+                failure_policy: self.batch.failure,
+                unresolved_policy: self.batch.unresolved,
             };
-            input.validate().map_err(|error| format!("{}: {}",error.code,error.message))?;
+            input
+                .validate()
+                .map_err(|error| format!("{}: {}", error.code, error.message))?;
             Ok(input)
         });
         match input {
-            Ok(input) => self.query("streams.clean.batch_plan", json!(input), Action::BatchPlan(self.batch.generation), ctx),
+            Ok(input) => self.query(
+                "streams.clean.batch_plan",
+                json!(input),
+                Action::BatchPlan(self.batch.generation),
+                ctx,
+            ),
             Err(error) => self.error = Some(error),
         }
     }
-    pub(super) fn receive_batch(&mut self, action: Action, result: Value) -> Result<(),String> {
+    pub(super) fn receive_batch(&mut self, action: Action, result: Value) -> Result<(), String> {
         match action {
-            Action::BatchOutput(generation,index) => {
+            Action::BatchOutput(generation, index) => {
                 if let Some(item) = self.batch.candidates.get_mut(index) {
                     if generation == self.batch.generation {
                         if item.output.is_empty() {
-                            item.output = result["output"].as_str().ok_or("Batch output suggestion missing")?.into();
+                            item.output = result["output"]
+                                .as_str()
+                                .ok_or("Batch output suggestion missing")?
+                                .into();
                         }
-                    } else if item.output.is_empty() { item.needs_output = true; }
+                    } else if item.output.is_empty() {
+                        item.needs_output = true;
+                    }
                 }
             }
             Action::BatchPlan(generation) => {
-                let plan: BatchPlanReview = serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let plan: BatchPlanReview =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
                 if generation == self.batch.generation {
                     self.batch.plan = Some(Arc::new(plan));
                     self.status = "Batch reviewed. Inspect every candidate before running.".into();
-                } else { self.status = "Batch controls changed. Review the current candidates again.".into(); }
+                } else {
+                    self.status =
+                        "Batch controls changed. Review the current candidates again.".into();
+                }
             }
             Action::BatchSubmit => {
-                let id = result["batch_id"].as_str().ok_or("Accepted batch identity missing")?.to_owned();
-                self.status = format!("Batch accepted: {id}. Closing this window leaves accepted jobs running.");
+                let id = result["batch_id"]
+                    .as_str()
+                    .ok_or("Accepted batch identity missing")?
+                    .to_owned();
+                self.status = format!(
+                    "Batch accepted: {id}. Closing this window leaves accepted jobs running."
+                );
                 self.batch.active = Some(id);
                 self.batch.plan = None;
                 self.batch.result = None;
@@ -138,7 +215,9 @@ impl WizApp {
                 self.last_jobs = Instant::now() - Duration::from_secs(2);
             }
             Action::BatchInspect => {
-                self.batch.result = Some(Arc::new(serde_json::from_value(result).map_err(|error| error.to_string())?));
+                self.batch.result = Some(Arc::new(
+                    serde_json::from_value(result).map_err(|error| error.to_string())?,
+                ));
                 self.batch.last_poll = Instant::now();
             }
             Action::BatchCancel => {
@@ -146,7 +225,8 @@ impl WizApp {
                 self.batch.last_poll = Instant::now() - Duration::from_secs(2);
             }
             Action::BatchHistory => {
-                let page: SnapshotPage<BatchSummary> = serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let page: SnapshotPage<BatchSummary> =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
                 self.batch.history = page.items;
                 self.batch.cursor = page.next_cursor;
                 self.batch.snapshot = Some(page.snapshot_id);
@@ -156,7 +236,9 @@ impl WizApp {
         Ok(())
     }
     pub(super) fn batch_window(&mut self, ctx: &egui::Context) {
-        if !self.batch.open { return; }
+        if !self.batch.open {
+            return;
+        }
         let mut open = true;
         egui::Window::new("Cleanup batch")
             .default_pos(egui::pos2(24.0,160.0)).default_width(1040.0)

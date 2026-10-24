@@ -1,6 +1,6 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
-mod cleanup;
 mod batches;
+mod cleanup;
 pub mod client;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
@@ -491,8 +491,12 @@ impl WizApp {
                         self.report_page = 0;
                     }
                 }
-                Action::BatchOutput(_, _) | Action::BatchPlan(_) | Action::BatchSubmit
-                | Action::BatchInspect | Action::BatchCancel | Action::BatchHistory => {
+                Action::BatchOutput(_, _)
+                | Action::BatchPlan(_)
+                | Action::BatchSubmit
+                | Action::BatchInspect
+                | Action::BatchCancel
+                | Action::BatchHistory => {
                     self.receive_batch(received.action, result)?;
                 }
                 Action::Inspect => {
@@ -519,10 +523,19 @@ impl WizApp {
     fn catalog(&mut self, ui: &mut egui::Ui) {
         ui.heading("Media");
         ui.horizontal(|ui| {
-            if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Refresh media")).clicked() {
+            if ui
+                .add_enabled(
+                    !self.waiting && self.pending.is_none(),
+                    egui::Button::new("Refresh media"),
+                )
+                .clicked()
+            {
                 self.refresh_assets(ui.ctx());
             }
-            if ui.button(format!("Batch ({})",self.batch.candidates.len())).clicked() {
+            if ui
+                .button(format!("Batch ({})", self.batch.candidates.len()))
+                .clicked()
+            {
                 self.batch.open = true;
             }
         });
@@ -551,11 +564,20 @@ impl WizApp {
                     let name = asset.display_name.as_str();
                     ui.horizontal(|ui| {
                         let mut included = self.batch.contains(&asset.id);
-                        if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Checkbox::without_text(&mut included))
-                            .on_hover_text("Include in cleanup batch").changed() {
-                            batch_changes.push((asset.clone(),included));
+                        if ui
+                            .add_enabled(
+                                !self.waiting && self.pending.is_none(),
+                                egui::Checkbox::without_text(&mut included),
+                            )
+                            .on_hover_text("Include in cleanup batch")
+                            .changed()
+                        {
+                            batch_changes.push((asset.clone(), included));
                         }
-                        if ui.selectable_label(self.selected.as_ref() == Some(&asset.id), name).clicked() {
+                        if ui
+                            .selectable_label(self.selected.as_ref() == Some(&asset.id), name)
+                            .clicked()
+                        {
                             select = Some(asset.id.clone());
                         }
                     });
@@ -568,7 +590,9 @@ impl WizApp {
                     ui.label("Add a file to inspect its streams and prepare cleanup.");
                 }
             });
-        for (asset,included) in batch_changes { self.batch_select(&asset,included); }
+        for (asset, included) in batch_changes {
+            self.batch_select(&asset, included);
+        }
         if let Some(id) = select {
             self.query("assets.inspect", json!({"id":id}), Action::Asset, ui.ctx());
         }
@@ -843,12 +867,22 @@ impl eframe::App for WizApp {
                 egui::Key::Enter,
             ))
         }) {
-            if self.batch.open { self.run_reviewed_batch(ui.ctx()); }
-            else { self.run_reviewed(ui.ctx()); }
+            if self.batch.open {
+                self.run_reviewed_batch(ui.ctx());
+            } else {
+                self.run_reviewed(ui.ctx());
+            }
         }
         if (self.batch.open || self.artifact_manifest.is_some())
-            && ui.ctx().input_mut(|input| input.consume_key(egui::Modifiers::NONE,egui::Key::Escape)) {
-            if self.batch.open { self.batch.open = false; } else { self.artifact_manifest = None; }
+            && ui
+                .ctx()
+                .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+        {
+            if self.batch.open {
+                self.batch.open = false;
+            } else {
+                self.artifact_manifest = None;
+            }
         }
         egui::Panel::top("navigation").show(ui, |ui| {
             ui.horizontal(|ui| {

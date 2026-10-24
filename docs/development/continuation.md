@@ -1649,3 +1649,42 @@ held publication claim. Its exact compiled merge is
 All four ordinary targets still fail the same two test-only lint issues;
 shared GUI batch and batch-specific lost accepted response/restart are next
 revision sources, not passes. No full gate or research row is advanced.
+
+## Batch source survives real SDK response loss and Chrome human input
+
+CI88 on 7a51b68219436ac92efe149ce8193db3e62e5594 (compiled merge
+934e32b32f65060950fbea15acad390260fa61ad) passes actual batch media and
+the new official SDK lost accepted response/restart case: both automatic
+responses are lost, then the original SDK replays the same receipt, group
+and two child IDs after the owner epoch changes. Exactly two jobs/one group
+and full per-source bytes remain. The existing single-job SDK restart case
+also passes. Three complete ordinary targets (Linux, macOS ARM/Intel) pass,
+including atomic64-member/rollback/cancellation regressions and Clippy.
+
+Actual headed Chrome passes genuine OS Save with the preserved original
+one-producer oracle, then genuine second-file intake, two checkboxes,
+batch Review and Run pointer input. Both child outputs independently equal
+their sources; final total producers are three. Saved and completed-batch
+PNGs were personally inspected. The original199-coordinate clicks succeeded;
+no speculative coordinate correction is applied. Exact scope and GitHub-
+reported artifact ZIP digests are recorded in cleanup-batches-ci88.json.
+
+CI88 still fails formatting (37 unique exact hosted hunks now applied),
+Windows discovery owner startup at the unchanged20s bound, and independent
+HTTP diagnostics setup. HTTP previously inherited its evidence directory
+from the preceding owner_media suite; it now creates that directory before
+its first use. Windows logs show one19.566s attach and a concurrent timeout
+while four separate unoptimized interface cases launch multiple owners.
+Independent interface cases are isolated next revision; the explicit
+three-concurrent-frontends/same-root regression remains concurrent and all
+assertions/product20s limits remain intact. This is a scoped test-isolation
+mitigation, not proof of full startup performance or aggregate R20.
+
+Native UI was skipped by that matrix failure. The next workflow still
+requires the complete matrix but permits the Linux UI job to collect its
+matching Linux executable evidence when a foreign platform fails; missing
+Linux artifacts still fail its download. Every original actual test remains,
+with independent owner/media/HTTP suites now parallel after the same source
+component artifact. The actual hash verifier reports807 manifest members;
+the earlier unsupported808 count in new ci87 evidence is corrected. No
+archived file, support CSV, full-task checkbox or release gate is changed.

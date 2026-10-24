@@ -233,9 +233,14 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(status, 0, "{completed}");
     assert_eq!(completed["result"]["finished"], 2);
     assert_eq!(completed["result"]["succeeded"], 2);
-    let child = cli.completed(completed["result"]["items"][0]["job_id"].as_str().unwrap()).await;
+    let child = cli
+        .completed(completed["result"]["items"][0]["job_id"].as_str().unwrap())
+        .await;
     assert_eq!(child["state"], "succeeded");
-    assert_eq!(child["artifact"]["bytes"], completed["result"]["items"][0]["output_bytes"]);
+    assert_eq!(
+        child["artifact"]["bytes"],
+        completed["result"]["items"][0]["output_bytes"]
+    );
 
     assert_eq!(completed["result"]["items"].as_array().unwrap().len(), 2);
     assert_eq!(

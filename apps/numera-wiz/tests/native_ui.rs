@@ -492,81 +492,152 @@ async fn journey() {
 
     // Keep the single-producer Save oracles above intact, then exercise a distinct
     // real two-file batch exclusively through pointer/keyboard input.
-    input(&["key","--clearmodifiers","Escape"]).await;
+    input(&["key", "--clearmodifiers", "Escape"]).await;
     let second_source = media.directory.path().join("native-second.mkv");
-    let ffmpeg_args = ["-hide_banner","-nostdin","-v","error","-i",media.source.to_str().unwrap(),
-        "-map","0:0","-map","0:1","-c","copy","-f","matroska",second_source.to_str().unwrap()].map(str::to_owned);
-    nw_platform::process::run(&media.bin.join("ffmpeg"),&ffmpeg_args,Duration::from_secs(30),4096,CancellationToken::new()).await.unwrap();
-    click(&window,"560","116").await;
-    input(&["key","--clearmodifiers","ctrl+a"]).await;
-    input(&["type","--clearmodifiers","--delay","1",second_source.to_str().unwrap()]).await;
-    click(&window,"995","116").await;
+    let ffmpeg_args = [
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        media.source.to_str().unwrap(),
+        "-map",
+        "0:0",
+        "-map",
+        "0:1",
+        "-c",
+        "copy",
+        "-f",
+        "matroska",
+        second_source.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &ffmpeg_args,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    click(&window, "560", "116").await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        second_source.to_str().unwrap(),
+    ])
+    .await;
+    click(&window, "995", "116").await;
     let started = Instant::now();
     loop {
-        if let Some(assets) = query(&root,"assets.list").await
-            && assets["items"].as_array().unwrap().len() == 2 { break; }
-        assert!(started.elapsed() < Duration::from_secs(20),"Second human registration did not finish");
+        if let Some(assets) = query(&root, "assets.list").await
+            && assets["items"].as_array().unwrap().len() == 2
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(20),
+            "Second human registration did not finish"
+        );
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     tokio::time::sleep(Duration::from_millis(700)).await;
-    screenshot(&window,&evidence.join("native-batch-candidates.png")).await;
-    click(&window,"16","94").await;
+    screenshot(&window, &evidence.join("native-batch-candidates.png")).await;
+    click(&window, "16", "94").await;
     tokio::time::sleep(Duration::from_millis(700)).await;
-    click(&window,"16","132").await;
+    click(&window, "16", "132").await;
     tokio::time::sleep(Duration::from_millis(700)).await;
-    click(&window,"158","68").await;
+    click(&window, "158", "68").await;
     tokio::time::sleep(Duration::from_millis(700)).await;
-    screenshot(&window,&evidence.join("native-batch-draft.png")).await;
-    click(&window,"85","199").await;
+    screenshot(&window, &evidence.join("native-batch-draft.png")).await;
+    click(&window, "85", "199").await;
     let started = Instant::now();
     let batch_review_event = loop {
         let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
-        if let Some(event) = log.lines().filter_map(|line| serde_json::from_str::<Value>(line).ok()).find(|event| {
-            event["fields"]["message"] == "command.completed"
-                && event["fields"]["command"] == "streams.clean.batch_plan"
-                && event["fields"]["ok"] == true
-                && event["fields"]["request_id"] != "local"
-        }) { break event; }
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "streams.clean.batch_plan"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
+            break event;
+        }
         if started.elapsed() >= Duration::from_secs(20) {
-            screenshot(&window,&evidence.join("native-batch-review-timeout.png")).await;
+            screenshot(&window, &evidence.join("native-batch-review-timeout.png")).await;
             let png = std::fs::read(evidence.join("native-batch-review-timeout.png")).unwrap();
-            if png.len() <= 256*1024 { println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}",STANDARD.encode(png)); }
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
             panic!("Human batch Review did not complete its canonical request");
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
-    assert_eq!(query(&root,"jobs.list").await.unwrap()["items"].as_array().unwrap().len(),1,
-        "Batch review must not start media jobs");
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "Batch review must not start media jobs"
+    );
     tokio::time::sleep(Duration::from_millis(300)).await;
-    screenshot(&window,&evidence.join("native-batch-reviewed.png")).await;
-    click(&window,"215","199").await;
+    screenshot(&window, &evidence.join("native-batch-reviewed.png")).await;
+    click(&window, "215", "199").await;
     let started = Instant::now();
     let batch_result = loop {
-        if let Some(groups) = query(&root,"batches.list").await
+        if let Some(groups) = query(&root, "batches.list").await
             && let Some(group) = groups["items"].as_array().and_then(|items| items.first())
-            && let Some(result) = query_params(&root,"batches.inspect",json!({"id":group["id"]})).await
-            && result["complete"] == true { break result; }
+            && let Some(result) =
+                query_params(&root, "batches.inspect", json!({"id":group["id"]})).await
+            && result["complete"] == true
+        {
+            break result;
+        }
         if started.elapsed() >= Duration::from_secs(30) {
-            screenshot(&window,&evidence.join("native-batch-run-timeout.png")).await;
+            screenshot(&window, &evidence.join("native-batch-run-timeout.png")).await;
             let png = std::fs::read(evidence.join("native-batch-run-timeout.png")).unwrap();
-            if png.len() <= 256*1024 { println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}",STANDARD.encode(png)); }
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
             panic!("Actual reviewed batch Run did not produce a terminal group");
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
-    assert_eq!(batch_result["total"],2,"{batch_result}");
-    assert_eq!(batch_result["succeeded"],2,"{batch_result}");
+    assert_eq!(batch_result["total"], 2, "{batch_result}");
+    assert_eq!(batch_result["succeeded"], 2, "{batch_result}");
     for member in batch_result["items"].as_array().unwrap() {
-        let child = query_params(&root,"jobs.inspect",json!({"id":member["job_id"]})).await.unwrap();
-        let source = query_params(&root,"assets.inspect",json!({"id":member["asset_id"]})).await.unwrap();
-        assert_eq!(std::fs::read(child["artifact"]["path"].as_str().unwrap()).unwrap(),
-            std::fs::read(source["identity"]["path"].as_str().unwrap()).unwrap());
+        let child = query_params(&root, "jobs.inspect", json!({"id":member["job_id"]}))
+            .await
+            .unwrap();
+        let source = query_params(&root, "assets.inspect", json!({"id":member["asset_id"]}))
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(child["artifact"]["path"].as_str().unwrap()).unwrap(),
+            std::fs::read(source["identity"]["path"].as_str().unwrap()).unwrap()
+        );
     }
-    assert_eq!(query(&root,"jobs.list").await.unwrap()["items"].as_array().unwrap().len(),3);
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
     tokio::time::sleep(Duration::from_millis(1200)).await;
-    screenshot(&window,&evidence.join("native-batch-completed.png")).await;
+    screenshot(&window, &evidence.join("native-batch-completed.png")).await;
     let png = std::fs::read(evidence.join("native-batch-completed.png")).unwrap();
-    if png.len() <= 256*1024 { println!("NW_NATIVE_BATCH_IMAGE:{}",STANDARD.encode(png)); }
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_BATCH_IMAGE:{}", STANDARD.encode(png));
+    }
     std::fs::write(evidence.join("native-batch.json"),serde_json::to_vec_pretty(&json!({
         "review_event":batch_review_event,"result":batch_result,"producer_job_count":3,
         "oracle":"Actual second-file registration, two media checkboxes, batch Review and Run mouse input; independent full bytes for each source/output",
