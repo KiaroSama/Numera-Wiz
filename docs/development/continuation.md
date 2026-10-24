@@ -1138,3 +1138,24 @@ written, and no Chrome pass is inferred. See original-container-ci72.json.
 MOV/MP4-specific adapter/control variants and all broader container/codec/category
 routes remain required, as do every other open task and product/package/resource/
 owner gate. No local source build/test/application/media execution was used.
+
+
+## Functional MOV/MP4 and browser observation checkpoint
+
+Run 40083701422 on 9b53a9f33d69f8ad2357517ee5d45a59d01c7397 passed
+every functional job: all four complete native targets, lock/WASM, complete
+MOV/MP4 and existing actual media/CLI/official SDK/lost-response/large HTTP work,
+real native controls and real Chrome report pointer/network response through
+subsequent reviewed byte-copy output. The exact cause of the preceding Chrome
+timeout is not retroactively claimed. Bounded completion-ID retention and
+pointer retry preserve real input and the original deadline. Only formatting
+failed; all four exact hosted diagnostic hunks are applied here. See
+evidence/original-container-ci73.json.
+
+This revision contains only those exact source-format changes and scoped
+evidence/documentation. Profile-specific five-surface variants, broader
+containers/codecs/categories, folder/batch work and every other open task remain
+mandatory. Native/browser output Save As is still not implemented; current
+controls inspect/copy the manifest URI and authenticated bytes already stream
+through CLI/MCP/application routes. No local compilation, tests, GUI/media
+execution or owner GPU run was performed.

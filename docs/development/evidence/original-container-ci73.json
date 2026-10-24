@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "run_id": 40083701422,
+  "branch_head": "9b53a9f33d69f8ad2357517ee5d45a59d01c7397",
+  "all_functional_jobs": "success",
+  "jobs": [
+    {
+      "id": 120842229916,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842230067,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842230079,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120842230085,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842643678,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842643685,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842643705,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120842643787,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120844377510,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120844708966,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "all four full native regression/Clippy/desktop targets, lock and WASM",
+    "complete original MOV/MP4 first/second round trips, exact packet/clock/codec/extradata/side-data/tag and independent raw-name/brand assertions",
+    "complete actual CLI/official SDK/lost-response/large HTTP/revocation/disconnect cleanup journeys",
+    "actual native shared report/output controls",
+    "actual Chrome report pointer/network response and subsequent reviewed byte-copy output"
+  ],
+  "formatting": "four exact hosted diagnostic hunks applied in following revision",
+  "browser_failure_follow_up": {
+    "previous_failure_run": 40082246721,
+    "previous_exact_cause": "not established",
+    "current_observation": "actual input/HTTP response journey passed with bounded completion-ID retention and pointer retries while no request was observed",
+    "deadline_seconds": 15,
+    "domain_handler_substitution": false,
+    "raw_network_headers_or_bodies_retained": false
+  },
+  "artifacts": [
+    {
+      "id": 12556632001,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "0e72f5a08228f834e34da64c4c2f28ee0c8c61a9b39b5b61138508317e0b029f",
+      "downloaded": false
+    },
+    {
+      "id": 12556179305,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "248979daa1c771ead00d276a39e259ab360b0f0b3937b2ecd6ceb40953b43633",
+      "downloaded": false
+    },
+    {
+      "id": 12555858769,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "d9397fd9a11c3fdd206dc111bb0668ba3860519d57080ee204621eeddf7bc193",
+      "downloaded": false
+    },
+    {
+      "id": 12555369158,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "1e40268478382fea5d14fe79eeadcd92259af3f410d8174802e47275047bb8aa",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "MOV/MP4-specific five-surface variants and broader codecs/categories",
+    "all report controls/pages, folder/batch full F08",
+    "complete project/editor/effects/migration/packages/resources/manuals/owner gates"
+  ]
+}

@@ -798,7 +798,10 @@ mod tests {
                         }
                     }
                 }
-                if report_request.as_ref().is_some_and(|id| completed_requests.contains(id)) {
+                if report_request
+                    .as_ref()
+                    .is_some_and(|id| completed_requests.contains(id))
+                {
                     let body = driver(
                         &client,
                         &base,
@@ -816,22 +819,35 @@ mod tests {
                     .unwrap();
                 }
                 if started.elapsed() >= Duration::from_secs(15) {
-                    let png = driver(&client, &base, reqwest::Method::GET, &format!("{route}/screenshot"), Value::Null).await;
+                    let png = driver(
+                        &client,
+                        &base,
+                        reqwest::Method::GET,
+                        &format!("{route}/screenshot"),
+                        Value::Null,
+                    )
+                    .await;
                     let png = png.as_str().unwrap();
-                    let bytes = base64::engine::general_purpose::STANDARD.decode(png).unwrap();
-                    std::fs::write(directory.join("selection-report-input-timeout.png"), &bytes).unwrap();
+                    let bytes = base64::engine::general_purpose::STANDARD
+                        .decode(png)
+                        .unwrap();
+                    std::fs::write(directory.join("selection-report-input-timeout.png"), &bytes)
+                        .unwrap();
                     if bytes.len() <= 256 * 1024 {
                         println!("NW_BROWSER_FAILURE_IMAGE:{png}");
                     }
                     panic!(
                         "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}",
-                        report_request.is_some(), report_input_attempts, completed_requests.len()
+                        report_request.is_some(),
+                        report_input_attempts,
+                        completed_requests.len()
                     );
                 }
                 // Registration is durable before the form's final async details/
                 // output-suggestion reply. Retry only this nonmutating pointer
                 // action while no report request is observed; UI guards remain.
-                if report_request.is_none() && last_report_input.elapsed() >= Duration::from_secs(1) {
+                if report_request.is_none() && last_report_input.elapsed() >= Duration::from_secs(1)
+                {
                     driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":591},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
                     last_report_input = Instant::now();
                     report_input_attempts += 1;
