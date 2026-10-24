@@ -41,30 +41,39 @@ fn open_regular_handle(path: &Path) -> Result<File> {
             path,
             OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
             Mode::empty(),
-        ).map_err(io_error)?;
+        )
+        .map_err(io_error)?;
         File::from(descriptor)
     };
     #[cfg(windows)]
     let file = {
         use std::os::windows::fs::OpenOptionsExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
-        OpenOptions::new().read(true)
+        OpenOptions::new()
+            .read(true)
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
             .security_qos_flags(0)
-            .open(path).map_err(io_error)?
+            .open(path)
+            .map_err(io_error)?
     };
     #[cfg(not(any(unix, windows)))]
     let file = File::open(path).map_err(io_error)?;
     let metadata = file.metadata().map_err(io_error)?;
     if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err(DomainError::new("INPUT_DENIED", "An opened ordinary regular file is required"));
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "An opened ordinary regular file is required",
+        ));
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err(DomainError::new("INPUT_DENIED", "An ordinary input cannot be a reparse point"));
+            return Err(DomainError::new(
+                "INPUT_DENIED",
+                "An ordinary input cannot be a reparse point",
+            ));
         }
     }
     Ok(file)
@@ -223,8 +232,9 @@ impl SourceStamp {
             )
         };
         let path = source_path(&self.path).map_err(|_| changed())?;
-        let current = same_file::Handle::from_file(open_regular_handle(&path).map_err(|_| changed())?)
-            .map_err(|_| changed())?;
+        let current =
+            same_file::Handle::from_file(open_regular_handle(&path).map_err(|_| changed())?)
+                .map_err(|_| changed())?;
         let metadata = current.as_file().metadata().map_err(|_| changed())?;
         if path != self.path
             || current != self.handle
@@ -378,7 +388,12 @@ mod tests {
     fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("input");
-        rustix::fs::mkfifoat(rustix::fs::CWD, &source, rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR).unwrap();
+        rustix::fs::mkfifoat(
+            rustix::fs::CWD,
+            &source,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )
+        .unwrap();
         let started = std::time::Instant::now();
         assert!(matches!(open_regular_handle(&source), Err(error) if error.code == "INPUT_DENIED"));
         assert!(started.elapsed() < std::time::Duration::from_secs(1));

@@ -245,19 +245,33 @@ async fn journey() {
     let started = Instant::now();
     let manifest_event = loop {
         let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
-        if let Some(event) = log.lines().filter_map(|line| serde_json::from_str::<Value>(line).ok())
-            .find(|event| event["fields"]["message"] == "command.completed"
-                && event["fields"]["command"] == "artifacts.manifest"
-                && event["fields"]["ok"] == true
-                && event["fields"]["request_id"] != "local") {
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "artifacts.manifest"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
             break event;
         }
-        assert!(started.elapsed() < Duration::from_secs(10), "Human Output details input did not complete a canonical manifest request");
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Human Output details input did not complete a canonical manifest request"
+        );
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
     tokio::time::sleep(Duration::from_millis(700)).await;
     screenshot(&window, &evidence.join("native-output-details.png")).await;
-    let manifest = query_params(&root, "artifacts.manifest", json!({"artifact_id":format!("job-{}",job.id)})).await.unwrap();
+    let manifest = query_params(
+        &root,
+        "artifacts.manifest",
+        json!({"artifact_id":format!("job-{}",job.id)}),
+    )
+    .await
+    .unwrap();
     assert_eq!(manifest["sha256"], artifact.sha256);
     assert_eq!(manifest["encoded_byte_count"], artifact.bytes);
     std::fs::write(evidence.join("native-manifest.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":manifest_event,"manifest":manifest,"scope":"Actual Output details mouse input, canonical completion before the independent manifest query, and retained dialog screenshot"})).unwrap()).unwrap();
