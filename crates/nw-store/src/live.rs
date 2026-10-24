@@ -206,7 +206,6 @@ mod tests {
         );
         let closed = redb::ReadOnlyDatabase::open(&path).unwrap();
         let transaction = closed.begin_read().unwrap();
-        use redb::ReadableTable;
         assert_eq!(
             transaction
                 .open_table(TABLE)

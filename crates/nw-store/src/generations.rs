@@ -95,7 +95,7 @@ fn location_path(root: &Path, location: &GenerationLocation) -> Result<PathBuf> 
     })
 }
 fn require_identity(path: &Path, root_id: &str, signing_key: &[u8]) -> Result<()> {
-    use redb::{ReadableDatabase, ReadableTable};
+    use redb::ReadableDatabase;
     let database = redb::Database::builder()
         .set_cache_size(8 * 1024 * 1024)
         .open_read_only(path.join("store.redb"))
@@ -127,7 +127,7 @@ fn require_identity(path: &Path, root_id: &str, signing_key: &[u8]) -> Result<()
     Ok(())
 }
 fn same_replay_identity(source: &Path, target: &Path, root_id: &str) -> Result<()> {
-    use redb::{ReadableDatabase, ReadableTable};
+    use redb::ReadableDatabase;
     let database = redb::Database::builder()
         .set_cache_size(8 * 1024 * 1024)
         .open_read_only(source.join("store.redb"))
