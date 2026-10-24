@@ -216,7 +216,12 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("logs.status", "Inspect bounded protected owner logging status", Query, Empty),
+        row!(
+            "logs.status",
+            "Inspect bounded protected owner logging status",
+            Query,
+            Empty
+        ),
         row!(
             "access.profiles.create",
             "Create a named operational access profile",

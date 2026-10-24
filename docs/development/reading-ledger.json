@@ -988,6 +988,38 @@
         "Read the encoder include separately and qualify typed options/cropping/side-data/timing/color behavior against actual admitted component profiles.",
         "Finish explicit decoder dependency admission and process-tree/RSS/scratch qualification; no codec invocation was run by reading this body."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_bitstream_filters.texi",
+      "sha256": "29de3d86573538d348b0be5c35c784ccba95c4f41896f088f7b76aeb89b2fc20",
+      "lines": [
+        1,
+        1095
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in ranges 1-410, 411-800 and 801-1095; external standards/references are not credited",
+      "interpretation": [
+        "Stream copy can auto-insert AAC ADTS-to-ASC or H.264/HEVC Annex-B conversions; packet payload and extradata changes need a frozen permitted-normalization contract and independent semantic proof.",
+        "Core extraction, unit removal, Dolby Vision stripping and E-AC-3/TrueHD changes can discard channels, captions, HDR or ATMOS data despite codec copy.",
+        "Bitstream color/SAR/tick-rate/cropping metadata changes are distinct from pixel conversion and exact container/decoded timing. MPEG-2 metadata can round an unrepresentable frame rate.",
+        "PCM rechunk defaults to padding the final packet; a framing-only preservation contract must forbid added samples and independently verify exact timing and sample count.",
+        "PGS display-set merging, MOV text headers and VP9 packet splitting/reordering alter packet boundaries; generic decoded equality alone cannot excuse lost unexposed metadata or changed clocks.",
+        "setts expressions can change PTS/DTS/duration/time base; input/output time-base and prescale semantics must be explicit, especially with B-frames."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T015",
+        "T025",
+        "T028",
+        "T029",
+        "T034"
+      ],
+      "unresolved": [
+        "Implement and qualify each required permitted reframing route; retain strict packet/metadata failure until its explicit normalization and independent oracle exist.",
+        "Complete standard component BSF closure and actual caption/HDR/audio-tail/timing fixtures; no bitstream filter was executed by reading this manual."
+      ]
     }
   ]
 }

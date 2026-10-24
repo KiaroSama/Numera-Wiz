@@ -72,7 +72,9 @@ async fn main() -> std::process::ExitCode {
     let status = match run().await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
-            let domain_code = error.downcast_ref::<nw_domain::DomainError>().map_or("ADAPTER_ERROR", |error| error.code.as_str());
+            let domain_code = error
+                .downcast_ref::<nw_domain::DomainError>()
+                .map_or("ADAPTER_ERROR", |error| error.code.as_str());
             tracing::error!(code=domain_code, %error,"Operation failed");
             let code = error
                 .downcast_ref::<nw_domain::DomainError>()
