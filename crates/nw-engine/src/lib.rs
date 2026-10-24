@@ -2,6 +2,8 @@
 mod admission;
 mod budget;
 mod preservation;
+mod output_profile;
+use output_profile::OutputProfile;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -178,11 +180,19 @@ impl Engine {
             ));
         }
         let resolution = mux::resolve(&asset.probe.streams, intent)?;
-        if resolution.action == CleanAction::Remux {
-            admit_matroska(&output, &resolution.streams)?;
-        }
+        let profile = if resolution.action == CleanAction::Remux {
+            let profile = OutputProfile::from_output(&output)?;
+            profile.admit(&asset, &resolution)?;
+            if profile == OutputProfile::Matroska {
+                admit_matroska(&output, &resolution.streams)?;
+            }
+            profile
+        } else {
+            OutputProfile::Matroska
+        };
         if resolution.action == CleanAction::CopyUnchanged
-            && Path::new(&asset.identity.path).extension() != output.extension()
+            && Path::new(&asset.identity.path).extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase)
+                != output.extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase)
         {
             return Err(DomainError::new(
                 "CONTAINER_CHANGE_REQUIRED",
@@ -190,7 +200,7 @@ impl Engine {
             ));
         }
         let args = if resolution.action == CleanAction::Remux {
-            lower_remux(&asset, &resolution)?
+            lower_remux(&asset, &resolution, profile)?
         } else {
             vec![]
         };
@@ -233,7 +243,7 @@ impl Engine {
                 .checked_add(1800)
                 .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Plan clock range exhausted"))?
                 .to_string(),
-            verification_scope: preservation::SCOPE.into(),
+            verification_scope: profile.scope().into(),
         };
         plan.hash = plan_digest(&plan)?;
         Ok(plan)
@@ -251,7 +261,12 @@ impl Engine {
                 "Stored plan hash mismatch",
             ));
         }
-        if plan.verification_scope != preservation::SCOPE {
+        let profile = if plan.resolution.action == CleanAction::Remux {
+            OutputProfile::from_output(Path::new(&plan.output))?
+        } else {
+            OutputProfile::Matroska
+        };
+        if plan.verification_scope != profile.scope() {
             return Err(DomainError::new(
                 "INVALID_PLAN",
                 "Review a fresh plan for the current verification contract",
@@ -263,8 +278,14 @@ impl Engine {
                 "Execution engine does not match the reviewed component identities",
             ));
         }
+        if plan.resolution.action == CleanAction::Remux {
+            profile.admit(&plan.source, &plan.resolution)?;
+            if profile == OutputProfile::Matroska {
+                admit_matroska(Path::new(&plan.output), &plan.resolution.streams)?;
+            }
+        }
         if plan.resolution.action == CleanAction::Remux
-            && plan.argv_template != lower_remux(&plan.source, &plan.resolution)?
+            && plan.argv_template != lower_remux(&plan.source, &plan.resolution, profile)?
         {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -840,7 +861,7 @@ fn registered_object(asset: &Asset) -> Result<&nw_domain::records::NativeObjectI
     }
     Ok(object)
 }
-fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<String>> {
+fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution, profile: OutputProfile) -> Result<Vec<String>> {
     let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
     let mut args = [
         "-hide_banner",
@@ -922,10 +943,11 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<S
             },
         ]);
     }
-    args.extend(["-f".into(), "matroska".into(), "@owned_staging@".into()]);
+    args.extend(["-f".into(), profile.muxer().into(), "@owned_staging@".into()]);
     Ok(args)
 }
 fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
+    let profile = OutputProfile::from_output(Path::new(&plan.output))?;
     if actual.streams.len() != plan.resolution.streams.len() {
         return Err(DomainError::new(
             "VERIFICATION_FAILED",
@@ -950,6 +972,7 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
             &observed.tags,
             &format!("Output stream {}", observed.index),
             false,
+            profile,
         )?;
     }
     if !plan.resolution.preservation.chapters
@@ -972,7 +995,7 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
     } else {
         &empty
     };
-    verify_tags(expected, &actual.global_tags, "Container", true)?;
+    verify_tags(expected, &actual.global_tags, "Container", true, profile)?;
     Ok(())
 }
 
@@ -981,12 +1004,14 @@ fn verify_tags(
     actual: &BTreeMap<String, String>,
     target: &str,
     generated_writer: bool,
+    profile: OutputProfile,
 ) -> Result<()> {
+    let matroska = profile == OutputProfile::Matroska;
     for (key, value) in expected {
         // Matroska regenerates its duration tags from the independently verified packet clock.
         let undefined_stream_language =
-            !generated_writer && key == "language" && value == "und" && !actual.contains_key(key);
-        if key != "duration" && !undefined_stream_language && actual.get(key) != Some(value) {
+            matroska && !generated_writer && key == "language" && value == "und" && !actual.contains_key(key);
+        if !(matroska && key == "duration") && !undefined_stream_language && actual.get(key) != Some(value) {
             return Err(DomainError::new(
                 "VERIFICATION_FAILED",
                 format!("{target} tag {key} did not match its frozen value"),
@@ -995,7 +1020,7 @@ fn verify_tags(
     }
     for key in actual.keys() {
         if !expected.contains_key(key)
-            && key != "duration"
+            && !(matroska && key == "duration")
             && !(generated_writer && key == "encoder")
         {
             return Err(DomainError::new(
@@ -1011,16 +1036,27 @@ fn verify_tags(
 mod tag_tests {
     use super::*;
     #[test]
+    fn mov_mp4_never_borrow_matroska_language_or_duration_exceptions() {
+        let empty = BTreeMap::new();
+        for profile in [OutputProfile::QuickTimeMpeg4, OutputProfile::IsoMp4Mpeg4] {
+            for (key, value) in [("language", "und"), ("duration", "authored duration")] {
+                let expected = BTreeMap::from([(key.into(), value.into())]);
+                assert!(verify_tags(&expected, &empty, "Stream", false, profile).is_err());
+                assert!(verify_tags(&empty, &expected, "Stream", false, profile).is_err());
+            }
+        }
+    }
+    #[test]
     fn only_matroska_undefined_stream_language_has_the_declared_omission() {
         let undefined = BTreeMap::from([("language".into(), "und".into())]);
         let english = BTreeMap::from([("language".into(), "eng".into())]);
         let empty = BTreeMap::new();
-        assert!(verify_tags(&undefined, &empty, "Stream", false).is_ok());
-        assert!(verify_tags(&undefined, &empty, "Container", true).is_err());
-        assert!(verify_tags(&english, &empty, "Stream", false).is_err());
-        assert!(verify_tags(&undefined, &english, "Stream", false).is_err());
-        assert!(verify_tags(&empty, &english, "Stream", false).is_err());
+        assert!(verify_tags(&undefined, &empty, "Stream", false, OutputProfile::Matroska).is_ok());
+        assert!(verify_tags(&undefined, &empty, "Container", true, OutputProfile::Matroska).is_err());
+        assert!(verify_tags(&english, &empty, "Stream", false, OutputProfile::Matroska).is_err());
+        assert!(verify_tags(&undefined, &english, "Stream", false, OutputProfile::Matroska).is_err());
+        assert!(verify_tags(&empty, &english, "Stream", false, OutputProfile::Matroska).is_err());
         let arbitrary = BTreeMap::from([("review_note".into(), "und".into())]);
-        assert!(verify_tags(&arbitrary, &empty, "Stream", false).is_err());
+        assert!(verify_tags(&arbitrary, &empty, "Stream", false, OutputProfile::Matroska).is_err());
     }
 }

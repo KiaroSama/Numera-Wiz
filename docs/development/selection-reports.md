@@ -63,3 +63,10 @@ Donor bodies personally read: standalone MuxCls reporting.py, processing.py and
 copying.py at 0cf9596f7510f894babf36595efbc827fbbfaf04. Their original bytes and
 research statuses remain unchanged. Personal interpretations are in the separate
 reading-ledger.json follow-up entries.
+
+Run 40079710323 subsequently passed all functional jobs, including the actual
+native report pointer/completion, Escape, Review/Run and full-byte output, plus
+all four native Clippy/desktop targets. Its real native report and manifest PNGs
+were personally inspected. Only one harness formatting hunk failed and is
+applied exactly. See evidence/selection-reports-ci69.json. Original-index control
+activation and large-page variants are still not credited.

@@ -877,6 +877,19 @@
           ],
           "report": "docs/development/evidence/selection-reports-ci68.json",
           "observed_outcome": "All four ordinary native report/rights units and actual CLI/official SDK report calls passed. Actual Chrome pointer/network-response journey and personally inspected PNG showed all three unique source/retained rows. Native report GUI, further control/page variants and complete F08 remain open."
+        },
+        {
+          "commit": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40079710323",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci69.json",
+          "observed_outcome": "All functional gates passed: four full native targets, WASM, complete actual media/transports/large HTTP and real Chrome/native report input through subsequent verified output. Actual native report and manifest PNGs personally inspected. Only one exact hosted harness formatting hunk failed; full product/package/resource/owner boundaries remain open."
         }
       ]
     },
@@ -902,6 +915,19 @@
           ],
           "report": "docs/development/evidence/selection-reports-ci68.json",
           "observed_outcome": "Held-directory no-replace/namespace-swap regressions passed in the native suites. Actual copy/remux and CLI/SDK/large owner HTTP journeys passed with exact retained payload/proof objects and transient-index cleanup. Complete recovery, retention and package/filesystem/resource qualification remain open."
+        },
+        {
+          "commit": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40079710323",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci69.json",
+          "observed_outcome": "All functional gates passed: four full native targets, WASM, complete actual media/transports/large HTTP and real Chrome/native report input through subsequent verified output. Actual native report and manifest PNGs personally inspected. Only one exact hosted harness formatting hunk failed; full product/package/resource/owner boundaries remain open."
         }
       ]
     }

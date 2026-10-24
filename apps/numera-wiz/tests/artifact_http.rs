@@ -430,7 +430,10 @@ async fn journey() {
         "Nonsecret hosted HTTP evidence must remain bounded"
     );
     std::fs::write(evidence.join("large-http-transfer.json"), encoded).unwrap();
-    println!("NW_ARTIFACT_HTTP_REPORT:{}", serde_json::to_string(&report).unwrap());
+    println!(
+        "NW_ARTIFACT_HTTP_REPORT:{}",
+        serde_json::to_string(&report).unwrap()
+    );
     controller.kill().await.unwrap();
     controller.wait().await.unwrap();
 }
