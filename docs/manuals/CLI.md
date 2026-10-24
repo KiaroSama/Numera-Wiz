@@ -92,7 +92,12 @@ managed object output paths cannot be used as media targets.
 Strict JSON rejects duplicate keys, unknown context, unsupported versions and
 ambiguous source registration. Ordinary JSON request/result limits are 1 MiB and
 256 KiB; binary upload routes have separate streaming limits. CLI domain errors
-return `ok=false`, a stable error code and nonzero exit. Diagnostics use timestamped
+return `ok=false` with a stable error code and the corresponding process status.
+Statuses are `0` success/accepted, `2` usage/validation, `3` availability, `4`
+conflict/stale state, `5` authorization, `6` execution/verification, `7` cancellation,
+`8` transport, `9` partial batch failure and `10` resource exhaustion. Inspecting
+a failed job is a successful query with failure facts; it does not itself return
+the failed producer job's process status. Diagnostics use timestamped
 INFO, WARNING, ERROR and DEBUG on stderr; protocol stdout stays clean. Tokens are
 never printed. Existing exported token files are preserved, including on Windows,
 where the protected ACL adapter is exercised in hosted tests.

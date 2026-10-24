@@ -57,7 +57,8 @@ impl Engine {
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {
         let canonical = files::source_path(path)?;
-        let input = blocking(move || admission::open(&canonical)).await?;
+        let admission_cancel = cancel.clone();
+        let input = blocking(move || admission::open(&canonical, &admission_cancel)).await?;
         let mut args = [
             "-v",
             "error",
@@ -226,8 +227,7 @@ impl Engine {
                 let source = plan.source.identity.clone();
                 let token = cancel.clone();
                 let (staging, actual) =
-                    blocking(move || files::copy_into_staging(&source, staging, &token))
-                        .await?;
+                    blocking(move || files::copy_into_staging(&source, staging, &token)).await?;
                 observer(ExecutionEvent::Verifying).await?;
                 let verification =
                     "Full byte SHA-256 and length verified before no-replace publication"
@@ -325,28 +325,53 @@ impl Engine {
         Ok((Some(artifact), verification, Some(args)))
     }
 }
-async fn prepare_staging(plan: &Plan, job_id: &str, observer: &Observer) -> Result<tempfile::NamedTempFile> {
+async fn prepare_staging(
+    plan: &Plan,
+    job_id: &str,
+    observer: &Observer,
+) -> Result<tempfile::NamedTempFile> {
     let output = files::revalidate_output(&plan.output)?;
-    let parent = output.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
+    let parent = output
+        .parent()
+        .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
     let directory = parent.join(format!(".numera-job-{}", Uuid::new_v4()));
     let payload = directory.join("payload.mkv");
-    observer(ExecutionEvent::StagingIntent(nw_domain::records::StagingIntent {
-        job_id: job_id.into(), directory: files::path_text(&directory)?, payload: files::path_text(&payload)?,
-    })).await?;
+    observer(ExecutionEvent::StagingIntent(
+        nw_domain::records::StagingIntent {
+            job_id: job_id.into(),
+            directory: files::path_text(&directory)?,
+            payload: files::path_text(&payload)?,
+        },
+    ))
+    .await?;
     blocking(move || {
         // The unpredictable workspace is journaled before any directory/file is created.
         if directory.try_exists().map_err(io_error)? {
-            return Err(DomainError::new("OUTPUT_COLLISION", "Staging workspace already exists"));
+            return Err(DomainError::new(
+                "OUTPUT_COLLISION",
+                "Staging workspace already exists",
+            ));
         }
         let directory = nw_platform::security::private_directory(&directory)?;
         #[cfg(unix)]
-        std::fs::File::open(directory.parent().expect("Staging parent")).and_then(|file| file.sync_all()).map_err(io_error)?;
-        let file = tempfile::Builder::new().prefix("payload").rand_bytes(0).suffix(".mkv").tempfile_in(&directory).map_err(io_error)?;
+        std::fs::File::open(directory.parent().expect("Staging parent"))
+            .and_then(|file| file.sync_all())
+            .map_err(io_error)?;
+        let file = tempfile::Builder::new()
+            .prefix("payload")
+            .rand_bytes(0)
+            .suffix(".mkv")
+            .tempfile_in(&directory)
+            .map_err(io_error)?;
         if file.path() != payload {
-            return Err(DomainError::new("TARGET_CHANGED", "Staging workspace resolved to a different parent"));
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "Staging workspace resolved to a different parent",
+            ));
         }
         Ok(file)
-    }).await
+    })
+    .await
 }
 async fn publish(
     staging: tempfile::NamedTempFile,
@@ -358,6 +383,7 @@ async fn publish(
     observer: Observer,
 ) -> Result<FileIdentity> {
     let output = files::revalidate_output(&plan.output)?;
+    #[cfg(unix)]
     let parent = output
         .parent()
         .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
@@ -367,7 +393,11 @@ async fn publish(
             "Cancelled before publication fence",
         ));
     }
-    let workspace = staging.path().parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging workspace required"))?.to_owned();
+    let workspace = staging
+        .path()
+        .parent()
+        .ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging workspace required"))?
+        .to_owned();
     let proof = workspace.join(format!(".numera-proof-{}", Uuid::new_v4()));
     std::fs::hard_link(staging.path(), &proof).map_err(io_error)?;
     #[cfg(unix)]

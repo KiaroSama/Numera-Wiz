@@ -3,7 +3,7 @@ mod client;
 mod mcp;
 mod server;
 mod web_assets;
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use client::NativeClient;
 use nw_domain::commands::Request;
@@ -38,7 +38,7 @@ enum Mode {
     Bridge {
         #[arg(long, default_value = "agent")]
         access_profile: String,
-        #[arg(long, default_value = "stdio")]
+        #[arg(long, default_value = "stdio", value_parser = ["stdio", "http"])]
         transport: String,
         #[arg(long, default_value_t = 1578)]
         port: u16,
@@ -66,7 +66,8 @@ async fn main() -> std::process::ExitCode {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error,"Operation failed");
-            std::process::ExitCode::FAILURE
+            let code = error.downcast_ref::<nw_domain::DomainError>().map(nw_domain::DomainError::exit_code).unwrap_or_else(|| if error.downcast_ref::<reqwest::Error>().is_some() { 8 } else { 6 });
+            std::process::ExitCode::from(code)
         }
     }
 }
@@ -113,7 +114,7 @@ async fn run() -> Result<()> {
                 .take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64)
                 .read_to_end(&mut bytes)?;
             if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
-                bail!("Request exceeds 1 MiB");
+                return Err(nw_domain::DomainError::new("RESOURCE_LIMIT", "Request exceeds 1 MiB").into());
             }
             print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
         }
@@ -147,14 +148,12 @@ async fn run() -> Result<()> {
                 server::serve(
                     client,
                     port,
-                    token_file.context(
-                        "HTTP bridge requires --token-file; credentials are never printed",
-                    )?,
+                    token_file.ok_or_else(|| nw_domain::DomainError::new("VALIDATION_ERROR", "HTTP bridge requires --token-file; credentials are never printed"))?,
                     access_profile,
                 )
                 .await
             }
-            _ => bail!("Unsupported transport; choose stdio or http"),
+            _ => Err(nw_domain::DomainError::new("VALIDATION_ERROR", "Unsupported transport; choose stdio or http").into()),
         },
         Some(Mode::Serve {
             port,
@@ -169,15 +168,13 @@ async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
     let result = client.request(&request).await?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.ok {
-        bail!("Command returned a domain error; inspect the JSON result");
+        return Err(result.error.unwrap_or_else(|| nw_domain::DomainError::new("INTERNAL_ERROR", "Command failed without a typed error")).into());
     }
     Ok(())
 }
 #[cfg(not(feature = "desktop"))]
 async fn desktop(_client: NativeClient) -> Result<()> {
-    bail!(
-        "This CI artifact is headless. Use commands/request/bridge/doctor, or select the separately built desktop artifact."
-    )
+    Err(nw_domain::DomainError::new("CAPABILITY_UNAVAILABLE", "This CI artifact is headless. Use commands/request/bridge/doctor, or select the desktop artifact.").into())
 }
 #[cfg(feature = "desktop")]
 async fn desktop(client: NativeClient) -> Result<()> {

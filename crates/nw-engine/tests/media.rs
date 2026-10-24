@@ -143,7 +143,10 @@ async fn actual_copy_and_order_metadata_remux() {
         Box::pin(async move {
             match event {
                 nw_engine::ExecutionEvent::StagingIntent(intent) => {
-                    assert!(!std::path::Path::new(&intent.directory).exists(), "Durable staging intent must precede workspace creation");
+                    assert!(
+                        !std::path::Path::new(&intent.directory).exists(),
+                        "Durable staging intent must precede workspace creation"
+                    );
                     assert!(!std::path::Path::new(&intent.payload).exists());
                 }
                 nw_engine::ExecutionEvent::Prepared(args) => {

@@ -32,6 +32,9 @@ impl Cli {
         command
     }
     async fn raw(&self, request: &Request) -> Value {
+        self.raw_with_exit(request).await.0
+    }
+    async fn raw_with_exit(&self, request: &Request) -> (Value, i32) {
         let mut child = self
             .command()
             .arg("request")
@@ -51,8 +54,9 @@ impl Cli {
             .await
             .unwrap()
             .unwrap();
-        serde_json::from_slice(&output.stdout)
-            .unwrap_or_else(|_| panic!("CLI failed: {}", String::from_utf8_lossy(&output.stderr)))
+        let value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|_| panic!("CLI failed: {}", String::from_utf8_lossy(&output.stderr)));
+        (value, output.status.code().expect("CLI must report its synchronous exit code"))
     }
     async fn query(&self, id: &str, params: Value) -> Value {
         let response = self.raw(&Request::query(id, params)).await;
@@ -108,6 +112,15 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
         )
         .await;
+    let (invalid, exit) = cli.raw_with_exit(&Request::query("media.probe", json!({"path":true}))).await;
+    assert_eq!(invalid["error"]["code"], "VALIDATION_ERROR");
+    assert_eq!(exit, 2, "A typed CLI validation failure retains parseable JSON and the stable usage exit");
+    let mut conflicting = Request::query("assets.register", json!({"path":"different-source.mkv"}));
+    conflicting.replay_scope = Some(scope.clone());
+    conflicting.idempotency_key = Some("register-cli".into());
+    let (conflict, exit) = cli.raw_with_exit(&conflicting).await;
+    assert_eq!(conflict["error"]["code"], "IDEMPOTENCY_CONFLICT");
+    assert_eq!(exit, 4, "A durable conflict is distinguishable from a media execution failure");
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
     let output = media.directory.path().join("cli-copy.mkv");
