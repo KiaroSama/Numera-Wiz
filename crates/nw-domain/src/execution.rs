@@ -21,7 +21,9 @@ enum DeadlineWire {
     Disabled {},
 }
 impl<'de> Deserialize<'de> for DeadlinePolicy {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
         Ok(match DeadlineWire::deserialize(deserializer)? {
             DeadlineWire::Finite { seconds } => Self::Finite { seconds },
             DeadlineWire::Disabled {} => Self::Disabled,
@@ -110,6 +112,48 @@ impl StageProgress {
         Ok(())
     }
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RemuxProgress {
+    /// FFmpeg's reported progress clock; not an absolute source or sequence time.
+    pub reported_out_time_us: Option<String>,
+    /// Actual byte count reported by the selected output muxer; unknown stays absent.
+    pub output_bytes: Option<String>,
+    /// FFmpeg's first video output counter; this is not a decoded-frame oracle.
+    pub reported_frame_count: Option<String>,
+    pub elapsed_ms: String,
+    pub coalesced_updates: String,
+    /// Ends the FFmpeg progress stream, never announces verified/published output.
+    pub process_progress_ended: bool,
+}
+impl RemuxProgress {
+    pub fn validate(&self) -> Result<()> {
+        let invalid = || {
+            DomainError::new(
+                "INVALID_PROGRESS",
+                "Invalid reported remux progress counter",
+            )
+        };
+        if let Some(value) = &self.reported_out_time_us {
+            let number = value.parse::<i64>().map_err(|_| invalid())?;
+            if number.to_string() != *value {
+                return Err(invalid());
+            }
+        }
+        for value in [&self.output_bytes, &self.reported_frame_count]
+            .into_iter()
+            .flatten()
+            .chain([&self.elapsed_ms, &self.coalesced_updates])
+        {
+            let number = value.parse::<u64>().map_err(|_| invalid())?;
+            if number.to_string() != *value {
+                return Err(invalid());
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,35 +184,5 @@ mod tests {
             CleanupLimits::default().operation.duration().unwrap(),
             Some(Duration::from_secs(10800))
         );
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RemuxProgress {
-    /// FFmpeg's reported progress clock; not an absolute source or sequence time.
-    pub reported_out_time_us: Option<String>,
-    /// Actual byte count reported by the selected output muxer; unknown stays absent.
-    pub output_bytes: Option<String>,
-    /// FFmpeg's first video output counter; this is not a decoded-frame oracle.
-    pub reported_frame_count: Option<String>,
-    pub elapsed_ms: String,
-    pub coalesced_updates: String,
-    /// Ends the FFmpeg progress stream, never announces verified/published output.
-    pub process_progress_ended: bool,
-}
-impl RemuxProgress {
-    pub fn validate(&self) -> Result<()> {
-        let invalid = || DomainError::new("INVALID_PROGRESS", "Invalid reported remux progress counter");
-        if let Some(value) = &self.reported_out_time_us {
-            let number = value.parse::<i64>().map_err(|_| invalid())?;
-            if number.to_string() != *value { return Err(invalid()); }
-        }
-        for value in [&self.output_bytes, &self.reported_frame_count].into_iter().flatten()
-            .chain([&self.elapsed_ms, &self.coalesced_updates])
-        {
-            let number = value.parse::<u64>().map_err(|_| invalid())?;
-            if number.to_string() != *value { return Err(invalid()); }
-        }
-        Ok(())
     }
 }

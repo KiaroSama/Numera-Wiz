@@ -1749,6 +1749,14 @@
       "read_scope": "complete_body",
       "lines": 392,
       "interpretation": "Complete body covers existing-destination safety, writable copied outputs, timestamps, finite copy/companion control and failure cleanup. Many Windows assertions replace robocopy with fake functions; they do not qualify Numera's OS publication or descendant boundary. Numera keeps mandatory full-byte verification and owned no-replace publication; equivalent replacement and complete companion accounting remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_output_paths.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "6cf5fd70c1316569f9a63007d3edaf139479cf72",
+      "read_scope": "complete_body",
+      "lines": 221,
+      "interpretation": "Complete body pins relative-tree roots, single-file suffixes, numbered collisions before review, nested-output rejection, directory-boundary exclusion, companion classification and stable presentation order. Its string-case/resolve examples do not qualify symlink/reparse aliases, Unicode/case filesystem identity or external replacement races. New batch traversal must remain bounded and preserve every candidate/error; publication cannot silently renumber after review."
     }
   ]
 }

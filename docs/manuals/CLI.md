@@ -408,3 +408,29 @@ A tagged policy/selector/tag action rejects fields belonging to another variant,
 including extra fields on disabled/all/none/keep/clear. A request cannot silently
 discard the ignored part and execute the remainder. Full remux/folder/companion
 and packaged five-surface qualification remains required.
+
+
+## Select the source-probe deadline
+
+Standalone `media probe` and durable `assets register` accept the optional
+canonical `probe_timeout` value in their parameter object. They use the same
+typed finite/disabled policy and current service admission as cleanup execution.
+
+```text
+numera-wiz media probe INPUT --probe-timeout-seconds 30
+numera-wiz assets register INPUT --probe-timeout-seconds 30 --replay-scope SCOPE --idempotency-key KEY
+```
+
+Protected local-owner callers can explicitly choose --disable-probe-timeout.
+Named profiles, browser sessions and scoped MCP callers receive PERMISSION_DENIED
+for that choice. Absence retains the finite 120-second compatibility default.
+The effective timeout is included in the returned probe and captured asset
+probe; it contributes to subsequent semantic plan hashes. Historical probe
+records omit the field and retain their earlier serialized shape/hash.
+
+Retain the selected probe_timeout when retrying durable registration; changing
+it with the same accepted scope/key is an idempotency conflict. Source-byte
+identity reads, caller transport deadlines and cancellation remain independent
+boundaries. This option governs the ffprobe child rather than promising a
+whole-command filesystem/transport deadline. Browser upload filenames remain
+opaque managed inputs; this field confers no path or object authority.

@@ -1104,11 +1104,15 @@ impl Service {
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
+                let deadline = input.probe_timeout.unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
+                self.admit_probe_timeout(&context, deadline)?;
                 let path = self.path(&context, Path::new(&input.path), false)?;
-                value(&runtime.block_on(self.engine()?.probe(&path, cancellation.clone()))?)?
+                value(&runtime.block_on(self.engine()?.probe_with_policy(&path, deadline, cancellation.clone()))?)?
             }
             "assets.register" => {
                 let input: nw_domain::ingest::RegisterInput = commands::parse(params)?;
+                let probe_timeout = input.probe_timeout.unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
+                self.admit_probe_timeout(&context, probe_timeout)?;
                 let upload_id = input.upload_id.clone();
                 let (path, display_name) = match (input.path, input.upload_id) {
                     (Some(path), None) => {
@@ -1134,9 +1138,10 @@ impl Service {
                             "Admitted source changed before preflight",
                         )
                     })?;
-                    let result = runtime.block_on(engine.register(
+                    let result = runtime.block_on(engine.register_with_policy(
                         path,
                         context.principal.clone(),
+                        probe_timeout,
                         cancellation.clone(),
                     ));
                     stamp.revalidate()?;
@@ -1149,6 +1154,7 @@ impl Service {
                 {
                     return Ok(replay);
                 }
+                self.admit_probe_timeout(&context, probe_timeout)?;
                 self.root_authority(&context, &selected_path, false)?;
                 if self.path(&context, &selected_path, false)? != selected_path {
                     return Err(DomainError::new(
@@ -1678,6 +1684,11 @@ impl Service {
         }
         Ok(())
     }
+    fn admit_probe_timeout(&self, context: &Context, probe: nw_domain::execution::DeadlinePolicy) -> Result<()> {
+        self.admit_execution_limits(context, &nw_domain::execution::CleanupLimits {
+            probe, ..nw_domain::execution::CleanupLimits::default()
+        })
+    }
     fn admit_execution_limits(
         &self,
         context: &Context,
@@ -1724,14 +1735,26 @@ impl Service {
                 progress.validate()?;
                 let job = self.store.inspect_job(id)?;
                 self.validate_job_paths(&job)?;
-                if !matches!(job.plan.resolution.action, nw_domain::mux::CleanAction::Remux)
-                    || job.state != JobState::Running
+                if !matches!(
+                    job.plan.resolution.action,
+                    nw_domain::mux::CleanAction::Remux
+                ) || job.state != JobState::Running
                 {
-                    return Err(DomainError::new("INVALID_PROGRESS", "Remux progress requires an active reviewed remux stage"));
+                    return Err(DomainError::new(
+                        "INVALID_PROGRESS",
+                        "Remux progress requires an active reviewed remux stage",
+                    ));
                 }
                 self.store.update_job(id, |job| {
-                    if job.remux_progress.as_ref().is_some_and(|previous| previous.process_progress_ended) {
-                        return Err(DomainError::new("INVALID_PROGRESS", "Final process progress cannot be rewritten"));
+                    if job
+                        .remux_progress
+                        .as_ref()
+                        .is_some_and(|previous| previous.process_progress_ended)
+                    {
+                        return Err(DomainError::new(
+                            "INVALID_PROGRESS",
+                            "Final process progress cannot be rewritten",
+                        ));
                     }
                     job.remux_progress = Some(progress);
                     Ok(())
@@ -1742,8 +1765,10 @@ impl Service {
                 progress.validate()?;
                 let job = self.store.inspect_job(id)?;
                 self.validate_job_paths(&job)?;
-                if !matches!(job.plan.resolution.action, nw_domain::mux::CleanAction::CopyUnchanged)
-                    || progress.total_bytes != job.plan.source.identity.bytes
+                if !matches!(
+                    job.plan.resolution.action,
+                    nw_domain::mux::CleanAction::CopyUnchanged
+                ) || progress.total_bytes != job.plan.source.identity.bytes
                     || !matches!(job.state, JobState::Running | JobState::Verifying)
                 {
                     return Err(DomainError::new(
@@ -2025,6 +2050,7 @@ mod tests {
             display_name: "source.mkv".into(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),
             probe: MediaProbe {
+                probe_timeout: None,
                 stream_details: Default::default(),
                 streams: vec![
                     Stream {
@@ -2482,6 +2508,7 @@ mod tests {
             display_name: "source.mkv".into(),
             identity: identity.clone(),
             probe: MediaProbe {
+                probe_timeout: None,
                 stream_details: Default::default(),
                 streams: Vec::new(),
                 format: "metadata-view-only".into(),
@@ -2676,6 +2703,7 @@ mod tests {
             display_name: "source.mkv".into(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),
             probe: nw_domain::records::MediaProbe {
+                probe_timeout: None,
                 streams,
                 stream_details: Default::default(),
                 format: "matroska,webm".into(),
@@ -2838,6 +2866,7 @@ mod tests {
             creator: owner.principal.clone(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),
             probe: nw_domain::records::MediaProbe {
+                probe_timeout: None,
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-only".into(),

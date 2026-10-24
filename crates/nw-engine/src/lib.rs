@@ -114,7 +114,9 @@ impl Engine {
         let result = ticket.finish(result)?;
         let value: Value = serde_json::from_slice(&result.stdout)
             .map_err(|e| DomainError::new("INVALID_PROBE", e.to_string()))?;
-        parse_probe(value)
+        let mut probe = parse_probe(value)?;
+        probe.probe_timeout = Some(deadline);
+        Ok(probe)
     }
     pub async fn register(
         &self,
@@ -122,6 +124,13 @@ impl Engine {
         creator: String,
         cancel: CancellationToken,
     ) -> Result<Asset> {
+        self.register_with_policy(path, creator, nw_domain::execution::CleanupLimits::default().probe, cancel).await
+    }
+    pub async fn register_with_policy(
+        &self, path: PathBuf, creator: String,
+        deadline: nw_domain::execution::DeadlinePolicy, cancel: CancellationToken,
+    ) -> Result<Asset> {
+        deadline.duration()?;
         let token = cancel.clone();
         let (initial, stamp) = blocking(move || {
             let path = files::source_path(&path)?;
@@ -131,7 +140,7 @@ impl Engine {
             Ok((identity, stamp))
         })
         .await?;
-        let probe = self.probe(Path::new(&initial.path), cancel.clone()).await?;
+        let probe = self.probe_with_policy(Path::new(&initial.path), deadline, cancel.clone()).await?;
         let expected = initial.clone();
         let source_object = blocking(move || {
             files::revalidate(&expected, &cancel)?;
@@ -786,6 +795,7 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
     }
 
     Ok(MediaProbe {
+        probe_timeout: None,
         stream_details: rows
             .iter()
             .map(|row| {

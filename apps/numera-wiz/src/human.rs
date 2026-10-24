@@ -57,15 +57,43 @@ impl Page {
         json!({"limit":self.limit,"cursor":self.cursor,"replace_snapshot":self.replace_snapshot})
     }
 }
+#[derive(Args)]
+pub struct ProbePolicy {
+    #[arg(long, conflicts_with = "disable_probe_timeout")]
+    probe_timeout_seconds: Option<u32>,
+    #[arg(long)]
+    disable_probe_timeout: bool,
+}
+impl ProbePolicy {
+    fn apply(self, params: &mut Value) -> Result<()> {
+        let policy = match (self.probe_timeout_seconds, self.disable_probe_timeout) {
+            (Some(seconds), false) => Some(nw_domain::execution::DeadlinePolicy::Finite { seconds }),
+            (None, true) => Some(nw_domain::execution::DeadlinePolicy::Disabled),
+            (None, false) => None,
+            _ => return Err(DomainError::new("VALIDATION_ERROR", "Choose one explicit probe timeout policy").into()),
+        };
+        if let Some(policy) = policy {
+            policy.duration()?;
+            params["probe_timeout"] = serde_json::to_value(policy)?;
+        }
+        Ok(())
+    }
+}
 #[derive(Subcommand)]
 pub enum Media {
     /// Inspect an authorized media file without creating an asset or job.
-    Probe { path: PathBuf },
+    Probe {
+        path: PathBuf,
+        #[command(flatten)]
+        probe: ProbePolicy,
+    },
 }
 #[derive(Subcommand)]
 pub enum Assets {
     Register {
         path: PathBuf,
+        #[command(flatten)]
+        probe: ProbePolicy,
         #[command(flatten)]
         identity: MutationIdentity,
     },
@@ -181,11 +209,15 @@ fn query(id: &str, params: Value) -> Request {
 }
 pub fn prepare(command: Command) -> Result<Request> {
     let request = match command {
-        Command::Media(Media::Probe { path }) => {
-            query("media.probe", json!({"path":native_path(&path)?}))
+        Command::Media(Media::Probe { path, probe }) => {
+            let mut params = json!({"path":native_path(&path)?});
+            probe.apply(&mut params)?;
+            query("media.probe", params)
         }
-        Command::Assets(Assets::Register { path, identity }) => {
-            let mut request = query("assets.register", json!({"path":native_path(&path)?}));
+        Command::Assets(Assets::Register { path, probe, identity }) => {
+            let mut params = json!({"path":native_path(&path)?});
+            probe.apply(&mut params)?;
+            let mut request = query("assets.register", params);
             identity.apply(&mut request)?;
             request
         }
