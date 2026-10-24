@@ -1455,3 +1455,42 @@ hosted formatter hunks are applied. No new policy/progress complete runtime or
 GUI pass is inferred. This corrective source requires a fresh hosted run.
 Additional remux-progress source is prepared separately and is not in this fix.
 No archived member or full-task checkbox changes; no local execution occurred.
+
+
+## Strict tagged policy correction and bounded FFmpeg remux reports
+
+Run 40102429114 restored/compiled the complete supervision source, passed WASM/
+lock and 32 domain regressions, but the deadline regression found that an
+internally tagged unit disabled variant accepted an extraneous seconds field.
+This revision deserializes it through strict struct variants without changing
+the serialized public wire form. The same silent-field hole is corrected for
+all/none selectors and keep/clear tag actions, with rejection/round-trip tests.
+The failing regression remains intact. One exact hosted formatter hunk is applied.
+
+New remux source reads actual -progress pipe:1 / -stats_period 0.2 output through
+the common incremental process consumer. The parser bounds lines, block bytes
+and key count, preserves N/A as unknown and retains only the latest block.
+A 200 ms observer loop records exact reported clock/output counters and
+coalescing; observer/authority failure requests cancellation and awaits the
+owned process drain. A terminal progress block is not verification/publication.
+The job/store/views/native/browser/CLI/MCP projections share the bounded facts.
+The complete prepared argv participates in plan validation; old remux argv
+requires explicit fresh review rather than an implicit stored-plan update.
+
+Primary sources personally inspected were pinned FFmpeg doc/ffmpeg.texi
+-progress/stats_period and fftools/ffmpeg.c print_report at
+946fcce07b6dcd0331c8cc609192aeff5e1924f8. The source confirms underscore keys,
+N/A counters, out_time_us (the legacy out_time_ms is also microseconds), copyts
+progress-clock adjustment and the first-video output counter. No absolute
+timeline/decoded-frame/ETA claim is inferred. A new hosted actual remux fixture
+requires an uncreated destination during reports, final reported bytes equal to
+the published file and independent expected two-stream/language assertions
+after the existing complete engine preservation verification. This source
+awaits hosted compilation and runtime evidence.
+
+The complete donor copying test body was personally read and recorded; its
+mocked robocopy/size/time assertions are not Numera OS or package evidence.
+Full batch/companion totals, project/editor/effects/DAG/preview/mixer/captions,
+command closure, retention/migration, package/resource/manual and owner-harness
+work remain mandatory. No full-task checkbox/archive member changed and no
+local source/media/GUI or owner GPU execution occurred.

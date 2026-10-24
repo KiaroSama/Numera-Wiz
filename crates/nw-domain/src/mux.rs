@@ -28,7 +28,7 @@ impl Stream {
         self.kind == StreamKind::Video && self.dispositions.contains("attached_pic")
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Selector {
     All,
@@ -36,6 +36,26 @@ pub enum Selector {
     SourceIndices { values: Vec<u32> },
     Languages { values: Vec<String> },
     TitleContainsAny { values: Vec<String> },
+}
+#[derive(Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+enum SelectorWire {
+    All {},
+    None {},
+    SourceIndices { values: Vec<u32> },
+    Languages { values: Vec<String> },
+    TitleContainsAny { values: Vec<String> },
+}
+impl<'de> Deserialize<'de> for Selector {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        Ok(match SelectorWire::deserialize(deserializer)? {
+            SelectorWire::All {} => Self::All,
+            SelectorWire::None {} => Self::None,
+            SelectorWire::SourceIndices { values } => Self::SourceIndices { values },
+            SelectorWire::Languages { values } => Self::Languages { values },
+            SelectorWire::TitleContainsAny { values } => Self::TitleContainsAny { values },
+        })
+    }
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -50,7 +70,7 @@ pub struct Selection {
     pub selector: Selector,
     pub no_match: NoMatch,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 #[derive(Default)]
 pub enum TagPatch {
@@ -60,6 +80,22 @@ pub enum TagPatch {
         value: String,
     },
     Clear,
+}
+#[derive(Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+enum TagPatchWire {
+    Keep {},
+    Set { value: String },
+    Clear {},
+}
+impl<'de> Deserialize<'de> for TagPatch {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        Ok(match TagPatchWire::deserialize(deserializer)? {
+            TagPatchWire::Keep {} => Self::Keep,
+            TagPatchWire::Set { value } => Self::Set { value },
+            TagPatchWire::Clear {} => Self::Clear,
+        })
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -429,6 +465,19 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unit_selection_and_tag_actions_never_discard_extra_fields() {
+        for wire in [
+            r#"{"mode":"all","values":[1]}"#, r#"{"mode":"none","unexpected":null}"#,
+        ] { assert!(serde_json::from_str::<Selector>(wire).is_err(), "{wire}"); }
+        for wire in [
+            r#"{"action":"keep","value":"changed"}"#, r#"{"action":"clear","unexpected":null}"#,
+        ] { assert!(serde_json::from_str::<TagPatch>(wire).is_err(), "{wire}"); }
+        for wire in [r#"{"mode":"all"}"#, r#"{"mode":"none"}"#] {
+            let value: Selector = serde_json::from_str(wire).unwrap();
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::from_str::<serde_json::Value>(wire).unwrap());
+        }
+    }
     fn stream(index: u32, kind: StreamKind, language: &str) -> Stream {
         Stream {
             index,

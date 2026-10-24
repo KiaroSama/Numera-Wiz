@@ -421,6 +421,7 @@ impl Service {
             })
             .collect();
         Ok(JobView {
+            remux_progress: job.remux_progress.clone(),
             progress: job.progress.clone(),
             file_times: job
                 .file_times
@@ -1472,6 +1473,7 @@ impl Service {
                 }
                 let id = Uuid::new_v4().to_string();
                 let job = Job {
+                    remux_progress: None,
                     progress: None,
                     file_times: None,
                     id: id.clone(),
@@ -1717,12 +1719,31 @@ impl Service {
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         match event {
+            ExecutionEvent::RemuxProgress(progress) => {
+                self.store.execution_allowed(id)?;
+                progress.validate()?;
+                let job = self.store.inspect_job(id)?;
+                self.validate_job_paths(&job)?;
+                if !matches!(job.plan.resolution.action, nw_domain::mux::CleanAction::Remux)
+                    || job.state != JobState::Running
+                {
+                    return Err(DomainError::new("INVALID_PROGRESS", "Remux progress requires an active reviewed remux stage"));
+                }
+                self.store.update_job(id, |job| {
+                    if job.remux_progress.as_ref().is_some_and(|previous| previous.process_progress_ended) {
+                        return Err(DomainError::new("INVALID_PROGRESS", "Final process progress cannot be rewritten"));
+                    }
+                    job.remux_progress = Some(progress);
+                    Ok(())
+                })?;
+            }
             ExecutionEvent::Progress(progress) => {
                 self.store.execution_allowed(id)?;
                 progress.validate()?;
                 let job = self.store.inspect_job(id)?;
                 self.validate_job_paths(&job)?;
-                if progress.total_bytes != job.plan.source.identity.bytes
+                if !matches!(job.plan.resolution.action, nw_domain::mux::CleanAction::CopyUnchanged)
+                    || progress.total_bytes != job.plan.source.identity.bytes
                     || !matches!(job.state, JobState::Running | JobState::Verifying)
                 {
                     return Err(DomainError::new(
@@ -2496,6 +2517,7 @@ mod tests {
             verification_scope: "Synthetic metadata view".into(),
         };
         let job = Job {
+            remux_progress: None,
             progress: None,
             file_times: Some(nw_domain::file_times::FileTimeOutcome {
                 policy: nw_domain::file_times::FileTimeRequest::PreserveBestEffort,

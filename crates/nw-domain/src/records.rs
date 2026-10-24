@@ -105,6 +105,8 @@ impl JobState {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Job {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remux_progress: Option<crate::execution::RemuxProgress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<crate::execution::StageProgress>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_times: Option<crate::file_times::FileTimeOutcome>,

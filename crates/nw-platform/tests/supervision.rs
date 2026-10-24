@@ -116,7 +116,11 @@ async fn explicit_finite_policy_times_out_and_disabled_policy_still_cancels() {
         .unwrap_err();
         assert_eq!(
             result.code,
-            if disabled { "CANCELLED" } else { "PROCESS_TIMEOUT" }
+            if disabled {
+                "CANCELLED"
+            } else {
+                "PROCESS_TIMEOUT"
+            }
         );
         assert!(started.elapsed() < Duration::from_secs(8));
         if let Some(task) = cancellation {

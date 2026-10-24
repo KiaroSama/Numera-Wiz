@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "run_id": 40102429114,
+  "branch_head": "5d9ffdef2c8560cb745367e3e9aa8a196291a1dd",
+  "status": "failed; strict tagged decoding correction required",
+  "observed": [
+    "restored original supervision source compiled",
+    "32 domain regressions passed; tagged deadline rejection regression failed",
+    "actual disabled variant accepted an extraneous seconds field despite the enum deny_unknown_fields annotation",
+    "WASM/lock passed; complete native ordinary/runtime/GUI qualification is not inferred"
+  ],
+  "correction": [
+    "deserialize deadline through strict struct variants while retaining the public wire shape",
+    "apply same strict treatment to unit selector and tag-patch variants; retain rejection regressions",
+    "one exact hosted formatter hunk applied"
+  ],
+  "not_qualified": [
+    "complete new limits/progress native/runtime matrix",
+    "new remux progress source; awaits next CI"
+  ]
+}
