@@ -121,6 +121,7 @@ impl Service {
         Ok(())
     }
     pub fn create_upload(&self, context: &Context, input: UploadInput) -> Result<UploadTicket> {
+        let _admission = self.ordinary_admission()?;
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         self.upload_allowed(context)?;
         let expected = input.bytes.parse::<u64>().map_err(|_| {
@@ -209,6 +210,7 @@ impl Service {
         })
     }
     pub fn begin_upload(self: &Arc<Self>, context: &Context, id: &str) -> Result<UploadWriter> {
+        let _admission = self.ordinary_admission()?;
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         self.upload_allowed(context)?;
         let key = named("upload", id)?;
@@ -242,6 +244,7 @@ impl Service {
         })
     }
     fn seal_upload(&self, upload: &Upload, digest: &str) -> Result<Upload> {
+        let _admission = self.ordinary_admission()?;
         let context = Context {
             principal: upload.principal.clone(),
             profile: upload.profile.clone(),

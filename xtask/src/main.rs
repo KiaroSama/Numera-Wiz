@@ -130,6 +130,14 @@ fn schemas(root: &Path) -> Result<()> {
         path.join("cleanup-batch-result.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::batches::BatchResult))?,
     )?;
+    fs::write(
+        path.join("migration-plan.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::maintenance::MigrationPlan))?,
+    )?;
+    fs::write(
+        path.join("migration-record.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::maintenance::MigrationRecord))?,
+    )?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }

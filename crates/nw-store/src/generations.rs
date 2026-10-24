@@ -25,6 +25,7 @@ pub const CURRENT_CAPABILITIES: &[&str] = &[
     "cleanup_batch.v1",
     "receipts.v1",
     "generation_activation.v1",
+    "migration.v1",
 ];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -160,10 +161,10 @@ fn validate_activation(activation: &Activation) -> Result<()> {
     uuid(&activation.id)?;
     uuid(&activation.operation_id)?;
     uuid(&activation.root_id)?;
-    if activation.store_version != 2 {
+    if ![2, 3].contains(&activation.store_version) {
         return Err(DomainError::new(
             "STORE_VERSION_UNSUPPORTED",
-            "This development reader admits store schema2 only",
+            "This development reader admits store schemas2/3 only",
         ));
     }
     if activation.sequence == 0
@@ -353,6 +354,11 @@ impl RootLease {
         }
         let path = location_path(&self.root, &activation.location)?;
         let facts = versions::inspect_closed(&path)?;
+        let file_capabilities = facts.required_capabilities.iter().collect::<std::collections::BTreeSet<_>>();
+        let declared_capabilities = activation.required_capabilities.iter().collect::<std::collections::BTreeSet<_>>();
+        if facts.store_version == 3 && file_capabilities != declared_capabilities {
+            return Err(invalid("Store and activation required capabilities differ"));
+        }
         if facts.root_id != activation.root_id || facts.store_version != activation.store_version {
             return Err(invalid(
                 "Activation requires a complete matching closed generation",
@@ -404,7 +410,7 @@ impl Store {
             ));
         }
         let facts = versions::inspect_closed(&path)?;
-        if facts.root_id != self.root_id || facts.store_version != 2 {
+        if facts.root_id != self.root_id || ![2, 3].contains(&facts.store_version) {
             return Err(invalid(
                 "Reopening requires the original identity and currently admitted codec",
             ));
@@ -420,7 +426,7 @@ impl Store {
         let selection = lease.selection()?;
         let path = lease.path(&selection)?;
         let facts = lease.inspect_selected()?;
-        if facts.root_id != self.root_id || facts.store_version != 2 {
+        if facts.root_id != self.root_id || ![2, 3].contains(&facts.store_version) {
             return Err(invalid(
                 "The activation requires a codec not yet admitted by this store implementation",
             ));
@@ -524,7 +530,10 @@ mod tests {
             "9007199254740993"
         );
         assert_eq!(store.generation_path().unwrap(), target);
-        assert_eq!(RootLock::acquire(&generation).err().unwrap().code, "OWNER_BUSY");
+        assert_eq!(
+            RootLock::acquire(&generation).err().unwrap().code,
+            "OWNER_BUSY"
+        );
         assert_eq!(RootLock::acquire(&target).err().unwrap().code, "OWNER_BUSY");
         store.close_generation(&lease).unwrap();
         store.reopen_current_generation(&lease).unwrap();

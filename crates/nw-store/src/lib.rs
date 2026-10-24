@@ -20,6 +20,7 @@ const SCOPE_TTL: u64 = 7 * 24 * 3600;
 pub mod copies;
 pub mod generations;
 mod live;
+pub mod migrations;
 mod profiles;
 mod records;
 pub mod versions;
@@ -71,6 +72,9 @@ impl Store {
         let lock = RootLock::acquire(&root)?;
         let file = root.join("store.redb");
         let fresh = !file.try_exists().map_err(storage)?;
+        if !fresh {
+            versions::preflight_existing(&root)?;
+        }
         let db = Database::builder()
             .set_cache_size(8 * 1024 * 1024)
             .create(file)
@@ -106,7 +110,7 @@ impl Store {
             .get("meta/schema")
             .map_err(storage)?
             .map(|v| v.value().to_vec())
-            != Some(STORE_SCHEMA.to_vec())
+             .is_none_or(|version| ![b"2".as_slice(), b"3".as_slice()].contains(&version.as_slice()))
         {
             return Err(DomainError::new(
                 "STORE_SCHEMA_UNSUPPORTED",
@@ -953,7 +957,7 @@ mod tests {
         write.commit().unwrap();
         drop(store);
         match Store::open(root.path()) {
-            Err(error) => assert_eq!(error.code, "STORE_SCHEMA_UNSUPPORTED"),
+            Err(error) => assert_eq!(error.code, "STORE_VERSION_UNSUPPORTED"),
             Ok(_) => panic!("A prior store generation was implicitly rewritten"),
         }
         let db = Database::create(root.path().join("store.redb")).unwrap();
@@ -982,7 +986,7 @@ mod tests {
         write.commit().unwrap();
         drop(store);
         match Store::open(root.path()) {
-            Err(error) => assert_eq!(error.code, "STORE_SCHEMA_UNSUPPORTED"),
+            Err(error) => assert_eq!(error.code, "STORE_VERSION_UNSUPPORTED"),
             Ok(_) => panic!("Future schema was wrongly initialized"),
         };
         let db = Database::create(root.path().join("store.redb")).unwrap();

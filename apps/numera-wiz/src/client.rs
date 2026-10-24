@@ -175,10 +175,11 @@ impl NativeClient {
                     Err(error) => return Err(error.into()),
                 }
             }
-            let lock_root = self.root.join("state/generations/1");
+            let state_root = self.root.join("state");
+            let lock_root = nw_store::generations::active_generation_path(&self.root)?;
             let may_spawn = bootstrap_gate.is_some()
-                && (!lock_root.try_exists()?
-                    || nw_platform::files::RootLock::acquire(&lock_root).is_ok());
+                && (!state_root.try_exists()? || nw_platform::files::RootLock::acquire(&state_root).is_ok())
+                && (!lock_root.try_exists()? || nw_platform::files::RootLock::acquire(&lock_root).is_ok());
             if may_spawn && !spawned {
                 let mut command = tokio::process::Command::new(std::env::current_exe()?);
                 command.arg("--data-dir").arg(&self.root);

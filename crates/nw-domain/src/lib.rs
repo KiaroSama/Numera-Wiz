@@ -54,6 +54,7 @@ impl DomainError {
             | "INVALID_JOB_TRANSITION"
             | "CANCELLATION_TOO_LATE"
             | "OWNER_BUSY"
+            | "STORE_COPY_CONFLICT"
             | "PUBLICATION_BUSY"
             | "PRINCIPAL_CHANGED"
             | "OWNER_IDENTITY_CONFLICT"
@@ -73,7 +74,10 @@ impl DomainError {
             | "ARTIFACT_UNAVAILABLE"
             | "INGEST_NOT_FOUND"
             | "INGEST_NOT_READY"
-            | "STORE_SCHEMA_UNSUPPORTED" => 3,
+            | "STORE_SCHEMA_UNSUPPORTED"
+            | "STORE_VERSION_UNSUPPORTED"
+            | "STORE_RECOVERY_REQUIRED"
+            | "MIGRATION_NOT_REQUIRED" => 3,
             "VALIDATION_ERROR"
             | "INVALID_RANGE"
             | "UNSUPPORTED_VERSION"
@@ -82,6 +86,7 @@ impl DomainError {
             | "INVALID_IDENTITY"
             | "INVALID_ACCEPTANCE"
             | "INVALID_RECORD"
+            | "INVALID_MIGRATION_PLAN"
             | "BATCH_REJECTED"
             | "UNRESOLVED_SOURCE_INDEX"
             | "SOURCE_OUTPUT_ALIAS"
@@ -121,3 +126,5 @@ pub mod file_times;
 pub mod reports;
 
 pub mod download;
+
+pub mod maintenance;
