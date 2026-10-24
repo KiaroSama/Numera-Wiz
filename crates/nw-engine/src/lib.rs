@@ -431,6 +431,7 @@ async fn publish(
         sha256: actual.sha256,
     };
     let journal = nw_domain::access::Publication {
+        read_purpose_version: 1,
         job_id: job_id.into(),
         proof: files::path_text(&proof)?,
         output: plan.output.clone(),

@@ -250,6 +250,8 @@ pub struct ExecutionAuthorization {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Publication {
+    #[serde(default)]
+    pub read_purpose_version: u32,
     pub job_id: String,
     pub proof: String,
     pub output: String,

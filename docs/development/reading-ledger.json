@@ -1020,6 +1020,67 @@
         "Implement and qualify each required permitted reframing route; retain strict packet/metadata failure until its explicit normalization and independent oracle exist.",
         "Complete standard component BSF closure and actual caption/HDR/audio-tail/timing fixtures; no bitstream filter was executed by reading this manual."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_developer.texi",
+      "sha256": "26549522babfb7af744059d68077440064de6693ee6ff8c41b53ea3c36534e4c",
+      "lines": [
+        1,
+        1184
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; referenced headers, external pages, samples and included manuals are not credited",
+      "interpretation": [
+        "FFmpeg public library APIs and ABI remain compatible within a major version; this does not establish stable CLI media defaults or waive candidate-specific component qualification.",
+        "Runtime CPU dispatch has portable C and architecture-specific implementations. checkasm and bitstream regression coverage are separate from application output/resource oracles.",
+        "New modules must treat malformed inputs as untrusted and avoid crashes, infinite work and excessive allocation; allocation failure and cleanup behavior need explicit fixtures.",
+        "FATE, sanitizer/memcheck and performance coverage answer different questions. Updated reference results require a reviewed semantic reason and do not become an independent oracle merely because the updated test passes.",
+        "Release branches and point-release source/ABI rules do not authorize automatic application releases; the owner review and exact packaged payload gates remain controlling."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T034",
+        "T035",
+        "T038"
+      ],
+      "unresolved": [
+        "Complete remaining manual bodies and external implementation qualification separately.",
+        "Qualify actual package/profile/platform malformed-media, memory and performance behavior in hosted and matching owner evidence."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_indevs.texi",
+      "sha256": "0deb468a38fdfe18db7a61c9b8d7d9153cae96598baea08af6ae2e47b0f7fc23",
+      "lines": [
+        1,
+        1596
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external device APIs, linked pages and hardware operation are not credited",
+      "interpretation": [
+        "Input device availability is a build/runtime fact. File media grants do not authorize camera, microphone, screen, display-server, network audio or privileged DRM capture.",
+        "AVFoundation can fall back to the first supported pixel format, frame rate or size; a frozen exact request must detect and report the resolved capture parameters rather than silently claim the requested format.",
+        "DirectShow filter load/save opens additional files and can overwrite; crossbar/dialog changes may persist across later invocations. Unattended admitted routes must enumerate and constrain those effects.",
+        "DeckLink default capture buffering is 1 GiB and signal loss can generate bars or repeated frames. These defaults are media semantics and exceed an unexamined small-memory assumption.",
+        "V4L2 timestamps can use wall or monotonic clocks, PulseAudio initially uses wall time, and KMS sampling is not synchronized to display changes. Exact application capture clocks require explicit mapping.",
+        "lavfi graph_file and movie/amovie sources open dependencies; CPU-only headless commands must not initialize device capture or GPU-backed KMS routes."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete device-specific authorization, dependency enumeration, budgets and actual admitted target qualification before advertising capture.",
+        "Finish the remaining full manual bodies."
+      ]
     }
   ]
 }

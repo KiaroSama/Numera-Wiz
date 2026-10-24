@@ -14,7 +14,8 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 24 actual owner handlers. This is partial initial
+The live registry now contains 27 actual owner handlers; the three latest
+artifact handlers await their complete integration CI result. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -518,3 +519,13 @@ Run 40057379599 for 97661c9e251169755f13635a6b07bc4022d3aae7 stopped
 before compilation because the new service Base64 edge needed the existing
 0.22.1 package qualifier in Cargo.lock. The exact hosted resolver artifact and
 full formatter patch are applied; no new transfer assertion is credited yet.
+
+Run 40057496601 for 1b57d594a9f93cf80dd658f1fc351c136f2523ea passed the
+format/lock gates, shared WASM build and actual engine media regressions. Its
+isolated artifact transfer passed for 268,435,473 bytes with VmHWM 3,616 KiB
+under the selected 128 MiB isolated-reader budget, and independently accumulated
+SHA-256 44acd490ab37cec35db90412ae33b955dbcb84f3c50a07c7d1a22c2f6642ff26.
+The service compiler found two artifact handler methods private to their child
+module; they are now visible to the containing runtime. CLI/SDK and native
+integration are not credited on that run. Complete developer/input-device manual
+bodies are now personally recorded, for 42 entries; full study remains pending.
