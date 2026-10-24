@@ -988,6 +988,12 @@
           ],
           "report": "docs/development/evidence/client-save-ci79.json",
           "observed_outcome": "Real typed destination/Save and genuine OS Save As both produced independently identical 197983-byte files, retained one producer job and closed normally. Actual OS-saved PNG personally inspected. Chrome reached real Save input but not a detected OS picker; browser save, other platforms, packaging and full R20 remain open."
+        },
+        {
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40100432221",
+          "artifact_sha256": "5729284030f13cacc6ec7cf48944867e15c83bd37e72e7a1c5ad6c85489b70bb",
+          "asserted_domain": "actual Linux headed Chrome genuine OS Save As through shared WASM and authenticated artifact stream",
+          "observed_outcome": "197983-byte saved/source full equality; one producer job; successful PNG personally inspected; other browsers/platforms/packages remain unqualified"
         }
       ]
     }

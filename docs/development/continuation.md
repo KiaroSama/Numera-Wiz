@@ -1397,3 +1397,46 @@ All full product, MuxCls/batch/companion/editor, timeout/progress, migration/
 retention, package/resource/manual and matching owner-harness work remains
 required. No full task checkbox changed; no local build/test/GUI/media or owner
 GPU run occurred. Public/single-review-branch/draft/main boundaries remain intact.
+
+
+## Explicit cleanup limits and actual copy stage progress
+
+New source adds shared finite/disabled policies with strict integer-second
+validation, a 1..604800-second finite range and owner-only disabled admission.
+Cleanup planning freezes the probe/operation choices into optional semantic
+fields; missing historical fields retain shape/hash and earlier interpretation.
+Service checks current admission at review/submit/execute/publication. Remux,
+staged-output probing and both streaming packet scans use the frozen policy.
+New copies share one operation budget across writes and independent staging/
+source verification, with checks between bounded synchronous calls and drained
+I/O before return. Existing process ownership/reap behavior is retained.
+
+Copy progress records actual per-pass bytes and elapsed time, with 200 ms
+coalescing plus stage boundaries and a suppressed-sample counter. The service
+persists only the latest bounded fact, publishes its normal invalidation event,
+and exposes it through job views/lists to every adapter. UI rows show measured
+stage bytes only while active. The shared UI and typed CLI --limits-file feed
+the same canonical contract; a complete example/manual section accompanies it.
+New hosted regressions cover invalid/nonfinite policies, immutable plan hashes,
+owner-only disabled admission at submission, real full-byte copy progress and
+drained copy timeout/cancellation. The actual CLI/SDK media journey additionally
+asserts selected policy and final measured byte counts. This source awaits CI.
+
+Constitution 1.0.1 explicitly reconciles the mandate's typed-disabled exception
+with finite defaults. No archived research file or full-task checkbox changes.
+Remux timestamp/ETA progress, deeper scan policies, aggregate batch accounting
+and every remaining full-product/package/resource/manual/owner gate remain
+required. No local build/test/GUI/media or owner GPU run occurred.
+
+
+## Actual Chrome OS Save As and ordinary typed CLI confirmed
+
+Run 40100432221 on d66fc711f72eb837e30b12a3e407e4f10748387d passed all four
+complete native targets, WASM/lock, complete actual typed CLI/official SDK/media
+and large-copy/cancel/revocation assertions. Both native Save variants and actual
+headed Chrome genuine OS Save As passed full independent saved/source equality
+for 197983 bytes, with one producer job and normal native teardown. The successful
+browser/native PNGs were personally inspected. This closes the observed chooser
+title harness issue at this Linux Chrome boundary only. All 22 exact hosted
+formatter hunks are applied in this revision. New timeout/progress source above
+awaits the next hosted compile/runtime evidence; no broader gate is inferred.

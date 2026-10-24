@@ -192,6 +192,8 @@ pub struct ResolveInput {
 #[serde(deny_unknown_fields)]
 pub struct CleanInput {
     #[serde(default)]
+    pub execution_limits: crate::execution::CleanupLimits,
+    #[serde(default)]
     pub file_times: crate::file_times::FileTimeRequest,
     pub asset_id: String,
     pub output: String,

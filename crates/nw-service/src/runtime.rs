@@ -421,6 +421,7 @@ impl Service {
             })
             .collect();
         Ok(JobView {
+            progress: job.progress.clone(),
             file_times: job
                 .file_times
                 .clone()
@@ -1307,6 +1308,7 @@ impl Service {
             }
             "streams.clean" => {
                 let input: CleanInput = commands::parse(params)?;
+                self.admit_execution_limits(&context, &input.execution_limits)?;
                 let asset: Asset = self
                     .store
                     .get(&named("asset", &input.asset_id)?)?
@@ -1322,6 +1324,7 @@ impl Service {
                     &context.principal,
                     now,
                 )?;
+                plan.execution_limits = Some(input.execution_limits);
                 let rights = plan.required_rights.as_mut().ok_or_else(|| {
                     DomainError::new("INVALID_PLAN", "Planner omitted execution rights")
                 })?;
@@ -1358,6 +1361,7 @@ impl Service {
             "jobs.submit" => {
                 let input: SubmitInput = commands::parse(params)?;
                 let plan = self.read_plan(&context, &input.plan_id, ObjectAction::Submit)?;
+                self.admit_execution_limits(&context, &plan.execution_limits.clone().unwrap_or_default())?;
                 if plan.hash != input.plan_hash
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= now
                 {
@@ -1465,6 +1469,7 @@ impl Service {
                 }
                 let id = Uuid::new_v4().to_string();
                 let job = Job {
+                    progress: None,
                     file_times: None,
                     id: id.clone(),
                     creator: context.principal.clone(),
@@ -1668,6 +1673,13 @@ impl Service {
         }
         Ok(())
     }
+    fn admit_execution_limits(&self, context: &Context, limits: &nw_domain::execution::CleanupLimits) -> Result<()> {
+        limits.validate()?;
+        if limits.has_disabled() && self.policy(context)?.is_some() {
+            return Err(DomainError::new("PERMISSION_DENIED", "Disabled cleanup deadlines require protected native-owner authority"));
+        }
+        Ok(())
+    }
     fn validate_job_paths(&self, job: &Job) -> Result<()> {
         let authorization: ExecutionAuthorization = self
             .store
@@ -1682,6 +1694,7 @@ impl Service {
             principal: authorization.principal,
             profile: authorization.profile,
         };
+        self.admit_execution_limits(&context, &job.plan.execution_limits.clone().unwrap_or_default())?;
         self.plan_source_path(&context, &job.plan)?;
         self.path(&context, Path::new(&job.plan.output), true)?;
         files::revalidate_output(&job.plan.output)?;
@@ -1691,6 +1704,34 @@ impl Service {
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         match event {
+            ExecutionEvent::Progress(progress) => {
+                self.store.execution_allowed(id)?;
+                progress.validate()?;
+                let job = self.store.inspect_job(id)?;
+                self.validate_job_paths(&job)?;
+                if progress.total_bytes != job.plan.source.identity.bytes
+                    || !matches!(job.state, JobState::Running | JobState::Verifying)
+                {
+                    return Err(DomainError::new("INVALID_PROGRESS", "Stage progress does not match the active reviewed job"));
+                }
+                self.store.update_job(id, |job| {
+                    if let Some(previous) = &job.progress {
+                        let order = |stage| match stage {
+                            nw_domain::execution::ProgressStage::CopyBytes => 0,
+                            nw_domain::execution::ProgressStage::VerifyStagingBytes => 1,
+                            nw_domain::execution::ProgressStage::VerifySourceBytes => 2,
+                        };
+                        if order(progress.stage) < order(previous.stage)
+                            || (progress.stage == previous.stage
+                                && progress.completed_bytes.parse::<u64>().unwrap_or(0) < previous.completed_bytes.parse::<u64>().unwrap_or(0))
+                        {
+                            return Err(DomainError::new("INVALID_PROGRESS", "Stage progress cannot move backwards"));
+                        }
+                    }
+                    job.progress = Some(progress);
+                    Ok(())
+                })?;
+            }
             ExecutionEvent::StagingIntent(intent) => {
                 self.store.execution_allowed(id)?;
                 if intent.job_id != id {
@@ -1851,6 +1892,25 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn disabled_deadlines_require_owner_at_review_and_submission() {
+        use nw_domain::execution::{CleanupLimits, DeadlinePolicy};
+        let (_root, service, context, request, _source) = preflight_fixture().await;
+        let limits = CleanupLimits { operation: DeadlinePolicy::Disabled, ..CleanupLimits::default() };
+        assert_eq!(service.admit_execution_limits(&context, &limits).unwrap_err().code, "PERMISSION_DENIED");
+        service.admit_execution_limits(&service.owner(), &limits).unwrap();
+        let id = request.params["plan_id"].as_str().unwrap();
+        let mut plan: Plan = service.store.get(&named("plan", id).unwrap()).unwrap().unwrap();
+        plan.execution_limits = Some(limits);
+        plan.hash = nw_engine::plan_digest(&plan).unwrap();
+        service.store.put(&named("plan", id).unwrap(), &plan).unwrap();
+        let mut request = request;
+        request.params["plan_hash"] = json!(plan.hash);
+        let response = service.dispatch(context, request).await;
+        assert!(!response.ok);
+        assert_eq!(response.error.unwrap().code, "PERMISSION_DENIED");
+        assert!(service.store.list::<Job>("job/", 8).unwrap().is_empty());
+    }
     #[tokio::test]
     async fn parameter_errors_obey_the_result_budget_as_well_as_successful_queries() {
         let root = tempfile::tempdir().unwrap();
@@ -2372,6 +2432,7 @@ mod tests {
             },
         };
         let plan = Plan {
+            execution_limits: None,
             file_times: None,
             schema_version: 1,
             required_rights: None,
@@ -2397,6 +2458,7 @@ mod tests {
             verification_scope: "Synthetic metadata view".into(),
         };
         let job = Job {
+            progress: None,
             file_times: Some(nw_domain::file_times::FileTimeOutcome {
                 policy: nw_domain::file_times::FileTimeRequest::PreserveBestEffort,
                 desired: None,

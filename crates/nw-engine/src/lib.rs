@@ -17,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     sync::Arc,
-    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -30,6 +29,7 @@ pub enum ExecutionEvent {
     Fence(nw_domain::access::Publication),
     Published(FileIdentity, String),
     FileTimes(nw_domain::file_times::FileTimeOutcome),
+    Progress(nw_domain::execution::StageProgress),
 }
 pub type Observer =
     Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -61,6 +61,12 @@ impl Engine {
         })
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {
+        self.probe_with_policy(path, nw_domain::execution::CleanupLimits::default().probe, cancel).await
+    }
+    pub async fn probe_with_policy(
+        &self, path: &Path, deadline: nw_domain::execution::DeadlinePolicy, cancel: CancellationToken,
+    ) -> Result<MediaProbe> {
+        deadline.duration()?;
         let canonical = files::source_path(path)?;
         let admission_cancel = cancel.clone();
         let input = blocking(move || admission::open(&canonical, &admission_cancel)).await?;
@@ -86,10 +92,10 @@ impl Engine {
         args.extend(input.options());
         args.extend(["-i".into(), "fd:".into()]);
         let ticket = self.process_budget.acquire(&cancel).await?;
-        let result = nw_platform::process::run_readonly(
+        let result = nw_platform::process::run_readonly_with_policy(
             Path::new(&self.ffprobe.path),
             &args,
-            Duration::from_secs(120),
+            deadline,
             4 * 1024 * 1024,
             input.file,
             cancel,
@@ -228,6 +234,7 @@ impl Engine {
         };
         source_stamp.revalidate()?;
         let mut plan = Plan {
+            execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
             schema_version: 2,
             required_rights: Some(required_rights),
@@ -367,8 +374,14 @@ impl Engine {
                 let source = plan.source.identity.clone();
                 let object = registered_object(&plan.source)?.clone();
                 let token = cancel.clone();
+                let deadline = plan.execution_limits.as_ref().map_or(
+                    nw_domain::execution::DeadlinePolicy::Disabled, |limits| limits.operation,
+                );
+                let progress_observer = observer.clone();
+                let runtime = tokio::runtime::Handle::current();
                 let (staging, actual, source_stamp) = blocking(move || {
-                    files::copy_into_staging_bound_held(&source, &object, staging, &token)
+                    files::copy_into_staging_observed(&source, &object, staging, &token, deadline,
+                        &mut |progress| runtime.block_on(progress_observer(ExecutionEvent::Progress(progress))))
                 })
                 .await?;
                 observer(ExecutionEvent::Verifying).await?;
@@ -449,10 +462,10 @@ impl Engine {
         if let Err(error) = source_stamp.revalidate() {
             return ticket.finish(Err(error));
         }
-        let process = nw_platform::process::run_readonly(
+        let process = nw_platform::process::run_readonly_with_policy(
             Path::new(&self.ffmpeg.path),
             &args,
-            Duration::from_secs(10800),
+            plan.execution_limits.clone().unwrap_or_default().operation,
             8 * 1024 * 1024,
             input.file,
             cancel.clone(),
@@ -472,7 +485,9 @@ impl Engine {
             ));
         }
         observer(ExecutionEvent::Verifying).await?;
-        let observed = self.probe(staging.path(), cancel.clone()).await?;
+        let observed = self.probe_with_policy(
+            staging.path(), plan.execution_limits.clone().unwrap_or_default().probe, cancel.clone(),
+        ).await?;
         verify_structure(plan, &observed)?;
         let verification = preservation::verify(
             self,

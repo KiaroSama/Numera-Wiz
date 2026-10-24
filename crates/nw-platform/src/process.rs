@@ -65,7 +65,7 @@ pub async fn run(
     run_with_stdin(
         program,
         args,
-        deadline,
+        Some(deadline),
         stdout_limit,
         Stdio::null(),
         None,
@@ -92,13 +92,28 @@ pub async fn run_readonly(
     run_with_stdin(
         program,
         args,
-        deadline,
+        Some(deadline),
         stdout_limit,
         Stdio::from(input),
         None,
         cancel,
     )
     .await
+}
+
+/// Execute an explicit reviewed finite/disabled policy. Service admission owns authority.
+pub async fn run_readonly_with_policy(
+    program: &Path,
+    args: &[String],
+    deadline: nw_domain::execution::DeadlinePolicy,
+    stdout_limit: usize,
+    input: std::fs::File,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    if !input.metadata().map_err(crate::files::io_error)?.is_file() {
+        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+    }
+    run_with_stdin(program, args, deadline.duration()?, stdout_limit, Stdio::from(input), None, cancel).await
 }
 
 pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
@@ -121,13 +136,28 @@ pub async fn stream_readonly(
     run_with_stdin(
         program,
         args,
-        deadline,
+        Some(deadline),
         0,
         Stdio::from(input),
         Some(consumer),
         cancel,
     )
     .await
+}
+
+/// Stream a reviewed policy without accumulating packet output.
+pub async fn stream_readonly_with_policy(
+    program: &Path,
+    args: &[String],
+    deadline: nw_domain::execution::DeadlinePolicy,
+    input: std::fs::File,
+    consumer: ChunkConsumer,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    if !input.metadata().map_err(crate::files::io_error)?.is_file() {
+        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+    }
+    run_with_stdin(program, args, deadline.duration()?, 0, Stdio::from(input), Some(consumer), cancel).await
 }
 
 async fn consume<R: AsyncRead + Unpin>(
@@ -160,13 +190,14 @@ async fn consume<R: AsyncRead + Unpin>(
 async fn run_with_stdin(
     program: &Path,
     args: &[String],
-    deadline: Duration,
+    deadline: Option<Duration>,
     stdout_limit: usize,
     input: Stdio,
     consumer: Option<ChunkConsumer>,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
-    if deadline.is_zero() || deadline > Duration::from_secs(10800) || stdout_limit > 8 * 1024 * 1024
+    if deadline.is_some_and(|value| value.is_zero() || value > Duration::from_secs(604800))
+        || stdout_limit > 8 * 1024 * 1024
     {
         return Err(DomainError::new(
             "RESOURCE_LIMIT",
@@ -244,7 +275,7 @@ async fn run_with_stdin(
         status=child.wait()=>status.map_err(|e|DomainError::new("PROCESS_WAIT_FAILED",e.to_string())),
         _=cancel.cancelled()=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("CANCELLED","Owned process was cancelled and reaped")),Err(error)=>Err(error)}},
         _=output_failed.cancelled()=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_OUTPUT_REJECTED","The streamed consumer rejected stdout")),Err(error)=>Err(error)}},
-        _=tokio::time::sleep(deadline)=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_TIMEOUT","Owned process exceeded its finite deadline and was reaped")),Err(error)=>Err(error)}},
+        _=async { match deadline { Some(value) => tokio::time::sleep(value).await, None => std::future::pending::<()>().await } }=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_TIMEOUT","Owned process exceeded its reviewed deadline and was reaped")),Err(error)=>Err(error)}},
     };
     let out = tokio::time::timeout(Duration::from_secs(5), &mut out_task).await;
     if out.is_err() {
@@ -304,7 +335,7 @@ async fn terminate(child: &mut Box<dyn ChildWrapper>) -> Result<()> {
     child
         .start_kill()
         .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;
-    tokio::time::timeout(Duration::from_secs(5), child.wait())
+    tokio::time::timeout(Duration::from_secs(nw_domain::execution::TERMINATION_GRACE_SECONDS), child.wait())
         .await
         .map_err(|_| DomainError::new("TREE_TERMINATION_UNCERTAIN", "Reap deadline exceeded"))?
         .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;

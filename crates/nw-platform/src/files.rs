@@ -171,6 +171,14 @@ pub fn revalidate_output(expected: &str) -> Result<PathBuf> {
     Ok(resolved)
 }
 pub fn identity(path: &Path, cancel: &CancellationToken) -> Result<FileIdentity> {
+    identity_observed(path, cancel, |_| Ok(()))
+}
+fn identity_observed(
+    path: &Path,
+    cancel: &CancellationToken,
+    mut on_bytes: impl FnMut(u64) -> Result<()>,
+) -> Result<FileIdentity> {
+    on_bytes(0)?;
     let canonical = source_path(path)?;
     let mut file = open_regular_handle(&canonical)?;
     let before = file.metadata().map_err(io_error)?;
@@ -193,6 +201,7 @@ pub fn identity(path: &Path, cancel: &CancellationToken) -> Result<FileIdentity>
         }
         hash.update(&buffer[..n]);
         count += n as u64;
+        on_bytes(count)?;
         if count > before.len() {
             return Err(DomainError::new(
                 "SOURCE_CHANGED",
@@ -618,18 +627,83 @@ pub fn copy_into_staging_bound_held(
     source_stamp.require_object(object)?;
     copy_from_held(expected, source_stamp, staging, cancel)
 }
+/// Copy and independent full-byte verification share one explicit operation budget.
+/// Checks run between bounded filesystem calls; admitted synchronous I/O is drained.
+pub fn copy_into_staging_observed(
+    expected: &FileIdentity,
+    object: &NativeObjectIdentity,
+    staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+    deadline: nw_domain::execution::DeadlinePolicy,
+    observer: &mut dyn FnMut(nw_domain::execution::StageProgress) -> Result<()>,
+) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
+    let source = SourceStamp::capture_resolved(Path::new(&expected.path))?;
+    source.require_object(object)?;
+    copy_from_held_observed(expected, source, staging, cancel, deadline, observer)
+}
+struct CopyProgress<'a> {
+    started: std::time::Instant,
+    sent: std::time::Instant,
+    deadline: Option<std::time::Duration>,
+    total: u64,
+    stage: Option<nw_domain::execution::ProgressStage>,
+    coalesced: u64,
+    observer: &'a mut dyn FnMut(nw_domain::execution::StageProgress) -> Result<()>,
+}
+impl CopyProgress<'_> {
+    fn report(&mut self, stage: nw_domain::execution::ProgressStage, completed: u64, force: bool) -> Result<()> {
+        if self.deadline.is_some_and(|limit| self.started.elapsed() >= limit) {
+            return Err(DomainError::new("COPY_TIMEOUT", "Reviewed copy/byte-verification deadline expired; admitted I/O drained and no output published"));
+        }
+        if !force && self.stage == Some(stage) && self.sent.elapsed() < std::time::Duration::from_millis(nw_domain::execution::PROGRESS_INTERVAL_MS) {
+            self.coalesced = self.coalesced.saturating_add(1);
+            return Ok(());
+        }
+        let progress = nw_domain::execution::StageProgress {
+            stage, completed_bytes: completed.to_string(), total_bytes: self.total.to_string(),
+            elapsed_ms: self.started.elapsed().as_millis().min(u128::from(u64::MAX)).to_string(),
+            coalesced_updates: self.coalesced.to_string(),
+        };
+        progress.validate()?;
+        (self.observer)(progress)?;
+        if self.deadline.is_some_and(|limit| self.started.elapsed() >= limit) {
+            return Err(DomainError::new("COPY_TIMEOUT", "Reviewed copy deadline expired after its admitted progress boundary drained"));
+        }
+        self.stage = Some(stage);
+        self.sent = std::time::Instant::now();
+        Ok(())
+    }
+}
 fn copy_from_held(
+    expected: &FileIdentity,
+    source_stamp: SourceStamp,
+    staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
+    copy_from_held_observed(expected, source_stamp, staging, cancel,
+        nw_domain::execution::DeadlinePolicy::Disabled, &mut |_| Ok(()))
+}
+fn copy_from_held_observed(
     expected: &FileIdentity,
     source_stamp: SourceStamp,
     mut staging: tempfile::NamedTempFile,
     cancel: &CancellationToken,
+    deadline: nw_domain::execution::DeadlinePolicy,
+    observer: &mut dyn FnMut(nw_domain::execution::StageProgress) -> Result<()>,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
     let expected_bytes = expected
         .bytes
         .parse::<u64>()
         .map_err(|_| DomainError::new("INVALID_IDENTITY", "Invalid reviewed byte length"))?;
+    use nw_domain::execution::ProgressStage as Stage;
+    let started = std::time::Instant::now();
+    let mut progress = CopyProgress {
+        started, sent: started, deadline: deadline.duration()?, total: expected_bytes,
+        stage: None, coalesced: 0, observer,
+    };
+    progress.report(Stage::CopyBytes, 0, true)?;
     let mut input = source_stamp.held_file().try_clone().map_err(io_error)?;
-    let mut buffer = vec![0; 4 * 1024 * 1024];
+    let mut buffer = vec![0; nw_domain::execution::COPY_BUFFER_BYTES];
     let mut copied = 0u64;
     loop {
         if cancel.is_cancelled() {
@@ -638,6 +712,7 @@ fn copy_from_held(
                 "Copy cancelled before publication",
             ));
         }
+        progress.report(Stage::CopyBytes, copied, false)?;
         let n = input.read(&mut buffer).map_err(io_error)?;
         if n == 0 {
             break;
@@ -653,8 +728,11 @@ fn copy_from_held(
         }
         staging.write_all(&buffer[..n]).map_err(io_error)?;
     }
+    progress.report(Stage::CopyBytes, copied, true)?;
     staging.as_file().sync_all().map_err(io_error)?;
-    let actual = identity(staging.path(), cancel)?;
+    progress.report(Stage::VerifyStagingBytes, 0, true)?;
+    let actual = identity_observed(staging.path(), cancel, |count| progress.report(Stage::VerifyStagingBytes, count, false))?;
+    progress.report(Stage::VerifyStagingBytes, expected_bytes, true)?;
     if actual.sha256 != expected.sha256 || actual.bytes != expected.bytes {
         return Err(DomainError::new(
             "VERIFICATION_FAILED",
@@ -662,7 +740,12 @@ fn copy_from_held(
         ));
     }
     source_stamp.revalidate()?;
-    revalidate(expected, cancel)?;
+    progress.report(Stage::VerifySourceBytes, 0, true)?;
+    let source_identity = identity_observed(Path::new(&expected.path), cancel, |count| progress.report(Stage::VerifySourceBytes, count, false))?;
+    if source_identity != *expected {
+        return Err(DomainError::new("SOURCE_CHANGED", "Source changed during observed copy verification"));
+    }
+    progress.report(Stage::VerifySourceBytes, expected_bytes, true)?;
     source_stamp.revalidate()?;
     if cancel.is_cancelled() {
         return Err(DomainError::new(
@@ -683,6 +766,69 @@ pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn observed_copy_measures_each_full_pass_without_publishing_early() {
+        use nw_domain::execution::{DeadlinePolicy, ProgressStage};
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        let mut file = File::create(&source).unwrap();
+        let block = vec![37; 1024 * 1024];
+        for _ in 0..9 {
+            file.write_all(&block).unwrap();
+        }
+        file.sync_all().unwrap();
+        drop(file);
+        let cancel = CancellationToken::new();
+        let expected = identity(&source, &cancel).unwrap();
+        let object = source_object(&source).unwrap();
+        let staging = tempfile::NamedTempFile::new_in(root.path()).unwrap();
+        let path = staging.path().to_owned();
+        let mut events = Vec::new();
+        let (staging, actual, _source) = copy_into_staging_observed(
+            &expected, &object, staging, &cancel, DeadlinePolicy::Finite { seconds: 120 },
+            &mut |event| { events.push(event); Ok(()) },
+        ).unwrap();
+        assert_eq!(actual.bytes, expected.bytes);
+        assert_eq!(actual.sha256, expected.sha256);
+        for stage in [ProgressStage::CopyBytes, ProgressStage::VerifyStagingBytes, ProgressStage::VerifySourceBytes] {
+            let last = events.iter().rfind(|event| event.stage == stage).unwrap();
+            assert_eq!(last.completed_bytes, expected.bytes);
+            assert_eq!(last.total_bytes, expected.bytes);
+        }
+        assert!(!root.path().join("published.bin").exists());
+        drop(staging);
+        assert!(!path.exists());
+    }
+    #[test]
+    fn observed_copy_drains_the_current_boundary_before_timeout_or_cancellation() {
+        use nw_domain::execution::DeadlinePolicy;
+        for timeout in [true, false] {
+            let root = tempfile::tempdir().unwrap();
+            let source = root.path().join("source.bin");
+            fs::write(&source, b"bounded copy fixture").unwrap();
+            let cancel = CancellationToken::new();
+            let expected = identity(&source, &cancel).unwrap();
+            let object = source_object(&source).unwrap();
+            let staging = tempfile::NamedTempFile::new_in(root.path()).unwrap();
+            let path = staging.path().to_owned();
+            let mut delayed = false;
+            let result = copy_into_staging_observed(
+                &expected, &object, staging, &cancel, DeadlinePolicy::Finite { seconds: 1 },
+                &mut |_| {
+                    if !delayed {
+                        delayed = true;
+                        if timeout { std::thread::sleep(std::time::Duration::from_millis(1100)); }
+                        else { cancel.cancel(); }
+                    }
+                    Ok(())
+                },
+            );
+            let error = match result { Err(error) => error, Ok(_) => panic!("Interrupted copy must not succeed") };
+            assert_eq!(error.code, if timeout { "COPY_TIMEOUT" } else { "CANCELLED" });
+            assert!(!path.exists());
+            assert_eq!(fs::read(&source).unwrap(), b"bounded copy fixture");
+        }
+    }
     #[test]
     fn windows_output_names_reject_devices_streams_and_silently_trimmed_aliases() {
         for name in [

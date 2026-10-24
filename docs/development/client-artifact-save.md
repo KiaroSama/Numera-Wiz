@@ -128,3 +128,17 @@ The next hosted browser setup uses a fresh DBus session and the same desktop
 portal/GTK packages as the successful native job, with broader chooser title
 matching and bounded full-desktop diagnostics. The actual picker/file oracle
 remains required; no synthetic file handle is introduced.
+
+
+Run 40100432221 on d66fc711f72eb837e30b12a3e407e4f10748387d passed the
+actual typed CLI journey, native typed Save and genuine OS Save As, and headed
+Chrome genuine OS Save As. Native/browser saved files were independently
+compared in full against the 197983-byte source; each retained one producer.
+Both successful Save PNGs were personally inspected. Chrome's real chooser has
+the observed warning title, now recognized by the input harness. No production
+picker/writer substitute was used. The earlier missing CDP body event remains
+a separate harness observation, not an inferred media failure or claimed fix.
+The large scoped client copy/cancel/revocation suite passed again; reported
+client HWM was 26104 KiB for 268633400 bytes. Exact run/merge/component and
+artifact facts are retained in the adjacent ci81 evidence records. Other
+browser/platform/package qualification and full release gates remain open.

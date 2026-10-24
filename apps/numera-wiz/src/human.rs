@@ -9,7 +9,10 @@ use nw_domain::{
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{io::Read, path::{Path, PathBuf}};
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 #[derive(Args)]
 pub struct MutationIdentity {
@@ -28,7 +31,9 @@ impl MutationIdentity {
             Some(id) => id,
             None => {
                 let bytes = serde_json::to_vec(&(
-                    &request.command.id, &self.replay_scope, &self.idempotency_key,
+                    &request.command.id,
+                    &self.replay_scope,
+                    &self.idempotency_key,
                 ))?;
                 format!("cli-{}", hex::encode(Sha256::digest(bytes)))
             }
@@ -68,9 +73,13 @@ pub enum Assets {
         #[command(flatten)]
         page: Page,
     },
-    Inspect { id: String },
+    Inspect {
+        id: String,
+    },
     /// Suggest a new output without creating it.
-    Output { id: String },
+    Output {
+        id: String,
+    },
 }
 #[derive(Subcommand)]
 pub enum Streams {
@@ -91,6 +100,9 @@ pub enum Streams {
         intent_file: PathBuf,
         #[arg(long, value_parser = ["new", "preserve_best_effort", "require_reviewed"])]
         file_times: Option<String>,
+        /// Explicit shared probe/operation policy document.
+        #[arg(long)]
+        limits_file: Option<PathBuf>,
     },
     /// Preview candidate and retained stream counts for 1-64 assets.
     Report {
@@ -114,7 +126,9 @@ pub enum Jobs {
         #[command(flatten)]
         identity: MutationIdentity,
     },
-    Inspect { id: String },
+    Inspect {
+        id: String,
+    },
     List {
         #[command(flatten)]
         page: Page,
@@ -167,7 +181,9 @@ fn query(id: &str, params: Value) -> Request {
 }
 pub fn prepare(command: Command) -> Result<Request> {
     let request = match command {
-        Command::Media(Media::Probe { path }) => query("media.probe", json!({"path":native_path(&path)?})),
+        Command::Media(Media::Probe { path }) => {
+            query("media.probe", json!({"path":native_path(&path)?}))
+        }
         Command::Assets(Assets::Register { path, identity }) => {
             let mut request = query("assets.register", json!({"path":native_path(&path)?}));
             identity.apply(&mut request)?;
@@ -176,23 +192,49 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Assets(Assets::List { page }) => query("assets.list", page.params()),
         Command::Assets(Assets::Inspect { id }) => query("assets.inspect", json!({"id":id})),
         Command::Assets(Assets::Output { id }) => query("assets.output_suggest", json!({"id":id})),
-        Command::Streams(Streams::Resolve { streams_file, intent_file }) => {
+        Command::Streams(Streams::Resolve {
+            streams_file,
+            intent_file,
+        }) => {
             let streams: Vec<Stream> = commands::parse(document(&streams_file)?)?;
-            query("streams.clean.resolve", json!({"streams":streams,"intent":intent(&intent_file)?}))
+            query(
+                "streams.clean.resolve",
+                json!({"streams":streams,"intent":intent(&intent_file)?}),
+            )
         }
-        Command::Streams(Streams::Clean { asset, out, intent_file, file_times }) => {
+        Command::Streams(Streams::Clean {
+            asset,
+            out,
+            intent_file,
+            file_times,
+            limits_file,
+        }) => {
             let mut params = json!({"asset_id":asset,"output":native_path(&out)?,"intent":intent(&intent_file)?});
+            if let Some(path) = limits_file {
+                let limits: nw_domain::execution::CleanupLimits = commands::parse(document(&path)?)?;
+                limits.validate()?;
+                params["execution_limits"] = serde_json::to_value(limits)?;
+            }
             if let Some(policy) = file_times {
-                let policy: nw_domain::file_times::FileTimeRequest = commands::parse(json!(policy))?;
+                let policy: nw_domain::file_times::FileTimeRequest =
+                    commands::parse(json!(policy))?;
                 params["file_times"] = serde_json::to_value(policy)?;
             }
             query("streams.clean", params)
         }
-        Command::Streams(Streams::Report { assets, intent_file }) => {
-            query("streams.clean.report", json!({"asset_ids":assets,"intent":intent(&intent_file)?}))
-        }
+        Command::Streams(Streams::Report {
+            assets,
+            intent_file,
+        }) => query(
+            "streams.clean.report",
+            json!({"asset_ids":assets,"intent":intent(&intent_file)?}),
+        ),
         Command::Plans(Plans::Inspect { id }) => query("plans.inspect", json!({"id":id})),
-        Command::Jobs(Jobs::Submit { plan, plan_hash, identity }) => {
+        Command::Jobs(Jobs::Submit {
+            plan,
+            plan_hash,
+            identity,
+        }) => {
             let mut request = query("jobs.submit", json!({"plan_id":plan,"plan_hash":plan_hash}));
             identity.apply(&mut request)?;
             request
@@ -206,7 +248,9 @@ pub fn prepare(command: Command) -> Result<Request> {
         }
         Command::Logs(Logs::Status) => query("logs.status", json!({})),
         Command::Discovery(None | Some(Discovery::List)) => query("commands.list", json!({})),
-        Command::Discovery(Some(Discovery::Schema { id })) => query("commands.schema", json!({"id":id})),
+        Command::Discovery(Some(Discovery::Schema { id })) => {
+            query("commands.schema", json!({"id":id}))
+        }
     };
     // Validate the same strict envelope and aggregate request budget before transport.
     Ok(commands::decode_request(&serde_json::to_vec(&request)?)?)
@@ -215,10 +259,19 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     match prepare(command) {
         Ok(request) => print_response(client, request).await,
         Err(error) => {
-            let public = error.downcast_ref::<DomainError>().cloned().unwrap_or_else(|| {
-                DomainError::new("CLI_INPUT_ERROR", "CLI input document or native path is unavailable")
-            });
-            println!("{}", serde_json::to_string_pretty(&Response::error("human-cli", public))?);
+            let public = error
+                .downcast_ref::<DomainError>()
+                .cloned()
+                .unwrap_or_else(|| {
+                    DomainError::new(
+                        "CLI_INPUT_ERROR",
+                        "CLI input document or native path is unavailable",
+                    )
+                });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&Response::error("human-cli", public))?
+            );
             Err(error)
         }
     }
@@ -229,10 +282,17 @@ mod tests {
     use super::*;
     #[test]
     fn durable_cli_retry_keeps_identity_and_never_allocates_a_fresh_scope() {
-        let make = || Command::Jobs(Jobs::Submit {
-            plan: "reviewed-plan".into(), plan_hash: "ab".repeat(32),
-            identity: MutationIdentity { replay_scope: "retained-scope".into(), idempotency_key: "same-operation".into(), request_id: None },
-        });
+        let make = || {
+            Command::Jobs(Jobs::Submit {
+                plan: "reviewed-plan".into(),
+                plan_hash: "ab".repeat(32),
+                identity: MutationIdentity {
+                    replay_scope: "retained-scope".into(),
+                    idempotency_key: "same-operation".into(),
+                    request_id: None,
+                },
+            })
+        };
         let first = prepare(make()).unwrap();
         let second = prepare(make()).unwrap();
         assert_eq!(first.request_id, second.request_id);

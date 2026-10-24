@@ -102,6 +102,14 @@ fn schemas(root: &Path) -> Result<()> {
         path.join("plan-review.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::views::PlanReview))?,
     )?;
+    fs::write(
+        path.join("cleanup-limits.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::execution::CleanupLimits))?,
+    )?;
+    fs::write(
+        path.join("stage-progress.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::execution::StageProgress))?,
+    )?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }

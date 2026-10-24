@@ -130,3 +130,15 @@ Actual Linux native destination entry, Save pointer input and the genuine OS
 Save As picker passed independent saved/source byte equality in CI79. Chrome
 Save and other platform variants are still undergoing hosted qualification.
 Previous Output details screenshots alone do not qualify those routes.
+
+
+Actual hosted Linux native typed-path Save, native OS Save As and headed Chrome
+OS Save As all passed independent saved/source equality for the 197983-byte
+fixture in run 40100432221, with one producer job. This is scoped runtime
+evidence, not qualification of other browsers, operating systems or packages.
+
+Execution limits under the cleanup form select the shared reviewed probe/
+operation budgets. Disabled deadlines require protected local-owner authority;
+a scoped browser session receives a permission error. Active job rows show
+measured copy/verification-stage bytes. See the CLI manual for exact fields,
+bounds and the distinction between a stage and the whole job.

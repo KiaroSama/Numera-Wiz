@@ -332,3 +332,48 @@ preserved. Ctrl+C requests cancellation during manifest/transfer preparation or
 copying and waits for admitted writes/cleanup; publication already underway is
 reported by its actual outcome. See [client artifact saves](../development/client-artifact-save.md)
 for limits and qualification status.
+
+
+## Explicit cleanup budgets and stage progress
+
+Cleanup requests accept `execution_limits` with two typed values:
+
+```json
+{
+  "probe": {"mode":"finite","seconds":120},
+  "operation": {"mode":"finite","seconds":10800}
+}
+```
+
+Pass this document with `streams clean ... --limits-file LIMITS.json`.
+The shared GUI exposes the same values under Execution limits. A finite value
+is an integer from 1 through 604800 seconds; fractional, negative, zero,
+nonfinite and unknown-field encodings are rejected. Explicit
+`{"mode":"disabled"}` requires protected local-owner authority. Named profiles,
+browser sessions and scoped MCP callers cannot disable a deadline. Current
+admission is checked at review, submission and executable/publication boundaries.
+No ambient MUXCLS environment setting alters an accepted plan.
+
+The probe budget covers staged-output structure probing; the operation budget
+covers the remux process and each full packet scan separately. A copy uses one
+operation budget for writing and its two full-byte verification passes. Source
+registration and preflight identity reads retain their current independent
+finite/cancellation contracts; these fields do not promise a whole-job deadline.
+Owned process cancellation/timeout still confirms termination/reaping with the
+existing 5-second grace. A Rust copy checks between bounded filesystem calls
+and drains an admitted synchronous call before returning; blocked OS I/O is
+not claimed to stop immediately.
+
+The selected policies contribute to the immutable plan hash. Historical plans
+without these fields retain their serialized shape/hash and their earlier
+execution interpretation; they are not silently rewritten. The default reviewed
+new copy receives the finite 10800-second compatibility budget.
+
+Job inspection and job-list rows expose the latest bounded `progress` fact for
+copy_bytes, verify_staging_bytes and verify_source_bytes. completed_bytes,
+total_bytes and elapsed_ms are exact decimal strings for that stage;
+coalesced_updates counts suppressed repeated samples. Updates are coalesced to
+one per 200 ms plus stage boundaries. A completed copy-stage byte count does
+not announce verified or published output. The terminal job/artifact remains
+authoritative. Remux time/ETA progress and batch aggregate accounting remain
+required work.

@@ -11,7 +11,6 @@ use std::{
     collections::BTreeMap,
     path::Path,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -277,6 +276,7 @@ async fn scan(
     probe: &MediaProbe,
     cancel: CancellationToken,
     observer: &Observer,
+    deadline: nw_domain::execution::DeadlinePolicy,
 ) -> Result<Ledger> {
     let source = path.to_owned();
     let admission_cancel = cancel.clone();
@@ -304,10 +304,10 @@ async fn scan(
     let ledger = Arc::new(Mutex::new(Ledger::new(probe)?));
     let consumer = ledger.clone();
     let ticket = engine.process_budget.acquire(&cancel).await?;
-    let process = nw_platform::process::stream_readonly(
+    let process = nw_platform::process::stream_readonly_with_policy(
         Path::new(&engine.ffprobe.path),
         &args,
-        Duration::from_secs(10800),
+        deadline,
         input.file,
         Box::new(move |bytes| {
             consumer
@@ -341,9 +341,10 @@ pub async fn verify(
         &plan.source.probe,
         cancel.clone(),
         observer,
+        plan.execution_limits.clone().unwrap_or_default().operation,
     )
     .await?;
-    let output = scan(engine, path, observed, cancel, observer).await?;
+    let output = scan(engine, path, observed, cancel, observer, plan.execution_limits.clone().unwrap_or_default().operation).await?;
     let mut packets = 0u64;
     let mut bytes = 0u64;
     for (position, stream) in plan.resolution.streams.iter().enumerate() {
