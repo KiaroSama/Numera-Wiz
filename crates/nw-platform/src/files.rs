@@ -85,7 +85,10 @@ pub(crate) fn validate_output_name(name: &std::ffi::OsStr) -> Result<()> {
     #[cfg(windows)]
     {
         windows_output_name(name.to_str().ok_or_else(|| {
-            DomainError::new("NATIVE_PATH_UNAVAILABLE", "Output filename must be representable as UTF-8")
+            DomainError::new(
+                "NATIVE_PATH_UNAVAILABLE",
+                "Output filename must be representable as UTF-8",
+            )
         })?)
     }
     #[cfg(not(windows))]
@@ -96,16 +99,29 @@ pub(crate) fn validate_output_name(name: &std::ffi::OsStr) -> Result<()> {
 }
 #[cfg(any(windows, test))]
 fn windows_output_name(name: &str) -> Result<()> {
-    let base = name.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_uppercase();
+    let base = name
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(' ')
+        .to_ascii_uppercase();
     let numbered_device = ["COM", "LPT"].into_iter().any(|prefix| {
         base.strip_prefix(prefix).is_some_and(|suffix| {
-            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "\u{b9}", "\u{b2}", "\u{b3}"].contains(&suffix)
+            [
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "\u{b9}", "\u{b2}", "\u{b3}",
+            ]
+            .contains(&suffix)
         })
     });
     if name.is_empty()
         || name.ends_with(['.', ' '])
-        || name.chars().any(|character| character < '\u{20}' || r#"<>:"/\|?*"#.contains(character))
-        || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || name
+            .chars()
+            .any(|character| character < '\u{20}' || r#"<>:"/\|?*"#.contains(character))
+        || matches!(
+            base.as_str(),
+            "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+        )
         || numbered_device
     {
         return Err(DomainError::new(
@@ -250,7 +266,8 @@ impl DirectoryStamp {
     pub fn revalidate(&self) -> Result<()> {
         if fs::canonicalize(&self.path).map_err(directory_changed)? != self.path
             || native_object(&self.file)? != self.object
-            || native_object(&open_directory_handle(&self.path).map_err(directory_changed)?)? != self.object
+            || native_object(&open_directory_handle(&self.path).map_err(directory_changed)?)?
+                != self.object
         {
             return Err(DomainError::new(
                 "TARGET_CHANGED",
@@ -261,7 +278,10 @@ impl DirectoryStamp {
     }
 }
 fn directory_changed(error: impl std::fmt::Display) -> DomainError {
-    DomainError::new("TARGET_CHANGED", format!("Reviewed output directory is unavailable: {error}"))
+    DomainError::new(
+        "TARGET_CHANGED",
+        format!("Reviewed output directory is unavailable: {error}"),
+    )
 }
 fn open_directory_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
@@ -653,8 +673,17 @@ mod tests {
     use super::*;
     #[test]
     fn windows_output_names_reject_devices_streams_and_silently_trimmed_aliases() {
-        for name in ["NUL.mkv", "con .mkv", "COM1.mkv", "LPT9", "COM\u{b9}.mkv",
-            "output.mkv:secret", "output.mkv.", "output.mkv ", "out\nput.mkv"] {
+        for name in [
+            "NUL.mkv",
+            "con .mkv",
+            "COM1.mkv",
+            "LPT9",
+            "COM\u{b9}.mkv",
+            "output.mkv:secret",
+            "output.mkv.",
+            "output.mkv ",
+            "out\nput.mkv",
+        ] {
             assert_eq!(windows_output_name(name).unwrap_err().code, "PATH_DENIED");
         }
         for name in ["résumé.mkv", ".output.mkv", "composition.mkv", "COM10.mkv"] {

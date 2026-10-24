@@ -1360,5 +1360,23 @@
       ]
     }
   ],
-  "in_progress_manual_reads": []
+  "in_progress_manual_reads": [],
+  "donor_followup_reads": [
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/models.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "1ab144405bc5f173f6c6e86bfee92aa79b0d6ee6",
+      "read_scope": "complete_body",
+      "lines": 179,
+      "interpretation": "Donor unknown-value parsing, complete stream categories, partial orders and estimated sizes must become strict typed observations and explicit confidence. Float parsing is behavioral evidence, not the selected exact-time representation."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/output.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "76035c056702441b5fb85e426245092cd297c1d8",
+      "read_scope": "complete_body",
+      "lines": 274,
+      "interpretation": "Original extension and relative tree are retained by default; single-file suffixes, numbered collisions, nested-output rejection, companion discovery, exclusion pruning and truthful byte accounting need the shared authority/publication pipeline. Donor resolve/stat failures cannot prove path separation; normal filename generation cannot become implicit authorization."
+    }
+  ]
 }
