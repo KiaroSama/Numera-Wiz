@@ -192,3 +192,32 @@ Its formatter gate failed; the exact CI-produced patch is applied in this next
 source revision. Later credential/staging changes require their own CI evidence.
 A brief local environment disconnection recovered with all pending files intact.
 No local build/media/GPU test was performed.
+
+
+Current CLI changes preserve typed command failures through the main process
+status, using the mandate's stable 0/2-10 categories. Internal HTTP failures
+retain bounded structured error codes instead of discarding them through a
+generic status error; owner identity/version conflicts remain typed. Actual
+owner/CLI media fixtures now assert parseable validation JSON with exit 2 and
+replay conflict JSON with exit 4. This batch awaits its hosted result. The full
+protocol manual body is now personally read and recorded; other full-body manual
+requirements remain open, with no borrowed research reading credit.
+
+
+Run [40042367860](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40042367860)
+on afdfd7c558986c2bf1ade6140288f4d044b8884a passed Linux and both macOS
+native checks, real media/owner/SDK and actual Chrome output. The Windows
+Clippy gate found a parent-directory variable used only by Unix directory fsync;
+it is now guarded by cfg(unix). All Windows unit tests passed before that lint.
+The native UI job was skipped by that failed dependency and is not credited.
+The exact formatter patch is applied.
+
+Current MOV admission additionally walks bounded boxes before ffprobe, rejects
+external URL/alias references and compressed/reference movie modes, and admits
+only explicit self-contained dref entries in that route. Size/overflow/depth/
+count and cancellation guards apply, including reference entries in the total
+box budget. Primary pinned mov.c dref/external-open paths were inspected. Unit
+cases use relative, absolute and network references plus valid/truncated layouts;
+the actual Unicode tail-index MP4 fixture must continue passing. This is not
+a completed resolver for the rejected modes or a claim of all-package canary
+qualification. Admission I/O runs on the blocking worker, including packet scans.

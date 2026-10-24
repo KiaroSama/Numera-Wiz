@@ -278,7 +278,9 @@ async fn scan(
     cancel: CancellationToken,
     observer: &Observer,
 ) -> Result<Ledger> {
-    let input = admission::open(path)?;
+    let source = path.to_owned();
+    let admission_cancel = cancel.clone();
+    let input = crate::blocking(move || admission::open(&source, &admission_cancel)).await?;
     let mut args = [
         "-v",
         "error",

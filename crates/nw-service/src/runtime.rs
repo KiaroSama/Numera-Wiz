@@ -1,6 +1,6 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
-mod uploads;
 mod clock;
+mod uploads;
 use nw_domain::{
     DomainError, Result,
     access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication},
@@ -1011,11 +1011,17 @@ impl Service {
             ExecutionEvent::StagingIntent(intent) => {
                 self.store.execution_allowed(id)?;
                 if intent.job_id != id {
-                    return Err(DomainError::new("INVALID_JOB_TRANSITION", "Staging intent must match its accepted job"));
+                    return Err(DomainError::new(
+                        "INVALID_JOB_TRANSITION",
+                        "Staging intent must match its accepted job",
+                    ));
                 }
                 self.store.update_job(id, |job| {
                     if job.owned_staging.is_some() {
-                        return Err(DomainError::new("INVALID_JOB_TRANSITION", "An accepted attempt already has staging intent"));
+                        return Err(DomainError::new(
+                            "INVALID_JOB_TRANSITION",
+                            "An accepted attempt already has staging intent",
+                        ));
                     }
                     job.owned_staging = Some(intent);
                     Ok(())

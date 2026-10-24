@@ -213,16 +213,21 @@
       "sha256": "9bc84820073cf7cedc7b26bda62a805e963bdae7f20974ee27ed49d0b42e3ead",
       "lines": [
         1,
-        520
+        2408
       ],
       "reviewer": "implementation-agent/root",
       "date": "2026-10-23",
-      "coverage": "Partial body only",
+      "coverage": "Complete file body; referenced third-party manuals and implementation source require separate evidence",
       "interpretation": [
         "protocol_whitelist restricts protocols, including nested protocols; it does not implement application filesystem-root grants.",
         "file truncates existing outputs by default, so only owned staging may be handed to a replacing FFmpeg output.",
         "file/fd blocksize affects termination reaction; follow ignores the reported file size and needs an independent termination policy.",
-        "async/cache wrappers introduce background I/O or temporary storage; they are not admitted implicitly by the file-only media profile."
+        "async/cache wrappers introduce background I/O or temporary storage; they are not admitted implicitly by the file-only media profile.",
+        "HTTP reconnect retries, total retry delay and redirects are distinct controls; none substitutes for per-destination authorization.",
+        "shared cache uses a URL-derived identity and can mix different contents behind the same URL; a content/credential/policy identity is required for application caches.",
+        "Protocol timeout units vary by protocol and option; canonical typed durations must convert explicitly.",
+        "The pinned TLS/DTLS manual distinguishes certificate-chain checks from hostname validation for its OpenSSL backend; network ingest needs an independently qualified TLS/destination policy.",
+        "UDP and RIST/SRT carry additional socket/queue/latency/drop budgets; ordinary file admission does not enable those routes."
       ],
       "tasks": [
         "T005",
@@ -231,8 +236,8 @@
         "T023"
       ],
       "unresolved": [
-        "Read lines 521-2408 separately.",
-        "Close secondary-reference admission before source probing."
+        "Qualify manifest/sequence dependency resolvers and per-package descriptor inheritance.",
+        "Implement bounded authorized network materialization and qualify any required direct-live route against an exact corrected component."
       ]
     },
     {
