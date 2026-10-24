@@ -61,6 +61,7 @@ impl DomainError {
             | "CONTAINER_UNQUALIFIED"
             | "INPUT_ROUTE_REQUIRED"
             | "NATIVE_PATH_UNAVAILABLE"
+            | "NATIVE_IDENTITY_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
             | "ARTIFACT_UNAVAILABLE"

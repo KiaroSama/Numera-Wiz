@@ -18,6 +18,8 @@ pub struct RequiredRights {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourceRead {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object: Option<crate::records::NativeObjectIdentity>,
     pub identity: FileIdentity,
     pub purpose: SourcePurpose,
 }
@@ -49,6 +51,7 @@ impl RequiredRights {
         Self {
             data_root: String::new(),
             source_read: SourceRead {
+                object: None,
                 identity: source,
                 purpose: SourcePurpose::NativeFile,
             },
@@ -94,7 +97,8 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
         .creation_audit
         .as_ref()
         .ok_or_else(|| invalid("Plan has no creation audit"))?;
-    if rights.source_read.identity != plan.source.identity
+    if rights.source_read.object != plan.source.source_object
+        || rights.source_read.identity != plan.source.identity
         || rights.output_create.path != plan.output
         || audit.principal != plan.creator
     {
@@ -203,6 +207,7 @@ mod tests {
             creator: "alice".into(),
             hash: String::new(),
             source: Asset {
+                source_object: None,
                 id: "first-asset".into(),
                 creator: "alice".into(),
                 display_name: "A label".into(),
@@ -289,6 +294,25 @@ mod tests {
         assert_ne!(digest(&changed).unwrap(), first.hash);
     }
     #[test]
+    fn original_native_object_is_a_frozen_semantic_requirement() {
+        let mut plan = fixture();
+        let before = plan.hash.clone();
+        plan.source.source_object = Some(crate::records::NativeObjectIdentity {
+            schema_version: 1,
+            kind: crate::records::NativeObjectKind::UnixDeviceInode,
+            volume: "10".into(), object: "20".into(), created_ns: Some("30".into()),
+        });
+        assert!(digest(&plan).is_err());
+        plan.required_rights.as_mut().unwrap().source_read.object = plan.source.source_object.clone();
+        plan.hash = digest(&plan).unwrap();
+        assert_ne!(plan.hash, before);
+        assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
+        let mut raw = serde_json::to_value(&plan).unwrap();
+        raw["source"]["source_object"]["future_generation"] = 7.into();
+        raw["hash"] = digest_value(raw.clone()).unwrap().into();
+        assert!(decode(raw).is_err());
+    }
+    #[test]
     fn raw_unknown_semantics_cannot_disappear_during_typed_decoding() {
         let plan = fixture();
         let mut raw = serde_json::to_value(&plan).unwrap();
@@ -311,6 +335,7 @@ mod tests {
         let raw = serde_json::to_value(&plan).unwrap();
         assert!(raw.get("schema_version").is_none());
         assert!(raw.get("required_rights").is_none());
+        assert!(raw["source"].get("source_object").is_none());
         let legacy = decode(raw).unwrap();
         assert_eq!(legacy.schema_version, 1);
         assert_eq!(digest(&legacy).unwrap(), plan.hash);

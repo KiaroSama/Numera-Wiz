@@ -40,7 +40,8 @@ eframe = { version = "=0.36.2", default-features = false, features = ["default_f
 ehttp = { version = "0.6", features = ["json"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# Audited OS FFI requires a local expectation with its safety contract.
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 await_holding_lock = "deny"

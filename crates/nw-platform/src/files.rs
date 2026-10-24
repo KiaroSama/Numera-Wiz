@@ -1,4 +1,4 @@
-use nw_domain::{DomainError, Result, records::FileIdentity};
+use nw_domain::{DomainError, Result, records::{FileIdentity, NativeObjectIdentity, NativeObjectKind}};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
@@ -176,6 +176,7 @@ pub fn revalidate(expected: &FileIdentity, cancel: &CancellationToken) -> Result
 pub struct SourceStamp {
     path: PathBuf,
     handle: same_file::Handle,
+    object: NativeObjectIdentity,
     bytes: u64,
     modified: std::time::SystemTime,
 }
@@ -209,20 +210,32 @@ impl SourceStamp {
                 "A regular held source is required",
             ));
         }
+        let object = native_object(handle.as_file())?;
         let stamp = Self {
             path,
             handle,
+            object,
             bytes: metadata.len(),
             modified: metadata.modified().map_err(io_error)?,
         };
         stamp.revalidate()?;
         Ok(stamp)
     }
+    pub fn object_identity(&self) -> Result<NativeObjectIdentity> {
+        self.revalidate()?;
+        Ok(self.object.clone())
+    }
+    pub fn require_object(&self, expected: &NativeObjectIdentity) -> Result<()> {
+        if &self.object_identity()? != expected {
+            return Err(DomainError::new("SOURCE_CHANGED", "Registered native object no longer matches its original physical identity"));
+        }
+        Ok(())
+    }
     pub(crate) fn held_file(&self) -> &File {
         self.handle.as_file()
     }
     pub(crate) fn same_as(&self, other: &Self) -> bool {
-        self.handle == other.handle
+        self.object == other.object
     }
     pub fn revalidate(&self) -> Result<()> {
         let changed = || {
@@ -238,6 +251,7 @@ impl SourceStamp {
         let metadata = current.as_file().metadata().map_err(|_| changed())?;
         if path != self.path
             || current != self.handle
+            || native_object(current.as_file()).map_err(|_| changed())? != self.object
             || metadata.len() != self.bytes
             || metadata.modified().map_err(|_| changed())? != self.modified
         {
@@ -245,6 +259,53 @@ impl SourceStamp {
         }
         Ok(())
     }
+}
+fn native_object(file: &File) -> Result<NativeObjectIdentity> {
+    let metadata = file.metadata().map_err(io_error)?;
+    #[cfg(unix)]
+    let (kind, volume, object) = {
+        use std::os::unix::fs::MetadataExt;
+        (NativeObjectKind::UnixDeviceInode, metadata.dev().to_string(), metadata.ino().to_string())
+    };
+    #[cfg(windows)]
+    let (kind, volume, object) = {
+        let (volume, id) = windows_object(file)?;
+        (NativeObjectKind::WindowsFileId128, volume.to_string(), hex::encode(id))
+    };
+    #[cfg(not(any(unix, windows)))]
+    return Err(DomainError::new("NATIVE_PATH_UNAVAILABLE", "No admitted native object identity on this target"));
+    #[cfg(any(unix, windows))]
+    {
+        let created_ns = metadata.created().ok().map(|time| match time.duration_since(std::time::UNIX_EPOCH) {
+            Ok(duration) => duration.as_nanos().to_string(),
+            Err(error) => format!("-{}", error.duration().as_nanos()),
+        });
+        Ok(NativeObjectIdentity {schema_version:1,kind,volume,object,created_ns})
+    }
+}
+#[cfg(windows)]
+#[expect(unsafe_code, reason = "One borrowed-handle Win32 FILE_ID_INFO query; its output buffer and lifetime are checked here")]
+fn windows_object(file: &File) -> Result<(u64, [u8; 16])> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx};
+    let mut information = FILE_ID_INFO::default();
+    // SAFETY: File keeps its valid disk handle alive for this call. The initialized,
+    // exclusively borrowed repr(C) FILE_ID_INFO has the exact size passed to Win32.
+    // No pointer is retained, and output is consumed only after a nonzero result.
+    let succeeded = unsafe { GetFileInformationByHandleEx(
+        file.as_raw_handle(), FileIdInfo, std::ptr::from_mut(&mut information).cast(),
+        std::mem::size_of::<FILE_ID_INFO>() as u32,
+    ) };
+    if succeeded == 0 {
+        return Err(DomainError::new("NATIVE_IDENTITY_UNAVAILABLE", format!("Full Windows file identity is unavailable: {}", std::io::Error::last_os_error())));
+    }
+    Ok((information.VolumeSerialNumber, information.FileId.Identifier))
+}
+pub fn source_object(path: &Path) -> Result<NativeObjectIdentity> {
+    SourceStamp::capture_resolved(&source_path(path)?)?.object_identity()
+}
+pub fn revalidate_source_object(path: &Path, expected: &NativeObjectIdentity) -> Result<()> {
+    SourceStamp::capture_resolved(path)?.require_object(expected)
 }
 pub fn private_root(path: &Path) -> Result<PathBuf> {
     fs::create_dir_all(path).map_err(io_error)?;
@@ -323,6 +384,25 @@ pub fn prepare_verified_copy(
 
 pub fn copy_into_staging(
     expected: &FileIdentity,
+    staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
+    let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
+    copy_from_held(expected, source_stamp, staging, cancel)
+}
+pub fn copy_into_staging_bound(
+    expected: &FileIdentity,
+    object: &NativeObjectIdentity,
+    staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
+    let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
+    source_stamp.require_object(object)?;
+    copy_from_held(expected, source_stamp, staging, cancel)
+}
+fn copy_from_held(
+    expected: &FileIdentity,
+    source_stamp: SourceStamp,
     mut staging: tempfile::NamedTempFile,
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
@@ -330,7 +410,6 @@ pub fn copy_into_staging(
         .bytes
         .parse::<u64>()
         .map_err(|_| DomainError::new("INVALID_IDENTITY", "Invalid reviewed byte length"))?;
-    let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
     let mut input = source_stamp.held_file().try_clone().map_err(io_error)?;
     let mut buffer = vec![0; 4 * 1024 * 1024];
     let mut copied = 0u64;
@@ -376,22 +455,60 @@ pub fn copy_into_staging(
     Ok((staging, actual))
 }
 pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
-    let first = same_file::Handle::from_file(open_regular_read(first)?).map_err(io_error)?;
-    let second = same_file::Handle::from_file(open_regular_read(second)?).map_err(io_error)?;
-    Ok(first == second)
+    let first = SourceStamp::capture_resolved(&source_path(first)?)?;
+    let second = SourceStamp::capture_resolved(&source_path(second)?)?;
+    let same = first.same_as(&second);
+    first.revalidate()?;
+    second.revalidate()?;
+    Ok(same)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn original_object_survives_handle_drop_but_rejects_identical_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        let retained = root.path().join("original.bin");
+        std::fs::write(&source, b"original identity bytes").unwrap();
+        let canonical = source_path(&source).unwrap();
+        let identity = identity(&canonical, &CancellationToken::new()).unwrap();
+        let original = source_object(&canonical).unwrap();
+        revalidate_source_object(&canonical, &original).unwrap();
+        std::fs::rename(&canonical, &retained).unwrap();
+        std::fs::copy(&retained, &canonical).unwrap();
+        revalidate(&identity, &CancellationToken::new()).unwrap();
+        assert_ne!(source_object(&canonical).unwrap(), original);
+        assert_eq!(revalidate_source_object(&canonical, &original).unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(source_object(&retained).unwrap(), original);
+    }
+    #[test]
+    fn native_object_identity_is_shared_by_hard_links_without_granting_a_path() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        let alias = root.path().join("alias.bin");
+        std::fs::write(&source, b"same physical object").unwrap();
+        std::fs::hard_link(&source, &alias).unwrap();
+        assert_eq!(source_object(&source).unwrap(), source_object(&alias).unwrap());
+    }
     #[cfg(unix)]
     #[tokio::test]
     async fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("input");
         let fixture_tool = [Path::new("/usr/bin/mkfifo"), Path::new("/bin/mkfifo")]
-            .into_iter().find(|path| path.is_file()).expect("Hosted POSIX FIFO fixture tool");
-        crate::process::run(fixture_tool, &[path_text(&source).unwrap()],
-            std::time::Duration::from_secs(5), 1024, CancellationToken::new()).await.unwrap();
+            .into_iter()
+            .find(|path| path.is_file())
+            .expect("Hosted POSIX FIFO fixture tool");
+        crate::process::run(
+            fixture_tool,
+            &[path_text(&source).unwrap()],
+            std::time::Duration::from_secs(5),
+            1024,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
         let started = std::time::Instant::now();
         assert!(matches!(open_regular_handle(&source), Err(error) if error.code == "INPUT_DENIED"));
         assert!(started.elapsed() < std::time::Duration::from_secs(1));

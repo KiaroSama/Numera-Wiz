@@ -33,18 +33,38 @@ struct SessionBinding {
 }
 impl SessionBinding {
     fn bind_root(&mut self, root: &str) -> Result<()> {
-        if self.root_id.as_deref().is_some_and(|original| original != root) {
-            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "The selected native root no longer has this adapter's original data identity").into());
+        if self
+            .root_id
+            .as_deref()
+            .is_some_and(|original| original != root)
+        {
+            return Err(nw_domain::DomainError::new(
+                "OWNER_IDENTITY_CONFLICT",
+                "The selected native root no longer has this adapter's original data identity",
+            )
+            .into());
         }
         self.root_id = Some(root.into());
         Ok(())
     }
     fn bind_principal(&mut self, principal: &str) -> Result<()> {
         if principal.is_empty() || principal.len() > 128 {
-            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Scoped bootstrap omitted its bounded principal identity").into());
+            return Err(nw_domain::DomainError::new(
+                "OWNER_IDENTITY_CONFLICT",
+                "Scoped bootstrap omitted its bounded principal identity",
+            )
+            .into());
         }
-        if self.principal.as_deref().is_some_and(|original| original != principal) {
-            return Err(nw_domain::DomainError::new("PRINCIPAL_CHANGED", "Scoped reconnect cannot change the adapter's original principal").into());
+        if self
+            .principal
+            .as_deref()
+            .is_some_and(|original| original != principal)
+        {
+            return Err(nw_domain::DomainError::new(
+                "PRINCIPAL_CHANGED",
+                "Scoped reconnect cannot change the adapter's original principal",
+            )
+            .into());
         }
         self.principal = Some(principal.into());
         Ok(())
@@ -118,8 +138,11 @@ impl NativeClient {
                     && health.status().is_success()
                 {
                     let identity = bounded_json(health).await?;
-                    if identity["epoch"] != record.epoch || identity["root_id"] != record.root_id
-                        || identity["build"] != record.build || identity["registry"] != record.registry {
+                    if identity["epoch"] != record.epoch
+                        || identity["root_id"] != record.root_id
+                        || identity["build"] != record.build
+                        || identity["registry"] != record.registry
+                    {
                         return Err(nw_domain::DomainError::new(
                             "OWNER_IDENTITY_CONFLICT",
                             "Protected bootstrap and active owner differ",
@@ -163,7 +186,11 @@ impl NativeClient {
                     .spawn()
                     .context("Cannot start the protected owner")?;
                 tokio::spawn(async move {
-                    let _ = child.wait().await;
+                    match child.wait().await {
+                        Ok(status) if status.success() => tracing::debug!("Protected owner child exited normally"),
+                        Ok(status) => tracing::warn!(exit_code=status.code(), "Protected owner child exited with an error"),
+                        Err(_) => tracing::warn!("Protected owner child status could not be collected"),
+                    }
                 });
                 spawned = Some(std::time::Instant::now());
             }
@@ -204,9 +231,16 @@ impl NativeClient {
             .context("Scoped credential was not issued")?
             .to_owned();
         if value["profile"].as_str() != Some(profile.as_str()) {
-            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Scoped bootstrap names a different profile").into());
+            return Err(nw_domain::DomainError::new(
+                "OWNER_IDENTITY_CONFLICT",
+                "Scoped bootstrap names a different profile",
+            )
+            .into());
         }
-        self.binding.lock().await.bind_principal(value["principal"].as_str().unwrap_or(""))?;
+        self.binding
+            .lock()
+            .await
+            .bind_principal(value["principal"].as_str().unwrap_or(""))?;
         *cached = Some((record.epoch.clone(), token.clone()));
         Ok(token)
     }
@@ -234,8 +268,13 @@ impl NativeClient {
             let record = self.attach().await?;
             let token = match self.scoped_token(&record).await {
                 Ok(token) => token,
-                Err(error) if attempt == 0 && (error.downcast_ref::<reqwest::Error>().is_some()
-                    || error.downcast_ref::<nw_domain::DomainError>().is_some_and(|error| error.code == "AUTHENTICATION_REQUIRED")) => {
+                Err(error)
+                    if attempt == 0
+                        && (error.downcast_ref::<reqwest::Error>().is_some()
+                            || error
+                                .downcast_ref::<nw_domain::DomainError>()
+                                .is_some_and(|error| error.code == "AUTHENTICATION_REQUIRED")) =>
+                {
                     *self.cached.lock().await = None;
                     *self.credential.lock().await = None;
                     continue;

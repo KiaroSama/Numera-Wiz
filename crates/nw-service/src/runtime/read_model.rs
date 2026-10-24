@@ -314,6 +314,7 @@ mod tests {
 
     fn asset(id: &str, creator: &str) -> Asset {
         Asset {
+            source_object: None,
             id: id.into(),
             creator: creator.into(),
             display_name: format!("{id}.mkv"),

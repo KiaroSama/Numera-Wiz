@@ -708,6 +708,7 @@ mod tests {
     }
     fn asset(id: &str) -> Arc<Asset> {
         Arc::new(Asset {
+            source_object: None,
             id: id.into(),
             creator: "controller-unit".into(),
             display_name: id.into(),

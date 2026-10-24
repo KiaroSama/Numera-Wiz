@@ -104,11 +104,21 @@ impl Engine {
         cancel: CancellationToken,
     ) -> Result<Asset> {
         let token = cancel.clone();
-        let initial = blocking(move || files::identity(&path, &token)).await?;
+        let (initial, stamp) = blocking(move || {
+            let path = files::source_path(&path)?;
+            let stamp = files::SourceStamp::capture_resolved(&path)?;
+            let identity = files::identity(&path, &token)?;
+            stamp.revalidate()?;
+            Ok((identity, stamp))
+        }).await?;
         let probe = self.probe(Path::new(&initial.path), cancel.clone()).await?;
         let expected = initial.clone();
-        blocking(move || files::revalidate(&expected, &cancel)).await?;
+        let source_object = blocking(move || {
+            files::revalidate(&expected, &cancel)?;
+            stamp.object_identity()
+        }).await?;
         Ok(Asset {
+            source_object: Some(source_object),
             display_name: String::new(),
             id: Uuid::new_v4().to_string(),
             creator,
@@ -136,6 +146,8 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
+        let object = registered_object(&asset)?.clone();
+        files::revalidate_source_object(Path::new(&asset.identity.path), &object)?;
         let output = files::output_path(output)?;
         if output == Path::new(&asset.identity.path) {
             return Err(DomainError::new(
@@ -160,12 +172,13 @@ impl Engine {
         } else {
             vec![]
         };
+        let mut required_rights = nw_domain::plans::RequiredRights::native(
+            asset.identity.clone(), files::path_text(&output)?,
+        );
+        required_rights.source_read.object = Some(object);
         let mut plan = Plan {
             schema_version: 2,
-            required_rights: Some(nw_domain::plans::RequiredRights::native(
-                asset.identity.clone(),
-                files::path_text(&output)?,
-            )),
+            required_rights: Some(required_rights),
             creation_audit: Some(nw_domain::plans::CreationAudit {
                 principal: creator.into(),
                 policy_revision: 0,
@@ -190,6 +203,8 @@ impl Engine {
         Ok(plan)
     }
     pub fn validate_plan(&self, plan: &Plan) -> Result<()> {
+        nw_domain::plans::validate_requirements(plan)?;
+        registered_object(&plan.source)?;
         if plan_digest(plan)? != plan.hash {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -252,11 +267,15 @@ impl Engine {
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
         self.validate_plan(plan)?;
         let source = plan.source.identity.clone();
+        let object = registered_object(&plan.source)?.clone();
         let ffmpeg = plan.ffmpeg.clone();
         let ffprobe = plan.ffprobe.clone();
         let token = cancel.clone();
         blocking(move || {
+            let stamp = files::SourceStamp::capture_resolved(Path::new(&source.path))?;
+            stamp.require_object(&object)?;
             files::revalidate(&source, &token)?;
+            stamp.require_object(&object)?;
             files::revalidate(&ffmpeg, &token)?;
             files::revalidate(&ffprobe, &token)
         })
@@ -277,9 +296,10 @@ impl Engine {
                 ]))
                 .await?;
                 let source = plan.source.identity.clone();
+                let object = registered_object(&plan.source)?.clone();
                 let token = cancel.clone();
                 let (staging, actual) =
-                    blocking(move || files::copy_into_staging(&source, staging, &token)).await?;
+                    blocking(move || files::copy_into_staging_bound(&source, &object, staging, &token)).await?;
                 observer(ExecutionEvent::Verifying).await?;
                 let verification =
                     "Full byte SHA-256 and length verified before no-replace publication"
@@ -309,6 +329,7 @@ impl Engine {
         let source = plan.source.identity.clone();
         let token = cancel.clone();
         let frozen_demuxer = admission::frozen_demuxer(&plan.source.probe.format)?;
+        let object = registered_object(&plan.source)?.clone();
         let (input, source_stamp) = blocking(move || {
             let path = Path::new(&source.path);
             let input = admission::open(path, &token)?;
@@ -322,8 +343,9 @@ impl Engine {
                 path,
                 input.file.try_clone().map_err(io_error)?,
             )?;
+            stamp.require_object(&object)?;
             files::revalidate(&source, &token)?;
-            stamp.revalidate()?;
+            stamp.require_object(&object)?;
             Ok((input, stamp))
         })
         .await?;
@@ -664,6 +686,15 @@ fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
         }
     }
     Ok(())
+}
+fn registered_object(asset: &Asset) -> Result<&nw_domain::records::NativeObjectIdentity> {
+    let object = asset.source_object.as_ref().ok_or_else(|| DomainError::new(
+        "INVALID_PLAN", "Register the source again to capture its original native object identity",
+    ))?;
+    if object.schema_version != 1 {
+        return Err(DomainError::new("INVALID_PLAN", "The native object identity version is not supported"));
+    }
+    Ok(object)
 }
 fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<String>> {
     let demuxer = admission::frozen_demuxer(&asset.probe.format)?;

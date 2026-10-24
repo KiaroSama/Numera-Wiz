@@ -523,12 +523,16 @@ impl Service {
             _ => {}
         }
         self.root_authority(context, Path::new(&plan.source.identity.path), false)?;
-        self.path_with_purpose(
+        let path = self.path_with_purpose(
             context,
             Path::new(&plan.source.identity.path),
             false,
             Some(&plan.source.identity),
-        )
+        )?;
+        if let Some(object) = &plan.source.source_object {
+            files::revalidate_source_object(&path, object)?;
+        }
+        Ok(path)
     }
     fn root_authority(&self, context: &Context, canonical: &Path, write: bool) -> Result<()> {
         if let Some(profile) = self.policy(context)? {
@@ -699,15 +703,22 @@ impl Service {
         self.credential_for_origin(name, None)
     }
     pub fn credential_for_origin(&self, name: &str, origin: Option<String>) -> Result<String> {
-        self.credential_for_origin_bound(name, origin, None).map(|(bearer, _)| bearer)
+        self.credential_for_origin_bound(name, origin, None)
+            .map(|(bearer, _)| bearer)
     }
     pub fn credential_for_origin_bound(
-        &self, name: &str, origin: Option<String>, expected_principal: Option<&str>,
+        &self,
+        name: &str,
+        origin: Option<String>,
+        expected_principal: Option<&str>,
     ) -> Result<(String, Context)> {
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let context = self.profile_context(name)?;
         if expected_principal.is_some_and(|principal| principal != context.principal) {
-            return Err(DomainError::new("PRINCIPAL_CHANGED", "The selected profile no longer names the adapter's original principal"));
+            return Err(DomainError::new(
+                "PRINCIPAL_CHANGED",
+                "The selected profile no longer names the adapter's original principal",
+            ));
         }
         let now = self.clock.now()?;
         let mut live = 0;
@@ -873,7 +884,11 @@ impl Service {
                     ));
                 }
                 let input: CredentialInput = commands::parse(params)?;
-                let (bearer, identity) = self.credential_for_origin_bound(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")), input.expected_principal.as_deref())?;
+                let (bearer, identity) = self.credential_for_origin_bound(
+                    &input.profile,
+                    input.port.map(|port| format!("http://127.0.0.1:{port}")),
+                    input.expected_principal.as_deref(),
+                )?;
                 json!({"bearer":bearer,"profile":input.profile,"principal":identity.principal,"expires_in_seconds":28800})
             }
             "access.tokens.issue" => {
@@ -1319,6 +1334,7 @@ impl Service {
                                     "Reviewed source changed before preflight",
                                 )
                             })?;
+                    source.require_object(plan.source.source_object.as_ref().ok_or_else(|| DomainError::new("INVALID_PLAN", "Original source object identity is missing"))?)?;
                     let ffmpeg = files::SourceStamp::capture_resolved(Path::new(&plan.ffmpeg.path))
                         .map_err(|_| {
                             DomainError::new(
@@ -1763,6 +1779,7 @@ mod tests {
         let source = root.path().join("source.mkv");
         std::fs::write(&source, b"synthetic preflight bytes, not a media container").unwrap();
         let asset = Asset {
+            source_object: Some(files::source_object(&source).unwrap()),
             id: "preflight-asset".into(),
             creator: context.principal.clone(),
             display_name: "source.mkv".into(),
@@ -1852,7 +1869,9 @@ mod tests {
         std::fs::create_dir_all(managed.parent().unwrap()).unwrap();
         std::fs::copy(root.path().join("source.mkv"), &managed).unwrap();
         plan.source.identity = files::identity(&managed, &CancellationToken::new()).unwrap();
+        plan.source.source_object = Some(files::source_object(&managed).unwrap());
         let rights = plan.required_rights.as_mut().unwrap();
+        rights.source_read.object = plan.source.source_object.clone();
         rights.source_read.identity = plan.source.identity.clone();
         rights.source_read.purpose = nw_domain::plans::SourcePurpose::CreatorBoundManaged {
             principal: context.principal.clone(),
@@ -2084,6 +2103,7 @@ mod tests {
             sha256: "00".repeat(32),
         };
         let asset = Asset {
+            source_object: None,
             id: "private-asset".into(),
             creator: owner.principal.clone(),
             display_name: "source.mkv".into(),
@@ -2252,6 +2272,7 @@ mod tests {
             dispositions: Default::default(),
         }));
         let asset = Asset {
+            source_object: None,
             id: "plan-budget-asset".into(),
             creator: owner.principal.clone(),
             display_name: "source.mkv".into(),
@@ -2413,6 +2434,7 @@ mod tests {
         let service = Service::open(root.path().join("data"), None).await.unwrap();
         let owner = service.owner();
         let mut asset = Asset {
+            source_object: None,
             display_name: String::new(),
             id: "owned-asset".into(),
             creator: owner.principal.clone(),
@@ -2542,15 +2564,37 @@ mod tests {
     async fn reattachment_cannot_issue_for_a_replacement_profile_principal() {
         let root = tempfile::tempdir().unwrap();
         let service = Service::open(root.path().to_owned(), None).await.unwrap();
-        let (first, context) = service.credential_for_origin_bound("agent", None, None).unwrap();
-        assert_eq!(service.authenticate(&first).unwrap().principal, context.principal);
+        let (first, context) = service
+            .credential_for_origin_bound("agent", None, None)
+            .unwrap();
+        assert_eq!(
+            service.authenticate(&first).unwrap().principal,
+            context.principal
+        );
         let mut profile: AccessProfile = service.store.get("profile/agent").unwrap().unwrap();
         profile.principal = Uuid::new_v4().to_string();
         profile.revision += 1;
         service.store.put("profile/agent", &profile).unwrap();
-        let before = service.store.rows::<Credential>("credential/", 10000).unwrap().len();
-        assert_eq!(service.credential_for_origin_bound("agent", None, Some(&context.principal)).unwrap_err().code, "PRINCIPAL_CHANGED");
-        assert_eq!(service.store.rows::<Credential>("credential/", 10000).unwrap().len(), before);
+        let before = service
+            .store
+            .rows::<Credential>("credential/", 10000)
+            .unwrap()
+            .len();
+        assert_eq!(
+            service
+                .credential_for_origin_bound("agent", None, Some(&context.principal))
+                .unwrap_err()
+                .code,
+            "PRINCIPAL_CHANGED"
+        );
+        assert_eq!(
+            service
+                .store
+                .rows::<Credential>("credential/", 10000)
+                .unwrap()
+                .len(),
+            before
+        );
         assert!(service.authenticate(&first).is_err());
     }
     #[tokio::test]
