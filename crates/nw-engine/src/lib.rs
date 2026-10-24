@@ -197,7 +197,10 @@ impl Engine {
             ));
         }
         if plan.verification_scope != preservation::SCOPE {
-            return Err(DomainError::new("INVALID_PLAN", "Review a fresh plan for the current verification contract"));
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Review a fresh plan for the current verification contract",
+            ));
         }
         if self.ffmpeg != plan.ffmpeg || self.ffprobe != plan.ffprobe {
             return Err(DomainError::new(
@@ -806,8 +809,8 @@ fn verify_tags(
 ) -> Result<()> {
     for (key, value) in expected {
         // Matroska regenerates its duration tags from the independently verified packet clock.
-        let undefined_stream_language = !generated_writer && key == "language"
-            && value == "und" && !actual.contains_key(key);
+        let undefined_stream_language =
+            !generated_writer && key == "language" && value == "und" && !actual.contains_key(key);
         if key != "duration" && !undefined_stream_language && actual.get(key) != Some(value) {
             return Err(DomainError::new(
                 "VERIFICATION_FAILED",

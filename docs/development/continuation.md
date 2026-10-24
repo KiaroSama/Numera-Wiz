@@ -696,3 +696,13 @@ verification scope at admission; they never skip packet, tag or timing checks.
 The guarded file opener and actual native Output details click are added and
 await qualification. Direct OS edges require the next hosted lock resolver output.
 No local compilation, tests, application or media execution was run.
+
+
+Run 40063286961 resolved only the two new direct OS dependency edges; the exact
+hosted Cargo.lock is retained (artifact 12547973743, ZIP SHA-256
+7273c28f92e1901561aa8f93a703f6f8e76b99bab65f220c9819997c0f7af1fe).
+The ordinary locked builds stopped before compilation because those edges were
+not yet in the committed lock. Its formatter output was also applied exactly
+(artifact 12547849196, ZIP SHA-256
+c4d6c58c2252080484b8fef119a740f698e3e42a3d61a64e65ae98a0805abfab).
+No source/package/media pass is inferred from that resolver-only run.
