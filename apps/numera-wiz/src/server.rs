@@ -398,14 +398,15 @@ async fn credential(
     }
     let service = owner.service.clone();
     match tokio::task::spawn_blocking(move || {
-        service.credential_for_origin(
+        service.credential_for_origin_bound(
             &input.profile,
             input.port.map(|port| format!("http://127.0.0.1:{port}")),
+            input.expected_principal.as_deref(),
         )
     })
     .await
     {
-        Ok(Ok(bearer)) => Json(json!({"bearer":bearer,"expires_in_seconds":28800})).into_response(),
+        Ok(Ok((bearer, identity))) => Json(json!({"bearer":bearer,"principal":identity.principal,"profile":identity.profile,"expires_in_seconds":28800})).into_response(),
         Ok(Err(error)) => (StatusCode::FORBIDDEN, Json(json!({"error":error}))).into_response(),
         Err(_) => failure(
             StatusCode::INTERNAL_SERVER_ERROR,

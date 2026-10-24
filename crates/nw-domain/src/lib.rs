@@ -52,6 +52,7 @@ impl DomainError {
             | "INVALID_JOB_TRANSITION"
             | "CANCELLATION_TOO_LATE"
             | "OWNER_BUSY"
+            | "PRINCIPAL_CHANGED"
             | "OWNER_IDENTITY_CONFLICT"
             | "OWNER_VERSION_CONFLICT" => 4,
             "LOG_FILE_UNOWNED" => 4,

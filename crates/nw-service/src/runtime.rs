@@ -699,8 +699,16 @@ impl Service {
         self.credential_for_origin(name, None)
     }
     pub fn credential_for_origin(&self, name: &str, origin: Option<String>) -> Result<String> {
+        self.credential_for_origin_bound(name, origin, None).map(|(bearer, _)| bearer)
+    }
+    pub fn credential_for_origin_bound(
+        &self, name: &str, origin: Option<String>, expected_principal: Option<&str>,
+    ) -> Result<(String, Context)> {
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let context = self.profile_context(name)?;
+        if expected_principal.is_some_and(|principal| principal != context.principal) {
+            return Err(DomainError::new("PRINCIPAL_CHANGED", "The selected profile no longer names the adapter's original principal"));
+        }
         let now = self.clock.now()?;
         let mut live = 0;
         for (key, credential) in self.store.rows::<Credential>("credential/", 10000)? {
@@ -729,7 +737,7 @@ impl Service {
         self.store.put(
             &key,
             &Credential {
-                context,
+                context: context.clone(),
                 epoch: self.epoch.clone(),
                 expires: now.checked_add(8 * 3600).ok_or_else(|| {
                     DomainError::new("RESOURCE_LIMIT", "Credential clock range exhausted")
@@ -740,7 +748,7 @@ impl Service {
                 revoked: false,
             },
         )?;
-        Ok(token)
+        Ok((token, context))
     }
     pub async fn dispatch(self: &Arc<Self>, context: Context, request: Request) -> Response {
         self.dispatch_cancel(context, request, CancellationToken::new())
@@ -865,7 +873,8 @@ impl Service {
                     ));
                 }
                 let input: CredentialInput = commands::parse(params)?;
-                json!({"bearer":self.credential_for_origin(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")))?,"profile":input.profile,"expires_in_seconds":28800})
+                let (bearer, identity) = self.credential_for_origin_bound(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")), input.expected_principal.as_deref())?;
+                json!({"bearer":bearer,"profile":input.profile,"principal":identity.principal,"expires_in_seconds":28800})
             }
             "access.tokens.issue" => {
                 if policy.is_some() {
@@ -2528,6 +2537,21 @@ mod tests {
                 .path(&owner, &root.path().join("ordinary-output.mkv"), true)
                 .is_ok()
         );
+    }
+    #[tokio::test]
+    async fn reattachment_cannot_issue_for_a_replacement_profile_principal() {
+        let root = tempfile::tempdir().unwrap();
+        let service = Service::open(root.path().to_owned(), None).await.unwrap();
+        let (first, context) = service.credential_for_origin_bound("agent", None, None).unwrap();
+        assert_eq!(service.authenticate(&first).unwrap().principal, context.principal);
+        let mut profile: AccessProfile = service.store.get("profile/agent").unwrap().unwrap();
+        profile.principal = Uuid::new_v4().to_string();
+        profile.revision += 1;
+        service.store.put("profile/agent", &profile).unwrap();
+        let before = service.store.rows::<Credential>("credential/", 10000).unwrap().len();
+        assert_eq!(service.credential_for_origin_bound("agent", None, Some(&context.principal)).unwrap_err().code, "PRINCIPAL_CHANGED");
+        assert_eq!(service.store.rows::<Credential>("credential/", 10000).unwrap().len(), before);
+        assert!(service.authenticate(&first).is_err());
     }
     #[tokio::test]
     async fn public_credentials_are_bound_to_origin_and_owner_epoch() {

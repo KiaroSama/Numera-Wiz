@@ -11,7 +11,7 @@
     {
       "subject_id": "R02",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -23,7 +23,7 @@
     {
       "subject_id": "R04",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -47,7 +47,7 @@
     {
       "subject_id": "R08",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -71,19 +71,19 @@
     {
       "subject_id": "R12",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "R13",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "R14",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -107,25 +107,25 @@
     {
       "subject_id": "R18",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "R19",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "R20",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "R21",
       "subject_kind": "requirement",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -179,7 +179,7 @@
     {
       "subject_id": "F08",
       "subject_kind": "workflow",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -437,19 +437,19 @@
     {
       "subject_id": "WP02",
       "subject_kind": "work_package",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "WP03",
       "subject_kind": "work_package",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "WP04",
       "subject_kind": "work_package",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -491,7 +491,7 @@
     {
       "subject_id": "WP11",
       "subject_kind": "work_package",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
@@ -643,6 +643,74 @@
             "ubuntu-24.04"
           ],
           "observed_outcome": "Actual separate owner process, CLI and official SDK stdio and HTTP initialize/discover clients passed real asset/plan/job copy/remux, retry identity and independent object-right assertions. The media job passed; matrix jobs stopped on the deliberately unresolved extended lockfile, now retained from that run. GUI/browser and package boundaries remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "plans.reviewed_rights_v2",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/plans.rs",
+        "crates/nw-service/src/runtime.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "observed_outcome": "All native tests/Clippy/desktop compositions passed; Linux real engine/CLI/official SDK/native/Chrome jobs passed. Equivalent native source/output rights reviewed by two principals had one semantic hash. This is a single-source cleanup contract, not project graph or release qualification."
+        }
+      ]
+    },
+    {
+      "subject_id": "artifacts.bounded_http_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/artifacts.rs",
+        "crates/nw-service/src/runtime/artifacts.rs",
+        "apps/numera-wiz/src/server/artifacts.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "actual_linux_owner_http",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "artifact_sha256": "1d1bafa1cef444b1d34082ea03747565896c5f94e9e392746ba9d7e0e519a095",
+          "report": "docs/development/evidence/artifact-http-ci54.json",
+          "observed_outcome": "Produced 268633400-byte valid media output transferred incrementally through the authenticated owner; measured process high-water mark 34980 KiB. Live job Read/bearer withdrawal and disconnect cleanup passed. Not full aggregate R20 or packaged qualification."
+        }
+      ]
+    },
+    {
+      "subject_id": "native.cleanup_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-ui/src/lib.rs",
+        "apps/numera-wiz/tests/native_ui.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "artifact_sha256": "615a0326ac8cb7cef9d9ddabc4d09fa363228055daccbe2f24e0543bc8ce2648",
+          "report": "docs/development/evidence/native-copy-ci54.json",
+          "observed_outcome": "Actual CI-built native executable and mouse/keyboard input registered media, reviewed and submitted a byte-copy job. Independent output byte equality passed; completed workspace screenshot personally inspected. Output details activation is added later and is not credited by this report. Not other-platform GUI, preview or full five-surface qualification."
         }
       ]
     }

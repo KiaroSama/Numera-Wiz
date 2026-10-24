@@ -162,6 +162,8 @@ impl ProfileInput {
 pub struct CredentialInput {
     pub profile: String,
     pub port: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_principal: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -53,3 +53,13 @@ arbitrary tags and container language metadata remain exact. Focused negative ca
 retain those distinctions. Old verification scopes require a fresh review rather
 than inheriting this change. Full packet/clock and corruption oracles remain intact.
 This follow-up also awaits hosted results.
+
+
+Hosted run 40063449245 passed the full Linux engine media journey, including the
+tail-indexed MOV remux, current-route and physical replacement rejections, and
+existing isolated authored-tag/packet corruption negatives. Its complete actual
+CLI/official SDK transport and large owner HTTP steps also passed. Ordinary
+Windows and Linux tests/Clippy/desktop composition passed. The macOS FIFO fixture
+required the subsequent POSIX-tool correction, and native dialog activation was
+not reached in that run. Full parent leases, persisted original object IDs and
+remaining global/package/reference qualification are still open.
