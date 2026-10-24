@@ -29,7 +29,10 @@ impl FileTimesSnapshot {
     }
 }
 fn invalid() -> DomainError {
-    DomainError::new("INVALID_PLAN", "File times require canonical signed decimal nanoseconds")
+    DomainError::new(
+        "INVALID_PLAN",
+        "File times require canonical signed decimal nanoseconds",
+    )
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
@@ -70,8 +73,20 @@ mod tests {
     #[test]
     fn snapshots_reject_noncanonical_and_nonfinite_values() {
         for value in ["NaN", "inf", "1.0", "+1", "01", "-0"] {
-            assert!(FileTimesSnapshot { accessed_ns: value.into(), modified_ns: "0".into() }.validate().is_err());
+            assert!(
+                FileTimesSnapshot {
+                    accessed_ns: value.into(),
+                    modified_ns: "0".into()
+                }
+                .validate()
+                .is_err()
+            );
         }
-        FileTimesSnapshot { accessed_ns: "-1".into(), modified_ns: "1700000000123456700".into() }.validate().unwrap();
+        FileTimesSnapshot {
+            accessed_ns: "-1".into(),
+            modified_ns: "1700000000123456700".into(),
+        }
+        .validate()
+        .unwrap();
     }
 }

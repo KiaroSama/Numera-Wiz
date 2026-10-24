@@ -79,9 +79,7 @@ impl Store {
                 let root_id = Uuid::new_v4().to_string();
                 let mut key = Uuid::new_v4().as_bytes().to_vec();
                 key.extend_from_slice(Uuid::new_v4().as_bytes());
-                table
-                    .insert("meta/schema", STORE_SCHEMA)
-                    .map_err(storage)?;
+                table.insert("meta/schema", STORE_SCHEMA).map_err(storage)?;
                 table
                     .insert("meta/root", root_id.as_bytes())
                     .map_err(storage)?;
@@ -670,7 +668,12 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let store = Store::open(root.path()).unwrap();
         let identity = store.root_id().to_owned();
-        store.put("migration/sentinel", &serde_json::json!({"retained":"original"})).unwrap();
+        store
+            .put(
+                "migration/sentinel",
+                &serde_json::json!({"retained":"original"}),
+            )
+            .unwrap();
         let write = store.db.begin_write().unwrap();
         {
             let mut table = write.open_table(RECORDS).unwrap();
@@ -686,7 +689,10 @@ mod tests {
         let read = db.begin_read().unwrap();
         let table = read.open_table(RECORDS).unwrap();
         assert_eq!(table.get("meta/schema").unwrap().unwrap().value(), b"1");
-        assert_eq!(table.get("meta/root").unwrap().unwrap().value(), identity.as_bytes());
+        assert_eq!(
+            table.get("meta/root").unwrap().unwrap().value(),
+            identity.as_bytes()
+        );
         let raw = table.get("migration/sentinel").unwrap().unwrap();
         let value: serde_json::Value = serde_json::from_slice(raw.value()).unwrap();
         assert_eq!(value["retained"], "original");

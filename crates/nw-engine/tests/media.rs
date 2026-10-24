@@ -585,26 +585,40 @@ async fn actual_copy_and_order_metadata_remux() {
                 source_indices: vec![2],
                 original_languages: vec![],
                 language: TagPatch::Keep,
-                title: TagPatch::Set { value: "Reviewed file times remux".into() },
+                title: TagPatch::Set {
+                    value: "Reviewed file times remux".into(),
+                },
             }];
         }
         let output = reviewed_parent.join(format!("required-times-{label}.mkv"));
-        let time_plan = engine.clean_plan_with_file_times_at(
-            plan.source.clone(), &output, &intent,
-            nw_domain::file_times::FileTimeRequest::RequireReviewed,
-            "fixture-owner", nw_platform::epoch_seconds(),
-        ).unwrap();
+        let time_plan = engine
+            .clean_plan_with_file_times_at(
+                plan.source.clone(),
+                &output,
+                &intent,
+                nw_domain::file_times::FileTimeRequest::RequireReviewed,
+                "fixture-owner",
+                nw_platform::epoch_seconds(),
+            )
+            .unwrap();
         let expected = match time_plan.file_times.as_ref().unwrap() {
             nw_domain::file_times::FileTimePlan::RequireReviewed { times } => times.clone(),
             _ => unreachable!(),
         };
-        engine.execute(&time_plan, CancellationToken::new()).await.unwrap();
+        engine
+            .execute(&time_plan, CancellationToken::new())
+            .await
+            .unwrap();
         assert_eq!(
-            nw_platform::file_times::capture_metadata(&std::fs::metadata(&output).unwrap()).unwrap(),
+            nw_platform::file_times::capture_metadata(&std::fs::metadata(&output).unwrap())
+                .unwrap(),
             expected,
         );
         if label == "copy" {
-            assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&output).unwrap());
+            assert_eq!(
+                std::fs::read(&source).unwrap(),
+                std::fs::read(&output).unwrap()
+            );
         }
     }
     let replaced_output = directory.path().join("physical-replacement.mkv");

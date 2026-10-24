@@ -22,14 +22,18 @@ pub struct PatchForm {
     title: String,
 }
 fn indices(text: &str) -> Result<Vec<u32>, String> {
-    if text.trim().is_empty() { return Ok(Vec::new()); }
+    if text.trim().is_empty() {
+        return Ok(Vec::new());
+    }
     text.split(',')
         .map(str::trim)
         .map(|value| {
             if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
                 return Err(format!("Invalid original stream index: {value}"));
             }
-            value.parse::<u32>().map_err(|_| format!("Invalid original stream index: {value}"))
+            value
+                .parse::<u32>()
+                .map_err(|_| format!("Invalid original stream index: {value}"))
         })
         .collect()
 }
@@ -294,8 +298,12 @@ impl WizApp {
                     if let Some(policy) = &plan.file_times {
                         let label = match policy.request() {
                             nw_domain::file_times::FileTimeRequest::New => "New output timestamps",
-                            nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve source timestamps where supported",
-                            nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require the reviewed source timestamps",
+                            nw_domain::file_times::FileTimeRequest::PreserveBestEffort => {
+                                "Preserve source timestamps where supported"
+                            }
+                            nw_domain::file_times::FileTimeRequest::RequireReviewed => {
+                                "Require the reviewed source timestamps"
+                            }
                         };
                         ui.small(label);
                     }

@@ -939,3 +939,16 @@ New native/actual copy-remux/CLI-SDK/privacy/legacy fixtures await CI. Full F08,
 project/editor/effects, remaining utilities, profile/package/resource/manual/owner
 and all other task-ledger obligations remain required. No local source build,
 test/application/media execution or owner GPU run was performed.
+
+
+## Filesystem timestamp hosted checkpoint
+
+Run 40075785336 on 9e72769d35bef778f76b89c001be5978dd9ef239 passed
+ordinary regressions on all four native targets, including exact timestamp
+copy/publication, injected denial policy, numeric inputs and legacy-store
+preservation. The complete actual Linux engine/CLI/official SDK/large HTTP and
+Chrome jobs passed. Formatting and a single engine Clippy collapsible_if failed;
+this revision applies all 53 exact hosted formatter hunks and the let-chain
+correction. Native GUI was skipped by that prerequisite and is not credited.
+See evidence/file-times-ci65.json. No migration, complete product/package/resource
+or owner GPU gate is inferred. No local compilation or execution was performed.

@@ -149,8 +149,14 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
-        self.clean_plan_with_file_times_at(asset, output, intent,
-            nw_domain::file_times::FileTimeRequest::default(), creator, now)
+        self.clean_plan_with_file_times_at(
+            asset,
+            output,
+            intent,
+            nw_domain::file_times::FileTimeRequest::default(),
+            creator,
+            now,
+        )
     }
     pub fn clean_plan_with_file_times_at(
         &self,
@@ -199,7 +205,9 @@ impl Engine {
             )?
             .object_identity()?,
         );
-        let file_times = if resolution.action == CleanAction::Skip { None } else {
+        let file_times = if resolution.action == CleanAction::Skip {
+            None
+        } else {
             Some(nw_platform::file_times::plan(&source_stamp, file_times)?)
         };
         source_stamp.revalidate()?;
@@ -232,7 +240,9 @@ impl Engine {
     }
     pub fn validate_plan(&self, plan: &Plan) -> Result<()> {
         nw_domain::plans::validate_requirements(plan)?;
-        if let Some(policy) = &plan.file_times { policy.validate()?; }
+        if let Some(policy) = &plan.file_times {
+            policy.validate()?;
+        }
         registered_object(&plan.source)?;
         reviewed_parent(plan)?;
         if plan_digest(plan)? != plan.hash {
@@ -336,13 +346,22 @@ impl Engine {
                 .await?;
                 observer(ExecutionEvent::Verifying).await?;
                 let (staging, source_stamp) = apply_file_times(
-                    staging, source_stamp, plan.file_times.clone(), &cancel, &observer,
-                ).await?;
+                    staging,
+                    source_stamp,
+                    plan.file_times.clone(),
+                    &cancel,
+                    &observer,
+                )
+                .await?;
                 let verification =
                     "Full byte SHA-256 and length verified before no-replace publication"
                         .to_owned();
                 let artifact = publish(
-                    VerifiedStaging { file: staging, identity: actual, source: source_stamp },
+                    VerifiedStaging {
+                        file: staging,
+                        identity: actual,
+                        source: source_stamp,
+                    },
                     plan,
                     job_id,
                     verification.clone(),
@@ -455,10 +474,19 @@ impl Engine {
             ));
         }
         let (staging, source_stamp) = apply_file_times(
-            staging, source_stamp, plan.file_times.clone(), &cancel, &observer,
-        ).await?;
+            staging,
+            source_stamp,
+            plan.file_times.clone(),
+            &cancel,
+            &observer,
+        )
+        .await?;
         let artifact = publish(
-            VerifiedStaging { file: staging, identity: actual, source: source_stamp },
+            VerifiedStaging {
+                file: staging,
+                identity: actual,
+                source: source_stamp,
+            },
             plan,
             job_id,
             verification.clone(),
@@ -477,26 +505,36 @@ async fn apply_file_times(
     observer: &Observer,
 ) -> Result<(tempfile::NamedTempFile, files::SourceStamp)> {
     if cancel.is_cancelled() {
-        return Err(DomainError::new("CANCELLED", "Cancelled before filesystem metadata verification"));
+        return Err(DomainError::new(
+            "CANCELLED",
+            "Cancelled before filesystem metadata verification",
+        ));
     }
-    if let Some(policy) = &policy {
-        if !matches!(policy, nw_domain::file_times::FileTimePlan::New) {
-            observer(ExecutionEvent::Prepared(vec![
-                "rust:preserve-file-times".into(),
-                files::path_text(staging.path())?,
-                serde_json::to_string(policy).map_err(io_error)?,
-            ])).await?;
-        }
+    if let Some(policy) = &policy
+        && !matches!(policy, nw_domain::file_times::FileTimePlan::New)
+    {
+        observer(ExecutionEvent::Prepared(vec![
+            "rust:preserve-file-times".into(),
+            files::path_text(staging.path())?,
+            serde_json::to_string(policy).map_err(io_error)?,
+        ]))
+        .await?;
     }
     let (staging, source, outcome) = blocking(move || {
         source.revalidate()?;
-        let outcome = policy.as_ref().map(|policy|
-            nw_platform::file_times::apply(&source, staging.as_file(), policy)).transpose()?;
+        let outcome = policy
+            .as_ref()
+            .map(|policy| nw_platform::file_times::apply(&source, staging.as_file(), policy))
+            .transpose()?;
         source.revalidate()?;
         Ok((staging, source, outcome))
-    }).await?;
+    })
+    .await?;
     if cancel.is_cancelled() {
-        return Err(DomainError::new("CANCELLED", "Cancelled before filesystem metadata publication"));
+        return Err(DomainError::new(
+            "CANCELLED",
+            "Cancelled before filesystem metadata publication",
+        ));
     }
     if let Some(outcome) = outcome {
         observer(ExecutionEvent::FileTimes(outcome)).await?;
@@ -566,7 +604,11 @@ async fn publish(
     cancel: CancellationToken,
     observer: Observer,
 ) -> Result<FileIdentity> {
-    let VerifiedStaging { file: staging, identity: actual, source: source_stamp } = verified;
+    let VerifiedStaging {
+        file: staging,
+        identity: actual,
+        source: source_stamp,
+    } = verified;
     let parent_stamp = output_parent_stamp(plan)?;
     let destination = nw_platform::claims::Destination::reviewed(
         Path::new(&plan.output),
