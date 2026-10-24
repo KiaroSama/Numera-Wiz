@@ -66,6 +66,8 @@ pub struct JobSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_probe_timeout: Option<crate::execution::DeadlinePolicy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_limits: Option<crate::execution::CleanupLimits>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_times: Option<crate::file_times::FileTimePlan>,
@@ -114,6 +116,7 @@ impl PlanReview {
         effective_actions: BTreeSet<ObjectAction>,
     ) -> Self {
         Self {
+            source_probe_timeout: plan.source.probe.probe_timeout,
             execution_limits: plan.execution_limits.clone(),
             file_times: plan.file_times.clone(),
             schema_version: plan.schema_version,

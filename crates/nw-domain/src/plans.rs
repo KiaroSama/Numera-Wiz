@@ -75,7 +75,8 @@ pub fn digest(plan: &Plan) -> Result<String> {
         1 if plan.required_rights.is_none()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
-            && plan.execution_limits.is_none() =>
+            && plan.execution_limits.is_none()
+            && plan.source.probe.probe_timeout.is_none() =>
         {
             let mut legacy = plan.clone();
             legacy.hash.clear();
@@ -84,6 +85,9 @@ pub fn digest(plan: &Plan) -> Result<String> {
             Ok(hex::encode(Sha256::digest(bytes)))
         }
         2 => {
+            if let Some(deadline) = plan.source.probe.probe_timeout {
+                deadline.duration()?;
+            }
             if let Some(limits) = &plan.execution_limits {
                 limits.validate()?;
             }
@@ -228,6 +232,7 @@ mod tests {
                 display_name: "A label".into(),
                 identity: identity.clone(),
                 probe: MediaProbe {
+                    probe_timeout: None,
                     streams: vec![],
                     stream_details: Default::default(),
                     format: "matroska".into(),
@@ -411,6 +416,18 @@ mod tests {
         assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
         plan.execution_limits.as_mut().unwrap().operation =
             crate::execution::DeadlinePolicy::Finite { seconds: 0 };
+        assert!(digest(&plan).is_err());
+    }
+    #[test]
+    fn source_probe_policy_is_captured_without_rewriting_historical_plans() {
+        let mut plan = fixture();
+        let before = plan.hash.clone();
+        assert!(serde_json::to_value(&plan.source.probe).unwrap().get("probe_timeout").is_none());
+        plan.source.probe.probe_timeout = Some(crate::execution::DeadlinePolicy::Finite { seconds: 30 });
+        assert_ne!(digest(&plan).unwrap(), before);
+        plan.hash = digest(&plan).unwrap();
+        assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
+        plan.source.probe.probe_timeout = Some(crate::execution::DeadlinePolicy::Finite { seconds: 0 });
         assert!(digest(&plan).is_err());
     }
     #[test]

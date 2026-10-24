@@ -1494,3 +1494,53 @@ Full batch/companion totals, project/editor/effects/DAG/preview/mixer/captions,
 command closure, retention/migration, package/resource/manual and owner-harness
 work remain mandatory. No full-task checkbox/archive member changed and no
 local source/media/GUI or owner GPU execution occurred.
+
+
+## Four-target regressions pass; source-probe policy completion
+
+Run 40103257764 on 472efde4ca2c43e7a24c7be5fadd87f31fcbd453 passed all
+ordinary regressions on Windows, Linux, macOS ARM and Intel. Strict tagged
+policy/selector/tag rejection, copy deadline/progress, actual finite/disabled
+child cancellation, frozen hashes and existing regressions passed. WASM/lock,
+actual engine preservation including the new remux-progress fixture, the
+isolated large artifact reader and actual typed CLI/official SDK/lost-ack suite
+also passed. Native lint stopped because the UI deadline helper followed its
+test module. This source moves helpers and the corresponding domain progress
+types before test modules and applies all 30 exact hosted formatter hunks.
+Desktop/GUI/package qualification is not inferred after that failed lint gate.
+
+The optional source probe_timeout now reaches standalone media.probe and
+assets.register, including managed upload registration. It shares strict
+finite/disabled typing, native-owner-only disabled admission and current
+acceptance recheck. Effective source-probe policy is captured in the returned
+probe/asset and later semantic plans. Historical absence stays absent. The
+ordinary CLI exposes --probe-timeout-seconds / --disable-probe-timeout and the
+actual media journey checks the chosen 30-second policy, separate-process
+durable retry and scoped disabled denial. Identity I/O, request transports and
+cancellation keep their independent bounds; no whole-command timeout is claimed.
+This source awaits the next hosted run.
+
+Full folder/batch/companion/replacement behavior, F01-F15, projects/editor/
+effects/DAG/preview/mixer/captions/interchange, remaining command/donor closure,
+retention/generation migration, packages/resources/manuals and the matching
+owner harness remain mandatory. No archive or full-task checkbox changed.
+No local source/media/GUI or owner GPU execution occurred.
+
+
+The same ci84 actual large HTTP suite subsequently completed successfully:
+268633400 bytes, observed client HWM 26268 KiB and owner HWM 31396 KiB,
+confirmed partial-copy cancellation before publication and complete jobRead/
+bearer revocation plus disconnect/index cleanup. Exact compiled merge
+78cd2bbc07aca74f1917f25cf655ba487fbdacc1 and executable/component hashes
+are retained in artifact-http-ci84.json. The actual remux-progress media
+regression passed. These measurements remain scoped Linux fixtures, not full
+aggregate R20 or package evidence. Native GUI was skipped after failed lint;
+the browser job outcome remains to be inspected before recording its scope.
+
+
+The ci84 actual Chrome journey also passed report/review/run/output inspection
+and genuine OS Save As with independent 197983-byte saved/source equality and
+one producer job. Its successful Save PNG was personally inspected, including
+the new Execution limits control. Native UI was skipped after lint failure;
+it is not counted as a pass. This revision now requires a fresh full hosted
+run for the lint fix and source-probe policy additions.

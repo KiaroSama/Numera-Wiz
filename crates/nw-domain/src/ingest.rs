@@ -11,6 +11,8 @@ pub struct UploadInput {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RegisterInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe_timeout: Option<crate::execution::DeadlinePolicy>,
     pub path: Option<String>,
     pub upload_id: Option<String>,
 }

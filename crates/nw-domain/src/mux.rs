@@ -47,7 +47,9 @@ enum SelectorWire {
     TitleContainsAny { values: Vec<String> },
 }
 impl<'de> Deserialize<'de> for Selector {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
         Ok(match SelectorWire::deserialize(deserializer)? {
             SelectorWire::All {} => Self::All,
             SelectorWire::None {} => Self::None,
@@ -89,7 +91,9 @@ enum TagPatchWire {
     Clear {},
 }
 impl<'de> Deserialize<'de> for TagPatch {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
         Ok(match TagPatchWire::deserialize(deserializer)? {
             TagPatchWire::Keep {} => Self::Keep,
             TagPatchWire::Set { value } => Self::Set { value },
@@ -468,14 +472,23 @@ mod tests {
     #[test]
     fn unit_selection_and_tag_actions_never_discard_extra_fields() {
         for wire in [
-            r#"{"mode":"all","values":[1]}"#, r#"{"mode":"none","unexpected":null}"#,
-        ] { assert!(serde_json::from_str::<Selector>(wire).is_err(), "{wire}"); }
+            r#"{"mode":"all","values":[1]}"#,
+            r#"{"mode":"none","unexpected":null}"#,
+        ] {
+            assert!(serde_json::from_str::<Selector>(wire).is_err(), "{wire}");
+        }
         for wire in [
-            r#"{"action":"keep","value":"changed"}"#, r#"{"action":"clear","unexpected":null}"#,
-        ] { assert!(serde_json::from_str::<TagPatch>(wire).is_err(), "{wire}"); }
+            r#"{"action":"keep","value":"changed"}"#,
+            r#"{"action":"clear","unexpected":null}"#,
+        ] {
+            assert!(serde_json::from_str::<TagPatch>(wire).is_err(), "{wire}");
+        }
         for wire in [r#"{"mode":"all"}"#, r#"{"mode":"none"}"#] {
             let value: Selector = serde_json::from_str(wire).unwrap();
-            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::from_str::<serde_json::Value>(wire).unwrap());
+            assert_eq!(
+                serde_json::to_value(value).unwrap(),
+                serde_json::from_str::<serde_json::Value>(wire).unwrap()
+            );
         }
     }
     fn stream(index: u32, kind: StreamKind, language: &str) -> Stream {

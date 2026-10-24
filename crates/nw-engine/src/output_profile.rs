@@ -214,6 +214,7 @@ mod tests {
                 sha256: "0".repeat(64),
             },
             probe: MediaProbe {
+                probe_timeout: None,
                 streams: streams.clone(),
                 stream_details: BTreeMap::new(),
                 format: "mov,mp4,m4a,3gp,3g2,mj2".into(),

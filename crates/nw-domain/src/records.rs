@@ -28,6 +28,8 @@ pub enum NativeObjectKind {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MediaProbe {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe_timeout: Option<crate::execution::DeadlinePolicy>,
     pub streams: Vec<Stream>,
     #[serde(default)]
     pub stream_details: BTreeMap<u32, serde_json::Value>,

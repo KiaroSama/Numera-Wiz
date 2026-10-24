@@ -312,6 +312,9 @@ impl WizApp {
                 ui.separator();
                 ui.label(&plan.verification_scope);
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
+                    if let Some(deadline) = plan.source_probe_timeout {
+                        ui.small(format!("Captured source probe: {deadline:?}"));
+                    }
                     if let Some(limits) = &plan.execution_limits {
                         ui.small(format!(
                             "Probe: {:?}; operation: {:?}",
@@ -493,19 +496,6 @@ impl WizApp {
     }
 }
 
-#[cfg(test)]
-mod validation_tests {
-    use super::*;
-    #[test]
-    fn malformed_index_csv_never_executes_a_valid_subset() {
-        assert_eq!(indices("0, 2").unwrap(), vec![0, 2]);
-        assert!(indices("  ").unwrap().is_empty());
-        for value in ["0,,2", "0,2,", ",0", "-1", "+1", "1.5", "1e3", "4294967296"] {
-            assert!(indices(value).is_err(), "{value}");
-        }
-    }
-}
-
 fn deadline_control(
     ui: &mut egui::Ui,
     label: &str,
@@ -528,4 +518,17 @@ fn deadline_control(
         }
     });
     *policy != before
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    #[test]
+    fn malformed_index_csv_never_executes_a_valid_subset() {
+        assert_eq!(indices("0, 2").unwrap(), vec![0, 2]);
+        assert!(indices("  ").unwrap().is_empty());
+        for value in ["0,,2", "0,2,", ",0", "-1", "+1", "1.5", "1e3", "4294967296"] {
+            assert!(indices(value).is_err(), "{value}");
+        }
+    }
 }

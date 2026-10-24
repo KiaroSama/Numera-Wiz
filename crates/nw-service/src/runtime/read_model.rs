@@ -324,6 +324,7 @@ mod tests {
                 sha256: "00".repeat(32),
             },
             probe: MediaProbe {
+                probe_timeout: None,
                 streams: Vec::new(),
                 stream_details: Default::default(),
                 format: "synthetic-summary-fixture".into(),

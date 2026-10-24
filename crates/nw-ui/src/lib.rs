@@ -592,10 +592,15 @@ impl WizApp {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
                         ui.label(&job.output_name);
-                        if !job.state.terminal() && let Some(progress) = &job.remux_progress {
+                        if !job.state.terminal()
+                            && let Some(progress) = &job.remux_progress
+                        {
                             ui.small(format!(
                                 "FFmpeg time: {} us | output: {} bytes",
-                                progress.reported_out_time_us.as_deref().unwrap_or("unknown"),
+                                progress
+                                    .reported_out_time_us
+                                    .as_deref()
+                                    .unwrap_or("unknown"),
                                 progress.output_bytes.as_deref().unwrap_or("unknown"),
                             ));
                         }
@@ -915,6 +920,7 @@ mod tests {
                 sha256: "00".repeat(32),
             },
             probe: MediaProbe {
+                probe_timeout: None,
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "synthetic-controller-unit".into(),

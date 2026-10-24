@@ -515,6 +515,7 @@ mod tests {
             creator: "alice".into(),
             identity: identity.clone(),
             probe: MediaProbe {
+                probe_timeout: None,
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-fixture".into(),

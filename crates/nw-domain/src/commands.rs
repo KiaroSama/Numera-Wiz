@@ -175,6 +175,8 @@ pub struct Empty {}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PathInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe_timeout: Option<crate::execution::DeadlinePolicy>,
     pub path: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
