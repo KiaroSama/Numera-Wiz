@@ -164,7 +164,7 @@ impl Engine {
             resolution,
             argv_template: args,
             created_at: now.to_string(),
-            expires_at: (now + 1800).to_string(),
+            expires_at: now.checked_add(1800).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Plan clock range exhausted"))?.to_string(),
             verification_scope: preservation::SCOPE.into(),
         };
         plan.hash = plan_digest(&plan)?;

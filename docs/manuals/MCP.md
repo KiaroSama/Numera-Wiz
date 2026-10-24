@@ -18,10 +18,15 @@ A conventional client configuration, when that client supports `mcpServers`, is:
 ```
 
 The default `agent` is discovery-only, apart from own replay-scope bootstrap. The
-owner creates explicit operating profiles through `access.profiles.put` before
+owner creates explicit operating profiles with `access profiles create` before
 using them. The stdio launcher obtains a scoped private credential; it never
 forwards its native owner credential to the agent. Rotation/restart preserves the
 stored profile's principal. An idle bridge alone does not retain the worker.
+Use `access profiles inspect --name operator --grants-out <new-file> --json`
+and revision-checked `access profiles update --grants-file <file>` to replace its
+complete policy while preserving existing path/operation grants. Plan read/submit
+and job read/control are separate rights. Lists use authorization-bound 30-second
+summary snapshots; they do not return every full record or infer access from IDs.
 
 ## Typed calls and retries
 

@@ -216,6 +216,11 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
+        row!("access.profiles.create", "Create a named operational access profile", DurableMutation, crate::access::ProfileCreateInput),
+        row!("access.profiles.update", "Replace an access policy at an exact revision", DurableMutation, crate::access::ProfileInput),
+        row!("access.profiles.inspect", "Inspect one explicit access policy", Query, crate::access::ProfileNameInput),
+        row!("access.tokens.issue", "Issue an audience-bound credential for private file delivery", Bootstrap, crate::access::TokenIssueInput),
+        row!("access.tokens.revoke", "Revoke one credential without changing principal identity", DurableMutation, crate::access::TokenRevokeInput),
         row!(
             "access.profiles.put",
             "Create or revise an explicit access profile",
@@ -494,6 +499,11 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "streams.clean.resolve",
     "access.replay_scope.create",
     "access.profiles.put",
+    "access.profiles.create",
+    "access.profiles.update",
+    "access.profiles.inspect",
+    "access.tokens.issue",
+    "access.tokens.revoke",
     "access.profiles.list",
     "access.credentials.issue",
     "media.probe",

@@ -284,7 +284,8 @@ impl Service {
     }
     pub(super) fn managed_read(&self, context: &Context, path: &Path) -> Result<()> {
         if let Some(profile) = self.policy(context)?
-            && (profile.mode != ProfileMode::Operate || !profile.owned_object_access) {
+            && (profile.mode != ProfileMode::Operate || !profile.owned_object_access)
+        {
             return Err(DomainError::object_not_found());
         }
         let text = files::path_text(path)?;

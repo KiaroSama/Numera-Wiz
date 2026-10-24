@@ -217,7 +217,13 @@ async fn journey() {
         .expect("Native UI must produce a verified artifact");
     assert_eq!(
         std::fs::read(&media.source).unwrap(),
-        std::fs::read(artifact.path.as_ref().expect("Owner inspection retains the authorized output path")).unwrap()
+        std::fs::read(
+            artifact
+                .path
+                .as_ref()
+                .expect("Owner inspection retains the authorized output path")
+        )
+        .unwrap()
     );
     assert_eq!(job.plan.source.id, assets[0]["id"].as_str().unwrap());
     std::fs::write(evidence.join("native-output.json"), serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"artifact":artifact,"verification":job.verification,"oracle":"Independent source/output byte equality after native input, Review and Ctrl+Enter Run"})).unwrap()).unwrap();

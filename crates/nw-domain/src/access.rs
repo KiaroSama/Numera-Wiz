@@ -73,7 +73,7 @@ impl ProfileInput {
         let invalid = || DomainError::new("VALIDATION_ERROR", "Profile grants are invalid, excessive or outside the declared operational policy");
         if self.allowed_command_ids.len() > 1024 || self.object_grants.len() > 256
             || self.read_roots.len() > 32 || self.write_roots.len() > 32
-            || self.allowed_command_ids.iter().any(|id| commands::descriptor(id).is_none() || id.starts_with("access.profiles") || id == "access.credentials.issue") {
+            || self.allowed_command_ids.iter().any(|id| commands::descriptor(id).is_none() || id.starts_with("access.profiles") || id.starts_with("access.tokens") || id == "access.credentials.issue") {
             return Err(invalid());
         }
         if self.mode == ProfileMode::Discovery && (self.owned_object_access || self.client_sessions
@@ -94,6 +94,48 @@ impl ProfileInput {
 pub struct CredentialInput {
     pub profile: String,
     pub port: Option<u16>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileCreateInput { pub name: String, pub read_roots: Vec<String>, pub write_roots: Vec<String> }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileNameInput { pub name: String }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TokenIssueInput { pub for_access_profile: String, pub port: u16 }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TokenRevokeInput { pub token_id: String }
+/// Replacement grant document: target name and revision remain explicit command fields.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GrantsDocument {
+    pub enabled: bool,
+    #[serde(default)] pub client_sessions: bool,
+    pub mode: ProfileMode,
+    pub owned_object_access: bool,
+    pub allowed_command_ids: BTreeSet<String>,
+    pub object_grants: Vec<ObjectGrant>,
+    pub read_roots: Vec<String>,
+    pub write_roots: Vec<String>,
+}
+impl GrantsDocument {
+    pub fn replace(self, name: String, expected_revision: u64) -> ProfileInput {
+        ProfileInput { name, expected_revision: Some(expected_revision), enabled: self.enabled, client_sessions: self.client_sessions,
+            mode: self.mode, owned_object_access: self.owned_object_access, allowed_command_ids: self.allowed_command_ids,
+            object_grants: self.object_grants, read_roots: self.read_roots, write_roots: self.write_roots }
+    }
+}
+impl From<&AccessProfile> for GrantsDocument {
+    fn from(profile: &AccessProfile) -> Self {
+        Self { enabled: profile.enabled, client_sessions: profile.client_sessions, mode: profile.mode,
+            owned_object_access: profile.owned_object_access, allowed_command_ids: profile.allowed_command_ids.clone(),
+            object_grants: profile.object_grants.clone(), read_roots: profile.read_roots.clone(), write_roots: profile.write_roots.clone() }
+    }
+}
+pub fn ordinary_commands() -> BTreeSet<String> {
+    crate::commands::ACTIVE_COMMANDS.iter().filter(|id| !id.starts_with("access.profiles") && !id.starts_with("access.tokens") && **id != "access.credentials.issue").map(|id| (*id).to_owned()).collect()
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionAuthorization {

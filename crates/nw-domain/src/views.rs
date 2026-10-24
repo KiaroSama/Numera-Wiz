@@ -1,8 +1,12 @@
 //! Bounded inventory projections. Detail records are fetched explicitly by identifier.
-use crate::{records::{Asset, Job, JobState, Plan}, mux::CleanResolution, access::ObjectAction};
-use std::collections::BTreeSet;
+use crate::{
+    access::ObjectAction,
+    mux::CleanResolution,
+    records::{Asset, Job, JobState, Plan},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -70,21 +74,43 @@ pub struct PlanReview {
     pub effective_actions: BTreeSet<ObjectAction>,
 }
 impl PlanReview {
-    pub fn new(plan: &Plan, source_visible: bool, output_visible: bool, owner: bool, policy_revision: u64, effective_actions: BTreeSet<ObjectAction>) -> Self {
+    pub fn new(
+        plan: &Plan,
+        source_visible: bool,
+        output_visible: bool,
+        owner: bool,
+        policy_revision: u64,
+        effective_actions: BTreeSet<ObjectAction>,
+    ) -> Self {
         Self {
-            id: plan.id.clone(), hash: plan.hash.clone(), source: AssetSummary::from(&plan.source),
+            id: plan.id.clone(),
+            hash: plan.hash.clone(),
+            source: AssetSummary::from(&plan.source),
             source_path: source_visible.then(|| plan.source.identity.path.clone()),
-            output_name: basename(&plan.output), output_path: output_visible.then(|| plan.output.clone()),
-            resolution: plan.resolution.clone(), argv_template: owner.then(|| plan.argv_template.clone()),
-            created_at: plan.created_at.clone(), expires_at: plan.expires_at.clone(), verification_scope: plan.verification_scope.clone(),
-            policy_revision, effective_actions,
+            output_name: basename(&plan.output),
+            output_path: output_visible.then(|| plan.output.clone()),
+            resolution: plan.resolution.clone(),
+            argv_template: owner.then(|| plan.argv_template.clone()),
+            created_at: plan.created_at.clone(),
+            expires_at: plan.expires_at.clone(),
+            verification_scope: plan.verification_scope.clone(),
+            policy_revision,
+            effective_actions,
         }
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ArtifactView { pub path: Option<String>, pub bytes: String, pub sha256: String }
+pub struct ArtifactView {
+    pub path: Option<String>,
+    pub bytes: String,
+    pub sha256: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ErrorView { pub code: String, pub message: Option<String>, pub retryable: bool }
+pub struct ErrorView {
+    pub code: String,
+    pub message: Option<String>,
+    pub retryable: bool,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobView {
     pub id: String,

@@ -7,7 +7,7 @@ use nw_domain::{
     commands::{Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
-    views::{AssetSummary, JobSummary, SnapshotPage, PlanReview},
+    views::{AssetSummary, JobSummary, PlanReview, SnapshotPage},
 };
 use serde_json::{Value, json};
 use std::{
