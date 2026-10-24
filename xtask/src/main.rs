@@ -94,8 +94,14 @@ fn schemas(root: &Path) -> Result<()> {
             nw_domain::artifacts::ArtifactManifest
         ))?,
     )?;
-    fs::write(path.join("execution-plan.schema.json"), serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::records::Plan))?)?;
-    fs::write(path.join("plan-review.schema.json"), serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::views::PlanReview))?)?;
+    fs::write(
+        path.join("execution-plan.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::records::Plan))?,
+    )?;
+    fs::write(
+        path.join("plan-review.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::views::PlanReview))?,
+    )?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }

@@ -1231,7 +1231,82 @@
       "unresolved": [
         "Read full filters and drawvg bodies; finish actual codec/profile, runtime-resolution, resource, subtitle and package qualification."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_drawvg-reference.texi",
+      "sha256": "0e500136012ea70c935907a55b4dafbc7d4f8c9404674791c66571b92f43828a",
+      "lines": [
+        1,
+        2793
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in contiguous ranges 1-460, 461-920, 921-1380, 1381-2070 and 2071-2793; linked Cairo, SVG, external expression sources and runtime behavior are not credited",
+      "interpretation": [
+        "drawvg has its own token, color, expression, implicit-command and procedure grammar. Shell/JSON/filter escaping do not substitute for generating valid admitted VGS.",
+        "Paths are cleared by fill/stroke/clip unless preserve is used; clipping intersects existing regions, and transforms affect newly added segments rather than earlier path segments. Shared geometry must freeze those semantics.",
+        "Coordinates, line widths, fill rules, alpha and gradient stops are distinct rendering choices; RGBA and HSLA bounds/clamping and color-variable shadowing must be resolved explicitly.",
+        "Expression-local st/ld state persists across frames while separate expressions do not share it. randomg instead shares seeded per-frame state; seek/restart/export determinism requires explicit state and seed policy.",
+        "Procedures restore argument variables while mutations to other variables persist. Loops, nesting, variable counts and generated script size require finite application budgets; nonfinite loop/condition inputs skip execution.",
+        "Frame t/ts/duration and metadata-based values depend on admitted clock/prefix context. Missing/non-numeric metadata yields NaN, so graphics must not silently acquire unrelated default timing.",
+        "print writes expression source/values to FFmpeg logs and can affect performance. Generated script and diagnostic paths remain subject to bounded buffers and sensitive-data policy."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T027",
+        "T030",
+        "T034"
+      ],
+      "unresolved": [
+        "Read the complete filter manual; implement and qualify admitted graphics generation, clock/state/color/alpha behavior, script budgets and matching packaged component closure."
+      ]
     }
   ],
-  "in_progress_manual_reads": []
+  "in_progress_manual_reads": [
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_filters.texi",
+      "sha256": "65661cccd35c02e12894f674b706df8e465fd6862cf0aa64db7d3383271e5a9e",
+      "lines_read": [
+        [
+          1,
+          15800
+        ]
+      ],
+      "complete": false,
+      "notes": [
+        "The graph and each option have distinct escaping layers; slash-prefixed option values load files. Automatic scaler/resampler insertion is semantic and must be frozen. FFmpeg may support cycles, while the application canonical media DAG must reject invalid cycles.",
+        "Timeline enable can bypass a processor; framesync defaults repeat secondary frames and use nearest-lower timestamp. Freeze EOF/repeat/sync policy explicitly.",
+        "Compressor/gate detector, channel-link, attack/release, makeup and mode affect state and audible output; metadata/labels are not DSP. Adaptive denoising and measured threshold modes require the correct upstream prefix.",
+        "Acrossfade sample-count versus duration precedence and overlap/curve selection affect exact length. Acrusher simulates quantization without changing actual sample bit depth.",
+        "AFIR IR normalization, per-channel linking, partition sizes, load timing and bounded duration affect gain, resources and latency. IR/model/ASR files and firequalizer dumpfiles are separate admitted opens.",
+        "Alimiter lookahead delay equals attack; latency compensation also flushes valid EOF audio. Reverse IIR block_size adds that many samples of delay and requires adequate impulse-response support.",
+        "Amerge may reorder channels and guess an arbitrary layout; amix is float-only, can auto-resample, normalizes by default and changes gain during dropout transition. Explicit routing and gain policies are mandatory.",
+        "Areverse buffers the whole clip; aloop and unconstrained apad can run indefinitely. Bound source windows/scratch and output extent rather than rely on filter defaults.",
+        "Asetnsamples defaults to zero-padding EOF, asetrate changes speed/pitch without changing PCM, while aresample may insert/drop samples to match timestamps. These are distinct sample/timing contracts.",
+        "Atrim timestamp constraints differ from counted samples and do not reset PTS; multiple constraints are greedy union, so intersection requires chaining. At tempo above 2, atempo skips samples; a selected high-quality route needs explicit decomposition and output oracles.",
+        "Dynaudnorm includes centered preceding/following frame windows, boundary gain assumptions, channel coupling and optional DC/compression; arbitrary chunk restarts do not preserve the declared processor.",
+        "Loudnorm linear mode can silently fall back to dynamic when measured constraints fail; dynamic true-peak processing upsamples to 192 kHz. The actual mode and output sample rate must be frozen/verified.",
+        "LADSPA/LV2 load executable plugins and search ambient library paths; model, HRIR/SOFA, dictionary, text and log destinations are explicit dependencies, not implied by a source-file grant.",
+        "Silencedetect reports interval start after a minimum detection delay; silenceremove can rewrite timestamps or retain holes. Canonical cut maps must transform dependent streams/captions exactly once.",
+        "Volume eval=once lacks time variables; frame-evaluated gain is not sample-accurate automation. ReplayGain side data is dropped by default; volumedetect forces signed 16-bit input and does not measure original high-precision peaks directly.",
+        "Whisper defaults use_gpu=true and can overwrite or network-write a destination; a CPU-only or granted-source route must explicitly disable GPU use and admit exact model/output dependencies.",
+        "Noise sources need explicit seed and finite duration. Generated source duration can end at a complete audio frame rather than the requested rational boundary.",
+        "addroi passes pixels unchanged but changes encoder side data. Temporal amplify/atadenoise require bounded neighboring-frame prefixes; bm3d search/group ranges need application resource limits tighter than native integer maxima.",
+        "ASS shaping depends on HarfBuzz-backed complex shaping and pinned fonts. Alpha reconstruction, blend plane units/framesync and black detection range/alpha modes are distinct media contracts.",
+        "Bwdif defaults send_field, all frames, and unknown parity falls back to top-field-first; a plan must record field/clock interpretation and verify output cadence.",
+        "Colordetect infers effective range/alpha from observed pixels, not original intent. Colorspace needs explicit characterized input; fast skips gamma/primary correction and is a changed approximation, not equivalent conversion.",
+        "RGB colorkey is 8-bit while chromakey uses YUV; channel/plane units and alpha association need a declared working representation. Colorlevels/curves can clip values and master curves apply a second mapping.",
+        "Crop rounds subsampled dimensions unless exact; keep_aspect changes SAR. Cropdetect defaults skip/round/history selection and is an analysis hint requiring a reviewed crop.",
+        "Cue uses wall-clock buffering without guaranteed frame accuracy. DCT denoise may leave borders unprocessed; decimate mixed creates VFR, and clean-source frame selection is distinct from processed metrics.",
+        "D3D12 custom deinterlacing is driver-defined and can need temporal references; CPU/GPU output equivalence is not implied. DNN backends have specific tensor ranks/layouts, device providers and async behavior; ONNX here is single-input synchronous NCHW float.",
+        "Drawtext text expansion can introduce wall-clock values and has separate escaping; freeze expansion mode, text/font bytes and shaping dependencies. Reloaded text/parameter failures retaining old state are not a valid committed edit result. Drawbox/grid default composition retains existing alpha unless replace=1.",
+        "Fade uses later-of-frame/time start and duration precedence; fieldmatch reconstructs fields but needs separate decimation. Detelecine needs the original pattern phase, and fieldorder shifts picture data rather than merely changing metadata.",
+        "FPS duplicates/drops with explicit PTS rounding/start/EOF; framerate interpolates and is not valid directly for interlaced inputs. AMF FRC may use future frames and a declared duplicate/blend fallback, so route/latency/objective must be qualified.",
+        "Geq expression state is per thread slice; stateful generated expressions need an explicit threading/seed policy. Missing alpha expressions can make output opaque.",
+        "Hald CLUT padding is ignored and last LUT can persist after EOF; guided fast is an approximation with subsampled guidance. Grayworld expects linear-light input. Hardware downloads/maps require exact supported formats and compatible devices, not a generic zero-copy assumption."
+      ]
+    }
+  ]
 }
