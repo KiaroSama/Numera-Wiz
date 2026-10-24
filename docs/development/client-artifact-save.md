@@ -50,8 +50,9 @@ the UI waits for its actual result. CLI Ctrl+C requests the same stop and waits.
 Closing the desktop requests cancellation without cancelling accepted media
 jobs.
 
-This implementation awaits its own hosted checks and actual GUI save journeys.
-Prior report/output inspection evidence does not qualify Save As. Complete
+Actual Linux native typed destination and genuine OS Save As passed independent
+saved/source byte equality in CI79; see the latest evidence below. Chrome Save
+is still undergoing qualification. Prior inspection alone does not qualify it. Complete
 download resumption UX, all browser/platform variants, interrupted workspace
 retention, package/resource gates and the complete product remain required.
 
@@ -117,3 +118,13 @@ It correlates them with the actual Chrome-observed pointer request. There is
 no direct business call or mocked response. The real report dialog PNG and
 independent Save As file oracle remain required. Artifact/upload byte routes
 are not intercepted by the command-response observer.
+
+CI79 passed the genuine Linux native OS picker and independently verified both
+saved files, one producer job and normal app close. Its native OS-saved PNG was
+personally inspected. Chrome report/Review/Run/Output details also passed through
+the bounded real HTTP response observer, but the real Save pointer left a pending
+picker promise without a detected OS dialog. The exact cause is not yet known.
+The next hosted browser setup uses a fresh DBus session and the same desktop
+portal/GTK packages as the successful native job, with broader chooser title
+matching and bounded full-desktop diagnostics. The actual picker/file oracle
+remains required; no synthetic file handle is introduced.

@@ -22,7 +22,8 @@ publication journals and real CLI/official MCP adapters. The shared native/WASM
 workspace has working media intake, cleanup forms, bounded selection reports,
 explicit filesystem timestamp policies, plan review, job controls and output
 manifest inspection. CLI and the actual Linux native Save controls also deliver
-verified client copies; browser/native OS Save As variants remain under qualification.
+verified client copies, including the genuine Linux OS Save As picker. Browser
+Save As and other desktop variants remain under qualification.
 CI builds hash-addressed same-source browser assets and exercises Chrome media
 selection, review and verified output. The actual Linux native window also has
 actual report controls, Review/keyboard Run, byte-verified output and an opened
