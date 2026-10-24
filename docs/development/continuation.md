@@ -761,3 +761,35 @@ registration, plan requirements and stage-bound copy/remux, including full Windo
 behavior are documented in source-inputs.md. Full SHA-256 remains mandatory.
 Source replacement/hard-link/hash/legacy regressions and an actual re-registration
 fixture are added. No local compilation or execution was run.
+
+
+Run 40065495154 passed the new native object/platform assertions, including full
+Windows held-handle IDs. Its Linux/ARM macOS ordinary suites found one stale
+plan-budget fixture with source_object=None: new admission correctly returned
+INVALID_PLAN before the intended RESOURCE_LIMIT assertion. The fixture now
+captures its synthetic file's real original object; the production checks and
+budget assertion remain intact. Its exact formatter output was applied (artifact
+12549301940, ZIP SHA-256
+f4013e0b14fe728048e1016642c62c28bcaae26d4764d08c885d038e282836b9).
+
+The Windows interface diagnostics from that run identify OWNER_START_TIMEOUT and
+many redundant child exits (status 4). Bounded protected logs in artifact
+12548608414 (ZIP SHA-256
+e602f17041b76b11a442ec5228a75cd7851386e4684c1524625073e7acfe5916)
+show the original CLI owner activated at 05:18:34.157Z and became ready only at
+05:19:04.084Z, after the adapter's unchanged 20-second deadline. Startup previously
+launched another child every second before the first owned the store. The source
+now serializes bootstrap per protected runtime root and launches only one child
+per attachment attempt. A real concurrent-frontends regression checks one owner.
+This correction still awaits hosted evidence; it is not a Windows pass record.
+
+
+The complete media job in run 40065495154 finished successfully: the actual
+registered-source replacement/re-registration and restarted-engine cases, full
+existing packet/tag negatives, real CLI/official SDK transports and the actual
+large owner HTTP transfer/revocation/cleanup journey all passed. Exact scoped
+large-output evidence is retained in evidence/artifact-http-ci59.json. Domain
+object/hash/legacy checks and platform physical-ID assertions passed on all four
+targets; full ordinary native/Clippy/desktop gates remain blocked by the stale
+fixture and the Windows attachment failure described above. No native dialog
+activation or complete-release qualification is inferred.

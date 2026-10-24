@@ -33,3 +33,15 @@ selected bridge can bind the new profile identity. A focused service test checks
 that the rejection creates no additional credential. A binding unit rejects root
 replacement. These additions await their own CI; no root-replacement package,
 upgrade/rollback, full owner-death recovery or release qualification is inferred.
+
+
+The pending startup correction holds a protected runtime-directory OS bootstrap
+gate across launch/readiness and allows at most one child per attachment attempt.
+Other frontends continue checking the authenticated health record while that gate
+is occupied. The separate store writer lock remains authoritative. This prevents
+one-second retries from launching duplicate initializers before the original
+process reaches its store lock; no startup deadline or identity check is relaxed.
+A new real three-frontend/same-root test asserts successful commands and exactly
+one observed child-spawn event across all frontend stderr streams and one
+structured owner initialization PID, then waits for the idle writer drain.
+Its evidence is pending.

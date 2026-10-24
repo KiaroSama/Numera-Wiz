@@ -1334,7 +1334,14 @@ impl Service {
                                     "Reviewed source changed before preflight",
                                 )
                             })?;
-                    source.require_object(plan.source.source_object.as_ref().ok_or_else(|| DomainError::new("INVALID_PLAN", "Original source object identity is missing"))?)?;
+                    source.require_object(plan.source.source_object.as_ref().ok_or_else(
+                        || {
+                            DomainError::new(
+                                "INVALID_PLAN",
+                                "Original source object identity is missing",
+                            )
+                        },
+                    )?)?;
                     let ffmpeg = files::SourceStamp::capture_resolved(Path::new(&plan.ffmpeg.path))
                         .map_err(|_| {
                             DomainError::new(
@@ -2272,7 +2279,7 @@ mod tests {
             dispositions: Default::default(),
         }));
         let asset = Asset {
-            source_object: None,
+            source_object: Some(files::source_object(&source).unwrap()),
             id: "plan-budget-asset".into(),
             creator: owner.principal.clone(),
             display_name: "source.mkv".into(),

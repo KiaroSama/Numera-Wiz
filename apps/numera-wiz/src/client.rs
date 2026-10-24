@@ -108,9 +108,14 @@ impl NativeClient {
         if let Some(record) = self.cached.lock().await.clone() {
             return Ok(record);
         }
-        let runtime = self.root.join("runtime/owner.json");
         let started = std::time::Instant::now();
-        let mut spawned: Option<std::time::Instant> = None;
+        let runtime_root = self.root.join("runtime");
+        let runtime_root = tokio::task::spawn_blocking(move || {
+            nw_platform::security::private_directory(&runtime_root)
+        }).await??;
+        let runtime = runtime_root.join("owner.json");
+        let mut bootstrap_gate = None;
+        let mut spawned = false;
         loop {
             if runtime.try_exists()? {
                 let path = runtime.clone();
@@ -161,12 +166,17 @@ impl NativeClient {
                     return Ok(record);
                 }
             }
+            if bootstrap_gate.is_none() {
+                match nw_platform::files::RootLock::acquire(&runtime_root) {
+                    Ok(gate) => bootstrap_gate = Some(gate),
+                    Err(error) if error.code == "OWNER_BUSY" => {},
+                    Err(error) => return Err(error.into()),
+                }
+            }
             let lock_root = self.root.join("state/generations/1");
-            let may_spawn = !lock_root.try_exists()?
-                || nw_platform::files::RootLock::acquire(&lock_root).is_ok();
-            if may_spawn
-                && spawned.is_none_or(|instant| instant.elapsed() >= Duration::from_secs(1))
-            {
+            let may_spawn = bootstrap_gate.is_some() && (!lock_root.try_exists()?
+                || nw_platform::files::RootLock::acquire(&lock_root).is_ok());
+            if may_spawn && !spawned {
                 let mut command = tokio::process::Command::new(std::env::current_exe()?);
                 command.arg("--data-dir").arg(&self.root);
                 if let Some(components) = &self.components {
@@ -185,14 +195,24 @@ impl NativeClient {
                 let mut child = command
                     .spawn()
                     .context("Cannot start the protected owner")?;
+                tracing::info!(process_id=child.id(), "Protected owner child spawned");
                 tokio::spawn(async move {
                     match child.wait().await {
-                        Ok(status) if status.success() => tracing::debug!("Protected owner child exited normally"),
-                        Ok(status) => tracing::warn!(exit_code=status.code(), "Protected owner child exited with an error"),
-                        Err(_) => tracing::warn!("Protected owner child status could not be collected"),
+                        Ok(status) if status.success() => {
+                            tracing::debug!("Protected owner child exited normally")
+                        }
+                        Ok(status) => tracing::warn!(
+                            exit_code = status.code(),
+                            "Protected owner child exited with an error"
+                        ),
+                        Err(_) => {
+                            tracing::warn!("Protected owner child status could not be collected")
+                        }
                     }
                 });
-                spawned = Some(std::time::Instant::now());
+                // Retain the per-root gate through readiness; never launch another child
+                // while this attempt may still be initializing its log/store ownership.
+                spawned = true;
             }
             if started.elapsed() > Duration::from_secs(20) {
                 return Err(nw_domain::DomainError::new(

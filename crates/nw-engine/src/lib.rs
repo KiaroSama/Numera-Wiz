@@ -110,13 +110,15 @@ impl Engine {
             let identity = files::identity(&path, &token)?;
             stamp.revalidate()?;
             Ok((identity, stamp))
-        }).await?;
+        })
+        .await?;
         let probe = self.probe(Path::new(&initial.path), cancel.clone()).await?;
         let expected = initial.clone();
         let source_object = blocking(move || {
             files::revalidate(&expected, &cancel)?;
             stamp.object_identity()
-        }).await?;
+        })
+        .await?;
         Ok(Asset {
             source_object: Some(source_object),
             display_name: String::new(),
@@ -173,7 +175,8 @@ impl Engine {
             vec![]
         };
         let mut required_rights = nw_domain::plans::RequiredRights::native(
-            asset.identity.clone(), files::path_text(&output)?,
+            asset.identity.clone(),
+            files::path_text(&output)?,
         );
         required_rights.source_read.object = Some(object);
         let mut plan = Plan {
@@ -298,8 +301,10 @@ impl Engine {
                 let source = plan.source.identity.clone();
                 let object = registered_object(&plan.source)?.clone();
                 let token = cancel.clone();
-                let (staging, actual) =
-                    blocking(move || files::copy_into_staging_bound(&source, &object, staging, &token)).await?;
+                let (staging, actual) = blocking(move || {
+                    files::copy_into_staging_bound(&source, &object, staging, &token)
+                })
+                .await?;
                 observer(ExecutionEvent::Verifying).await?;
                 let verification =
                     "Full byte SHA-256 and length verified before no-replace publication"
@@ -688,11 +693,17 @@ fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
     Ok(())
 }
 fn registered_object(asset: &Asset) -> Result<&nw_domain::records::NativeObjectIdentity> {
-    let object = asset.source_object.as_ref().ok_or_else(|| DomainError::new(
-        "INVALID_PLAN", "Register the source again to capture its original native object identity",
-    ))?;
+    let object = asset.source_object.as_ref().ok_or_else(|| {
+        DomainError::new(
+            "INVALID_PLAN",
+            "Register the source again to capture its original native object identity",
+        )
+    })?;
     if object.schema_version != 1 {
-        return Err(DomainError::new("INVALID_PLAN", "The native object identity version is not supported"));
+        return Err(DomainError::new(
+            "INVALID_PLAN",
+            "The native object identity version is not supported",
+        ));
     }
     Ok(object)
 }

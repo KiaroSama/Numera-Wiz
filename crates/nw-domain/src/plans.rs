@@ -300,10 +300,13 @@ mod tests {
         plan.source.source_object = Some(crate::records::NativeObjectIdentity {
             schema_version: 1,
             kind: crate::records::NativeObjectKind::UnixDeviceInode,
-            volume: "10".into(), object: "20".into(), created_ns: Some("30".into()),
+            volume: "10".into(),
+            object: "20".into(),
+            created_ns: Some("30".into()),
         });
         assert!(digest(&plan).is_err());
-        plan.required_rights.as_mut().unwrap().source_read.object = plan.source.source_object.clone();
+        plan.required_rights.as_mut().unwrap().source_read.object =
+            plan.source.source_object.clone();
         plan.hash = digest(&plan).unwrap();
         assert_ne!(plan.hash, before);
         assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());

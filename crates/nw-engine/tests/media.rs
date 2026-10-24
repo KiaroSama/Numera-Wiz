@@ -355,24 +355,69 @@ async fn actual_copy_and_order_metadata_remux() {
     );
     let persisted_source = directory.path().join("registered-source.mkv");
     std::fs::copy(&source, &persisted_source).unwrap();
-    let registered = engine.register(persisted_source.clone(), "fixture-owner".into(), CancellationToken::new()).await.unwrap();
+    let registered = engine
+        .register(
+            persisted_source.clone(),
+            "fixture-owner".into(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
     let persisted_output = directory.path().join("registered-copy.mkv");
-    let reviewed = engine.clean_plan(registered.clone(), &persisted_output, &rules(), "fixture-owner").unwrap();
+    let reviewed = engine
+        .clean_plan(
+            registered.clone(),
+            &persisted_output,
+            &rules(),
+            "fixture-owner",
+        )
+        .unwrap();
     let retained = directory.path().join("registered-original.mkv");
     std::fs::rename(&persisted_source, &retained).unwrap();
     std::fs::copy(&retained, &persisted_source).unwrap();
-    assert_eq!(std::fs::read(&retained).unwrap(), std::fs::read(&persisted_source).unwrap());
-    assert_eq!(engine.clean_plan(registered, &persisted_output, &rules(), "fixture-owner").unwrap_err().code, "SOURCE_CHANGED");
+    assert_eq!(
+        std::fs::read(&retained).unwrap(),
+        std::fs::read(&persisted_source).unwrap()
+    );
+    assert_eq!(
+        engine
+            .clean_plan(registered, &persisted_output, &rules(), "fixture-owner")
+            .unwrap_err()
+            .code,
+        "SOURCE_CHANGED"
+    );
     let restarted_engine = Engine::new(ffmpeg.clone(), ffprobe.clone()).await.unwrap();
-    assert_eq!(restarted_engine.execute(&reviewed, CancellationToken::new()).await.unwrap_err().code, "SOURCE_CHANGED");
+    assert_eq!(
+        restarted_engine
+            .execute(&reviewed, CancellationToken::new())
+            .await
+            .unwrap_err()
+            .code,
+        "SOURCE_CHANGED"
+    );
     assert!(!persisted_output.exists());
-    let fresh = restarted_engine.register(persisted_source.clone(), "fixture-owner".into(), CancellationToken::new()).await.unwrap();
+    let fresh = restarted_engine
+        .register(
+            persisted_source.clone(),
+            "fixture-owner".into(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
     assert_eq!(fresh.identity, reviewed.source.identity);
     assert_ne!(fresh.source_object, reviewed.source.source_object);
-    let fresh_plan = restarted_engine.clean_plan(fresh, &persisted_output, &rules(), "fixture-owner").unwrap();
+    let fresh_plan = restarted_engine
+        .clean_plan(fresh, &persisted_output, &rules(), "fixture-owner")
+        .unwrap();
     assert_ne!(fresh_plan.hash, reviewed.hash);
-    restarted_engine.execute(&fresh_plan, CancellationToken::new()).await.unwrap();
-    assert_eq!(std::fs::read(&persisted_source).unwrap(), std::fs::read(&persisted_output).unwrap());
+    restarted_engine
+        .execute(&fresh_plan, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read(&persisted_source).unwrap(),
+        std::fs::read(&persisted_output).unwrap()
+    );
     let replaced_output = directory.path().join("physical-replacement.mkv");
     let replacement_plan = engine
         .clean_plan(
