@@ -42,6 +42,7 @@ impl DomainError {
             | "OBJECT_CONFLICT"
             | "OUTPUT_COLLISION"
             | "SOURCE_CHANGED"
+            | "ARTIFACT_CHANGED"
             | "TARGET_CHANGED"
             | "COMPONENT_CHANGED"
             | "STALE_REVISION"
@@ -61,10 +62,12 @@ impl DomainError {
             | "NATIVE_PATH_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
+            | "ARTIFACT_UNAVAILABLE"
             | "INGEST_NOT_FOUND"
             | "INGEST_NOT_READY"
             | "STORE_SCHEMA_UNSUPPORTED" => 3,
             "VALIDATION_ERROR"
+            | "INVALID_RANGE"
             | "UNSUPPORTED_VERSION"
             | "UNKNOWN_COMMAND"
             | "INVALID_TIME"
@@ -93,6 +96,7 @@ impl DomainError {
 }
 pub type Result<T> = std::result::Result<T, DomainError>;
 
+pub mod artifacts;
 pub mod access;
 pub mod diagnostics;
 pub mod records;

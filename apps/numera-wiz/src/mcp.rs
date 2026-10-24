@@ -22,6 +22,21 @@ impl Bridge {
             backend: Backend::Http(service),
         }
     }
+    async fn execute(&self, canonical: Request, context: &RequestContext<RoleServer>) -> Result<commands::Response, ErrorData> {
+        match &self.backend {
+            Backend::Native(client) => {
+                tokio::select! {
+                    result=client.request(&canonical)=>result.map_err(|_|ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None)),
+                    _=context.ct.cancelled()=>Ok(commands::Response::error(&canonical.request_id,nw_domain::DomainError::new("CANCELLED","MCP request cancelled; retain durable request identity to inspect a possibly accepted mutation"))),
+                }
+            }
+            Backend::Http(service) => {
+                let principal = context.extensions.get::<axum::http::request::Parts>().and_then(|parts| parts.extensions.get::<Context>()).cloned().ok_or_else(|| ErrorData::invalid_request("Authenticated request context is missing", None))?;
+                Ok(service.dispatch_cancel(principal, canonical, context.ct.clone()).await)
+            }
+        }
+    }
+
 }
 fn tool(name: &str) -> Option<Tool> {
     if !ACTIVE_COMMANDS.contains(&name) {
@@ -43,7 +58,7 @@ fn tool(name: &str) -> Option<Tool> {
 }
 impl ServerHandler for Bridge {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(Implementation::new("numera-wiz",env!("CARGO_PKG_VERSION"))).with_instructions("Typed commands use the shared owner service. The default agent profile is discovery-only. Durable mutations require an issued replay_scope and idempotency_key in context; retain them on retry.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().build()).with_server_info(Implementation::new("numera-wiz",env!("CARGO_PKG_VERSION"))).with_instructions("Typed commands use the shared owner service. The default agent profile is discovery-only. Durable mutations require an issued replay_scope and idempotency_key in context; retain them on retry.")
     }
     fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
         Cow::Owned(vec![
@@ -62,6 +77,24 @@ impl ServerHandler for Bridge {
     }
     fn get_tool(&self, name: &str) -> Option<Tool> {
         tool(name)
+    }
+    async fn list_resources(&self, request: Option<PaginatedRequestParams>, context: RequestContext<RoleServer>) -> Result<ListResourcesResult, ErrorData> {
+        let cursor = request.and_then(|r| r.cursor);
+        let response = self.execute(Request::query("artifacts.list", serde_json::json!({"limit":64,"cursor":cursor})), &context).await?;
+        if !response.ok { return Err(resource_error(response)); }
+        let page: nw_domain::views::SnapshotPage<nw_domain::artifacts::ArtifactSummary> = commands::parse(response.result.unwrap_or_default()).map_err(|_| ErrorData::internal_error("Artifact page decoding failed", None))?;
+        let mut result = ListResourcesResult::with_all_items(page.items.into_iter().map(|a| Resource::new(a.manifest_uri, a.artifact_id).with_mime_type("application/json")).collect());
+        result.next_cursor = page.next_cursor;
+        Ok(result)
+    }
+    async fn read_resource(&self, request: ReadResourceRequestParams, context: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
+        if request.input_responses.is_some() || request.request_state.is_some() { return Err(ErrorData::invalid_params("Artifact reads do not accept input responses or request state", None)); }
+        let id = request.uri.strip_prefix("numera://artifact/").and_then(|u| u.strip_suffix("/manifest")).filter(|id| id.len() <= 132 && !id.contains('/')).ok_or_else(|| ErrorData::invalid_params("Expected a Numera artifact manifest URI", None))?;
+        let response = self.execute(Request::query("artifacts.manifest", serde_json::json!({"artifact_id":id})), &context).await?;
+        if !response.ok { return Err(resource_error(response)); }
+        let text = serde_json::to_string(&response.result.unwrap_or_default()).map_err(|_| ErrorData::internal_error("Manifest serialization failed", None))?;
+        if text.len() > 64 * 1024 { return Err(ErrorData::internal_error("Manifest exceeded its 64 KiB budget", None)); }
+        Ok(ReadResourceResult::new(vec![ResourceContents::text(text, request.uri).with_mime_type("application/json")]).with_ttl_ms(0).with_cache_scope(CacheScope::Private).into())
     }
     async fn call_tool(
         &self,
@@ -93,27 +126,7 @@ impl ServerHandler for Bridge {
         }
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
-        let response = match &self.backend {
-            Backend::Native(client) => {
-                tokio::select! {
-                    result=client.request(&canonical)=>result.map_err(|_|ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None))?,
-                    _=context.ct.cancelled()=>commands::Response::error(&canonical.request_id,nw_domain::DomainError::new("CANCELLED","MCP request cancelled; retain durable request identity to inspect a possibly accepted mutation")),
-                }
-            }
-            Backend::Http(service) => {
-                let principal = context
-                    .extensions
-                    .get::<axum::http::request::Parts>()
-                    .and_then(|parts| parts.extensions.get::<Context>())
-                    .cloned()
-                    .ok_or_else(|| {
-                        ErrorData::invalid_request("Authenticated request context is missing", None)
-                    })?;
-                service
-                    .dispatch_cancel(principal, canonical, context.ct.clone())
-                    .await
-            }
-        };
+        let response = self.execute(canonical, &context).await?;
         let value = serde_json::to_value(&response)
             .map_err(|_| ErrorData::internal_error("Response serialization failed", None))?;
         let mut result = if response.ok {
@@ -128,4 +141,9 @@ impl ServerHandler for Bridge {
         })];
         Ok(result.into())
     }
+}
+
+fn resource_error(response: commands::Response) -> ErrorData {
+    let diagnostic = serde_json::to_value(response.error).ok();
+    ErrorData::invalid_params("Artifact resource is unavailable under current authority", diagnostic)
 }

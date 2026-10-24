@@ -491,3 +491,25 @@ byte-string form. The exact hosted formatter patch is applied. Desktop stripping
 native-window startup was skipped by that failed dependency, so the optimized
 artifact's startup is not credited yet. The complete bitstream-filter manual is
 now personally recorded, for 40 manual entries; full study remains pending.
+
+Run [40055843262](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40055843262)
+for 19c4f022be09bc3d5ef4db70c8cc840903bc6a4f passed every job: formatting,
+lock, four native unit/lint/desktop targets, actual media/CLI/official SDK, Chrome
+and native import/review/keyboard Run with independent byte equality. The stripped
+Linux development artifact is 126,946,544 bytes, SHA-256
+d5a3c36ab70af77f8183e713d7f5df305eea4d111fb7e8342c57b9268780fd9b.
+Native evidence 12545103082 records synthetic merge source
+079690f003c114d82b7944933df336ec1b757b18 and 9,929 ms to a visible window;
+identity hashing took 3,797 ms and owner attachment 4,154 ms. The ZIP digest is
+d814f39c6638aa89a57c3d8abc9088af12a094740a5d518291929bdda066211e.
+The completed-window screenshot was visually inspected. These are hosted Linux
+functional observations, not packaged startup/performance or other-platform UI
+qualification.
+
+Current source adds authorized artifact lists/manifests/chunks, retained physical
+publication proofs, full-digest plus bounded block verification, MCP resources,
+shared Output details and authenticated HTTP streaming/ranges/ETags. See
+artifact-transfer.md for the selected limits, exact authority model, old-proof
+migration behavior and remaining retention/Save As/observation work. Source and
+new isolated-memory/actual-media/SDK cases await their own CI result. No local
+compile/test/media or owner hardware execution was performed.

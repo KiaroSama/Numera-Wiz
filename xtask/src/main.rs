@@ -84,6 +84,8 @@ fn schemas(root: &Path) -> Result<()> {
         path.join("streams-clean.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::mux::CleanIntent))?,
     )?;
+    fs::write(path.join("artifact-transfer.schema.json"), serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::artifacts::ArtifactChunk))?)?;
+    fs::write(path.join("artifact-manifest.schema.json"), serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::artifacts::ArtifactManifest))?)?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }

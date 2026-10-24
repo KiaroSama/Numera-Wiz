@@ -216,6 +216,9 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
+        row!("artifacts.list", "List current job-readable artifact manifests", Query, crate::views::PageInput),
+        row!("artifacts.manifest", "Inspect an authorized published artifact", Query, crate::artifacts::ManifestInput),
+        row!("artifacts.read_chunk", "Read a bounded verified artifact byte range", Query, crate::artifacts::ChunkInput),
         row!(
             "logs.status",
             "Inspect bounded protected owner logging status",
@@ -525,6 +528,9 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
+    "artifacts.list",
+    "artifacts.manifest",
+    "artifacts.read_chunk",
     "logs.status",
     "commands.list",
     "commands.schema",

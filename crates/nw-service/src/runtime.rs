@@ -1,4 +1,6 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
+mod artifacts;
+pub use artifacts::ArtifactTransfer;
 mod clock;
 mod read_model;
 mod uploads;
@@ -65,6 +67,7 @@ pub struct Service {
     origins: Mutex<HashMap<String, u64>>,
     requests: Arc<Semaphore>,
     heavy: Arc<Semaphore>,
+    transfers: Arc<Semaphore>,
     pending: Arc<AtomicUsize>,
     cancellations: Mutex<HashMap<String, CancellationToken>>,
     events: broadcast::Sender<String>,
@@ -206,6 +209,7 @@ impl Service {
             origins: Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
             heavy: Arc::new(Semaphore::new(1)),
+            transfers: Arc::new(Semaphore::new(2)),
             pending: Arc::new(AtomicUsize::new(0)),
             cancellations: Mutex::new(HashMap::new()),
             events,
@@ -777,6 +781,17 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "artifacts.list" => {
+                self.artifact_inventory(&context, commands::parse(params)?, &cancellation)?
+            }
+            "artifacts.manifest" => {
+                let input: nw_domain::artifacts::ManifestInput = commands::parse(params)?;
+                value(&self.artifact_manifest(&context, &input.artifact_id, &cancellation)?)?
+            }
+            "artifacts.read_chunk" => {
+                let input: nw_domain::artifacts::ChunkInput = commands::parse(params)?;
+                value(&self.artifact_chunk(context.clone(), input, cancellation.clone())?)?
+            }
             "logs.status" => {
                 let _: Empty = commands::parse(params)?;
                 if policy.is_some() {
@@ -1636,7 +1651,6 @@ impl Service {
             {
                 self.store
                     .published(&job.id, actual, publication.verified)?;
-                std::fs::remove_file(publication.proof).map_err(files::io_error)?;
                 return Ok(());
             }
         }
@@ -1664,7 +1678,7 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
-    async fn preflight_fixture() -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
+    pub(super) async fn preflight_fixture() -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
         use nw_domain::{mux::*, records::MediaProbe};
         let root = tempfile::tempdir().unwrap();
         let programs = root.path().join("programs");

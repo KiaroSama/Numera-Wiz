@@ -269,6 +269,8 @@ jobs:
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
         run: cargo test --locked -p nw-engine --test media -- --ignored --nocapture
+      - name: Transfer an artifact larger than the isolated reader memory budget
+        run: cargo test --locked -p nw-platform --test artifact_memory -- --ignored --nocapture
       - name: Exercise actual owner and official SDK transport media parity
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin

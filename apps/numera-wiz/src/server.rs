@@ -1,5 +1,6 @@
 //! One owner process serves private IPC and the explicitly enabled public listener.
 use crate::client::{OwnerRecord, registry_fingerprint};
+mod artifacts;
 mod browser;
 mod listener;
 mod uploads;
@@ -171,6 +172,7 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         .and_then(|value| value.strip_prefix("Bearer "))
         .unwrap_or("")
         .to_owned();
+    let download_token = supplied.clone();
     let context = if auth.private
         && bool::from(
             supplied
@@ -259,6 +261,9 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
             );
         }
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
+    }
+    if request.uri().path().starts_with("/api/v1/artifacts/") {
+        request.extensions_mut().insert(artifacts::DownloadAuthority { owner: auth.owner.clone(), token: context.profile.as_ref().map(|_| download_token), origin: (!auth.private).then(|| auth.origin.clone()), context: context.clone(), listener_stop: auth.listener_stop.clone() });
     }
     request.extensions_mut().insert(context);
     request.extensions_mut().insert(PublicRoute(!auth.private));
@@ -434,6 +439,7 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
                 },
             ),
         )
+        .route("/api/v1/artifacts/{id}/bytes", get(artifacts::receive))
         .route("/api/v1/uploads", post(uploads::create))
         .route("/api/v1/uploads/{id}", axum::routing::put(uploads::receive))
         .route("/api/v1/lease", post(lease))
