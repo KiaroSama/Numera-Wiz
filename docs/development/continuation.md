@@ -266,3 +266,26 @@ measurement. Arbitrary tag preservation currently needs stronger comparison than
 the four named stream keys in verify_structure; do not infer it from packet
 hashes. Exact attachment/unknown clocks and chapter/header normalization also
 need independent output assertions before claiming their complete support.
+
+
+All jobs in [40044587697](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40044587697)
+passed for 2bb54fa11dc478b0b83e869a45a4d69e6b10d22d, including the formatter,
+lock closure, four native targets, real CPU/CLI/official SDK, Chrome and actual
+native window output. This is a clean development checkpoint, not full initial
+scope or packaged/GPU qualification.
+
+The next batch makes ordinary media path admission reject staging/proof names
+before path lookup and after canonicalization, including broad local-owner paths.
+Opaque object lookup returns the same public typed error for absent and
+unauthorized IDs. Full object-action grants and path-redacted typed projections
+remain open; this does not claim their completion.
+
+Remux tag verification is strengthened from four named stream keys to every
+frozen authored stream/container tag, including creation time, and rejects
+unexpected retained tags. The declared Matroska duration normalization is
+checked through full packet timing; generated container writer metadata is
+allowed only as described in the plan scope. Real fixture cases now preserve
+and strip a custom stream tag and container artist/date, and alter only an
+authored tag before verification to prove unchanged packets cannot hide metadata
+loss. These source changes await their own hosted results. The pinned Matroska
+writer and ffmpeg mux metadata-copy paths were inspected to ground this policy.

@@ -57,10 +57,16 @@ pub async fn generate() -> Media {
         "pcm_s16le",
         "-metadata:s:a:0",
         "language=eng",
+        "-metadata:s:a:0",
+        "review_note=PRESERVE-ME-STREAM-TAG",
         "-metadata:s:a:1",
         "language=fas",
         "-metadata",
         "title=Fixture",
+        "-metadata",
+        "artist=Fixture artist",
+        "-metadata",
+        "creation_time=2024-01-02T03:04:05Z",
     ]
     .map(str::to_owned)
     .to_vec();
