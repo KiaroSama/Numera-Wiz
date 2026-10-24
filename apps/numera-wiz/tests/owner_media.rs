@@ -173,6 +173,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
+    let report = cli.query(
+        "streams.clean.report",
+        json!({"asset_ids":[asset["id"]],"intent":fixture::rules()}),
+    ).await;
+    assert_eq!(report["resolved_files"], 1);
+    assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+    assert_eq!(report["unique_streams"].as_array().unwrap().len(), 3);
     let output = media.directory.path().join("cli-copy.mkv");
     let plan = cli
         .query(
@@ -219,7 +226,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -276,6 +283,14 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
+    let report = call!(
+        stdio,
+        "streams.clean.report",
+        json!({"asset_ids":[operator_asset["id"]],"intent":fixture::rules()}),
+        json!({})
+    );
+    assert_eq!(report["resolved_files"], 1);
+    assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
     let mut rules = fixture::rules();
     rules.audio_order = vec![2, 1];
     rules.stream_tag_patches = vec![StreamTagPatch {
@@ -632,6 +647,14 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
+        let report = call!(
+            http,
+            "streams.clean.report",
+            json!({"asset_ids":[asset["id"]],"intent":fixture::rules()}),
+            json!({})
+        );
+        assert_eq!(report["resolved_files"], 1);
+        assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
         let output = media.directory.path().join(format!("http-{ordinal}.mkv"));
         let plan = call!(
             http,

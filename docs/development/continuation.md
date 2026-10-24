@@ -975,3 +975,30 @@ Scoped evidence is file-times-ci66.json. New required/new control variants, stor
 generation migration and complete product/package/resource/GPU gates stay open.
 The held-directory publication source above is introduced after this green run
 and requires its own CI; no local execution was used.
+
+
+## Held publication checkpoint and selection report follow-up
+
+Run 40078001423 on 6a1171838d203fcee14f0a3726b8b59047557bea passed all
+four native test/Clippy/desktop targets, lock/WASM, actual engine retained-link,
+timestamp, packet/tag and CLI/official SDK/lost-response journeys. The isolated
+268435473-byte reader transfer used a measured 3456 KiB high-water mark. The
+large owner HTTP test stopped before transfer at its obsolete one-retained-file
+assertion; the new policy deliberately retains the recorded payload plus proof.
+This revision requires the two exact owned name classes and their physical
+identity with the published object, including after stream index cleanup. It
+preserves the existing full SHA, current-rights/revocation, disconnect and memory
+oracles. Its 14 exact formatter hunks are applied. Native/Chrome jobs were
+skipped by media; see evidence/held-publication-ci67.json.
+
+New canonical streams.clean.report loads/authorizes one explicit asset at a
+time, uses the original shared resolver, and reports all resolved/skipped/rejected
+candidates with original-index and case-insensitive unique summaries. Bounded
+text/row/result admission fails rather than silently truncating. Native/browser
+controls present paged tables and per-file details; edits invalidate the report.
+New fixtures cover mixed foreign/absent disclosure, current path/command rights,
+CLI and official SDK transports, actual native pointer/canonical completion and
+actual Chrome pointer/network response. Both actual report images are retained
+with bounded log transport for visual review. These source changes await CI.
+Folder/batch plans, full F08, project/editor/effects, generation migration,
+packages/resources/manuals and owner harness/evidence all remain mandatory.

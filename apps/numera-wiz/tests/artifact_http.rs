@@ -57,13 +57,21 @@ fn rss_high_kib(pid: u64) -> u64 {
         .parse()
         .unwrap()
 }
-fn workspace_files(workspace: &Path) -> usize {
-    std::fs::read_dir(workspace).unwrap().count()
+fn retained_publication_objects(workspace: &Path, output: &Path) -> bool {
+    let paths: Vec<_> = std::fs::read_dir(workspace).unwrap().map(|entry| entry.unwrap().path()).collect();
+    paths.len() == 2
+        && paths.iter().any(|path| path.file_name().is_some_and(|name| name == "payload.mkv"))
+        && paths.iter().any(|path| {
+            path.file_name().and_then(|name| name.to_str())
+                .and_then(|name| name.strip_prefix(".numera-proof-"))
+                .is_some_and(|name| uuid::Uuid::parse_str(name).is_ok())
+        })
+        && paths.iter().all(|path| nw_platform::files::same_object(path, output).unwrap_or(false))
 }
-async fn cleaned_index(workspace: &Path) {
+async fn cleaned_index(workspace: &Path, output: &Path) {
     let started = Instant::now();
     loop {
-        if workspace_files(workspace) == 1 {
+        if retained_publication_objects(workspace, output) {
             return;
         }
         assert!(
@@ -208,10 +216,9 @@ async fn journey() {
                 .starts_with(".numera-job-")
         })
         .unwrap();
-    assert_eq!(
-        workspace_files(&workspace),
-        1,
-        "Only the retained publication proof remains after successful publication"
+    assert!(
+        retained_publication_objects(&workspace, &output),
+        "Only the recorded payload and proof remain, both identifying the published verified object"
     );
     let profile = json!({"name":"download-reader","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":false,"allowed_command_ids":["artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[{"kind":"job","id":id,"actions":["read"]}],"read_roots":[],"write_roots":[]});
     assert_eq!(
@@ -292,7 +299,7 @@ async fn journey() {
     }
     assert_eq!(received, total);
     assert_eq!(hex::encode(hash.finalize()), expected.sha256);
-    cleaned_index(&workspace).await;
+    cleaned_index(&workspace, &output).await;
     let high = rss_high_kib(pid);
     assert!(
         high < 128 * 1024,
@@ -322,7 +329,7 @@ async fn journey() {
         true
     );
     let job_revoked_bytes = incomplete_after_revocation(interrupted, first, total).await;
-    cleaned_index(&workspace).await;
+    cleaned_index(&workspace, &output).await;
     assert_eq!(
         client
             .get(&url)
@@ -384,7 +391,7 @@ async fn journey() {
         .await;
     assert_eq!(status, 0, "{revoked}");
     let credential_revoked_bytes = incomplete_after_revocation(interrupted, first, total).await;
-    cleaned_index(&workspace).await;
+    cleaned_index(&workspace, &output).await;
     assert_eq!(
         client
             .get(&url)
@@ -405,7 +412,7 @@ async fn journey() {
         .unwrap();
     assert!(!cancelled.chunk().await.unwrap().unwrap().is_empty());
     drop(cancelled);
-    cleaned_index(&workspace).await;
+    cleaned_index(&workspace, &output).await;
     let high = high.max(rss_high_kib(pid));
     assert!(high < 128 * 1024);
     std::fs::write(evidence.join("large-http-transfer.json"), serde_json::to_vec_pretty(&json!({"schema_version":1,"status":"passed","executable":executable,"registry":runtime_record["registry"],"components":{"ffmpeg":plan["ffmpeg"],"ffprobe":plan["ffprobe"]},"job_id":id,"plan_id":plan["id"],"plan_hash":plan["hash"],"artifact_id":artifact_id,"source":std::env::var("GITHUB_SHA").ok(),"artifact_bytes":total.to_string(),"sha256":expected.sha256,"owner_process_id":pid,"owner_before_high_kib":before,"owner_high_kib":high,"selected_owner_rss_ceiling_kib":131072,"job_revoked_delivered_bytes":job_revoked_bytes.to_string(),"credential_revoked_delivered_bytes":credential_revoked_bytes.to_string(),"cancelled_index_cleanup":true,"scope":"Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification."})).unwrap()).unwrap();

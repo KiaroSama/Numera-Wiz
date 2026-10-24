@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "run_id": 40078001423,
+  "branch_head": "6a1171838d203fcee14f0a3726b8b59047557bea",
+  "jobs": [
+    {
+      "id": 120825447405,
+      "name": "media",
+      "conclusion": "failure",
+      "passed_steps": [
+        "Set up job",
+        "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "Restore verified-toolchain compilation cache",
+        "Install toolchain",
+        "Build the identified CPU fixture component profile",
+        "Execute actual media preservation regressions",
+        "Transfer an artifact larger than the isolated reader memory budget",
+        "Exercise actual owner and official SDK transport media parity",
+        "Save fixture components and actual configuration",
+        "Save owner transport diagnostics",
+        "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "Complete job"
+      ]
+    },
+    {
+      "id": 120825447435,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120825447482,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120825447647,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120825840041,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120825840046,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120825840057,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120825840082,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120827347155,
+      "name": "browser",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 120827347273,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "asserted": [
+    "all four native held-directory/no-replace/object/proof/race regressions, Clippy and desktop builds",
+    "deterministic Unix final-check namespace swap never follows installed symlink",
+    "actual engine copy retained payload/proof object and full byte assertions",
+    "actual required-timestamp copy/remux and full packet preservation",
+    "actual CLI/official SDK/lost-response restart journey",
+    "isolated 268435473-byte artifact reader transfer; VmHWM 3456 KiB"
+  ],
+  "failures": [
+    "formatting: 14 exact hosted hunks applied in the following revision",
+    "large owner HTTP fixture stopped before transfer: old expected retained-file count was 1, new journal-owned payload/proof policy retained 2; next revision asserts exact known names and original object identity instead"
+  ],
+  "not_asserted": [
+    "complete large owner HTTP transfer/revocation in this run",
+    "native or Chrome GUI: skipped by media prerequisite",
+    "complete T017, filesystem packages, aggregate resources or GPU"
+  ],
+  "artifacts": [
+    {
+      "id": 12553854311,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "846dbe43ab6d3593ce6d4d3adb82797d5b6a00bf182ba9c7d554210444e413d0",
+      "downloaded": false
+    },
+    {
+      "id": 12552994423,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "54fbe897273a64429414dd7cc3f130a54823cb044a3fff6df30d6c42c2797a91",
+      "downloaded": false
+    }
+  ]
+}

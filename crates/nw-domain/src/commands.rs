@@ -351,6 +351,12 @@ pub fn registry() -> Vec<Descriptor> {
             ResolveInput
         ),
         row!(
+            "streams.clean.report",
+            "Report authorized source inventory and cleanup selections",
+            Query,
+            crate::reports::ReportInput
+        ),
+        row!(
             "streams.clean",
             "Plan cleanup of a registered asset",
             Query,
@@ -546,6 +552,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "commands.list",
     "commands.schema",
     "streams.clean.resolve",
+    "streams.clean.report",
     "access.replay_scope.create",
     "access.profiles.put",
     "access.profiles.create",
