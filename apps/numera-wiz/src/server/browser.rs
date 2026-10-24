@@ -294,7 +294,64 @@ mod media_fixture;
 #[cfg(all(test, feature = "embedded-web"))]
 mod tests {
     use super::*;
+    struct ObservedReport {
+        request_id: String,
+        status: u16,
+        response: Value,
+    }
+    type ObservedReports = Arc<Mutex<std::collections::VecDeque<ObservedReport>>>;
+    async fn observe_reports(
+        State(reports): State<ObservedReports>,
+        request: Request,
+        next: Next,
+    ) -> Response {
+        if request.method() != axum::http::Method::POST
+            || request.uri().path() != "/api/v1/commands"
+        {
+            return next.run(request).await;
+        }
+        let (parts, body) = request.into_parts();
+        let bytes = axum::body::to_bytes(body, nw_domain::commands::MAX_COMMAND_BYTES)
+            .await
+            .expect("Observed command request exceeds the production bound");
+        let report_id = nw_domain::commands::decode_json(&bytes)
+            .ok()
+            .and_then(|value| {
+                if value["command"]["id"] == "streams.clean.report" {
+                    value["request_id"].as_str().map(str::to_owned)
+                } else {
+                    None
+                }
+            });
+        let request = Request::from_parts(parts, axum::body::Body::from(bytes));
+        let response = next.run(request).await;
+        let Some(request_id) = report_id else {
+            return response;
+        };
+        // This test-only wire observer records the actual canonical response,
+        // then forwards its original status, headers and exact body bytes.
+        // It never invokes a business handler or stores request headers/tokens.
+        let status = response.status().as_u16();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, nw_domain::commands::MAX_RESULT_BYTES)
+            .await
+            .expect("Observed report response exceeds the production bound");
+        let result = nw_domain::commands::decode_json(&bytes).expect("Observed report JSON");
+        {
+            let mut reports = reports.lock().await;
+            if reports.len() == 8 {
+                reports.pop_front();
+            }
+            reports.push_back(ObservedReport {
+                request_id,
+                status,
+                response: result,
+            });
+        }
+        Response::from_parts(parts, axum::body::Body::from(bytes))
+    }
     struct Fixture {
+        observed_reports: ObservedReports,
         owner: Arc<Owner>,
         endpoint: String,
         _root: tempfile::TempDir,
@@ -341,11 +398,17 @@ mod tests {
             slots: Arc::new(Semaphore::new(32)),
             pairing: Mutex::new(HashMap::new()),
         });
-        let routes = super::super::router(owner.clone(), port, false, owner.stop.clone());
+        let observed_reports = Arc::new(Mutex::new(std::collections::VecDeque::new()));
+        let routes = super::super::router(owner.clone(), port, false, owner.stop.clone())
+            .layer(axum::middleware::from_fn_with_state(
+                observed_reports.clone(),
+                observe_reports,
+            ));
         let task = tokio::spawn(async move {
             axum::serve(listener, routes).await.unwrap();
         });
         Fixture {
+            observed_reports,
             owner,
             endpoint: format!("http://127.0.0.1:{port}"),
             _root: root,
@@ -810,7 +873,7 @@ mod tests {
             let started = Instant::now();
             let mut report_request = None::<String>;
             let mut report_correlation = None::<String>;
-            let mut report_body_attempts = 0usize;
+            let mut report_response_polls = 0usize;
             let mut report_cancelled_event = false;
             let mut completed_requests = std::collections::VecDeque::new();
             let mut last_report_input = Instant::now();
@@ -840,7 +903,8 @@ mod tests {
                         && request["command"]["id"] == "streams.clean.report"
                     {
                         assert_ne!(request["request_id"], "local");
-                        report_correlation = Some(request["request_id"].as_str().unwrap().to_owned());
+                        report_correlation =
+                            Some(request["request_id"].as_str().unwrap().to_owned());
                         report_request = Some(params["requestId"].as_str().unwrap().to_owned());
                     }
                     if message["method"] == "Network.loadingFailed"
@@ -858,29 +922,20 @@ mod tests {
                         }
                     }
                 }
-                if let Some(request_id) = &report_request {
-                    // The body is the actual Chrome-observed response for this real UI
-                    // request. Event delivery/late abort can omit loadingFinished;
-                    // retry only this bounded debugger read, never a domain handler.
-                    report_body_attempts += 1;
-                    let response = client
-                        .post(format!("{base}{route}/goog/cdp/execute"))
-                        .json(&json!({"cmd":"Network.getResponseBody","params":{"requestId":request_id}}))
-                        .send().await.expect("Chrome response-body observation transport");
-                    let status = response.status();
-                    let response: Value = response.json().await.expect("Chrome response-body observation JSON");
-                    if status.is_success() {
-                        let body = &response["value"];
-                        assert_eq!(body["base64Encoded"], false);
-                        let text = body["body"].as_str().expect("Chrome response body missing");
-                        assert!(text.len() <= nw_domain::commands::MAX_RESULT_BYTES);
-                        if let Ok(value) = nw_domain::commands::decode_json(text.as_bytes()) {
-                            assert_eq!(value["request_id"].as_str(), report_correlation.as_deref());
-                            break value;
-                        }
-                    } else {
-                        assert_eq!(response["value"]["error"], "unknown error",
-                            "Chrome response-body observation failed outside a not-yet-retained body");
+                if let Some(correlation) = &report_correlation {
+                    report_response_polls += 1;
+                    let mut responses = fixture.observed_reports.lock().await;
+                    if let Some(index) = responses
+                        .iter()
+                        .position(|value| &value.request_id == correlation)
+                    {
+                        let observed = responses.remove(index).unwrap();
+                        assert_eq!(observed.status, 200);
+                        assert_eq!(
+                            observed.response["request_id"].as_str(),
+                            Some(correlation.as_str())
+                        );
+                        break observed.response;
                     }
                 }
                 if started.elapsed() >= Duration::from_secs(15) {
@@ -902,11 +957,11 @@ mod tests {
                         println!("NW_BROWSER_FAILURE_IMAGE:{png}");
                     }
                     panic!(
-                        "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}, body_attempts={}, cancelled_event={}",
+                        "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}, response_polls={}, cancelled_event={}",
                         report_request.is_some(),
                         report_input_attempts,
                         completed_requests.len(),
-                        report_body_attempts,
+                        report_response_polls,
                         report_cancelled_event
                     );
                 }
@@ -929,7 +984,7 @@ mod tests {
             );
             std::fs::write(directory.join("selection-report.json"), serde_json::to_vec_pretty(&json!({
                 "actual_ui_response":report_response,
-                "scope":"Actual shared Selection report mouse input and real Chrome HTTP response; no direct handler invocation substituted for the UI"
+                "scope":"Actual Chrome Selection report mouse input, observed request correlation and bounded canonical HTTP response forwarded unchanged by test-only middleware; no direct handler or mocked UI response"
             })).unwrap()).unwrap();
             tokio::time::sleep(Duration::from_millis(500)).await;
             let report_png = driver(
@@ -1111,6 +1166,7 @@ mod tests {
                 assert!(status.success());
                 browser_input(&["windowactivate", "--sync", &dialog]).await;
                 browser_input(&["key", "--clearmodifiers", "ctrl+l"]).await;
+                browser_input(&["key", "--clearmodifiers", "ctrl+a"]).await;
                 browser_input(&[
                     "type",
                     "--clearmodifiers",

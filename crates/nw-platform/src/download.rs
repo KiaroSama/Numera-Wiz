@@ -141,7 +141,9 @@ impl ClientCopy {
         Ok(receipt)
     }
     fn cleanup(&mut self) -> Result<()> {
-        if self.cleanup_attempted { return Ok(()); }
+        if self.cleanup_attempted {
+            return Ok(());
+        }
         // A failed ownership check is final for this instance. Drop must not
         // retry an unbound pathname after the original payload handle is gone.
         self.cleanup_attempted = true;
@@ -150,12 +152,18 @@ impl ClientCopy {
         }
         self.parent.revalidate()?;
         let name = self.workspace.file_name().ok_or_else(|| {
-            DomainError::new("PATH_DENIED", "Client workspace must have one owned basename")
+            DomainError::new(
+                "PATH_DENIED",
+                "Client workspace must have one owned basename",
+            )
         })?;
         #[cfg(unix)]
         let removed = rustix::fs::unlinkat(
-            self.parent.held_file(), name, rustix::fs::AtFlags::REMOVEDIR,
-        ).map_err(std::io::Error::from);
+            self.parent.held_file(),
+            name,
+            rustix::fs::AtFlags::REMOVEDIR,
+        )
+        .map_err(std::io::Error::from);
         #[cfg(not(unix))]
         let removed = {
             let _ = name;
@@ -276,7 +284,10 @@ mod tests {
         std::fs::create_dir(&unrelated).unwrap();
         assert_eq!(copy.cleanup().unwrap_err().code, "TARGET_CHANGED");
         drop(copy);
-        assert!(unrelated.is_dir(), "Drop must preserve the unrelated empty replacement directory");
+        assert!(
+            unrelated.is_dir(),
+            "Drop must preserve the unrelated empty replacement directory"
+        );
         assert_eq!(std::fs::read_dir(&unrelated).unwrap().count(), 0);
         assert_eq!(std::fs::read_dir(moved.join(&name)).unwrap().count(), 1);
     }
