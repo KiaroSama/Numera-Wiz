@@ -118,10 +118,8 @@ impl ClientCopy {
             ));
         }
         self.parent.revalidate()?;
-        let destination = crate::claims::Destination::reviewed(
-            &self.output,
-            &self.parent.object_identity()?,
-        )?;
+        let destination =
+            crate::claims::Destination::reviewed(&self.output, &self.parent.object_identity()?)?;
         // Client copies participate in the same cross-root writer namespace.
         // Contention is explicit and nonblocking; no held filesystem write is dropped.
         let claims = crate::claims::DestinationClaims::try_acquire(vec![destination])?;
@@ -166,6 +164,7 @@ mod tests {
     fn manifest(bytes: &[u8]) -> ArtifactManifest {
         ArtifactManifest {
             schema_version: 1,
+            suggested_name: Some("test-copy.mkv".into()),
             artifact_id: "job-copy-test".into(),
             manifest_uri: "numera://artifact/job-copy-test/manifest".into(),
             job_id: "copy-test".into(),

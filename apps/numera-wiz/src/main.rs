@@ -340,7 +340,7 @@ impl nw_ui::CommandClient for NativeUiClient {
             Some(path) => Some(PathBuf::from(path)),
             None => rfd::FileDialog::new()
                 .set_title("Save verified artifact copy")
-                .set_file_name(format!("numera-{}.bin", manifest.artifact_id))
+                .set_file_name(manifest.suggested_file_name())
                 .save_file(),
         };
         let Some(output) = output else {

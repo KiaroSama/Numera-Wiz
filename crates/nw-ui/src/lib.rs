@@ -455,7 +455,9 @@ impl WizApp {
                 }
                 Action::ArtifactManifest => {
                     #[cfg(target_arch = "wasm32")]
-                    { self.focus_artifact_save = true; }
+                    {
+                        self.focus_artifact_save = true;
+                    }
                     self.artifact_manifest =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                     #[cfg(not(target_arch = "wasm32"))]

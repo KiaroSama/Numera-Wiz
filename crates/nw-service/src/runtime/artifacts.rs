@@ -208,6 +208,8 @@ impl Service {
             .is_none_or(|p| p.allows_command("artifacts.read_chunk"));
         Ok(ArtifactManifest {
             schema_version: 1,
+            suggested_name: Path::new(&job.plan.output).file_name()
+                .and_then(|name| name.to_str()).map(str::to_owned),
             artifact_id: id.into(),
             manifest_uri: format!("numera://artifact/{id}/manifest"),
             job_id: job.id,

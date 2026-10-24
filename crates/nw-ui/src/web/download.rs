@@ -29,7 +29,7 @@ pub(super) fn select_destination(manifest: &ArtifactManifest) -> Result<js_sys::
     js_sys::Reflect::set(
         &options,
         &JsValue::from_str("suggestedName"),
-        &JsValue::from_str(&format!("numera-{}.bin", manifest.artifact_id)),
+        &JsValue::from_str(&manifest.suggested_file_name()),
     )
     .map_err(js_error)?;
     call(

@@ -10,7 +10,6 @@ mod evidence;
 mod fixture;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use evidence::RetainLogs;
-use tokio_util::sync::CancellationToken;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
 use std::{
@@ -18,6 +17,7 @@ use std::{
     process::Stdio,
     time::{Duration, Instant},
 };
+use tokio_util::sync::CancellationToken;
 async fn xdo(args: &[&str]) -> std::process::Output {
     tokio::time::timeout(
         Duration::from_secs(5),
@@ -347,7 +347,14 @@ async fn journey() {
     assert!(!saved_path.exists());
     click(&window, "300", "400").await;
     input(&["key", "--clearmodifiers", "ctrl+a"]).await;
-    input(&["type", "--clearmodifiers", "--delay", "1", saved_path.to_str().unwrap()]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        saved_path.to_str().unwrap(),
+    ])
+    .await;
     click(&window, "100", "436").await;
     let started = Instant::now();
     loop {
@@ -361,17 +368,27 @@ async fn journey() {
         if started.elapsed() >= Duration::from_secs(20) {
             screenshot(&window, &evidence.join("native-client-save-timeout.png")).await;
             let png = std::fs::read(evidence.join("native-client-save-timeout.png")).unwrap();
-            if png.len() <= 256 * 1024 { println!("NW_NATIVE_SAVE_FAILURE_IMAGE:{}", STANDARD.encode(png)); }
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_SAVE_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
             panic!("Native human Save verified copy controls did not publish the selected bytes");
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    assert_eq!(std::fs::read(&saved_path).unwrap(), std::fs::read(&media.source).unwrap());
+    assert_eq!(
+        std::fs::read(&saved_path).unwrap(),
+        std::fs::read(&media.source).unwrap()
+    );
     tokio::time::sleep(Duration::from_millis(300)).await;
     screenshot(&window, &evidence.join("native-client-saved.png")).await;
     let png = std::fs::read(evidence.join("native-client-saved.png")).unwrap();
-    if png.len() <= 256 * 1024 { println!("NW_NATIVE_SAVE_IMAGE:{}", STANDARD.encode(png)); }
-    let producer_job_count = query(&root, "jobs.list").await.unwrap()["items"].as_array().unwrap().len();
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_SAVE_IMAGE:{}", STANDARD.encode(png));
+    }
+    let producer_job_count = query(&root, "jobs.list").await.unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .len();
     assert_eq!(producer_job_count, 1);
     std::fs::write(evidence.join("native-client-save.json"), serde_json::to_vec_pretty(&json!({
         "artifact_id":manifest["artifact_id"], "sha256":artifact.sha256, "bytes":artifact.bytes,

@@ -59,3 +59,18 @@ The browser adapter follows the primary
 [Chrome File System Access guide](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access):
 invoke the actual save picker during user activation, then await writes and the
 final close. API support is detected at runtime. No mock picker qualifies it.
+
+The optional manifest suggested_name carries only the authorized output basename.
+Pickers use it only after portable single-component validation; old manifests
+still work with a bounded artifact-based fallback. CLI/official SDK assertions
+cover the basename and absence of native parent paths.
+
+Run 40089645393 passed all four native targets, WASM/lock, complete engine and
+owner/official SDK work, and the new large scoped client copy assertions. It
+failed to observe a partial cancellation transfer before the harness's 40-second
+preparation deadline; the exact blocked phase was not established. GUI save jobs
+were consequently skipped. The next source removes a redundant full native
+manifest scan: the actual GET already reauthorizes and verifies strong If-Match
+identity and exact length. Preparation gets a separate bounded diagnostic window;
+the 20-second observed cancellation drain assertion and memory ceilings stay
+intact. No pass is inferred until that correction runs.

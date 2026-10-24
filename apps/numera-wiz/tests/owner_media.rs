@@ -211,6 +211,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .query("artifacts.manifest", json!({"artifact_id":artifact_id}))
         .await;
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
+    assert_eq!(manifest["suggested_name"], "cli-copy.mkv");
+    assert!(!manifest.to_string().contains(media.directory.path().to_str().unwrap()));
     let saved_path = media.directory.path().join("client-saved-copy.mkv");
     let (saved, exit) = cli
         .human(&[
@@ -425,6 +427,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let contents: Value =
         serde_json::from_str(resource["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(contents["sha256"], job["artifact"]["sha256"]);
+    assert_eq!(contents["suggested_name"], "stdio-remux.mkv");
     let chunk = call!(
         stdio,
         "artifacts.read_chunk",
@@ -767,6 +770,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"artifact_id":artifact_id}),
             json!({})
         );
+        assert_eq!(manifest["suggested_name"], format!("http-{ordinal}.mkv"));
         let resource = http
             .read_resource(rmcp::model::ReadResourceRequestParams::new(
                 manifest["manifest_uri"].as_str().unwrap(),
