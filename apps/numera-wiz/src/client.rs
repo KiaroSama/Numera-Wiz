@@ -183,6 +183,8 @@ impl NativeClient {
                 && (!lock_root.try_exists()?
                     || nw_platform::files::RootLock::acquire(&lock_root).is_ok());
             if may_spawn && !spawned {
+                #[cfg(windows)]
+                nw_platform::process::prevent_stdio_inheritance()?;
                 let mut command = tokio::process::Command::new(std::env::current_exe()?);
                 command.arg("--data-dir").arg(&self.root);
                 if let Some(components) = &self.components {

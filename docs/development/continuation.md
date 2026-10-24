@@ -1924,3 +1924,39 @@ bootstrap remains20seconds. No scoped performance gate is widened or claimed.
 Fresh full checks remain required. Adoption-aware rollback restoration and its
 actual prior-binary qualification remain in progress, with no rollback command
 exposed and all complete-product obligations open.
+
+
+## Windows detached-owner stdio inheritance correction
+
+CI98 passes Linux and both macOS full checks, native GUI, browser, media and all
+existing SDK/HTTP suites. Windows's new timing diagnostics show its first scope
+CLI returning only after20782ms, followed immediately by connection refusal on
+the saved owner endpoint. Increasing the aggregate harness budget did not solve
+this; the prior slow-sequence explanation was incomplete.
+
+The pinned Rust1.99.1 Windows implementation defaults inherit_handles=true and
+passes that directly to CreateProcessW. Its ordinary command path does not apply
+a handle whitelist. Configuring null child streams does not suppress inheritance
+of other already-inheritable frontend pipe handles. Source:
+rust-lang/rust@1.99.1 library/std/src/sys/process/windows.rs,
+blob0cff0fb7945c45076f4c95014d5b96c1b95162db. The owner's idle grace is15seconds.
+
+Before starting a detached owner on Windows, the native adapter now clears only
+HANDLE_FLAG_INHERIT on its current standard handles. The handles stay open and
+usable by CLI/MCP; Command still creates the explicit null child streams.
+An audited narrow Win32 helper checks every valid borrowed handle and fails
+closed if inheritance cannot be cleared. This uses stable Rust plus the already
+pinned windows-sys0.61.2, without nightly APIs, shell launchers or custom quoting.
+The existing Windows console module feature is added; no package version changes.
+
+The real migration CLI/HTTP journey remains the regression: immediately after
+a captured CLI returns, its owner must still answer the protected request, then
+real idle restart must preserve original receipts and state. Its aggregate
+deadline is restored to180seconds; the per-step60second and actual product
+20second startup limits are unchanged. Only the1 exact hosted formatting hunk
+is applied. Fresh hosted Windows verification is required before calling this
+symptom fixed. CI96 remains the latest completely green13-job baseline.
+
+The full rollback controller/restoration/owned replacement work remains a
+separate unexposed draft until its fault/adoption/receipt/legacy-binary tests and
+all interface wiring are complete. No complete-product gate closes.

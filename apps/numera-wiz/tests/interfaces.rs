@@ -301,9 +301,7 @@ async fn migration_owner_http(
         .unwrap();
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.unwrap() {
-        assert!(
-            bytes.len().saturating_add(chunk.len()) <= nw_domain::commands::MAX_RESULT_BYTES
-        );
+        assert!(bytes.len().saturating_add(chunk.len()) <= nw_domain::commands::MAX_RESULT_BYTES);
         bytes.extend_from_slice(&chunk);
     }
     let response: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -321,7 +319,7 @@ async fn migration_owner_http(
 #[tokio::test]
 async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart() {
     let _case = OWNER_CASE.lock().await;
-    tokio::time::timeout(std::time::Duration::from_secs(240), async {
+    tokio::time::timeout(std::time::Duration::from_secs(180), async {
         use nw_domain::commands::Request;
         use serde_json::json;
         let data = tempfile::tempdir().unwrap();
