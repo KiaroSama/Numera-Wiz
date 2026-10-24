@@ -1440,3 +1440,18 @@ browser/native PNGs were personally inspected. This closes the observed chooser
 title harness issue at this Linux Chrome boundary only. All 22 exact hosted
 formatter hunks are applied in this revision. New timeout/progress source above
 awaits the next hosted compile/runtime evidence; no broader gate is inferred.
+
+
+## Correct malformed test assembly before continuing remux progress
+
+Run 40101879547 on af6fdc0baa75953c71425b9de7e1a9ee18182814 passed WASM/
+lock and its initial actual engine/isolated reader phases, but native ordinary
+checks rejected the supervision test at line 1: source assembly had concatenated
+an absent cache value, producing literal undefined and omitting the four original
+tests. This was an implementation-preparation error. The correction restores the
+complete exact prior source from d66fc711f72eb837e30b12a3e407e4f10748387d
+and retains the new fifth real finite/disabled cancellation test. All 41 exact
+hosted formatter hunks are applied. No new policy/progress complete runtime or
+GUI pass is inferred. This corrective source requires a fresh hosted run.
+Additional remux-progress source is prepared separately and is not in this fix.
+No archived member or full-task checkbox changes; no local execution occurred.

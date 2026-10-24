@@ -344,7 +344,15 @@ pub async fn verify(
         plan.execution_limits.clone().unwrap_or_default().operation,
     )
     .await?;
-    let output = scan(engine, path, observed, cancel, observer, plan.execution_limits.clone().unwrap_or_default().operation).await?;
+    let output = scan(
+        engine,
+        path,
+        observed,
+        cancel,
+        observer,
+        plan.execution_limits.clone().unwrap_or_default().operation,
+    )
+    .await?;
     let mut packets = 0u64;
     let mut bytes = 0u64;
     for (position, stream) in plan.resolution.streams.iter().enumerate() {

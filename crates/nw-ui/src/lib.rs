@@ -592,13 +592,22 @@ impl WizApp {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
                         ui.label(&job.output_name);
-                        if !job.state.terminal() && let Some(progress) = &job.progress {
+                        if !job.state.terminal()
+                            && let Some(progress) = &job.progress
+                        {
                             let stage = match progress.stage {
                                 nw_domain::execution::ProgressStage::CopyBytes => "Copy",
-                                nw_domain::execution::ProgressStage::VerifyStagingBytes => "Verify saved bytes",
-                                nw_domain::execution::ProgressStage::VerifySourceBytes => "Recheck source",
+                                nw_domain::execution::ProgressStage::VerifyStagingBytes => {
+                                    "Verify saved bytes"
+                                }
+                                nw_domain::execution::ProgressStage::VerifySourceBytes => {
+                                    "Recheck source"
+                                }
                             };
-                            ui.small(format!("{stage}: {} / {} bytes", progress.completed_bytes, progress.total_bytes));
+                            ui.small(format!(
+                                "{stage}: {} / {} bytes",
+                                progress.completed_bytes, progress.total_bytes
+                            ));
                         }
                         if job.state == nw_domain::records::JobState::Succeeded
                             && ui
