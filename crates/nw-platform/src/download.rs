@@ -21,6 +21,7 @@ pub struct ClientCopy {
     staging: Option<RetainedStaging>,
     verifier: Option<DownloadVerifier>,
     copied: u64,
+    cleanup_attempted: bool,
 }
 impl ClientCopy {
     pub fn create(output: &Path, manifest: &ArtifactManifest) -> Result<Self> {
@@ -54,6 +55,7 @@ impl ClientCopy {
             staging: Some(staging),
             verifier: Some(verifier),
             copied: 0,
+            cleanup_attempted: false,
         })
     }
     pub fn write(&mut self, bytes: &[u8]) -> Result<()> {
@@ -139,10 +141,27 @@ impl ClientCopy {
         Ok(receipt)
     }
     fn cleanup(&mut self) -> Result<()> {
+        if self.cleanup_attempted { return Ok(()); }
+        // A failed ownership check is final for this instance. Drop must not
+        // retry an unbound pathname after the original payload handle is gone.
+        self.cleanup_attempted = true;
         if let Some(staging) = self.staging.take() {
             staging.remove_owned_name()?;
         }
-        match std::fs::remove_dir(&self.workspace) {
+        self.parent.revalidate()?;
+        let name = self.workspace.file_name().ok_or_else(|| {
+            DomainError::new("PATH_DENIED", "Client workspace must have one owned basename")
+        })?;
+        #[cfg(unix)]
+        let removed = rustix::fs::unlinkat(
+            self.parent.held_file(), name, rustix::fs::AtFlags::REMOVEDIR,
+        ).map_err(std::io::Error::from);
+        #[cfg(not(unix))]
+        let removed = {
+            let _ = name;
+            std::fs::remove_dir(&self.workspace)
+        };
+        match removed {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(io_error(error)),
@@ -238,6 +257,28 @@ mod tests {
         assert_eq!(copy.finish(&control).unwrap_err().code, "CANCELLED");
         assert!(!cancelled.exists());
         assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+    #[cfg(unix)]
+    #[test]
+    fn failed_cleanup_is_not_retried_against_a_redirected_empty_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("selected");
+        let moved = root.path().join("moved");
+        let outside = root.path().join("outside");
+        std::fs::create_dir(&parent).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        let mut copy = ClientCopy::create(&parent.join("saved"), &manifest(b"abc")).unwrap();
+        copy.write(b"abc").unwrap();
+        let name = copy.workspace.file_name().unwrap().to_owned();
+        std::fs::rename(&parent, &moved).unwrap();
+        std::os::unix::fs::symlink(&outside, &parent).unwrap();
+        let unrelated = outside.join(&name);
+        std::fs::create_dir(&unrelated).unwrap();
+        assert_eq!(copy.cleanup().unwrap_err().code, "TARGET_CHANGED");
+        drop(copy);
+        assert!(unrelated.is_dir(), "Drop must preserve the unrelated empty replacement directory");
+        assert_eq!(std::fs::read_dir(&unrelated).unwrap().count(), 0);
+        assert_eq!(std::fs::read_dir(moved.join(&name)).unwrap().count(), 1);
     }
     #[test]
     fn cleanup_removes_only_the_owned_payload_and_preserves_unknown_entries() {

@@ -212,7 +212,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await;
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
     assert_eq!(manifest["suggested_name"], "cli-copy.mkv");
-    assert!(!manifest.to_string().contains(media.directory.path().to_str().unwrap()));
+    assert!(
+        !manifest
+            .to_string()
+            .contains(media.directory.path().to_str().unwrap())
+    );
     let saved_path = media.directory.path().join("client-saved-copy.mkv");
     let (saved, exit) = cli
         .human(&[

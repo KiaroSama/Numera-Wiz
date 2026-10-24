@@ -60,6 +60,7 @@ async fn response(
         window: window.clone(),
         timer,
         controller: controller.clone(),
+        completed: false,
         _callback: callback,
     };
     let init = web_sys::RequestInit::new();
@@ -169,7 +170,7 @@ async fn copy(
     control: &SaveControl,
 ) -> Result<SaveReceipt, String> {
     let mut verifier = DownloadVerifier::new(manifest).map_err(|error| error.to_string())?;
-    let (response, _deadline) = control
+    let (response, mut deadline) = control
         .interruptible(response(origin, bearer, manifest))
         .await
         .map_err(|error| error.to_string())??;
@@ -214,6 +215,7 @@ async fn copy(
             offset = end;
         }
     }
+    deadline.complete();
     let receipt = verifier
         .finish(format!("Browser file: {name}"))
         .map_err(|error| error.to_string())?;

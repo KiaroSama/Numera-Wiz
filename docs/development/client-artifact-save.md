@@ -74,3 +74,30 @@ manifest scan: the actual GET already reauthorizes and verifies strong If-Match
 identity and exact length. Preparation gets a separate bounded diagnostic window;
 the 20-second observed cancellation drain assertion and memory ceilings stay
 intact. No pass is inferred until that correction runs.
+
+CI77 passed the actual Linux native typed-destination/Save pointer journey and
+the full large scoped CLI save/cancel/revocation suite. The client copied
+268633400 bytes in 34610 ms with observed process HWM 26016 KiB; the owner HWM
+was 36136 KiB. The actual native saved PNG was personally inspected. See
+[evidence](evidence/client-save-ci77.json) and the separately scoped exact
+[HTTP report](evidence/artifact-http-ci77.json).
+
+Headed Chrome displayed the correct actual report but the harness did not
+observe loadingFinished for its known request. The exact cause is not proved.
+The next browser source clears its deadline after fully consuming the response,
+without an unnecessary abort on successful EOF, and the harness retrieves only
+the actual correlated Chrome response through bounded debugger reads. Input,
+correlation, report assertions and the 15-second bound remain required. No
+business handler or mocked picker substitutes for the controls.
+
+The native OS Save As test uses the pinned rfd 0.17.2 save implementation under
+a real hosted DBus/Xvfb desktop portal. Its targeted SaveFile/default-backend
+source was inspected. This is a test runtime dependency setup, not a new
+application runtime or a claimed portable-package qualification.
+
+Client staging cleanup attempts ownership reconciliation once. Unix removal of
+the known empty workspace uses the held destination-parent descriptor; an
+ownership failure is not retried against a newly resolved pathname. A regression
+renames the selected parent, redirects it to an unrelated empty replacement,
+then verifies that both the replacement and retained original payload survive.
+These latest source/control corrections await their own CI.

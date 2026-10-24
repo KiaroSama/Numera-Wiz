@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "run_id": 40091314188,
+  "branch_head": "4b40f816f6846dc9e74ea3a7eee1e2c3b44a1d0d",
+  "jobs": [
+    {
+      "id": 120864396703,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864396841,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120864396845,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864396873,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864752273,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864752287,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864752294,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120864752332,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120866164451,
+      "name": "browser",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120866306947,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "four complete native regression/Clippy/desktop targets, WASM and lock",
+    "complete actual original MOV/MP4, existing owner/official SDK/lost-response media",
+    "268633400-byte scoped CLI save, exact independent file identity, observed process high-water 26016 KiB, 34610 ms elapsed",
+    "partial-transfer SIGINT with confirmed drain and owned staging cleanup; setup 20316 ms",
+    "complete existing live HTTP job-read/bearer revocation and disconnect index cleanup; owner high-water 36136 KiB",
+    "actual native destination-field pointer/keyboard and Save-button pointer input, independent saved/source byte equality and unchanged one producer job",
+    "safe optional basename, legacy fallback and CLI/official SDK assertions"
+  ],
+  "personally_inspected_images": [
+    "native-client-saved.png",
+    "Chrome selection-report-input-timeout.png"
+  ],
+  "browser_failure": {
+    "point": "actual report HTTP observation before Save",
+    "request_seen": true,
+    "pointer_attempts": 1,
+    "retained_finished_ids": 16,
+    "observed_ui": "actual report dialog correctly displays resolved content",
+    "exact_missing_event_cause": "not established",
+    "save_picker_reached": false
+  },
+  "next_source": [
+    "do not abort a fully consumed browser response on Deadline Drop; clear its timer after EOF",
+    "retrieve the actual correlated Chrome report response through bounded debugger reads without requiring a loadingFinished event",
+    "preserve real input, correlation, report assertions and 15-second observation bound",
+    "actual native OS Save As picker through hosted DBus/Xvfb",
+    "owned cleanup retry/parent-redirect protection and deterministic regression",
+    "nine exact hosted formatter hunks"
+  ],
+  "artifacts": [
+    {
+      "id": 12559730670,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:3eb6e264ec603f4f0c2f85f793f6bf7f43c07cd024dd8c72d5fcaaa3211ff6f8",
+      "downloaded": false
+    },
+    {
+      "id": 12559675636,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:11cee0e5818625280d5f5e1b228e35ac700507f0d4c9903b63578b2a2856d6a0",
+      "downloaded": false
+    },
+    {
+      "id": 12559064232,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:26d89af0188c031e97f63c6e6c657ce01c51ec28ac7d8745860a603a5f2aae5b",
+      "downloaded": false
+    },
+    {
+      "id": 12558647902,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:9575be59cffcc6f2c90aa513c52c68451b120ac8e74d4ed9436231c3ff2ae37f",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "new native OS picker and browser Save controls",
+    "other browser/desktop variants and crash-orphan cleanup",
+    "full F01-F15/editor/effects/retention/migration/packages/resources/manual/owner gates"
+  ]
+}

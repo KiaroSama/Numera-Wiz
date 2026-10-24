@@ -396,6 +396,63 @@ async fn journey() {
         "producer_job_count":producer_job_count,
         "not_qualified":["native OS Save As picker", "other desktop platforms", "browser file handles"]
     })).unwrap()).unwrap();
+    // A second actual Save uses the native OS picker, with an empty client field.
+    click(&window, "300", "400").await;
+    input(&["key", "--clearmodifiers", "ctrl+a", "BackSpace"]).await;
+    click(&window, "100", "436").await;
+    let started = Instant::now();
+    let picker = loop {
+        let found = xdo(&["search", "--onlyvisible", "--name", "^Save"]).await;
+        if found.status.success() {
+            let windows = String::from_utf8(found.stdout).unwrap();
+            if let Some(window) = windows.lines().last() { break window.to_owned(); }
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot("root", &evidence.join("native-picker-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-picker-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 { println!("NW_NATIVE_PICKER_FAILURE_IMAGE:{}", STANDARD.encode(png)); }
+            panic!("Actual native Save control did not open its OS file picker");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    screenshot(&picker, &evidence.join("native-save-picker.png")).await;
+    let png = std::fs::read(evidence.join("native-save-picker.png")).unwrap();
+    if png.len() <= 256 * 1024 { println!("NW_NATIVE_PICKER_IMAGE:{}", STANDARD.encode(png)); }
+    let picker_saved_path = evidence.join("native-picker-saved-copy.mkv");
+    assert!(!picker_saved_path.exists());
+    input(&["windowactivate", "--sync", &picker]).await;
+    input(&["key", "--clearmodifiers", "ctrl+l"]).await;
+    input(&["type", "--clearmodifiers", "--delay", "1", picker_saved_path.to_str().unwrap()]).await;
+    input(&["key", "--clearmodifiers", "Return"]).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    if xdo(&["search", "--onlyvisible", "--name", "^Save"]).await.status.success() {
+        input(&["key", "--clearmodifiers", "alt+s"]).await;
+    }
+    let started = Instant::now();
+    loop {
+        if picker_saved_path.exists()
+            && let Ok(saved) = nw_platform::files::identity(&picker_saved_path, &CancellationToken::new())
+            && saved.sha256 == artifact.sha256 && saved.bytes == artifact.bytes { break; }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot("root", &evidence.join("native-picker-save-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-picker-save-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 { println!("NW_NATIVE_PICKER_FAILURE_IMAGE:{}", STANDARD.encode(png)); }
+            panic!("Native OS picker and authenticated copy did not publish the selected bytes");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(std::fs::read(&picker_saved_path).unwrap(), std::fs::read(&media.source).unwrap());
+    assert_eq!(query(&root,"jobs.list").await.unwrap()["items"].as_array().unwrap().len(), 1);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-picker-saved.png")).await;
+    let png = std::fs::read(evidence.join("native-picker-saved.png")).unwrap();
+    if png.len() <= 256 * 1024 { println!("NW_NATIVE_PICKER_SAVE_IMAGE:{}", STANDARD.encode(png)); }
+    std::fs::write(evidence.join("native-picker-save.json"),serde_json::to_vec_pretty(&json!({
+        "artifact_id":manifest["artifact_id"],"sha256":artifact.sha256,"bytes":artifact.bytes,
+        "oracle":"Actual empty destination field, native Save pointer input, real OS file picker and independent saved/source byte equality",
+        "producer_job_count":1,
+        "not_qualified":["other desktop platforms", "crash recovery", "full product"]
+    })).unwrap()).unwrap();
     let record: Value = serde_json::from_slice(
         &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
     )
