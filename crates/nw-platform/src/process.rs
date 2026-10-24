@@ -185,6 +185,9 @@ async fn run_with_stdin(
             "Executable parent directory is required",
         )
     })?;
+    if cancel.is_cancelled() {
+        return Err(DomainError::new("CANCELLED", "Media stage cancelled before process launch"));
+    }
     tracing::info!(program=%program.display(),cwd=%cwd.display(),argv=?args,"stage.prepared");
     let mut command = Command::new(program);
     command

@@ -281,6 +281,9 @@ impl WizApp {
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
                     ui.small(format!("Plan {}", plan.id));
                     ui.monospace(&plan.hash);
+                    ui.small(format!("Source SHA-256: {}", plan.source_sha256));
+                    ui.small(format!("{} SHA-256: {}", plan.ffmpeg.file_name, plan.ffmpeg.sha256));
+                    ui.small(format!("{} SHA-256: {}", plan.ffprobe.file_name, plan.ffprobe.sha256));
                     for argument in plan.argv_template.iter().flatten() {
                         ui.monospace(argument);
                     }

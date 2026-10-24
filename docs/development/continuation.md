@@ -409,3 +409,25 @@ now exercises human create/collision/inspect/grant export/revision update, scope
 CLI denial, protected token delivery/collision and actual HTTP acceptance before
 revocation and denial afterward. These latest source changes await CI. No local
 build, ordinary test, media execution or owner GPU qualification was run.
+
+Run [40049839038](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40049839038)
+for beedaed21b3aacbc7b4b31d05f1ab01d22591c81 passed the actual CPU media,
+human access create/inspect/export/update, scoped CLI denial, protected token
+delivery/collision, real HTTP acceptance/revocation and full CLI/SDK journeys.
+Actual Chrome output also passed. Native tests passed on all four targets; Clippy
+found client_lease unused in headless builds. It is now compiled only with the
+desktop feature, where it is used. The exact hosted formatter patch is applied.
+The native-window job is not credited on this source after its failed dependency.
+
+Current changes add a shared two-slot media leaf pool across all Engine clones,
+with finite cancellable admission and conservative in-memory capacity quarantine
+when cleanup cannot be confirmed or a supervisor is abandoned. Each ticket is
+released before another probe/verification phase can acquire it; observers run
+outside the ticket. Current path policy is revalidated for each prepared job
+stage, and an already-cancelled stage is rejected before process launch. See
+process-budgets.md for exact behavior and the unresolved RSS/scratch/tree/restart
+boundaries. New pool cases are synthetic admission tests, not child-liveness or
+memory qualification. Plan-review views now retain input and component digests/
+sizes without disclosing private component directories. Seven additional complete
+manual bodies are recorded personally, for 39 manual entries; full study remains
+pending. These latest changes await their own hosted result.

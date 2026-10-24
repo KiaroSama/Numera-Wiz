@@ -1,5 +1,6 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
+mod budget;
 mod preservation;
 use nw_domain::{
     DomainError, Result,
@@ -35,6 +36,7 @@ pub type Observer =
 pub struct Engine {
     pub ffmpeg: FileIdentity,
     pub ffprobe: FileIdentity,
+    process_budget: budget::ProcessBudget,
 }
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     tokio::task::spawn_blocking(f)
@@ -53,6 +55,7 @@ impl Engine {
         Ok(Self {
             ffmpeg: pair.0,
             ffprobe: pair.1,
+            process_budget: budget::ProcessBudget::default(),
         })
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {
@@ -80,6 +83,7 @@ impl Engine {
         .to_vec();
         args.extend(input.options());
         args.extend(["-i".into(), "fd:".into()]);
+        let ticket = self.process_budget.acquire(&cancel).await?;
         let result = nw_platform::process::run_readonly(
             Path::new(&self.ffprobe.path),
             &args,
@@ -88,7 +92,8 @@ impl Engine {
             input.file,
             cancel,
         )
-        .await?;
+        .await;
+        let result = ticket.finish(result)?;
         let value: Value = serde_json::from_slice(&result.stdout)
             .map_err(|e| DomainError::new("INVALID_PROBE", e.to_string()))?;
         parse_probe(value)
@@ -112,6 +117,7 @@ impl Engine {
             probe,
         })
     }
+    pub fn media_process_capacity(&self) -> (usize, usize, usize) { self.process_budget.status() }
     pub fn clean_plan(
         &self,
         asset: Asset,
@@ -164,7 +170,10 @@ impl Engine {
             resolution,
             argv_template: args,
             created_at: now.to_string(),
-            expires_at: now.checked_add(1800).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Plan clock range exhausted"))?.to_string(),
+            expires_at: now
+                .checked_add(1800)
+                .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Plan clock range exhausted"))?
+                .to_string(),
             verification_scope: preservation::SCOPE.into(),
         };
         plan.hash = plan_digest(&plan)?;
@@ -277,15 +286,16 @@ impl Engine {
             })
             .collect::<Vec<_>>();
         observer(ExecutionEvent::Prepared(args.clone())).await?;
-        if let Err(error) = nw_platform::process::run(
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let process = nw_platform::process::run(
             Path::new(&self.ffmpeg.path),
             &args,
             Duration::from_secs(10800),
             8 * 1024 * 1024,
             cancel.clone(),
         )
-        .await
-        {
+        .await;
+        if let Err(error) = ticket.finish(process) {
             let (_, retained) = staging.keep().map_err(|e| io_error(e.error))?;
             tracing::warn!(staging=%retained.display(),"Owned staging retained after process failure; no output was published");
             return Err(error);
