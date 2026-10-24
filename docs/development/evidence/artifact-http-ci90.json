@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "source_head": "e0ed712d22ea7e993a7bd08fa10f2111fbb73c54",
+  "compiled_merge": "72e29647b288e78251546e8d6e0f502fd9747121",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40120155167",
+  "job": 120950413652,
+  "report": {
+    "artifact_bytes": "268633400",
+    "artifact_id": "job-0d9847c3-8b96-42d2-b7c6-13fd7a8dac6b",
+    "cancelled_index_cleanup": true,
+    "client_copy_bytes": "268633400",
+    "client_copy_cancel_setup_ms": "23261",
+    "client_copy_cancelled_before_publication": true,
+    "client_copy_elapsed_ms": "37298",
+    "client_copy_peak_kib": 26680,
+    "client_copy_profile": "job-read-only; no general filesystem roots",
+    "client_copy_sha256": "e0e5b770b8a1d4be36bd939c26a9904df80ade8374b9aba3ec561128f7773d6b",
+    "components": {
+      "ffmpeg": {
+        "bytes": "5132352",
+        "file_name": "ffmpeg",
+        "sha256": "57027bd7d6aacfafa1b31e8ceef2e41e1f5c4ba685ae69dd17274c692fadeec6"
+      },
+      "ffprobe": {
+        "bytes": "4911104",
+        "file_name": "ffprobe",
+        "sha256": "e3cb5b229af9be9e31e8fb18f6ab8a92bfab17762fa47166325268159732f8f5"
+      }
+    },
+    "credential_revoked_delivered_bytes": "3145728",
+    "executable": {
+      "bytes": "231247712",
+      "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/debug/numera-wiz",
+      "sha256": "3ff89146a6212be8408ea7edf67d8984f18a6624021140daf6d8e5b2d638bb9c"
+    },
+    "job_id": "0d9847c3-8b96-42d2-b7c6-13fd7a8dac6b",
+    "job_revoked_delivered_bytes": "3670016",
+    "owner_before_high_kib": 37800,
+    "owner_high_kib": 37800,
+    "owner_process_id": 2478,
+    "plan_hash": "36ba1ab3669aa79fc9f5c5d8b1e2e7d9b63ad6d3dc4867e9902692b9fd82ccff",
+    "plan_id": "8ae14684-68c1-497d-a608-dc00488c05b8",
+    "registry": "d988c40df4f7e53658e49577b8a91215a0b6f5373f55a4f527cd419ec0a21db6",
+    "schema_version": 1,
+    "scope": "Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification.",
+    "selected_owner_rss_ceiling_kib": 131072,
+    "sha256": "e0e5b770b8a1d4be36bd939c26a9904df80ade8374b9aba3ec561128f7773d6b",
+    "source": "72e29647b288e78251546e8d6e0f502fd9747121",
+    "status": "passed"
+  },
+  "scope": "Actual independent Linux large-copy/cancel/jobRead and bearer revocation, source-built limited CPU profile. Not aggregateR20, portable standard package or owner hardware evidence."
+}

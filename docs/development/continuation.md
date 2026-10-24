@@ -1728,3 +1728,26 @@ All folder/probe-failure/companion/replacement, F01-F15, project/editor/effects/
 DAG/preview/mixer/captions/interchange, closure, retention, migration, standard
 offline packages/resources/full manuals and matching owner harness obligations
 remain mandatory. No full-task checkbox, support CSV or release gate is closed.
+
+## Thirteen human-label jobs pass; generation foundations await hosted checks
+
+CI90 (40120155167) on e0ed712d22ea7e993a7bd08fa10f2111fbb73c54 passes
+all13 jobs; compiled merge72e29647b288e78251546e8d6e0f502fd9747121.
+Both native and Chrome genuine OS Save and two-file completed-batch PNGs were
+personally inspected. Actual SDK lost-response and independent HTTP reports
+are retained with GitHub-reported artifact ZIP digests in ci90 evidence.
+
+This revision introduces closed read-only inspection, transaction-leased
+DatabaseSlot and root-lease/immutable-activation primitives. New safety tests
+cover unchanged source bytes, exact values/receipts, live transaction refusal,
+untouched empty/future stores, immutable history, stable replay identity and
+reattaching the same Store to a closed copy. These are test sources, not passes.
+
+The application remains on schema2/generation1 with34active commands.
+No schema3 migration, old-reader floor, owned streamed backup, activation
+recovery/adoption/rollback, retired-version replay or migration CLI/service
+handler is advertised. Future domain drafts remain separate. Actual migration
+continues next using ordinary durable owner scope/receipt semantics. Full
+folder/probe-failure/companion/replacement, F01-F15/editor/preview/effects/DAG/
+interchange, closure, retention/migration, standard offline packages/resources/
+full manuals and matching owner harness remain mandatory. No full gate closes.
