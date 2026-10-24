@@ -69,3 +69,12 @@ raw-name snapshots retain their prior lowering, while current canonical title
 projections explicitly lower the alias. New compatibility/negative units cover
 both. MP4 and complete-job qualification still await CI; see
 original-container-ci71.json.
+
+Run 40082246721 passed the complete actual media job with both MOV and MP4
+first and second round trips, independent raw name/brand assertions, unchanged
+case-extension byte copies and the existing full packet/clock/extradata/side-data
+oracles. All four native test/Clippy/desktop targets, the existing actual CLI/SDK/
+lost-response/large HTTP journey and real native workspace passed. Chrome report
+response observation timed out and is diagnosed separately; this is not an
+all-green workflow. MOV/MP4-specific adapter/control variants remain unqualified.
+See evidence/original-container-ci72.json for exact boundaries.

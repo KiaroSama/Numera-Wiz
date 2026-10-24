@@ -1111,3 +1111,30 @@ asserts both paths; all raw probe details remain intact. See
 evidence/original-container-ci71.json. These corrections await their own CI.
 Full F08, every other open task and product/package/resource/owner gates remain
 mandatory. No local source compilation, tests, GUI or media execution was run.
+
+
+## MOV/MP4 full media checkpoint and browser observation follow-up
+
+Run 40082246721 on 0a4073d26b485e3fb87cf3ef321e73e7dc59f44b passed
+the complete real media job: both original MOV and MP4 video-removal/title/language
+cases, both second registration/remux title-preserving round trips, independent
+raw-name/brand assertions, unchanged case-extension full byte copies, all packet/
+clock/codec/extradata/side-data oracles and existing CLI/official SDK/lost-response/
+large HTTP boundaries. All four full native targets, lock/WASM and the real
+native report/Escape/Review/Run/manifest journey also passed. The actual native
+report PNG was personally inspected. The Linux HTTP owner transferred 268633400
+bytes with a 35852 KiB high-water mark; exact report/compiled merge identity is
+evidence/artifact-http-ci72.json. Five exact formatter hunks are applied.
+
+Chrome timed out observing the actual Selection report HTTP response; its cause
+was not established by that run. The following harness retains at most 64 finished
+network IDs across batches independently of event order, retries only the real
+nonmutating report pointer input while no request has been observed and final
+async form readiness may remain pending, and keeps the 15-second deadline.
+Failure retains a bounded actual PNG and nonsecret request/attempt counters.
+No domain handler substitutes for the input, no raw network headers/bodies are
+written, and no Chrome pass is inferred. See original-container-ci72.json.
+
+MOV/MP4-specific adapter/control variants and all broader container/codec/category
+routes remain required, as do every other open task and product/package/resource/
+owner gate. No local source build/test/application/media execution was used.
