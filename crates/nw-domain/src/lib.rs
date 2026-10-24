@@ -52,6 +52,7 @@ impl DomainError {
             | "INVALID_JOB_TRANSITION"
             | "CANCELLATION_TOO_LATE"
             | "OWNER_BUSY"
+            | "PUBLICATION_BUSY"
             | "PRINCIPAL_CHANGED"
             | "OWNER_IDENTITY_CONFLICT"
             | "OWNER_VERSION_CONFLICT" => 4,
@@ -62,6 +63,7 @@ impl DomainError {
             | "INPUT_ROUTE_REQUIRED"
             | "NATIVE_PATH_UNAVAILABLE"
             | "NATIVE_IDENTITY_UNAVAILABLE"
+            | "PUBLICATION_CLAIM_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
             | "ARTIFACT_UNAVAILABLE"

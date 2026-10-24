@@ -85,16 +85,20 @@ object fields cannot disappear during the raw semantic verification round trip.
 The ordinary hosted units add physical replacement and hard-link assertions.
 The actual Linux fixture replaces a registered source before planning/execution,
 reopens the engine, rejects its old review and verifies a fresh registration's
-byte-identical copy. These changes await CI. Parent leases, global destination
-claims, complete reference routes and filesystem/package qualification remain
-required; native IDs can be recycled after the original object is deleted and
+byte-identical copy. These original source bindings passed their actual media and cross-platform
+boundaries by run 40066276733. Frozen output-directory bindings subsequently
+passed run 40068124936. Global destination claims are new pending source described
+in destination-claims.md. Complete reference routes, handle-relative publication
+and filesystem/package qualification remain required; native IDs can be recycled after the original object is deleted and
 never replace the mandatory content and active-handle checks.
 
 Windows uses one local, documented unsafe FFI expectation around the borrowed
 handle GetFileInformationByHandleEx call. Its initialized repr(C) output buffer
 size and handle lifetime are fixed; output is read only on success. The workspace
 unsafe lint is deny, with that exact helper's expectation explaining the exception;
-all other first-party code remains denied. The existing windows-sys dependency
+A second local expectation now covers the separately documented Windows
+known-folder/COM coordinator lookup. All other first-party unsafe code remains
+denied. The existing windows-sys dependency
 supplies the ABI; no new runtime helper executable or path reopening is added.
 Official API contracts inspected: https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info
 and https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex.

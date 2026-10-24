@@ -422,10 +422,17 @@ async fn actual_copy_and_order_metadata_remux() {
     std::fs::create_dir(&reviewed_parent).unwrap();
     let parent_output = reviewed_parent.join("original-parent-copy.mkv");
     let parent_plan = engine
-        .clean_plan(plan.source.clone(), &parent_output, &rules(), "fixture-owner")
+        .clean_plan(
+            plan.source.clone(),
+            &parent_output,
+            &rules(),
+            "fixture-owner",
+        )
         .unwrap();
     let retained_parent = directory.path().join("original-reviewed-exports");
     std::fs::rename(&reviewed_parent, &retained_parent).unwrap();
+    let missing_parent = engine.execute(&parent_plan, CancellationToken::new()).await.unwrap_err();
+    assert_eq!(missing_parent.code, "TARGET_CHANGED");
     std::fs::create_dir(&reviewed_parent).unwrap();
     let changed_parent = engine
         .execute(&parent_plan, CancellationToken::new())
@@ -433,14 +440,110 @@ async fn actual_copy_and_order_metadata_remux() {
         .unwrap_err();
     assert_eq!(changed_parent.code, "TARGET_CHANGED");
     assert!(!parent_output.exists());
-    assert!(std::fs::read_dir(&reviewed_parent).unwrap().next().is_none());
-    assert!(std::fs::read_dir(&retained_parent).unwrap().next().is_none());
+    assert!(
+        std::fs::read_dir(&reviewed_parent)
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    assert!(
+        std::fs::read_dir(&retained_parent)
+            .unwrap()
+            .next()
+            .is_none()
+    );
     let fresh_parent_plan = engine
-        .clean_plan(plan.source.clone(), &parent_output, &rules(), "fixture-owner")
+        .clean_plan(
+            plan.source.clone(),
+            &parent_output,
+            &rules(),
+            "fixture-owner",
+        )
         .unwrap();
     assert_ne!(fresh_parent_plan.hash, parent_plan.hash);
-    engine.execute(&fresh_parent_plan, CancellationToken::new()).await.unwrap();
-    assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&parent_output).unwrap());
+    engine
+        .execute(&fresh_parent_plan, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read(&source).unwrap(),
+        std::fs::read(&parent_output).unwrap()
+    );
+
+    let claim_output = reviewed_parent.join("claim-race.mkv");
+    let claim_plan = engine
+        .clean_plan(plan.source.clone(), &claim_output, &rules(), "fixture-owner")
+        .unwrap();
+    let fence_entered = std::sync::Arc::new(tokio::sync::Notify::new());
+    let resume = std::sync::Arc::new(tokio::sync::Notify::new());
+    let entered = fence_entered.clone();
+    let resume_first = resume.clone();
+    let observer: nw_engine::Observer = std::sync::Arc::new(move |event| {
+        let entered = entered.clone();
+        let resume = resume_first.clone();
+        Box::pin(async move {
+            if matches!(event, nw_engine::ExecutionEvent::Fence(_)) {
+                entered.notify_one();
+                resume.notified().await;
+            }
+            Ok(())
+        })
+    });
+    let first_engine = engine.clone();
+    let first_plan = claim_plan.clone();
+    let first = tokio::spawn(async move {
+        first_engine.execute_observed(
+            &first_plan, CancellationToken::new(), "claim-owner-a", observer,
+        ).await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(10), fence_entered.notified())
+        .await.expect("First publication fence deadline");
+    let expected_parent = claim_plan.required_rights.as_ref().unwrap()
+        .output_create.parent_object.as_ref().unwrap();
+    let probe = nw_platform::claims::Destination::reviewed(&claim_output, expected_parent).unwrap();
+    match nw_platform::claims::DestinationClaims::try_acquire(vec![probe]) {
+        Err(error) => assert_eq!(error.code, "PUBLICATION_BUSY"),
+        Ok(_) => panic!("The first publication fence must retain its cross-root destination claim"),
+    }
+    let second_verifying = std::sync::Arc::new(tokio::sync::Notify::new());
+    let reached = second_verifying.clone();
+    let fences = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let second_fences = fences.clone();
+    let observer: nw_engine::Observer = std::sync::Arc::new(move |event| {
+        let reached = reached.clone();
+        let fences = second_fences.clone();
+        Box::pin(async move {
+            match event {
+                nw_engine::ExecutionEvent::Verifying => reached.notify_one(),
+                nw_engine::ExecutionEvent::Fence(_) => {
+                    fences.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+                }
+                _ => {}
+            }
+            Ok(())
+        })
+    });
+    let second_engine = engine.clone();
+    let second_plan = claim_plan.clone();
+    let cancellation = CancellationToken::new();
+    let second_token = cancellation.clone();
+    let second = tokio::spawn(async move {
+        second_engine.execute_observed(
+            &second_plan, second_token, "claim-owner-b", observer,
+        ).await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(10), second_verifying.notified())
+        .await.expect("Contending verification deadline");
+    cancellation.cancel();
+    let cancelled = tokio::time::timeout(std::time::Duration::from_secs(5), second)
+        .await.expect("Contending publication cancellation deadline").unwrap().unwrap_err();
+    assert_eq!(cancelled.code, "CANCELLED");
+    assert_eq!(fences.load(std::sync::atomic::Ordering::Acquire), 0);
+    assert!(!claim_output.exists());
+    resume.notify_one();
+    tokio::time::timeout(std::time::Duration::from_secs(10), first)
+        .await.expect("Winning publication deadline").unwrap().unwrap();
+    assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&claim_output).unwrap());
 
     let replaced_output = directory.path().join("physical-replacement.mkv");
     let replacement_plan = engine

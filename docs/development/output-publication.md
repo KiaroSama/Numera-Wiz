@@ -32,16 +32,16 @@ This does not silently upgrade old acceptance into a different destination.
 New hosted fixtures cover parent replacement after review, a changed parent
 while Unix preflight is paused outside the semantic lock, child changes retaining
 identity, live Windows namespace exclusion and the actual FFmpeg fixture's fresh
-review/copy into the replacement directory. These source additions await CI.
+review/copy into the replacement directory. These directory identity additions passed all four native targets and the full
+real Linux media/CLI/official SDK/large HTTP, Chrome and native UI jobs in run
+40068124936. Only formatting failed; the 14 exact diagnostic hunks are applied.
 
-This checkpoint does not complete T017. Publication still needs the secure,
-user-scoped, data-root-independent destination claims mandated in the ownership
-handoff, deterministic multi-output acquisition, cancellable claim waiting,
-handle-relative operations and all required crash/fence/rename fault journeys.
-Claims must begin only after render/verification, cover final target checks,
-fence/publication and the durable result, and be reacquired during recovery.
-They must account for absent targets and filesystem case/normalization aliases;
-a per-data-root lock or a lock retained for the whole render is insufficient.
-Project checkpoint replacement additionally requires the target project's writer
-lease. The current media route remains atomic no-replace only; no overwrite or
-project-save capability is inferred from these directory identity checks.
+New unqualified source adds cross-data-root destination claims after verification,
+through the final absence check, fence, no-replace publication and durable result.
+Recovery positively reconciles only while holding the same claims. See
+destination-claims.md for namespaces, conservative alias exclusion, budgets,
+actual process/engine fixtures and remaining mandatory work. Handle-relative
+publication, project checkpoint writer leases, complete crash/retention and
+package/filesystem/resource qualification still keep T017 open. The current
+media route remains no-replace only; no overwrite or project-save capability is
+inferred from these directory and claim checks.

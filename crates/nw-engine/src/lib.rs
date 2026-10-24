@@ -180,8 +180,10 @@ impl Engine {
         );
         required_rights.source_read.object = Some(object);
         required_rights.output_create.parent_object = Some(
-            files::DirectoryStamp::capture_resolved(output.parent().expect("Resolved output parent"))?
-                .object_identity()?,
+            files::DirectoryStamp::capture_resolved(
+                output.parent().expect("Resolved output parent"),
+            )?
+            .object_identity()?,
         );
         let mut plan = Plan {
             schema_version: 2,
@@ -502,6 +504,10 @@ async fn publish(
     observer: Observer,
 ) -> Result<FileIdentity> {
     let parent_stamp = output_parent_stamp(plan)?;
+    let destination = nw_platform::claims::Destination::reviewed(
+        Path::new(&plan.output), reviewed_parent(plan)?,
+    )?;
+    let claims = nw_platform::claims::DestinationClaims::acquire(vec![destination], cancel.clone()).await?;
     let output = files::revalidate_output(&plan.output)?;
     #[cfg(unix)]
     let parent = output
@@ -538,6 +544,7 @@ async fn publish(
         verified: verification.clone(),
         published: false,
     };
+    claims.revalidate()?;
     parent_stamp.revalidate()?;
     if let Err(error) = observer(ExecutionEvent::Fence(journal)).await {
         let _ = staging.keep();
@@ -555,6 +562,7 @@ async fn publish(
     std::fs::File::open(parent)
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;
+    claims.revalidate()?;
     parent_stamp.revalidate()?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
     Ok(artifact)
@@ -710,16 +718,22 @@ fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
 }
 fn reviewed_parent(plan: &Plan) -> Result<&nw_domain::records::NativeObjectIdentity> {
     let rights = nw_domain::plans::validate_requirements(plan)?;
-    rights.output_create.parent_object.as_ref()
+    rights
+        .output_create
+        .parent_object
+        .as_ref()
         .filter(|object| object.schema_version == 1)
-        .ok_or_else(|| DomainError::new(
-            "INVALID_PLAN",
-            "Review a fresh plan with the original output directory identity",
-        ))
+        .ok_or_else(|| {
+            DomainError::new(
+                "INVALID_PLAN",
+                "Review a fresh plan with the original output directory identity",
+            )
+        })
 }
 /// Bind the current output directory to the identity frozen in the reviewed plan.
 pub fn output_parent_stamp(plan: &Plan) -> Result<files::DirectoryStamp> {
-    let parent = Path::new(&plan.output).parent()
+    let parent = Path::new(&plan.output)
+        .parent()
         .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
     let stamp = files::DirectoryStamp::capture_resolved(parent)?;
     stamp.require_object(reviewed_parent(plan)?)?;
