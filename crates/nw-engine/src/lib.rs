@@ -733,7 +733,10 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
             codec: row["codec_name"].as_str().unwrap_or("unknown").into(),
             tags: {
                 let mut tags = parse_tags(&row["tags"]);
-                if movie && !tags.contains_key("title") && let Some(name) = tags.remove("name") {
+                if movie
+                    && !tags.contains_key("title")
+                    && let Some(name) = tags.remove("name")
+                {
                     tags.insert("title".into(), name);
                 }
                 tags
@@ -937,9 +940,15 @@ fn lower_remux(
             .find(|s| s.index == stream.index)
             .ok_or_else(|| DomainError::new("INVALID_PLAN", "Missing source stream"))?;
         let movie_name_alias = demuxer == "mov"
-            && asset.probe.stream_details.get(&original.index).is_some_and(|row| {
-                row["tags"].get("name").is_some() && row["tags"].get("title").is_none()
-            });
+            && !original.tags.contains_key("name")
+            && original.tags.contains_key("title")
+            && asset
+                .probe
+                .stream_details
+                .get(&original.index)
+                .is_some_and(|row| {
+                    row["tags"].get("name").is_some() && row["tags"].get("title").is_none()
+                });
         if movie_name_alias {
             args.extend([format!("-metadata:s:{index}"), "name=".into()]);
         }
@@ -1076,6 +1085,32 @@ fn verify_tags(
 mod tag_tests {
     use super::*;
     #[test]
+    fn lowering_distinguishes_current_title_projection_from_a_legacy_raw_name_snapshot() {
+        let probe = parse_probe(serde_json::json!({
+            "format":{"format_name":"mov"},
+            "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Original label","language":"und"}}]
+        })).unwrap();
+        let mut source = Asset {
+            source_object: None, display_name: "source.mov".into(), id: "a".into(), creator: "owner".into(),
+            identity: FileIdentity { path: "/source.mov".into(), bytes: "1".into(), sha256: "0".repeat(64) },
+            probe,
+        };
+        let mut resolved = mux::CleanResolution {
+            action: CleanAction::Remux, streams: source.probe.streams.clone(),
+            outcomes: vec![], reasons: vec![], warnings: vec![],
+            preservation: nw_domain::mux::Preservation::default(),
+        };
+        let current = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
+        assert!(current.windows(2).any(|args| args == ["-metadata:s:0", "name="]));
+        assert!(current.windows(2).any(|args| args == ["-metadata:s:0", "title=Original label"]));
+        let title = source.probe.streams[0].tags.remove("title").unwrap();
+        source.probe.streams[0].tags.insert("name".into(), title);
+        resolved.streams = source.probe.streams.clone();
+        let legacy = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
+        assert!(!legacy.iter().any(|argument| argument == "name=" || argument == "title=Original label"));
+        assert!(legacy.windows(2).any(|args| args == ["-map_metadata:s:0", "0:s:0"]));
+    }
+    #[test]
     fn movie_track_name_is_an_exact_title_projection_with_raw_metadata_retained() {
         for format in ["mov,mp4,m4a,3gp,3g2,mj2", "matroska,webm"] {
             let input = serde_json::json!({
@@ -1083,12 +1118,21 @@ mod tag_tests {
                 "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Exact mixed-case title"}}]
             });
             let probe = parse_probe(input).unwrap();
-            assert_eq!(probe.stream_details[&0]["tags"]["name"], "Exact mixed-case title");
+            assert_eq!(
+                probe.stream_details[&0]["tags"]["name"],
+                "Exact mixed-case title"
+            );
             if format.starts_with("mov") {
-                assert_eq!(probe.streams[0].tags.get("title").unwrap(), "Exact mixed-case title");
+                assert_eq!(
+                    probe.streams[0].tags.get("title").unwrap(),
+                    "Exact mixed-case title"
+                );
                 assert!(!probe.streams[0].tags.contains_key("name"));
             } else {
-                assert_eq!(probe.streams[0].tags.get("name").unwrap(), "Exact mixed-case title");
+                assert_eq!(
+                    probe.streams[0].tags.get("name").unwrap(),
+                    "Exact mixed-case title"
+                );
                 assert!(!probe.streams[0].tags.contains_key("title"));
             }
         }
@@ -1096,8 +1140,14 @@ mod tag_tests {
             "format":{"format_name":"mov"},
             "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Original name","title":"Separate title"}}]
         })).unwrap();
-        assert_eq!(ambiguous.streams[0].tags.get("name").unwrap(), "Original name");
-        assert_eq!(ambiguous.streams[0].tags.get("title").unwrap(), "Separate title");
+        assert_eq!(
+            ambiguous.streams[0].tags.get("name").unwrap(),
+            "Original name"
+        );
+        assert_eq!(
+            ambiguous.streams[0].tags.get("title").unwrap(),
+            "Separate title"
+        );
     }
     #[test]
     fn mov_mp4_never_borrow_matroska_language_or_duration_exceptions() {

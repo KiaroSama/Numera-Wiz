@@ -1090,3 +1090,24 @@ README and human/CLI/MCP manuals now cover actual source reports, strict numeric
 indices, timestamp policies/facts, report limits, fixed grants, store compatibility,
 replay identity and the observed native/Chrome boundaries. Full manuals and all
 remaining task-ledger obligations remain mandatory.
+
+
+## MOV full preservation and MP4 vendor correction
+
+Run 40081501150 on 3f45408576d72357908b35152439474a9e645641 completed
+the actual MOV first cleanup and second re-registration/language-only remux,
+including full packet/clock/codec/side-data/metadata checks and independent raw
+name/title assertions. The execution trace reached the subsequent MP4 iteration,
+which failed its initial vendor gate. The combined test is still failed; no full
+media, MP4, owner/HTTP or GUI pass is inferred. Pinned mov_parse_stsd_video skips
+ISO reserved fields and exposes vendor_id only for QuickTime. This revision
+requires exact FFMP for QuickTime and exact absence for ISO MP4; the synthetic
+profile fixture and an invented-vendor negative follow that actual contract.
+
+Eight exact hosted formatter hunks are applied. New lowering also distinguishes
+a current canonical title projection from a historical raw-name snapshot, so
+legacy Matroska prepared arguments retain their prior semantics. The new unit
+asserts both paths; all raw probe details remain intact. See
+evidence/original-container-ci71.json. These corrections await their own CI.
+Full F08, every other open task and product/package/resource/owner gates remain
+mandatory. No local source compilation, tests, GUI or media execution was run.
