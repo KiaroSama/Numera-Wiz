@@ -58,15 +58,23 @@ fn rss_high_kib(pid: u64) -> u64 {
         .unwrap()
 }
 fn retained_publication_objects(workspace: &Path, output: &Path) -> bool {
-    let paths: Vec<_> = std::fs::read_dir(workspace).unwrap().map(|entry| entry.unwrap().path()).collect();
+    let paths: Vec<_> = std::fs::read_dir(workspace)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
     paths.len() == 2
-        && paths.iter().any(|path| path.file_name().is_some_and(|name| name == "payload.mkv"))
+        && paths
+            .iter()
+            .any(|path| path.file_name().is_some_and(|name| name == "payload.mkv"))
         && paths.iter().any(|path| {
-            path.file_name().and_then(|name| name.to_str())
+            path.file_name()
+                .and_then(|name| name.to_str())
                 .and_then(|name| name.strip_prefix(".numera-proof-"))
                 .is_some_and(|name| uuid::Uuid::parse_str(name).is_ok())
         })
-        && paths.iter().all(|path| nw_platform::files::same_object(path, output).unwrap_or(false))
+        && paths
+            .iter()
+            .all(|path| nw_platform::files::same_object(path, output).unwrap_or(false))
 }
 async fn cleaned_index(workspace: &Path, output: &Path) {
     let started = Instant::now();
@@ -415,7 +423,14 @@ async fn journey() {
     cleaned_index(&workspace, &output).await;
     let high = high.max(rss_high_kib(pid));
     assert!(high < 128 * 1024);
-    std::fs::write(evidence.join("large-http-transfer.json"), serde_json::to_vec_pretty(&json!({"schema_version":1,"status":"passed","executable":executable,"registry":runtime_record["registry"],"components":{"ffmpeg":plan["ffmpeg"],"ffprobe":plan["ffprobe"]},"job_id":id,"plan_id":plan["id"],"plan_hash":plan["hash"],"artifact_id":artifact_id,"source":std::env::var("GITHUB_SHA").ok(),"artifact_bytes":total.to_string(),"sha256":expected.sha256,"owner_process_id":pid,"owner_before_high_kib":before,"owner_high_kib":high,"selected_owner_rss_ceiling_kib":131072,"job_revoked_delivered_bytes":job_revoked_bytes.to_string(),"credential_revoked_delivered_bytes":credential_revoked_bytes.to_string(),"cancelled_index_cleanup":true,"scope":"Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification."})).unwrap()).unwrap();
+    let report = json!({"schema_version":1,"status":"passed","executable":executable,"registry":runtime_record["registry"],"components":{"ffmpeg":plan["ffmpeg"],"ffprobe":plan["ffprobe"]},"job_id":id,"plan_id":plan["id"],"plan_hash":plan["hash"],"artifact_id":artifact_id,"source":std::env::var("GITHUB_SHA").ok(),"artifact_bytes":total.to_string(),"sha256":expected.sha256,"owner_process_id":pid,"owner_before_high_kib":before,"owner_high_kib":high,"selected_owner_rss_ceiling_kib":131072,"job_revoked_delivered_bytes":job_revoked_bytes.to_string(),"credential_revoked_delivered_bytes":credential_revoked_bytes.to_string(),"cancelled_index_cleanup":true,"scope":"Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification."});
+    let encoded = serde_json::to_vec_pretty(&report).unwrap();
+    assert!(
+        encoded.len() <= 16 * 1024,
+        "Nonsecret hosted HTTP evidence must remain bounded"
+    );
+    std::fs::write(evidence.join("large-http-transfer.json"), encoded).unwrap();
+    println!("NW_ARTIFACT_HTTP_REPORT:{}", serde_json::to_string(&report).unwrap());
     controller.kill().await.unwrap();
     controller.wait().await.unwrap();
 }

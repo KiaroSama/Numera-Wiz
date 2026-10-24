@@ -854,6 +854,56 @@
           "observed_outcome": "All native timestamp/native-publication, denial-policy, canonical-number/hash and old-store preservation regressions passed. Actual Linux required copy/remux, CLI/SDK facts and existing native/Chrome copy journeys passed. Native PNG personally inspected. Explicit control variants, generation migration, packages/resources/GPU remain open."
         }
       ]
+    },
+    {
+      "subject_id": "cleanup.selection_report",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/reports.rs",
+        "crates/nw-service/src/runtime.rs",
+        "crates/nw-ui/src/cleanup.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "f4d6ff05336c9f3f5ecdd77571bb55c58d92851d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40078904727",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci68.json",
+          "observed_outcome": "All four ordinary native report/rights units and actual CLI/official SDK report calls passed. Actual Chrome pointer/network-response journey and personally inspected PNG showed all three unique source/retained rows. Native report GUI, further control/page variants and complete F08 remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "publication.held_directory_links",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/publication.rs",
+        "crates/nw-engine/src/lib.rs",
+        "apps/numera-wiz/tests/artifact_http.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "f4d6ff05336c9f3f5ecdd77571bb55c58d92851d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40078904727",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci68.json",
+          "observed_outcome": "Held-directory no-replace/namespace-swap regressions passed in the native suites. Actual copy/remux and CLI/SDK/large owner HTTP journeys passed with exact retained payload/proof objects and transient-index cleanup. Complete recovery, retention and package/filesystem/resource qualification remain open."
+        }
+      ]
     }
   ]
 }

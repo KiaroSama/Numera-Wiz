@@ -1002,3 +1002,30 @@ actual Chrome pointer/network response. Both actual report images are retained
 with bounded log transport for visual review. These source changes await CI.
 Folder/batch plans, full F08, project/editor/effects, generation migration,
 packages/resources/manuals and owner harness/evidence all remain mandatory.
+
+
+## Selection report and complete media hosted checkpoint
+
+Run 40078904727 on f4d6ff05336c9f3f5ecdd77571bb55c58d92851d passed
+all four ordinary native suites, new report/rights regressions, locked WASM,
+the full actual engine/CLI/official SDK/lost-response job and the corrected
+large owner HTTP/revocation/disconnect-index cleanup test. Its Chrome report
+button completed the actual canonical HTTP response before continuing through
+Review/Run and byte verification. The actual report PNG was personally inspected:
+one ready candidate and all three unique source/retained rows are visible.
+See evidence/selection-reports-ci68.json. Formatting and the UI source-order
+Clippy check failed; this revision applies all 38 exact hosted hunks and moves
+the report implementation before its test module. The native report job was
+skipped and is not credited. Original-index activation and large-page variants
+still require their own journeys.
+
+All 17 preserved standalone MuxCls module bodies have now been personally read,
+with exact Git blob/source pins and individual interpretations in reading-ledger.
+This does not claim complete embedded-variant body reading, rewrite support or
+donor/package qualification. The immutable research archive is unchanged.
+
+The hosted large HTTP fixture additionally emits at most 16 KiB of its existing
+nonsecret report to its test log, making exact measured metadata review possible
+without a local execution environment. It never emits credentials or application/
+MCP stdout. This evidence transport addition awaits its own CI. All remaining
+task-ledger work and release/owner gates remain mandatory.

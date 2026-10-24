@@ -1269,12 +1269,17 @@ impl Service {
                     if cancellation.is_cancelled() {
                         return Err(DomainError::new("CANCELLED", "Selection report cancelled"));
                     }
-                    let asset: Asset = self.store.get(&named("asset", id)?)?
+                    let asset: Asset = self
+                        .store
+                        .get(&named("asset", id)?)?
                         .ok_or_else(DomainError::object_not_found)?;
                     self.object(&context, &asset.id, &asset.creator)?;
                     self.path(&context, Path::new(&asset.identity.path), false)?;
                     let label = if asset.display_name.is_empty() {
-                        Path::new(&asset.identity.path).file_name().and_then(|name| name.to_str()).unwrap_or("media")
+                        Path::new(&asset.identity.path)
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or("media")
                     } else {
                         &asset.display_name
                     };
@@ -1284,10 +1289,19 @@ impl Service {
                 if current.as_ref().map(|profile| profile.revision)
                     != policy.as_ref().map(|profile| profile.revision)
                 {
-                    return Err(DomainError::new("STALE_REVISION", "Access policy changed while building the selection report"));
+                    return Err(DomainError::new(
+                        "STALE_REVISION",
+                        "Access policy changed while building the selection report",
+                    ));
                 }
-                if current.as_ref().is_some_and(|profile| !profile.allows_command("streams.clean.report")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Selection report command access was revoked"));
+                if current
+                    .as_ref()
+                    .is_some_and(|profile| !profile.allows_command("streams.clean.report"))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Selection report command access was revoked",
+                    ));
                 }
                 value(&report.finish()?)?
             }
@@ -1961,11 +1975,18 @@ mod tests {
         (root, service, context, request, output)
     }
     #[tokio::test]
-    async fn selection_report_requires_current_asset_and_path_rights_and_rejects_mixed_disclosure() {
+    async fn selection_report_requires_current_asset_and_path_rights_and_rejects_mixed_disclosure()
+    {
         let (_root, service, context, request, _) = preflight_fixture().await;
-        let plan = service.store.get_plan(request.params["plan_id"].as_str().unwrap()).unwrap().unwrap();
+        let plan = service
+            .store
+            .get_plan(request.params["plan_id"].as_str().unwrap())
+            .unwrap()
+            .unwrap();
         let mut profile: AccessProfile = service.store.get("profile/preflight").unwrap().unwrap();
-        profile.allowed_command_ids.insert("streams.clean.report".into());
+        profile
+            .allowed_command_ids
+            .insert("streams.clean.report".into());
         service.store.put("profile/preflight", &profile).unwrap();
         let asset = plan.source.clone();
         service.store.put("asset/preflight-asset", &asset).unwrap();
@@ -1973,21 +1994,44 @@ mod tests {
         foreign.id = "foreign-report-asset".into();
         foreign.creator = "another-principal".into();
         foreign.display_name = "PRIVATE-REPORT-FILENAME".into();
-        service.store.put("asset/foreign-report-asset", &foreign).unwrap();
+        service
+            .store
+            .put("asset/foreign-report-asset", &foreign)
+            .unwrap();
         let intent = json!({
             "audio_selection":{"selector":{"mode":"all"},"no_match":"skip_file"},
             "subtitle_selection":{"selector":{"mode":"none"},"no_match":"allow_empty"},
             "preservation":nw_domain::mux::Preservation::default()
         });
-        let query = |ids: Value| Request::query("streams.clean.report", json!({"asset_ids":ids,"intent":intent}));
-        let response = service.dispatch(context.clone(), query(json!([asset.id]))).await;
+        let query = |ids: Value| {
+            Request::query(
+                "streams.clean.report",
+                json!({"asset_ids":ids,"intent":intent}),
+            )
+        };
+        let response = service
+            .dispatch(context.clone(), query(json!([asset.id])))
+            .await;
         assert!(response.ok, "{response:?}");
         let report = response.result.unwrap();
         assert_eq!(report["resolved_files"], 1);
-        assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1]));
-        let foreign_response = service.dispatch(context.clone(), query(json!([asset.id, foreign.id]))).await;
-        let absent_response = service.dispatch(context.clone(), query(json!([asset.id, "missing-report-asset"]))).await;
-        assert_eq!(foreign_response.error.as_ref().unwrap().code, "OBJECT_NOT_FOUND");
+        assert_eq!(
+            report["files"][0]["selected_original_indices"],
+            json!([0, 1])
+        );
+        let foreign_response = service
+            .dispatch(context.clone(), query(json!([asset.id, foreign.id])))
+            .await;
+        let absent_response = service
+            .dispatch(
+                context.clone(),
+                query(json!([asset.id, "missing-report-asset"])),
+            )
+            .await;
+        assert_eq!(
+            foreign_response.error.as_ref().unwrap().code,
+            "OBJECT_NOT_FOUND"
+        );
         assert_eq!(
             serde_json::to_value(foreign_response.error).unwrap(),
             serde_json::to_value(absent_response.error).unwrap()
@@ -1996,7 +2040,9 @@ mod tests {
         profile.revision += 1;
         profile.read_roots.clear();
         service.store.put("profile/preflight", &profile).unwrap();
-        let denied = service.dispatch(context.clone(), query(json!([asset.id]))).await;
+        let denied = service
+            .dispatch(context.clone(), query(json!([asset.id])))
+            .await;
         assert_eq!(denied.error.unwrap().code, "PATH_DENIED");
         profile.revision += 1;
         profile.allowed_command_ids.remove("streams.clean.report");

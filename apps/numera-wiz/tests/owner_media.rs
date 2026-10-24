@@ -173,12 +173,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
-    let report = cli.query(
-        "streams.clean.report",
-        json!({"asset_ids":[asset["id"]],"intent":fixture::rules()}),
-    ).await;
+    let report = cli
+        .query(
+            "streams.clean.report",
+            json!({"asset_ids":[asset["id"]],"intent":fixture::rules()}),
+        )
+        .await;
     assert_eq!(report["resolved_files"], 1);
-    assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
     assert_eq!(report["unique_streams"].as_array().unwrap().len(), 3);
     let output = media.directory.path().join("cli-copy.mkv");
     let plan = cli
@@ -290,7 +295,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({})
     );
     assert_eq!(report["resolved_files"], 1);
-    assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
     let mut rules = fixture::rules();
     rules.audio_order = vec![2, 1];
     rules.stream_tag_patches = vec![StreamTagPatch {
@@ -654,7 +662,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({})
         );
         assert_eq!(report["resolved_files"], 1);
-        assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+        assert_eq!(
+            report["files"][0]["selected_original_indices"],
+            json!([0, 1, 2])
+        );
         let output = media.directory.path().join(format!("http-{ordinal}.mkv"));
         let plan = call!(
             http,

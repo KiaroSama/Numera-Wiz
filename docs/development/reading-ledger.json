@@ -1401,6 +1401,102 @@
       "read_scope": "complete_body",
       "lines": 409,
       "interpretation": "Scan inventory, case-insensitive unique language/title/codec summaries, original stream-index counts and per-file selection previews are product behavior. Shared typed paged projections must replace console-only reporting without losing unmatched files or confusing inventory with verification. Echo-to-log behavior must preserve privacy and bounded diagnostics; display colors are adapter presentation, not domain authority."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/__init__.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "ca91a49572d12e4ba4c51059c1c57ca3986400ff",
+      "read_scope": "complete_body",
+      "lines": 5,
+      "interpretation": "The package initializer exposes version 1.3.1 while constants.py says 1.8.0. Those donor labels are inconsistent behavioral provenance, never the runtime/component identity. Numera uses its own identified application, registry and exact component hashes."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/constants.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "32e3863e08b459dde984251c040c737d1c5581cb",
+      "read_scope": "complete_body",
+      "lines": 98,
+      "interpretation": "The six filename hints, 120-second probe, 5-second kill grace, 4 MiB copy buffer and 10800-second operation default are concrete donor behavior. Timeout disabling must be explicit and finite typed validation must reject NaN/infinity; filename partial markers are not ownership. Source container and full copy deadlines remain implementation obligations."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/metadata_edits.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "cf4a8f3109df824d65fb4fb230f64979a2099889",
+      "read_scope": "complete_body",
+      "lines": 230,
+      "interpretation": "Only retained audio/subtitle streams are editable, with original index/language choices and partial stable reorders. Editing output never mutates source. Rust's typed Keep/Set/Clear and original-snapshot predicates preserve the behavior without the donor's empty-string ambiguity; full actual control variants remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "0d458aaef747551b972a41d972221e07267aa4e9",
+      "read_scope": "complete_body",
+      "lines": 264,
+      "interpretation": "Selection uses original indices and normalized language, ordered subsets preserve unnamed relative order, duplicate order entries are honored once, and patches match original stream properties. The donor maps only video/audio/subtitle/attachments and restores default alone; Rust requires explicit complete retained-category maps and full dispositions. Copy is valid only when the entire effective outcome is unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/logsetup.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "292c475b7216b4ae849b41952f05ca55acaa9a6f",
+      "read_scope": "complete_body",
+      "lines": 120,
+      "interpretation": "UTC severity, environment/component provenance and useful failure tails are required, but debug-only command visibility, unbounded captured strings and unsanitized raw argv are unsuitable. Rust logs prepared vectors before execution with protected bounded rotating records and credential/privacy handling; support export remains mandatory."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/app.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "bb7beaa493e95e0d14e0d39305f24adfa604f8a0",
+      "read_scope": "complete_body",
+      "lines": 233,
+      "interpretation": "The no-project utility flow includes native/drag-drop intake, explicit probe failures, inventories, rule review/back, output review, processing, per-file result summaries and repeated tasks. Optional postpublication verification is a donor defect. The new query covers inventory/selection preview only; folder work, defaults and remaining full workflow still require implementation and evidence."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/media.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "c57a4e87d7bd147fee20c3f76dbc2f7386ca5482",
+      "read_scope": "complete_body",
+      "lines": 382,
+      "interpretation": "Discovery and scan failures must remain explicit; timeout/progress parsing must distinguish unavailable, invalid and exact observations. Donor float NaN/infinity, UTF-8 replacement, full lifetime output rereads, shell/PATH tool selection and termination claims cannot be copied as safety evidence. Rust uses admitted held inputs and finite supervised processes; complete discovery/progress and copy deadline behavior remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/prompts.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "282cfa035bae8a75593c01b0150b03a7d304dcf3",
+      "read_scope": "complete_body",
+      "lines": 313,
+      "interpretation": "Defaults, back/quit navigation, unknown index review and no-overwrite output choices need equivalent shared human controls. Donor navigation token 0 conflicts with a valid original stream index, so the Rust typed index field retains index 0. A failed path resolve cannot establish separation or authority, and private prompt values must not be logged wholesale."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/textutil.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "f87ffd9671607b9d0e416346c1211a10dc213a90",
+      "read_scope": "complete_body",
+      "lines": 326,
+      "interpretation": "Language aliases and original indices, truthful unknown sizes, escaped human display and redirected plain output are reusable semantics. The donor CSV parser silently accepts valid subsets of malformed input, and its byte-size/elapsed floats are presentation rather than exact media time. Rust rejects malformed numeric CSV and keeps exact domain clocks; complete reporting/progress remains required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/colors.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "01c5f1024681d868fbe40114c0f56b9d606cab7c",
+      "read_scope": "complete_body",
+      "lines": 264,
+      "interpretation": "This module is presentation-only ANSI palette/stripping and Windows console activation. No shell/ctypes runtime should be imported into Rust. Shared GUI uses the admitted FilmCraft presentation; CLI JSON/MCP remain protocol-only and logs must not contain terminal cursor/control sequences or credentials."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/progressview.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "ac00eb813b28dca1d079c7a71a35aae66f7f2535",
+      "read_scope": "complete_body",
+      "lines": 406,
+      "interpretation": "The donor uses bounded terminal viewport rendering and frame throttling, but deriving shown bytes from a percentage is an estimate, not measured I/O, and finished-file progress includes skipped/failed files. Rust must keep unknown progress unknown, measured bytes separate from estimates, explicit success totals and bounded paged human views. Full live progress remains required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/selection.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "6e41f183bfbca7def676c419f59c8110fbef62de",
+      "read_scope": "complete_body",
+      "lines": 589,
+      "interpretation": "All/language/title/original-index selection, explicit no-track choices, stable back/revisit state, retained-stream metadata edits and folder companion defaults are real behavior. Automatic attachment removal when subtitles are absent/removed is the confirmed coupling defect; Rust preserves independent attachment policy. A single audio track remains a choice. These bodies do not qualify complete F08."
     }
   ]
 }

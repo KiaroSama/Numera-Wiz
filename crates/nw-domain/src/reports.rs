@@ -22,7 +22,10 @@ impl ReportInput {
     pub fn validate(&self) -> Result<()> {
         if self.asset_ids.is_empty()
             || self.asset_ids.len() > MAX_REPORT_ASSETS
-            || self.asset_ids.iter().any(|id| id.is_empty() || id.len() > 128)
+            || self
+                .asset_ids
+                .iter()
+                .any(|id| id.is_empty() || id.len() > 128)
             || self.asset_ids.iter().collect::<BTreeSet<_>>().len() != self.asset_ids.len()
         {
             return Err(DomainError::new(
@@ -100,9 +103,26 @@ impl ReportBuilder {
         };
         match mux::resolve(streams, intent) {
             Ok(resolved) => {
-                file.matched_audio_count = Some(resolved.streams.iter().filter(|s| s.kind == StreamKind::Audio).count() as u32);
-                file.matched_subtitle_count = Some(resolved.streams.iter().filter(|s| s.kind == StreamKind::Subtitle).count() as u32);
-                file.selected_original_indices = resolved.outcomes.iter().filter(|outcome| outcome.output_index.is_some()).map(|outcome| outcome.source_index).collect();
+                file.matched_audio_count = Some(
+                    resolved
+                        .streams
+                        .iter()
+                        .filter(|s| s.kind == StreamKind::Audio)
+                        .count() as u32,
+                );
+                file.matched_subtitle_count = Some(
+                    resolved
+                        .streams
+                        .iter()
+                        .filter(|s| s.kind == StreamKind::Subtitle)
+                        .count() as u32,
+                );
+                file.selected_original_indices = resolved
+                    .outcomes
+                    .iter()
+                    .filter(|outcome| outcome.output_index.is_some())
+                    .map(|outcome| outcome.source_index)
+                    .collect();
                 file.warnings = resolved.warnings;
                 file.action = Some(resolved.action);
             }
@@ -115,21 +135,34 @@ impl ReportBuilder {
             self.charge(error.message.len().saturating_add(error.code.len()))?;
         }
         for stream in streams {
-            let language = mux::normalize_language(stream.tags.get("language").map_or("und", String::as_str));
+            let language =
+                mux::normalize_language(stream.tags.get("language").map_or("und", String::as_str));
             let title = stream.tags.get("title").cloned().unwrap_or_default();
             let retained = u32::from(file.selected_original_indices.contains(&stream.index));
             for source_index in [None, Some(stream.index)] {
-                let key = (kind_key(stream), source_index, language.to_lowercase(), title.to_lowercase(), stream.codec.to_lowercase());
+                let key = (
+                    kind_key(stream),
+                    source_index,
+                    language.to_lowercase(),
+                    title.to_lowercase(),
+                    stream.codec.to_lowercase(),
+                );
                 let row_count = self.rows.len();
-                let text_bytes = language.len().saturating_add(title.len()).saturating_add(stream.codec.len())
-                    .saturating_add(key.2.len()).saturating_add(key.3.len()).saturating_add(key.4.len());
+                let text_bytes = language
+                    .len()
+                    .saturating_add(title.len())
+                    .saturating_add(stream.codec.len())
+                    .saturating_add(key.2.len())
+                    .saturating_add(key.3.len())
+                    .saturating_add(key.4.len());
                 let summary = match self.rows.entry(key) {
                     std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
                     std::collections::btree_map::Entry::Vacant(entry) => {
                         if row_count >= MAX_SUMMARY_ROWS {
                             return Err(limit());
                         }
-                        self.text_bytes = self.text_bytes.checked_add(text_bytes).ok_or_else(limit)?;
+                        self.text_bytes =
+                            self.text_bytes.checked_add(text_bytes).ok_or_else(limit)?;
                         if self.text_bytes > MAX_TEXT_BYTES {
                             return Err(limit());
                         }
@@ -160,10 +193,30 @@ impl ReportBuilder {
         Ok(())
     }
     pub fn finish(self) -> Result<SelectionReport> {
-        let resolved_files = self.files.iter().filter(|file| matches!(file.action, Some(CleanAction::CopyUnchanged | CleanAction::Remux))).count() as u32;
-        let skipped_files = self.files.iter().filter(|file| file.action == Some(CleanAction::Skip)).count() as u32;
-        let rejected_files = self.files.iter().filter(|file| file.error.is_some()).count() as u32;
-        let (unique_streams, original_index_streams) = self.rows.into_values().partition(|row| row.source_index.is_none());
+        let resolved_files = self
+            .files
+            .iter()
+            .filter(|file| {
+                matches!(
+                    file.action,
+                    Some(CleanAction::CopyUnchanged | CleanAction::Remux)
+                )
+            })
+            .count() as u32;
+        let skipped_files = self
+            .files
+            .iter()
+            .filter(|file| file.action == Some(CleanAction::Skip))
+            .count() as u32;
+        let rejected_files = self
+            .files
+            .iter()
+            .filter(|file| file.error.is_some())
+            .count() as u32;
+        let (unique_streams, original_index_streams) = self
+            .rows
+            .into_values()
+            .partition(|row| row.source_index.is_none());
         let report = SelectionReport {
             files: self.files,
             unique_streams,
@@ -173,7 +226,11 @@ impl ReportBuilder {
             rejected_files,
             scope: "Registered source inventory and pure selection preview; no fresh probe, output compatibility admission, byte verification or produced artifact".into(),
         };
-        if serde_json::to_vec(&report).map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))?.len() > MAX_REPORT_BYTES {
+        if serde_json::to_vec(&report)
+            .map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))?
+            .len()
+            > MAX_REPORT_BYTES
+        {
             return Err(limit());
         }
         Ok(report)
@@ -205,35 +262,106 @@ mod tests {
     use crate::mux::{NoMatch, Preservation, Selection, Selector};
     fn intent() -> CleanIntent {
         CleanIntent {
-            audio_selection: Selection { selector: Selector::Languages { values: vec!["fas".into()] }, no_match: NoMatch::SkipFile },
-            subtitle_selection: Selection { selector: Selector::None, no_match: NoMatch::AllowEmpty },
-            audio_order: vec![], subtitle_order: vec![], stream_tag_patches: vec![],
+            audio_selection: Selection {
+                selector: Selector::Languages {
+                    values: vec!["fas".into()],
+                },
+                no_match: NoMatch::SkipFile,
+            },
+            subtitle_selection: Selection {
+                selector: Selector::None,
+                no_match: NoMatch::AllowEmpty,
+            },
+            audio_order: vec![],
+            subtitle_order: vec![],
+            stream_tag_patches: vec![],
             preservation: Preservation::default(),
         }
     }
     fn stream(index: u32, kind: StreamKind, language: &str, title: &str) -> Stream {
         Stream {
-            index, kind, codec: "fixture".into(),
-            tags: BTreeMap::from([("language".into(), language.into()), ("title".into(), title.into())]),
+            index,
+            kind,
+            codec: "fixture".into(),
+            tags: BTreeMap::from([
+                ("language".into(), language.into()),
+                ("title".into(), title.into()),
+            ]),
             dispositions: BTreeSet::new(),
         }
     }
     #[test]
     fn grouping_preserves_original_indices_and_counts_skip_and_rejection_separately() {
         let mut report = ReportBuilder::default();
-        report.add("a", "first.mkv", &[stream(0, StreamKind::Video, "und", ""), stream(2, StreamKind::Audio, "FAS", "Dialogue")], &intent()).unwrap();
-        report.add("b", "second.mkv", &[stream(0, StreamKind::Video, "unknown", ""), stream(5, StreamKind::Audio, "fas", "dialogue")], &intent()).unwrap();
-        report.add("c", "unmatched.mkv", &[stream(0, StreamKind::Video, "und", ""), stream(1, StreamKind::Audio, "eng", "Other")], &intent()).unwrap();
-        report.add("d", "audio-only.mkv", &[stream(0, StreamKind::Audio, "fas", "Dialogue")], &intent()).unwrap();
+        report
+            .add(
+                "a",
+                "first.mkv",
+                &[
+                    stream(0, StreamKind::Video, "und", ""),
+                    stream(2, StreamKind::Audio, "FAS", "Dialogue"),
+                ],
+                &intent(),
+            )
+            .unwrap();
+        report
+            .add(
+                "b",
+                "second.mkv",
+                &[
+                    stream(0, StreamKind::Video, "unknown", ""),
+                    stream(5, StreamKind::Audio, "fas", "dialogue"),
+                ],
+                &intent(),
+            )
+            .unwrap();
+        report
+            .add(
+                "c",
+                "unmatched.mkv",
+                &[
+                    stream(0, StreamKind::Video, "und", ""),
+                    stream(1, StreamKind::Audio, "eng", "Other"),
+                ],
+                &intent(),
+            )
+            .unwrap();
+        report
+            .add(
+                "d",
+                "audio-only.mkv",
+                &[stream(0, StreamKind::Audio, "fas", "Dialogue")],
+                &intent(),
+            )
+            .unwrap();
         let report = report.finish().unwrap();
-        assert_eq!((report.resolved_files, report.skipped_files, report.rejected_files), (2, 1, 1));
+        assert_eq!(
+            (
+                report.resolved_files,
+                report.skipped_files,
+                report.rejected_files
+            ),
+            (2, 1, 1)
+        );
         assert!(report.files[2].selected_original_indices.is_empty());
-        assert_eq!(report.files[3].error.as_ref().unwrap().code, "VIDEO_REQUIRED");
-        let summary = report.unique_streams.iter().find(|row| row.kind == StreamKind::Audio && row.language == "fas").unwrap();
+        assert_eq!(
+            report.files[3].error.as_ref().unwrap().code,
+            "VIDEO_REQUIRED"
+        );
+        let summary = report
+            .unique_streams
+            .iter()
+            .find(|row| row.kind == StreamKind::Audio && row.language == "fas")
+            .unwrap();
         assert_eq!((summary.source_count, summary.retained_count), (3, 2));
         assert_eq!(summary.title, "Dialogue");
         for index in [0, 2, 5] {
-            assert!(report.original_index_streams.iter().any(|row| row.kind == StreamKind::Audio && row.source_index == Some(index)));
+            assert!(
+                report
+                    .original_index_streams
+                    .iter()
+                    .any(|row| row.kind == StreamKind::Audio && row.source_index == Some(index))
+            );
         }
     }
     #[test]
@@ -257,18 +385,38 @@ mod tests {
         let mut cover = stream(1, StreamKind::Video, "und", "");
         cover.dispositions.insert("attached_pic".into());
         let mut report = ReportBuilder::default();
-        report.add("a", "covers.mkv", &[video, cover], &rules).unwrap();
+        report
+            .add("a", "covers.mkv", &[video, cover], &rules)
+            .unwrap();
         let report = report.finish().unwrap();
         assert_eq!(report.unique_streams.len(), 2);
-        assert_eq!(report.unique_streams.iter().filter(|row| row.attached_picture).count(), 1);
-        assert!(report.unique_streams.iter().all(|row| row.retained_count == 1));
+        assert_eq!(
+            report
+                .unique_streams
+                .iter()
+                .filter(|row| row.attached_picture)
+                .count(),
+            1
+        );
+        assert!(
+            report
+                .unique_streams
+                .iter()
+                .all(|row| row.retained_count == 1)
+        );
     }
     #[test]
     fn inventory_backpressure_never_silently_truncates_source_metadata() {
         let mut report = ReportBuilder::default();
         let huge = stream(0, StreamKind::Video, "und", &"x".repeat(MAX_TEXT_BYTES));
-        assert_eq!(report.add("a", "a", &[huge], &intent()).unwrap_err().code, "RESOURCE_LIMIT");
-        let mut input = ReportInput { asset_ids: vec!["a".into(), "a".into()], intent: intent() };
+        assert_eq!(
+            report.add("a", "a", &[huge], &intent()).unwrap_err().code,
+            "RESOURCE_LIMIT"
+        );
+        let mut input = ReportInput {
+            asset_ids: vec!["a".into(), "a".into()],
+            intent: intent(),
+        };
         assert!(input.validate().is_err());
         input.asset_ids = vec![];
         assert!(input.validate().is_err());

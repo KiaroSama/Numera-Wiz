@@ -762,10 +762,21 @@ mod tests {
             let report_response = loop {
                 // Inspect actual Chrome network events in memory. Never retain
                 // raw headers, cookies, pairing proof or unrelated request bodies.
-                let events = driver(&client, &base, reqwest::Method::POST, &format!("{route}/se/log"), json!({"type":"performance"})).await;
+                let events = driver(
+                    &client,
+                    &base,
+                    reqwest::Method::POST,
+                    &format!("{route}/se/log"),
+                    json!({"type":"performance"}),
+                )
+                .await;
                 let mut finished = false;
                 for entry in events.as_array().unwrap() {
-                    let Ok(event) = serde_json::from_str::<Value>(entry["message"].as_str().unwrap()) else { continue; };
+                    let Ok(event) =
+                        serde_json::from_str::<Value>(entry["message"].as_str().unwrap())
+                    else {
+                        continue;
+                    };
                     let message = &event["message"];
                     let params = &message["params"];
                     if message["method"] == "Network.requestWillBeSent"
@@ -784,26 +795,51 @@ mod tests {
                     }
                 }
                 if finished {
-                    let body = driver(&client, &base, reqwest::Method::POST, &format!("{route}/goog/cdp/execute"), json!({
-                        "cmd":"Network.getResponseBody","params":{"requestId":report_request}
-                    })).await;
+                    let body = driver(
+                        &client,
+                        &base,
+                        reqwest::Method::POST,
+                        &format!("{route}/goog/cdp/execute"),
+                        json!({
+                            "cmd":"Network.getResponseBody","params":{"requestId":report_request}
+                        }),
+                    )
+                    .await;
                     assert_eq!(body["base64Encoded"], false);
-                    break nw_domain::commands::decode_json(body["body"].as_str().unwrap().as_bytes()).unwrap();
+                    break nw_domain::commands::decode_json(
+                        body["body"].as_str().unwrap().as_bytes(),
+                    )
+                    .unwrap();
                 }
-                assert!(started.elapsed() < Duration::from_secs(15), "Actual browser Selection report click did not complete its canonical HTTP response");
+                assert!(
+                    started.elapsed() < Duration::from_secs(15),
+                    "Actual browser Selection report click did not complete its canonical HTTP response"
+                );
                 tokio::time::sleep(Duration::from_millis(100)).await;
             };
             assert_eq!(report_response["ok"], true, "{report_response}");
             assert_eq!(report_response["result"]["resolved_files"], 1);
-            assert_eq!(report_response["result"]["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+            assert_eq!(
+                report_response["result"]["files"][0]["selected_original_indices"],
+                json!([0, 1, 2])
+            );
             std::fs::write(directory.join("selection-report.json"), serde_json::to_vec_pretty(&json!({
                 "actual_ui_response":report_response,
                 "scope":"Actual shared Selection report mouse input and real Chrome HTTP response; no direct handler invocation substituted for the UI"
             })).unwrap()).unwrap();
             tokio::time::sleep(Duration::from_millis(500)).await;
-            let report_png = driver(&client, &base, reqwest::Method::GET, &format!("{route}/screenshot"), Value::Null).await;
+            let report_png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
             let report_png = report_png.as_str().unwrap();
-            let report_bytes = base64::engine::general_purpose::STANDARD.decode(report_png).unwrap();
+            let report_bytes = base64::engine::general_purpose::STANDARD
+                .decode(report_png)
+                .unwrap();
             std::fs::write(directory.join("selection-report.png"), &report_bytes).unwrap();
             if report_bytes.len() <= 256 * 1024 {
                 println!("NW_BROWSER_SELECTION_IMAGE:{report_png}");
