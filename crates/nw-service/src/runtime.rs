@@ -492,7 +492,11 @@ impl Service {
         };
         let policy = self.policy(&context)?;
         let now = self.clock.now()?;
-        if durable && let Some(response) = self.store.replay_with_clock(&context.principal, &request, || self.clock.now())? {
+        if durable
+            && let Some(response) =
+                self.store
+                    .replay_with_clock(&context.principal, &request, || self.clock.now())?
+        {
             return Ok(response);
         }
         if let Some(profile) = &policy
@@ -744,9 +748,13 @@ impl Service {
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 let output = self.path(&context, Path::new(&input.output), true)?;
-                let plan =
-                    self.engine()?
-                        .clean_plan_at(asset, &output, &input.intent, &context.principal, now)?;
+                let plan = self.engine()?.clean_plan_at(
+                    asset,
+                    &output,
+                    &input.intent,
+                    &context.principal,
+                    now,
+                )?;
                 self.store.put(&named("plan", &plan.id)?, &plan)?;
                 value(&plan)?
             }
@@ -1111,13 +1119,25 @@ mod tests {
     #[tokio::test]
     async fn a_waiting_request_cannot_accept_a_profile_snapshot_from_before_revocation() {
         let directory = tempfile::tempdir().unwrap();
-        let service = Service::open(directory.path().to_owned(), None).await.unwrap();
+        let service = Service::open(directory.path().to_owned(), None)
+            .await
+            .unwrap();
         let mut profile = AccessProfile {
-            id: "waiting-reader".into(), name: "waiting-reader".into(), principal: "waiting-principal".into(),
-            revision: 1, enabled: true, client_sessions: false,
-            commands: ["access.replay_scope.create".into()].into(), objects: Default::default(), read_roots: Vec::new(), write_roots: Vec::new(),
+            id: "waiting-reader".into(),
+            name: "waiting-reader".into(),
+            principal: "waiting-principal".into(),
+            revision: 1,
+            enabled: true,
+            client_sessions: false,
+            commands: ["access.replay_scope.create".into()].into(),
+            objects: Default::default(),
+            read_roots: Vec::new(),
+            write_roots: Vec::new(),
         };
-        service.store.put("profile/waiting-reader", &profile).unwrap();
+        service
+            .store
+            .put("profile/waiting-reader", &profile)
+            .unwrap();
         let context = service.profile_context("waiting-reader").unwrap();
         let guard = service.mutation.lock().unwrap();
         let (started, ready) = std::sync::mpsc::channel();
@@ -1126,14 +1146,27 @@ mod tests {
         let worker = std::thread::spawn(move || {
             let _entered = runtime.enter();
             started.send(()).unwrap();
-            request_service.dispatch_sync(context, Request::query("access.replay_scope.create", json!({})), CancellationToken::new())
+            request_service.dispatch_sync(
+                context,
+                Request::query("access.replay_scope.create", json!({})),
+                CancellationToken::new(),
+            )
         });
-        ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        ready
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(100));
-        profile.enabled = false; profile.revision = 2;
-        service.store.put("profile/waiting-reader", &profile).unwrap();
+        profile.enabled = false;
+        profile.revision = 2;
+        service
+            .store
+            .put("profile/waiting-reader", &profile)
+            .unwrap();
         drop(guard);
-        assert_eq!(worker.join().unwrap().unwrap_err().code, "PERMISSION_DENIED");
+        assert_eq!(
+            worker.join().unwrap().unwrap_err().code,
+            "PERMISSION_DENIED"
+        );
     }
     async fn mutate(
         service: &Arc<Service>,

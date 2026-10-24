@@ -178,7 +178,12 @@ impl Store {
     pub fn replay(&self, principal: &str, request: &Request, now: u64) -> Result<Option<Response>> {
         self.replay_with_clock(principal, request, || Ok(now))
     }
-    pub fn replay_with_clock(&self, principal: &str, request: &Request, clock: impl FnOnce() -> Result<u64>) -> Result<Option<Response>> {
+    pub fn replay_with_clock(
+        &self,
+        principal: &str,
+        request: &Request,
+        clock: impl FnOnce() -> Result<u64>,
+    ) -> Result<Option<Response>> {
         let read = self.db.begin_read().map_err(storage)?;
         let now = clock()?;
         let (key, _) = self.replay_key(principal, request, now)?;

@@ -142,7 +142,11 @@ impl Store {
     pub fn issue_scope(&self, principal: &str, now: u64) -> Result<String> {
         self.issue_scope_with_clock(principal, || Ok(now))
     }
-    pub fn issue_scope_with_clock(&self, principal: &str, clock: impl FnOnce() -> Result<u64>) -> Result<String> {
+    pub fn issue_scope_with_clock(
+        &self,
+        principal: &str,
+        clock: impl FnOnce() -> Result<u64>,
+    ) -> Result<String> {
         if principal.is_empty() || principal.len() > 128 {
             return Err(DomainError::new(
                 "VALIDATION_ERROR",
@@ -446,7 +450,11 @@ mod tests {
     };
     #[test]
     fn scope_issuance_samples_time_after_waiting_for_the_writer() {
-        use std::sync::{Arc, atomic::{AtomicU64, Ordering}, mpsc};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+            mpsc,
+        };
         let directory = tempfile::tempdir().unwrap();
         let store = Arc::new(Store::open(directory.path()).unwrap());
         let writer = store.db.begin_write().unwrap();
@@ -463,14 +471,34 @@ mod tests {
                 Ok(time)
             })
         });
-        ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
-        assert_eq!(observed.recv_timeout(std::time::Duration::from_millis(100)), Err(mpsc::RecvTimeoutError::Timeout));
+        ready
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        assert_eq!(
+            observed.recv_timeout(std::time::Duration::from_millis(100)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        );
         wall.store(80, Ordering::SeqCst);
         drop(writer);
-        assert_eq!(observed.recv_timeout(std::time::Duration::from_secs(5)).unwrap(), 80);
+        assert_eq!(
+            observed
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap(),
+            80
+        );
         let token = worker.join().unwrap().unwrap();
-        assert_eq!(store.verify_scope(&token, "writer-time-fixture", 80).unwrap().issued_at, "80");
-        assert!(store.verify_scope(&token, "writer-time-fixture", 79).is_err());
+        assert_eq!(
+            store
+                .verify_scope(&token, "writer-time-fixture", 80)
+                .unwrap()
+                .issued_at,
+            "80"
+        );
+        assert!(
+            store
+                .verify_scope(&token, "writer-time-fixture", 79)
+                .is_err()
+        );
     }
     fn job() -> Job {
         let identity = FileIdentity {

@@ -44,9 +44,10 @@ whole research pass. Installed command spelling is `$speckit-constitution`,
 `$speckit-specify`, `$speckit-clarify`, `$speckit-plan`, `$speckit-checklist`,
 `$speckit-tasks`, `$speckit-analyze`, `$speckit-implement`, `$speckit-converge`.
 
-The final application will expose `numera-wiz bridge` for stdio MCP and direct
-HTTP at configurable loopback port `1578`. These interfaces are not advertised
-as qualified until their actual typed operation and authentication tests pass.
+The development application exposes `numera-wiz bridge` for official stdio MCP
+and direct HTTP at configurable loopback port `1578`. The [MCP guide](docs/manuals/MCP.md)
+records the current typed operation and authentication boundary; the complete
+application and packaged client walkthroughs are still required.
 No source build or ordinary media test is required on the owner's machine.
 Actual GPU qualification uses the matching CI-built harness on the RTX 4070 Ti.
 
