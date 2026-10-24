@@ -1,4 +1,5 @@
 //! Native boundary: identity, no-replace publication and bounded process I/O.
+pub mod claims;
 pub mod files;
 pub mod logging;
 pub mod process;

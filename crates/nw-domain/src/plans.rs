@@ -323,15 +323,22 @@ mod tests {
         let mut plan = fixture();
         let before = plan.hash.clone();
         let raw = serde_json::to_value(&plan).unwrap();
-        assert!(raw["required_rights"]["output_create"].get("parent_object").is_none());
-        plan.required_rights.as_mut().unwrap().output_create.parent_object =
-            Some(crate::records::NativeObjectIdentity {
-                schema_version: 1,
-                kind: crate::records::NativeObjectKind::UnixDeviceInode,
-                volume: "10".into(),
-                object: "40".into(),
-                created_ns: Some("50".into()),
-            });
+        assert!(
+            raw["required_rights"]["output_create"]
+                .get("parent_object")
+                .is_none()
+        );
+        plan.required_rights
+            .as_mut()
+            .unwrap()
+            .output_create
+            .parent_object = Some(crate::records::NativeObjectIdentity {
+            schema_version: 1,
+            kind: crate::records::NativeObjectKind::UnixDeviceInode,
+            volume: "10".into(),
+            object: "40".into(),
+            created_ns: Some("50".into()),
+        });
         plan.hash = digest(&plan).unwrap();
         assert_ne!(plan.hash, before);
         let mut raw = serde_json::to_value(&plan).unwrap();

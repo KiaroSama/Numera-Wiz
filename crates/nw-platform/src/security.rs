@@ -186,7 +186,7 @@ fn check_dacl(text: &str, sid: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
+pub fn verify_private_file(path: &Path, limit: u64) -> Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| denied("Protected parent required"))?;
@@ -208,6 +208,10 @@ pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
     }
     #[cfg(windows)]
     protect_windows(path, false)?;
+    Ok(())
+}
+pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
+    verify_private_file(path, limit)?;
     fs::read(path).map_err(io_error)
 }
 pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<()> {

@@ -856,3 +856,30 @@ Run 40067320046 subsequently finished all four native targets, WASM/lock, Chrome
 and native-window interaction successfully; only formatting failed. Its exact
 six diagnostic changes are applied. These results do not qualify the new
 output-directory identity source added after that run.
+
+
+## Original output directory checkpoint and pending global claims
+
+Run [40068124936](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40068124936)
+on 791af2591dbcea9ad81783f065f78d46b1fdde1e finished all four native
+test/Clippy/desktop targets, WASM/lock, the full actual media/CLI/official SDK/large
+HTTP job, Chrome and native-window input successfully. This includes frozen
+parent semantic/legacy checks, physical replacement/child-change assertions,
+live Windows directory exclusion, Unix preflight replacement and actual media
+fresh review after parent replacement. Only formatting failed; its 14 exact
+hosted diagnostic hunks are applied. Evidence is in output-directory-ci62.json.
+Its retained screenshots have not been personally inspected for this run.
+
+New pending source adds data-root-independent user publication claims only after
+render/verification, with deterministic multi-output stripe order, conservative
+parent-wide alias exclusion, cancellable bounded waiting and a guard retained
+through durable publication. Positive recovery obtains the same claims. The
+namespace has a fixed bounded lock-file set and never deletes locked files.
+Preparation has eight retained slots for stalled operations. Windows uses a
+second audited known-folder/COM FFI helper and an ordinary output-name policy;
+missing parents report TARGET_CHANGED. Real separate executable-copy and actual
+engine fence/cancellation fixtures are added. See destination-claims.md for exact
+scope and remaining interrupted-initialization, handle-relative, project-writer,
+crash/multi-output/package/resource requirements. These source changes await CI.
+No full task or release gate is closed. No local compilation/test/application/
+media execution or owner GPU run was performed.

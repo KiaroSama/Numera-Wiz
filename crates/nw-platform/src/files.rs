@@ -81,6 +81,40 @@ fn open_regular_handle(path: &Path) -> Result<File> {
     }
     Ok(file)
 }
+pub(crate) fn validate_output_name(name: &std::ffi::OsStr) -> Result<()> {
+    #[cfg(windows)]
+    {
+        windows_output_name(name.to_str().ok_or_else(|| {
+            DomainError::new("NATIVE_PATH_UNAVAILABLE", "Output filename must be representable as UTF-8")
+        })?)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = name;
+        Ok(())
+    }
+}
+#[cfg(any(windows, test))]
+fn windows_output_name(name: &str) -> Result<()> {
+    let base = name.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_uppercase();
+    let numbered_device = ["COM", "LPT"].into_iter().any(|prefix| {
+        base.strip_prefix(prefix).is_some_and(|suffix| {
+            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "\u{b9}", "\u{b2}", "\u{b3}"].contains(&suffix)
+        })
+    });
+    if name.is_empty()
+        || name.ends_with(['.', ' '])
+        || name.chars().any(|character| character < '\u{20}' || r#"<>:"/\|?*"#.contains(character))
+        || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || numbered_device
+    {
+        return Err(DomainError::new(
+            "PATH_DENIED", "Windows output requires an ordinary filename without device, stream or normalization aliases",
+        ).field("output"));
+    }
+    Ok(())
+}
+
 pub fn output_path(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() {
         return Err(DomainError::new(
@@ -91,6 +125,7 @@ pub fn output_path(path: &Path) -> Result<PathBuf> {
     let name = path
         .file_name()
         .ok_or_else(|| DomainError::new("PATH_DENIED", "Output must name a file"))?;
+    validate_output_name(name)?;
     let parent = path
         .parent()
         .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent is required"))?;
@@ -182,13 +217,13 @@ pub struct DirectoryStamp {
 }
 impl DirectoryStamp {
     pub fn capture_resolved(path: &Path) -> Result<Self> {
-        if !path.is_absolute() || fs::canonicalize(path).map_err(io_error)? != path {
+        if !path.is_absolute() || fs::canonicalize(path).map_err(directory_changed)? != path {
             return Err(DomainError::new(
                 "TARGET_CHANGED",
                 "Output directory must retain its canonical reviewed path",
             ));
         }
-        let file = open_directory_handle(path)?;
+        let file = open_directory_handle(path).map_err(directory_changed)?;
         let object = native_object(&file)?;
         let stamp = Self {
             path: path.to_owned(),
@@ -213,9 +248,9 @@ impl DirectoryStamp {
         Ok(())
     }
     pub fn revalidate(&self) -> Result<()> {
-        if fs::canonicalize(&self.path).map_err(io_error)? != self.path
+        if fs::canonicalize(&self.path).map_err(directory_changed)? != self.path
             || native_object(&self.file)? != self.object
-            || native_object(&open_directory_handle(&self.path)?)? != self.object
+            || native_object(&open_directory_handle(&self.path).map_err(directory_changed)?)? != self.object
         {
             return Err(DomainError::new(
                 "TARGET_CHANGED",
@@ -224,6 +259,9 @@ impl DirectoryStamp {
         }
         Ok(())
     }
+}
+fn directory_changed(error: impl std::fmt::Display) -> DomainError {
+    DomainError::new("TARGET_CHANGED", format!("Reviewed output directory is unavailable: {error}"))
 }
 fn open_directory_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
@@ -242,8 +280,8 @@ fn open_directory_handle(path: &Path) -> Result<File> {
     let file = {
         use std::os::windows::fs::OpenOptionsExt;
         use windows_sys::Win32::Storage::FileSystem::{
-            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-            FILE_SHARE_READ, FILE_SHARE_WRITE,
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ,
+            FILE_SHARE_WRITE,
         };
         // Excluding delete sharing retains the parent namespace while this lease is live.
         OpenOptions::new()
@@ -258,14 +296,20 @@ fn open_directory_handle(path: &Path) -> Result<File> {
     let file = File::open(path).map_err(io_error)?;
     let metadata = file.metadata().map_err(io_error)?;
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return Err(DomainError::new("TARGET_CHANGED", "An ordinary output directory is required"));
+        return Err(DomainError::new(
+            "TARGET_CHANGED",
+            "An ordinary output directory is required",
+        ));
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err(DomainError::new("TARGET_CHANGED", "Output directories cannot be reparse points"));
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "Output directories cannot be reparse points",
+            ));
         }
     }
     Ok(file)
@@ -608,6 +652,16 @@ pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
 mod tests {
     use super::*;
     #[test]
+    fn windows_output_names_reject_devices_streams_and_silently_trimmed_aliases() {
+        for name in ["NUL.mkv", "con .mkv", "COM1.mkv", "LPT9", "COM\u{b9}.mkv",
+            "output.mkv:secret", "output.mkv.", "output.mkv ", "out\nput.mkv"] {
+            assert_eq!(windows_output_name(name).unwrap_err().code, "PATH_DENIED");
+        }
+        for name in ["résumé.mkv", ".output.mkv", "composition.mkv", "COM10.mkv"] {
+            windows_output_name(name).unwrap();
+        }
+    }
+    #[test]
     fn reviewed_directory_identity_rejects_replacement_after_its_handle_closes() {
         let root = tempfile::tempdir().unwrap();
         let parent = root.path().join("exports");
@@ -619,7 +673,10 @@ mod tests {
         fs::rename(&parent, parent.with_file_name("original-exports")).unwrap();
         fs::create_dir(&parent).unwrap();
         let replacement = DirectoryStamp::capture_resolved(&parent).unwrap();
-        assert_eq!(replacement.require_object(&original).unwrap_err().code, "TARGET_CHANGED");
+        assert_eq!(
+            replacement.require_object(&original).unwrap_err().code,
+            "TARGET_CHANGED"
+        );
     }
     #[cfg(unix)]
     #[test]

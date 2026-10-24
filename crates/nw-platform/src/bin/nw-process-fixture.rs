@@ -27,6 +27,33 @@ fn main() -> std::process::ExitCode {
             std::thread::sleep(std::time::Duration::from_secs(20));
             std::process::ExitCode::SUCCESS
         }
+        Some("hold-destination" | "try-destination") => {
+            let Some(path) = args.get(2).map(std::path::PathBuf::from) else {
+                tracing::error!("Destination fixture requires an absolute output");
+                return std::process::ExitCode::FAILURE;
+            };
+            let result = (|| {
+                let parent = nw_platform::files::DirectoryStamp::capture_resolved(path.parent().unwrap())?;
+                let destination = nw_platform::claims::Destination::reviewed(&path, &parent.object_identity()?)?;
+                nw_platform::claims::DestinationClaims::try_acquire(vec![destination])
+            })();
+            match result {
+                Ok(_claims) => {
+                    if args[1] == "hold-destination" {
+                        println!("CLAIM_READY");
+                        std::io::stdout().flush().unwrap();
+                        // The supervisor can terminate this bounded fixture to test crash unlock.
+                        std::thread::sleep(std::time::Duration::from_secs(50));
+                    }
+                    std::process::ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    println!("{}", error.code);
+                    tracing::warn!(code = %error.code, "Destination fixture could not acquire publication");
+                    std::process::ExitCode::from(4)
+                }
+            }
+        }
         Some("failure") => {
             tracing::error!("Deterministic process failure");
             std::process::ExitCode::from(9)

@@ -1706,6 +1706,10 @@ impl Service {
             }
         };
         parent.revalidate()?;
+        let destination = nw_platform::claims::Destination::reviewed(
+            Path::new(&job.plan.output), &parent.object_identity()?,
+        )?;
+        let claims = nw_platform::claims::DestinationClaims::try_acquire(vec![destination])?;
         let publication: Option<Publication> = self.store.get(&named("publication", &job.id)?)?;
         if let Some(publication) = publication
             && Path::new(&publication.output)
@@ -1724,6 +1728,7 @@ impl Service {
             if actual.sha256 == publication.identity.sha256
                 && actual.bytes == publication.identity.bytes
             {
+                claims.revalidate()?;
                 parent.revalidate()?;
                 self.store
                     .published(&job.id, actual, publication.verified)?;
@@ -2033,29 +2038,46 @@ mod tests {
         std::fs::create_dir(&parent).unwrap();
         let parent = std::fs::canonicalize(parent).unwrap();
         let output = parent.join("output.mkv");
-        let mut plan = service.store
-            .get_plan(request.params["plan_id"].as_str().unwrap()).unwrap().unwrap();
+        let mut plan = service
+            .store
+            .get_plan(request.params["plan_id"].as_str().unwrap())
+            .unwrap()
+            .unwrap();
         plan.output = files::path_text(&output).unwrap();
         let rights = plan.required_rights.as_mut().unwrap();
         rights.output_create.path = plan.output.clone();
-        rights.output_create.parent_object =
-            Some(files::DirectoryStamp::capture_resolved(&parent).unwrap().object_identity().unwrap());
+        rights.output_create.parent_object = Some(
+            files::DirectoryStamp::capture_resolved(&parent)
+                .unwrap()
+                .object_identity()
+                .unwrap(),
+        );
         plan.hash = nw_engine::plan_digest(&plan).unwrap();
         request.params["plan_hash"] = json!(plan.hash);
-        service.store.put(&named("plan", &plan.id).unwrap(), &plan).unwrap();
+        service
+            .store
+            .put(&named("plan", &plan.id).unwrap(), &plan)
+            .unwrap();
         let (started, ready) = std::sync::mpsc::channel();
         let (resume, waiting) = std::sync::mpsc::channel();
         let waiting = Mutex::new(waiting);
         *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
             started.send(()).unwrap();
-            waiting.lock().unwrap()
-                .recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+            waiting
+                .lock()
+                .unwrap()
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .unwrap();
         }));
         let worker = service.clone();
         let task = tokio::spawn(async move { worker.dispatch(context, request).await });
         tokio::task::spawn_blocking(move || {
-            ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap()
-        }).await.unwrap();
+            ready
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap()
+        })
+        .await
+        .unwrap();
         std::fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
         std::fs::create_dir(&parent).unwrap();
         resume.send(()).unwrap();
