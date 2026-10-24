@@ -117,7 +117,9 @@ pub fn copy_closed(
     lease.revalidate()?;
     let source = std::fs::canonicalize(source).map_err(files::io_error)?;
     let _source_guard = RootLock::acquire(&source).map_err(|mut error| {
-        if error.code == "OWNER_BUSY" { error.message = "The source generation is still owned".into(); }
+        if error.code == "OWNER_BUSY" {
+            error.message = "The source generation is still owned".into();
+        }
         error
     })?;
     copy_locked(lease, operation_id, role, &source, cancel)
@@ -157,13 +159,20 @@ pub(crate) fn copy_locked(
         if !metadata.is_file() || metadata.file_type().is_symlink() {
             return Err(conflict("Unexpected copy workspace member was preserved"));
         }
-        retained_bytes = retained_bytes.checked_add(metadata.len()).ok_or_else(||conflict("Copy workspace byte count overflow"))?;
+        retained_bytes = retained_bytes
+            .checked_add(metadata.len())
+            .ok_or_else(|| conflict("Copy workspace byte count overflow"))?;
         if retained_entries > 256 || retained_bytes > 2 * versions::MAX_GENERATION_BYTES {
-            return Err(DomainError::new("RESOURCE_LIMIT","Retained copy workspace entries/bytes exceed their finite quota; nothing was evicted"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained copy workspace entries/bytes exceed their finite quota; nothing was evicted",
+            ));
         }
     }
     let _destination_guard = RootLock::acquire(&destination).map_err(|mut error| {
-        if error.code == "OWNER_BUSY" { error.message = "The copy destination is still owned".into(); }
+        if error.code == "OWNER_BUSY" {
+            error.message = "The copy destination is still owned".into();
+        }
         error
     })?;
     let mut manifest = CopyManifest {
@@ -181,11 +190,18 @@ pub(crate) fn copy_locked(
         if existing != manifest {
             let mut original = existing.source.clone();
             original.store_bytes = source_facts.store_bytes.clone();
-            if existing.schema_version != 1 || existing.operation_id != operation_id
-                || existing.role != role || original != source_facts
-                || !destination.join("store.redb").try_exists().map_err(files::io_error)?
+            if existing.schema_version != 1
+                || existing.operation_id != operation_id
+                || existing.role != role
+                || original != source_facts
+                || !destination
+                    .join("store.redb")
+                    .try_exists()
+                    .map_err(files::io_error)?
             {
-                return Err(conflict("Existing workspace manifest belongs to different source facts"));
+                return Err(conflict(
+                    "Existing workspace manifest belongs to different source facts",
+                ));
             }
             // Reopening a writer may change redb's physical transaction pages
             // without changing a single retained raw record. A previously completed

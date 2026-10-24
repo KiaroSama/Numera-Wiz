@@ -865,7 +865,8 @@ impl Service {
                     .replay_with_clock(&context.principal, &request, || self.clock.now())?
         {
             if request.command.id == "maintenance.migrate" && policy.is_none() {
-                self.store.recover_migration(&self.root_lease, || self.clock.now())?;
+                self.store
+                    .recover_migration(&self.root_lease, || self.clock.now())?;
             }
             return self.replay_view(&context, &request, response);
         }

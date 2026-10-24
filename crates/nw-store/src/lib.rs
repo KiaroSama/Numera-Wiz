@@ -110,7 +110,7 @@ impl Store {
             .get("meta/schema")
             .map_err(storage)?
             .map(|v| v.value().to_vec())
-             .is_none_or(|version| ![b"2".as_slice(), b"3".as_slice()].contains(&version.as_slice()))
+            .is_none_or(|version| ![b"2".as_slice(), b"3".as_slice()].contains(&version.as_slice()))
         {
             return Err(DomainError::new(
                 "STORE_SCHEMA_UNSUPPORTED",

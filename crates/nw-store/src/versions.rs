@@ -84,10 +84,21 @@ pub fn inspect_closed(generation: &Path) -> Result<GenerationFacts> {
             .ok_or_else(unsupported)?
             .value(),
     )?;
-    let required_capabilities: Vec<String> = table.get("meta/required-capabilities").map_err(storage)?
-        .map(|value|crate::decode(value.value())).transpose()?.unwrap_or_default();
-    if required_capabilities.len() > 64 || required_capabilities.iter().any(|value|value.is_empty() || value.len()>128) {
-        return Err(DomainError::new("RESOURCE_LIMIT","Required generation capabilities exceed bounded metadata limits"));
+    let required_capabilities: Vec<String> = table
+        .get("meta/required-capabilities")
+        .map_err(storage)?
+        .map(|value| crate::decode(value.value()))
+        .transpose()?
+        .unwrap_or_default();
+    if required_capabilities.len() > 64
+        || required_capabilities
+            .iter()
+            .any(|value| value.is_empty() || value.len() > 128)
+    {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Required generation capabilities exceed bounded metadata limits",
+        ));
     }
     let root = table
         .get("meta/root")
@@ -160,7 +171,6 @@ pub fn inspect_closed(generation: &Path) -> Result<GenerationFacts> {
     })
 }
 
-
 /// Establish application codec compatibility before redb gets write access.
 /// A dirty legacy file is repaired only in a separately owned verified probe;
 /// an unknown source remains byte-for-byte untouched, including its dirty header.
@@ -175,13 +185,17 @@ pub(crate) fn preflight_existing(generation: &Path) -> Result<()> {
             if bytes == 0 || bytes > MAX_GENERATION_BYTES {
                 return Err(unsupported());
             }
-            let parent = nw_platform::security::private_directory(&generation.join("recovery-probes"))?;
+            let parent =
+                nw_platform::security::private_directory(&generation.join("recovery-probes"))?;
             let mut count = 0usize;
             for entry in std::fs::read_dir(&parent).map_err(files::io_error)? {
                 entry.map_err(files::io_error)?;
                 count += 1;
                 if count >= 8 {
-                    return Err(DomainError::new("RESOURCE_LIMIT", "Eight retained recovery probes require explicit review; no probe was deleted"));
+                    return Err(DomainError::new(
+                        "RESOURCE_LIMIT",
+                        "Eight retained recovery probes require explicit review; no probe was deleted",
+                    ));
                 }
             }
             crate::copies::require_copy_space(&parent, bytes, 1)?;
@@ -191,26 +205,38 @@ pub(crate) fn preflight_existing(generation: &Path) -> Result<()> {
                 "schema_version":1,"operation_id":operation,
                 "source_bytes":identity.bytes,"source_sha256":identity.sha256,
                 "purpose":"read_compatibility_before_source_repair"
-            })).map_err(storage)?;
+            }))
+            .map_err(storage)?;
             nw_platform::security::write_private(&probe.join("probe.json"), &manifest, false)?;
             files::verified_copy_expected(&identity, &probe.join("store.redb"), &cancel)?;
-            let database = Database::builder().set_cache_size(8 * 1024 * 1024)
-                .open(probe.join("store.redb")).map_err(database_error)?;
+            let database = Database::builder()
+                .set_cache_size(8 * 1024 * 1024)
+                .open(probe.join("store.redb"))
+                .map_err(database_error)?;
             drop(database);
             let facts = inspect_closed(&probe)?;
             let unchanged = files::identity(&file, &cancel)?;
             if unchanged.bytes != identity.bytes || unchanged.sha256 != identity.sha256 {
-                return Err(DomainError::new("SOURCE_CHANGED", "Original store changed during owned recovery inspection"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Original store changed during owned recovery inspection",
+                ));
             }
             facts
         }
         Err(error) => return Err(error),
     };
-    if ![2,3].contains(&facts.store_version)
-        || (facts.store_version == 3 && (facts.required_capabilities.is_empty()
-            || facts.required_capabilities.iter().any(|value|!crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str()))))
+    if ![2, 3].contains(&facts.store_version)
+        || (facts.store_version == 3
+            && (facts.required_capabilities.is_empty()
+                || facts.required_capabilities.iter().any(|value| {
+                    !crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str())
+                })))
     {
-        return Err(DomainError::new("STORE_VERSION_UNSUPPORTED", "The existing application store version is unsupported; original bytes were not opened writable"));
+        return Err(DomainError::new(
+            "STORE_VERSION_UNSUPPORTED",
+            "The existing application store version is unsupported; original bytes were not opened writable",
+        ));
     }
     Ok(())
 }

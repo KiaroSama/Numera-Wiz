@@ -222,9 +222,24 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("maintenance.plan", "Review an idle schema2 generation migration", Query, Empty),
-        row!("maintenance.migrate", "Accept a reviewed generation migration exactly once", DurableMutation, crate::maintenance::MigrationSubmitInput),
-        row!("maintenance.inspect", "Inspect an accepted owner migration", Query, IdInput),
+        row!(
+            "maintenance.plan",
+            "Review an idle schema2 generation migration",
+            Query,
+            Empty
+        ),
+        row!(
+            "maintenance.migrate",
+            "Accept a reviewed generation migration exactly once",
+            DurableMutation,
+            crate::maintenance::MigrationSubmitInput
+        ),
+        row!(
+            "maintenance.inspect",
+            "Inspect an accepted owner migration",
+            Query,
+            IdInput
+        ),
         row!(
             "streams.clean.batch_plan",
             "Review every explicit cleanup batch candidate",
