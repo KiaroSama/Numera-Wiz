@@ -67,8 +67,8 @@ impl OutputProfile {
             ));
         }
         let (brand, compatible, vendor) = match self {
-            Self::QuickTimeMpeg4 => ("qt  ", "qt  ", "FFMP"),
-            Self::IsoMp4Mpeg4 => ("isom", "isomiso2mp41", "[0][0][0][0]"),
+            Self::QuickTimeMpeg4 => ("qt  ", "qt  ", Some("FFMP")),
+            Self::IsoMp4Mpeg4 => ("isom", "isomiso2mp41", None),
             Self::Matroska => unreachable!(),
         };
         let tags = &source.probe.global_tags;
@@ -155,9 +155,11 @@ impl OutputProfile {
                 ));
             }
             if stream.tags.get("title").is_some_and(String::is_empty) {
-                return Err(incompatible("An empty MOV/MP4 title cannot be retained as an authored value; choose an explicit clear"));
+                return Err(incompatible(
+                    "An empty MOV/MP4 title cannot be retained as an authored value; choose an explicit clear",
+                ));
             }
-            if stream.tags.get("vendor_id").map(String::as_str) != Some(vendor)
+            if stream.tags.get("vendor_id").map(String::as_str) != vendor
                 || stream
                     .tags
                     .get("encoder")
@@ -197,7 +199,6 @@ mod tests {
             codec: "mpeg4".into(),
             tags: BTreeMap::from([
                 ("language".into(), "und".into()),
-                ("vendor_id".into(), "[0][0][0][0]".into()),
                 ("encoder".into(), "Preserved encoder".into()),
             ]),
             dispositions: BTreeSet::from(["default".into()]),
@@ -249,8 +250,15 @@ mod tests {
             "INCOMPATIBLE_PRESERVATION"
         );
         changed = resolution.clone();
-        changed.streams[0].tags.insert("name".into(), "Original name".into());
-        changed.streams[0].tags.insert("title".into(), "Separate title".into());
+        changed.streams[0]
+            .tags
+            .insert("name".into(), "Original name".into());
+        changed.streams[0]
+            .tags
+            .insert("title".into(), "Separate title".into());
+        assert!(profile.admit(&source, &changed).is_err());
+        changed = resolution.clone();
+        changed.streams[0].tags.insert("vendor_id".into(), "[0][0][0][0]".into());
         assert!(profile.admit(&source, &changed).is_err());
         changed = resolution.clone();
         changed.streams[0].codec = "h264".into();

@@ -191,18 +191,41 @@ async fn actual_copy_and_order_metadata_remux() {
             observed["format"]["tags"]["major_brand"],
             original_plan.source.probe.global_tags["major_brand"]
         );
-        let second_asset = engine.register(output.clone(), "fixture-owner".into(), token.clone()).await.unwrap();
-        assert_eq!(second_asset.probe.streams[0].tags["title"], "Reviewed original-container video");
-        assert_eq!(second_asset.probe.stream_details[&0]["tags"]["name"], "Reviewed original-container video");
+        let second_asset = engine
+            .register(output.clone(), "fixture-owner".into(), token.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            second_asset.probe.streams[0].tags["title"],
+            "Reviewed original-container video"
+        );
+        assert_eq!(
+            second_asset.probe.stream_details[&0]["tags"]["name"],
+            "Reviewed original-container video"
+        );
         let mut second_intent = intent.clone();
-        second_intent.stream_tag_patches[0].language = TagPatch::Set { value: "jpn".into() };
+        second_intent.stream_tag_patches[0].language = TagPatch::Set {
+            value: "jpn".into(),
+        };
         second_intent.stream_tag_patches[0].title = TagPatch::Keep;
-        let second_output = directory.path().join(format!("original-family-roundtrip.{extension}"));
-        let second_plan = engine.clean_plan(second_asset, &second_output, &second_intent, "fixture-owner").unwrap();
+        let second_output = directory
+            .path()
+            .join(format!("original-family-roundtrip.{extension}"));
+        let second_plan = engine
+            .clean_plan(
+                second_asset,
+                &second_output,
+                &second_intent,
+                "fixture-owner",
+            )
+            .unwrap();
         engine.execute(&second_plan, token.clone()).await.unwrap();
         let second_probe = fixture::probe(&media.bin, &second_output).await;
         assert_eq!(second_probe["streams"][0]["tags"]["language"], "jpn");
-        assert_eq!(second_probe["streams"][0]["tags"]["name"], "Reviewed original-container video");
+        assert_eq!(
+            second_probe["streams"][0]["tags"]["name"],
+            "Reviewed original-container video"
+        );
         let mut unsupported = intent.clone();
         unsupported.preservation.stream_tags = false;
         assert_eq!(

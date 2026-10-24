@@ -58,3 +58,14 @@ Independent fixture checks inspect the actual name atom; a second actual
 registration/remux keeps the title while changing language. These corrections
 await CI. No packet/metadata assertion is weakened; Matroska raw name tags are
 unchanged. See evidence/original-container-ci70.json.
+
+Run 40081501150 reached the subsequent MP4 iteration after completing all actual
+MOV first/second round-trip packet, tag and independent raw-name assertions. The
+combined media test then failed MP4 preflight: the pinned ISO demux path omits
+vendor_id, whereas the initial gate incorrectly required a rendered zero vendor.
+The correction requires exact FFMP for QuickTime and exact absence for ISO MP4;
+it does not allow arbitrary vendors or omit any observed tag assertion. Legacy
+raw-name snapshots retain their prior lowering, while current canonical title
+projections explicitly lower the alias. New compatibility/negative units cover
+both. MP4 and complete-job qualification still await CI; see
+original-container-ci71.json.
