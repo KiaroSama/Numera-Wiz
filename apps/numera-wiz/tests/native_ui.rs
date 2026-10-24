@@ -56,6 +56,9 @@ async fn screenshot(window: &str, path: &Path) {
     assert!(status.success(), "Native screenshot failed");
 }
 async fn query(root: &Path, id: &str) -> Option<Value> {
+    query_params(root, id, json!({})).await
+}
+async fn query_params(root: &Path, id: &str, params: Value) -> Option<Value> {
     let bytes =
         nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).ok()?;
     let record: Value = serde_json::from_slice(&bytes).ok()?;
@@ -69,7 +72,7 @@ async fn query(root: &Path, id: &str) -> Option<Value> {
         .ok()?
         .post(format!("http://127.0.0.1:{port}/api/v1/commands"))
         .bearer_auth(bearer)
-        .json(&Request::query(id, json!({})))
+        .json(&Request::query(id, params))
         .send()
         .await
         .ok()?;
@@ -161,9 +164,9 @@ async fn journey() {
     let start = Instant::now();
     let assets = loop {
         if let Some(assets) = query(&root, "assets.list").await
-            && assets.as_array().is_some_and(|items| !items.is_empty())
+            && assets["items"].as_array().is_some_and(|items| !items.is_empty())
         {
-            break assets;
+            break assets["items"].clone();
         }
         assert!(
             start.elapsed() < Duration::from_secs(30),
@@ -171,14 +174,15 @@ async fn journey() {
         );
         tokio::time::sleep(Duration::from_millis(200)).await;
     };
+    let asset = query_params(&root, "assets.inspect", json!({"id":assets[0]["id"]})).await.unwrap();
     assert_eq!(
-        assets[0]["identity"]["path"].as_str().unwrap(),
+        asset["identity"]["path"].as_str().unwrap(),
         std::fs::canonicalize(&media.source)
             .unwrap()
             .to_str()
             .unwrap()
     );
-    assert_eq!(assets[0]["probe"]["streams"].as_array().unwrap().len(), 3);
+    assert_eq!(asset["probe"]["streams"].as_array().unwrap().len(), 3);
     tokio::time::sleep(Duration::from_millis(500)).await;
     screenshot(&window, &evidence.join("native-loaded-workspace.png")).await;
     click(&window, "331", "570").await;
@@ -188,8 +192,9 @@ async fn journey() {
     let start = Instant::now();
     let job = loop {
         if let Some(jobs) = query(&root, "jobs.list").await
-            && let Some(job) = jobs.as_array().and_then(|jobs| jobs.first())
-            && let Ok(job) = serde_json::from_value::<nw_domain::records::Job>(job.clone())
+            && let Some(summary) = jobs["items"].as_array().and_then(|jobs| jobs.first())
+            && let Some(job) = query_params(&root, "jobs.inspect", json!({"id":summary["id"]})).await
+            && let Ok(job) = serde_json::from_value::<nw_domain::records::Job>(job)
             && job.state.terminal()
         {
             break job;

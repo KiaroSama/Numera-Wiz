@@ -14,7 +14,7 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 17 actual owner handlers. This is partial initial
+The live registry now contains 18 actual owner handlers. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -303,3 +303,33 @@ error against an absent ID through the actual official SDK. This preserves denia
 and tests the required privacy boundary. Its formatter patch is applied. The
 HTTP/browser/native journeys were skipped after the failed prerequisite and
 are not credited on this source.
+
+Run [40046736189](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40046736189)
+for 0a0a224546fdd69a86f2c9ed6fc181a24fe03515 passed all four native
+test/lint/build targets, real engine/CLI/official SDK media, actual Chrome output
+and actual native-window output. Only formatting failed; its exact hosted patch
+is applied. This establishes the corrected typed lookup error on the real SDK
+and the complete authored-tag checks at the stated narrow media boundary.
+
+Current inventory changes replace full-record asset/job lists with typed summary
+pages, default 128 and maximum 512 rows, with the 256 KiB response ceiling winning
+first. One immutable store read is visited one record at a time; only authorized
+summaries are retained. Counts are exact for that authorized snapshot. The summary
+cache retains at most 32 leases, four per principal, 4 MiB per snapshot and 16 MiB
+globally, for 30 seconds. Cursors bind principal, profile revision, projection,
+page size and snapshot. Refresh can replace its own previous lease; no foreign
+lease is removed. Inventory pages have no project/event cursor because they do
+not implement project snapshots or retained events. A new assets.inspect handler
+fetches an explicit detail under current object and native-path rights. The shared
+native/browser UI keeps only one summary page and the selected asset detail,
+supports next-page/refresh and discards expired inventory pages. The actual native
+fixture now observes summaries, then retrieves explicit details for its independent
+output oracle. Focused CI cases cover more than 256 hidden foreign rows, stable
+pages across writes, identity/query/policy/lease changes and the byte ceiling.
+These source changes await their own hosted result; they do not qualify the full
+project read model, object-action schema, retention GC or cross-surface paging.
+
+Oversized ephemeral cleanup-plan responses are now rejected before retaining the
+plan. The focused synthetic planner case checks that a valid bounded request whose
+resolved plan exceeds the response ceiling does not consume plan-history quota.
+No local build, ordinary test or media process was run.
