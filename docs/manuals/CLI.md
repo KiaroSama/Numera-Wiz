@@ -45,7 +45,8 @@ The active registry contains discovery/schema, pure cleanup resolution, replay-s
 creation, access-profile create/update/inspect/put/list, file-delivered token
 issue/revoke, scoped internal credential issuance, media probe, source
 registration/list/inspect/output suggestion, cleanup planning/inspection and job
-submit/inspect/list/cancel. `commands.list` and `commands.schema` return generated
+submit/inspect/list/cancel, artifact list/manifest/chunk retrieval and owner log
+status. `commands.list` and `commands.schema` return generated
 current parameter schemas. This list does not promise the remaining mandate scope.
 
 A query has the following envelope:
@@ -84,6 +85,38 @@ Select audio/subtitle rules, original indices, partial ordering and Keep/Set/Cle
 language/title patches. Preservation switches remain independent. Review a plan,
 then explicitly run it. The queue shows actual job state and cancellation results.
 The command-details inspector is supplementary to the human forms.
+
+## Retrieve a produced output
+
+For a successful job, its current single-output artifact ID is `job-<job-id>`.
+Use artifacts.list for authorization-filtered summary pages, or request the exact
+manifest:
+
+```json
+{"api_version":1,"request_id":"output-manifest","command":{"id":"artifacts.manifest","version":1},"params":{"artifact_id":"job-<job-id>"}}
+```
+
+Then explicitly request a bounded byte range using the returned SHA-256:
+
+```json
+{"api_version":1,"request_id":"output-prefix","command":{"id":"artifacts.read_chunk","version":1},"params":{"artifact_id":"job-<job-id>","expected_sha256":"<64-lowercase-hex-digits>","offset":"0","length":4096}}
+```
+
+These are queries and reject replay-scope/idempotency fields. A profile needs the
+particular artifact command and current job Read. Its produced-output byte
+purpose does not add general read access to the export directory. Existing
+profiles need an owner revision update to admit these new command IDs.
+
+Chunks contain base64 for the explicit requested range, at most 128 KiB raw and
+256 KiB for the entire response. Only the final chunk may be short; an EOF-offset
+query returns empty data and eof true. Wrong digest, substitution of the output,
+out-of-bounds offsets, overflow and revoked job rights fail. Large file transfer
+uses the existing listener's authenticated bytes route, single Range and strong
+SHA-256 ETag/If-Match, rather than repeated media dumps into agent text. The
+manifest gives a relative route, never a token. It does not start a listener.
+Transfer buffers are bounded and cancellation/revocation stops subsequent frames.
+Native/browser Save As controls and full retained-artifact lifecycle remain open;
+the shared Output details control currently inspects verified manifest metadata.
 
 ## Authority and errors
 

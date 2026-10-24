@@ -239,8 +239,15 @@ impl Service {
                             && job.owned_staging.is_some()
                             && let Some(identity) = &job.artifact
                         {
-                            let publication: Option<Publication> = self.store.get(&named("publication", &job.id)?)?;
-                            if !publication.as_ref().is_some_and(|p| p.read_purpose_version == 1 && p.published && p.identity == *identity) { return Ok(()); }
+                            let publication: Option<Publication> =
+                                self.store.get(&named("publication", &job.id)?)?;
+                            if !publication.as_ref().is_some_and(|p| {
+                                p.read_purpose_version == 1
+                                    && p.published
+                                    && p.identity == *identity
+                            }) {
+                                return Ok(());
+                            }
                             let id = format!("job-{}", job.id);
                             snapshot.push(&nw_domain::artifacts::ArtifactSummary {
                                 artifact_id: id.clone(),

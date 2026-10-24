@@ -87,7 +87,10 @@ impl Service {
                 )
             })?;
         if publication.read_purpose_version != 1 {
-            return Err(DomainError::new("ARTIFACT_UNAVAILABLE", "A supported retained publication byte-read purpose is unavailable"));
+            return Err(DomainError::new(
+                "ARTIFACT_UNAVAILABLE",
+                "A supported retained publication byte-read purpose is unavailable",
+            ));
         }
         let intent = job.owned_staging.as_ref().ok_or_else(|| {
             DomainError::new(

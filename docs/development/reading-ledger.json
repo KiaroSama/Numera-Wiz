@@ -1081,6 +1081,98 @@
         "Complete device-specific authorization, dependency enumeration, budgets and actual admitted target qualification before advertising capture.",
         "Finish the remaining full manual bodies."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_general_contents.texi",
+      "sha256": "4569ace25b4c6f6947dd58ce770524f6f4107593e7a64c1458e75292d778c526",
+      "lines": [
+        1,
+        1600
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete external-library and capability-table body; no external-library source/API, binary or hardware qualification is credited",
+      "interpretation": [
+        "Broad upstream format/codec tables are neither a concrete build manifest nor successful runtime admission; query and qualify the exact bundled component candidate.",
+        "Native codecs and external encoders/decoders have different dependency, feature and quality closure. H.264, HEVC, AV1, JPEG XL, Opus and subtitle capability must identify the actual selected implementation.",
+        "Optional script engines such as AviSynth and VapourSynth are execution/dependency surfaces, not ordinary granted file formats; automatic script execution is not an admitted file probe.",
+        "Optional external libraries and GPU dispatchers introduce package, redistribution and driver/runtime requirements. No nonfree-enabled profile is silently substituted for the selected redistributable payload.",
+        "Image formats with separate planes, VobSub companion pairs and reference/network formats require complete dependency enumeration rather than admission by filename extension.",
+        "Integer-only availability, experimental codec flags, restricted encoder pixel formats and table footnotes are explicit capability constraints; a catalogue row does not prove exact media or preservation behavior."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T028",
+        "T029",
+        "T034",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Finish full encoder/muxer/filter/ffmpeg/drawvg bodies separately.",
+        "Implement exact runtime capability cache and standard offline component payload with candidate-specific closure and qualification."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg.texi",
+      "sha256": "c845782067f5e6291a5aefc6e567bbeba107107ffa771f75d4c5bf70c5ee3d91",
+      "lines": [
+        1,
+        3338
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete wrapper body including all main/advanced options and examples; included manual bodies retain their independent reading entries",
+      "interpretation": [
+        "Input/output option placement and last matching per-stream option determine actual behavior. Explicit maps must bind original streams and exact labeled graph outputs; automatic choices omit attachments/data and can add unlabeled filter outputs.",
+        "Input -ss seeks to an earlier seek point; streamcopy retains preroll while accurate transcoding discards it. Seek correctness must be independently asserted against source clocks and actual presentation intervals.",
+        "copyts does not by itself prevent muxer/fps-mode timestamp changes. start_at_zero is an explicit time shift; copytb and enc_time_base affect VFR correctness and must be frozen and verified.",
+        "Input/output frame-rate options have different effects. Output streamcopy -r changes declared rate without changing packet timestamps, and output -s appends a scale stage; these are not interchangeable with an exact timeline transform.",
+        "Automatic pixel-format conversion, autorotate, apply_cropping, autoscale, channel-layout guessing and filter reinitialization can change pixels/audio/state. Explicit graph/profile policy must account for these defaults and mid-stream changes.",
+        "Filter thread pools default to all CPUs; filter-buffered frames default unlimited; muxing queues admit 50 MB per stream before packet-count limits; shortest/subtitle-duration repair can buffer sparse streams substantially. max_alloc/process-count limits are not aggregate memory qualification.",
+        "Hardware type enumeration is not usable device qualification; QSV decoders can initialize hardware independently of -hwaccel and a chosen device/driver/frame domain must be explicit.",
+        "Preset searches, pass logs, graph/stat/progress/SDP outputs, attachment filenames and image patterns create additional reads/writes. All must be enumerated under owned plan namespaces and explicit grants; environment clearing alone does not make an arbitrary option safe.",
+        "max_error_rate affects final status without immediately stopping processing, and timelimit is CPU-user-time rather than a wall deadline. A successful process exit or progress=end does not replace mandatory artifact verification."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Read full encoder, muxer, filter and drawvg bodies independently.",
+        "Complete exact timeline/graph, resource bounds, secondary-open admission and candidate-specific media/target qualification."
+      ]
+    }
+  ],
+  "in_progress_manual_reads": [
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_muxers.texi",
+      "sha256": "81d092c67f16221178c6ec8c1b1332c764bfe0147023ade0aa72175c8b98f302",
+      "lines_read": [
+        [
+          1,
+          2100
+        ]
+      ],
+      "complete": false,
+      "notes": [
+        "Raw codec/PCM outputs do not carry source timestamps/metadata; no-remux-preservation claim follows from identical codec payload alone.",
+        "Ordinary MOV/MP4 retains packet index metadata until final close; fragmented/hybrid modes change compatibility, seek and recovery behavior and must appear in plan/resource policy.",
+        "Explicit movie/video timescales, edit lists, CTTS offsets, chapter/timecode/color/ICC flags and auto defaults affect exact output semantics; faststart is a second-stage rewrite.",
+        "DASH/HDS/HLS generate multiple manifests, initialization/media files and optional network/key/HTTP side effects. Complete owned artifact/dependency manifests and no-replace publication must cover every generated output.",
+        "FIFO recovery can retry indefinitely and drop packets on queue overflow. It is not preservation or finite supervisor recovery without a separately admitted bounded policy.",
+        "Framehash/framecrc default to decoded conversions; hash ignores timestamps. These tools must not be mistaken for independent packet-payload-plus-clock equality."
+      ]
     }
   ]
 }

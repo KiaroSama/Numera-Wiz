@@ -529,3 +529,28 @@ The service compiler found two artifact handler methods private to their child
 module; they are now visible to the containing runtime. CLI/SDK and native
 integration are not credited on that run. Complete developer/input-device manual
 bodies are now personally recorded, for 42 entries; full study remains pending.
+
+Run [40057791449](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40057791449)
+for c5afd1bf83ff3055ed7f67d6d9b19a0afa142b46 passed all four native test/lint/
+desktop targets, the shared WASM build, actual engine and owner/CLI/official SDK
+media journeys, Chrome and native import/Review/keyboard Run with byte equality.
+Artifact manifest resources and chunks passed through stdio initialize/discover
+and HTTP initialize/discover. Actual produced-output full HTTP/ranges, ETag,
+copied-route denial and identical-content physical replacement rejection passed.
+The isolated 268,435,473-byte reader repeated at VmHWM 3,476 KiB. These do not yet
+qualify a larger-than-RAM artifact through the complete HTTP/package boundary.
+Only formatting failed; its exact hosted patch is applied. Native artifact
+12545899839 (ZIP SHA-256 df9669d8c17b0625c6c49d06a1ef540b939dd6de05af67cbd2986396f6ff81e2)
+identifies merge source 2a5e8c89d3b217aa2036c5111ce4141134f1e451, a
+127,775,192-byte executable SHA-256
+11f5cb570174c6179e9c9c6745007c90c6a7a7c3e6f548b15a01699357c4f539,
+and 9,542 ms visible-window timing. Its completed screenshot was inspected;
+Output details is visibly present but its human activation is not credited yet.
+
+Current source also removes an unintended second 256 KiB request decoder limit
+so strict requests use the documented 1 MiB cap; ordinary results remain 256 KiB.
+A boundary/overflow regression awaits CI. CLI/MCP/GUI transfer documentation is
+updated. Complete general-capability and ffmpeg option bodies are now personally
+recorded, for 44 manual entries. Muxer reading is partial through line 2100;
+encoder/filter/drawvg full reading remains open. All full-scope tasks remain
+controlling; no local build/test/media or owner hardware run was performed.

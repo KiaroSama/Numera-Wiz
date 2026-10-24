@@ -56,6 +56,12 @@ lease while accepted jobs continue in the owner. Inspect the accepted job throug
 the common command interface for its frozen plan, prepared stages, verification
 and published artifact.
 
+For a successful job, Output details requests its currently authorized artifact
+manifest and displays verified size, SHA-256 and job identity. Copy manifest URI
+copies only a lookup handle; the recipient still needs current job/command rights.
+The control does not grant general access to the export directory. Native/browser
+streamed Save As remains required work.
+
 A true unchanged copy must match complete source/output bytes. Remux must pass
 structure and full packet-read verification under the declared clock policy.
 Unadmitted framing changes fail verification; decoded fallback is not yet
