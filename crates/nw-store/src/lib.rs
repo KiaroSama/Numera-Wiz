@@ -551,6 +551,7 @@ mod tests {
             verification_scope: "unit-only".into(),
         };
         Job {
+            remux_progress: None,
             progress: None,
             file_times: None,
             id: "test-job".into(),

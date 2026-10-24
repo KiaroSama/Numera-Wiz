@@ -3,6 +3,7 @@ mod admission;
 mod budget;
 mod output_profile;
 mod preservation;
+mod progress;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -30,6 +31,7 @@ pub enum ExecutionEvent {
     Published(FileIdentity, String),
     FileTimes(nw_domain::file_times::FileTimeOutcome),
     Progress(nw_domain::execution::StageProgress),
+    RemuxProgress(nw_domain::execution::RemuxProgress),
 }
 pub type Observer =
     Arc<dyn Fn(ExecutionEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -481,13 +483,13 @@ impl Engine {
         if let Err(error) = source_stamp.revalidate() {
             return ticket.finish(Err(error));
         }
-        let process = nw_platform::process::run_readonly_with_policy(
+        let process = progress::run(
             Path::new(&self.ffmpeg.path),
             &args,
             plan.execution_limits.clone().unwrap_or_default().operation,
-            8 * 1024 * 1024,
             input.file,
             cancel.clone(),
+            &observer,
         )
         .await;
         if let Err(error) = ticket.finish(process) {
@@ -930,6 +932,10 @@ fn lower_remux(
         "-hide_banner",
         "-nostdin",
         "-nostats",
+        "-progress",
+        "pipe:1",
+        "-stats_period",
+        "0.2",
         "-v",
         "error",
         "-max_alloc",

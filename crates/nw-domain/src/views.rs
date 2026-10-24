@@ -53,6 +53,8 @@ pub struct AssetSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remux_progress: Option<crate::execution::RemuxProgress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<crate::execution::StageProgress>,
     #[serde(default)]
     pub warning_count: usize,
@@ -153,6 +155,8 @@ pub struct ErrorView {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remux_progress: Option<crate::execution::RemuxProgress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<crate::execution::StageProgress>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_times: Option<FileTimeOutcomeView>,
@@ -190,6 +194,7 @@ impl From<&Job> for JobSummary {
     fn from(job: &Job) -> Self {
         Self {
             progress: job.progress.clone(),
+            remux_progress: job.remux_progress.clone(),
             warning_count: job
                 .file_times
                 .as_ref()

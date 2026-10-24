@@ -377,3 +377,34 @@ one per 200 ms plus stage boundaries. A completed copy-stage byte count does
 not announce verified or published output. The terminal job/artifact remains
 authoritative. Remux time/ETA progress and batch aggregate accounting remain
 required work.
+
+
+## Reported remux progress
+
+A remux reserves FFmpeg stdout for its bounded key=value progress stream:
+`-progress pipe:1 -stats_period 0.2`. Process stderr remains independently
+drained and bounded. The exact invocation is part of the reviewed plan and
+command inspector. Older remux plans with different argv require a fresh review;
+their stored plan and hash are never rewritten.
+
+Job inspection/listing adds `remux_progress` with optional
+reported_out_time_us, output_bytes and reported_frame_count, plus exact decimal
+elapsed_ms/coalesced_updates and process_progress_ended. N/A stays absent.
+The reported clock follows FFmpeg's progress/copyts adjustment, rather than
+absolute source/sequence time. FFmpeg's first-video frame field is an observed
+output counter, not a decoded-frame content oracle. No duration ratio or ETA is
+invented. process_progress_ended ends the FFmpeg report stream; verification
+and no-replace publication must still succeed before the job succeeds.
+
+The incremental parser admits lines up to 4096 bytes, blocks up to 128 KiB and
+1024 distinct bounded keys. It rejects duplicate/malformed known counters and
+truncated/missing terminal blocks. Only the latest block is retained and the
+shared job observer publishes at most one sample per 200 ms plus the final
+boundary. If current authority or the observer fails, the owned process is
+cancelled and drained before staging handling. The same bounded facts reach
+native/browser rows, CLI and both MCP job APIs.
+
+A tagged policy/selector/tag action rejects fields belonging to another variant,
+including extra fields on disabled/all/none/keep/clear. A request cannot silently
+discard the ignored part and execute the remainder. Full remux/folder/companion
+and packaged five-surface qualification remains required.

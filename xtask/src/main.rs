@@ -110,6 +110,10 @@ fn schemas(root: &Path) -> Result<()> {
         path.join("stage-progress.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::execution::StageProgress))?,
     )?;
+    fs::write(
+        path.join("remux-progress.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::execution::RemuxProgress))?,
+    )?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }

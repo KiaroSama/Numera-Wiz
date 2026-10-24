@@ -859,3 +859,47 @@ async fn actual_copy_and_order_metadata_remux() {
         "No process was spawned; changed-input admission must return capacity"
     );
 }
+
+#[tokio::test]
+#[ignore = "Requires CI-built FFmpeg fixture profile; executed by the hosted media job"]
+async fn actual_remux_progress_is_reported_without_announcing_verified_output() {
+    use nw_domain::execution::RemuxProgress;
+    use std::sync::{Arc, Mutex};
+    let media = fixture::generate().await;
+    let engine = Engine::new(media.bin.join("ffmpeg"), media.bin.join("ffprobe")).await.unwrap();
+    let token = CancellationToken::new();
+    let asset = engine.register(media.source.clone(), "progress-fixture".into(), token.clone()).await.unwrap();
+    let mut intent = rules();
+    intent.audio_selection.selector = Selector::SourceIndices { values: vec![1] };
+    let output = media.directory.path().join("measured-remux.mkv");
+    let plan = engine.clean_plan(asset, &output, &intent, "progress-fixture").unwrap();
+    assert_eq!(plan.resolution.action, CleanAction::Remux);
+    assert!(plan.argv_template.windows(2).any(|pair| pair[0] == "-progress" && pair[1] == "pipe:1"));
+    let facts = Arc::new(Mutex::new(Vec::<RemuxProgress>::new()));
+    let observed = facts.clone();
+    let target = output.clone();
+    let observer: nw_engine::Observer = Arc::new(move |event| {
+        let facts = observed.clone();
+        let target = target.clone();
+        Box::pin(async move {
+            if let nw_engine::ExecutionEvent::RemuxProgress(progress) = event {
+                assert!(!target.exists(), "Process progress must precede verified publication");
+                progress.validate().unwrap();
+                facts.lock().unwrap().push(progress);
+            }
+            Ok(())
+        })
+    });
+    let (artifact, verification, _) = engine.execute_observed(&plan, token, "measured-remux", observer).await.unwrap();
+    let artifact = artifact.unwrap();
+    assert!(verification.contains("packet"));
+    {
+        let facts = facts.lock().unwrap();
+        let last = facts.last().expect("The actual FFmpeg process must emit its report");
+        assert!(last.process_progress_ended);
+        assert_eq!(last.output_bytes.as_deref(), Some(artifact.bytes.as_str()));
+    }
+    let actual = fixture::probe(&media.bin, &output).await;
+    assert_eq!(actual["streams"].as_array().unwrap().len(), 2);
+    assert_eq!(actual["streams"][1]["tags"]["language"], "eng");
+}
