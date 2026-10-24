@@ -1751,3 +1751,26 @@ continues next using ordinary durable owner scope/receipt semantics. Full
 folder/probe-failure/companion/replacement, F01-F15/editor/preview/effects/DAG/
 interchange, closure, retention/migration, standard offline packages/resources/
 full manuals and matching owner harness remain mandatory. No full gate closes.
+
+## Correct generation fixture protection and canonical closed-store inspection
+
+CI91 builds WASM and passes actual core media, SDK batch/lost-response restart,
+legacy owner transports, large HTTP and Chrome. Its new transaction-leased Slot
+and the original store regressions pass. Ordinary store results are17/20 on
+Linux,18/20 on Windows and15/20 on macOS. The three generation fixtures reused
+an existing Unix temporary root with shared permission bits; the protection
+check correctly refused it. They now create a fresh private data-root child.
+
+The inspector also received noncanonical temporary-root aliases on macOS and
+Windows. It now canonicalizes the explicit generation root once before taking
+its existing physical DirectoryStamp, preserving the file-level alias guards.
+Read-only/no-write, OWNER_BUSY, exact-receipt and raw-numeric assertions remain
+intact. All54 exact hosted formatter hunks are applied. No security check is
+weakened or suppressed. Linux executable packaging did not run after the store
+test failure, so the native evidence job had no matching artifact; it is not a
+native pass or an observed GUI failure. These corrections require fresh CI.
+
+The full migration domain draft remains separate and inactive. All actual
+canonical durable migration, source reader-floor, owned-copy, activation/
+recovery/adoption/rollback, retired-version replay and old/new binary journeys
+remain mandatory, as do the rest of the full product requirements.
