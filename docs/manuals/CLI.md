@@ -6,7 +6,11 @@ it is not the complete editor, standard portable media package or qualified rele
 
 ## Start and attach
 
-Global options are `--data-dir <directory>` and `--components-dir <directory>`.
+Global options include `--data-dir <directory>`, `--components-dir <directory>`
+and `--access-profile <name>`. For CLI requests the last option selects the
+effective caller; without it native CLI uses protected local-owner authority.
+Stdio defaults to agent, while serve defaults to browser. In serve/HTTP bridge
+the option selects the stored profile hosted by the owner-controlled listener.
 The selected components directory must contain both `ffmpeg` and `ffprobe` (with
 `.exe` on Windows). The current fixture payload is Linux-only development evidence,
 not the required standard distribution. Processing without an admitted component
@@ -38,8 +42,9 @@ its earlier credentials. Owner and client requests have finite timeouts and limi
 ## Canonical operations
 
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope
-creation, access-profile put/list, scoped credential issuance, media probe, source
-registration/list/output suggestion, cleanup planning/inspection and job
+creation, access-profile create/update/inspect/put/list, file-delivered token
+issue/revoke, scoped internal credential issuance, media probe, source
+registration/list/inspect/output suggestion, cleanup planning/inspection and job
 submit/inspect/list/cancel. `commands.list` and `commands.schema` return generated
 current parameter schemas. This list does not promise the remaining mandate scope.
 
@@ -81,6 +86,62 @@ then explicitly run it. The queue shows actual job state and cancellation result
 The command-details inspector is supplementary to the human forms.
 
 ## Authority and errors
+
+Create an operational profile under owner authority with explicit directories:
+
+```powershell
+numera-wiz access profiles create --name operator --read-root 'G:\Media' --write-root 'G:\Exports' --json
+numera-wiz access profiles inspect --name operator --grants-out 'G:\Numera Data\setup\grants.json' --json
+```
+
+The created policy has mode operate, owned_object_access true and a frozen
+explicit set of the current ordinary commands. Future registry additions do not
+expand it. No access-administration, device or network grant is added. Existing
+names conflict. Inspection prints the stable principal, effective policy and
+revision, and optionally writes a protected no-overwrite replacement grant file.
+Edit that document while retaining its existing operation and path grants, then
+replace the whole policy at the inspected revision:
+
+```powershell
+numera-wiz access profiles update --name operator --expected-revision 1 --grants-file 'G:\Numera Data\setup\grants.json' --json
+numera-wiz --access-profile operator commands
+numera-wiz bridge --access-profile operator
+```
+
+The grant document has enabled, client_sessions, mode, owned_object_access,
+allowed_command_ids, object_grants, read_roots and write_roots. Name and revision
+belong only in the explicit update arguments. For example, adding
+`{"kind":"plan","id":"<existing-plan-id>","actions":["read","submit"]}`
+to object_grants admits that plan under the recipient's own input/output rights.
+Job read does not imply control. Turning owned_object_access off withdraws
+inherited access to creator-owned records; separately explicit grants remain.
+Opaque IDs and shared roots do not grant another principal's objects. Legacy
+development access.profiles.put remains available; prefer create/update.
+
+While the selected loopback listener is running, deliver a separate token to a
+protected new file; the default audience is exact port 1578:
+
+```powershell
+numera-wiz access tokens issue --for-access-profile operator --port 1578 --out 'G:\Numera Data\setup\http-token' --json
+numera-wiz access tokens revoke --token-id '<returned-token-id>' --json
+```
+
+Issue prints token ID, principal, expiry and file location, never its value.
+An existing file is preserved without issuing a token. Publication failure
+attempts explicit revocation and reports whether it was confirmed. Raw universal
+CLI credential requests are rejected before issuance. Revocation invalidates that
+credential, preserves the profile principal and leaves other credentials alone.
+It does not itself revoke already accepted jobs' durable execution rights.
+
+Asset/job list results are summary pages, default 128 and maximum 512 items with
+the 256 KiB ceiling first. Pass the exact next_cursor as cursor with the same
+limit. Leases last 30 seconds and bind current principal/profile revision and
+projection. Refresh may supply replace_snapshot to retire only its own prior
+lease. Counts are exact for authorized items. Expiry discards partial pages;
+never append pages from another snapshot. assets.inspect and jobs.inspect fetch
+explicit details. Plan/job views omit unauthorized paths and private invocation
+internals. Revoked asset-receipt fields return RECEIPT_RESULT_RESTRICTED with
+safe immutable receipt status and digest, without rerunning the operation.
 
 Native owner authority comes from the protected runtime record. The default `agent`
 profile has discovery and own replay-scope bootstrap only. Named operating profiles

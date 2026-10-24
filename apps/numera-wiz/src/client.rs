@@ -1,5 +1,5 @@
 //! Native adapters reconnect to the selected owner without lending owner authority to an agent.
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result};
 use nw_domain::commands::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
@@ -172,19 +172,26 @@ impl NativeClient {
         Ok(token)
     }
     pub async fn request(&self, request: &Request) -> Result<Response> {
+        Ok(serde_json::from_value(self.scoped_post("api/v1/commands", &serde_json::to_value(request)?).await?)?)
+    }
+    pub async fn client_lease(&self, id: &str, release: bool) -> Result<()> {
+        self.scoped_post("api/v1/lease", &serde_json::json!({"id":id,"release":release})).await?;
+        Ok(())
+    }
+    async fn scoped_post(&self, route: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
         for attempt in 0..2 {
             let record = self.attach().await?;
             let token = self.scoped_token(&record).await?;
             let result = self
                 .http
-                .post(format!("http://127.0.0.1:{}/api/v1/commands", record.port))
+                .post(format!("http://127.0.0.1:{}/{route}", record.port))
                 .bearer_auth(token)
-                .json(request)
+                .json(body)
                 .send()
                 .await;
             match result {
                 Ok(response) if response.status().is_success() => {
-                    return Ok(serde_json::from_value(bounded_json(response).await?)?);
+                    return bounded_json(response).await;
                 }
                 Ok(response)
                     if (response.status() == reqwest::StatusCode::UNAUTHORIZED
@@ -216,17 +223,9 @@ impl NativeClient {
         body: serde_json::Value,
     ) -> Result<serde_json::Value> {
         if self.profile.is_some() {
-            bail!("Internal owner controls are not available to an agent adapter");
+            return Err(nw_domain::DomainError::new("PERMISSION_DENIED", "Internal owner controls are not available to a scoped adapter").into());
         }
-        let record = self.attach().await?;
-        let response = self
-            .http
-            .post(format!("http://127.0.0.1:{}/{route}", record.port))
-            .bearer_auth(record.bearer)
-            .json(&body)
-            .send()
-            .await?;
-        bounded_json(response).await
+        self.scoped_post(route, &body).await
     }
 }
 pub async fn bounded_json(mut response: reqwest::Response) -> Result<serde_json::Value> {

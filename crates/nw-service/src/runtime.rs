@@ -44,6 +44,8 @@ struct Credential {
     origin: Option<String>,
     #[serde(default)]
     audience: u64,
+    #[serde(default)]
+    revoked: bool,
 }
 pub struct Service {
     pub store: Arc<Store>,
@@ -148,13 +150,7 @@ impl Service {
                     client_sessions: true,
                     mode: ProfileMode::Operate,
                     owned_object_access: true,
-                    allowed_command_ids: commands::ACTIVE_COMMANDS
-                        .iter()
-                        .filter(|id| {
-                            !id.starts_with("access.profiles") && **id != "access.credentials.issue"
-                        })
-                        .map(|id| (*id).into())
-                        .collect(),
+                    allowed_command_ids: nw_domain::access::ordinary_commands(),
                     object_grants: Vec::new(),
                     read_roots: vec![files::path_text(&assets)?],
                     write_roots: vec![files::path_text(&exports)?],
@@ -433,7 +429,7 @@ impl Service {
                 "Credential is missing or revoked",
             )
         })?;
-        if credential.epoch != self.epoch
+        if credential.revoked || credential.epoch != self.epoch
             || now >= credential.expires
             || now.saturating_sub(credential.last_active) >= 7200
             || credential.origin.as_deref() != origin
@@ -481,7 +477,7 @@ impl Service {
         let now = self.clock.now()?;
         let mut live = 0;
         for (key, credential) in self.store.rows::<Credential>("credential/", 10000)? {
-            if credential.epoch != self.epoch
+            if credential.revoked || credential.epoch != self.epoch
                 || credential.expires <= now
                 || now.saturating_sub(credential.last_active) >= 7200
                 || credential.audience != self.origin_generation(credential.origin.as_deref())?
@@ -507,10 +503,11 @@ impl Service {
             &Credential {
                 context,
                 epoch: self.epoch.clone(),
-                expires: now + 8 * 3600,
+                expires: now.checked_add(8 * 3600).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Credential clock range exhausted"))?,
                 last_active: now,
                 audience: self.origin_generation(origin.as_deref())?,
                 origin,
+                revoked: false,
             },
         )?;
         Ok(token)
@@ -614,6 +611,30 @@ impl Service {
                 let input: CredentialInput = commands::parse(params)?;
                 json!({"bearer":self.credential_for_origin(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")))?,"profile":input.profile,"expires_in_seconds":28800})
             }
+            "access.tokens.issue" => {
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Token issuance requires native owner authority")); }
+                let input: nw_domain::access::TokenIssueInput = commands::parse(params)?;
+                if input.port == 0 { return Err(DomainError::new("VALIDATION_ERROR", "Select an explicit nonzero listener port")); }
+                let bearer = self.credential_for_origin(&input.for_access_profile, Some(format!("http://127.0.0.1:{}", input.port)))?;
+                let token_id = hex::encode(Sha256::digest(bearer.as_bytes()));
+                let credential: Credential = self.store.get(&format!("credential/{token_id}"))?.ok_or_else(|| DomainError::new("STORAGE_ERROR", "Issued credential was not retained"))?;
+                json!({"token_id":token_id,"principal":credential.context.principal,"expires_at":credential.expires.to_string(),"bearer":bearer})
+            }
+            "access.tokens.revoke" => {
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Token revocation requires native owner authority")); }
+                let input: nw_domain::access::TokenRevokeInput = commands::parse(params)?;
+                if input.token_id.len() != 64 || !input.token_id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) { return Err(DomainError::new("VALIDATION_ERROR", "Token ID must be the lowercase SHA-256 identifier")); }
+                let _credential_guard = self.credentials.lock().map_err(|_| lock_error())?;
+                let key = format!("credential/{}", input.token_id);
+                let mut credential: Credential = self.store.get(&key)?.ok_or_else(DomainError::object_not_found)?;
+                credential.revoked = true;
+                return self.store.commit_with_clock(&context.principal, &request, || self.clock.now(), json!({"token_id":input.token_id,"revoked":true}), &[(key, value(&credential)?)])
+            }
+            "access.profiles.inspect" => {
+                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Policy inspection requires owner authority")); }
+                let input: nw_domain::access::ProfileNameInput = commands::parse(params)?;
+                value(&self.store.get::<AccessProfile>(&named("profile", &input.name)?)?.ok_or_else(DomainError::object_not_found)?)?
+            }
             "access.profiles.list" => {
                 let _: Empty = commands::parse(params)?;
                 if policy.is_some() {
@@ -624,14 +645,18 @@ impl Service {
                 }
                 value(&self.store.list::<AccessProfile>("profile/", 128)?)?
             }
-            "access.profiles.put" => {
+            "access.profiles.put" | "access.profiles.create" | "access.profiles.update" => {
                 if policy.is_some() {
                     return Err(DomainError::new(
                         "PERMISSION_DENIED",
                         "Only the native owner can change access profiles",
                     ));
                 }
-                let input: ProfileInput = commands::parse(params)?;
+                let input: ProfileInput = if request.command.id == "access.profiles.create" {
+                    let create: nw_domain::access::ProfileCreateInput = commands::parse(params)?;
+                    ProfileInput { name: create.name, expected_revision: None, enabled: true, client_sessions: false, mode: ProfileMode::Operate, owned_object_access: true, allowed_command_ids: nw_domain::access::ordinary_commands(), object_grants: Vec::new(), read_roots: create.read_roots, write_roots: create.write_roots }
+                } else { commands::parse(params)? };
+                if request.command.id == "access.profiles.update" && input.expected_revision.is_none() { return Err(DomainError::new("VALIDATION_ERROR", "Policy update requires an exact expected revision")); }
                 let key = named("profile", &input.name)?;
                 if input.name == "agent" {
                     return Err(DomainError::new(
@@ -645,6 +670,7 @@ impl Service {
                     if self.store.get::<Value>(&named(prefix, &grant.id)?)?.is_none() { return Err(DomainError::object_not_found()); }
                 }
                 let old: Option<AccessProfile> = self.store.get(&key)?;
+                if request.command.id == "access.profiles.create" && old.is_some() { return Err(DomainError::new("OBJECT_CONFLICT", "An access profile with that name already exists; inspect and update its exact revision")); }
                 if old.as_ref().map(|profile| profile.revision) != input.expected_revision {
                     return Err(DomainError::new(
                         "STALE_REVISION",
@@ -674,7 +700,7 @@ impl Service {
                         .as_ref()
                         .map(|profile| profile.principal.clone())
                         .unwrap_or_else(|| Uuid::new_v4().to_string()),
-                    revision: old.as_ref().map_or(1, |profile| profile.revision + 1),
+                    revision: old.as_ref().map_or(Ok(1), |profile| profile.revision.checked_add(1).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Access-policy revision range exhausted")))?,
                     enabled: input.enabled,
                     client_sessions: input.client_sessions,
                     mode: input.mode,

@@ -1,7 +1,7 @@
 //! Bounded records, replay-first acceptance and atomic execution journals.
 use super::*;
 use nw_domain::{
-    access::{AccessProfile, ExecutionAuthorization, Publication, ObjectKind, ObjectAction},
+    access::{AccessProfile, ExecutionAuthorization, ObjectAction, ObjectKind, Publication},
     records::{FileIdentity, JobState},
 };
 use serde_json::Value;
@@ -59,7 +59,12 @@ fn execution_policy(
     if !profile.enabled
         || profile.principal != authorization.principal
         || !profile.allows_command("jobs.submit")
-        || !profile.allows_object(ObjectKind::Plan, &job.plan.id, &job.plan.creator, ObjectAction::Submit)
+        || !profile.allows_object(
+            ObjectKind::Plan,
+            &job.plan.id,
+            &job.plan.creator,
+            ObjectAction::Submit,
+        )
         || !profile
             .read_roots
             .iter()

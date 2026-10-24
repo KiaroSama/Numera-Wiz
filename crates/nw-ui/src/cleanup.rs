@@ -256,7 +256,11 @@ impl WizApp {
             .show(ui, |ui| {
                 ui.strong(format!("{:?}", plan.resolution.action));
                 ui.label("Source");
-                ui.label(plan.source_path.as_deref().unwrap_or(&plan.source.display_name));
+                ui.label(
+                    plan.source_path
+                        .as_deref()
+                        .unwrap_or(&plan.source.display_name),
+                );
                 ui.label("Destination");
                 ui.label(plan.output_path.as_deref().unwrap_or(&plan.output_name));
                 ui.separator();

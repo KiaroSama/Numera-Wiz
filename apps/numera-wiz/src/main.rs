@@ -1,5 +1,6 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
 mod client;
+mod access;
 mod mcp;
 mod server;
 mod web_assets;
@@ -20,11 +21,16 @@ struct Args {
     data_dir: Option<PathBuf>,
     #[arg(long, global = true)]
     components_dir: Option<PathBuf>,
+    /// Select the effective profile for CLI/stdio, or the profile hosted by serve/HTTP bridge.
+    #[arg(long, global = true)]
+    access_profile: Option<String>,
     #[command(subcommand)]
     command: Option<Mode>,
 }
 #[derive(Subcommand)]
 enum Mode {
+    /// Create and inspect explicit policies, or issue/revoke file-delivered credentials.
+    Access { #[arg(long, global = true)] json: bool, #[command(subcommand)] command: access::AccessCommand },
     #[command(name = "__owner", hide = true)]
     Owner,
     /// Discover active development commands and their qualification limits.
@@ -36,8 +42,6 @@ enum Mode {
     },
     /// Official MCP adapter; default agent access remains discovery-only.
     Bridge {
-        #[arg(long, default_value = "agent")]
-        access_profile: String,
         #[arg(long, default_value = "stdio", value_parser = ["stdio", "http"])]
         transport: String,
         #[arg(long, default_value_t = 1578)]
@@ -47,8 +51,6 @@ enum Mode {
     },
     /// Start a loopback development application API and direct HTTP MCP.
     Serve {
-        #[arg(long, default_value = "browser")]
-        access_profile: String,
         #[arg(long, default_value_t = 1578)]
         port: u16,
         #[arg(long)]
@@ -97,15 +99,16 @@ async fn run() -> Result<()> {
     }
     let profile = match &args.command {
         Some(Mode::Bridge {
-            access_profile,
             transport,
             ..
-        }) if transport == "stdio" => Some(access_profile.clone()),
-        _ => None,
+        }) if transport == "stdio" => Some(args.access_profile.clone().unwrap_or_else(|| "agent".into())),
+        Some(Mode::Bridge { .. } | Mode::Serve { .. }) => None,
+        _ => args.access_profile.clone(),
     };
     let client = NativeClient::new(root, args.components_dir, profile).await?;
     match args.command {
         Some(Mode::Owner) => unreachable!("owner was dispatched before frontend initialization"),
+        Some(Mode::Access { command, json }) => { tracing::debug!(json_output=json, "Access command uses structured JSON output"); access::run(&client, command).await },
         Some(Mode::Commands) => {
             print_response(
                 &client,
@@ -145,7 +148,6 @@ async fn run() -> Result<()> {
             transport,
             port,
             token_file,
-            access_profile,
         }) => match transport.as_str() {
             "stdio" => {
                 use rmcp::ServiceExt;
@@ -165,7 +167,7 @@ async fn run() -> Result<()> {
                             "HTTP bridge requires --token-file; credentials are never printed",
                         )
                     })?,
-                    access_profile,
+                    args.access_profile.unwrap_or_else(|| "agent".into()),
                 )
                 .await
             }
@@ -178,13 +180,17 @@ async fn run() -> Result<()> {
         Some(Mode::Serve {
             port,
             token_file,
-            access_profile,
             open_browser,
-        }) => server::serve_browser(client, port, token_file, access_profile, open_browser).await,
+        }) => server::serve_browser(client, port, token_file, args.access_profile.unwrap_or_else(|| "browser".into()), open_browser).await,
         None => desktop(client).await,
     }
 }
 async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
+    if matches!(request.command.id.as_str(), "access.tokens.issue" | "access.credentials.issue") {
+        let error = nw_domain::DomainError::new("VALIDATION_ERROR", "Use access tokens issue --for-access-profile NAME --out FILE; raw credential responses are never printed");
+        println!("{}", serde_json::to_string_pretty(&nw_domain::commands::Response::error(&request.request_id, error.clone()))?);
+        return Err(error.into());
+    }
     let result = client.request(&request).await?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.ok {
@@ -213,16 +219,14 @@ async fn desktop(client: NativeClient) -> Result<()> {
     });
     let session = uuid::Uuid::new_v4().simple().to_string();
     let lease = uuid::Uuid::new_v4().to_string();
-    client
-        .internal("internal/lease", serde_json::json!({"id":lease}))
-        .await?;
+    client.client_lease(&lease, false).await?;
     let heartbeat = client.clone();
     let heartbeat_id = lease.clone();
     let task = tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
             if heartbeat
-                .internal("internal/lease", serde_json::json!({"id":heartbeat_id}))
+                .client_lease(&heartbeat_id, false)
                 .await
                 .is_err()
             {
@@ -240,12 +244,7 @@ async fn desktop(client: NativeClient) -> Result<()> {
         Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, port, session)))),
     );
     task.abort();
-    let _ = client
-        .internal(
-            "internal/lease",
-            serde_json::json!({"id":lease,"release":true}),
-        )
-        .await;
+    let _ = client.client_lease(&lease, true).await;
     result.map_err(|e| anyhow::anyhow!("Desktop failed: {e}"))
 }
 

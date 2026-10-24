@@ -11,46 +11,6 @@ struct LegacyProfile {
     commands: BTreeSet<String>, objects: BTreeSet<String>, read_roots: Vec<String>, write_roots: Vec<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn legacy(name: &str, objects: serde_json::Value) -> serde_json::Value {
-        serde_json::json!({"id":name,"name":name,"principal":"stable-principal","revision":7,"enabled":true,"client_sessions":false,"commands":["jobs.inspect"],"objects":objects,"read_roots":[],"write_roots":[]})
-    }
-    #[test]
-    fn migration_preserves_principal_explicit_commands_and_old_policy_bytes() {
-        let root = tempfile::tempdir().unwrap();
-        let store = Store::open(root.path()).unwrap();
-        let old = legacy("operator", serde_json::json!(["job-one"]));
-        store.put("profile/operator", &old).unwrap();
-        store.put("job/job-one", &serde_json::json!({"id":"job-one"})).unwrap();
-        drop(store);
-        let store = Store::open(root.path()).unwrap();
-        let current: AccessProfile = store.get("profile/operator").unwrap().unwrap();
-        assert_eq!(current.schema_version, 2);
-        assert_eq!(current.principal, "stable-principal");
-        assert_eq!(current.revision, 7);
-        assert!(current.owned_object_access);
-        assert_eq!(current.allowed_command_ids, ["jobs.inspect".to_owned()].into());
-        assert!(current.allows_object(ObjectKind::Job, "job-one", "other", ObjectAction::Control));
-        assert!(!current.allows_command("jobs.cancel"));
-        assert_eq!(store.get::<serde_json::Value>("migration/access-v1/profile/operator").unwrap().unwrap(), old);
-    }
-    #[test]
-    fn one_nonrepresentable_legacy_grant_rolls_back_the_entire_profile_migration() {
-        let root = tempfile::tempdir().unwrap();
-        let store = Store::open(root.path()).unwrap();
-        let a = legacy("a", serde_json::json!([]));
-        let b = legacy("b", serde_json::json!(["foreign-asset"]));
-        store.put("profile/a", &a).unwrap();
-        store.put("profile/b", &b).unwrap();
-        store.put("asset/foreign-asset", &serde_json::json!({"id":"foreign-asset"})).unwrap();
-        assert_eq!(store.upgrade_access_profiles().unwrap_err().code, "STORE_SCHEMA_UNSUPPORTED");
-        assert_eq!(store.get::<serde_json::Value>("profile/a").unwrap().unwrap(), a);
-        assert_eq!(store.get::<serde_json::Value>("profile/b").unwrap().unwrap(), b);
-        assert!(store.get::<serde_json::Value>("migration/access-v1/profile/a").unwrap().is_none());
-    }
-}
 impl Store {
     pub(super) fn upgrade_access_profiles(&self) -> Result<()> {
         let write = self.db.begin_write().map_err(storage)?;
@@ -97,5 +57,46 @@ impl Store {
             }
         }
         write.commit().map_err(storage)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn legacy(name: &str, objects: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({"id":name,"name":name,"principal":"stable-principal","revision":7,"enabled":true,"client_sessions":false,"commands":["jobs.inspect"],"objects":objects,"read_roots":[],"write_roots":[]})
+    }
+    #[test]
+    fn migration_preserves_principal_explicit_commands_and_old_policy_bytes() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let old = legacy("operator", serde_json::json!(["job-one"]));
+        store.put("profile/operator", &old).unwrap();
+        store.put("job/job-one", &serde_json::json!({"id":"job-one"})).unwrap();
+        drop(store);
+        let store = Store::open(root.path()).unwrap();
+        let current: AccessProfile = store.get("profile/operator").unwrap().unwrap();
+        assert_eq!(current.schema_version, 2);
+        assert_eq!(current.principal, "stable-principal");
+        assert_eq!(current.revision, 7);
+        assert!(current.owned_object_access);
+        assert_eq!(current.allowed_command_ids, BTreeSet::from(["jobs.inspect".to_owned()]));
+        assert!(current.allows_object(ObjectKind::Job, "job-one", "other", ObjectAction::Control));
+        assert!(!current.allows_command("jobs.cancel"));
+        assert_eq!(store.get::<serde_json::Value>("migration/access-v1/profile/operator").unwrap().unwrap(), old);
+    }
+    #[test]
+    fn one_nonrepresentable_legacy_grant_rolls_back_the_entire_profile_migration() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let a = legacy("a", serde_json::json!([]));
+        let b = legacy("b", serde_json::json!(["foreign-asset"]));
+        store.put("profile/a", &a).unwrap();
+        store.put("profile/b", &b).unwrap();
+        store.put("asset/foreign-asset", &serde_json::json!({"id":"foreign-asset"})).unwrap();
+        assert_eq!(store.upgrade_access_profiles().unwrap_err().code, "STORE_SCHEMA_UNSUPPORTED");
+        assert_eq!(store.get::<serde_json::Value>("profile/a").unwrap().unwrap(), a);
+        assert_eq!(store.get::<serde_json::Value>("profile/b").unwrap().unwrap(), b);
+        assert!(store.get::<serde_json::Value>("migration/access-v1/profile/a").unwrap().is_none());
     }
 }

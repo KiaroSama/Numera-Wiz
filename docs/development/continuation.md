@@ -14,7 +14,7 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 18 actual owner handlers. This is partial initial
+The live registry now contains 23 actual owner handlers. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -374,3 +374,38 @@ withdrawn inherited access and restricted receipt replay. These latest changes
 await hosted results. Canonical human access create/update/token verbs, complete
 required_rights payload/versioned plan hashing, artifact byte retrieval, project
 rights, full cross-surface revocation/cancellation and audit export remain required.
+
+Run [40049029350](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40049029350)
+for 7a73858bf4521139d4b8a2da04550d8275facb58 passed all four native unit
+suites, the actual engine/CLI/stdio/HTTP SDK path and actual Chrome output. The
+real SDK case exercised a foreign plan's explicit read/submit grant, actual
+verified output under the submitter's current roots, job read without control,
+withdrawn creator access and restricted asset receipt replay. Native Clippy then
+rejected items after the profile-migration test module. That module now follows
+the implementation. Native-window checks were skipped by the failed dependency.
+The formatter patch is applied for unchanged files; access/runtime/migration
+formatting awaits the next hosted formatter, alongside their new changes.
+
+Current human access commands lower to canonical access.profiles.create/update/
+inspect and access.tokens.issue/revoke, with default ordinary command allowlists
+frozen at profile creation. Inspection can export a protected no-overwrite typed
+grant document for exact-revision whole-policy replacement. Shared CLI selection
+uses the named effective principal for request/commands/access/stdio; HTTP serve
+and bridge retain owner-only setup for the explicitly selected hosted profile.
+Owner-only internal controls remain unavailable to scoped adapters. Native GUI
+leases now use the ordinary authenticated lease route under the selected context,
+including current client_sessions rights; they no longer require a scoped adapter
+to enter an internal owner route. The common bounded reconnect path retains
+request/lease identity and also covers authorized private setup calls.
+
+Token issuance writes its bearer only to a new protected file and prints bounded
+metadata. Universal CLI credential responses are rejected before issuance so a
+request file cannot print a bearer. Collision preserves the existing file without
+issuance; publication failure attempts revocation and reports whether confirmed.
+Individual revocation commits under the credential/semantic locks and is observed
+before future authentication; it preserves principal identity and other tokens.
+Checked revision/clock arithmetic rejects range exhaustion. The real media fixture
+now exercises human create/collision/inspect/grant export/revision update, scoped
+CLI denial, protected token delivery/collision and actual HTTP acceptance before
+revocation and denial afterward. These latest source changes await CI. No local
+build, ordinary test, media execution or owner GPU qualification was run.

@@ -206,7 +206,14 @@ impl Service {
         if jobs {
             self.store.visit("job/", |job: Job| {
                 check_cancel()?;
-                if policy.as_ref().is_none_or(|profile| profile.allows_object(ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)) {
+                if policy.as_ref().is_none_or(|profile| {
+                    profile.allows_object(
+                        ObjectKind::Job,
+                        &job.id,
+                        &job.creator,
+                        ObjectAction::Read,
+                    )
+                }) {
                     snapshot.push(&JobSummary::from(&job))?;
                 }
                 Ok(())
@@ -214,7 +221,10 @@ impl Service {
         } else {
             self.store.visit("asset/", |asset: Asset| {
                 check_cancel()?;
-                if policy.as_ref().is_none_or(|profile| profile.allows_asset(&asset.creator)) {
+                if policy
+                    .as_ref()
+                    .is_none_or(|profile| profile.allows_asset(&asset.creator))
+                {
                     snapshot.push(&AssetSummary::from(&asset))?;
                 }
                 Ok(())
