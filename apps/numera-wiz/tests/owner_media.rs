@@ -211,6 +211,41 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .query("artifacts.manifest", json!({"artifact_id":artifact_id}))
         .await;
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
+    let saved_path = media.directory.path().join("client-saved-copy.mkv");
+    let (saved, exit) = cli.human(&[
+        "artifacts", "save", "--artifact-id", &artifact_id,
+        "--expected-sha256", manifest["sha256"].as_str().unwrap(),
+        "--out", saved_path.to_str().unwrap(),
+    ]).await;
+    assert_eq!(exit, 0, "{saved}");
+    assert_eq!(saved["result"]["sha256"], manifest["sha256"]);
+    assert_eq!(saved["result"]["encoded_byte_count"], manifest["encoded_byte_count"]);
+    assert_eq!(std::fs::read(&saved_path).unwrap(), std::fs::read(&output).unwrap());
+    let (collision, exit) = cli.human(&[
+        "artifacts", "save", "--artifact-id", &artifact_id,
+        "--expected-sha256", manifest["sha256"].as_str().unwrap(),
+        "--out", saved_path.to_str().unwrap(),
+    ]).await;
+    assert_ne!(exit, 0);
+    assert_eq!(collision["error"]["code"], "OUTPUT_COLLISION");
+    assert_eq!(std::fs::read(&saved_path).unwrap(), std::fs::read(&output).unwrap());
+    let wrong_path = media.directory.path().join("wrong-client-digest.mkv");
+    let (changed, exit) = cli.human(&[
+        "artifacts", "save", "--artifact-id", &artifact_id,
+        "--expected-sha256", &"0".repeat(64), "--out", wrong_path.to_str().unwrap(),
+    ]).await;
+    assert_ne!(exit, 0);
+    assert_eq!(changed["error"]["code"], "ARTIFACT_CHANGED");
+    assert!(!wrong_path.exists());
+    let denied_path = media.directory.path().join("foreign-client-copy.mkv");
+    let (denied, exit) = cli.human(&[
+        "--access-profile", "human-setup", "artifacts", "save",
+        "--artifact-id", &artifact_id, "--expected-sha256", manifest["sha256"].as_str().unwrap(),
+        "--out", denied_path.to_str().unwrap(),
+    ]).await;
+    assert_ne!(exit, 0);
+    assert_eq!(denied["error"]["code"], "OBJECT_NOT_FOUND");
+    assert!(!denied_path.exists());
     let chunk = cli.query("artifacts.read_chunk", json!({"artifact_id":artifact_id,"expected_sha256":manifest["sha256"],"offset":"3","length":29})).await;
     assert_eq!(
         STANDARD

@@ -1,4 +1,5 @@
 //! Native adapters reconnect to the selected owner without lending owner authority to an agent.
+mod download;
 use anyhow::{Context as _, Result};
 use nw_domain::commands::{Request, Response};
 use serde::{Deserialize, Serialize};

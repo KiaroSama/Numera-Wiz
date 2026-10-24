@@ -1,7 +1,7 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod cleanup;
 pub mod client;
-pub use client::{CommandClient, Reply};
+pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
     commands::{Request, Response},
@@ -77,11 +77,50 @@ pub struct WizApp {
     stream_page: usize,
     inspect: String,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
+    save_control: Option<Arc<nw_domain::download::SaveControl>>,
+    save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
+    save_status: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    save_destination: String,
     selection_report: Option<Arc<nw_domain::reports::SelectionReport>>,
     report_by_index: bool,
     report_page: usize,
 }
 impl WizApp {
+    fn save_artifact(&mut self, manifest: nw_domain::artifacts::ArtifactManifest, ctx: &egui::Context) {
+        if self.save_control.is_some() { return; }
+        #[cfg(not(target_arch = "wasm32"))]
+        let destination = (!self.save_destination.trim().is_empty()).then(|| self.save_destination.clone());
+        #[cfg(target_arch = "wasm32")]
+        let destination = None;
+        let control = Arc::new(nw_domain::download::SaveControl::default());
+        self.save_control = Some(control.clone());
+        self.save_status = "Selecting a client destination and verifying its artifact copy…".into();
+        let inbox = self.save_inbox.clone();
+        let repaint = ctx.clone();
+        self.client.save_artifact(manifest, destination, control, Box::new(move |result| {
+            if let Ok(mut slot) = inbox.lock() { *slot = Some(result); }
+            repaint.request_repaint();
+        }));
+    }
+    fn save_controls(&mut self, ui: &mut egui::Ui) {
+        if let Some(control) = &self.save_control {
+            ui.horizontal(|ui| {
+                ui.label(format!("Client copy: {} bytes", control.copied()));
+                if control.is_cancelling() {
+                    ui.label("Cancelling; waiting for active writes and cleanup…");
+                } else if ui.button("Cancel client copy").clicked() {
+                    self.save_status = if control.cancel() {
+                        "Cancellation requested; waiting for active writes and cleanup.".into()
+                    } else {
+                        "Client publication is already underway; waiting for its result.".into()
+                    };
+                }
+            });
+            ui.ctx().request_repaint_after(Duration::from_millis(100));
+        }
+        if !self.save_status.is_empty() { ui.label(&self.save_status); }
+    }
     fn run_reviewed(&mut self, ctx: &egui::Context) {
         if !self.waiting
             && self.pending.is_none()
@@ -161,6 +200,11 @@ impl WizApp {
             stream_page: 0,
             inspect: String::new(),
             artifact_manifest: None,
+            save_control: None,
+            save_inbox: Arc::new(Mutex::new(None)),
+            save_status: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            save_destination: String::new(),
             selection_report: None,
             report_by_index: false,
             report_page: 0,
@@ -392,6 +436,11 @@ impl WizApp {
                 Action::ArtifactManifest => {
                     self.artifact_manifest =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        self.save_destination.clear();
+                        ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("artifact-save-destination")));
+                    }
                 }
                 Action::SelectionReport(generation) => {
                     if generation == self.generation {
@@ -573,26 +622,60 @@ impl WizApp {
             );
         }
         let mut open = self.artifact_manifest.is_some();
-        if let Some(manifest) = &self.artifact_manifest {
-            egui::Window::new("Output details").open(&mut open).show(ui.ctx(), |ui| {
+        let mut save = None;
+        if let Some(manifest) = self.artifact_manifest.clone() {
+            egui::Window::new("Output details").default_pos(egui::pos2(24.0, 260.0))
+                .default_width(720.0).open(&mut open).show(ui.ctx(), |ui| {
                 ui.label(format!("Verified bytes: {}", manifest.encoded_byte_count));
                 ui.label("SHA-256"); ui.monospace(&manifest.sha256);
                 ui.label(format!("Job: {}", manifest.job_id));
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    ui.label("Client destination");
+                    ui.add(egui::TextEdit::singleline(&mut self.save_destination)
+                        .id(egui::Id::new("artifact-save-destination"))
+                        .hint_text("Absolute new file path; leave blank for the Save As dialog")
+                        .desired_width(f32::INFINITY));
+                    ui.small("An existing native destination is preserved.");
+                }
+                if ui.add_enabled(self.save_control.is_none(), egui::Button::new("Save verified copy…")).clicked() {
+                    save = Some(manifest.clone());
+                }
                 if ui.button("Copy manifest URI").clicked() { ui.ctx().copy_text(manifest.manifest_uri.clone()); }
                 ui.small("Reading this output requires current job access. A copied URI does not grant access.");
             });
         }
+        if let Some(manifest) = save { self.save_artifact(manifest, ui.ctx()); }
         if !open {
             self.artifact_manifest = None;
         }
+        self.save_controls(ui);
         self.selection_report_window(ui.ctx());
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }
     }
 }
+impl Drop for WizApp {
+    fn drop(&mut self) {
+        if let Some(control) = &self.save_control { control.cancel(); }
+    }
+}
 impl eframe::App for WizApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let saved = self.save_inbox.lock().ok().and_then(|mut slot| slot.take());
+        if let Some(saved) = saved {
+            self.save_control = None;
+            self.save_status = match saved {
+                Ok(receipt) => {
+                    let warning = if receipt.warnings.is_empty() { String::new() } else {
+                        format!(" Warning: {}", receipt.warnings.join(", "))
+                    };
+                    format!("Saved {} verified bytes to {}.{}", receipt.encoded_byte_count, receipt.destination, warning)
+                }
+                Err(error) => format!("Client copy did not finish: {error}"),
+            };
+        }
         self.receive(ctx);
         self.schedule_output(ctx);
         if !self.waiting
@@ -727,6 +810,15 @@ mod tests {
     impl CommandClient for Port {
         fn send(&self, request: Request, reply: Reply) {
             self.waiting.lock().unwrap().push_back((request, reply));
+        }
+        fn save_artifact(
+            &self,
+            _manifest: nw_domain::artifacts::ArtifactManifest,
+            _destination: Option<String>,
+            _control: Arc<nw_domain::download::SaveControl>,
+            _reply: SaveReply,
+        ) {
+            panic!("This controller test does not invoke artifact delivery");
         }
         fn choose_media(&self, _reply: Reply) {
             panic!("This controller test does not invoke the platform file picker");

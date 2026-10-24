@@ -38,6 +38,25 @@ impl RetainedStaging {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    /// Client transfers may write only before their independent verification fence.
+    pub(crate) fn client_write_handle(&mut self) -> &mut File {
+        &mut self.file
+    }
+    /// Remove exactly this owned payload name, never its parent tree or a destination.
+    pub(crate) fn remove_owned_name(self) -> Result<()> {
+        self.revalidate()?;
+        #[cfg(unix)]
+        rustix::fs::unlinkat(
+            self.directory.held_file(),
+            &self.name,
+            rustix::fs::AtFlags::empty(),
+        )
+        .map_err(|error| io_error(std::io::Error::from(error)))?;
+        #[cfg(not(unix))]
+        std::fs::remove_file(&self.path).map_err(io_error)?;
+        Ok(())
+    }
     fn revalidate(&self) -> Result<()> {
         self.directory.revalidate()?;
         if native_object(&self.file)? != self.object

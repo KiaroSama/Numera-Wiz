@@ -1,5 +1,6 @@
 //! Single-threaded browser presentation. Credentials are sent only to the paired origin.
-use crate::{CommandClient, Reply};
+mod download;
+use crate::{CommandClient, Reply, SaveReply};
 use nw_domain::commands::{self, Request};
 use std::{cell::RefCell, sync::Arc};
 use wasm_bindgen::{JsCast, prelude::*};
@@ -30,6 +31,31 @@ impl CommandClient for BrowserClient {
                     .await
                     .map(|params| commands::Response::success("intake", params)),
             );
+        });
+    }
+    fn save_artifact(
+        &self,
+        manifest: nw_domain::artifacts::ArtifactManifest,
+        destination: Option<String>,
+        control: Arc<nw_domain::download::SaveControl>,
+        reply: SaveReply,
+    ) {
+        if destination.is_some() {
+            drop(nw_domain::download::SaveSession(control));
+            reply(Err("Browser saves require a browser-selected file handle".into()));
+            return;
+        }
+        // Start the picker synchronously while the human activation is still live.
+        let picker = download::select_destination(&manifest);
+        let origin = self.origin.clone();
+        let bearer = self.bearer.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let _session = nw_domain::download::SaveSession(control.clone());
+            let result = match picker {
+                Ok(picker) => download::save(&origin, &bearer, manifest, picker, &control).await,
+                Err(error) => Err(error),
+            };
+            reply(result);
         });
     }
     fn send(&self, request: Request, reply: Reply) {
