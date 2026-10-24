@@ -356,7 +356,7 @@ impl Store {
             .get(key.as_str())
             .map_err(storage)?
             .ok_or_else(DomainError::object_not_found)?;
-        decode(value.value())
+        records::decode_job(value.value())
     }
     pub fn transition_job(&self, id: &str, expected: JobState, next: JobState) -> Result<Job> {
         let write = self.db.begin_write().map_err(storage)?;
@@ -369,7 +369,7 @@ impl Store {
                     .get(key.as_str())
                     .map_err(storage)?
                     .ok_or_else(DomainError::object_not_found)?;
-                decode(value.value())?
+                records::decode_job(value.value())?
             };
             if current.state != expected {
                 return Err(DomainError::new(
@@ -531,6 +531,9 @@ mod tests {
             preservation: Preservation::default(),
         };
         let plan = Plan {
+            schema_version: 1,
+            required_rights: None,
+            creation_audit: None,
             id: "test-plan".into(),
             creator: "alice".into(),
             hash: "unit-plan-hash".into(),

@@ -100,6 +100,7 @@ pub mod access;
 pub mod artifacts;
 pub mod diagnostics;
 pub mod records;
+pub mod plans;
 pub mod views;
 
 pub mod ingest;

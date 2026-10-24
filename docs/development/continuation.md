@@ -609,3 +609,17 @@ Full personal manual coverage is now 46 of 48 preserved bodies; filters and draw
 remain. Next implement versioned semantic plan rights/audit separation without
 silently changing historical plan hashes. Continue all open task-ledger obligations;
 no complete-release claim or task closure is inferred from this checkpoint.
+
+
+## Pending version 2 plan qualification
+
+New cleanup plans now carry normalized exact source/output/data-root requirements,
+creator-bound managed-input purposes and separate creation policy audit. Semantic
+hashes exclude review/registration/creator metadata; current relevant rights are
+still checked before preflight, after preflight, at stage admission and before
+publication. Raw stored semantic JSON is checked before a typed round trip can
+drop unknown fields. Plan object rights are checked before compatibility errors.
+Legacy hashes/serialization are retained; new legacy submissions require a new
+review. Historical terminal facts are not rewritten. Details and migration scope
+are in `plan-rights.md`. Focused tests plus real MCP equivalent-plan assertions
+are added but await their own hosted result. No local build or execution was run.

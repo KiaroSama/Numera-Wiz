@@ -9,7 +9,6 @@ use nw_domain::{
 };
 use nw_platform::files::{self, io_error};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     future::Future,
@@ -162,6 +161,9 @@ impl Engine {
             vec![]
         };
         let mut plan = Plan {
+            schema_version: 2,
+            required_rights: Some(nw_domain::plans::RequiredRights::native(asset.identity.clone(), files::path_text(&output)?)),
+            creation_audit: Some(nw_domain::plans::CreationAudit { principal: creator.into(), policy_revision: 0 }),
             id: Uuid::new_v4().to_string(),
             creator: creator.into(),
             hash: String::new(),
@@ -530,12 +532,9 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
     })
 }
 pub fn plan_digest(plan: &Plan) -> Result<String> {
-    let mut copy = plan.clone();
-    copy.hash.clear();
-    serde_json::to_vec(&copy)
-        .map(|bytes| hex::encode(Sha256::digest(bytes)))
-        .map_err(|e| DomainError::new("INVALID_PLAN", e.to_string()))
+    nw_domain::plans::digest(plan)
 }
+
 fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
     if output
         .extension()
