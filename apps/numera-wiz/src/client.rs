@@ -37,11 +37,13 @@ impl NativeClient {
         std::fs::create_dir_all(&root)?;
         let root = std::fs::canonicalize(root)?;
         let exe = std::env::current_exe()?;
-        let build = tokio::task::spawn_blocking(move || {
+        let identity_started = std::time::Instant::now();
+        let identity = tokio::task::spawn_blocking(move || {
             nw_platform::files::identity(&exe, &tokio_util::sync::CancellationToken::new())
         })
-        .await??
-        .sha256;
+        .await??;
+        tracing::info!(elapsed_ms=identity_started.elapsed().as_millis(), executable_bytes=%identity.bytes, "Executable identity read completed");
+        let build = identity.sha256;
         Ok(Self {
             root,
             components,
@@ -101,6 +103,7 @@ impl NativeClient {
                         return Err(nw_domain::DomainError::new("OWNER_VERSION_CONFLICT", "Another build owns this root; let its jobs/clients drain before updating").into());
                     }
                     *self.cached.lock().await = Some(record.clone());
+                    tracing::info!(elapsed_ms=started.elapsed().as_millis(), "Protected owner attachment completed");
                     return Ok(record);
                 }
             }

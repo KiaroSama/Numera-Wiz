@@ -117,7 +117,9 @@ impl Engine {
             probe,
         })
     }
-    pub fn media_process_capacity(&self) -> (usize, usize, usize) { self.process_budget.status() }
+    pub fn media_process_capacity(&self) -> (usize, usize, usize) {
+        self.process_budget.status()
+    }
     pub fn clean_plan(
         &self,
         asset: Asset,

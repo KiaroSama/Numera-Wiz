@@ -28,6 +28,7 @@ The two-slot gate is a process-count limit. FFmpeg max_alloc remains a 64 MiB
 single-allocation guard. Neither establishes aggregate RSS, VRAM, scratch, child
 tree memory or the mandate's target desktop working set. Cross-root destination
 claims, scratch reservation, OS resource enforcement, measurements and the full
-resource scheduler remain open in T017/T034/T037. Expensive media preflight still
-needs two-phase semantic acceptance so a waiting durable request cannot delay
-policy revocation by holding the mutation lock.
+resource scheduler remain open in T017/T034/T037. Asset registration and job
+submission now release the semantic lock during content hashing/probing, then
+reacquire it and repeat replay/current-policy/dependency/target checks before
+acceptance. Their fault cases and remaining boundaries are in preflight.md.

@@ -431,3 +431,28 @@ memory qualification. Plan-review views now retain input and component digests/
 sizes without disclosing private component directories. Seven additional complete
 manual bodies are recorded personally, for 39 manual entries; full study remains
 pending. These latest changes await their own hosted result.
+
+Run [40050419387](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40050419387)
+for 648a7269c3b821a6f3df2b8c4a2a5943ed7c2647 passed all four native
+test/lint/build targets, the actual media/CLI/official SDK paths and actual Chrome
+output, including the leaf-process pool cases and corrected headless feature
+boundary. Only formatting failed; its exact hosted patch is applied. The native
+window job failed to observe a visible window within its 30-second functional
+deadline. Its retained stderr shows entry at 01:46:05.830Z and graphics setup
+at 01:46:30.423Z; it had not exited. The cause of that delay is not established.
+New timings identify executable hashing, owner attachment, lease/bootstrap and
+shared-workspace construction. The hosted unoptimized/software-GL functional
+deadline is now 60 seconds and retains actual visible-window timing separately;
+it is not a packaged startup-performance qualification or a claim of a fix.
+
+Current two-phase acceptance releases the semantic lock during assets.register
+hash/probe and jobs.submit source/component hashing. Reacquisition repeats replay
+before propagating preflight errors, current command/object/path rights, plan
+payload/hash/expiry and target/queue conditions. Physical source/component handles
+with length/mtime stamps supplement the mandatory content digests. A matching
+receipt accepted concurrently takes precedence over a later preflight failure.
+The new fault cases revoke policy while preflight is stopped, and separately
+accept a duplicate then remove its source before the delayed request resumes.
+They use explicitly synthetic data/components and do not claim actual media
+qualification. See preflight.md for exact behavior and unresolved physical-path/
+immutable-content boundaries. These source changes await their own hosted result.
