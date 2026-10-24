@@ -711,14 +711,7 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
                 ),
             ));
         }
-        for key in ["language", "title", "filename", "mimetype"] {
-            if expected.tags.get(key) != observed.tags.get(key) {
-                return Err(DomainError::new(
-                    "VERIFICATION_FAILED",
-                    format!("Output stream {} tag {key} mismatch", observed.index),
-                ));
-            }
-        }
+        verify_tags(&expected.tags, &observed.tags, &format!("Output stream {}", observed.index), false)?;
     }
     if !plan.resolution.preservation.chapters
         && actual.chapters.as_array().is_some_and(|v| !v.is_empty())
@@ -734,21 +727,22 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
             "Preserved chapters differ from the frozen source snapshot",
         ));
     }
-    for (key, value) in &plan.source.probe.global_tags {
-        if ["encoder", "duration", "creation_time"].contains(&key.as_str()) {
-            continue;
+    let empty = BTreeMap::new();
+    let expected = if plan.resolution.preservation.global_tags { &plan.source.probe.global_tags } else { &empty };
+    verify_tags(expected, &actual.global_tags, "Container", true)?;
+    Ok(())
+}
+
+fn verify_tags(expected: &BTreeMap<String, String>, actual: &BTreeMap<String, String>, target: &str, generated_writer: bool) -> Result<()> {
+    for (key, value) in expected {
+        // Matroska regenerates its duration tags from the independently verified packet clock.
+        if key != "duration" && actual.get(key) != Some(value) {
+            return Err(DomainError::new("VERIFICATION_FAILED", format!("{target} tag {key} did not match its frozen value")));
         }
-        if plan.resolution.preservation.global_tags && actual.global_tags.get(key) != Some(value) {
-            return Err(DomainError::new(
-                "VERIFICATION_FAILED",
-                format!("Global tag {key} was not retained"),
-            ));
-        }
-        if !plan.resolution.preservation.global_tags && actual.global_tags.contains_key(key) {
-            return Err(DomainError::new(
-                "VERIFICATION_FAILED",
-                format!("Global tag {key} was not stripped"),
-            ));
+    }
+    for key in actual.keys() {
+        if !expected.contains_key(key) && key != "duration" && !(generated_writer && key == "encoder") {
+            return Err(DomainError::new("VERIFICATION_FAILED", format!("{target} unexpectedly retained or introduced tag {key}")));
         }
     }
     Ok(())

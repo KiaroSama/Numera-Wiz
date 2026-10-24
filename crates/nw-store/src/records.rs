@@ -296,7 +296,7 @@ impl Store {
                 let value = table
                     .get(key.as_str())
                     .map_err(storage)?
-                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Job does not exist"))?;
+                    .ok_or_else(|| DomainError::object_not_found())?;
                 decode(value.value())?
             };
             if current.state.terminal() {
@@ -366,7 +366,7 @@ impl Store {
             let key = format!("job/{id}");
             let mut job: Job = {
                 let value = table.get(key.as_str()).map_err(storage)?.ok_or_else(|| {
-                    DomainError::new("OBJECT_NOT_FOUND", "Job missing at publication fence")
+                    DomainError::object_not_found()
                 })?;
                 decode(value.value())?
             };
@@ -428,7 +428,7 @@ impl Store {
             let key = format!("job/{id}");
             let mut current: Job = {
                 let value = table.get(key.as_str()).map_err(storage)?.ok_or_else(|| {
-                    DomainError::new("OBJECT_NOT_FOUND", "Job missing after publication")
+                    DomainError::object_not_found()
                 })?;
                 decode(value.value())?
             };

@@ -63,6 +63,17 @@ pub struct Service {
 fn lock_error() -> DomainError {
     DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned")
 }
+fn staging_path(path: &Path) -> bool {
+    path.components().any(|part| {
+        let name = part.as_os_str().to_string_lossy().to_ascii_lowercase();
+        [".numera-job-", ".numera-proof-", ".numera-owned-"]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+    })
+}
+fn staging_denied() -> DomainError {
+    DomainError::new("PATH_DENIED", "Engine-owned staging and proof namespaces are not ordinary media paths")
+}
 fn value(input: &impl Serialize) -> Result<Value> {
     serde_json::to_value(input)
         .map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))
@@ -267,19 +278,18 @@ impl Service {
             && context.principal != creator
             && !profile.objects.contains(id)
         {
-            return Err(DomainError::new(
-                "PERMISSION_DENIED",
-                "Object rights are independent of path grants",
-            ));
+            return Err(DomainError::object_not_found());
         }
         Ok(())
     }
     fn path(&self, context: &Context, path: &Path, write: bool) -> Result<PathBuf> {
+        if staging_path(path) { return Err(staging_denied()); }
         let canonical = if write {
             files::output_path(path)?
         } else {
             files::source_path(path)?
         };
+        if staging_path(&canonical) { return Err(staging_denied()); }
         if ["state", "runtime", "logs", "ingest"]
             .iter()
             .any(|name| canonical.starts_with(self.root.join(name)))
@@ -688,7 +698,7 @@ impl Service {
                 let asset: Asset = self
                     .store
                     .get(&named("asset", &input.id)?)?
-                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Asset does not exist"))?;
+                    .ok_or_else(|| DomainError::object_not_found())?;
                 self.object(&context, &asset.id, &asset.creator)?;
                 let parent = if let Some(policy) = &policy {
                     policy
@@ -744,7 +754,7 @@ impl Service {
                 let asset: Asset = self
                     .store
                     .get(&named("asset", &input.asset_id)?)?
-                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Asset does not exist"))?;
+                    .ok_or_else(|| DomainError::object_not_found())?;
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 let output = self.path(&context, Path::new(&input.output), true)?;
@@ -763,7 +773,7 @@ impl Service {
                 let plan: Plan = self
                     .store
                     .get(&named("plan", &input.id)?)?
-                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Plan does not exist"))?;
+                    .ok_or_else(|| DomainError::object_not_found())?;
                 self.object(&context, &plan.id, &plan.creator)?;
                 value(&plan)?
             }
@@ -772,7 +782,7 @@ impl Service {
                 let plan: Plan = self
                     .store
                     .get(&named("plan", &input.plan_id)?)?
-                    .ok_or_else(|| DomainError::new("OBJECT_NOT_FOUND", "Plan does not exist"))?;
+                    .ok_or_else(|| DomainError::object_not_found())?;
                 self.object(&context, &plan.id, &plan.creator)?;
                 self.object(&context, &plan.source.id, &plan.source.creator)?;
                 if plan.hash != input.plan_hash
@@ -1272,18 +1282,11 @@ mod tests {
         };
         let params =
             json!({"asset_id":asset.id,"output":root.path().join("out.mkv"),"intent":intent});
-        assert_eq!(
-            service
-                .dispatch(
-                    reader.clone(),
-                    Request::query("streams.clean", params.clone())
-                )
-                .await
-                .error
-                .unwrap()
-                .code,
-            "PERMISSION_DENIED"
-        );
+        let denied = service.dispatch(reader.clone(), Request::query("streams.clean", params.clone())).await.error.unwrap();
+        assert_eq!(denied.code, "OBJECT_NOT_FOUND");
+        let mut missing = params.clone(); missing["asset_id"] = json!("absent-asset");
+        let absent = service.dispatch(reader.clone(), Request::query("streams.clean", missing)).await.error.unwrap();
+        assert_eq!(serde_json::to_value(&denied).unwrap(), serde_json::to_value(&absent).unwrap(), "An object lookup must not disclose whether an unauthorized ID exists");
         assert!(mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"reader","expected_revision":1,"enabled":true,"commands":["streams.clean"],"objects":["owned-asset"],"read_roots":[],"write_roots":[]})).await.ok);
         assert_eq!(
             service
@@ -1294,6 +1297,25 @@ mod tests {
                 .code,
             "PATH_DENIED"
         );
+    }
+    #[tokio::test]
+    async fn staging_and_proof_namespaces_are_not_general_media_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let service = Service::open(root.path().join("data"), None).await.unwrap();
+        let owner = service.owner();
+        for name in [".numera-job-fixture", ".numera-owned-fixture", ".NUMERA-PROOF-fixture"] {
+            let directory = root.path().join(name);
+            std::fs::create_dir(&directory).unwrap();
+            let source = directory.join("source.mkv");
+            std::fs::write(&source, b"Owned namespace boundary fixture").unwrap();
+            assert_eq!(service.path(&owner, &source, false).unwrap_err().code, "PATH_DENIED");
+            assert_eq!(service.path(&owner, &directory.join("new.mkv"), true).unwrap_err().code, "PATH_DENIED");
+            assert_eq!(service.path(&owner, &directory.join("absent.mkv"), false).unwrap_err().code, "PATH_DENIED");
+        }
+        let ordinary = root.path().join("ordinary.mkv");
+        std::fs::write(&ordinary, b"Ordinary file boundary fixture").unwrap();
+        assert!(service.path(&owner, &ordinary, false).is_ok());
+        assert!(service.path(&owner, &root.path().join("ordinary-output.mkv"), true).is_ok());
     }
     #[tokio::test]
     async fn public_credentials_are_bound_to_origin_and_owner_epoch() {
