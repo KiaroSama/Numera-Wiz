@@ -809,6 +809,9 @@ mod tests {
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":591},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
             let started = Instant::now();
             let mut report_request = None::<String>;
+            let mut report_correlation = None::<String>;
+            let mut report_body_attempts = 0usize;
+            let mut report_cancelled_event = false;
             let mut completed_requests = std::collections::VecDeque::new();
             let mut last_report_input = Instant::now();
             let mut report_input_attempts = 1;
@@ -837,7 +840,14 @@ mod tests {
                         && request["command"]["id"] == "streams.clean.report"
                     {
                         assert_ne!(request["request_id"], "local");
+                        report_correlation = Some(request["request_id"].as_str().unwrap().to_owned());
                         report_request = Some(params["requestId"].as_str().unwrap().to_owned());
+                    }
+                    if message["method"] == "Network.loadingFailed"
+                        && params["requestId"].as_str() == report_request.as_deref()
+                        && params["canceled"] == true
+                    {
+                        report_cancelled_event = true;
                     }
                     if message["method"] == "Network.loadingFinished"
                         && let Some(id) = params["requestId"].as_str()
@@ -848,25 +858,30 @@ mod tests {
                         }
                     }
                 }
-                if report_request
-                    .as_ref()
-                    .is_some_and(|id| completed_requests.contains(id))
-                {
-                    let body = driver(
-                        &client,
-                        &base,
-                        reqwest::Method::POST,
-                        &format!("{route}/goog/cdp/execute"),
-                        json!({
-                            "cmd":"Network.getResponseBody","params":{"requestId":report_request}
-                        }),
-                    )
-                    .await;
-                    assert_eq!(body["base64Encoded"], false);
-                    break nw_domain::commands::decode_json(
-                        body["body"].as_str().unwrap().as_bytes(),
-                    )
-                    .unwrap();
+                if let Some(request_id) = &report_request {
+                    // The body is the actual Chrome-observed response for this real UI
+                    // request. Event delivery/late abort can omit loadingFinished;
+                    // retry only this bounded debugger read, never a domain handler.
+                    report_body_attempts += 1;
+                    let response = client
+                        .post(format!("{base}{route}/goog/cdp/execute"))
+                        .json(&json!({"cmd":"Network.getResponseBody","params":{"requestId":request_id}}))
+                        .send().await.expect("Chrome response-body observation transport");
+                    let status = response.status();
+                    let response: Value = response.json().await.expect("Chrome response-body observation JSON");
+                    if status.is_success() {
+                        let body = &response["value"];
+                        assert_eq!(body["base64Encoded"], false);
+                        let text = body["body"].as_str().expect("Chrome response body missing");
+                        assert!(text.len() <= nw_domain::commands::MAX_RESULT_BYTES);
+                        if let Ok(value) = nw_domain::commands::decode_json(text.as_bytes()) {
+                            assert_eq!(value["request_id"].as_str(), report_correlation.as_deref());
+                            break value;
+                        }
+                    } else {
+                        assert_eq!(response["value"]["error"], "unknown error",
+                            "Chrome response-body observation failed outside a not-yet-retained body");
+                    }
                 }
                 if started.elapsed() >= Duration::from_secs(15) {
                     let png = driver(
@@ -887,10 +902,12 @@ mod tests {
                         println!("NW_BROWSER_FAILURE_IMAGE:{png}");
                     }
                     panic!(
-                        "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}",
+                        "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}, body_attempts={}, cancelled_event={}",
                         report_request.is_some(),
                         report_input_attempts,
-                        completed_requests.len()
+                        completed_requests.len(),
+                        report_body_attempts,
+                        report_cancelled_event
                     );
                 }
                 // Registration is durable before the form's final async details/

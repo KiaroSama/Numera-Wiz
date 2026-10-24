@@ -30,7 +30,8 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     } = command;
     let control = Arc::new(SaveControl::default());
     let saving = async {
-        let response = control.interruptible(client.request(&Request::query(
+        let response = control
+            .interruptible(client.request(&Request::query(
                 "artifacts.manifest",
                 serde_json::json!({"artifact_id":artifact_id}),
             )))

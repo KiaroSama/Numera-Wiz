@@ -955,6 +955,31 @@
           "observed_outcome": "All native admission/legacy/tag units passed. Actual Linux MOV and MP4 MPEG-4 ordinary-video first/second round trips passed full packet/clock/extradata/side-data and independent raw name/brand assertions. Complete media/CLI/SDK/large HTTP and native shared workspace passed; Chrome report observation failed. Profile-specific five-surface variants, broader routes and all package/resource/owner gates remain open."
         }
       ]
+    },
+    {
+      "subject_id": "artifacts.client_copy_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/download.rs",
+        "crates/nw-platform/src/download.rs",
+        "apps/numera-wiz/src/client/download.rs",
+        "apps/numera-wiz/src/artifacts_cli.rs",
+        "crates/nw-ui/src/lib.rs",
+        "crates/nw-ui/src/web/download.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "4b40f816f6846dc9e74ea3a7eee1e2c3b44a1d0d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40091314188",
+          "boundary": "actual_linux_scoped_cli_and_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/client-save-ci77.json",
+          "observed_outcome": "Actual 268633400-byte job-read-only CLI copy, observed 26016 KiB high-water mark, independent full byte identity and partial SIGINT cleanup. Actual native typed-destination and Save pointer input produced independently identical bytes with one producer job; PNG personally inspected. Native OS picker, Chrome Save, other platforms/packages and full R20 remain open."
+        }
+      ]
     }
   ]
 }

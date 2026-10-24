@@ -91,12 +91,21 @@ struct Deadline {
     window: web_sys::Window,
     timer: i32,
     controller: web_sys::AbortController,
+    completed: bool,
     _callback: Closure<dyn FnMut()>,
+}
+impl Deadline {
+    fn complete(&mut self) {
+        self.completed = true;
+        self.window.clear_timeout_with_handle(self.timer);
+    }
 }
 impl Drop for Deadline {
     fn drop(&mut self) {
         self.window.clear_timeout_with_handle(self.timer);
-        self.controller.abort();
+        if !self.completed {
+            self.controller.abort();
+        }
     }
 }
 pub async fn fetch_json(
@@ -139,10 +148,11 @@ async fn fetch_value(
             timeout,
         )
         .map_err(js_error)?;
-    let _deadline = Deadline {
+    let mut deadline = Deadline {
         window: window.clone(),
         timer,
         controller: controller.clone(),
+        completed: false,
         _callback: callback,
     };
     let init = web_sys::RequestInit::new();
@@ -199,6 +209,7 @@ async fn fetch_value(
         }
         bytes.extend_from_slice(&chunk.to_vec());
     }
+    deadline.complete();
     commands::decode_json(&bytes).map_err(|error| error.to_string())
 }
 struct BrowserLease {

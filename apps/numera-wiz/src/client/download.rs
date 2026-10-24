@@ -64,7 +64,10 @@ impl NativeClient {
             )
             .into());
         }
-        tracing::info!(elapsed_ms = preflight.elapsed().as_millis(), "artifact.client_copy.bytes.accepted");
+        tracing::info!(
+            elapsed_ms = preflight.elapsed().as_millis(),
+            "artifact.client_copy.bytes.accepted"
+        );
         let mut copy =
             tokio::task::spawn_blocking(move || ClientCopy::create(&output, &selected)).await??;
         while let Some(frame) = control.interruptible(response.chunk()).await?? {

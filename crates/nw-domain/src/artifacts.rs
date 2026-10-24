@@ -82,26 +82,54 @@ pub struct ArtifactManifest {
 }
 impl ArtifactManifest {
     pub fn suggested_file_name(&self) -> String {
-        if let Some(name) = self.suggested_name.as_deref().filter(|name| portable_file_name(name)) {
+        if let Some(name) = self
+            .suggested_name
+            .as_deref()
+            .filter(|name| portable_file_name(name))
+        {
             return name.to_owned();
         }
-        let id: String = self.artifact_id.chars()
+        let id: String = self
+            .artifact_id
+            .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
-            .take(96).collect();
-        format!("numera-{}.bin", if id.is_empty() { "artifact" } else { &id })
+            .take(96)
+            .collect();
+        format!(
+            "numera-{}.bin",
+            if id.is_empty() { "artifact" } else { &id }
+        )
     }
 }
 fn portable_file_name(name: &str) -> bool {
-    if name.is_empty() || name.len() > 240 || name.ends_with(['.', ' '])
-        || name.chars().any(|c| c.is_control() || r#"<>:"/\|?*"#.contains(c))
-    { return false; }
-    let stem = name.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_uppercase();
+    if name.is_empty()
+        || name.len() > 240
+        || name.ends_with(['.', ' '])
+        || name
+            .chars()
+            .any(|c| c.is_control() || r#"<>:"/\|?*"#.contains(c))
+    {
+        return false;
+    }
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(' ')
+        .to_ascii_uppercase();
     let numbered_device = ["COM", "LPT"].into_iter().any(|prefix| {
         stem.strip_prefix(prefix).is_some_and(|suffix| {
-            ["1","2","3","4","5","6","7","8","9","\u{b9}","\u{b2}","\u{b3}"].contains(&suffix)
+            [
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "\u{b9}", "\u{b2}", "\u{b3}",
+            ]
+            .contains(&suffix)
         })
     });
-    !numbered_device && !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+    !numbered_device
+        && !matches!(
+            stem.as_str(),
+            "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+        )
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactChunk {
@@ -129,8 +157,25 @@ mod tests {
         for name in ["movie.mkv", "movie 2.mov", "محتوا.mp4"] {
             assert!(portable_file_name(name), "{name}");
         }
-        for name in ["", ".", "..", "../movie.mkv", "C:\\movie.mkv", "/tmp/movie.mkv", "a/b", "a\\b",
-            "CON", "con.mkv", "COM1.mp4", "LPT\u{b2}.wav", "name. ", "name.", "name ", "line\n.mkv", "a:b.mp4"] {
+        for name in [
+            "",
+            ".",
+            "..",
+            "../movie.mkv",
+            "C:\\movie.mkv",
+            "/tmp/movie.mkv",
+            "a/b",
+            "a\\b",
+            "CON",
+            "con.mkv",
+            "COM1.mp4",
+            "LPT\u{b2}.wav",
+            "name. ",
+            "name.",
+            "name ",
+            "line\n.mkv",
+            "a:b.mp4",
+        ] {
             assert!(!portable_file_name(name), "{name:?}");
         }
         assert!(!portable_file_name(&"x".repeat(241)));

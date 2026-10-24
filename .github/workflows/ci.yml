@@ -119,6 +119,8 @@ jobs:
       NW_DESKTOP_EXE: ${{ github.workspace }}/target/native-app/numera-wiz
       NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
       LIBGL_ALWAYS_SOFTWARE: '1'
+      XDG_CURRENT_DESKTOP: GNOME
+      XDG_SESSION_TYPE: x11
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -130,7 +132,7 @@ jobs:
           name: ffmpeg-development-fixture-profile-linux
           path: target
       - name: Install native input and display tools
-        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick libxkbcommon0 libxkbcommon-x11-0 libegl1 libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick libxkbcommon0 libxkbcommon-x11-0 libegl1 libgl1-mesa-dri dbus-x11 xdg-desktop-portal xdg-desktop-portal-gtk
       - name: Prepare identified executable artifacts
         run: chmod +x target/native-app/numera-wiz target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
       - name: Restore the compiler cache for the matching harness
@@ -145,7 +147,7 @@ jobs:
       - name: Install the selected Rust harness toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
       - name: Exercise the real native workspace and file controls
-        run: xvfb-run -a -s '-screen 0 1600x1000x24 -nolisten tcp' cargo test --locked -p numera-wiz --test native_ui -- --ignored --nocapture
+        run: xvfb-run -a -s '-screen 0 1600x1000x24 -nolisten tcp' dbus-run-session -- cargo test --locked -p numera-wiz --test native_ui -- --ignored --nocapture
       - name: Retain native window and execution evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

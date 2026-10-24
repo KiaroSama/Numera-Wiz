@@ -1250,3 +1250,43 @@ All open complete-product/five-surface/package/resource/manual and matching
 owner-harness obligations remain mandatory. No task checkbox or preserved
 research member changed. No local compilation/test/GUI/media or owner GPU run
 occurred. Work remains only on the public repo's review branch and draft PR.
+
+
+## Large-copy and native Save checkpoint; Chrome observation correction
+
+Run 40091314188 on 4b40f816f6846dc9e74ea3a7eee1e2c3b44a1d0d passed
+four complete native targets, lock/WASM and the entire actual media job. The
+new scoped CLI copied 268633400 bytes with independent identity, observed
+26016 KiB HWM and 34610 ms elapsed. Partial SIGINT cancellation reached its
+staging boundary after 20316 ms, confirmed drain and removed owned staging.
+All following HTTP job-read/bearer revocation and disconnect cleanup assertions
+passed; owner HWM was 36136 KiB. Full reports retain compiled merge
+aab8a7d7a704dd8285cd5d8d702e5cc24a5f6ff6 and exact binary/components.
+Actual native destination pointer/keyboard and Save pointer input produced
+independently identical bytes with one producer job. Its saved PNG was
+personally inspected. See evidence/client-save-ci77.json and linked reports.
+
+Headed Chrome reached and visibly displayed the correct actual selection report,
+but its observation deadline had request_seen=true, one pointer attempt and
+16 retained loadingFinished IDs without a match. Its actual timeout PNG was
+personally inspected. The exact missing event cause is not established; no
+Chrome Save claim is made. The following runtime clears its timeout after EOF
+and does not abort a fully consumed response. The harness reads only the actual
+Chrome response for the observed UI request, requires correlation and the same
+report assertions, and keeps its 15-second bound. No direct domain call or mock
+file handle replaces actual input.
+
+The next native journey also exercises the real rfd OS Save As picker under
+hosted DBus/Xvfb. Pinned rfd 0.17.2 targeted SaveFile/default backend source was
+inspected before selecting portal setup. Client cleanup additionally avoids
+retry after ownership failure and removes the known Unix workspace through the
+held destination-parent descriptor. A deterministic parent-rename/symlink
+regression preserves the unrelated empty replacement and original payload.
+All nine exact hosted formatter hunks are applied. These new changes await CI.
+
+The completion ledger adds only an implemented_unqualified internal client-copy
+record with scoped evidence. No release/work-package requirement is marked
+complete. All full F01-F15/MuxCls/folder/batch, project/editor/effects/DAG/preview/
+mixer/captions/interchange, command/donor closure, retention/migration, packages/
+resources/manuals and matching owner-harness gates remain required. No local
+build/test/GUI/media or owner GPU run occurred. Main/public/draft boundaries hold.

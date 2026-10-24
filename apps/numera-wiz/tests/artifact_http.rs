@@ -325,7 +325,11 @@ async fn journey() {
         "profile":"job read only; no general filesystem roots",
         "not_qualified":["later cancellation/revocation assertions", "other platforms/packages", "aggregate R20"]
     });
-    std::fs::write(evidence.join("large-client-copy.json"), serde_json::to_vec_pretty(&client_checkpoint).unwrap()).unwrap();
+    std::fs::write(
+        evidence.join("large-client-copy.json"),
+        serde_json::to_vec_pretty(&client_checkpoint).unwrap(),
+    )
+    .unwrap();
     println!("NW_CLIENT_COPY_REPORT:{client_checkpoint}");
     let cancelled_output = media.directory.path().join("cancelled-client-copy.mkv");
     let mut cancelling = cli
@@ -376,18 +380,31 @@ async fn journey() {
         if started.elapsed() >= Duration::from_secs(100) {
             use std::io::Read as _;
             let mut bytes = Vec::new();
-            std::fs::File::open(evidence.join("cancelled-client-copy.log")).unwrap()
-                .take(64 * 1024).read_to_end(&mut bytes).unwrap();
-            let phases: Vec<String> = String::from_utf8_lossy(&bytes).lines()
-                .filter(|line| line.contains("artifact.client_copy")
-                    || line.contains("Executable identity read completed")
-                    || line.contains("Protected owner attachment completed"))
-                .take(16).map(|line| line.chars().take(4096).collect()).collect();
-            println!("NW_CLIENT_COPY_PREPARATION:{}", json!({
-                "elapsed_ms":started.elapsed().as_millis().to_string(), "phases":phases,
-                "scope":"Bounded safe preflight diagnostics; no headers, credentials or response bodies"
-            }));
-            panic!("Client did not begin a partial staged transfer within the bounded preparation deadline");
+            std::fs::File::open(evidence.join("cancelled-client-copy.log"))
+                .unwrap()
+                .take(64 * 1024)
+                .read_to_end(&mut bytes)
+                .unwrap();
+            let phases: Vec<String> = String::from_utf8_lossy(&bytes)
+                .lines()
+                .filter(|line| {
+                    line.contains("artifact.client_copy")
+                        || line.contains("Executable identity read completed")
+                        || line.contains("Protected owner attachment completed")
+                })
+                .take(16)
+                .map(|line| line.chars().take(4096).collect())
+                .collect();
+            println!(
+                "NW_CLIENT_COPY_PREPARATION:{}",
+                json!({
+                    "elapsed_ms":started.elapsed().as_millis().to_string(), "phases":phases,
+                    "scope":"Bounded safe preflight diagnostics; no headers, credentials or response bodies"
+                })
+            );
+            panic!(
+                "Client did not begin a partial staged transfer within the bounded preparation deadline"
+            );
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }

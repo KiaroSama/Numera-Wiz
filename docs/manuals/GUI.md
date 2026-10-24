@@ -126,5 +126,7 @@ The copy has a separate progress/cancel control. Cancelling it does not cancel
 the completed producer. Wait for active writes and cleanup; a request to stop
 is not displayed as a confirmed stop. Length and SHA-256 are checked before
 client publication. See [scope and limits](../development/client-artifact-save.md).
-The new actual Save control journeys are undergoing hosted qualification;
-previous Output details screenshots alone do not qualify them.
+Actual Linux native destination entry and Save pointer input passed independent
+saved/source byte equality in CI77. The native OS picker, Chrome Save and other
+platform variants are still undergoing hosted qualification. Previous Output
+details screenshots alone do not qualify those routes.
