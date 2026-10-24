@@ -1377,6 +1377,30 @@
       "read_scope": "complete_body",
       "lines": 274,
       "interpretation": "Original extension and relative tree are retained by default; single-file suffixes, numbered collisions, nested-output rejection, companion discovery, exclusion pruning and truthful byte accounting need the shared authority/publication pipeline. Donor resolve/stat failures cannot prove path separation; normal filename generation cannot become implicit authorization."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/copying.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "cb33fa2f71e2d1289599d4b2166bb3eefda0faa2",
+      "read_scope": "complete_body",
+      "lines": 330,
+      "interpretation": "The donor supplies progress-aware 4 MiB copy, best-effort access/modification times and companion counts. Its predictable partial deletion, replace-after-exists race and size-only copy checks are defects; Rust uses journal-owned staging, mandatory full bytes and atomic no-replace publication. Donor robocopy speed claims are not measured qualification. Copy deadline and truthful companion accounting remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/processing.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "5118adf5184586cc40abc1f27871ac6c4dec8085",
+      "read_scope": "complete_body",
+      "lines": 457,
+      "interpretation": "Every candidate, including probe failures and no-audio matches, contributes an explicit terminal result. Successful per-file byte deltas exclude skipped/failed source sizes. The donor rc=0 plus final.exists path can falsely credit old output; publication must use this attempt's verified staging and durable proof. Folder batching, separate companion outcomes, measured progress and complete failure/partial-result semantics remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/reporting.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "c199e4a47b372f846b8d5a3cdbf7df6fca67385a",
+      "read_scope": "complete_body",
+      "lines": 409,
+      "interpretation": "Scan inventory, case-insensitive unique language/title/codec summaries, original stream-index counts and per-file selection previews are product behavior. Shared typed paged projections must replace console-only reporting without losing unmatched files or confusing inventory with verification. Echo-to-log behavior must preserve privacy and bounded diagnostics; display colors are adapter presentation, not domain authority."
     }
   ]
 }

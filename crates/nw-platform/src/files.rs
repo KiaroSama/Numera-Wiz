@@ -249,6 +249,13 @@ impl DirectoryStamp {
         stamp.revalidate()?;
         Ok(stamp)
     }
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+    #[cfg(unix)]
+    pub(crate) fn held_file(&self) -> &File {
+        &self.file
+    }
     pub fn object_identity(&self) -> Result<NativeObjectIdentity> {
         self.revalidate()?;
         Ok(self.object.clone())
@@ -427,7 +434,7 @@ impl SourceStamp {
         Ok(())
     }
 }
-fn native_object(file: &File) -> Result<NativeObjectIdentity> {
+pub(crate) fn native_object(file: &File) -> Result<NativeObjectIdentity> {
     let metadata = file.metadata().map_err(io_error)?;
     #[cfg(unix)]
     let (kind, volume, object) = {
@@ -554,23 +561,17 @@ pub fn verified_copy_expected(
     destination: &Path,
     cancel: &CancellationToken,
 ) -> Result<FileIdentity> {
-    let (staging, actual) = prepare_verified_copy(expected, destination, cancel)?;
     let output = output_path(destination)?;
-    #[cfg(unix)]
-    let parent = output.parent().expect("validated parent");
+    let parent = DirectoryStamp::capture_resolved(output.parent().expect("validated parent"))?;
+    let (staging, actual) = prepare_verified_copy(expected, &output, cancel)?;
     if cancel.is_cancelled() {
         return Err(DomainError::new(
             "CANCELLED",
             "Copy cancelled before publication fence",
         ));
     }
-    staging
-        .persist_noclobber(&output)
-        .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
-    #[cfg(unix)]
-    File::open(parent)
-        .and_then(|file| file.sync_all())
-        .map_err(io_error)?;
+    let staging = crate::publication::RetainedStaging::new(staging)?;
+    staging.publish_no_replace(&parent, &output)?;
     Ok(FileIdentity {
         path: path_text(&output)?,
         bytes: actual.bytes,

@@ -119,7 +119,35 @@ async fn actual_copy_and_order_metadata_remux() {
         "COMPONENT_CHANGED"
     );
     assert!(!copy.exists());
-    let (artifact, verification, _) = engine.execute(&plan, token.clone()).await.unwrap();
+    let publication_links = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let retained_links = publication_links.clone();
+    let observer: nw_engine::Observer = std::sync::Arc::new(move |event| {
+        let retained = retained_links.clone();
+        Box::pin(async move {
+            match event {
+                nw_engine::ExecutionEvent::StagingIntent(intent) => {
+                    retained.lock().unwrap().push(std::path::PathBuf::from(intent.payload));
+                }
+                nw_engine::ExecutionEvent::Fence(publication) => {
+                    retained.lock().unwrap().push(std::path::PathBuf::from(publication.proof));
+                }
+                _ => {}
+            }
+            Ok(())
+        })
+    });
+    let (artifact, verification, _) = engine
+        .execute_observed(&plan, token.clone(), "held-directory-copy", observer)
+        .await
+        .unwrap();
+    {
+        let links = publication_links.lock().unwrap();
+        assert_eq!(links.len(), 2);
+        for link in links.iter() {
+            assert!(nw_platform::files::same_object(link, &copy).unwrap());
+            assert_eq!(std::fs::read(link).unwrap(), std::fs::read(&source).unwrap());
+        }
+    }
     assert!(artifact.is_some());
     assert!(verification.contains("Full byte"));
     assert_eq!(
