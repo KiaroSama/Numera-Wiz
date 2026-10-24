@@ -952,3 +952,26 @@ this revision applies all 53 exact hosted formatter hunks and the let-chain
 correction. Native GUI was skipped by that prerequisite and is not credited.
 See evidence/file-times-ci65.json. No migration, complete product/package/resource
 or owner GPU gate is inferred. No local compilation or execution was performed.
+
+
+## Pending held-directory publication
+
+The shared copy/remux publisher now creates no-replace links relative to held
+Unix staging/output directories, retaining journal-owned payload and proof links.
+Windows retains its delete-excluding parent leases and atomic hard-link path.
+Proof names must be single ordinary components; all existing output entries are
+preserved. A deterministic Unix race fixture moves the parent after its final
+check and proves an installed symlink cannot redirect publication. The actual
+media fixture independently checks retained payload/proof objects and bytes.
+See held-publication.md for exact durability and remaining recovery/retention
+scope. These additions await hosted CI and do not close T017 or any release gate.
+
+
+Run 40076950138 on 06166dea5a1310c870065d3f105c5ac56f491623 finished every
+job successfully after the timestamp formatter/lint corrections. The actual
+native PNG was personally inspected, including the timestamp selector, Succeeded
+job and opened Output details dialog with 197983 verified bytes and full digest.
+Scoped evidence is file-times-ci66.json. New required/new control variants, store
+generation migration and complete product/package/resource/GPU gates stay open.
+The held-directory publication source above is introduced after this green run
+and requires its own CI; no local execution was used.

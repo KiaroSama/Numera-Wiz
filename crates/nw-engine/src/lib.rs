@@ -617,27 +617,15 @@ async fn publish(
     let claims =
         nw_platform::claims::DestinationClaims::acquire(vec![destination], cancel.clone()).await?;
     let output = files::revalidate_output(&plan.output)?;
-    #[cfg(unix)]
-    let parent = output
-        .parent()
-        .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
     if cancel.is_cancelled() {
         return Err(DomainError::new(
             "CANCELLED",
             "Cancelled before publication fence",
         ));
     }
-    let workspace = staging
-        .path()
-        .parent()
-        .ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging workspace required"))?
-        .to_owned();
-    let proof = workspace.join(format!(".numera-proof-{}", Uuid::new_v4()));
-    std::fs::hard_link(staging.path(), &proof).map_err(io_error)?;
-    #[cfg(unix)]
-    std::fs::File::open(&workspace)
-        .and_then(|file| file.sync_all())
-        .map_err(io_error)?;
+    let staging = nw_platform::publication::RetainedStaging::new(staging)?;
+    let proof_name = format!(".numera-proof-{}", Uuid::new_v4());
+    let proof = staging.create_proof(std::ffi::OsStr::new(&proof_name))?;
     let artifact = FileIdentity {
         path: plan.output.clone(),
         bytes: actual.bytes,
@@ -655,22 +643,10 @@ async fn publish(
     claims.revalidate()?;
     parent_stamp.revalidate()?;
     source_stamp.revalidate()?;
-    if let Err(error) = observer(ExecutionEvent::Fence(journal)).await {
-        let _ = staging.keep();
-        return Err(error);
-    }
+    observer(ExecutionEvent::Fence(journal)).await?;
     // The committed fence is the cancellation boundary. The retained hard link proves the published object for later job-scoped byte reads.
-    if let Err(error) = parent_stamp.revalidate() {
-        let _ = staging.keep();
-        return Err(error);
-    }
-    staging
-        .persist_noclobber(&output)
-        .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
-    #[cfg(unix)]
-    std::fs::File::open(parent)
-        .and_then(|file| file.sync_all())
-        .map_err(io_error)?;
+    parent_stamp.revalidate()?;
+    staging.publish_no_replace(&parent_stamp, &output)?;
     claims.revalidate()?;
     parent_stamp.revalidate()?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;

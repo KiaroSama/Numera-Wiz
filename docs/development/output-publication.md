@@ -40,8 +40,9 @@ New unqualified source adds cross-data-root destination claims after verificatio
 through the final absence check, fence, no-replace publication and durable result.
 Recovery positively reconciles only while holding the same claims. See
 destination-claims.md for namespaces, conservative alias exclusion, budgets,
-actual process/engine fixtures and remaining mandatory work. Handle-relative
-publication, project checkpoint writer leases, complete crash/retention and
+actual process/engine fixtures and remaining mandatory work. The following
+unqualified held-publication.md change replaces pathname-based Unix publication
+with held-directory no-replace linking. Project checkpoint writer leases, complete crash/retention and
 package/filesystem/resource qualification still keep T017 open. The current
 media route remains no-replace only; no overwrite or project-save capability is
 inferred from these directory and claim checks.

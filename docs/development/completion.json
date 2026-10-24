@@ -828,6 +828,32 @@
           "observed_outcome": "Separate executable copies with distinct environments shared absent-target and alias claims on all four platforms; waiting cancellation and killed-holder unlock passed. The actual Linux engine retained its claim through the fence and cancelled a contending verified attempt. Remaining T017 boundaries stay open."
         }
       ]
+    },
+    {
+      "subject_id": "cleanup.filesystem_times",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/file_times.rs",
+        "crates/nw-platform/src/file_times.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-ui/src/cleanup.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "06166dea5a1310c870065d3f105c5ac56f491623",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40076950138",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/file-times-ci66.json",
+          "observed_outcome": "All native timestamp/native-publication, denial-policy, canonical-number/hash and old-store preservation regressions passed. Actual Linux required copy/remux, CLI/SDK facts and existing native/Chrome copy journeys passed. Native PNG personally inspected. Explicit control variants, generation migration, packages/resources/GPU remain open."
+        }
+      ]
     }
   ]
 }

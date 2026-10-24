@@ -25,7 +25,7 @@ impl DomainError {
     /// Stable process status for a failed synchronous CLI request.
     pub fn exit_code(&self) -> u8 {
         match self.code.as_str() {
-            "RESOURCE_LIMIT" | "SCRATCH_EXHAUSTED" => 10,
+            "RESOURCE_LIMIT" | "SCRATCH_EXHAUSTED" | "OUTPUT_STORAGE_FULL" => 10,
             "PARTIAL_BATCH_FAILURE" => 9,
             "TRANSPORT_ERROR" | "OWNER_START_TIMEOUT" | "OWNER_STOPPING" => 8,
             "CANCELLED" => 7,
@@ -33,6 +33,7 @@ impl DomainError {
             | "PERMISSION_DENIED"
             | "PATH_DENIED"
             | "INPUT_DENIED"
+            | "PUBLICATION_DENIED"
             | "INSECURE_DATA_ROOT"
             | "REPLAY_SCOPE_INVALID"
             | "REPLAY_SCOPE_EXPIRED"
@@ -65,6 +66,7 @@ impl DomainError {
             | "NATIVE_IDENTITY_UNAVAILABLE"
             | "NATIVE_FILE_TIMES_UNAVAILABLE"
             | "PUBLICATION_CLAIM_UNAVAILABLE"
+            | "PUBLICATION_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
             | "ARTIFACT_UNAVAILABLE"

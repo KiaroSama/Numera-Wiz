@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "run_id": 40076950138,
+  "branch_head": "06166dea5a1310c870065d3f105c5ac56f491623",
+  "all_jobs": "success",
+  "jobs": [
+    {
+      "id": 120822245433,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822245534,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822245827,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822246018,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822625238,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822625320,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822625322,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120822625398,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120824663831,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120824663885,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "all four native timestamp, numeric, semantic and old-store preservation regressions, Clippy and embedded desktop builds",
+    "actual required copy/remux timestamps and CLI/official SDK metadata facts",
+    "all existing source, packet, tag, claim, lost-response and large HTTP/revocation journeys",
+    "real Chrome and native Linux human copy/manifest journey"
+  ],
+  "native_visual_review": {
+    "personally_inspected": true,
+    "boundary": "actual Linux X11/Glow CI executable with real window input",
+    "viewport": [
+      1440,
+      861
+    ],
+    "encoded_png_characters": 170512,
+    "observed": [
+      "Succeeded job",
+      "Output details opened and 197983 verified bytes displayed",
+      "full wrapped SHA-256 and job identity",
+      "Preserve timestamps selector visible within the preservation controls",
+      "Job details control visible"
+    ],
+    "not_asserted": [
+      "native required/new selector journeys",
+      "Job details activation",
+      "Windows/macOS GUI"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": 12554395343,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "04f12332452975fd12e36b8013d0711b451c0843c824078e7156a28f76c229f2",
+      "downloaded": false
+    },
+    {
+      "id": 12553627661,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "00506000af6381b3661084de843864e0874a5f6f2542e33e6fdf67adecadb57d",
+      "downloaded": false
+    },
+    {
+      "id": 12553604337,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "e703b5a7202f4db34b816b01403fb3f8c5097a3eebfc1ccc1c89f3e0a6108273",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "held-directory publication source introduced after this run",
+    "store generation migration or old executable downgrade",
+    "complete F08, product, packages, aggregate resources or owner GPU"
+  ]
+}

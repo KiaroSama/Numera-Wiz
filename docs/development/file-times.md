@@ -62,7 +62,11 @@ regressions on all four targets and the complete real Linux media/CLI/SDK and
 Chrome journeys. Its formatter and one Clippy collapsible_if check failed; the
 following revision applies the exact hosted format changes and simplifies that
 condition. Native UI was skipped by the failed prerequisite. Scoped evidence is
-in evidence/file-times-ci65.json. The ordinary shared UI has functional controls but all new control variants still
+in evidence/file-times-ci65.json. The following run 40076950138 then passed all
+jobs, including all four full native targets, the complete actual media and
+transport job, Chrome and real native input. Its actual native screenshot was
+personally inspected: the Preserve timestamps selector, Succeeded output and
+opened manifest dialog are visible. See evidence/file-times-ci66.json. The ordinary shared UI has functional controls but all new control variants still
 need their explicit native/browser input journeys. This does not close full F08,
 copy/retention/resource/filesystem package qualification or owner GPU gates.
 
