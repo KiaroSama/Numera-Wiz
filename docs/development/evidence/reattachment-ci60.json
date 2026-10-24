@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "run_id": 40066276733,
+  "branch_head": "a9f4f0c68ba93c51b65d52f4e14ef6ba5444f0c0",
+  "compiled_merge": "254f719f5e4bf596040ddf1a0b8febcc71662c45",
+  "boundary": "hosted development tests and real interface harnesses",
+  "passed": [
+    "dependency-lock",
+    "web",
+    "checks (ubuntu-24.04)",
+    "checks (windows-2025)",
+    "checks (macos-15)",
+    "checks (macos-15-intel)",
+    "media",
+    "browser",
+    "native-ui"
+  ],
+  "failed": [
+    "formatting"
+  ],
+  "windows_interface_tests": [
+    "concurrent_native_frontends_boot_one_owner_for_the_same_root",
+    "cli_stdout_is_canonical_json_and_index_zero_survives",
+    "official_stdio_discovery_is_clean_and_does_not_inherit_owner",
+    "official_stdio_reconnects_after_idle_without_changing_its_principal"
+  ],
+  "native_manifest_boundary": "Actual Output details mouse input and canonical successful completion before independent manifest SHA/length query, asserted by hosted native_ui test",
+  "screenshots_personally_inspected": false,
+  "not_qualified": [
+    "complete release",
+    "Windows/macOS GUI input",
+    "portable packages",
+    "aggregate R20",
+    "owner GPU",
+    "lost-response restart fixture added after this run"
+  ],
+  "formatting": {
+    "artifact_id": 12549710436,
+    "github_reported_zip_sha256": "0ba9196c63510e0679ae32a8c0cf3f7aed240791f6bd25b4f6b124f12d403da9",
+    "applied": "Seven exact formatter diagnostic hunks from completed job 120790134958"
+  }
+}

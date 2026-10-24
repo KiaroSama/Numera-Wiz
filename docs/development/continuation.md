@@ -793,3 +793,33 @@ object/hash/legacy checks and platform physical-ID assertions passed on all four
 targets; full ordinary native/Clippy/desktop gates remain blocked by the stale
 fixture and the Windows attachment failure described above. No native dialog
 activation or complete-release qualification is inferred.
+
+
+## Hosted reattachment and human manifest checkpoint
+
+Run [40066276733](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40066276733)
+on head a9f4f0c68ba93c51b65d52f4e14ef6ba5444f0c0 passed the locked WASM build,
+all four native test/Clippy/desktop targets, actual engine/CLI/official SDK media,
+the larger-than-memory HTTP/revocation journey, real Chrome interaction and real
+Linux native window input. Windows explicitly passed all four interface tests,
+including concurrent startup and idle restart/principal binding. The bootstrap
+gate correction passed without increasing the 20-second attachment deadline.
+The native test activated Output details and observed its successful canonical
+manifest completion before issuing the harness's independent SHA/length oracle.
+The retained dialog screenshot has not been personally inspected for this run.
+Only formatting failed; its seven exact hosted diagnostic hunks are applied.
+The original formatter artifact is 12549710436 with GitHub-reported ZIP SHA-256
+0ba9196c63510e0679ae32a8c0cf3f7aed240791f6bd25b4f6b124f12d403da9.
+These are development boundaries, not complete product/package/GPU qualification.
+
+New source adds a separate, bounded real transport fault inside the existing
+hosted owner-media journey. A loopback fixture forwards every request to the real
+private owner, then withholds both actual accepted submission responses from the
+same official-SDK stdio bridge. After the job succeeds and the owner exits idle,
+the same bridge replays the exact original durable command against the restarted
+owner. Assertions require unchanged automatic retry bytes, one receipt/job,
+unchanged root/principal, a new epoch and exact output bytes. It retains only a
+nonsecret summary and bounded protected JSONLs. This new source awaits CI; it is
+not an observed lost-response pass. Retired command replay, crash/fence/migration
+recovery and all other open tasks remain mandatory. No local source compilation,
+tests, application/media execution or owner GPU run was performed.

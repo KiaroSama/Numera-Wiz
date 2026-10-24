@@ -169,30 +169,60 @@ async fn concurrent_native_frontends_boot_one_owner_for_the_same_root() {
         for _ in 0..3 {
             let root = data.path().to_owned();
             children.spawn(async move {
-                tokio::time::timeout(std::time::Duration::from_secs(45),
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(45),
                     tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
-                        .arg("--data-dir").arg(root).arg("commands")
-                        .stdin(std::process::Stdio::null()).kill_on_drop(true).output()
-                ).await.unwrap().unwrap()
+                        .arg("--data-dir")
+                        .arg(root)
+                        .arg("commands")
+                        .stdin(std::process::Stdio::null())
+                        .kill_on_drop(true)
+                        .output(),
+                )
+                .await
+                .unwrap()
+                .unwrap()
             });
         }
         let mut spawned = 0;
         while let Some(output) = children.join_next().await {
             let output = output.unwrap();
-            spawned += String::from_utf8_lossy(&output.stderr).lines()
-                .filter(|line| line.contains("Protected owner child spawned")).count();
-            assert!(output.status.success(), "Concurrent owner attachment failed: {}", String::from_utf8_lossy(&output.stderr));
+            spawned += String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .filter(|line| line.contains("Protected owner child spawned"))
+                .count();
+            assert!(
+                output.status.success(),
+                "Concurrent owner attachment failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
             assert_eq!(response["ok"], true);
         }
-        assert_eq!(spawned, 1, "Concurrent frontends launched redundant owner children");
+        assert_eq!(
+            spawned, 1,
+            "Concurrent frontends launched redundant owner children"
+        );
         wait_for_idle_owner_unlock(data.path()).await;
-        let lines = nw_platform::security::read_private(&data.path().join("logs/owner.jsonl"),2*1024*1024+1024).unwrap();
-        let owners = lines.split(|b| *b == b'\n')
+        let lines = nw_platform::security::read_private(
+            &data.path().join("logs/owner.jsonl"),
+            2 * 1024 * 1024 + 1024,
+        )
+        .unwrap();
+        let owners = lines
+            .split(|b| *b == b'\n')
             .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
-            .filter(|row| row["fields"]["message"] == "Protected structured owner logging activated")
+            .filter(|row| {
+                row["fields"]["message"] == "Protected structured owner logging activated"
+            })
             .filter_map(|row| row["process_id"].as_u64())
             .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(owners.len(), 1, "Concurrent startup initialized redundant owner processes");
-    }).await.expect("Concurrent native attachment deadline");
+        assert_eq!(
+            owners.len(),
+            1,
+            "Concurrent startup initialized redundant owner processes"
+        );
+    })
+    .await
+    .expect("Concurrent native attachment deadline");
 }

@@ -30,6 +30,9 @@ macro_rules! call {
         value["structuredContent"]["result"].clone()
     }};
 }
+#[path = "support/lost_ack.rs"]
+mod lost_ack;
+
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
 async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
@@ -933,4 +936,5 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     server.kill().await.unwrap();
     server.wait().await.unwrap();
+    lost_ack::verify(&media).await;
 }
