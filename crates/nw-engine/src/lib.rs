@@ -442,7 +442,7 @@ async fn publish(
         let _ = staging.keep();
         return Err(error);
     }
-    // The committed fence is the cancellation boundary. Recovery retains the hard-link proof until durable acknowledgement.
+    // The committed fence is the cancellation boundary. The retained hard link proves the published object for later job-scoped byte reads.
     staging
         .persist_noclobber(&output)
         .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
@@ -451,11 +451,6 @@ async fn publish(
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
-    std::fs::remove_file(&proof).map_err(io_error)?;
-    // Only the now-empty private workspace is removed; unknown contents are preserved.
-    if let Err(error) = std::fs::remove_dir(&workspace) {
-        tracing::warn!(%error, workspace=%workspace.display(), "Owned empty workspace cleanup remains pending");
-    }
     Ok(artifact)
 }
 fn parse_tags(value: &Value) -> BTreeMap<String, String> {

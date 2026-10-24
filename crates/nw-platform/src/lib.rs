@@ -36,3 +36,5 @@ pub fn init_logging() {
         .init();
     tracing::debug!("DEBUG: Diagnostic logging initialized; credentials are excluded");
 }
+
+pub mod artifacts;

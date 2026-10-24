@@ -4,7 +4,7 @@ use nw_domain::{
     commands::{self, Empty, IdInput, Request, ResolveInput, Response},
 };
 mod runtime;
-pub use runtime::{Context, Service};
+pub use runtime::{ArtifactTransfer, Context, Service};
 
 pub use nw_domain::commands::ACTIVE_COMMANDS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

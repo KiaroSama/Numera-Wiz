@@ -149,6 +149,8 @@ impl SourceStamp {
             modified: metadata.modified().map_err(io_error)?,
         })
     }
+    pub(crate) fn held_file(&self) -> &File { self.handle.as_file() }
+    pub(crate) fn same_as(&self, other: &Self) -> bool { self.handle == other.handle }
     pub fn revalidate(&self) -> Result<()> {
         let changed = || {
             DomainError::new(

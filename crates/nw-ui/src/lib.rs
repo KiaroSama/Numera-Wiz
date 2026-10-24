@@ -29,6 +29,7 @@ enum Action {
     Jobs,
     Cancel,
     Inspect,
+    ArtifactManifest,
 }
 struct Pending {
     request: Request,
@@ -73,6 +74,7 @@ pub struct WizApp {
     last_jobs: Instant,
     stream_page: usize,
     inspect: String,
+    artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
 }
 impl WizApp {
     fn run_reviewed(&mut self, ctx: &egui::Context) {
@@ -152,6 +154,7 @@ impl WizApp {
             last_jobs: Instant::now(),
             stream_page: 0,
             inspect: String::new(),
+            artifact_manifest: None,
         };
         app.query("assets.list", json!({}), Action::Assets, ctx);
         app
@@ -376,6 +379,9 @@ impl WizApp {
                             .into();
                     self.last_jobs = Instant::now() - Duration::from_secs(2);
                 }
+                Action::ArtifactManifest => {
+                    self.artifact_manifest = Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
+                }
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
@@ -479,6 +485,7 @@ impl WizApp {
             }
         });
         let mut cancel = None;
+        let mut artifact = None;
         egui::ScrollArea::vertical()
             .id_salt("jobs")
             .max_height(145.0)
@@ -488,6 +495,7 @@ impl WizApp {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
                         ui.label(&job.output_name);
+                        if job.state == nw_domain::records::JobState::Succeeded && ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Output details")).clicked() { artifact = Some(format!("job-{}", job.id)); }
                         if !job.state.terminal()
                             && ui
                                 .add_enabled(
@@ -509,6 +517,18 @@ impl WizApp {
                     );
                 }
             });
+        if let Some(id) = artifact { self.query("artifacts.manifest", json!({"artifact_id":id}), Action::ArtifactManifest, ui.ctx()); }
+        let mut open = self.artifact_manifest.is_some();
+        if let Some(manifest) = &self.artifact_manifest {
+            egui::Window::new("Output details").open(&mut open).show(ui.ctx(), |ui| {
+                ui.label(format!("Verified bytes: {}", manifest.encoded_byte_count));
+                ui.label("SHA-256"); ui.monospace(&manifest.sha256);
+                ui.label(format!("Job: {}", manifest.job_id));
+                if ui.button("Copy manifest URI").clicked() { ui.ctx().copy_text(manifest.manifest_uri.clone()); }
+                ui.small("Reading this output requires current job access. A copied URI does not grant access.");
+            });
+        }
+        if !open { self.artifact_manifest = None; }
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }
