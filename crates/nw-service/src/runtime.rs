@@ -779,7 +779,12 @@ impl Service {
         let result = match request.command.id.as_str() {
             "logs.status" => {
                 let _: Empty = commands::parse(params)?;
-                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Protected log status requires local-owner authority")); }
+                if policy.is_some() {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Protected log status requires local-owner authority",
+                    ));
+                }
                 value(&nw_platform::logging::status())?
             }
             "commands.list" | "commands.schema" | "streams.clean.resolve" => {

@@ -94,8 +94,8 @@ impl DomainError {
 pub type Result<T> = std::result::Result<T, DomainError>;
 
 pub mod access;
+pub mod diagnostics;
 pub mod records;
 pub mod views;
-pub mod diagnostics;
 
 pub mod ingest;

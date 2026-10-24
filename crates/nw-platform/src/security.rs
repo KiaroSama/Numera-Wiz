@@ -89,7 +89,12 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
             ));
         }
     }
-    let scratch_parent = if path.is_dir() { path } else { path.parent().ok_or_else(|| denied("Protected file parent is required"))? };
+    let scratch_parent = if path.is_dir() {
+        path
+    } else {
+        path.parent()
+            .ok_or_else(|| denied("Protected file parent is required"))?
+    };
     let scratch = tempfile::Builder::new()
         .prefix("acl-check-")
         .tempfile_in(scratch_parent)
@@ -194,8 +199,10 @@ pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::{PermissionsExt, MetadataExt};
-        if metadata.permissions().mode() & 0o077 != 0 || metadata.uid() != fs::metadata(parent).map_err(io_error)?.uid() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        if metadata.permissions().mode() & 0o077 != 0
+            || metadata.uid() != fs::metadata(parent).map_err(io_error)?.uid()
+        {
             return Err(denied("Credential/runtime file permissions are too broad"));
         }
     }
@@ -237,9 +244,16 @@ mod tests {
         let path = root.path().join("credential.txt");
         write_private(&path, b"private file ACL fixture", false).unwrap();
         assert!(read_private(&path, 128).is_ok());
-        let changed = Command::new(system_tool("icacls.exe").unwrap()).arg(&path).args(["/grant", "*S-1-1-0:R", "/q"]).output().unwrap();
+        let changed = Command::new(system_tool("icacls.exe").unwrap())
+            .arg(&path)
+            .args(["/grant", "*S-1-1-0:R", "/q"])
+            .output()
+            .unwrap();
         assert!(changed.status.success());
-        assert_eq!(read_private(&path, 128).unwrap_err().code, "INSECURE_DATA_ROOT");
+        assert_eq!(
+            read_private(&path, 128).unwrap_err().code,
+            "INSECURE_DATA_ROOT"
+        );
     }
     #[test]
     fn local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user() {

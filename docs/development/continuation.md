@@ -480,3 +480,14 @@ the parent. See protected-logging.md for exact behavior, fault cases and remaini
 export/repair/retention obligations. The actual owner media fixture checks JSONL
 and absence of its issued bearers. These latest changes await hosted results.
 No local build/test/media or owner GPU run was executed.
+
+Run [40055050551](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40055050551)
+for cb1769ba42c0cdb1ba4dcdf2bde6b8f2dbc7cf4f passed the actual engine,
+human CLI/official SDK, protected JSONL and absence-of-issued-bearers assertions,
+plus actual Chrome output. All four native unit suites passed, including rotation,
+interrupted logs, redaction and the independent Windows credential-file DACL
+rejection. Clippy rejected a one-byte array literal; it now uses the suggested
+byte-string form. The exact hosted formatter patch is applied. Desktop stripping/
+native-window startup was skipped by that failed dependency, so the optimized
+artifact's startup is not credited yet. The complete bitstream-filter manual is
+now personally recorded, for 40 manual entries; full study remains pending.
