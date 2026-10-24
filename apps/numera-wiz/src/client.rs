@@ -23,7 +23,32 @@ pub struct NativeClient {
     http: reqwest::Client,
     cached: Arc<Mutex<Option<OwnerRecord>>>,
     credential: Arc<Mutex<Option<(String, String)>>>,
+    binding: Arc<Mutex<SessionBinding>>,
     build: String,
+}
+#[derive(Default)]
+struct SessionBinding {
+    root_id: Option<String>,
+    principal: Option<String>,
+}
+impl SessionBinding {
+    fn bind_root(&mut self, root: &str) -> Result<()> {
+        if self.root_id.as_deref().is_some_and(|original| original != root) {
+            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "The selected native root no longer has this adapter's original data identity").into());
+        }
+        self.root_id = Some(root.into());
+        Ok(())
+    }
+    fn bind_principal(&mut self, principal: &str) -> Result<()> {
+        if principal.is_empty() || principal.len() > 128 {
+            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Scoped bootstrap omitted its bounded principal identity").into());
+        }
+        if self.principal.as_deref().is_some_and(|original| original != principal) {
+            return Err(nw_domain::DomainError::new("PRINCIPAL_CHANGED", "Scoped reconnect cannot change the adapter's original principal").into());
+        }
+        self.principal = Some(principal.into());
+        Ok(())
+    }
 }
 pub fn registry_fingerprint() -> String {
     nw_domain::commands::registry_fingerprint()
@@ -55,6 +80,7 @@ impl NativeClient {
                 .build()?,
             cached: Arc::new(Mutex::new(None)),
             credential: Arc::new(Mutex::new(None)),
+            binding: Arc::new(Mutex::new(SessionBinding::default())),
             build,
         })
     }
@@ -92,7 +118,8 @@ impl NativeClient {
                     && health.status().is_success()
                 {
                     let identity = bounded_json(health).await?;
-                    if identity["epoch"] != record.epoch || identity["root_id"] != record.root_id {
+                    if identity["epoch"] != record.epoch || identity["root_id"] != record.root_id
+                        || identity["build"] != record.build || identity["registry"] != record.registry {
                         return Err(nw_domain::DomainError::new(
                             "OWNER_IDENTITY_CONFLICT",
                             "Protected bootstrap and active owner differ",
@@ -102,6 +129,7 @@ impl NativeClient {
                     if record.build != self.build || record.registry != registry_fingerprint() {
                         return Err(nw_domain::DomainError::new("OWNER_VERSION_CONFLICT", "Another build owns this root; let its jobs/clients drain before updating").into());
                     }
+                    self.binding.lock().await.bind_root(&record.root_id)?;
                     *self.cached.lock().await = Some(record.clone());
                     tracing::info!(
                         elapsed_ms = started.elapsed().as_millis(),
@@ -159,6 +187,7 @@ impl NativeClient {
         {
             return Ok(token.clone());
         }
+        let expected_principal = self.binding.lock().await.principal.clone();
         let response = self
             .http
             .post(format!(
@@ -166,7 +195,7 @@ impl NativeClient {
                 record.port
             ))
             .bearer_auth(&record.bearer)
-            .json(&serde_json::json!({"profile":profile}))
+            .json(&serde_json::json!({"profile":profile,"expected_principal":expected_principal}))
             .send()
             .await?;
         let value = bounded_json(response).await?;
@@ -174,6 +203,10 @@ impl NativeClient {
             .as_str()
             .context("Scoped credential was not issued")?
             .to_owned();
+        if value["profile"].as_str() != Some(profile.as_str()) {
+            return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Scoped bootstrap names a different profile").into());
+        }
+        self.binding.lock().await.bind_principal(value["principal"].as_str().unwrap_or(""))?;
         *cached = Some((record.epoch.clone(), token.clone()));
         Ok(token)
     }
@@ -199,7 +232,16 @@ impl NativeClient {
     ) -> Result<serde_json::Value> {
         for attempt in 0..2 {
             let record = self.attach().await?;
-            let token = self.scoped_token(&record).await?;
+            let token = match self.scoped_token(&record).await {
+                Ok(token) => token,
+                Err(error) if attempt == 0 && (error.downcast_ref::<reqwest::Error>().is_some()
+                    || error.downcast_ref::<nw_domain::DomainError>().is_some_and(|error| error.code == "AUTHENTICATION_REQUIRED")) => {
+                    *self.cached.lock().await = None;
+                    *self.credential.lock().await = None;
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             let result = self
                 .http
                 .post(format!("http://127.0.0.1:{}/{route}", record.port))
@@ -272,4 +314,21 @@ pub async fn bounded_json(mut response: reqwest::Response) -> Result<serde_json:
         return Err(nw_domain::DomainError::new(code, message).into());
     }
     Ok(value)
+}
+
+#[cfg(test)]
+mod binding_tests {
+    use super::*;
+    #[test]
+    fn reconnect_keeps_root_and_principal_anchors_after_cache_eviction() {
+        let mut binding = SessionBinding::default();
+        binding.bind_root("root-original").unwrap();
+        binding.bind_principal("principal-original").unwrap();
+        binding.bind_root("root-original").unwrap();
+        binding.bind_principal("principal-original").unwrap();
+        assert!(binding.bind_root("root-replacement").is_err());
+        assert!(binding.bind_principal("principal-replacement").is_err());
+        assert_eq!(binding.root_id.as_deref(), Some("root-original"));
+        assert_eq!(binding.principal.as_deref(), Some("principal-original"));
+    }
 }

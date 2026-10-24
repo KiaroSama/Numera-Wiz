@@ -706,3 +706,34 @@ not yet in the committed lock. Its formatter output was also applied exactly
 (artifact 12547849196, ZIP SHA-256
 c4d6c58c2252080484b8fef119a740f698e3e42a3d61a64e65ae98a0805abfab).
 No source/package/media pass is inferred from that resolver-only run.
+
+
+## Pending native reattachment identity checks
+
+A native adapter now retains root and scoped-principal bindings separately from
+its evictable connection/credential caches. Bootstrap checks the active build and
+registry and compares expected_principal before issuance. Bounded canonical MCP
+errors preserve identity conflicts and request correlation. The new official SDK
+regression retains one stdio process through real idle owner shutdown/restart,
+then tests a replacement profile against the old and a fresh bridge. See
+native-reattachment.md. This source awaits CI; no actual reattachment pass yet.
+
+Run 40063449245 passed ordinary Windows/Linux tests, lint and desktop composition,
+the WASM/lock/format jobs, the real held-file MOV/remux/corruption/replacement
+engine journey and the isolated larger-than-memory reader. Both macOS suites
+stopped at their FIFO fixture: Rustix does not expose mkfifoat there. The test
+now uses the standard hosted POSIX mkfifo fixture through the same finite process
+supervisor; the production guarded opener is unchanged. The actual owner/SDK
+and full HTTP steps are still in progress at this source checkpoint; they are
+not credited here. No local execution was used.
+
+
+Run 40063449245's complete media job subsequently finished successfully, including
+actual CLI/official SDK transports and the full larger-than-memory owner HTTP
+journey. The exact large-output report is evidence/artifact-http-ci57.json. Its
+268633400-byte output used a measured owner high-water mark of 28816 KiB; live
+job Read/bearer withdrawal and disconnect index cleanup passed. This qualifies
+the held-file remux/corruption/source-replacement cases at the Linux development
+media boundary. It does not qualify the pending identity reattachment additions
+or native Output details input. macOS requires the fixture correction above,
+so the run is not an all-platform pass.

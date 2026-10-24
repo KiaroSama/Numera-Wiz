@@ -30,7 +30,14 @@ impl Bridge {
         match &self.backend {
             Backend::Native(client) => {
                 tokio::select! {
-                    result=client.request(&canonical)=>result.map_err(|_|ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None)),
+                    result=client.request(&canonical)=>match result {
+                        Ok(response)=>Ok(response),
+                        Err(error)=>if let Some(error)=error.downcast_ref::<nw_domain::DomainError>() {
+                            Ok(commands::Response::error(&canonical.request_id,error.clone()).bounded())
+                        } else {
+                            Err(ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None))
+                        },
+                    },
                     _=context.ct.cancelled()=>Ok(commands::Response::error(&canonical.request_id,nw_domain::DomainError::new("CANCELLED","MCP request cancelled; retain durable request identity to inspect a possibly accepted mutation"))),
                 }
             }

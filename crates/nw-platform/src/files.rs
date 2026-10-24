@@ -384,16 +384,14 @@ pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
 mod tests {
     use super::*;
     #[cfg(unix)]
-    #[test]
-    fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
+    #[tokio::test]
+    async fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("input");
-        rustix::fs::mkfifoat(
-            rustix::fs::CWD,
-            &source,
-            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
-        )
-        .unwrap();
+        let fixture_tool = [Path::new("/usr/bin/mkfifo"), Path::new("/bin/mkfifo")]
+            .into_iter().find(|path| path.is_file()).expect("Hosted POSIX FIFO fixture tool");
+        crate::process::run(fixture_tool, &[path_text(&source).unwrap()],
+            std::time::Duration::from_secs(5), 1024, CancellationToken::new()).await.unwrap();
         let started = std::time::Instant::now();
         assert!(matches!(open_regular_handle(&source), Err(error) if error.code == "INPUT_DENIED"));
         assert!(started.elapsed() < std::time::Duration::from_secs(1));
