@@ -69,6 +69,7 @@ impl DomainError {
             | "NATIVE_FILE_TIMES_UNAVAILABLE"
             | "PUBLICATION_CLAIM_UNAVAILABLE"
             | "PUBLICATION_UNAVAILABLE"
+            | "PROCESS_ISOLATION_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
             | "ARTIFACT_UNAVAILABLE"
