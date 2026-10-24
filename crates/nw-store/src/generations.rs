@@ -524,6 +524,8 @@ mod tests {
             "9007199254740993"
         );
         assert_eq!(store.generation_path().unwrap(), target);
+        assert_eq!(RootLock::acquire(&generation).err().unwrap().code, "OWNER_BUSY");
+        assert_eq!(RootLock::acquire(&target).err().unwrap().code, "OWNER_BUSY");
         store.close_generation(&lease).unwrap();
         store.reopen_current_generation(&lease).unwrap();
     }

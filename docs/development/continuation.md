@@ -1790,3 +1790,23 @@ native input pass is inferred for ci92.
 
 No migration handler, schema upgrade or rollback is exposed. The retained domain
 draft is separate from this correction. All full product obligations remain.
+
+
+## Manifest-bound closed generation copies and retained legacy leases
+
+The stopped-store copy primitive now reserves a bounded UUID workspace and writes
+private source/role ownership facts before publication. It uses the existing
+full-byte verified no-replace copy path, checks complete source and destination
+record hashes/counts/namespaces, and writes a flushed completion proof. Resuming
+requires the exact manifest and full file hash; an unrelated destination is
+preserved. All copies are bounded by64GiB/50000records and16 retained workspaces;
+space checks include64MiB margin. There is no automatic history eviction.
+
+A Slot now retains prior generation locks across attachment switches until the
+Store drops. This closes the live-owner stale-generation opening gap for old
+binaries that only know generation1. Durable reader floors after owner exit,
+actual migration acceptance/recovery/activation/rollback and application wiring
+are still required; a copy primitive is not a completed schema migration.
+New tests cover exact numeric/unknown fields, original signed receipt replay,
+complete-copy restart, live-source refusal, unproven-file preservation and both
+source/target locks after attachment. Hosted formatting and full CI are pending.

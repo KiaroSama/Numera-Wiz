@@ -18,5 +18,7 @@ hex.workspace = true
 hmac = "0.12"
 base64 = "0.22"
 tracing.workspace = true
+fs2.workspace = true
+tokio-util.workspace = true
 [dev-dependencies]
 tempfile.workspace = true

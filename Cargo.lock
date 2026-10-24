@@ -2206,6 +2206,7 @@ name = "nw-store"
 version = "0.1.0-dev"
 dependencies = [
  "base64 0.22.1",
+ "fs2",
  "hex",
  "hmac",
  "nw-domain",
@@ -2215,6 +2216,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
