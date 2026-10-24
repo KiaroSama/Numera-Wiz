@@ -14,7 +14,7 @@ pub struct Input {
 
 pub fn open(path: &Path, cancel: &tokio_util::sync::CancellationToken) -> Result<Input> {
     check_cancel(cancel)?;
-    let mut file = File::open(path).map_err(io_error)?;
+    let mut file = nw_platform::files::open_regular_read(path)?;
     if !file.metadata().map_err(io_error)?.is_file() {
         return Err(DomainError::new(
             "INPUT_DENIED",

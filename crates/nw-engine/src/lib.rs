@@ -196,6 +196,9 @@ impl Engine {
                 "Stored plan hash mismatch",
             ));
         }
+        if plan.verification_scope != preservation::SCOPE {
+            return Err(DomainError::new("INVALID_PLAN", "Review a fresh plan for the current verification contract"));
+        }
         if self.ffmpeg != plan.ffmpeg || self.ffprobe != plan.ffprobe {
             return Err(DomainError::new(
                 "COMPONENT_CHANGED",
@@ -203,11 +206,18 @@ impl Engine {
             ));
         }
         if plan.resolution.action == CleanAction::Remux
-            && plan.argv_template != lower_remux(&plan.source, &plan.resolution)? {
-            return Err(DomainError::new("INVALID_PLAN", "Review a fresh plan for the admitted held-file remux route"));
+            && plan.argv_template != lower_remux(&plan.source, &plan.resolution)?
+        {
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Review a fresh plan for the admitted held-file remux route",
+            ));
         }
         if plan.resolution.action != CleanAction::Remux && !plan.argv_template.is_empty() {
-            return Err(DomainError::new("INVALID_PLAN", "Copy/skip plans cannot contain a media subprocess"));
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Copy/skip plans cannot contain a media subprocess",
+            ));
         }
         Ok(())
     }
@@ -300,15 +310,20 @@ impl Engine {
             let path = Path::new(&source.path);
             let input = admission::open(path, &token)?;
             if input.demuxer != frozen_demuxer {
-                return Err(DomainError::new("SOURCE_CHANGED", "Held input format differs from the reviewed source"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Held input format differs from the reviewed source",
+                ));
             }
             let stamp = files::SourceStamp::capture_open_resolved(
-                path, input.file.try_clone().map_err(io_error)?,
+                path,
+                input.file.try_clone().map_err(io_error)?,
             )?;
             files::revalidate(&source, &token)?;
             stamp.revalidate()?;
             Ok((input, stamp))
-        }).await?;
+        })
+        .await?;
         let staging = prepare_staging(plan, job_id, &observer).await?;
         let staging_name = files::path_text(staging.path())?;
         let args = plan
@@ -369,7 +384,8 @@ impl Engine {
         blocking(move || {
             files::revalidate(&source, &token)?;
             source_stamp.revalidate()
-        }).await?;
+        })
+        .await?;
         if cancel.is_cancelled() {
             return Err(DomainError::new(
                 "CANCELLED",
@@ -790,7 +806,9 @@ fn verify_tags(
 ) -> Result<()> {
     for (key, value) in expected {
         // Matroska regenerates its duration tags from the independently verified packet clock.
-        if key != "duration" && actual.get(key) != Some(value) {
+        let undefined_stream_language = !generated_writer && key == "language"
+            && value == "und" && !actual.contains_key(key);
+        if key != "duration" && !undefined_stream_language && actual.get(key) != Some(value) {
             return Err(DomainError::new(
                 "VERIFICATION_FAILED",
                 format!("{target} tag {key} did not match its frozen value"),
@@ -809,4 +827,22 @@ fn verify_tags(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tag_tests {
+    use super::*;
+    #[test]
+    fn only_matroska_undefined_stream_language_has_the_declared_omission() {
+        let undefined = BTreeMap::from([("language".into(), "und".into())]);
+        let english = BTreeMap::from([("language".into(), "eng".into())]);
+        let empty = BTreeMap::new();
+        assert!(verify_tags(&undefined, &empty, "Stream", false).is_ok());
+        assert!(verify_tags(&undefined, &empty, "Container", true).is_err());
+        assert!(verify_tags(&english, &empty, "Stream", false).is_err());
+        assert!(verify_tags(&undefined, &english, "Stream", false).is_err());
+        assert!(verify_tags(&empty, &english, "Stream", false).is_err());
+        let arbitrary = BTreeMap::from([("review_note".into(), "und".into())]);
+        assert!(verify_tags(&arbitrary, &empty, "Stream", false).is_err());
+    }
 }

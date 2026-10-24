@@ -680,3 +680,19 @@ Held-file remux source changes below this checkpoint still await their own CI.
 
 Personal reading is 47 complete bodies and the filters body through line 28300;
 all later filter lines remain pending. No local compilation or media execution ran.
+
+
+## Full preserved manual reading and pending follow-up
+
+All 48 preserved FFmpeg manual bodies have now been personally read; the final
+34370-line filter body is complete with interpretations in reading-ledger.json.
+T005 records this research output only, not implementation/effect/package support.
+Run 40062872192 passed lock/WASM but its actual MOV remux found the undefined
+language metadata representation described in source-inputs.md. Its exact hosted
+formatter patch was applied (ZIP SHA-256
+f619eac4808c7dd7111af39b45f57b6d06da8c37b8fffbf6a8e04b5ec4b576ce).
+New changes declare the narrowly normalized language contract and enforce current
+verification scope at admission; they never skip packet, tag or timing checks.
+The guarded file opener and actual native Output details click are added and
+await qualification. Direct OS edges require the next hosted lock resolver output.
+No local compilation, tests, application or media execution was run.
