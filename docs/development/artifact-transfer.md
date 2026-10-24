@@ -73,3 +73,14 @@ ceiling. These newly added cases await their own hosted result; this is not a
 claim of full B7-J03 observation, packaged download or aggregate RSS qualification.
 Native Save As, browser streamed Save As, observations, retained snapshot/revision
 purposes and complete artifact retention/export management remain required work.
+
+The next hosted integration journey constructs a valid Matroska file larger than
+256 MiB using the pinned muxer's reserved Cues/Void region, registers it, reviews
+and submits a true byte-copy job, then hashes the complete authenticated HTTP
+response incrementally. It observes the matching protected owner's Linux process
+VmHWM under a selected 128 MiB ceiling, revokes job Read during one active stream,
+revokes one bearer during another, and checks client-disconnect index cleanup.
+The owner identity comes from matching protected root/epoch log records, never
+from an untrusted PID used as authority. The new fixture is not yet qualified.
+Protected first-party JSONL and a report are retained in CI; no runtime credentials
+or complete media bytes are uploaded as diagnostic evidence.

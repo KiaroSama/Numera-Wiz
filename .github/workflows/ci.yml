@@ -275,6 +275,10 @@ jobs:
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
         run: cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture
+      - name: Exercise actual larger-than-memory HTTP publication and revocation
+        env:
+          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+        run: cargo test --locked -p numera-wiz --test artifact_http -- --ignored --nocapture
       - name: Save fixture components and actual configuration
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

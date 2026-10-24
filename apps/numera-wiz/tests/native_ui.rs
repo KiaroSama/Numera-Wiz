@@ -6,6 +6,9 @@
 )]
 #[path = "../../../test-support/media.rs"]
 mod fixture;
+#[path = "support/evidence.rs"]
+mod evidence;
+use evidence::RetainLogs;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
 use std::{
@@ -108,6 +111,7 @@ async fn journey() {
         .expect("Hosted X11 window manager");
     let media = fixture::generate().await;
     let root = media.directory.path().join("native-data");
+    let _owner_logs = RetainLogs { source: root.join("logs"), destination: evidence.join("native-owner-logs") };
     let identity =
         nw_platform::files::identity(&executable, &tokio_util::sync::CancellationToken::new())
             .unwrap();
@@ -193,7 +197,10 @@ async fn journey() {
     click(&window, "331", "570").await;
     tokio::time::sleep(Duration::from_secs(1)).await;
     screenshot(&window, &evidence.join("native-reviewed-workspace.png")).await;
+    input(&["windowactivate", "--sync", &window]).await;
     input(&["key", "--clearmodifiers", "ctrl+Return"]).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    screenshot(&window, &evidence.join("native-run-requested.png")).await;
     let start = Instant::now();
     let job = loop {
         if let Some(jobs) = query(&root, "jobs.list").await
