@@ -33,6 +33,7 @@ impl Bridge {
                     result=client.request(&canonical)=>match result {
                         Ok(response)=>Ok(response),
                         Err(error)=>if let Some(error)=error.downcast_ref::<nw_domain::DomainError>() {
+                            tracing::warn!(code=%error.code, "Native owner request failed before canonical dispatch");
                             Ok(commands::Response::error(&canonical.request_id,error.clone()).bounded())
                         } else {
                             Err(ErrorData::internal_error("Owner attachment/request failed; retain durable retry identity",None))

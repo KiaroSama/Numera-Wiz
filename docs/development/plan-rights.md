@@ -37,3 +37,10 @@ MCP cross-principal equivalent-plan hash assertion to the hosted owner journey.
 Hosted run 40061709915 passed all four native test/lint/desktop targets, the WASM build, actual engine and CLI/official MCP journeys, actual Linux native input and Chrome interaction. Its cross-principal equivalent-plan assertion passed. Native and large-output evidence is retained in `evidence/native-copy-ci54.json` and `evidence/artifact-http-ci54.json`. This is the current single-source cleanup
 contract; multi-source project/dependency graphs, observations, device/network
 purposes and the full release acceptance matrix remain required work.
+
+
+The pending original-object extension also hashes the asset's captured native
+file identity in source_read.object. New planning/admission requires it; no
+historical missing identity is silently filled. The legacy optional field is
+omitted during serialization, retaining prior hashes. See source-inputs.md for
+its OS ABI, full digest, current authority and pending qualification boundaries.

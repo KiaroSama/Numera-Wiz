@@ -1,11 +1,22 @@
 //! CLI and actual official-SDK stdio parity and authorization regressions.
 use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 use std::process::Command;
+#[path = "support/evidence.rs"]
+mod evidence;
+fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLogs {
+    evidence::RetainLogs {
+        source: data.join("logs"),
+        destination: std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/interface-evidence")
+            .join(format!("{label}-{}",uuid::Uuid::new_v4())),
+    }
+}
 #[test]
 fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
     let data = tempfile::tempdir().unwrap();
+    let _logs = retain_owner_logs(data.path(), "cli");
     let output = Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
         .arg("--data-dir")
         .arg(data.path())
@@ -13,7 +24,7 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
         .arg(path)
         .output()
         .unwrap();
-    assert!(output.status.success());
+    assert!(output.status.success(), "CLI owner failure: {}", String::from_utf8_lossy(&output.stderr));
     let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(response["ok"], true);
     assert_eq!(
@@ -31,6 +42,7 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
 async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
     let data = tempfile::tempdir().unwrap();
+    let _logs = retain_owner_logs(data.path(), "discovery");
     command.arg("--data-dir").arg(data.path()).arg("bridge");
     let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
     let tools = client.list_all_tools().await.unwrap();
@@ -44,7 +56,7 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         .await
         .unwrap();
     let value = serde_json::to_value(listed).unwrap();
-    assert_eq!(value["structuredContent"]["ok"], true);
+    assert_eq!(value["structuredContent"]["ok"], true, "Owner command error: {}",value["structuredContent"]["error"]);
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/clean-resolve.json")).unwrap();
     let denied = client
@@ -66,10 +78,16 @@ async fn wait_for_idle_owner_unlock(root: &std::path::Path) {
     let start = std::time::Instant::now();
     loop {
         match nw_platform::files::RootLock::acquire(&root.join("state/generations/1")) {
-            Ok(lock) => { drop(lock); return; }
+            Ok(lock) => {
+                drop(lock);
+                return;
+            }
             Err(error) => assert_eq!(error.code, "OWNER_BUSY"),
         }
-        assert!(start.elapsed() < std::time::Duration::from_secs(35), "Idle owner did not drain while its stdio bridge remained alive");
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(35),
+            "Idle owner did not drain while its stdio bridge remained alive"
+        );
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 }
@@ -79,6 +97,7 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         use serde_json::Value;
         let data = tempfile::tempdir().unwrap();
+        let _logs = retain_owner_logs(data.path(), "reattach");
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
         command.arg("--data-dir").arg(data.path()).arg("bridge");
         let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
@@ -87,7 +106,7 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
                 let response = $client.call_tool(CallToolRequestParams::new("access.replay_scope.create")
                     .with_arguments(rmcp::object!({"params":{}}))).await.unwrap();
                 let response = serde_json::to_value(response).unwrap();
-                assert_eq!(response["structuredContent"]["ok"], true);
+                assert_eq!(response["structuredContent"]["ok"], true, "Owner scope error: {}",response["structuredContent"]["error"]);
                 let scope = response["structuredContent"]["result"]["replay_scope"].as_str().unwrap();
                 let payload = URL_SAFE_NO_PAD.decode(scope.split_once('.').unwrap().0).unwrap();
                 serde_json::from_slice::<Value>(&payload).unwrap()

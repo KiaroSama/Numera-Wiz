@@ -63,3 +63,38 @@ Windows and Linux tests/Clippy/desktop composition passed. The macOS FIFO fixtur
 required the subsequent POSIX-tool correction, and native dialog activation was
 not reached in that run. Full parent leases, persisted original object IDs and
 remaining global/package/reference qualification are still open.
+
+
+## Pending persisted original object binding
+
+New registrations retain a versioned native object identity from the exact held
+file spanning full hashing and probing. Unix uses device/inode; Windows requests
+the complete FILE_ID_INFO volume serial and 128-bit ID from the held handle, with
+no 64-bit fallback. Creation time is retained where the OS supplies it. These
+values supplement full SHA-256/length and current path/object authority. A hard
+link can have the same physical identity without granting another native path.
+
+The original key is captured in both the asset and reviewed source requirements,
+so it contributes to the semantic plan hash. Planning, submission preflight, stage
+admission, held Rust copy and held remux reject identical-content replacement.
+Full object IDs also strengthen retained publication same-object checks. Missing
+legacy object bindings are not invented: history retains its previous serialized
+shape/hash, and a fresh operation requires re-registration and review. Unknown
+object fields cannot disappear during the raw semantic verification round trip.
+
+The ordinary hosted units add physical replacement and hard-link assertions.
+The actual Linux fixture replaces a registered source before planning/execution,
+reopens the engine, rejects its old review and verifies a fresh registration's
+byte-identical copy. These changes await CI. Parent leases, global destination
+claims, complete reference routes and filesystem/package qualification remain
+required; native IDs can be recycled after the original object is deleted and
+never replace the mandatory content and active-handle checks.
+
+Windows uses one local, documented unsafe FFI expectation around the borrowed
+handle GetFileInformationByHandleEx call. Its initialized repr(C) output buffer
+size and handle lifetime are fixed; output is read only on success. The workspace
+unsafe lint is deny, with that exact helper's expectation explaining the exception;
+all other first-party code remains denied. The existing windows-sys dependency
+supplies the ABI; no new runtime helper executable or path reopening is added.
+Official API contracts inspected: https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info
+and https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex.

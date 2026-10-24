@@ -737,3 +737,27 @@ the held-file remux/corruption/source-replacement cases at the Linux development
 media boundary. It does not qualify the pending identity reattachment additions
 or native Output details input. macOS requires the fixture correction above,
 so the run is not an all-platform pass.
+
+
+## Pending original source objects and Windows attachment diagnosis
+
+Run 40064318602 passed ordinary Linux, ARM macOS and Intel macOS tests/lint/desktop,
+the real media/CLI/official SDK/large HTTP job, WASM/lock and Chrome. This includes
+actual idle/restart/principal-guard SDK assertions on the passing native targets.
+Windows passed the platform suite but all three actual frontend/stdio interface
+tests failed at first attachment around the 20-second startup deadline. The
+assertions did not retain their canonical error details, so the cause is not yet
+established. No startup deadline or authorization check is weakened. The next
+source retains bounded protected interface owner logs, prints only failure error
+fields/CLI diagnostics, and records failed owner-child status. Native Output
+details was skipped because of the Windows prerequisite; do not credit activation.
+
+The exact hosted formatter patch from run 40064318602 is applied: artifact
+12548269752, ZIP SHA-256
+96001f21976f47c851e80ba2ca217cdc8e15041cc6e8c5c168bc7b17f9872562.
+New unqualified source also persists the original native file object through
+registration, plan requirements and stage-bound copy/remux, including full Windows
+128-bit held-handle identity. Its one audited OS FFI expectation and migration
+behavior are documented in source-inputs.md. Full SHA-256 remains mandatory.
+Source replacement/hard-link/hash/legacy regressions and an actual re-registration
+fixture are added. No local compilation or execution was run.

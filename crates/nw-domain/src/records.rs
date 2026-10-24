@@ -10,6 +10,22 @@ pub struct FileIdentity {
     pub bytes: String,
     pub sha256: String,
 }
+/// Supplemental native object identity. Content digest remains mandatory.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct NativeObjectIdentity {
+    pub schema_version: u32,
+    pub kind: NativeObjectKind,
+    pub volume: String,
+    pub object: String,
+    pub created_ns: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeObjectKind {
+    UnixDeviceInode,
+    WindowsFileId128,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MediaProbe {
     pub streams: Vec<Stream>,
@@ -22,6 +38,8 @@ pub struct MediaProbe {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Asset {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_object: Option<NativeObjectIdentity>,
     #[serde(default)]
     pub display_name: String,
     pub id: String,

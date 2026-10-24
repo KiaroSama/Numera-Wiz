@@ -509,6 +509,7 @@ mod tests {
             sha256: "00".repeat(32),
         };
         let asset = Asset {
+            source_object: None,
             display_name: String::new(),
             id: "test-asset".into(),
             creator: "alice".into(),
