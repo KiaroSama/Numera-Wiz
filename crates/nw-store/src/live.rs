@@ -59,6 +59,7 @@ struct Attachment {
     database: Option<Database>,
     _guards: Vec<nw_platform::files::RootLock>,
     path: PathBuf,
+    track_adoption: bool,
 }
 pub(super) struct DatabaseSlot {
     database: RwLock<Attachment>,
@@ -69,11 +70,13 @@ impl DatabaseSlot {
         database: Database,
         path: PathBuf,
         guard: nw_platform::files::RootLock,
+        track_adoption: bool,
     ) -> Self {
         Self {
             database: RwLock::new(Attachment {
                 database: Some(database),
                 path,
+                track_adoption,
                 _guards: vec![guard],
             }),
             active: Arc::new(AtomicUsize::new(0)),
@@ -107,6 +110,12 @@ impl DatabaseSlot {
         })
     }
     pub(super) fn begin_write(&self) -> std::result::Result<Write, TransactionError> {
+        self.begin_write_kind(true)
+    }
+    pub(super) fn begin_control_write(&self) -> std::result::Result<Write, TransactionError> {
+        self.begin_write_kind(false)
+    }
+    fn begin_write_kind(&self, adopting:bool) -> std::result::Result<Write, TransactionError> {
         // Read guards permit readers and concurrent writer admission to progress.
         // The redb writer remains the sole transaction serialization authority.
         let state = self.database.read().map_err(StorageError::from)?;
@@ -116,6 +125,9 @@ impl DatabaseSlot {
             .ok_or(StorageError::DatabaseClosed)?;
         let lease = self.lease();
         let inner = database.begin_write()?;
+        if adopting && state.track_adoption {
+            crate::adoption::mark(&inner).map_err(|error|StorageError::from(std::io::Error::other(error.to_string())))?;
+        }
         Ok(Write {
             inner: Some(inner),
             _lease: lease,
@@ -140,7 +152,7 @@ impl DatabaseSlot {
         drop(state.database.take());
         Ok(())
     }
-    pub(super) fn reopen(&self, database: Database) -> Result<()> {
+    pub(super) fn reopen(&self, database: Database, track_adoption:bool) -> Result<()> {
         let mut state = self.database.write().map_err(|_| {
             DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
         })?;
@@ -151,6 +163,7 @@ impl DatabaseSlot {
             ));
         }
         state.database = Some(database);
+        state.track_adoption = track_adoption;
         Ok(())
     }
     pub(super) fn attach_generation(
@@ -158,6 +171,7 @@ impl DatabaseSlot {
         database: Database,
         path: &Path,
         guard: nw_platform::files::RootLock,
+        track_adoption:bool,
     ) -> Result<()> {
         let mut state = self.database.write().map_err(|_| {
             DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
@@ -174,6 +188,7 @@ impl DatabaseSlot {
         state._guards.push(guard);
         state.database = Some(database);
         state.path = path.to_owned();
+        state.track_adoption = track_adoption;
         Ok(())
     }
 }
@@ -189,6 +204,7 @@ mod tests {
             Database::create(&path).unwrap(),
             temporary.path().to_owned(),
             nw_platform::files::RootLock::acquire(temporary.path()).unwrap(),
+            false,
         );
         let write = slot.begin_write().unwrap();
         {
@@ -219,7 +235,7 @@ mod tests {
         );
         drop(transaction);
         drop(closed);
-        slot.reopen(Database::open(&path).unwrap()).unwrap();
+        slot.reopen(Database::open(&path).unwrap(), false).unwrap();
         let read = slot.begin_read().unwrap();
         assert_eq!(
             read.open_table(TABLE)

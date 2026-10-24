@@ -185,7 +185,11 @@ impl Store {
     }
     pub fn remove(&self, key: &str) -> Result<()> {
         valid_key(key)?;
-        let write = self.db.begin_write().map_err(storage)?;
+        let write = if key.starts_with("credential/") {
+            self.db.begin_control_write()
+        } else {
+            self.db.begin_write()
+        }.map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             table.remove(key).map_err(storage)?;
@@ -202,7 +206,11 @@ impl Store {
                 "Transaction record budget exceeded",
             ));
         }
-        let write = self.db.begin_write().map_err(storage)?;
+        let write = if records.iter().all(|(key,_)|key.starts_with("credential/")) {
+            self.db.begin_control_write()
+        } else {
+            self.db.begin_write()
+        }.map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             for (key, value) in records {
@@ -322,7 +330,11 @@ impl Store {
     ) -> Result<Response> {
         request.validate()?;
         let digest = request.structural_digest();
-        let write = self.db.begin_write().map_err(storage)?;
+        let write = if request.command.id.starts_with("maintenance.") {
+            self.db.begin_control_write()
+        } else {
+            self.db.begin_write()
+        }.map_err(storage)?;
         let now = clock()?;
         let (key, scope) = self.replay_key(principal, request, now)?;
         let response;

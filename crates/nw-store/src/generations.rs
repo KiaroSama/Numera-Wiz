@@ -26,6 +26,7 @@ pub const CURRENT_CAPABILITIES: &[&str] = &[
     "receipts.v1",
     "generation_activation.v1",
     "migration.v1",
+    "adoption_guard.v1",
 ];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -69,6 +70,7 @@ pub struct RootLease {
     state: PathBuf,
     stamp: DirectoryStamp,
     _guard: RootLock,
+    _legacy_guard: std::sync::Mutex<Option<RootLock>>,
 }
 fn invalid(message: &'static str) -> DomainError {
     DomainError::new("STORE_ACTIVATION_INVALID", message)
@@ -282,11 +284,21 @@ impl RootLease {
         let state = security::private_directory(&root.join("state"))?;
         let guard = RootLock::acquire(&state)?;
         let stamp = DirectoryStamp::capture_resolved(&state)?;
+        let history = activations(&root)?;
+        let legacy_guard = if history.last().is_some_and(|(record,_)|matches!(&record.location,GenerationLocation::Workspace{..})) {
+            let legacy=root.join("state/generations/1");
+            if !legacy.join("store.redb").try_exists().map_err(files::io_error)? {
+                return Err(invalid("Legacy reader fence is missing; no empty legacy generation was initialized"));
+            }
+            let legacy=security::private_directory(&legacy)?;
+            Some(RootLock::acquire(&legacy)?)
+        } else {None};
         Ok(Arc::new(Self {
             root,
             state,
             stamp,
             _guard: guard,
+            _legacy_guard: std::sync::Mutex::new(legacy_guard),
         }))
     }
     pub fn root(&self) -> &Path {
@@ -426,7 +438,8 @@ impl Store {
             .set_cache_size(8 * 1024 * 1024)
             .open(path.join("store.redb"))
             .map_err(versions::database_error)?;
-        self.db.reopen(database)
+        let track_adoption = crate::adoption::enabled(&database)?;
+        self.db.reopen(database, track_adoption)
     }
     pub fn attach_activated_generation(&self, lease: &RootLease) -> Result<()> {
         let selection = lease.selection()?;
@@ -443,7 +456,8 @@ impl Store {
             .set_cache_size(8 * 1024 * 1024)
             .open(path.join("store.redb"))
             .map_err(versions::database_error)?;
-        self.db.attach_generation(database, &path, guard)
+        let track_adoption = crate::adoption::enabled(&database)?;
+        self.db.attach_generation(database, &path, guard, track_adoption)
     }
 }
 #[cfg(test)]

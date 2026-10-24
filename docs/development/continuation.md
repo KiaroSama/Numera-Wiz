@@ -1865,3 +1865,35 @@ All49 exact hosted formatting hunks are applied. The production unused versions
 import moves into the test module. Native/store qualification had not run after
 the Service failure; no all-green result is claimed. Fresh full CI is required.
 Adoption-aware rollback remains the next implementation, not an exposed command.
+
+
+## All13 jobs pass the explicit migration integration in CI96
+
+CI96 (40129735497) on d72937bb8b96936eb2665644dd53dd27288cc0e6 passes
+all13 jobs, including all four native targets, formatting/Clippy/lock/WASM,
+original archive verification, core media/memory, actual CLI/official SDK,
+large HTTP/cancellation/revocation and actual native/Chrome Save and batches.
+All four successful Save/batch PNGs were personally inspected again. All four
+native targets pass24 store and30 Service regressions. The Service restart,
+ordinary migration receipt, preserved pre-migration receipt and all three
+injected migration boundaries pass. The repeated completed-copy macOS case passes
+without assertion weakening. Complete facts and GitHub-reported ZIP digests
+are in evidence/generation-migration-ci96.json; no ZIP digest is presented as
+independently downloaded/hashed. This is development integration only.
+
+The next change adds a transaction-bound adoption counter for new business
+facts, including internal job/plan/intake writes and ordinary acceptance.
+A matching receipt or rejected writer aborts that tentative counter update.
+Replay-scope and ephemeral credential/control changes do not invent adoption.
+The profile opener avoids an empty writer commit when all current policies are
+already valid. A missing legacy guard means unknown rollback history, never
+assumed zero; a declared but missing/invalid guard blocks writable access.
+
+The owner also retains the legacy generation1 lock on selected-workspace
+restart. A new actual typed CLI journey exercises scope, reviewed migration,
+inspection, original receipt replay, real idle owner shutdown/restart, exact
+migration retry and duplicate-object refusal across all native targets. It uses
+a Unicode data filename while command/schema/help text remains English.
+These changes require fresh hosted CI. No rollback command is exposed yet;
+full old/new packaged application rollback/retirement/retention and all other
+mandated product scope remain mandatory and no full-task gate is closed.

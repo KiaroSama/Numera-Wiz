@@ -88,6 +88,9 @@ impl Store {
         self.close_generation(lease)?;
         let result = (|| {
             let facts = lease.inspect_selected()?;
+            if facts.record_count > crate::versions::MAX_GENERATION_RECORDS.saturating_sub(16) {
+                return Err(DomainError::new("RESOURCE_LIMIT","A new migration requires capacity for its complete retained metadata and receipt"));
+            }
             if facts.store_version != 2 {
                 return Err(invalid("The reviewed source must use schema2"));
             }
@@ -201,6 +204,11 @@ impl Store {
             nw_domain::commands::parse(request.params.clone())?;
         let plan = &submitted.plan;
         plan.validate_hash()?;
+        // New acceptance reserves metadata capacity without changing the frozen
+        // schema1 plan digest/validation used to recover previously accepted work.
+        if plan.source_records > crate::versions::MAX_GENERATION_RECORDS.saturating_sub(16) {
+            return Err(DomainError::new("RESOURCE_LIMIT","Source leaves no bounded capacity for a new migration receipt and metadata"));
+        }
         if plan.root_id != self.root_id()
             || plan.application_build != application_build
             || plan.expires_at.parse::<u64>().map_err(storage)? <= clock()?
@@ -262,6 +270,11 @@ impl Store {
             // replay receipt commit in the same redb transaction, after a complete backup.
             table.insert("meta/schema",b"3".as_slice()).map_err(storage)?;
             table.insert("meta/required-capabilities",encode(&CURRENT_CAPABILITIES)?.as_slice()).map_err(storage)?;
+            let guard=crate::adoption::Guard {
+                schema_version:1,migration_id:plan.id.clone(),
+                activation_id:activation_id.clone(),revision:"0".into(),
+            };
+            table.insert("meta/rollback-guard",encode(&guard)?.as_slice()).map_err(storage)?;
             table.insert("meta/pending-migration",plan.id.as_bytes()).map_err(storage)?;
             table.insert(key.as_str(),encode(&record)?.as_slice()).map_err(storage)?;
             Ok(serde_json::json!({"migration_id":plan.id,"target_generation":plan.target_generation,"state":"accepted"}))
@@ -361,7 +374,7 @@ impl Store {
                 return Err(error);
             }
         }
-        let write = self.db.begin_write().map_err(storage)?;
+        let write = self.db.begin_control_write().map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             let mut completed = record;
