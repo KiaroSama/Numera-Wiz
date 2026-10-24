@@ -19,6 +19,9 @@ const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
 mod profiles;
 mod records;
+mod live;
+pub mod versions;
+pub mod generations;
 fn storage(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("STORAGE_ERROR", error.to_string())
 }
@@ -57,8 +60,7 @@ struct Receipt {
     expires_at: u64,
 }
 pub struct Store {
-    db: Database,
-    _lock: RootLock,
+    db: live::DatabaseSlot,
     root_id: String,
     signing_key: Vec<u8>,
 }
@@ -131,8 +133,7 @@ impl Store {
             return Err(storage("Invalid stored signing-key length"));
         }
         let store = Self {
-            db,
-            _lock: lock,
+            db: live::DatabaseSlot::new(db, root.clone(), lock),
             root_id,
             signing_key,
         };
