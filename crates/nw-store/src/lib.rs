@@ -353,7 +353,7 @@ impl Store {
         let value = table
             .get(key.as_str())
             .map_err(storage)?
-            .ok_or_else(|| DomainError::object_not_found())?;
+            .ok_or_else(DomainError::object_not_found)?;
         decode(value.value())
     }
     pub fn transition_job(&self, id: &str, expected: JobState, next: JobState) -> Result<Job> {
@@ -366,7 +366,7 @@ impl Store {
                 let value = table
                     .get(key.as_str())
                     .map_err(storage)?
-                    .ok_or_else(|| DomainError::object_not_found())?;
+                    .ok_or_else(DomainError::object_not_found)?;
                 decode(value.value())?
             };
             if current.state != expected {

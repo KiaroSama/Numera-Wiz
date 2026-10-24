@@ -6,7 +6,12 @@ use tokio_util::sync::CancellationToken;
 mod fixture;
 use fixture::rules;
 fn observed_tag<'a>(value: &'a serde_json::Value, name: &str) -> Option<&'a str> {
-    value.as_object()?.iter().find(|(key, _)| key.eq_ignore_ascii_case(name))?.1.as_str()
+    value
+        .as_object()?
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))?
+        .1
+        .as_str()
 }
 #[tokio::test]
 #[ignore = "Requires CI-built FFmpeg fixture profile; executed by the hosted media job"]
@@ -134,13 +139,26 @@ async fn actual_copy_and_order_metadata_remux() {
     assert_eq!(streams[1]["tags"]["language"], "fas");
     assert_eq!(streams[1]["tags"]["title"], "Persian first");
     assert_eq!(streams[2]["tags"]["language"], "eng");
-    assert_eq!(observed_tag(&streams[2]["tags"], "review_note"), Some("PRESERVE-ME-STREAM-TAG"));
-    assert_eq!(observed_tag(&json["format"]["tags"], "artist"), Some("Fixture artist"));
-    assert!(observed_tag(&json["format"]["tags"], "creation_time").unwrap().starts_with("2024-01-02T03:04:05"));
+    assert_eq!(
+        observed_tag(&streams[2]["tags"], "review_note"),
+        Some("PRESERVE-ME-STREAM-TAG")
+    );
+    assert_eq!(
+        observed_tag(&json["format"]["tags"], "artist"),
+        Some("Fixture artist")
+    );
+    assert!(
+        observed_tag(&json["format"]["tags"], "creation_time")
+            .unwrap()
+            .starts_with("2024-01-02T03:04:05")
+    );
     let stripped = directory.path().join("stripped.mkv");
     let mut strip = clean.clone();
-    strip.preservation.stream_tags = false; strip.preservation.global_tags = false;
-    let strip_plan = engine.clean_plan(plan.source.clone(), &stripped, &strip, "fixture-owner").unwrap();
+    strip.preservation.stream_tags = false;
+    strip.preservation.global_tags = false;
+    let strip_plan = engine
+        .clean_plan(plan.source.clone(), &stripped, &strip, "fixture-owner")
+        .unwrap();
     engine.execute(&strip_plan, token.clone()).await.unwrap();
     let stripped_probe = fixture::probe(&media.bin, &stripped).await;
     for stream in stripped_probe["streams"].as_array().unwrap() {
@@ -149,7 +167,9 @@ async fn actual_copy_and_order_metadata_remux() {
     assert!(observed_tag(&stripped_probe["format"]["tags"], "artist").is_none());
     assert!(observed_tag(&stripped_probe["format"]["tags"], "creation_time").is_none());
     let changed_tag = directory.path().join("changed-tag.mkv");
-    let tag_plan = engine.clean_plan(plan.source.clone(), &changed_tag, &clean, "fixture-owner").unwrap();
+    let tag_plan = engine
+        .clean_plan(plan.source.clone(), &changed_tag, &clean, "fixture-owner")
+        .unwrap();
     let staged_tag = std::sync::Arc::new(std::sync::Mutex::new(None::<std::path::PathBuf>));
     let observer: nw_engine::Observer = std::sync::Arc::new(move |event| {
         let staged = staged_tag.clone();
@@ -157,27 +177,39 @@ async fn actual_copy_and_order_metadata_remux() {
             match event {
                 nw_engine::ExecutionEvent::Prepared(args) => {
                     let mut path = staged.lock().unwrap();
-                    if path.is_none() { *path = args.last().map(std::path::PathBuf::from); }
+                    if path.is_none() {
+                        *path = args.last().map(std::path::PathBuf::from);
+                    }
                 }
                 nw_engine::ExecutionEvent::Verifying => {
                     let path = staged.lock().unwrap().clone().unwrap();
                     let bytes = std::fs::read(&path).unwrap();
                     let marker = b"PRESERVE-ME-STREAM-TAG";
-                    let position = bytes.windows(marker.len()).position(|bytes| bytes == marker).unwrap();
+                    let position = bytes
+                        .windows(marker.len())
+                        .position(|bytes| bytes == marker)
+                        .unwrap();
                     use std::io::{Seek, SeekFrom, Write};
                     let mut file = std::fs::OpenOptions::new().write(true).open(path).unwrap();
                     file.seek(SeekFrom::Start(position as u64)).unwrap();
-                    file.write_all(b"X").unwrap(); file.sync_all().unwrap();
+                    file.write_all(b"X").unwrap();
+                    file.sync_all().unwrap();
                 }
                 _ => {}
             }
             Ok(())
         })
     });
-    let rejected = engine.execute_observed(&tag_plan, token.clone(), "tag-fixture", observer).await.unwrap_err();
+    let rejected = engine
+        .execute_observed(&tag_plan, token.clone(), "tag-fixture", observer)
+        .await
+        .unwrap_err();
     assert_eq!(rejected.code, "VERIFICATION_FAILED");
     assert!(rejected.message.contains("review_note"));
-    assert!(!changed_tag.exists(), "A changed authored tag must fail even when every media packet is unchanged");
+    assert!(
+        !changed_tag.exists(),
+        "A changed authored tag must fail even when every media packet is unchanged"
+    );
     let corrupt = directory.path().join("corrupt.mkv");
     let corrupt_plan = engine
         .clean_plan(plan.source.clone(), &corrupt, &clean, "fixture-owner")
