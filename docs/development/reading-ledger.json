@@ -1152,27 +1152,46 @@
         "Read full encoder, muxer, filter and drawvg bodies independently.",
         "Complete exact timeline/graph, resource bounds, secondary-open admission and candidate-specific media/target qualification."
       ]
-    }
-  ],
-  "in_progress_manual_reads": [
+    },
     {
       "path": "../vendor/ffmpeg/n9.0.2/doc_muxers.texi",
       "sha256": "81d092c67f16221178c6ec8c1b1332c764bfe0147023ade0aa72175c8b98f302",
-      "lines_read": [
-        [
-          1,
-          2100
-        ]
+      "lines": [
+        1,
+        4092
       ],
-      "complete": false,
-      "notes": [
-        "Raw codec/PCM outputs do not carry source timestamps/metadata; no-remux-preservation claim follows from identical codec payload alone.",
-        "Ordinary MOV/MP4 retains packet index metadata until final close; fragmented/hybrid modes change compatibility, seek and recovery behavior and must appear in plan/resource policy.",
-        "Explicit movie/video timescales, edit lists, CTTS offsets, chapter/timecode/color/ICC flags and auto defaults affect exact output semantics; faststart is a second-stage rewrite.",
-        "DASH/HDS/HLS generate multiple manifests, initialization/media files and optional network/key/HTTP side effects. Complete owned artifact/dependency manifests and no-replace publication must cover every generated output.",
-        "FIFO recovery can retry indefinitely and drop packets on queue overflow. It is not preservation or finite supervisor recovery without a separately admitted bounded policy.",
-        "Framehash/framecrc default to decoded conversions; hash ignores timestamps. These tools must not be mistaken for independent packet-payload-plus-clock equality."
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external container specifications, device/network operation and linked codec implementations are not credited",
+      "interpretation": [
+        "Raw codec and PCM muxers omit source timestamps/metadata. Framehash/framecrc default to decoded conversions and hash/streamhash ignore timestamps; the oracle must select its exact decoded or packet identity and clock contract.",
+        "Ordinary MOV/MP4 buffers packet index metadata until close; fragmentation/hybrid modes trade memory/recovery against compatibility. Faststart rewrites the index in a second pass. Frozen budgets and plan stages must include these effects.",
+        "Movie/video timescales, edit lists, CTTS offsets, chapters/timecode/color/ICC flags and stream-group behavior can change semantics even with streamcopy. Stream-specific automatic defaults require explicit verification.",
+        "DASH/HDS/HLS/segment/image2/tee generate multiple artifacts, secondary outputs, optional key/certificate/network opens, automatic companion planes, deletions, append/overwrite and retry behavior. A shell-free argv alone does not confine their internal mini-languages.",
+        "FIFO recovery may be unlimited and drop packets; tee onfail=ignore deliberately permits an incomplete destination. These are not complete verified export success without a separately admitted finite policy.",
+        "Matroska reserve_index_space writes seekable Cues/Void space; default_mode defaults passthrough. Metadata flip flags do not flip pixels. MP3 attached pictures may buffer preceding audio.",
+        "Segment times are keyframe-dependent, reset_timestamps changes clocks, and break_non_keyframes changes decode/seek reliability. Exact interval operations need a separate qualified lowering and oracle.",
+        "RIFF default never-RF64 can overflow above 4 GiB; choosing RF64 has compatibility implications. NUT write_index=0 disables growing index tables; disabling syncpoints instead damages seek/recovery behavior.",
+        "WHIP uses HTTP/ICE/STUN/DTLS/SRTP with independent timeouts and secret-bearing authorization/certificate/key fields. A future admitted network route needs protected secret delivery/redaction and explicit network/device grants."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T022",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Finish full encoder/filter/drawvg manual bodies.",
+        "Implement all admitted output families and their multi-artifact publication/dependency/clock/resource/package qualification."
       ]
     }
-  ]
+  ],
+  "in_progress_manual_reads": []
 }

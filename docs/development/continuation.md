@@ -554,3 +554,28 @@ updated. Complete general-capability and ffmpeg option bodies are now personally
 recorded, for 44 manual entries. Muxer reading is partial through line 2100;
 encoder/filter/drawvg full reading remains open. All full-scope tasks remain
 controlling; no local build/test/media or owner hardware run was performed.
+
+Current source adds the larger-than-memory actual owner/HTTP journey described in
+artifact-transfer.md and shares the existing CLI fixture without changing its
+behavior. Both successful and failed service responses now pass the same 256 KiB
+result check; a large unknown parameter name under the 1 MiB request cap cannot
+expand an MCP error beyond its result budget. Its new regression awaits hosted CI.
+The complete muxer manual is personally recorded, for 45 full manual bodies;
+only encoder/filter/drawvg full-body study remains pending in that manual corpus.
+
+Run [40058675113](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40058675113)
+for 1f775421704ea84a296603a520443f8a6ef776c9 passed formatting/lock, all four
+native test/lint/desktop targets, actual CPU/owner/CLI/SDK/artifact HTTP and Chrome.
+The 1 MiB request boundary passed. The native input journey failed to observe a
+terminal job after Review/Run. Its retained screenshot shows a ready reviewed
+plan and no accepted job; startup was 5,788 ms, so this is a different observed
+failure than the earlier window startup timeout. The archive 12547026076 has
+SHA-256 fdd33672dd937b939654465b48ad3aaac75dd216a0519fb34fd56156ca94fce8.
+No single cause is established. Current shared UI consumes the Run shortcut in
+the input-bearing UI pass, instead of reading key state in logic callbacks that
+can also run hidden with previous-frame input. The native harness explicitly
+restores focus, retains a post-key screenshot and preserves protected owner JSONL
+on failure as well as success. These changes and the large HTTP journey still
+need their own hosted result. The ordinary CLI fixture keeps its prior 40-second
+bound; the large-fixture client allowance is finite 150 seconds around the
+application's own bounded requests. This is not a performance qualification.

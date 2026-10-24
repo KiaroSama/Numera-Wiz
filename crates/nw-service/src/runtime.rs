@@ -725,12 +725,12 @@ impl Service {
         })
         .await
         {
-            Ok(Ok(response)) => response.bounded(),
+            Ok(Ok(response)) => response,
             Ok(Err(error)) => Response::error(&id, error),
             Err(error) => {
                 Response::error(&id, DomainError::new("WORKER_FAILED", error.to_string()))
             }
-        };
+        }.bounded();
         tracing::info!(request_id=%id, command=%operation, ok=response.ok, code=response.error.as_ref().map_or("OK", |error| error.code.as_str()), receipt_id=response.receipt_id.as_deref().unwrap_or(""), "command.completed");
         response
     }
@@ -1678,6 +1678,19 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn parameter_errors_obey_the_result_budget_as_well_as_successful_queries() {
+        let root = tempfile::tempdir().unwrap();
+        let service = Service::open(root.path().join("data"), None).await.unwrap();
+        let request = Request::query("logs.status", json!({("x".repeat(600 * 1024)):true}));
+        let encoded = serde_json::to_vec(&request).unwrap();
+        assert!(encoded.len() < commands::MAX_COMMAND_BYTES);
+        commands::decode_json(&encoded).unwrap();
+        let response = service.dispatch(service.owner(), request).await;
+        assert!(!response.ok);
+        assert_eq!(response.error.as_ref().unwrap().code, "RESOURCE_LIMIT");
+        assert!(serde_json::to_vec(&response).unwrap().len() <= commands::MAX_RESULT_BYTES);
+    }
     pub(super) async fn preflight_fixture()
     -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
         use nw_domain::{mux::*, records::MediaProbe};
