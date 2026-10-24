@@ -236,17 +236,18 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "assets.list",
-            "List authorized registered assets",
+            "Page authorized asset summaries in a bounded snapshot",
             Query,
-            Empty
+            crate::views::PageInput
         ),
+        row!("assets.inspect", "Inspect one authorized registered asset", Query, IdInput),
         row!(
             "assets.output_suggest",
             "Suggest an authorized new cleanup output",
             Query,
             IdInput
         ),
-        row!("jobs.list", "List authorized retained jobs", Query, Empty),
+        row!("jobs.list", "Page authorized job summaries in a bounded snapshot", Query, crate::views::PageInput),
         row!(
             "commands.list",
             "Discover implemented development commands",
@@ -488,6 +489,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.probe",
     "assets.register",
     "assets.list",
+    "assets.inspect",
     "assets.output_suggest",
     "streams.clean",
     "plans.inspect",

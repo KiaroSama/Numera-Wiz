@@ -1,5 +1,6 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
 mod clock;
+mod read_model;
 mod uploads;
 use nw_domain::{
     DomainError, Result,
@@ -52,6 +53,7 @@ pub struct Service {
     code_roots: Vec<PathBuf>,
     mutation: Mutex<()>,
     credentials: Mutex<()>,
+    snapshots: Mutex<read_model::Snapshots>,
     clock: clock::SessionClock,
     origins: Mutex<HashMap<String, u64>>,
     requests: Arc<Semaphore>,
@@ -190,6 +192,7 @@ impl Service {
             engine,
             mutation: Mutex::new(()),
             credentials: Mutex::new(()),
+            snapshots: Mutex::new(read_model::Snapshots::default()),
             clock: clock::SessionClock::default(),
             origins: Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
@@ -690,15 +693,14 @@ impl Service {
                 );
             }
             "assets.list" => {
-                let _: Empty = commands::parse(params)?;
-                value(
-                    &self
-                        .store
-                        .list::<Asset>("asset/", 256)?
-                        .into_iter()
-                        .filter(|asset| self.object(&context, &asset.id, &asset.creator).is_ok())
-                        .collect::<Vec<_>>(),
-                )?
+                self.inventory_page(&context, commands::parse(params)?, false, &cancellation)?
+            }
+            "assets.inspect" => {
+                let input: IdInput = commands::parse(params)?;
+                let asset: Asset = self.store.get(&named("asset", &input.id)?)?.ok_or_else(DomainError::object_not_found)?;
+                self.object(&context, &asset.id, &asset.creator)?;
+                self.path(&context, Path::new(&asset.identity.path), false)?;
+                value(&asset)?
             }
             "assets.output_suggest" => {
                 let input: IdInput = commands::parse(params)?;
@@ -772,8 +774,12 @@ impl Service {
                     &context.principal,
                     now,
                 )?;
+                let response = Response::success(&request.request_id, value(&plan)?).bounded();
+                if !response.ok {
+                    return Ok(response);
+                }
                 self.store.put(&named("plan", &plan.id)?, &plan)?;
-                value(&plan)?
+                return Ok(response);
             }
             "plans.inspect" => {
                 let input: IdInput = commands::parse(params)?;
@@ -851,15 +857,7 @@ impl Service {
                 value(&job)?
             }
             "jobs.list" => {
-                let _: Empty = commands::parse(params)?;
-                value(
-                    &self
-                        .store
-                        .list::<Job>("job/", 256)?
-                        .into_iter()
-                        .filter(|job| self.object(&context, &job.id, &job.creator).is_ok())
-                        .collect::<Vec<_>>(),
-                )?
+                self.inventory_page(&context, commands::parse(params)?, true, &cancellation)?
             }
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
@@ -1134,6 +1132,37 @@ impl Drop for Pending {
 mod tests {
     use super::*;
     #[tokio::test]
+    async fn an_oversized_plan_response_does_not_fill_retained_plan_history() {
+        use nw_domain::mux::*;
+        let root = tempfile::tempdir().unwrap();
+        let component = std::env::current_exe().unwrap();
+        // This fixture only plans; neither synthetic executable is launched as media software.
+        let service = Service::open(root.path().join("data"), Some((component.clone(), component))).await.unwrap();
+        let owner = service.owner();
+        let source = root.path().join("source.mkv");
+        std::fs::write(&source, b"Plan response budget fixture").unwrap();
+        let mut streams = vec![Stream { index: 0, kind: StreamKind::Video, codec: "ffv1".into(), tags: Default::default(), dispositions: Default::default() }];
+        streams.extend((1..=64).map(|index| Stream { index, kind: StreamKind::Audio, codec: "pcm_s16le".into(), tags: Default::default(), dispositions: Default::default() }));
+        let asset = Asset {
+            id: "plan-budget-asset".into(), creator: owner.principal.clone(), display_name: "source.mkv".into(),
+            identity: files::identity(&source, &CancellationToken::new()).unwrap(),
+            probe: nw_domain::records::MediaProbe { streams, stream_details: Default::default(), format: "matroska,webm".into(), global_tags: Default::default(), chapters: json!([]), verification_scope: "Synthetic planner-only fixture".into() },
+        };
+        service.store.put("asset/plan-budget-asset", &asset).unwrap();
+        let intent = CleanIntent {
+            audio_selection: Selection { selector: Selector::All, no_match: NoMatch::SkipFile },
+            subtitle_selection: Selection { selector: Selector::All, no_match: NoMatch::AllowEmpty },
+            audio_order: Vec::new(), subtitle_order: Vec::new(), preservation: Preservation::default(),
+            stream_tag_patches: (1..=64).map(|index| StreamTagPatch { kind: StreamKind::Audio, source_indices: vec![index], original_languages: Vec::new(), language: TagPatch::Keep, title: TagPatch::Set { value: "x".repeat(4000) } }).collect(),
+        };
+        let request = Request::query("streams.clean", json!({"asset_id":asset.id,"output":root.path().join("output.mkv"),"intent":intent}));
+        assert!(serde_json::to_vec(&request).unwrap().len() < commands::MAX_COMMAND_BYTES);
+        let response = service.dispatch(owner, request).await;
+        assert_eq!(response.error.unwrap().code, "RESOURCE_LIMIT");
+        assert!(service.store.list::<Plan>("plan/", 512).unwrap().is_empty());
+        assert!(!root.path().join("output.mkv").exists());
+    }
+    #[tokio::test]
     async fn a_waiting_request_cannot_accept_a_profile_snapshot_from_before_revocation() {
         let directory = tempfile::tempdir().unwrap();
         let service = Service::open(directory.path().to_owned(), None)
@@ -1270,7 +1299,7 @@ mod tests {
                 .dispatch(reader.clone(), Request::query("assets.list", json!({})))
                 .await
                 .result
-                .unwrap(),
+                .unwrap()["items"],
             json!([])
         );
         let intent = nw_domain::mux::CleanIntent {

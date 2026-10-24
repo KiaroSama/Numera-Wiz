@@ -6,7 +6,8 @@ use eframe::egui;
 use nw_domain::{
     commands::{Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
-    records::{Asset, Job, Plan},
+    records::{Asset, Plan},
+    views::{AssetSummary, JobSummary, SnapshotPage},
 };
 use serde_json::{Value, json};
 use std::{
@@ -18,6 +19,7 @@ use web_time::Instant;
 #[derive(Clone, Copy)]
 enum Action {
     Assets,
+    Asset,
     Register,
     Intake,
     Output(u64),
@@ -47,7 +49,10 @@ pub struct WizApp {
     status: String,
     scope: Option<String>,
     deferred: Option<(String, Value, Action)>,
-    assets: Vec<Arc<Asset>>,
+    assets: Vec<AssetSummary>,
+    asset_detail: Option<Arc<Asset>>,
+    assets_cursor: Option<String>,
+    assets_snapshot: Option<String>,
     selected: Option<String>,
     source: String,
     output: String,
@@ -62,7 +67,9 @@ pub struct WizApp {
     subtitle_order: String,
     generation: u64,
     plan: Option<Arc<Plan>>,
-    jobs: Vec<Arc<Job>>,
+    jobs: Vec<JobSummary>,
+    jobs_cursor: Option<String>,
+    jobs_snapshot: Option<String>,
     last_jobs: Instant,
     stream_page: usize,
     inspect: String,
@@ -109,6 +116,9 @@ impl WizApp {
             scope: None,
             deferred: None,
             assets: vec![],
+            asset_detail: None,
+            assets_cursor: None,
+            assets_snapshot: None,
             selected: None,
             source: String::new(),
             output: String::new(),
@@ -137,6 +147,8 @@ impl WizApp {
             generation: 0,
             plan: None,
             jobs: vec![],
+            jobs_cursor: None,
+            jobs_snapshot: None,
             last_jobs: Instant::now(),
             stream_page: 0,
             inspect: String::new(),
@@ -145,13 +157,11 @@ impl WizApp {
         app
     }
     fn selected_asset(&self) -> Option<Arc<Asset>> {
-        self.assets
-            .iter()
-            .find(|asset| self.selected.as_ref() == Some(&asset.id))
-            .cloned()
+        self.asset_detail.clone().filter(|asset| self.selected.as_ref() == Some(&asset.id))
     }
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
         self.selected = Some(asset.id.clone());
+        self.asset_detail = Some(Arc::new(asset.clone()));
         self.output.clear();
         self.output_needed = true;
         self.stream_page = 0;
@@ -176,6 +186,12 @@ impl WizApp {
     fn changed(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.plan = None;
+    }
+    fn refresh_assets(&mut self, ctx: &egui::Context) {
+        self.query("assets.list", json!({"replace_snapshot":self.assets_snapshot}), Action::Assets, ctx);
+    }
+    fn refresh_jobs(&mut self, ctx: &egui::Context) {
+        self.query("jobs.list", json!({"replace_snapshot":self.jobs_snapshot}), Action::Jobs, ctx);
     }
     fn dispatch(&mut self, request: Request, action: Action, ctx: &egui::Context) {
         if self.waiting {
@@ -245,6 +261,14 @@ impl WizApp {
         self.pending = None;
         if !response.ok {
             if let Some(error) = response.error {
+                if error.code == "SNAPSHOT_EXPIRED" {
+                    match received.action {
+                        Action::Assets => { self.assets.clear(); self.assets_cursor = None; self.assets_snapshot = None; }
+                        Action::Jobs => { self.jobs.clear(); self.jobs_cursor = None; self.jobs_snapshot = None; }
+                        _ => {}
+                    }
+                    self.status = "Inventory snapshot expired. Refresh to load a coherent page.".into();
+                }
                 if error.code == "REPLAY_SCOPE_EXPIRED" || error.code == "REPLAY_SCOPE_INVALID" {
                     self.scope = None;
                 }
@@ -257,9 +281,15 @@ impl WizApp {
         let parsed: Result<(), String> = (|| {
             match received.action {
                 Action::Assets => {
-                    let assets: Vec<Asset> =
+                    let page: SnapshotPage<AssetSummary> =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
-                    self.assets = assets.into_iter().map(Arc::new).collect();
+                    self.assets = page.items;
+                    self.assets_cursor = page.next_cursor;
+                    self.assets_snapshot = Some(page.snapshot_id);
+                }
+                Action::Asset => {
+                    let asset: Asset = serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    self.select_asset(&asset, ctx);
                 }
                 Action::Intake => {
                     self.mutate("assets.register", result, Action::Register, ctx);
@@ -278,7 +308,7 @@ impl WizApp {
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     self.select_asset(&asset, ctx);
                     self.assets.retain(|old| old.id != asset.id);
-                    self.assets.push(Arc::new(asset));
+                    if self.assets.len() < 128 { self.assets.push(AssetSummary::from(&asset)); }
                     self.status = "Media registered. Review stream selection and output.".into();
                 }
                 Action::Scope => {
@@ -309,9 +339,11 @@ impl WizApp {
                     self.last_jobs = Instant::now() - Duration::from_secs(2);
                 }
                 Action::Jobs => {
-                    let jobs: Vec<Job> =
+                    let page: SnapshotPage<JobSummary> =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
-                    self.jobs = jobs.into_iter().map(Arc::new).collect();
+                    self.jobs = page.items;
+                    self.jobs_cursor = page.next_cursor;
+                    self.jobs_snapshot = Some(page.snapshot_id);
                     self.last_jobs = Instant::now();
                 }
                 Action::Cancel => {
@@ -338,7 +370,7 @@ impl WizApp {
             received.action,
             Action::Submit | Action::Cancel | Action::Assets
         ) {
-            self.query("jobs.list", json!({}), Action::Jobs, ctx);
+            self.refresh_jobs(ctx);
         }
     }
     fn catalog(&mut self, ui: &mut egui::Ui) {
@@ -350,7 +382,10 @@ impl WizApp {
             )
             .clicked()
         {
-            self.query("assets.list", json!({}), Action::Assets, ui.ctx());
+            self.refresh_assets(ui.ctx());
+        }
+        if self.assets_cursor.is_some() && ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Next media page")).clicked() {
+            self.query("assets.list", json!({"cursor":self.assets_cursor}), Action::Assets, ui.ctx());
         }
         ui.separator();
         let mut select = None;
@@ -358,30 +393,25 @@ impl WizApp {
             .id_salt("asset-catalog")
             .show(ui, |ui| {
                 for asset in &self.assets {
-                    let name = if asset.display_name.is_empty() {
-                        cleanup::file_name(&asset.identity.path)
-                    } else {
-                        asset.display_name.as_str()
-                    };
+                    let name = asset.display_name.as_str();
                     if ui
                         .selectable_label(self.selected.as_ref() == Some(&asset.id), name)
-                        .on_hover_text(&asset.identity.path)
                         .clicked()
                     {
-                        select = Some(asset.clone());
+                        select = Some(asset.id.clone());
                     }
                     ui.small(format!(
                         "{} streams · {} bytes",
-                        asset.probe.streams.len(),
-                        asset.identity.bytes
+                        asset.stream_count,
+                        asset.bytes
                     ));
                 }
                 if self.assets.is_empty() {
                     ui.label("Add a file to inspect its streams and prepare cleanup.");
                 }
             });
-        if let Some(asset) = select {
-            self.select_asset(&asset, ui.ctx());
+        if let Some(id) = select {
+            self.query("assets.inspect", json!({"id":id}), Action::Asset, ui.ctx());
         }
     }
 
@@ -395,7 +425,10 @@ impl WizApp {
                 )
                 .clicked()
             {
-                self.query("jobs.list", json!({}), Action::Jobs, ui.ctx());
+                self.refresh_jobs(ui.ctx());
+            }
+            if self.jobs_cursor.is_some() && ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Next jobs page")).clicked() {
+                self.query("jobs.list", json!({"cursor":self.jobs_cursor}), Action::Jobs, ui.ctx());
             }
         });
         let mut cancel = None;
@@ -407,7 +440,7 @@ impl WizApp {
                     ui.horizontal(|ui| {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
-                        ui.label(cleanup::file_name(&job.plan.output));
+                        ui.label(&job.output_name);
                         if !job.state.terminal()
                             && ui
                                 .add_enabled(
@@ -419,14 +452,11 @@ impl WizApp {
                             cancel = Some(job.id.clone());
                         }
                     });
-                    if let Some(error) = &job.error {
+                    if let Some(error) = &job.error_code {
                         ui.colored_label(
                             egui::Color32::from_rgb(237, 143, 112),
-                            format!("{}: {}", error.code, error.message),
+                            error,
                         );
-                    }
-                    if let Some(verified) = &job.verification {
-                        ui.small(verified);
                     }
                 }
                 if self.jobs.is_empty() {
@@ -452,7 +482,7 @@ impl eframe::App for WizApp {
             && self.jobs.iter().any(|job| !job.state.terminal())
         {
             if self.last_jobs.elapsed() >= Duration::from_secs(1) {
-                self.query("jobs.list", json!({}), Action::Jobs, ctx);
+                self.refresh_jobs(ctx);
             }
             ctx.request_repaint_after(Duration::from_millis(250));
         }
@@ -612,13 +642,13 @@ mod tests {
         let ctx = egui::Context::default();
         let port = Arc::new(Port::default());
         let mut app = WizApp::with_context(&ctx, port.clone(), "unit".into());
-        port.complete(json!([]));
+        port.complete(json!({"schema_version":1,"project_revision":null,"snapshot_id":"assets","snapshot_expires_at":"30","projection":"assets.summary.v1","items":[],"next_cursor":null,"event_cursor":null,"total_count":0,"count_accuracy":"exact"}));
         app.receive(&ctx);
-        port.complete(json!([]));
+        port.complete(json!({"schema_version":1,"project_revision":null,"snapshot_id":"jobs","snapshot_expires_at":"30","projection":"jobs.summary.v1","items":[],"next_cursor":null,"event_cursor":null,"total_count":0,"count_accuracy":"exact"}));
         app.receive(&ctx);
         let a = asset("a");
         let b = asset("b");
-        app.assets = vec![a.clone(), b.clone()];
+        app.assets = vec![AssetSummary::from(a.as_ref()), AssetSummary::from(b.as_ref())];
         app.select_asset(&a, &ctx);
         app.schedule_output(&ctx);
         app.select_asset(&b, &ctx);

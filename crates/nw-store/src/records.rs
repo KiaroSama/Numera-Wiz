@@ -77,6 +77,22 @@ fn execution_policy(
     Ok(())
 }
 impl Store {
+    /// Visit one immutable read transaction without retaining full records in a collection.
+    pub fn visit<T: DeserializeOwned>(
+        &self,
+        prefix: &str,
+        mut visitor: impl FnMut(T) -> Result<()>,
+    ) -> Result<()> {
+        valid_key(prefix)?;
+        let read = self.db.begin_read().map_err(storage)?;
+        let table = read.open_table(RECORDS).map_err(storage)?;
+        for row in table.range(prefix..).map_err(storage)? {
+            let (key, value) = row.map_err(storage)?;
+            if !key.value().starts_with(prefix) { break; }
+            visitor(decode(value.value())?)?;
+        }
+        Ok(())
+    }
     pub fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
         valid_key(key)?;
         let read = self.db.begin_read().map_err(storage)?;

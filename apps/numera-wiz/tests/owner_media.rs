@@ -163,7 +163,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(accepted["result"]["job_id"], replay["result"]["job_id"]);
     assert_eq!(
         cli.query("jobs.list", json!({}))
-            .await
+            .await["items"]
             .as_array()
             .unwrap()
             .len(),
@@ -195,7 +195,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await
         .unwrap();
     let denied = serde_json::to_value(denied).unwrap();
-    assert_eq!(denied["structuredContent"]["error"]["code"], "OBJECT_NOT_FOUND");
+    assert_eq!(
+        denied["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
     let absent = stdio
         .call_tool(
             CallToolRequestParams::new("jobs.inspect")
@@ -203,7 +206,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         )
         .await
         .unwrap();
-    assert_eq!(denied["structuredContent"]["error"], serde_json::to_value(absent).unwrap()["structuredContent"]["error"], "Official MCP must not disclose unauthorized object existence");
+    assert_eq!(
+        denied["structuredContent"]["error"],
+        serde_json::to_value(absent).unwrap()["structuredContent"]["error"],
+        "Official MCP must not disclose unauthorized object existence"
+    );
     let operator_scope =
         call!(stdio, "access.replay_scope.create", json!({}), json!({}))["replay_scope"]
             .as_str()
