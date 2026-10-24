@@ -1361,7 +1361,10 @@ impl Service {
             "jobs.submit" => {
                 let input: SubmitInput = commands::parse(params)?;
                 let plan = self.read_plan(&context, &input.plan_id, ObjectAction::Submit)?;
-                self.admit_execution_limits(&context, &plan.execution_limits.clone().unwrap_or_default())?;
+                self.admit_execution_limits(
+                    &context,
+                    &plan.execution_limits.clone().unwrap_or_default(),
+                )?;
                 if plan.hash != input.plan_hash
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= now
                 {
@@ -1673,10 +1676,17 @@ impl Service {
         }
         Ok(())
     }
-    fn admit_execution_limits(&self, context: &Context, limits: &nw_domain::execution::CleanupLimits) -> Result<()> {
+    fn admit_execution_limits(
+        &self,
+        context: &Context,
+        limits: &nw_domain::execution::CleanupLimits,
+    ) -> Result<()> {
         limits.validate()?;
         if limits.has_disabled() && self.policy(context)?.is_some() {
-            return Err(DomainError::new("PERMISSION_DENIED", "Disabled cleanup deadlines require protected native-owner authority"));
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Disabled cleanup deadlines require protected native-owner authority",
+            ));
         }
         Ok(())
     }
@@ -1694,7 +1704,10 @@ impl Service {
             principal: authorization.principal,
             profile: authorization.profile,
         };
-        self.admit_execution_limits(&context, &job.plan.execution_limits.clone().unwrap_or_default())?;
+        self.admit_execution_limits(
+            &context,
+            &job.plan.execution_limits.clone().unwrap_or_default(),
+        )?;
         self.plan_source_path(&context, &job.plan)?;
         self.path(&context, Path::new(&job.plan.output), true)?;
         files::revalidate_output(&job.plan.output)?;
@@ -1712,7 +1725,10 @@ impl Service {
                 if progress.total_bytes != job.plan.source.identity.bytes
                     || !matches!(job.state, JobState::Running | JobState::Verifying)
                 {
-                    return Err(DomainError::new("INVALID_PROGRESS", "Stage progress does not match the active reviewed job"));
+                    return Err(DomainError::new(
+                        "INVALID_PROGRESS",
+                        "Stage progress does not match the active reviewed job",
+                    ));
                 }
                 self.store.update_job(id, |job| {
                     if let Some(previous) = &job.progress {
@@ -1723,9 +1739,13 @@ impl Service {
                         };
                         if order(progress.stage) < order(previous.stage)
                             || (progress.stage == previous.stage
-                                && progress.completed_bytes.parse::<u64>().unwrap_or(0) < previous.completed_bytes.parse::<u64>().unwrap_or(0))
+                                && progress.completed_bytes.parse::<u64>().unwrap_or(0)
+                                    < previous.completed_bytes.parse::<u64>().unwrap_or(0))
                         {
-                            return Err(DomainError::new("INVALID_PROGRESS", "Stage progress cannot move backwards"));
+                            return Err(DomainError::new(
+                                "INVALID_PROGRESS",
+                                "Stage progress cannot move backwards",
+                            ));
                         }
                     }
                     job.progress = Some(progress);
@@ -1896,14 +1916,32 @@ mod tests {
     async fn disabled_deadlines_require_owner_at_review_and_submission() {
         use nw_domain::execution::{CleanupLimits, DeadlinePolicy};
         let (_root, service, context, request, _source) = preflight_fixture().await;
-        let limits = CleanupLimits { operation: DeadlinePolicy::Disabled, ..CleanupLimits::default() };
-        assert_eq!(service.admit_execution_limits(&context, &limits).unwrap_err().code, "PERMISSION_DENIED");
-        service.admit_execution_limits(&service.owner(), &limits).unwrap();
+        let limits = CleanupLimits {
+            operation: DeadlinePolicy::Disabled,
+            ..CleanupLimits::default()
+        };
+        assert_eq!(
+            service
+                .admit_execution_limits(&context, &limits)
+                .unwrap_err()
+                .code,
+            "PERMISSION_DENIED"
+        );
+        service
+            .admit_execution_limits(&service.owner(), &limits)
+            .unwrap();
         let id = request.params["plan_id"].as_str().unwrap();
-        let mut plan: Plan = service.store.get(&named("plan", id).unwrap()).unwrap().unwrap();
+        let mut plan: Plan = service
+            .store
+            .get(&named("plan", id).unwrap())
+            .unwrap()
+            .unwrap();
         plan.execution_limits = Some(limits);
         plan.hash = nw_engine::plan_digest(&plan).unwrap();
-        service.store.put(&named("plan", id).unwrap(), &plan).unwrap();
+        service
+            .store
+            .put(&named("plan", id).unwrap(), &plan)
+            .unwrap();
         let mut request = request;
         request.params["plan_hash"] = json!(plan.hash);
         let response = service.dispatch(context, request).await;

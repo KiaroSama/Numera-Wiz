@@ -394,16 +394,23 @@ mod tests {
     fn explicit_execution_limits_are_frozen_and_old_hashes_remain_unchanged() {
         let mut plan = fixture();
         let historical = plan.hash.clone();
-        assert!(serde_json::to_value(&plan).unwrap().get("execution_limits").is_none());
+        assert!(
+            serde_json::to_value(&plan)
+                .unwrap()
+                .get("execution_limits")
+                .is_none()
+        );
         plan.execution_limits = Some(crate::execution::CleanupLimits::default());
         assert_ne!(digest(&plan).unwrap(), historical);
         plan.hash = digest(&plan).unwrap();
         let first = plan.hash.clone();
-        plan.execution_limits.as_mut().unwrap().operation = crate::execution::DeadlinePolicy::Disabled;
+        plan.execution_limits.as_mut().unwrap().operation =
+            crate::execution::DeadlinePolicy::Disabled;
         assert_ne!(digest(&plan).unwrap(), first);
         plan.hash = digest(&plan).unwrap();
         assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
-        plan.execution_limits.as_mut().unwrap().operation = crate::execution::DeadlinePolicy::Finite { seconds: 0 };
+        plan.execution_limits.as_mut().unwrap().operation =
+            crate::execution::DeadlinePolicy::Finite { seconds: 0 };
         assert!(digest(&plan).is_err());
     }
     #[test]

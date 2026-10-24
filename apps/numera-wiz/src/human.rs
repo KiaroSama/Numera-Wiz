@@ -211,7 +211,8 @@ pub fn prepare(command: Command) -> Result<Request> {
         }) => {
             let mut params = json!({"asset_id":asset,"output":native_path(&out)?,"intent":intent(&intent_file)?});
             if let Some(path) = limits_file {
-                let limits: nw_domain::execution::CleanupLimits = commands::parse(document(&path)?)?;
+                let limits: nw_domain::execution::CleanupLimits =
+                    commands::parse(document(&path)?)?;
                 limits.validate()?;
                 params["execution_limits"] = serde_json::to_value(limits)?;
             }

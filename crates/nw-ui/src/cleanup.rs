@@ -313,7 +313,10 @@ impl WizApp {
                 ui.label(&plan.verification_scope);
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
                     if let Some(limits) = &plan.execution_limits {
-                        ui.small(format!("Probe: {:?}; operation: {:?}", limits.probe, limits.operation));
+                        ui.small(format!(
+                            "Probe: {:?}; operation: {:?}",
+                            limits.probe, limits.operation
+                        ));
                     }
                     if let Some(policy) = &plan.file_times {
                         let label = match policy.request() {
@@ -503,14 +506,22 @@ mod validation_tests {
     }
 }
 
-fn deadline_control(ui: &mut egui::Ui, label: &str, policy: &mut nw_domain::execution::DeadlinePolicy) -> bool {
+fn deadline_control(
+    ui: &mut egui::Ui,
+    label: &str,
+    policy: &mut nw_domain::execution::DeadlinePolicy,
+) -> bool {
     use nw_domain::execution::DeadlinePolicy;
     let before = *policy;
     ui.horizontal(|ui| {
         ui.label(label);
         let mut disabled = policy.disabled();
         if ui.checkbox(&mut disabled, "Disabled").changed() {
-            *policy = if disabled { DeadlinePolicy::Disabled } else { DeadlinePolicy::Finite { seconds: 120 } };
+            *policy = if disabled {
+                DeadlinePolicy::Disabled
+            } else {
+                DeadlinePolicy::Finite { seconds: 120 }
+            };
         }
         if let DeadlinePolicy::Finite { seconds } = policy {
             ui.add(egui::DragValue::new(seconds).range(1..=604800).suffix(" s"));

@@ -17,10 +17,14 @@ pub enum DeadlinePolicy {
 impl DeadlinePolicy {
     pub fn duration(self) -> Result<Option<Duration>> {
         match self {
-            Self::Finite { seconds } if (1..=604800).contains(&seconds) =>
-                Ok(Some(Duration::from_secs(u64::from(seconds)))),
+            Self::Finite { seconds } if (1..=604800).contains(&seconds) => {
+                Ok(Some(Duration::from_secs(u64::from(seconds))))
+            }
             Self::Disabled => Ok(None),
-            _ => Err(DomainError::new("VALIDATION_ERROR", "Deadline seconds must be an integer from 1 through 604800")),
+            _ => Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Deadline seconds must be an integer from 1 through 604800",
+            )),
         }
     }
     pub fn disabled(self) -> bool {
@@ -70,14 +74,22 @@ pub struct StageProgress {
 impl StageProgress {
     pub fn validate(&self) -> Result<()> {
         let exact = |value: &str| -> Result<u64> {
-            let parsed = value.parse::<u64>().map_err(|_| DomainError::new("INVALID_PROGRESS", "Invalid progress counter"))?;
+            let parsed = value
+                .parse::<u64>()
+                .map_err(|_| DomainError::new("INVALID_PROGRESS", "Invalid progress counter"))?;
             if parsed.to_string() != value {
-                return Err(DomainError::new("INVALID_PROGRESS", "Progress counters must be canonical decimal strings"));
+                return Err(DomainError::new(
+                    "INVALID_PROGRESS",
+                    "Progress counters must be canonical decimal strings",
+                ));
             }
             Ok(parsed)
         };
         if exact(&self.completed_bytes)? > exact(&self.total_bytes)? {
-            return Err(DomainError::new("INVALID_PROGRESS", "Stage byte count exceeds its reviewed bound"));
+            return Err(DomainError::new(
+                "INVALID_PROGRESS",
+                "Stage byte count exceeds its reviewed bound",
+            ));
         }
         exact(&self.elapsed_ms)?;
         exact(&self.coalesced_updates)?;
@@ -96,11 +108,21 @@ mod tests {
             r#"{"mode":"finite","seconds":1e999}"#,
             r#"{"mode":"disabled","seconds":0}"#,
         ] {
-            assert!(serde_json::from_str::<DeadlinePolicy>(value).is_err(), "{value}");
+            assert!(
+                serde_json::from_str::<DeadlinePolicy>(value).is_err(),
+                "{value}"
+            );
         }
         assert!(DeadlinePolicy::Finite { seconds: 0 }.duration().is_err());
-        assert!(DeadlinePolicy::Finite { seconds: 604801 }.duration().is_err());
+        assert!(
+            DeadlinePolicy::Finite { seconds: 604801 }
+                .duration()
+                .is_err()
+        );
         assert_eq!(DeadlinePolicy::Disabled.duration().unwrap(), None);
-        assert_eq!(CleanupLimits::default().operation.duration().unwrap(), Some(Duration::from_secs(10800)));
+        assert_eq!(
+            CleanupLimits::default().operation.duration().unwrap(),
+            Some(Duration::from_secs(10800))
+        );
     }
 }

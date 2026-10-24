@@ -210,7 +210,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(report["unique_streams"].as_array().unwrap().len(), 3);
     let output = media.directory.path().join("cli-copy.mkv");
     let limits_file = media.directory.path().join("cli-limits.json");
-    std::fs::write(&limits_file, serde_json::to_vec(&nw_domain::execution::CleanupLimits::default()).unwrap()).unwrap();
+    std::fs::write(
+        &limits_file,
+        serde_json::to_vec(&nw_domain::execution::CleanupLimits::default()).unwrap(),
+    )
+    .unwrap();
     let (plan, exit) = cli
         .human(&[
             "streams",
@@ -221,12 +225,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             output.to_str().unwrap(),
             "--intent-file",
             intent_file.to_str().unwrap(),
-            "--limits-file", limits_file.to_str().unwrap(),
+            "--limits-file",
+            limits_file.to_str().unwrap(),
         ])
         .await;
     assert_eq!(exit, 0, "{plan}");
     let plan = plan["result"].clone();
-    assert_eq!(plan["execution_limits"], serde_json::to_value(nw_domain::execution::CleanupLimits::default()).unwrap());
+    assert_eq!(
+        plan["execution_limits"],
+        serde_json::to_value(nw_domain::execution::CleanupLimits::default()).unwrap()
+    );
     let (inspected, exit) = cli
         .human(&["plans", "inspect", plan["id"].as_str().unwrap()])
         .await;

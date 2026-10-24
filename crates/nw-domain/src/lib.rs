@@ -1,6 +1,6 @@
 //! Shared, display-independent command and media contracts.
-pub mod execution;
 pub mod commands;
+pub mod execution;
 pub mod mux;
 pub mod time;
 

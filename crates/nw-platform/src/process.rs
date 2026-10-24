@@ -111,9 +111,21 @@ pub async fn run_readonly_with_policy(
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
-        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "A regular input file is required",
+        ));
     }
-    run_with_stdin(program, args, deadline.duration()?, stdout_limit, Stdio::from(input), None, cancel).await
+    run_with_stdin(
+        program,
+        args,
+        deadline.duration()?,
+        stdout_limit,
+        Stdio::from(input),
+        None,
+        cancel,
+    )
+    .await
 }
 
 pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
@@ -155,9 +167,21 @@ pub async fn stream_readonly_with_policy(
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
-        return Err(DomainError::new("INPUT_DENIED", "A regular input file is required"));
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "A regular input file is required",
+        ));
     }
-    run_with_stdin(program, args, deadline.duration()?, 0, Stdio::from(input), Some(consumer), cancel).await
+    run_with_stdin(
+        program,
+        args,
+        deadline.duration()?,
+        0,
+        Stdio::from(input),
+        Some(consumer),
+        cancel,
+    )
+    .await
 }
 
 async fn consume<R: AsyncRead + Unpin>(
@@ -335,9 +359,12 @@ async fn terminate(child: &mut Box<dyn ChildWrapper>) -> Result<()> {
     child
         .start_kill()
         .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;
-    tokio::time::timeout(Duration::from_secs(nw_domain::execution::TERMINATION_GRACE_SECONDS), child.wait())
-        .await
-        .map_err(|_| DomainError::new("TREE_TERMINATION_UNCERTAIN", "Reap deadline exceeded"))?
-        .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;
+    tokio::time::timeout(
+        Duration::from_secs(nw_domain::execution::TERMINATION_GRACE_SECONDS),
+        child.wait(),
+    )
+    .await
+    .map_err(|_| DomainError::new("TREE_TERMINATION_UNCERTAIN", "Reap deadline exceeded"))?
+    .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;
     Ok(())
 }

@@ -61,10 +61,18 @@ impl Engine {
         })
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {
-        self.probe_with_policy(path, nw_domain::execution::CleanupLimits::default().probe, cancel).await
+        self.probe_with_policy(
+            path,
+            nw_domain::execution::CleanupLimits::default().probe,
+            cancel,
+        )
+        .await
     }
     pub async fn probe_with_policy(
-        &self, path: &Path, deadline: nw_domain::execution::DeadlinePolicy, cancel: CancellationToken,
+        &self,
+        path: &Path,
+        deadline: nw_domain::execution::DeadlinePolicy,
+        cancel: CancellationToken,
     ) -> Result<MediaProbe> {
         deadline.duration()?;
         let canonical = files::source_path(path)?;
@@ -374,14 +382,25 @@ impl Engine {
                 let source = plan.source.identity.clone();
                 let object = registered_object(&plan.source)?.clone();
                 let token = cancel.clone();
-                let deadline = plan.execution_limits.as_ref().map_or(
-                    nw_domain::execution::DeadlinePolicy::Disabled, |limits| limits.operation,
-                );
+                let deadline = plan
+                    .execution_limits
+                    .as_ref()
+                    .map_or(nw_domain::execution::DeadlinePolicy::Disabled, |limits| {
+                        limits.operation
+                    });
                 let progress_observer = observer.clone();
                 let runtime = tokio::runtime::Handle::current();
                 let (staging, actual, source_stamp) = blocking(move || {
-                    files::copy_into_staging_observed(&source, &object, staging, &token, deadline,
-                        &mut |progress| runtime.block_on(progress_observer(ExecutionEvent::Progress(progress))))
+                    files::copy_into_staging_observed(
+                        &source,
+                        &object,
+                        staging,
+                        &token,
+                        deadline,
+                        &mut |progress| {
+                            runtime.block_on(progress_observer(ExecutionEvent::Progress(progress)))
+                        },
+                    )
                 })
                 .await?;
                 observer(ExecutionEvent::Verifying).await?;
@@ -485,9 +504,13 @@ impl Engine {
             ));
         }
         observer(ExecutionEvent::Verifying).await?;
-        let observed = self.probe_with_policy(
-            staging.path(), plan.execution_limits.clone().unwrap_or_default().probe, cancel.clone(),
-        ).await?;
+        let observed = self
+            .probe_with_policy(
+                staging.path(),
+                plan.execution_limits.clone().unwrap_or_default().probe,
+                cancel.clone(),
+            )
+            .await?;
         verify_structure(plan, &observed)?;
         let verification = preservation::verify(
             self,

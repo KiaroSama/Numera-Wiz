@@ -651,23 +651,51 @@ struct CopyProgress<'a> {
     observer: &'a mut dyn FnMut(nw_domain::execution::StageProgress) -> Result<()>,
 }
 impl CopyProgress<'_> {
-    fn report(&mut self, stage: nw_domain::execution::ProgressStage, completed: u64, force: bool) -> Result<()> {
-        if self.deadline.is_some_and(|limit| self.started.elapsed() >= limit) {
-            return Err(DomainError::new("COPY_TIMEOUT", "Reviewed copy/byte-verification deadline expired; admitted I/O drained and no output published"));
+    fn report(
+        &mut self,
+        stage: nw_domain::execution::ProgressStage,
+        completed: u64,
+        force: bool,
+    ) -> Result<()> {
+        if self
+            .deadline
+            .is_some_and(|limit| self.started.elapsed() >= limit)
+        {
+            return Err(DomainError::new(
+                "COPY_TIMEOUT",
+                "Reviewed copy/byte-verification deadline expired; admitted I/O drained and no output published",
+            ));
         }
-        if !force && self.stage == Some(stage) && self.sent.elapsed() < std::time::Duration::from_millis(nw_domain::execution::PROGRESS_INTERVAL_MS) {
+        if !force
+            && self.stage == Some(stage)
+            && self.sent.elapsed()
+                < std::time::Duration::from_millis(nw_domain::execution::PROGRESS_INTERVAL_MS)
+        {
             self.coalesced = self.coalesced.saturating_add(1);
             return Ok(());
         }
         let progress = nw_domain::execution::StageProgress {
-            stage, completed_bytes: completed.to_string(), total_bytes: self.total.to_string(),
-            elapsed_ms: self.started.elapsed().as_millis().min(u128::from(u64::MAX)).to_string(),
+            stage,
+            completed_bytes: completed.to_string(),
+            total_bytes: self.total.to_string(),
+            elapsed_ms: self
+                .started
+                .elapsed()
+                .as_millis()
+                .min(u128::from(u64::MAX))
+                .to_string(),
             coalesced_updates: self.coalesced.to_string(),
         };
         progress.validate()?;
         (self.observer)(progress)?;
-        if self.deadline.is_some_and(|limit| self.started.elapsed() >= limit) {
-            return Err(DomainError::new("COPY_TIMEOUT", "Reviewed copy deadline expired after its admitted progress boundary drained"));
+        if self
+            .deadline
+            .is_some_and(|limit| self.started.elapsed() >= limit)
+        {
+            return Err(DomainError::new(
+                "COPY_TIMEOUT",
+                "Reviewed copy deadline expired after its admitted progress boundary drained",
+            ));
         }
         self.stage = Some(stage);
         self.sent = std::time::Instant::now();
@@ -680,8 +708,14 @@ fn copy_from_held(
     staging: tempfile::NamedTempFile,
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
-    copy_from_held_observed(expected, source_stamp, staging, cancel,
-        nw_domain::execution::DeadlinePolicy::Disabled, &mut |_| Ok(()))
+    copy_from_held_observed(
+        expected,
+        source_stamp,
+        staging,
+        cancel,
+        nw_domain::execution::DeadlinePolicy::Disabled,
+        &mut |_| Ok(()),
+    )
 }
 fn copy_from_held_observed(
     expected: &FileIdentity,
@@ -698,8 +732,13 @@ fn copy_from_held_observed(
     use nw_domain::execution::ProgressStage as Stage;
     let started = std::time::Instant::now();
     let mut progress = CopyProgress {
-        started, sent: started, deadline: deadline.duration()?, total: expected_bytes,
-        stage: None, coalesced: 0, observer,
+        started,
+        sent: started,
+        deadline: deadline.duration()?,
+        total: expected_bytes,
+        stage: None,
+        coalesced: 0,
+        observer,
     };
     progress.report(Stage::CopyBytes, 0, true)?;
     let mut input = source_stamp.held_file().try_clone().map_err(io_error)?;
@@ -731,7 +770,9 @@ fn copy_from_held_observed(
     progress.report(Stage::CopyBytes, copied, true)?;
     staging.as_file().sync_all().map_err(io_error)?;
     progress.report(Stage::VerifyStagingBytes, 0, true)?;
-    let actual = identity_observed(staging.path(), cancel, |count| progress.report(Stage::VerifyStagingBytes, count, false))?;
+    let actual = identity_observed(staging.path(), cancel, |count| {
+        progress.report(Stage::VerifyStagingBytes, count, false)
+    })?;
     progress.report(Stage::VerifyStagingBytes, expected_bytes, true)?;
     if actual.sha256 != expected.sha256 || actual.bytes != expected.bytes {
         return Err(DomainError::new(
@@ -741,9 +782,14 @@ fn copy_from_held_observed(
     }
     source_stamp.revalidate()?;
     progress.report(Stage::VerifySourceBytes, 0, true)?;
-    let source_identity = identity_observed(Path::new(&expected.path), cancel, |count| progress.report(Stage::VerifySourceBytes, count, false))?;
+    let source_identity = identity_observed(Path::new(&expected.path), cancel, |count| {
+        progress.report(Stage::VerifySourceBytes, count, false)
+    })?;
     if source_identity != *expected {
-        return Err(DomainError::new("SOURCE_CHANGED", "Source changed during observed copy verification"));
+        return Err(DomainError::new(
+            "SOURCE_CHANGED",
+            "Source changed during observed copy verification",
+        ));
     }
     progress.report(Stage::VerifySourceBytes, expected_bytes, true)?;
     source_stamp.revalidate()?;
@@ -785,12 +831,24 @@ mod tests {
         let path = staging.path().to_owned();
         let mut events = Vec::new();
         let (staging, actual, _source) = copy_into_staging_observed(
-            &expected, &object, staging, &cancel, DeadlinePolicy::Finite { seconds: 120 },
-            &mut |event| { events.push(event); Ok(()) },
-        ).unwrap();
+            &expected,
+            &object,
+            staging,
+            &cancel,
+            DeadlinePolicy::Finite { seconds: 120 },
+            &mut |event| {
+                events.push(event);
+                Ok(())
+            },
+        )
+        .unwrap();
         assert_eq!(actual.bytes, expected.bytes);
         assert_eq!(actual.sha256, expected.sha256);
-        for stage in [ProgressStage::CopyBytes, ProgressStage::VerifyStagingBytes, ProgressStage::VerifySourceBytes] {
+        for stage in [
+            ProgressStage::CopyBytes,
+            ProgressStage::VerifyStagingBytes,
+            ProgressStage::VerifySourceBytes,
+        ] {
             let last = events.iter().rfind(|event| event.stage == stage).unwrap();
             assert_eq!(last.completed_bytes, expected.bytes);
             assert_eq!(last.total_bytes, expected.bytes);
@@ -813,18 +871,31 @@ mod tests {
             let path = staging.path().to_owned();
             let mut delayed = false;
             let result = copy_into_staging_observed(
-                &expected, &object, staging, &cancel, DeadlinePolicy::Finite { seconds: 1 },
+                &expected,
+                &object,
+                staging,
+                &cancel,
+                DeadlinePolicy::Finite { seconds: 1 },
                 &mut |_| {
                     if !delayed {
                         delayed = true;
-                        if timeout { std::thread::sleep(std::time::Duration::from_millis(1100)); }
-                        else { cancel.cancel(); }
+                        if timeout {
+                            std::thread::sleep(std::time::Duration::from_millis(1100));
+                        } else {
+                            cancel.cancel();
+                        }
                     }
                     Ok(())
                 },
             );
-            let error = match result { Err(error) => error, Ok(_) => panic!("Interrupted copy must not succeed") };
-            assert_eq!(error.code, if timeout { "COPY_TIMEOUT" } else { "CANCELLED" });
+            let error = match result {
+                Err(error) => error,
+                Ok(_) => panic!("Interrupted copy must not succeed"),
+            };
+            assert_eq!(
+                error.code,
+                if timeout { "COPY_TIMEOUT" } else { "CANCELLED" }
+            );
             assert!(!path.exists());
             assert_eq!(fs::read(&source).unwrap(), b"bounded copy fixture");
         }
