@@ -159,7 +159,12 @@ conflict/stale state, `5` authorization, `6` execution/verification, `7` cancell
 `8` transport, `9` partial batch failure and `10` resource exhaustion. Inspecting
 a failed job is a successful query with failure facts; it does not itself return
 the failed producer job's process status. Diagnostics use timestamped
-INFO, WARNING, ERROR and DEBUG on stderr; protocol stdout stays clean. Tokens are
+INFO, WARNING, ERROR and DEBUG on stderr; protocol stdout stays clean. The detached
+owner retains protected JSONL with a 32-record queue, 16 KiB record ceiling and
+five-file 2 MiB rotation. Owner `logs.status` reports health, limits and omitted/
+dropped records through a canonical request. Named profiles cannot administer
+these logs. Unknown reserved files are preserved for explicit repair. Actual
+job/stage/publication facts remain in the store. Tokens are
 never printed. Existing exported token files are preserved, including on Windows,
 where the protected ACL adapter is exercised in hosted tests.
 

@@ -103,7 +103,10 @@ impl NativeClient {
                         return Err(nw_domain::DomainError::new("OWNER_VERSION_CONFLICT", "Another build owns this root; let its jobs/clients drain before updating").into());
                     }
                     *self.cached.lock().await = Some(record.clone());
-                    tracing::info!(elapsed_ms=started.elapsed().as_millis(), "Protected owner attachment completed");
+                    tracing::info!(
+                        elapsed_ms = started.elapsed().as_millis(),
+                        "Protected owner attachment completed"
+                    );
                     return Ok(record);
                 }
             }

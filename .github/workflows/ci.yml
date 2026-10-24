@@ -193,7 +193,7 @@ jobs:
       - name: Build the desktop composition with its matching browser assets
         env:
           NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
-        run: cargo build --locked -p numera-wiz --features desktop,embedded-web
+        run: cargo rustc --locked -p numera-wiz --bin numera-wiz --features desktop,embedded-web -- -C strip=debuginfo
       - name: Check shared browser UI dependency closure
         if: runner.os == 'Linux'
         run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown

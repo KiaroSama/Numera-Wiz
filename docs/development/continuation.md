@@ -14,7 +14,7 @@ Official Spec Kit 1.2.2 contracts and honest convergence records; the complete
 envelopes and schemas; pure cleanup resolution; protected single-owner runtime;
 scoped access profiles; durable replay, jobs and publication fences; real CLI and
 official stdio/HTTP MCP; and a shared human Stream Cleanup/media/job workspace.
-The live registry now contains 23 actual owner handlers. This is partial initial
+The live registry now contains 24 actual owner handlers. This is partial initial
 scope; it does not qualify the full MuxCls utility or the complete product.
 
 ## Actual evidence
@@ -456,3 +456,27 @@ accept a duplicate then remove its source before the delayed request resumes.
 They use explicitly synthetic data/components and do not claim actual media
 qualification. See preflight.md for exact behavior and unresolved physical-path/
 immutable-content boundaries. These source changes await their own hosted result.
+
+Run [40051820196](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40051820196)
+for 56ffc9db65c9579185c91cd3e1bcdc48ba04c957 passed all four native
+test/lint/build targets, actual CPU media/CLI/official SDK, Chrome and the actual
+native-window import/review/Run/byte-equality journey. New two-phase revocation,
+concurrent-receipt and physical-source tests passed on all four targets. Only
+formatting failed; its exact hosted patch is applied. Native evidence recorded
+26,647 ms to a visible window under the 60-second functional CI bound. The
+448,222,720-byte unoptimized executable took 13,031 ms to hash; owner attachment
+took 13,172 ms. These observations identify substantial identity/bootstrap cost
+without establishing the earlier timeout's entire cause. Current desktop artifact
+linking strips debug information with the selected Rust compiler and retains full
+final-file identity hashing. The matching native harness will measure startup
+again; packaged startup/RSS qualification remains open.
+
+Current protected JSONL has finite records/queue/five-file rotation, ownership
+validation, redaction, root/epoch context, command completion, interruption
+handling and owner-only logs.status. Unknown reserved files are preserved. Queue/
+disk omissions and failed flush are reported; authoritative facts stay in redb.
+Existing credential/runtime/log files now verify their own Windows DACL alongside
+the parent. See protected-logging.md for exact behavior, fault cases and remaining
+export/repair/retention obligations. The actual owner media fixture checks JSONL
+and absence of its issued bearers. These latest changes await hosted results.
+No local build/test/media or owner GPU run was executed.

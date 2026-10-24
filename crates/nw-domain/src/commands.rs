@@ -216,6 +216,7 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
+        row!("logs.status", "Inspect bounded protected owner logging status", Query, Empty),
         row!(
             "access.profiles.create",
             "Create a named operational access profile",
@@ -519,6 +520,7 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
+    "logs.status",
     "commands.list",
     "commands.schema",
     "streams.clean.resolve",

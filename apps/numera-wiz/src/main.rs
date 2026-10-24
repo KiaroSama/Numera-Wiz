@@ -69,10 +69,11 @@ enum Mode {
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
     nw_platform::init_logging();
-    match run().await {
+    let status = match run().await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
-            tracing::error!(%error,"Operation failed");
+            let domain_code = error.downcast_ref::<nw_domain::DomainError>().map_or("ADAPTER_ERROR", |error| error.code.as_str());
+            tracing::error!(code=domain_code, %error,"Operation failed");
             let code = error
                 .downcast_ref::<nw_domain::DomainError>()
                 .map(nw_domain::DomainError::exit_code)
@@ -85,7 +86,9 @@ async fn main() -> std::process::ExitCode {
                 });
             std::process::ExitCode::from(code)
         }
-    }
+    };
+    let _ = nw_platform::logging::flush();
+    status
 }
 async fn run() -> Result<()> {
     let args = Args::parse();
@@ -100,6 +103,8 @@ async fn run() -> Result<()> {
     std::fs::create_dir_all(&root)?;
     let root = std::fs::canonicalize(root)?;
     if matches!(&args.command, Some(Mode::Owner)) {
+        nw_platform::logging::activate(&root)?;
+        tracing::info!("Protected structured owner logging activated");
         return server::run_owner(root, args.components_dir).await;
     }
     let profile = match &args.command {
@@ -255,7 +260,10 @@ async fn desktop(client: NativeClient) -> Result<()> {
     let session = uuid::Uuid::new_v4().simple().to_string();
     let lease = uuid::Uuid::new_v4().to_string();
     client.client_lease(&lease, false).await?;
-    tracing::info!(elapsed_ms=bootstrap_started.elapsed().as_millis(), "Native desktop owner and lease are ready");
+    tracing::info!(
+        elapsed_ms = bootstrap_started.elapsed().as_millis(),
+        "Native desktop owner and lease are ready"
+    );
     let heartbeat = client.clone();
     let heartbeat_id = lease.clone();
     let task = tokio::spawn(async move {
@@ -275,7 +283,10 @@ async fn desktop(client: NativeClient) -> Result<()> {
         },
         Box::new(move |cc| {
             let workspace = nw_ui::WizApp::new(cc, port, session);
-            tracing::info!(elapsed_ms=bootstrap_started.elapsed().as_millis(), "Shared native workspace constructed");
+            tracing::info!(
+                elapsed_ms = bootstrap_started.elapsed().as_millis(),
+                "Shared native workspace constructed"
+            );
             Ok(Box::new(workspace))
         }),
     );

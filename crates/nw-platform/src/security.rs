@@ -89,9 +89,10 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
             ));
         }
     }
+    let scratch_parent = if path.is_dir() { path } else { path.parent().ok_or_else(|| denied("Protected file parent is required"))? };
     let scratch = tempfile::Builder::new()
         .prefix("acl-check-")
-        .tempfile_in(path)
+        .tempfile_in(scratch_parent)
         .map_err(io_error)?;
     let check = scratch.path().to_owned();
     scratch.close().map_err(io_error)?;
@@ -193,11 +194,13 @@ pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
+        use std::os::unix::fs::{PermissionsExt, MetadataExt};
+        if metadata.permissions().mode() & 0o077 != 0 || metadata.uid() != fs::metadata(parent).map_err(io_error)?.uid() {
             return Err(denied("Credential/runtime file permissions are too broad"));
         }
     }
+    #[cfg(windows)]
+    protect_windows(path, false)?;
     fs::read(path).map_err(io_error)
 }
 pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<()> {
@@ -227,6 +230,17 @@ pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn private_parent_does_not_substitute_for_the_credential_files_own_dacl() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("credential.txt");
+        write_private(&path, b"private file ACL fixture", false).unwrap();
+        assert!(read_private(&path, 128).is_ok());
+        let changed = Command::new(system_tool("icacls.exe").unwrap()).arg(&path).args(["/grant", "*S-1-1-0:R", "/q"]).output().unwrap();
+        assert!(changed.status.success());
+        assert_eq!(read_private(&path, 128).unwrap_err().code, "INSECURE_DATA_ROOT");
+    }
     #[test]
     fn local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user() {
         assert!(check_dacl("D:PAI(A;OICI;FA;;;LA)", "S-1-5-21-1-2-3-500").is_ok());

@@ -53,6 +53,7 @@ impl DomainError {
             | "OWNER_BUSY"
             | "OWNER_IDENTITY_CONFLICT"
             | "OWNER_VERSION_CONFLICT" => 4,
+            "LOG_FILE_UNOWNED" => 4,
             "CAPABILITY_UNAVAILABLE"
             | "COMPONENT_UNAVAILABLE"
             | "CONTAINER_UNQUALIFIED"
@@ -95,5 +96,6 @@ pub type Result<T> = std::result::Result<T, DomainError>;
 pub mod access;
 pub mod records;
 pub mod views;
+pub mod diagnostics;
 
 pub mod ingest;

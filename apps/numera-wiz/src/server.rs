@@ -549,6 +549,7 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
         )
     });
     let service = Service::open(root.clone(), binaries).await?;
+    nw_platform::logging::bind_owner(service.store.root_id(), &service.epoch)?;
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
     let port = listener.local_addr()?.port();
     let exe = std::env::current_exe()?;
