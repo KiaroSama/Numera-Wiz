@@ -1774,3 +1774,19 @@ The full migration domain draft remains separate and inactive. All actual
 canonical durable migration, source reader-floor, owned-copy, activation/
 recovery/adoption/rollback, retired-version replay and old/new binary journeys
 remain mandatory, as do the rest of the full product requirements.
+
+## All20 store regressions pass across the four platforms
+
+CI92 (40125719804) passes all20 store regressions on Linux, Windows and both
+macOS architectures, including all new read-only inspection, live-transaction,
+activation/replay-key and copy-attachment cases. Existing actual engine/media,
+SDK batch/lost-response, legacy SDK/CLI, large HTTP and browser journeys pass.
+Formatting/lock/WASM pass. Clippy alone found three unnecessary ReadableTable
+imports: two local helpers and one test; ReadOnlyTable exposes those used methods
+inherently in pinned redb4.4.0. This revision removes the imports without lint
+suppression or assertion changes. Fresh full checks remain required. The native
+job had no matching Linux executable because Clippy stopped that build, so no
+native input pass is inferred for ci92.
+
+No migration handler, schema upgrade or rollback is exposed. The retained domain
+draft is separate from this correction. All full product obligations remain.
