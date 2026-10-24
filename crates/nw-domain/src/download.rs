@@ -207,6 +207,7 @@ mod tests {
     fn manifest() -> ArtifactManifest {
         ArtifactManifest {
             schema_version: 1,
+            suggested_name: Some("test-copy.mkv".into()),
             artifact_id: "job-example".into(),
             manifest_uri: "numera://artifact/job-example/manifest".into(),
             job_id: "example".into(),
@@ -224,6 +225,14 @@ mod tests {
     #[test]
     fn selected_identity_rejects_changed_truncated_excess_and_foreign_route_bytes() {
         let m = manifest();
+        assert_eq!(m.suggested_file_name(), "test-copy.mkv");
+        let mut legacy = serde_json::to_value(&m).unwrap();
+        legacy.as_object_mut().unwrap().remove("suggested_name");
+        let legacy: ArtifactManifest = serde_json::from_value(legacy).unwrap();
+        assert_eq!(legacy.suggested_file_name(), "numera-job-example.bin");
+        let mut unsafe_name = m.clone();
+        unsafe_name.suggested_name = Some("../foreign.mkv".into());
+        assert_eq!(unsafe_name.suggested_file_name(), "numera-job-example.bin");
         let mut good = DownloadVerifier::new(&m).unwrap();
         good.push(b"a").unwrap();
         good.push(b"bc").unwrap();
@@ -244,10 +253,15 @@ mod tests {
     }
     #[test]
     fn cancelling_a_pending_network_wait_wakes_it_and_returns_a_typed_stop() {
-        use std::{sync::atomic::AtomicUsize, task::{Context, Wake, Waker}};
+        use std::{
+            sync::atomic::AtomicUsize,
+            task::{Context, Wake, Waker},
+        };
         struct Counter(AtomicUsize);
         impl Wake for Counter {
-            fn wake(self: Arc<Self>) { self.0.fetch_add(1, Ordering::Relaxed); }
+            fn wake(self: Arc<Self>) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
         }
         let counter = Arc::new(Counter(AtomicUsize::new(0)));
         let waker = Waker::from(counter.clone());

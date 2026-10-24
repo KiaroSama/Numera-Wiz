@@ -126,3 +126,12 @@ under enforced CSP/MIME, pairing and page teardown. This does not qualify browse
 media playback, every desktop browser, native GUI interaction, the standard offline
 payload, all donor commands or the owner's hardware-media routes. See the task and
 continuation records for the required unfinished work.
+
+
+Artifact manifests optionally include suggested_name, the authorized output
+basename only. It is advisory metadata and grants no native path authority.
+The existing authenticated bytes/chunk routes remain authoritative for identity,
+current job rights and revocation. Native CLI clients may also use
+artifacts save with the selected digest and their own local destination; this
+is client delivery, not another server mutation or permission to write a path
+named by an agent. No private owner bearer or query-token URL is returned.

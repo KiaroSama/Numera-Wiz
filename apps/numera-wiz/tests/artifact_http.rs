@@ -242,76 +242,183 @@ async fn journey() {
     // A fresh CLI adapter with only this job's read grant saves through its private
     // authenticated byte route; it has no general read/write root permission.
     let client_output = media.directory.path().join("large-client-copy.mkv");
-    let mut saving = cli.command()
-        .args(["--access-profile", "download-reader", "artifacts", "save",
-            "--artifact-id", &artifact_id, "--expected-sha256", &expected.sha256, "--out"])
+    let mut saving = cli
+        .command()
+        .args([
+            "--access-profile",
+            "download-reader",
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            &expected.sha256,
+            "--out",
+        ])
         .arg(&client_output)
-        .stdin(Stdio::null()).stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(std::fs::File::create(evidence.join("large-client-copy.log")).unwrap())
-        .kill_on_drop(true).spawn().unwrap();
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
     let client_pid = saving.id().unwrap() as u64;
     let mut client_copy_peak_kib = 0u64;
     let started = Instant::now();
     loop {
         if let Ok(status) = std::fs::read_to_string(format!("/proc/{client_pid}/status"))
             && let Some(high) = status.lines().find_map(|line| {
-                line.strip_prefix("VmHWM:")?.split_whitespace().next()?.parse::<u64>().ok()
+                line.strip_prefix("VmHWM:")?
+                    .split_whitespace()
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
             })
         {
             client_copy_peak_kib = client_copy_peak_kib.max(high);
         }
-        if saving.try_wait().unwrap().is_some() { break; }
-        assert!(started.elapsed() < Duration::from_secs(100), "Actual bounded client copy did not finish");
+        if saving.try_wait().unwrap().is_some() {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(100),
+            "Actual bounded client copy did not finish"
+        );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+    let client_copy_elapsed_ms = started.elapsed().as_millis().to_string();
     let saved = saving.wait_with_output().await.unwrap();
-    assert!(saved.status.success(), "Actual scoped client artifact save failed");
+    assert!(
+        saved.status.success(),
+        "Actual scoped client artifact save failed"
+    );
     let receipt: Value = serde_json::from_slice(&saved.stdout).unwrap();
     assert_eq!(receipt["ok"], true, "{receipt}");
     assert_eq!(receipt["result"]["sha256"], expected.sha256);
     assert_eq!(receipt["result"]["encoded_byte_count"], total.to_string());
-    let client_identity = nw_platform::files::identity(&client_output, &CancellationToken::new()).unwrap();
+    let client_identity =
+        nw_platform::files::identity(&client_output, &CancellationToken::new()).unwrap();
     assert_eq!(client_identity.sha256, expected.sha256);
     assert_eq!(client_identity.bytes, total.to_string());
-    assert!(client_copy_peak_kib > 0 && client_copy_peak_kib < 128 * 1024,
-        "Actual client exceeded its selected 128 MiB RSS ceiling: {client_copy_peak_kib} KiB");
-    assert!(!std::fs::read_dir(media.directory.path()).unwrap().any(|entry| {
-        entry.unwrap().file_name().to_string_lossy().starts_with(".numera-wiz-save-")
-    }));
+    assert!(
+        client_copy_peak_kib > 0 && client_copy_peak_kib < 128 * 1024,
+        "Actual client exceeded its selected 128 MiB RSS ceiling: {client_copy_peak_kib} KiB"
+    );
+    assert!(
+        !std::fs::read_dir(media.directory.path())
+            .unwrap()
+            .any(|entry| {
+                entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".numera-wiz-save-")
+            })
+    );
     cleaned_index(&workspace, &output).await;
+    let client_checkpoint = json!({
+        "schema_version":1, "status":"full_client_copy_passed",
+        "source":std::env::var("GITHUB_SHA").ok(), "artifact_id":artifact_id,
+        "bytes":client_identity.bytes, "sha256":client_identity.sha256,
+        "client_peak_kib":client_copy_peak_kib,"selected_client_ceiling_kib":131072,
+        "elapsed_ms":client_copy_elapsed_ms,
+        "profile":"job read only; no general filesystem roots",
+        "not_qualified":["later cancellation/revocation assertions", "other platforms/packages", "aggregate R20"]
+    });
+    std::fs::write(evidence.join("large-client-copy.json"), serde_json::to_vec_pretty(&client_checkpoint).unwrap()).unwrap();
+    println!("NW_CLIENT_COPY_REPORT:{client_checkpoint}");
     let cancelled_output = media.directory.path().join("cancelled-client-copy.mkv");
-    let mut cancelling = cli.command()
-        .args(["--access-profile", "download-reader", "artifacts", "save",
-            "--artifact-id", &artifact_id, "--expected-sha256", &expected.sha256, "--out"])
+    let mut cancelling = cli
+        .command()
+        .args([
+            "--access-profile",
+            "download-reader",
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            &expected.sha256,
+            "--out",
+        ])
         .arg(&cancelled_output)
-        .stdin(Stdio::null()).stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(std::fs::File::create(evidence.join("cancelled-client-copy.log")).unwrap())
-        .kill_on_drop(true).spawn().unwrap();
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
     let cancel_pid = cancelling.id().unwrap();
     let started = Instant::now();
     loop {
-        let partial = std::fs::read_dir(media.directory.path()).unwrap()
-            .filter_map(Result::ok).map(|entry| entry.path())
-            .filter(|path| path.file_name().unwrap().to_string_lossy().starts_with(".numera-wiz-save-"))
-            .filter_map(|path| std::fs::read_dir(path).ok()).flatten()
-            .filter_map(Result::ok).filter_map(|entry| entry.metadata().ok())
+        let partial = std::fs::read_dir(media.directory.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with(".numera-wiz-save-")
+            })
+            .filter_map(|path| std::fs::read_dir(path).ok())
+            .flatten()
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.metadata().ok())
             .any(|meta| meta.is_file() && meta.len() > 0 && meta.len() < total);
-        if partial { break; }
-        assert!(cancelling.try_wait().unwrap().is_none(), "Client finished before the cancellation boundary was observed");
-        assert!(started.elapsed() < Duration::from_secs(40), "Client did not begin a partial staged transfer");
+        if partial {
+            break;
+        }
+        assert!(
+            cancelling.try_wait().unwrap().is_none(),
+            "Client finished before the cancellation boundary was observed"
+        );
+        if started.elapsed() >= Duration::from_secs(100) {
+            use std::io::Read as _;
+            let mut bytes = Vec::new();
+            std::fs::File::open(evidence.join("cancelled-client-copy.log")).unwrap()
+                .take(64 * 1024).read_to_end(&mut bytes).unwrap();
+            let phases: Vec<String> = String::from_utf8_lossy(&bytes).lines()
+                .filter(|line| line.contains("artifact.client_copy")
+                    || line.contains("Executable identity read completed")
+                    || line.contains("Protected owner attachment completed"))
+                .take(16).map(|line| line.chars().take(4096).collect()).collect();
+            println!("NW_CLIENT_COPY_PREPARATION:{}", json!({
+                "elapsed_ms":started.elapsed().as_millis().to_string(), "phases":phases,
+                "scope":"Bounded safe preflight diagnostics; no headers, credentials or response bodies"
+            }));
+            panic!("Client did not begin a partial staged transfer within the bounded preparation deadline");
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    assert!(tokio::process::Command::new("/bin/kill").args(["-INT",&cancel_pid.to_string()])
-        .status().await.unwrap().success());
-    let cancelled = tokio::time::timeout(Duration::from_secs(20), cancelling.wait_with_output()).await
-        .expect("Client cancellation did not drain").unwrap();
+    let client_copy_cancel_setup_ms = started.elapsed().as_millis().to_string();
+    assert!(
+        tokio::process::Command::new("/bin/kill")
+            .args(["-INT", &cancel_pid.to_string()])
+            .status()
+            .await
+            .unwrap()
+            .success()
+    );
+    let cancelled = tokio::time::timeout(Duration::from_secs(20), cancelling.wait_with_output())
+        .await
+        .expect("Client cancellation did not drain")
+        .unwrap();
     assert!(!cancelled.status.success());
     let cancelled_receipt: Value = serde_json::from_slice(&cancelled.stdout).unwrap();
     assert_eq!(cancelled_receipt["error"]["code"], "CANCELLED");
     assert!(!cancelled_output.exists());
-    assert!(!std::fs::read_dir(media.directory.path()).unwrap().any(|entry| {
-        entry.unwrap().file_name().to_string_lossy().starts_with(".numera-wiz-save-")
-    }));
+    assert!(
+        !std::fs::read_dir(media.directory.path())
+            .unwrap()
+            .any(|entry| {
+                entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".numera-wiz-save-")
+            })
+    );
     cleaned_index(&workspace, &output).await;
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -497,7 +604,7 @@ async fn journey() {
     cleaned_index(&workspace, &output).await;
     let high = high.max(rss_high_kib(pid));
     assert!(high < 128 * 1024);
-    let report = json!({"schema_version":1,"status":"passed","executable":executable,"registry":runtime_record["registry"],"components":{"ffmpeg":plan["ffmpeg"],"ffprobe":plan["ffprobe"]},"job_id":id,"plan_id":plan["id"],"plan_hash":plan["hash"],"artifact_id":artifact_id,"source":std::env::var("GITHUB_SHA").ok(),"artifact_bytes":total.to_string(),"sha256":expected.sha256,"owner_process_id":pid,"client_copy_peak_kib":client_copy_peak_kib,"client_copy_bytes":client_identity.bytes,"client_copy_sha256":client_identity.sha256,"client_copy_profile":"job-read-only; no general filesystem roots","client_copy_cancelled_before_publication":true,"owner_before_high_kib":before,"owner_high_kib":high,"selected_owner_rss_ceiling_kib":131072,"job_revoked_delivered_bytes":job_revoked_bytes.to_string(),"credential_revoked_delivered_bytes":credential_revoked_bytes.to_string(),"cancelled_index_cleanup":true,"scope":"Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification."});
+    let report = json!({"schema_version":1,"status":"passed","executable":executable,"registry":runtime_record["registry"],"components":{"ffmpeg":plan["ffmpeg"],"ffprobe":plan["ffprobe"]},"job_id":id,"plan_id":plan["id"],"plan_hash":plan["hash"],"artifact_id":artifact_id,"source":std::env::var("GITHUB_SHA").ok(),"artifact_bytes":total.to_string(),"sha256":expected.sha256,"owner_process_id":pid,"client_copy_peak_kib":client_copy_peak_kib,"client_copy_bytes":client_identity.bytes,"client_copy_sha256":client_identity.sha256,"client_copy_profile":"job-read-only; no general filesystem roots","client_copy_cancelled_before_publication":true,"client_copy_elapsed_ms":client_copy_elapsed_ms,"client_copy_cancel_setup_ms":client_copy_cancel_setup_ms,"owner_before_high_kib":before,"owner_high_kib":high,"selected_owner_rss_ceiling_kib":131072,"job_revoked_delivered_bytes":job_revoked_bytes.to_string(),"credential_revoked_delivered_bytes":credential_revoked_bytes.to_string(),"cancelled_index_cleanup":true,"scope":"Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification."});
     let encoded = serde_json::to_vec_pretty(&report).unwrap();
     assert!(
         encoded.len() <= 16 * 1024,

@@ -111,3 +111,20 @@ never silently drops unsupported retained streams, transcodes, changes brands
 or strips required tags. An incompatible combination fails before execution.
 See [profile scope](../development/original-container-profiles.md) for exact
 limits and pending evidence. This is not full MOV/MP4 or complete F08 support.
+
+
+## Save verified output bytes
+
+Open Output details, then use Save verified copy. On native desktop, enter a
+new absolute client file path or leave the destination blank for the OS Save As
+picker. The browser uses its own File System Access save picker. Its selected
+folder does not become an engine filesystem grant. The default filename uses
+the authorized output basename when it is a safe portable component, otherwise
+a bounded artifact-based fallback.
+
+The copy has a separate progress/cancel control. Cancelling it does not cancel
+the completed producer. Wait for active writes and cleanup; a request to stop
+is not displayed as a confirmed stop. Length and SHA-256 are checked before
+client publication. See [scope and limits](../development/client-artifact-save.md).
+The new actual Save control journeys are undergoing hosted qualification;
+previous Output details screenshots alone do not qualify them.

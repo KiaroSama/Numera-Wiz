@@ -64,6 +64,9 @@ pub fn decimal(value: &str) -> Result<u64> {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactManifest {
     pub schema_version: u32,
+    /// Authorized basename only; never an engine path or new filesystem grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggested_name: Option<String>,
     pub artifact_id: String,
     pub manifest_uri: String,
     pub job_id: String,
@@ -76,6 +79,29 @@ pub struct ArtifactManifest {
     pub retrieval_methods: Vec<String>,
     pub bytes_route: Option<String>,
     pub max_chunk_bytes: u32,
+}
+impl ArtifactManifest {
+    pub fn suggested_file_name(&self) -> String {
+        if let Some(name) = self.suggested_name.as_deref().filter(|name| portable_file_name(name)) {
+            return name.to_owned();
+        }
+        let id: String = self.artifact_id.chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .take(96).collect();
+        format!("numera-{}.bin", if id.is_empty() { "artifact" } else { &id })
+    }
+}
+fn portable_file_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 240 || name.ends_with(['.', ' '])
+        || name.chars().any(|c| c.is_control() || r#"<>:"/\|?*"#.contains(c))
+    { return false; }
+    let stem = name.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_uppercase();
+    let numbered_device = ["COM", "LPT"].into_iter().any(|prefix| {
+        stem.strip_prefix(prefix).is_some_and(|suffix| {
+            ["1","2","3","4","5","6","7","8","9","\u{b9}","\u{b2}","\u{b3}"].contains(&suffix)
+        })
+    });
+    !numbered_device && !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactChunk {
@@ -98,6 +124,17 @@ pub struct ArtifactSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn download_names_are_bounded_single_portable_components() {
+        for name in ["movie.mkv", "movie 2.mov", "محتوا.mp4"] {
+            assert!(portable_file_name(name), "{name}");
+        }
+        for name in ["", ".", "..", "../movie.mkv", "C:\\movie.mkv", "/tmp/movie.mkv", "a/b", "a\\b",
+            "CON", "con.mkv", "COM1.mp4", "LPT\u{b2}.wav", "name. ", "name.", "name ", "line\n.mkv", "a:b.mp4"] {
+            assert!(!portable_file_name(name), "{name:?}");
+        }
+        assert!(!portable_file_name(&"x".repeat(241)));
+    }
     #[test]
     fn range_rejects_noncanonical_overflow_and_unbounded_lengths() {
         for value in ["", "01", "-1", "+1", "1.0", "18446744073709551616"] {

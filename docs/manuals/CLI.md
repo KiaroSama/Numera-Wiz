@@ -262,3 +262,22 @@ selected drive/path supported. Quote paths with spaces in PowerShell:
 Full F01-F15, complete MuxCls, editing/preview, package/resource and owner GPU
 qualification remain open tasks. The owner GPU harness must eventually match the
 CI-built candidate; no ordinary local source build or media test is requested.
+
+
+## Save an already verified artifact
+
+Obtain its authorized manifest, then select its exact SHA-256 and a new absolute
+client destination:
+
+```text
+numera-wiz --data-dir DATA artifacts save --artifact-id job-JOB --expected-sha256 SHA256 --out ABSOLUTE_NEW_FILE
+```
+
+This streams through the same current principal's private authenticated byte
+route; it does not start a public listener or another producer job. The client
+destination is a user-selected local file, independent of engine path grants.
+The command prints a structured verified-copy receipt. Existing entries are
+preserved. Ctrl+C requests cancellation during manifest/transfer preparation or
+copying and waits for admitted writes/cleanup; publication already underway is
+reported by its actual outcome. See [client artifact saves](../development/client-artifact-save.md)
+for limits and qualification status.

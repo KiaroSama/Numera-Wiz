@@ -28,13 +28,13 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
         expected_sha256,
         out,
     } = command;
-    let result: Result<nw_domain::download::SaveReceipt> = async {
-        let response = client
-            .request(&Request::query(
+    let control = Arc::new(SaveControl::default());
+    let saving = async {
+        let response = control.interruptible(client.request(&Request::query(
                 "artifacts.manifest",
                 serde_json::json!({"artifact_id":artifact_id}),
-            ))
-            .await?;
+            )))
+            .await??;
         if !response.ok {
             return Err(response
                 .error
@@ -52,19 +52,17 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
             )
             .into());
         }
-        let control = Arc::new(SaveControl::default());
-        let saving = client.save_artifact(manifest, out, control.clone());
-        tokio::pin!(saving);
-        tokio::select! {
-            result = &mut saving => result,
-            _ = tokio::signal::ctrl_c() => {
-                control.cancel();
-                // Wait for active filesystem work and cleanup; never announce an unobserved stop.
-                saving.await
-            }
+        client.save_artifact(manifest, out, control.clone()).await
+    };
+    tokio::pin!(saving);
+    let result: Result<nw_domain::download::SaveReceipt> = tokio::select! {
+        result = &mut saving => result,
+        _ = tokio::signal::ctrl_c() => {
+            control.cancel();
+            // Observe manifest/network cancellation and drain admitted filesystem work.
+            saving.await
         }
-    }
-    .await;
+    };
     match result {
         Ok(receipt) => {
             println!(

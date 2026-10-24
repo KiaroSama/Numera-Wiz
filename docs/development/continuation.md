@@ -1216,3 +1216,37 @@ cleanup variants remain unqualified. All previously open complete-product,
 five-surface, package/resource/manual and owner-harness obligations remain
 mandatory; no task checkbox or preserved research member changed. No local
 source execution, GUI/media run or owner GPU run occurred.
+
+
+## Client copy preparation failure and bounded follow-up
+
+Run 40089645393 on 0d75fb8374c823a49b06a855ad47eb1dbe2309ae passed
+all four complete native targets, WASM/lock, complete original MOV/MP4 media and
+owner/official SDK/lost-response work. The new job-read-only large client copy
+also passed full independent byte identity, positive HWM below 128 MiB and
+owned staging cleanup assertions. Its exact HWM was not emitted before the
+subsequent failure. The cancellation setup did not observe partial staging
+within 40 seconds while the child remained active. Its exact phase is not
+established. The rest of that media job and both GUI save jobs did not run.
+See evidence/client-save-ci76.json; no full media/Save UI pass is inferred.
+
+The source removes a redundant native manifest scan because the actual GET
+already reauthorizes, performs the full server identity preflight and enforces
+strong If-Match. Exact client length/SHA and independently reread native staging
+remain required. CLI cancellation now spans initial manifest preparation too.
+Preparation receives a separate 100-second bounded observation window and safe
+phase diagnostics; the 20-second confirmed cancellation drain and 128 MiB
+memory ceilings are unchanged. A successful large-copy checkpoint is emitted
+before later assertions so a later failure cannot hide its measured evidence.
+All 23 exact hosted formatter hunks are applied.
+
+Manifests also add backward-compatible optional suggested_name (authorized
+basename only), shared portable filename validation and native/browser picker
+defaults. Unsafe/missing names fall back to a bounded artifact-based name;
+parent paths and grants are never conveyed. New legacy/unsafe-name, CLI and
+official SDK assertions await CI along with the control/cancellation follow-up.
+
+All open complete-product/five-surface/package/resource/manual and matching
+owner-harness obligations remain mandatory. No task checkbox or preserved
+research member changed. No local compilation/test/GUI/media or owner GPU run
+occurred. Work remains only on the public repo's review branch and draft PR.

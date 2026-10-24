@@ -15,36 +15,10 @@ impl NativeClient {
     ) -> Result<SaveReceipt> {
         let _session = SaveSession(control.clone());
         let admitted = DownloadVerifier::new(&selected)?;
-        let response = control
-            .interruptible(self.request(&Request::query(
-                "artifacts.manifest",
-                serde_json::json!({"artifact_id":selected.artifact_id}),
-            )))
-            .await??;
-        if !response.ok {
-            return Err(response
-                .error
-                .unwrap_or_else(|| {
-                    nw_domain::DomainError::new(
-                        "ARTIFACT_UNAVAILABLE",
-                        "Artifact manifest is unavailable",
-                    )
-                })
-                .into());
-        }
-        let fresh: ArtifactManifest =
-            serde_json::from_value(response.result.context("Artifact manifest missing")?)?;
-        let _ = DownloadVerifier::new(&fresh)?;
-        if fresh.artifact_id != selected.artifact_id
-            || fresh.sha256 != selected.sha256
-            || fresh.encoded_byte_count != selected.encoded_byte_count
-        {
-            return Err(nw_domain::DomainError::new(
-                "ARTIFACT_CHANGED",
-                "The selected artifact identity changed",
-            )
-            .into());
-        }
+        // The selected manifest is already authorized. GET reauthorizes and fully
+        // verifies its strong If-Match identity; a second manifest scan is redundant.
+        let preflight = std::time::Instant::now();
+        tracing::info!(artifact_id = %selected.artifact_id, "artifact.client_copy.preflight.started");
         let record = control.interruptible(self.attach()).await??;
         let token = control.interruptible(self.scoped_token(&record)).await??;
         let expected_etag = format!("\"{}\"", selected.sha256);
@@ -53,7 +27,7 @@ impl NativeClient {
             .get(format!(
                 "http://127.0.0.1:{}{}",
                 record.port,
-                fresh
+                selected
                     .bytes_route
                     .as_deref()
                     .context("Artifact byte route missing")?
@@ -90,6 +64,7 @@ impl NativeClient {
             )
             .into());
         }
+        tracing::info!(elapsed_ms = preflight.elapsed().as_millis(), "artifact.client_copy.bytes.accepted");
         let mut copy =
             tokio::task::spawn_blocking(move || ClientCopy::create(&output, &selected)).await??;
         while let Some(frame) = control.interruptible(response.chunk()).await?? {
