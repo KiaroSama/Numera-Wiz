@@ -2,6 +2,7 @@
 mod access;
 mod artifacts_cli;
 mod client;
+mod human;
 mod mcp;
 mod server;
 mod web_assets;
@@ -44,8 +45,35 @@ enum Mode {
         #[command(subcommand)]
         command: artifacts_cli::Command,
     },
+    Media {
+        #[command(subcommand)]
+        command: human::Media,
+    },
+    Assets {
+        #[command(subcommand)]
+        command: human::Assets,
+    },
+    Streams {
+        #[command(subcommand)]
+        command: human::Streams,
+    },
+    Plans {
+        #[command(subcommand)]
+        command: human::Plans,
+    },
+    Jobs {
+        #[command(subcommand)]
+        command: human::Jobs,
+    },
+    Logs {
+        #[command(subcommand)]
+        command: human::Logs,
+    },
     /// Discover active development commands and their qualification limits.
-    Commands,
+    Commands {
+        #[command(subcommand)]
+        command: Option<human::Discovery>,
+    },
     /// Submit a bounded canonical JSON request from a file or stdin.
     Request {
         #[arg(long)]
@@ -135,13 +163,13 @@ async fn run() -> Result<()> {
             access::run(&client, command).await
         }
         Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
-        Some(Mode::Commands) => {
-            print_response(
-                &client,
-                Request::query("commands.list", serde_json::json!({})),
-            )
-            .await
-        }
+        Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
+        Some(Mode::Assets { command }) => human::run(&client, human::Command::Assets(command)).await,
+        Some(Mode::Streams { command }) => human::run(&client, human::Command::Streams(command)).await,
+        Some(Mode::Plans { command }) => human::run(&client, human::Command::Plans(command)).await,
+        Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
+        Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
+        Some(Mode::Commands { command }) => human::run(&client, human::Command::Discovery(command)).await,
         Some(Mode::Request { file }) => {
             let input: Box<dyn Read> = match file {
                 Some(path) => Box::new(std::fs::File::open(path)?),

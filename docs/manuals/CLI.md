@@ -39,6 +39,57 @@ The public listener drains after public client/service/work leases end; private
 background jobs and a native editor can continue. Reopening the port invalidates
 its earlier credentials. Owner and client requests have finite timeouts and limits.
 
+## Ordinary composable commands
+
+The following commands use the same canonical owner port, access profile,
+strict schemas and typed JSON responses as request/MCP. Run any command with
+`--help` for its options. All listed output is JSON without a separate flag.
+
+| Command | Purpose |
+|---|---|
+| `commands list` / `commands schema ID` | Inspect the active registry and one parameter schema. |
+| `media probe PATH` | Probe an authorized source. |
+| `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
+| `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |
+| `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |
+| `streams report --asset ID --intent-file INTENT.json` | Inspect selection counts; repeat --asset for up to 64 assets. |
+| `streams clean --asset ID --out PATH --intent-file INTENT.json` | Prepare a cleanup plan for separate review and submission. |
+| `plans inspect ID` | Inspect the exact admitted plan and its hash. |
+| `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
+| `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
+| `jobs cancel ID --replay-scope SCOPE --idempotency-key KEY` | Request cancellation of the selected accepted job. |
+| `artifacts list` / `artifacts manifest --artifact-id ID` | Page authorized outputs or inspect one exact object. |
+| `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
+| `logs status` | Inspect owner log health under current owner authority. |
+
+List commands accept `--limit`, `--cursor` and `--replace-snapshot`.
+Cleanup planning accepts `--file-times new|preserve_best_effort|require_reviewed`.
+Relative native paths resolve against the CLI process working directory before
+the same canonical authorization checks. Input JSON documents are individually
+limited to 1 MiB, reject duplicate keys and still share the aggregate request
+budget. They are data, never executable configuration.
+
+A practical cleanup sequence is:
+
+1. Run `access replay-scope create --json` and retain its returned replay_scope.
+2. Run `assets register INPUT --replay-scope SCOPE --idempotency-key register-1`;
+   retain the returned asset ID.
+3. Use [cleanup-keep-all.json](../../examples/cleanup-keep-all.json), or edit an
+   explicit copy with the desired original-stream selectors and preservation.
+4. Run `streams report --asset ASSET --intent-file INTENT.json`, then
+   `streams clean --asset ASSET --out NEW_OUTPUT --intent-file INTENT.json`.
+5. Review `plans inspect PLAN`, including source/output, selected indices,
+   preservation, argv and limits. Submit its exact hash with `jobs submit`.
+6. Inspect the returned job, then its artifact manifest; save a verified client
+   copy when needed using the command below.
+
+Durable typed commands require an explicit retained scope and operation key.
+Without --request-id the request ID is deterministically derived from the command,
+scope and key, so a separate CLI retry retains the same identity. An explicit
+--request-id can be retained too. Reuse the same scope/key/parameters after a
+lost response. Changed content returns IDEMPOTENCY_CONFLICT. These commands
+never silently allocate a new mutation scope during a retry.
+
 ## Canonical operations
 
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope

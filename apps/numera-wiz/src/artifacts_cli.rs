@@ -12,6 +12,24 @@ use std::{path::PathBuf, sync::Arc};
 
 #[derive(Subcommand)]
 pub enum Command {
+    List {
+        #[command(flatten)]
+        page: crate::human::Page,
+    },
+    Manifest {
+        #[arg(long)]
+        artifact_id: String,
+    },
+    ReadChunk {
+        #[arg(long)]
+        artifact_id: String,
+        #[arg(long)]
+        expected_sha256: String,
+        #[arg(long, default_value = "0")]
+        offset: String,
+        #[arg(long, default_value_t = 131072)]
+        length: u32,
+    },
     /// Stream a selected immutable artifact to an absent client destination.
     Save {
         #[arg(long)]
@@ -23,11 +41,27 @@ pub enum Command {
     },
 }
 pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
-    let Command::Save {
-        artifact_id,
-        expected_sha256,
-        out,
-    } = command;
+    let request = match command {
+        Command::Save { artifact_id, expected_sha256, out } => {
+            return save(client, artifact_id, expected_sha256, out).await;
+        }
+        Command::List { page } => Request::query("artifacts.list", page.params()),
+        Command::Manifest { artifact_id } => {
+            Request::query("artifacts.manifest", serde_json::json!({"artifact_id":artifact_id}))
+        }
+        Command::ReadChunk { artifact_id, expected_sha256, offset, length } => Request::query(
+            "artifacts.read_chunk",
+            serde_json::json!({"artifact_id":artifact_id,"expected_sha256":expected_sha256,"offset":offset,"length":length}),
+        ),
+    };
+    crate::print_response(client, request).await
+}
+async fn save(
+    client: &NativeClient,
+    artifact_id: String,
+    expected_sha256: String,
+    out: PathBuf,
+) -> Result<()> {
     let control = Arc::new(SaveControl::default());
     let saving = async {
         let response = control
