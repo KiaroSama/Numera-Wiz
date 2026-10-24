@@ -1159,3 +1159,29 @@ mandatory. Native/browser output Save As is still not implemented; current
 controls inspect/copy the manifest URI and authenticated bytes already stream
 through CLI/MCP/application routes. No local compilation, tests, GUI/media
 execution or owner GPU run was performed.
+
+
+## All-green original profiles and streamed client save implementation
+
+Run 40085147422 on ca32eea45fd1a5894310e1f4084c9456647e5088 passed
+all ten jobs, including formatting, four complete native targets, complete real
+media and owner/SDK/large HTTP work, actual native and actual Chrome input.
+Both report PNGs were personally inspected. The public repo, open draft PR and
+unchanged main 80ec75ea5a97285276c4173534d1c73de02466ed were rechecked.
+See evidence/original-container-ci74.json.
+
+The following source introduces a bounded verified client artifact copy through
+native UI/CLI and browser File System Access, with exact manifest/If-Match checks,
+128 KiB writes, SHA-256/length verification, independent flushed native staging
+reread, held-directory no-replace native publication and a separate observed
+cancellation/publication fence. CLI actual media tests add full copy, collision,
+digest mismatch and foreign-principal denial. Domain/platform tests cover
+truncation, changed disk, cancellation, unknown-file preservation and late
+collision. This new source awaits hosted compilation and actual save controls;
+previous GUI manifest inspection is not relabelled Save As evidence.
+
+No research files or task completion checkboxes changed. Complete F01-F15,
+MuxCls/folder/batch, editor/project/DAG/preview/mixer/captions/effects/interchange,
+remaining command/donor closure, retention/generation migration, packages,
+resources, full manuals and matching owner harness/evidence remain mandatory.
+No local build/test/GUI/media execution or owner GPU run occurred.

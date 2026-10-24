@@ -1,5 +1,6 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
 mod access;
+mod artifacts_cli;
 mod client;
 mod mcp;
 mod server;
@@ -38,6 +39,11 @@ enum Mode {
     },
     #[command(name = "__owner", hide = true)]
     Owner,
+    /// Save an authorized verified artifact to a new client-side file.
+    Artifacts {
+        #[command(subcommand)]
+        command: artifacts_cli::Command,
+    },
     /// Discover active development commands and their qualification limits.
     Commands,
     /// Submit a bounded canonical JSON request from a file or stdin.
@@ -128,6 +134,7 @@ async fn run() -> Result<()> {
             );
             access::run(&client, command).await
         }
+        Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
         Some(Mode::Commands) => {
             print_response(
                 &client,
@@ -321,6 +328,30 @@ impl nw_ui::CommandClient for NativeUiClient {
             ),
             None => reply(Err("File selection cancelled".into())),
         }
+    }
+    fn save_artifact(
+        &self,
+        manifest: nw_domain::artifacts::ArtifactManifest,
+        destination: Option<String>,
+        control: std::sync::Arc<nw_domain::download::SaveControl>,
+        reply: nw_ui::SaveReply,
+    ) {
+        let output = match destination {
+            Some(path) => Some(PathBuf::from(path)),
+            None => rfd::FileDialog::new()
+                .set_title("Save verified artifact copy")
+                .set_file_name(format!("numera-{}.bin", manifest.artifact_id))
+                .save_file(),
+        };
+        let Some(output) = output else {
+            drop(nw_domain::download::SaveSession(control));
+            reply(Err("Save selection cancelled; no client file was published".into()));
+            return;
+        };
+        let client = self.client.clone();
+        self.runtime.spawn(async move {
+            reply(client.save_artifact(manifest, output, control).await.map_err(|error| error.to_string()));
+        });
     }
     fn send(&self, request: Request, reply: nw_ui::Reply) {
         let client = self.client.clone();
