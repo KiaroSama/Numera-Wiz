@@ -288,6 +288,34 @@ fn apply_tag(tags: &mut BTreeMap<String, String>, name: &str, patch: &TagPatch) 
         }
     }
 }
+/// Validate bounded selector/order/tag input before batch allocation or source work.
+pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
+    if intent.stream_tag_patches.len() > 256 || intent.audio_order.len() > 256 || intent.subtitle_order.len() > 256 {
+        return Err(DomainError::new("RESOURCE_LIMIT", "At most 256 order entries and tag patches are admitted"));
+    }
+    validate_selector(&intent.audio_selection.selector)?;
+    validate_selector(&intent.subtitle_selection.selector)?;
+    for patch in &intent.stream_tag_patches {
+        if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Tag matcher is too large",
+            ));
+        }
+        for value in [&patch.language, &patch.title] {
+            if let TagPatch::Set { value } = value
+                && (value.len() > 4096 || value.contains('\0'))
+            {
+                return Err(DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Tag values must be bounded and contain no NUL",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResolution> {
     if streams.is_empty()
         || streams.len() > 256
@@ -321,26 +349,7 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
             "Cleanup requires an ordinary video stream",
         ));
     }
-    validate_selector(&intent.audio_selection.selector)?;
-    validate_selector(&intent.subtitle_selection.selector)?;
-    for patch in &intent.stream_tag_patches {
-        if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 {
-            return Err(DomainError::new(
-                "RESOURCE_LIMIT",
-                "Tag matcher is too large",
-            ));
-        }
-        for value in [&patch.language, &patch.title] {
-            if let TagPatch::Set { value } = value
-                && (value.len() > 4096 || value.contains('\0'))
-            {
-                return Err(DomainError::new(
-                    "VALIDATION_ERROR",
-                    "Tag values must be bounded and contain no NUL",
-                ));
-            }
-        }
-    }
+    validate_intent(intent)?;
     let mut kept = Vec::new();
     let mut ordinary_video_seen = false;
     for stream in streams {

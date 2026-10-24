@@ -96,7 +96,7 @@ impl Service {
         jobs: bool,
         cancellation: &CancellationToken,
     ) -> Result<Value> {
-        self.inventory_projection(context, input, jobs, false, cancellation)
+        self.inventory_projection(context, input, jobs, false, false, cancellation)
     }
     pub(super) fn artifact_inventory(
         &self,
@@ -104,7 +104,12 @@ impl Service {
         input: PageInput,
         cancellation: &CancellationToken,
     ) -> Result<Value> {
-        self.inventory_projection(context, input, true, true, cancellation)
+        self.inventory_projection(context, input, true, true, false, cancellation)
+    }
+    pub(super) fn batch_inventory(
+        &self, context: &Context, input: PageInput, cancellation: &CancellationToken,
+    ) -> Result<Value> {
+        self.inventory_projection(context, input, false, false, true, cancellation)
     }
     fn inventory_projection(
         &self,
@@ -112,6 +117,7 @@ impl Service {
         input: PageInput,
         jobs: bool,
         artifacts: bool,
+        batches: bool,
         cancellation: &CancellationToken,
     ) -> Result<Value> {
         if !(1..=512).contains(&input.limit)
@@ -130,7 +136,9 @@ impl Service {
                 "Page limit must be 1..512 and cursor must be bounded",
             ));
         }
-        let projection = if artifacts {
+        let projection = if batches {
+            "batches.summary.v1"
+        } else if artifacts {
             "artifacts.summary.v1"
         } else if jobs {
             "jobs.summary.v1"
@@ -223,7 +231,26 @@ impl Service {
                 Ok(())
             }
         };
-        if jobs {
+        if batches {
+            self.store.visit("batch/", |batch: nw_domain::batches::Batch| {
+                check_cancel()?;
+                if batch.schema_version != 1 || batch.members.len() > nw_domain::batches::MAX_BATCH_ITEMS {
+                    return Err(DomainError::new("INVALID_BATCH", "Unknown batch summary record"));
+                }
+                let readable = policy.as_ref().is_none_or(|profile| {
+                    profile.allows_object(ObjectKind::Job, &batch.id, &batch.creator, ObjectAction::Read)
+                        && batch.members.iter().filter_map(|member| member.job_id.as_ref()).all(|id| {
+                            profile.allows_object(ObjectKind::Job, id, &batch.creator, ObjectAction::Read)
+                        })
+                });
+                if readable {
+                    snapshot.push(&nw_domain::batches::BatchSummary {
+                        id: batch.id, plan_id: batch.plan_id, total: batch.members.len(), accepted_at: batch.accepted_at,
+                    })?;
+                }
+                Ok(())
+            })?;
+        } else if jobs {
             self.store.visit("job/", |job: Job| {
                 check_cancel()?;
                 if policy.as_ref().is_none_or(|profile| {

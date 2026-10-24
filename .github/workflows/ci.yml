@@ -282,7 +282,7 @@ jobs:
       - name: Exercise actual owner and official SDK transport media parity
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
-        run: cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture
+        run: cargo test --locked -p numera-wiz --test owner_media --test owner_batch -- --ignored --nocapture
       - name: Exercise actual larger-than-memory HTTP publication and revocation
         env:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin

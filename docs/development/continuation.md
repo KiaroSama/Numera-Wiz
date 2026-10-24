@@ -1571,3 +1571,41 @@ Full native folder/companion/replacement, F01-F15, project/editor/effects/DAG/
 preview/mixer/captions/interchange, command closure, retention/migration,
 packages/resources/manuals and matching owner harness remain required.
 No archive/full-task checkbox changed and no local execution occurred.
+
+
+## Ten-job policy/progress/source-probe run passes
+
+Run 40105897346 on 5d9b1106f3725051b42c4aaf7e1492baf4271875 passed all
+10 jobs, including formatting/lock/WASM, four complete native targets, actual
+engine/typed CLI/SDK/lost-ack/large-copy/cancel/revocation and both actual GUI
+journeys. Original cross-principal plan equality passes with different completed
+source-probe audit budgets. Genuine native/browser OS Save As passed independent
+197983-byte saved/source equality with one producer; both successful PNGs were
+personally inspected. Exact merge/executable/component/report/artifact facts
+are retained in ci86 evidence. Scoped observed client/owner HWM was 26300/31228
+KiB for 268633400 bytes; no aggregate R20/package inference is made.
+
+The repository was personally rechecked public; main remains
+80ec75ea5a97285276c4173534d1c73de02466ed and PR #1 is open/draft with the
+single implementation branch. Full product obligations remain mandatory.
+Batch domain/store/service source is now being built on this green baseline;
+no command is advertised or batch support inferred from unfinished source.
+
+## Explicit batch composition ready for its first hosted check
+
+Prepared six real canonical batch handlers using the existing cleanup planner,
+individual job engine and bounded replay transaction kernel. Typed CLI adapters,
+client-only wait, generated type schemas and explicit candidate documentation
+are included. Atomic store regressions cover 64-member acceptance, writer-clock
+audit, restart/replay/conflict, late rollback/retry and cancellation request state.
+The new hosted owner_batch test uses two different actual media sources, mixed
+Remux/Copy, typed CLI and both official SDK transports, retained packet/full-byte
+oracles, partial failure exit 9, all-skip accounting, held-publication cancellation,
+authorization denial and pagination. These are test sources, not observed passes.
+
+This revision has not been compiled or executed. Shared GUI batch controls and
+genuine batch input journeys follow immediately after backend/CLI corrections.
+Directory/companion/replacement, full F01-F15/editor/effects, command closure,
+retention/generation migration, packages/resources/manuals and owner harness
+remain mandatory. The existing single-file GUI/save regressions remain intact.
+Main and archived research remain unchanged; no release/full-task gate is closed.

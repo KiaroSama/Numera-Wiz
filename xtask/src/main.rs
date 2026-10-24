@@ -114,6 +114,22 @@ fn schemas(root: &Path) -> Result<()> {
         path.join("remux-progress.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::execution::RemuxProgress))?,
     )?;
+    fs::write(
+        path.join("cleanup-batch-input.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::batches::CleanBatchInput))?,
+    )?;
+    fs::write(
+        path.join("cleanup-batch-plan.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::batches::BatchPlan))?,
+    )?;
+    fs::write(
+        path.join("cleanup-batch-review.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::batches::BatchPlanReview))?,
+    )?;
+    fs::write(
+        path.join("cleanup-batch-result.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::batches::BatchResult))?,
+    )?;
     tracing::info!("Generated schemas from authoritative Rust types");
     Ok(())
 }
