@@ -13,6 +13,8 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 use uuid::Uuid;
 const RECORDS: TableDefinition<&str, &[u8]> = TableDefinition::new("versioned_records");
+// Older readers must refuse records whose timestamp policies/facts they could discard.
+const STORE_SCHEMA: &[u8] = b"2";
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
 mod profiles;
@@ -78,7 +80,7 @@ impl Store {
                 let mut key = Uuid::new_v4().as_bytes().to_vec();
                 key.extend_from_slice(Uuid::new_v4().as_bytes());
                 table
-                    .insert("meta/schema", b"1".as_slice())
+                    .insert("meta/schema", STORE_SCHEMA)
                     .map_err(storage)?;
                 table
                     .insert("meta/root", root_id.as_bytes())
@@ -103,7 +105,7 @@ impl Store {
             .get("meta/schema")
             .map_err(storage)?
             .map(|v| v.value().to_vec())
-            != Some(b"1".to_vec())
+            != Some(STORE_SCHEMA.to_vec())
         {
             return Err(DomainError::new(
                 "STORE_SCHEMA_UNSUPPORTED",
@@ -532,6 +534,7 @@ mod tests {
             preservation: Preservation::default(),
         };
         let plan = Plan {
+            file_times: None,
             schema_version: 1,
             required_rights: None,
             creation_audit: None,
@@ -549,6 +552,7 @@ mod tests {
             verification_scope: "unit-only".into(),
         };
         Job {
+            file_times: None,
             id: "test-job".into(),
             creator: "alice".into(),
             plan,
@@ -660,6 +664,32 @@ mod tests {
             store.inspect_job("test-job").unwrap().state,
             JobState::Cancelled
         );
+    }
+    #[test]
+    fn version_one_roots_are_preserved_for_an_explicit_generation_migration() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let identity = store.root_id().to_owned();
+        store.put("migration/sentinel", &serde_json::json!({"retained":"original"})).unwrap();
+        let write = store.db.begin_write().unwrap();
+        {
+            let mut table = write.open_table(RECORDS).unwrap();
+            table.insert("meta/schema", b"1".as_slice()).unwrap();
+        }
+        write.commit().unwrap();
+        drop(store);
+        match Store::open(root.path()) {
+            Err(error) => assert_eq!(error.code, "STORE_SCHEMA_UNSUPPORTED"),
+            Ok(_) => panic!("A prior store generation was implicitly rewritten"),
+        }
+        let db = Database::create(root.path().join("store.redb")).unwrap();
+        let read = db.begin_read().unwrap();
+        let table = read.open_table(RECORDS).unwrap();
+        assert_eq!(table.get("meta/schema").unwrap().unwrap().value(), b"1");
+        assert_eq!(table.get("meta/root").unwrap().unwrap().value(), identity.as_bytes());
+        let raw = table.get("migration/sentinel").unwrap().unwrap();
+        let value: serde_json::Value = serde_json::from_slice(raw.value()).unwrap();
+        assert_eq!(value["retained"], "original");
     }
     #[test]
     fn unsupported_store_schema_is_never_reinitialized() {

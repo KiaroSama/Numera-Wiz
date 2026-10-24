@@ -49,6 +49,8 @@ pub struct Asset {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_times: Option<crate::file_times::FileTimePlan>,
     #[serde(
         default = "legacy_plan_version",
         skip_serializing_if = "is_legacy_plan"
@@ -100,6 +102,8 @@ impl JobState {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Job {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_times: Option<crate::file_times::FileTimeOutcome>,
     pub id: String,
     pub creator: String,
     pub plan: Plan,

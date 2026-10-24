@@ -188,6 +188,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let id = accepted["result"]["job_id"].as_str().unwrap();
     let job = cli.completed(id).await;
     assert_eq!(job["state"], "succeeded", "{job}");
+    assert_eq!(job["file_times"]["policy"], "preserve_best_effort");
+    assert_eq!(job["file_times"]["preserved"], true);
     assert_eq!(
         std::fs::read(&media.source).unwrap(),
         std::fs::read(&output).unwrap()
@@ -289,7 +291,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let plan = call!(
         stdio,
         "streams.clean",
-        json!({"asset_id":operator_asset["id"],"output":output,"intent":rules}),
+        json!({"asset_id":operator_asset["id"],"output":output,"intent":rules,"file_times":"require_reviewed"}),
         json!({})
     );
     let accepted = call!(
@@ -300,6 +302,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     let job = cli.completed(accepted["job_id"].as_str().unwrap()).await;
     assert_eq!(job["state"], "succeeded", "{job}");
+    assert_eq!(job["file_times"]["policy"], "require_reviewed");
+    assert_eq!(job["file_times"]["preserved"], true);
+    assert_eq!(job["file_times"]["desired"], job["file_times"]["observed"]);
     let observed = fixture::probe(&media.bin, &output).await;
     assert_eq!(observed["streams"][1]["tags"]["language"], "fas");
     assert_eq!(observed["streams"][1]["tags"]["title"], "SDK stdio first");

@@ -22,13 +22,14 @@ pub struct PatchForm {
     title: String,
 }
 fn indices(text: &str) -> Result<Vec<u32>, String> {
+    if text.trim().is_empty() { return Ok(Vec::new()); }
     text.split(',')
         .map(str::trim)
-        .filter(|value| !value.is_empty())
         .map(|value| {
-            value
-                .parse::<u32>()
-                .map_err(|_| format!("Invalid original stream index: {value}"))
+            if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(format!("Invalid original stream index: {value}"));
+            }
+            value.parse::<u32>().map_err(|_| format!("Invalid original stream index: {value}"))
         })
         .collect()
 }
@@ -215,6 +216,17 @@ impl WizApp {
                     changed |= ui.checkbox(&mut self.intent.preservation.stream_tags,"Stream tags").changed();
                     changed |= ui.checkbox(&mut self.intent.preservation.dispositions,"Dispositions").changed();
                     changed |= ui.checkbox(&mut self.intent.preservation.chapters,"Chapters").changed();
+                    ui.label("File timestamps");
+                    let label = match self.file_times {
+                        nw_domain::file_times::FileTimeRequest::New => "New timestamps",
+                        nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps",
+                        nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
+                    };
+                    egui::ComboBox::from_id_salt("cleanup-file-times").selected_text(label).show_ui(ui, |ui| {
+                        changed |= ui.selectable_value(&mut self.file_times, nw_domain::file_times::FileTimeRequest::PreserveBestEffort, "Preserve timestamps").changed();
+                        changed |= ui.selectable_value(&mut self.file_times, nw_domain::file_times::FileTimeRequest::RequireReviewed, "Require reviewed timestamps").changed();
+                        changed |= ui.selectable_value(&mut self.file_times, nw_domain::file_times::FileTimeRequest::New, "New timestamps").changed();
+                    }).response.on_hover_text("Preserve source access and modification times where supported. Required mode restores the reviewed values before publication; later file reads can change access time.");
                 });
             });
             egui::CollapsingHeader::new("Language and title edits").show(ui,|ui| {
@@ -241,7 +253,7 @@ impl WizApp {
             ui.small("An existing destination is preserved. Changed stream layouts currently require an admitted Matroska output.");
             if changed {self.changed();}
             if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty(),egui::Button::new("Review cleanup plan")).clicked() {
-                match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
+                match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
             }
         });
     }
@@ -279,6 +291,14 @@ impl WizApp {
                 ui.separator();
                 ui.label(&plan.verification_scope);
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
+                    if let Some(policy) = &plan.file_times {
+                        let label = match policy.request() {
+                            nw_domain::file_times::FileTimeRequest::New => "New output timestamps",
+                            nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve source timestamps where supported",
+                            nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require the reviewed source timestamps",
+                        };
+                        ui.small(label);
+                    }
                     ui.small(format!("Plan {}", plan.id));
                     ui.monospace(&plan.hash);
                     ui.small(format!("Source SHA-256: {}", plan.source_sha256));
@@ -305,5 +325,18 @@ impl WizApp {
                 }
                 ui.small("Ctrl/Cmd+Enter runs the reviewed plan.");
             });
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    #[test]
+    fn malformed_index_csv_never_executes_a_valid_subset() {
+        assert_eq!(indices("0, 2").unwrap(), vec![0, 2]);
+        assert!(indices("  ").unwrap().is_empty());
+        for value in ["0,,2", "0,2,", ",0", "-1", "+1", "1.5", "1e3", "4294967296"] {
+            assert!(indices(value).is_err(), "{value}");
+        }
     }
 }

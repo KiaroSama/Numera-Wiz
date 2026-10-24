@@ -421,6 +421,7 @@ impl Service {
             })
             .collect();
         Ok(JobView {
+            file_times: job.file_times.clone().map(|value| nw_domain::views::FileTimeOutcomeView::new(value, owner)),
             id: job.id.clone(),
             state: job.state.clone(),
             plan: self.plan_review(context, &job.plan)?,
@@ -1266,10 +1267,11 @@ impl Service {
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 let output = self.path(&context, Path::new(&input.output), true)?;
-                let mut plan = self.engine()?.clean_plan_at(
+                let mut plan = self.engine()?.clean_plan_with_file_times_at(
                     asset,
                     &output,
                     &input.intent,
+                    input.file_times,
                     &context.principal,
                     now,
                 )?;
@@ -1416,6 +1418,7 @@ impl Service {
                 }
                 let id = Uuid::new_v4().to_string();
                 let job = Job {
+                    file_times: None,
                     id: id.clone(),
                     creator: context.principal.clone(),
                     plan,
@@ -1688,6 +1691,34 @@ impl Service {
             }
             ExecutionEvent::Published(artifact, verification) => {
                 self.store.published(id, artifact, verification)?;
+            }
+            ExecutionEvent::FileTimes(outcome) => {
+                self.store.execution_allowed(id)?;
+                let job = self.store.inspect_job(id)?;
+                let expected = job.plan.file_times.as_ref().ok_or_else(|| {
+                    DomainError::new("INVALID_JOB_TRANSITION", "Legacy plan has no file timestamp assertion")
+                })?;
+                if job.state != JobState::Verifying || expected.request() != outcome.policy
+                    || outcome.warnings.len() > 4
+                    || serde_json::to_vec(&outcome).map_err(files::io_error)?.len() > 16 * 1024
+                {
+                    return Err(DomainError::new("INVALID_JOB_TRANSITION", "File timestamp fact exceeds its verified stage contract"));
+                }
+                if let nw_domain::file_times::FileTimePlan::RequireReviewed { times } = expected
+                    && (outcome.desired.as_ref() != Some(times)
+                        || outcome.observed.as_ref() != Some(times)
+                        || outcome.preserved != Some(true)
+                        || !outcome.warnings.is_empty())
+                {
+                    return Err(DomainError::new("INVALID_JOB_TRANSITION", "Required file timestamp assertion did not succeed"));
+                }
+                self.store.update_job(id, |job| {
+                    if job.file_times.is_some() {
+                        return Err(DomainError::new("INVALID_JOB_TRANSITION", "File timestamp facts are immutable"));
+                    }
+                    job.file_times = Some(outcome);
+                    Ok(())
+                })?;
             }
         }
         let _ = self.events.send(id.into());
@@ -2205,6 +2236,7 @@ mod tests {
             },
         };
         let plan = Plan {
+            file_times: None,
             schema_version: 1,
             required_rights: None,
             creation_audit: None,
@@ -2229,6 +2261,12 @@ mod tests {
             verification_scope: "Synthetic metadata view".into(),
         };
         let job = Job {
+            file_times: Some(nw_domain::file_times::FileTimeOutcome {
+                policy: nw_domain::file_times::FileTimeRequest::PreserveBestEffort,
+                desired: None, observed: None, preserved: Some(false),
+                warnings: vec![DomainError::new("FILE_TIMES_NOT_PRESERVED", "PRIVATE-FILE-TIME-DIAGNOSTIC")],
+                scope: nw_domain::file_times::SCOPE.into(),
+            }),
             id: "private-job".into(),
             creator: owner.principal.clone(),
             plan: plan.clone(),
@@ -2266,6 +2304,9 @@ mod tests {
         assert!(observed.ok, "{observed:?}");
         let observed = observed.result.unwrap();
         assert!(observed["prepared_stages"].is_null());
+        assert_eq!(observed["file_times"]["warnings"][0]["code"], "FILE_TIMES_NOT_PRESERVED");
+        assert!(observed["file_times"]["warnings"][0]["message"].is_null());
+        assert!(!observed.to_string().contains("PRIVATE-FILE-TIME-DIAGNOSTIC"));
         assert!(observed["artifact"]["path"].is_null());
         assert!(observed["plan"]["source_path"].is_null());
         assert!(observed["plan"]["output_path"].is_null());

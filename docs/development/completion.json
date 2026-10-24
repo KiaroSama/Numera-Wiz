@@ -721,6 +721,16 @@
           ],
           "report": "docs/development/evidence/destination-claims-ci63.json",
           "observed_outcome": "Actual native Output details click completed the canonical manifest request before the independent harness SHA/length oracle. Screenshots were retained but not personally inspected for this run. Not preview, other-platform GUI, Save As or full parity."
+        },
+        {
+          "commit": "9f33c8eccc546851b4929b33cf6eedea5b55c6cb",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40071636236",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/native-manifest-ci64.json",
+          "observed_outcome": "All jobs passed. Actual Output details mouse input, independent manifest SHA/length assertion and personally inspected original native PNG show 197983 verified bytes and a Succeeded job. No package, preview, full F08 or new filesystem timestamp qualification is inferred."
         }
       ]
     },
