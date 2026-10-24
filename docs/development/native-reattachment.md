@@ -31,11 +31,12 @@ and protected owner epochs, then replaces a profile principal only while no owne
 or store writer is alive. The original bridge must reject reattachment; a newly
 selected bridge can bind the new profile identity. A focused service test checks
 that the rejection creates no additional credential. A binding unit rejects root
-replacement. These additions await their own CI; no root-replacement package,
+replacement. The idle/principal regression passed on all four native CI targets in run
+40066276733. No root-replacement package,
 upgrade/rollback, full owner-death recovery or release qualification is inferred.
 
 
-The pending startup correction holds a protected runtime-directory OS bootstrap
+The startup correction holds a protected runtime-directory OS bootstrap
 gate across launch/readiness and allows at most one child per attachment attempt.
 Other frontends continue checking the authenticated health record while that gate
 is occupied. The separate store writer lock remains authoritative. This prevents
@@ -44,4 +45,19 @@ process reaches its store lock; no startup deadline or identity check is relaxed
 A new real three-frontend/same-root test asserts successful commands and exactly
 one observed child-spawn event across all frontend stderr streams and one
 structured owner initialization PID, then waits for the idle writer drain.
-Its evidence is pending.
+It passed on all four native targets in run 40066276733, including Windows.
+The attachment deadline and authorization checks are unchanged.
+
+
+A separate real owner-media regression adds transport response loss after actual
+jobs.submit acceptance. A bounded loopback proxy forwards the same authenticated
+private requests and consumes the actual accepted responses, returning transport
+failure instead of the receipt to the SDK. Both automatic attempts must retain
+identical request bytes and refer to the same receipt/job. The same SDK stdio
+process then retries after real idle owner shutdown and restart, using its
+original replay scope/key/body. The restarted owner must return the original
+receipt/job even though its destination now exists. Exact output, one stored job,
+root/principal stability and changed owner epoch are asserted. Only fixture
+transport is altered; there is no alternate handler or product fault flag.
+The new lost-response assertion awaits hosted CI. It does not stand in for
+retired-version replay or crash/publication/upgrade recovery qualification.
