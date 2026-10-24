@@ -290,6 +290,7 @@ mod tests {
         std::fs::hard_link(&output, &proof).unwrap();
         let identity = files::identity(&output, &CancellationToken::new()).unwrap();
         let job = Job {
+            progress: None,
             file_times: None,
             id: id.clone(),
             creator: context.principal.clone(),

@@ -532,6 +532,7 @@ mod tests {
             preservation: Preservation::default(),
         };
         let plan = Plan {
+            execution_limits: None,
             file_times: None,
             schema_version: 1,
             required_rights: None,
@@ -550,6 +551,7 @@ mod tests {
             verification_scope: "unit-only".into(),
         };
         Job {
+            progress: None,
             file_times: None,
             id: "test-job".into(),
             creator: "alice".into(),

@@ -261,7 +261,7 @@ impl WizApp {
             ui.small("An existing destination is preserved. Changed layouts require an admitted preservation profile for the selected output container.");
             if changed {self.changed();}
             if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty(),egui::Button::new("Review cleanup plan")).clicked() {
-                match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
+                match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times,"execution_limits":self.execution_limits}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
             }
             if ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Selection report")).clicked() {
                 match self.normalized_intent() {
@@ -269,6 +269,13 @@ impl WizApp {
                     Err(error) => self.error = Some(error),
                 }
             }
+            let budget_changed = ui.collapsing("Execution limits", |ui| {
+                let mut changed = deadline_control(ui, "Probe and output inspection", &mut self.execution_limits.probe);
+                changed |= deadline_control(ui, "Copy, remux and each packet scan", &mut self.execution_limits.operation);
+                ui.small("Seconds per stage. Disabled requires protected local-owner authority. Copy waits for any admitted filesystem call to return.");
+                changed
+            }).body_returned.unwrap_or(false);
+            if budget_changed { self.changed(); }
         });
     }
     pub(super) fn plan_panel(&mut self, ui: &mut egui::Ui) {
@@ -305,6 +312,9 @@ impl WizApp {
                 ui.separator();
                 ui.label(&plan.verification_scope);
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
+                    if let Some(limits) = &plan.execution_limits {
+                        ui.small(format!("Probe: {:?}; operation: {:?}", limits.probe, limits.operation));
+                    }
                     if let Some(policy) = &plan.file_times {
                         let label = match policy.request() {
                             nw_domain::file_times::FileTimeRequest::New => "New output timestamps",
@@ -491,4 +501,20 @@ mod validation_tests {
             assert!(indices(value).is_err(), "{value}");
         }
     }
+}
+
+fn deadline_control(ui: &mut egui::Ui, label: &str, policy: &mut nw_domain::execution::DeadlinePolicy) -> bool {
+    use nw_domain::execution::DeadlinePolicy;
+    let before = *policy;
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let mut disabled = policy.disabled();
+        if ui.checkbox(&mut disabled, "Disabled").changed() {
+            *policy = if disabled { DeadlinePolicy::Disabled } else { DeadlinePolicy::Finite { seconds: 120 } };
+        }
+        if let DeadlinePolicy::Finite { seconds } = policy {
+            ui.add(egui::DragValue::new(seconds).range(1..=604800).suffix(" s"));
+        }
+    });
+    *policy != before
 }

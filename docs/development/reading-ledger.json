@@ -1725,6 +1725,22 @@
       "read_scope": "complete_body",
       "lines": 566,
       "interpretation": "The integration adapter clears/restores argv, maps only actual media/companion failures to an aggregate code, distinguishes leaving before work, and releases terminal ownership. It does not implement a machine-config API from base_answers. Full body also includes source-dependent GPU probes, crop previews and join helpers: actual qualified device probing is separate from a compiled encoder list and remains owner-harness work; no GPU result is inferred or executed here."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_process_control.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "8a2c08ee9ec2fcfe19a3eb98840a74285bb5cd31",
+      "read_scope": "complete_body",
+      "lines": 99,
+      "interpretation": "Complete body confirms the alleged tree/ignored-terminate test creates one ordinary sleeper, with no descendant and no ignored signal. Escalation is tested against a stand-in. These names cannot qualify Numera process-tree cleanup. New typed-policy tests use the real hosted fixture but do not close the still-required descendant/termination-failure matrix."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_progressview.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "8dbb77de3d93902bde313504d445b7475c759335",
+      "read_scope": "complete_body",
+      "lines": 307,
+      "interpretation": "Complete body pins unknown ratios, finished elapsed time, all terminal states in finished totals, bounded viewport and redirected-output silence. Percentage-derived donor byte display is an estimate, not measured bytes. Numera records measured copy/verification pass bytes with coalescing; remux/ETA and complete batch accounting remain required."
     }
   ]
 }

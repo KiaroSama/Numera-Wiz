@@ -16,7 +16,10 @@ from qualified user capabilities. No surface may silently change media semantics
 
 ### III. Verified bytes before publication
 Plans MUST capture stream identities, input fingerprints, output claims and exact
-argv. Subprocesses MUST use argument vectors, bounded I/O and finite deadlines.
+argv. Subprocesses MUST use argument vectors, bounded I/O and finite deadlines by default.
+The mandate's explicit typed disabled cleanup deadline is admitted only for the
+protected local owner; scoped callers cannot disable it. Accepted plans freeze
+that choice and all adapters preserve the current service admission policy.
 Every invocation MUST be visible before execution. Publication MUST verify owned
 staging and MUST NOT infer success from exit zero or a pre-existing destination.
 Copy, packet remux and decoded render are different preservation claims.
@@ -62,4 +65,9 @@ closure task; they MUST NOT weaken a requirement to manufacture completion.
 The supplied upstream Spec Kit shell/PowerShell helpers are development tooling
 exceptions, not Numera runtime dependencies.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-23 | **Last Amended**: 2026-10-23
+**Version**: 1.0.1 | **Ratified**: 2026-10-23 | **Last Amended**: 2026-10-24
+
+Amendment 1.0.1 applies the authoritative Annex D explicit-disabled timeout
+contract without ambient environment settings. It affects cleanup policy,
+planning, supervision and adapters. Historical optional fields remain absent
+with unchanged plan hashes; no store reset or implicit migration is authorized.

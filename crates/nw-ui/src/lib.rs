@@ -61,6 +61,7 @@ pub struct WizApp {
     output_needed: bool,
     intent: CleanIntent,
     file_times: nw_domain::file_times::FileTimeRequest,
+    execution_limits: nw_domain::execution::CleanupLimits,
     patches: Vec<cleanup::PatchForm>,
     audio_mode: usize,
     subtitle_mode: usize,
@@ -188,6 +189,7 @@ impl WizApp {
             output: String::new(),
             output_needed: false,
             file_times: nw_domain::file_times::FileTimeRequest::default(),
+            execution_limits: nw_domain::execution::CleanupLimits::default(),
             intent: CleanIntent {
                 audio_selection: Selection {
                     selector: Selector::All,
@@ -590,6 +592,14 @@ impl WizApp {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
                         ui.label(&job.output_name);
+                        if !job.state.terminal() && let Some(progress) = &job.progress {
+                            let stage = match progress.stage {
+                                nw_domain::execution::ProgressStage::CopyBytes => "Copy",
+                                nw_domain::execution::ProgressStage::VerifyStagingBytes => "Verify saved bytes",
+                                nw_domain::execution::ProgressStage::VerifySourceBytes => "Recheck source",
+                            };
+                            ui.small(format!("{stage}: {} / {} bytes", progress.completed_bytes, progress.total_bytes));
+                        }
                         if job.state == nw_domain::records::JobState::Succeeded
                             && ui
                                 .add_enabled(

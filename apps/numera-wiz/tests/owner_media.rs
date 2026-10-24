@@ -43,12 +43,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         components: media.bin.clone(),
         request_timeout: Duration::from_secs(40),
     };
-    let (scope, exit) = cli.human(&["access","replay-scope","create","--json"]).await;
+    let (scope, exit) = cli
+        .human(&["access", "replay-scope", "create", "--json"])
+        .await;
     assert_eq!(exit, 0, "{scope}");
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
-    let (schema, exit) = cli.human(&["commands","schema","streams.clean"]).await;
+    let (schema, exit) = cli.human(&["commands", "schema", "streams.clean"]).await;
     assert_eq!(exit, 0, "{schema}");
-    let (probe, exit) = cli.human(&["media","probe",media.source.to_str().unwrap()]).await;
+    let (probe, exit) = cli
+        .human(&["media", "probe", media.source.to_str().unwrap()])
+        .await;
     assert_eq!(exit, 0, "{probe}");
     assert_eq!(probe["result"]["streams"].as_array().unwrap().len(), 3);
     let intent_file = media.directory.path().join("cli-intent.json");
@@ -153,8 +157,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         created["result"]["principal"]
     );
     let registration_args = [
-        "assets","register",media.source.to_str().unwrap(),
-        "--replay-scope",&scope,"--idempotency-key","register-cli",
+        "assets",
+        "register",
+        media.source.to_str().unwrap(),
+        "--replay-scope",
+        &scope,
+        "--idempotency-key",
+        "register-cli",
     ];
     let (registered, exit) = cli.human(&registration_args).await;
     assert_eq!(exit, 0, "{registered}");
@@ -181,10 +190,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
-    let (report, exit) = cli.human(&[
-        "streams","report","--asset",asset["id"].as_str().unwrap(),
-        "--intent-file",intent_file.to_str().unwrap(),
-    ]).await;
+    let (report, exit) = cli
+        .human(&[
+            "streams",
+            "report",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--intent-file",
+            intent_file.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(exit, 0, "{report}");
     let report = report["result"].clone();
     assert_eq!(report["resolved_files"], 1);
@@ -194,20 +209,41 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(report["unique_streams"].as_array().unwrap().len(), 3);
     let output = media.directory.path().join("cli-copy.mkv");
-    let (plan, exit) = cli.human(&[
-        "streams","clean","--asset",asset["id"].as_str().unwrap(),"--out",output.to_str().unwrap(),
-        "--intent-file",intent_file.to_str().unwrap(),
-    ]).await;
+    let limits_file = media.directory.path().join("cli-limits.json");
+    std::fs::write(&limits_file, serde_json::to_vec(&nw_domain::execution::CleanupLimits::default()).unwrap()).unwrap();
+    let (plan, exit) = cli
+        .human(&[
+            "streams",
+            "clean",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--out",
+            output.to_str().unwrap(),
+            "--intent-file",
+            intent_file.to_str().unwrap(),
+            "--limits-file", limits_file.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(exit, 0, "{plan}");
     let plan = plan["result"].clone();
-    let (inspected, exit) = cli.human(&["plans","inspect",plan["id"].as_str().unwrap()]).await;
+    assert_eq!(plan["execution_limits"], serde_json::to_value(nw_domain::execution::CleanupLimits::default()).unwrap());
+    let (inspected, exit) = cli
+        .human(&["plans", "inspect", plan["id"].as_str().unwrap()])
+        .await;
     assert_eq!(exit, 0, "{inspected}");
     assert_eq!(inspected["result"]["hash"], plan["hash"]);
     let submit = json!({"plan_id":plan["id"],"plan_hash":plan["hash"]});
     let submission_args = [
-        "jobs","submit","--plan",plan["id"].as_str().unwrap(),
-        "--plan-hash",plan["hash"].as_str().unwrap(),
-        "--replay-scope",&scope,"--idempotency-key","submit-cli",
+        "jobs",
+        "submit",
+        "--plan",
+        plan["id"].as_str().unwrap(),
+        "--plan-hash",
+        plan["hash"].as_str().unwrap(),
+        "--replay-scope",
+        &scope,
+        "--idempotency-key",
+        "submit-cli",
     ];
     let (accepted, exit) = cli.human(&submission_args).await;
     assert_eq!(exit, 0, "{accepted}");
@@ -219,6 +255,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let id = accepted["result"]["job_id"].as_str().unwrap();
     let job = cli.completed(id).await;
     assert_eq!(job["state"], "succeeded", "{job}");
+    assert_eq!(job["progress"]["stage"], "verify_source_bytes");
+    assert_eq!(job["progress"]["completed_bytes"], job["artifact"]["bytes"]);
+    assert_eq!(job["progress"]["total_bytes"], job["artifact"]["bytes"]);
     assert_eq!(job["file_times"]["policy"], "preserve_best_effort");
     assert_eq!(job["file_times"]["preserved"], true);
     assert_eq!(
@@ -226,9 +265,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         std::fs::read(&output).unwrap()
     );
     let artifact_id = format!("job-{id}");
-    let (manifest, exit) = cli.human(&[
-        "artifacts","manifest","--artifact-id",&artifact_id,
-    ]).await;
+    let (manifest, exit) = cli
+        .human(&["artifacts", "manifest", "--artifact-id", &artifact_id])
+        .await;
     assert_eq!(exit, 0, "{manifest}");
     let manifest = manifest["result"].clone();
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
@@ -313,11 +352,20 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_ne!(exit, 0);
     assert_eq!(denied["error"]["code"], "OBJECT_NOT_FOUND");
     assert!(!denied_path.exists());
-    let (chunk, exit) = cli.human(&[
-        "artifacts","read-chunk","--artifact-id",&artifact_id,
-        "--expected-sha256",manifest["sha256"].as_str().unwrap(),
-        "--offset","3","--length","29",
-    ]).await;
+    let (chunk, exit) = cli
+        .human(&[
+            "artifacts",
+            "read-chunk",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            manifest["sha256"].as_str().unwrap(),
+            "--offset",
+            "3",
+            "--length",
+            "29",
+        ])
+        .await;
     assert_eq!(exit, 0, "{chunk}");
     let chunk = chunk["result"].clone();
     assert_eq!(

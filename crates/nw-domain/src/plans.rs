@@ -74,7 +74,8 @@ pub fn digest(plan: &Plan) -> Result<String> {
     match plan.schema_version {
         1 if plan.required_rights.is_none()
             && plan.creation_audit.is_none()
-            && plan.file_times.is_none() =>
+            && plan.file_times.is_none()
+            && plan.execution_limits.is_none() =>
         {
             let mut legacy = plan.clone();
             legacy.hash.clear();
@@ -83,6 +84,9 @@ pub fn digest(plan: &Plan) -> Result<String> {
             Ok(hex::encode(Sha256::digest(bytes)))
         }
         2 => {
+            if let Some(limits) = &plan.execution_limits {
+                limits.validate()?;
+            }
             if let Some(policy) = &plan.file_times {
                 policy.validate()?;
             }
@@ -206,6 +210,7 @@ mod tests {
         };
         let output = "/exports/output.mkv".to_owned();
         let mut plan = Plan {
+            execution_limits: None,
             file_times: None,
             schema_version: 2,
             required_rights: Some(RequiredRights::native(identity.clone(), output.clone())),
@@ -384,6 +389,22 @@ mod tests {
         raw["file_times"]["future_time_rule"] = true.into();
         raw["hash"] = digest_value(raw.clone()).unwrap().into();
         assert!(decode(raw).is_err());
+    }
+    #[test]
+    fn explicit_execution_limits_are_frozen_and_old_hashes_remain_unchanged() {
+        let mut plan = fixture();
+        let historical = plan.hash.clone();
+        assert!(serde_json::to_value(&plan).unwrap().get("execution_limits").is_none());
+        plan.execution_limits = Some(crate::execution::CleanupLimits::default());
+        assert_ne!(digest(&plan).unwrap(), historical);
+        plan.hash = digest(&plan).unwrap();
+        let first = plan.hash.clone();
+        plan.execution_limits.as_mut().unwrap().operation = crate::execution::DeadlinePolicy::Disabled;
+        assert_ne!(digest(&plan).unwrap(), first);
+        plan.hash = digest(&plan).unwrap();
+        assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
+        plan.execution_limits.as_mut().unwrap().operation = crate::execution::DeadlinePolicy::Finite { seconds: 0 };
+        assert!(digest(&plan).is_err());
     }
     #[test]
     fn raw_unknown_semantics_cannot_disappear_during_typed_decoding() {

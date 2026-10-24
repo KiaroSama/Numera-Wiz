@@ -52,6 +52,8 @@ pub struct AssetSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<crate::execution::StageProgress>,
     #[serde(default)]
     pub warning_count: usize,
     pub id: String,
@@ -61,6 +63,8 @@ pub struct JobSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_limits: Option<crate::execution::CleanupLimits>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_times: Option<crate::file_times::FileTimePlan>,
     pub schema_version: u32,
@@ -108,6 +112,7 @@ impl PlanReview {
         effective_actions: BTreeSet<ObjectAction>,
     ) -> Self {
         Self {
+            execution_limits: plan.execution_limits.clone(),
             file_times: plan.file_times.clone(),
             schema_version: plan.schema_version,
             required_rights: (source_visible && output_visible)
@@ -148,6 +153,8 @@ pub struct ErrorView {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<crate::execution::StageProgress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_times: Option<FileTimeOutcomeView>,
     pub id: String,
     pub state: JobState,
@@ -182,6 +189,7 @@ impl From<&Asset> for AssetSummary {
 impl From<&Job> for JobSummary {
     fn from(job: &Job) -> Self {
         Self {
+            progress: job.progress.clone(),
             warning_count: job
                 .file_times
                 .as_ref()

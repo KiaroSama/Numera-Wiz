@@ -164,12 +164,18 @@ async fn run() -> Result<()> {
         }
         Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
         Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
-        Some(Mode::Assets { command }) => human::run(&client, human::Command::Assets(command)).await,
-        Some(Mode::Streams { command }) => human::run(&client, human::Command::Streams(command)).await,
+        Some(Mode::Assets { command }) => {
+            human::run(&client, human::Command::Assets(command)).await
+        }
+        Some(Mode::Streams { command }) => {
+            human::run(&client, human::Command::Streams(command)).await
+        }
         Some(Mode::Plans { command }) => human::run(&client, human::Command::Plans(command)).await,
         Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
         Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
-        Some(Mode::Commands { command }) => human::run(&client, human::Command::Discovery(command)).await,
+        Some(Mode::Commands { command }) => {
+            human::run(&client, human::Command::Discovery(command)).await
+        }
         Some(Mode::Request { file }) => {
             let input: Box<dyn Read> = match file {
                 Some(path) => Box::new(std::fs::File::open(path)?),

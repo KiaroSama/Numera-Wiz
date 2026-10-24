@@ -108,8 +108,14 @@ async fn durable(client: &NativeClient, id: &str, params: Value) -> Result<Respo
 pub async fn run(client: &NativeClient, command: AccessCommand) -> Result<()> {
     tracing::info!("Access setup command started; credentials are excluded from diagnostics");
     match command {
-        AccessCommand::ReplayScope { command: ReplayScope::Create } => {
-            print_response(client, Request::query("access.replay_scope.create", json!({}))).await
+        AccessCommand::ReplayScope {
+            command: ReplayScope::Create,
+        } => {
+            print_response(
+                client,
+                Request::query("access.replay_scope.create", json!({})),
+            )
+            .await
         }
         AccessCommand::Profiles { command } => match command {
             Profiles::Create {

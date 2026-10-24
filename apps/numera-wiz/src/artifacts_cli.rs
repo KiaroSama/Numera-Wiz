@@ -42,14 +42,24 @@ pub enum Command {
 }
 pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     let request = match command {
-        Command::Save { artifact_id, expected_sha256, out } => {
+        Command::Save {
+            artifact_id,
+            expected_sha256,
+            out,
+        } => {
             return save(client, artifact_id, expected_sha256, out).await;
         }
         Command::List { page } => Request::query("artifacts.list", page.params()),
-        Command::Manifest { artifact_id } => {
-            Request::query("artifacts.manifest", serde_json::json!({"artifact_id":artifact_id}))
-        }
-        Command::ReadChunk { artifact_id, expected_sha256, offset, length } => Request::query(
+        Command::Manifest { artifact_id } => Request::query(
+            "artifacts.manifest",
+            serde_json::json!({"artifact_id":artifact_id}),
+        ),
+        Command::ReadChunk {
+            artifact_id,
+            expected_sha256,
+            offset,
+            length,
+        } => Request::query(
             "artifacts.read_chunk",
             serde_json::json!({"artifact_id":artifact_id,"expected_sha256":expected_sha256,"offset":offset,"length":length}),
         ),
