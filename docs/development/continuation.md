@@ -513,3 +513,8 @@ artifact-transfer.md for the selected limits, exact authority model, old-proof
 migration behavior and remaining retention/Save As/observation work. Source and
 new isolated-memory/actual-media/SDK cases await their own CI result. No local
 compile/test/media or owner hardware execution was performed.
+
+Run 40057379599 for 97661c9e251169755f13635a6b07bc4022d3aae7 stopped
+before compilation because the new service Base64 edge needed the existing
+0.22.1 package qualifier in Cargo.lock. The exact hosted resolver artifact and
+full formatter patch are applied; no new transfer assertion is credited yet.

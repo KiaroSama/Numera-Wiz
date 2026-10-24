@@ -263,7 +263,15 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
     if request.uri().path().starts_with("/api/v1/artifacts/") {
-        request.extensions_mut().insert(artifacts::DownloadAuthority { owner: auth.owner.clone(), token: context.profile.as_ref().map(|_| download_token), origin: (!auth.private).then(|| auth.origin.clone()), context: context.clone(), listener_stop: auth.listener_stop.clone() });
+        request
+            .extensions_mut()
+            .insert(artifacts::DownloadAuthority {
+                owner: auth.owner.clone(),
+                token: context.profile.as_ref().map(|_| download_token),
+                origin: (!auth.private).then(|| auth.origin.clone()),
+                context: context.clone(),
+                listener_stop: auth.listener_stop.clone(),
+            });
     }
     request.extensions_mut().insert(context);
     request.extensions_mut().insert(PublicRoute(!auth.private));

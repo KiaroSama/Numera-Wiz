@@ -21,20 +21,45 @@ impl ChunkInput {
     pub fn range(&self) -> Result<(u64, usize)> {
         let offset = decimal(&self.offset)?;
         if self.length == 0 || self.length as usize > ARTIFACT_CHUNK_BYTES {
-            return Err(DomainError::new("INVALID_RANGE", "Chunk length must be 1..131072 bytes"));
+            return Err(DomainError::new(
+                "INVALID_RANGE",
+                "Chunk length must be 1..131072 bytes",
+            ));
         }
-        offset.checked_add(self.length as u64).ok_or_else(|| DomainError::new("INVALID_RANGE", "Requested byte range overflows"))?;
-        if self.expected_sha256.len() != 64 || !self.expected_sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Expected SHA-256 must contain 64 lowercase hexadecimal digits"));
+        offset
+            .checked_add(self.length as u64)
+            .ok_or_else(|| DomainError::new("INVALID_RANGE", "Requested byte range overflows"))?;
+        if self.expected_sha256.len() != 64
+            || !self
+                .expected_sha256
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Expected SHA-256 must contain 64 lowercase hexadecimal digits",
+            ));
         }
         Ok((offset, self.length as usize))
     }
 }
 pub fn decimal(value: &str) -> Result<u64> {
-    if value.is_empty() || value.len() > 20 || (value.len() > 1 && value.starts_with('0')) || !value.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(DomainError::new("INVALID_RANGE", "Byte offsets must be canonical unsigned decimal strings"));
+    if value.is_empty()
+        || value.len() > 20
+        || (value.len() > 1 && value.starts_with('0'))
+        || !value.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Err(DomainError::new(
+            "INVALID_RANGE",
+            "Byte offsets must be canonical unsigned decimal strings",
+        ));
     }
-    value.parse().map_err(|_| DomainError::new("INVALID_RANGE", "Byte offset exceeds the supported integer range"))
+    value.parse().map_err(|_| {
+        DomainError::new(
+            "INVALID_RANGE",
+            "Byte offset exceeds the supported integer range",
+        )
+    })
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactManifest {
@@ -75,8 +100,15 @@ mod tests {
     use super::*;
     #[test]
     fn range_rejects_noncanonical_overflow_and_unbounded_lengths() {
-        for value in ["", "01", "-1", "+1", "1.0", "18446744073709551616"] { assert!(decimal(value).is_err()); }
-        let mut input = ChunkInput { artifact_id: "job".into(), expected_sha256: "0".repeat(64), offset: "18446744073709551615".into(), length: 1 };
+        for value in ["", "01", "-1", "+1", "1.0", "18446744073709551616"] {
+            assert!(decimal(value).is_err());
+        }
+        let mut input = ChunkInput {
+            artifact_id: "job".into(),
+            expected_sha256: "0".repeat(64),
+            offset: "18446744073709551615".into(),
+            length: 1,
+        };
         assert!(input.range().is_err());
         input.offset = "0".into();
         input.length = ARTIFACT_CHUNK_BYTES as u32 + 1;

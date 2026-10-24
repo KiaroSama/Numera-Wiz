@@ -22,7 +22,11 @@ impl Bridge {
             backend: Backend::Http(service),
         }
     }
-    async fn execute(&self, canonical: Request, context: &RequestContext<RoleServer>) -> Result<commands::Response, ErrorData> {
+    async fn execute(
+        &self,
+        canonical: Request,
+        context: &RequestContext<RoleServer>,
+    ) -> Result<commands::Response, ErrorData> {
         match &self.backend {
             Backend::Native(client) => {
                 tokio::select! {
@@ -31,12 +35,20 @@ impl Bridge {
                 }
             }
             Backend::Http(service) => {
-                let principal = context.extensions.get::<axum::http::request::Parts>().and_then(|parts| parts.extensions.get::<Context>()).cloned().ok_or_else(|| ErrorData::invalid_request("Authenticated request context is missing", None))?;
-                Ok(service.dispatch_cancel(principal, canonical, context.ct.clone()).await)
+                let principal = context
+                    .extensions
+                    .get::<axum::http::request::Parts>()
+                    .and_then(|parts| parts.extensions.get::<Context>())
+                    .cloned()
+                    .ok_or_else(|| {
+                        ErrorData::invalid_request("Authenticated request context is missing", None)
+                    })?;
+                Ok(service
+                    .dispatch_cancel(principal, canonical, context.ct.clone())
+                    .await)
             }
         }
     }
-
 }
 fn tool(name: &str) -> Option<Tool> {
     if !ACTIVE_COMMANDS.contains(&name) {
@@ -78,23 +90,80 @@ impl ServerHandler for Bridge {
     fn get_tool(&self, name: &str) -> Option<Tool> {
         tool(name)
     }
-    async fn list_resources(&self, request: Option<PaginatedRequestParams>, context: RequestContext<RoleServer>) -> Result<ListResourcesResult, ErrorData> {
+    async fn list_resources(
+        &self,
+        request: Option<PaginatedRequestParams>,
+        context: RequestContext<RoleServer>,
+    ) -> Result<ListResourcesResult, ErrorData> {
         let cursor = request.and_then(|r| r.cursor);
-        let response = self.execute(Request::query("artifacts.list", serde_json::json!({"limit":64,"cursor":cursor})), &context).await?;
-        if !response.ok { return Err(resource_error(response)); }
-        let page: nw_domain::views::SnapshotPage<nw_domain::artifacts::ArtifactSummary> = commands::parse(response.result.unwrap_or_default()).map_err(|_| ErrorData::internal_error("Artifact page decoding failed", None))?;
-        let mut result = ListResourcesResult::with_all_items(page.items.into_iter().map(|a| Resource::new(a.manifest_uri, a.artifact_id).with_mime_type("application/json")).collect());
+        let response = self
+            .execute(
+                Request::query(
+                    "artifacts.list",
+                    serde_json::json!({"limit":64,"cursor":cursor}),
+                ),
+                &context,
+            )
+            .await?;
+        if !response.ok {
+            return Err(resource_error(response));
+        }
+        let page: nw_domain::views::SnapshotPage<nw_domain::artifacts::ArtifactSummary> =
+            commands::parse(response.result.unwrap_or_default())
+                .map_err(|_| ErrorData::internal_error("Artifact page decoding failed", None))?;
+        let mut result = ListResourcesResult::with_all_items(
+            page.items
+                .into_iter()
+                .map(|a| {
+                    Resource::new(a.manifest_uri, a.artifact_id).with_mime_type("application/json")
+                })
+                .collect(),
+        );
         result.next_cursor = page.next_cursor;
         Ok(result)
     }
-    async fn read_resource(&self, request: ReadResourceRequestParams, context: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
-        if request.input_responses.is_some() || request.request_state.is_some() { return Err(ErrorData::invalid_params("Artifact reads do not accept input responses or request state", None)); }
-        let id = request.uri.strip_prefix("numera://artifact/").and_then(|u| u.strip_suffix("/manifest")).filter(|id| id.len() <= 132 && !id.contains('/')).ok_or_else(|| ErrorData::invalid_params("Expected a Numera artifact manifest URI", None))?;
-        let response = self.execute(Request::query("artifacts.manifest", serde_json::json!({"artifact_id":id})), &context).await?;
-        if !response.ok { return Err(resource_error(response)); }
-        let text = serde_json::to_string(&response.result.unwrap_or_default()).map_err(|_| ErrorData::internal_error("Manifest serialization failed", None))?;
-        if text.len() > 64 * 1024 { return Err(ErrorData::internal_error("Manifest exceeded its 64 KiB budget", None)); }
-        Ok(ReadResourceResult::new(vec![ResourceContents::text(text, request.uri).with_mime_type("application/json")]).with_ttl_ms(0).with_cache_scope(CacheScope::Private).into())
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<ReadResourceResponse, ErrorData> {
+        if request.input_responses.is_some() || request.request_state.is_some() {
+            return Err(ErrorData::invalid_params(
+                "Artifact reads do not accept input responses or request state",
+                None,
+            ));
+        }
+        let id = request
+            .uri
+            .strip_prefix("numera://artifact/")
+            .and_then(|u| u.strip_suffix("/manifest"))
+            .filter(|id| id.len() <= 132 && !id.contains('/'))
+            .ok_or_else(|| {
+                ErrorData::invalid_params("Expected a Numera artifact manifest URI", None)
+            })?;
+        let response = self
+            .execute(
+                Request::query("artifacts.manifest", serde_json::json!({"artifact_id":id})),
+                &context,
+            )
+            .await?;
+        if !response.ok {
+            return Err(resource_error(response));
+        }
+        let text = serde_json::to_string(&response.result.unwrap_or_default())
+            .map_err(|_| ErrorData::internal_error("Manifest serialization failed", None))?;
+        if text.len() > 64 * 1024 {
+            return Err(ErrorData::internal_error(
+                "Manifest exceeded its 64 KiB budget",
+                None,
+            ));
+        }
+        Ok(ReadResourceResult::new(vec![
+            ResourceContents::text(text, request.uri).with_mime_type("application/json"),
+        ])
+        .with_ttl_ms(0)
+        .with_cache_scope(CacheScope::Private)
+        .into())
     }
     async fn call_tool(
         &self,
@@ -145,5 +214,8 @@ impl ServerHandler for Bridge {
 
 fn resource_error(response: commands::Response) -> ErrorData {
     let diagnostic = serde_json::to_value(response.error).ok();
-    ErrorData::invalid_params("Artifact resource is unavailable under current authority", diagnostic)
+    ErrorData::invalid_params(
+        "Artifact resource is unavailable under current authority",
+        diagnostic,
+    )
 }
