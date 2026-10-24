@@ -1,0 +1,27 @@
+{
+  "revision": "7.0",
+  "changes": [
+    {
+      "source_id": "sequence.settings",
+      "replacements": {
+        "canonical_parameters": "project_id; expected_revision; sequence_id; settings_patch; time_policy=preserve_elapsed_time,geometry_policy=preserve_authored_values|scale_supported_motion",
+        "functional_behavior": "Change sequence dimensions/rate/audio/color settings with an explicit migration report. Sequence FPS changes preserve elapsed authored time; canvas changes preserve authored values by default; sample-rate changes preserve duration and pitch. Apply one atomic settings edit with explicit compatibility/invalidation report."
+      }
+    },
+    {
+      "source_id": "project.inspect",
+      "replacements": {
+        "canonical_parameters": "project_id; revision?; projection=summary|bin_page|entity; bin_id?; entity_id?; detail?; query?; sort?; limit?; cursor?",
+        "functional_behavior": "Read a coherent project snapshot/query. Return the selected bounded revision-bound projection; filter authorization before counts and pagination."
+      }
+    },
+    {
+      "source_id": "sequence.inspect",
+      "replacements": {
+        "canonical_parameters": "project_id; sequence_id; revision?; projection=track_page|viewport|entity; track_ids?; range?; entity_id?; detail?; limit?; cursor?",
+        "functional_behavior": "Read an exact sequence view independently of client focus. Return the selected bounded track/viewport/entity projection with exact interval membership and coherent snapshot revision."
+      }
+    }
+  ],
+  "runtime_execution": false
+}

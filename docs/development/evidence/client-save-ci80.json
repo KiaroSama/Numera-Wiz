@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "run_id": 40098707444,
+  "branch_head": "47830b118f2c6167c01608b4526b932eb35c4e71",
+  "jobs": [
+    {
+      "id": 120886242379,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886242560,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886242572,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886242589,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120886661570,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886661608,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886661613,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120886661614,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120888532557,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120888532577,
+      "name": "browser",
+      "conclusion": "failure"
+    }
+  ],
+  "asserted": [
+    "four complete native regression/Clippy/desktop targets, WASM/lock, complete media/CLI/official SDK/large-copy/cancellation/revocation suite",
+    "actual native typed-path Save and genuine OS Save As independent saved/source equality, one producer and normal close",
+    "actual Chrome report, Review/Run/verified producer output and opened genuine OS Save dialog"
+  ],
+  "personally_inspected_images": [
+    "native-picker-saved.png",
+    "browser-save-picker-desktop-timeout.png",
+    "browser-save-picker-timeout.png"
+  ],
+  "browser_remaining": {
+    "observed_title": "Warning: this site can see edits you make",
+    "cause": "test title matcher excluded the genuine visible Chrome Save dialog",
+    "saved_file_oracle": "not reached",
+    "next_source": "include the observed exact warning title; retain genuine OS input and full independent saved file oracle"
+  },
+  "formatting": {
+    "exact_hosted_hunks_applied": 4,
+    "awaiting_next_ci": true
+  },
+  "artifacts": [
+    {
+      "id": 12562357455,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:93fdace54805738d26db7e7f88eee84865c8305a57be04d3e00547bd33388acb",
+      "downloaded": false
+    },
+    {
+      "id": 12561953751,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:c7caeeb8075bc57f3a940b6bb4c9de4489ab61018eae50264e43b2f92f3cc014",
+      "downloaded": false
+    },
+    {
+      "id": 12561869093,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:d047b9b85db3803803fb2c0e9446d02218e9e6bc1b5330bea42386d8cf4091db",
+      "downloaded": false
+    },
+    {
+      "id": 12561504258,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:9ba048a8d17a555a628505089d2bc0dee5a8eaeb6a3ab53f31ae32e02351f997",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "completed browser client save",
+    "other platform/browser/package and full release gates"
+  ]
+}

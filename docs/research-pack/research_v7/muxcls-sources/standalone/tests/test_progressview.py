@@ -1,0 +1,306 @@
+"""Unit tests for the multi-row progress block (muxcls.progressview).
+
+The block is the only part of the UI that does arithmetic rather than just
+printing, so the parts worth pinning are the ones a wrong number would make
+lie: how a row decides its ratio, what Overall counts, what happens when the
+block is taller than the terminal, and that colour codes never count as
+printable width.
+"""
+import io
+import time
+
+import pytest
+
+from muxcls.colors import C, color, plain
+from muxcls.progressview import (
+    ACTIVE,
+    DONE,
+    FAILED,
+    SKIPPED,
+    ProgressRow,
+    ProgressView,
+    bar,
+    truncate_visible,
+    visible_length,
+)
+
+
+class FakeConsole(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def _rows(count, total=1000):
+    return [ProgressRow(name=f"file{n}.mkv", total=total) for n in range(count)]
+
+
+# --- width accounting -----------------------------------------------------
+
+def test_visible_length_ignores_colour_codes():
+    plain = "Done | 466.7 MB"
+    assert visible_length(color(plain, C.SKY)) == len(plain)
+
+
+def test_truncate_visible_cuts_by_printable_width_not_bytes():
+    line = color("A" * 40, C.SKY)
+    cut = truncate_visible(line, 10)
+    assert visible_length(cut) == 10
+    # The colour it was wearing must still be opened and closed.
+    assert cut.startswith("\x1b[")
+    assert cut.endswith(C.RESET)
+
+
+def test_truncate_visible_leaves_a_short_line_alone():
+    line = color("short", C.SKY)
+    assert truncate_visible(line, 40) == line
+
+
+def test_a_finished_row_keeps_the_time_it_took():
+    """finish() froze the elapsed time after flipping the state, and
+    live_elapsed() only measures while a row is ACTIVE - so every finished row
+    reported 00:00:00 no matter how long it had run."""
+    row = _rows(1)[0]
+    view = ProgressView([row], enabled=False)
+    view.start(0)
+    row.started_at = time.perf_counter() - 12.0     # pretend it ran for 12s
+    view.finish(0, DONE)
+
+    assert row.elapsed == pytest.approx(12.0, abs=0.5)
+    assert "00:00:12" in "\n".join(view.compose(99, 24))
+
+
+def test_a_finished_row_ends_with_what_the_file_gained_or_lost():
+    """The size change is the result of the file, so it goes last. It used to
+    sit between the state word and Elapsed, where a live row shows its
+    countdown - in that slot it read as the transfer-speed column that was
+    removed, which is why it was taken out before being put back here."""
+    row = _rows(1)[0]
+    view = ProgressView([row], enabled=False)
+    view.start(0)
+    view.finish(0, DONE, "-65.12 MB")
+    line = plain(view.compose(120, 24)[-1])
+
+    assert "Done" in line and "-65.12 MB" in line
+    assert line.index("Elapsed") < line.index("-65.12 MB"), "the size change comes after Elapsed"
+    assert line.index("Done") < line.index("Elapsed")
+
+
+def test_a_finished_row_without_a_detail_ends_at_elapsed():
+    row = _rows(1)[0]
+    view = ProgressView([row], enabled=False)
+    view.start(0)
+    view.finish(0, DONE)
+
+    assert plain(view.compose(120, 24)[-1]).rstrip().endswith("00:00:00")
+
+
+def test_a_full_finished_row_still_fits_the_terminal():
+    # The extra column must not push the row past the width; truncation would
+    # eat the figure it was added for.
+    row = ProgressRow(name="[Cleo]Death_March_kara_Hajimaru_Isekai_Kyousoukyoku_-_01.mkv",
+                      total=307_000_000, completed=307_000_000, percent=100.0,
+                      state=DONE, detail="-31.24 MB", elapsed=4.0)
+    for width in (100, 110, 120, 140):
+        lines = ProgressView([row], enabled=False).compose(width, 24)
+        assert all(visible_length(line) <= width for line in lines), f"row overflows at {width}"
+        assert "-31.24 MB" in plain(lines[-1]), f"the size change was truncated at {width}"
+
+
+def test_the_bar_uses_the_shared_progress_palette():
+    # EVdlc draws the unfilled track in crimson, not grey; that contrast is
+    # what makes the filled portion readable.
+    drawn = bar(0.5, 10, ACTIVE)
+    assert C.BAR_FILL in drawn
+    assert C.BAR_TRACK in drawn
+    assert C.GRAY not in drawn
+
+
+def test_no_row_shows_a_transfer_speed():
+    row = ProgressRow(name="a.mkv", total=489_401_205, completed=200_000_000,
+                      state=ACTIVE, started_at=1.0)
+    body = "\n".join(ProgressView([row], enabled=False).compose(99, 24))
+    assert "/s" not in body, "the speed column was removed on purpose"
+
+
+def test_elapsed_is_labelled_not_a_bare_time():
+    rows = _rows(2)
+    view = ProgressView(rows, enabled=False)
+    view.finish(0, DONE)
+    body = "\n".join(view.compose(99, 24))
+    assert body.count("Elapsed") >= 2, "both Overall and the file rows carry the label"
+
+
+def test_size_is_shown_as_done_over_total():
+    row = ProgressRow(name="a.mkv", total=1_000_000, completed=250_000, state=ACTIVE)
+    line = ProgressView([row], enabled=False).compose(99, 24)[-1]
+    assert " / " in line, "a total with no progress beside it says nothing"
+
+
+def test_a_full_row_survives_a_normal_terminal_width():
+    row = ProgressRow(name="Season 1/Episode 01.mkv", total=489_401_205,
+                      percent=83.5, state=ACTIVE, detail="")
+    view = ProgressView([row], enabled=False)
+    lines = view.compose(width=99, height=24)
+    assert all(visible_length(line) <= 99 for line in lines), \
+        "a row wider than the terminal would be cut mid-number"
+
+
+# --- ratio ----------------------------------------------------------------
+
+def test_reported_percent_wins_over_byte_count():
+    # FFmpeg reports a position on the timeline; the byte count of a remux says
+    # nothing useful about how far along it is.
+    row = ProgressRow(name="a.mkv", total=1000, completed=100, percent=75.0)
+    assert row.ratio == pytest.approx(0.75)
+
+
+def test_ratio_falls_back_to_bytes_when_no_percent_was_reported():
+    row = ProgressRow(name="a.mkv", total=1000, completed=250)
+    assert row.ratio == pytest.approx(0.25)
+
+
+def test_ratio_is_unknown_when_neither_is_available():
+    assert ProgressRow(name="a.mkv").ratio is None
+
+
+def test_an_unknown_ratio_draws_an_empty_track_rather_than_zero_percent():
+    row = ProgressRow(name="a.mkv", state=ACTIVE)
+    line = ProgressView([row], enabled=False).compose(99, 24)[-1]
+    assert "--.-%" in line, "a copy that cannot report bytes has not done nothing"
+
+
+# --- overall --------------------------------------------------------------
+
+def test_overall_counts_every_finished_state_not_just_success():
+    rows = _rows(4)
+    view = ProgressView(rows, enabled=False)
+    view.finish(0, DONE)
+    view.finish(1, FAILED)
+    view.finish(2, SKIPPED)
+    assert "3/4 files" in view.overall_line(99)
+
+
+def test_overall_advances_while_one_long_file_is_running():
+    rows = _rows(4)
+    view = ProgressView(rows, enabled=False)
+    view.finish(0, DONE)
+    view.start(1)
+    before = view.overall_line(99)
+    view.update(1, percent=50.0)
+    after = view.overall_line(99)
+    assert before != after, "the bar must move during a file, not only between files"
+    # One of four done, plus half of the second: 25% + 12.5%.
+    assert " 37.5%" in after
+
+
+# --- viewport -------------------------------------------------------------
+
+def test_a_block_taller_than_the_terminal_keeps_the_active_file_visible():
+    rows = _rows(40)
+    view = ProgressView(rows, enabled=False)
+    for index in range(30):
+        view.finish(index, DONE)
+    view.start(30)
+    lines = view.compose(width=99, height=20)
+    body = "\n".join(lines)
+    assert "file30.mkv" in body, "the file being worked on scrolled out of view"
+    assert "file(s) above" in body, "hidden rows must be announced, not silently dropped"
+
+
+# --- output gating --------------------------------------------------------
+
+def test_a_disabled_view_writes_nothing(monkeypatch):
+    stream = io.StringIO()          # no isatty -> redirected output
+    monkeypatch.setattr("sys.stdout", stream)
+    view = ProgressView(_rows(2))
+    view.start(0)
+    view.update(0, percent=50.0)
+    view.finish(0, DONE)
+    view.close()
+    assert stream.getvalue() == "", "redirected output must not receive cursor control"
+
+
+def test_an_enabled_view_repaints_in_place(monkeypatch):
+    console = FakeConsole()
+    monkeypatch.setattr("sys.stdout", console)
+    view = ProgressView(_rows(2))
+    assert view.enabled
+    view.start(0)
+    view.finish(0, DONE)
+    output = console.getvalue()
+    assert "\x1b[?25l" in output, "the cursor should be hidden while the block owns the screen"
+    assert "\x1b[J" in output, "frame 2+ must clear the old block instead of appending"
+
+
+def test_close_restores_the_cursor(monkeypatch):
+    console = FakeConsole()
+    monkeypatch.setattr("sys.stdout", console)
+    view = ProgressView(_rows(1))
+    view.start(0)
+    view.close()
+    assert console.getvalue().endswith("\x1b[?25h"), "the cursor must come back"
+
+
+def test_a_row_that_only_knows_a_percentage_still_shows_how_much_is_done():
+    """Robocopy reports a percentage and no byte count. Reading row.completed
+    directly left the size column at 0 B for the whole copy while the bar beside
+    it moved."""
+    row = ProgressRow(name="a.mkv", total=1_000_000, percent=40.0, state=ACTIVE)
+    line = ProgressView([row], enabled=False).compose(99, 24)[-1]
+
+    assert "391 KB / 977 KB" in line, "the size must follow the bar, not sit at 0 B"
+
+
+# --- who owns the screen ---------------------------------------------------
+
+def test_the_per_command_timer_stays_quiet_while_the_block_draws(monkeypatch):
+    """`run_with_progress` builds a ProgressPrinter for every command it runs.
+    On a terminal the block is drawing at the same time, and a line printed
+    underneath it scrolls the terminal by one - so the block's next repaint,
+    which moves up by the number of lines it drew last time, lands one line
+    short and strands its top row. The symptom is a duplicated `Overall` label
+    with a stray `Elapsed .. | Total ..` line below the block.
+    """
+    from muxcls.textutil import ProgressPrinter, block_owns_screen
+
+    console = FakeConsole()
+    monkeypatch.setattr("sys.stdout", console)
+    view = ProgressView(_rows(2))
+    assert view.enabled and block_owns_screen()
+
+    printer = ProgressPrinter(total_started_at=0.0)
+    before = console.getvalue()
+    printer.tick(force=True)
+    printer.close()
+
+    assert console.getvalue() == before, "nothing may be written under the block"
+    view.close()
+    assert not block_owns_screen(), "the screen must be released when the run ends"
+
+
+def test_the_timer_still_works_when_no_block_is_drawing(monkeypatch):
+    # Without the view - a single ffprobe at scan time, say - the timer is the
+    # only progress the user gets, so it must not be silenced globally.
+    from muxcls.textutil import ProgressPrinter, set_block_owns_screen
+
+    set_block_owns_screen(False)
+    console = FakeConsole()
+    monkeypatch.setattr("sys.stdout", console)
+
+    printer = ProgressPrinter(total_started_at=0.0)
+    printer.tick(force=True)
+
+    assert "Elapsed" in console.getvalue()
+    printer.close()
+
+
+def test_a_redirected_run_releases_the_screen_too(monkeypatch):
+    stream = io.StringIO()          # no isatty -> the view never draws
+    monkeypatch.setattr("sys.stdout", stream)
+    from muxcls.textutil import block_owns_screen
+
+    view = ProgressView(_rows(1))
+    assert not view.enabled
+    view.close()
+
+    assert not block_owns_screen()

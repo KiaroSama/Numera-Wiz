@@ -1,0 +1,47 @@
+[package]
+name = "numera-wiz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[lints]
+workspace = true
+[features]
+default = []
+desktop = ["dep:nw-ui", "dep:eframe", "dep:rfd"]
+embedded-web = []
+[dependencies]
+nw-domain.workspace = true
+nw-platform.workspace = true
+nw-store.workspace = true
+nw-service.workspace = true
+nw-ui = { workspace = true, optional = true }
+eframe = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+clap.workspace = true
+tokio.workspace = true
+axum.workspace = true
+rmcp.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+reqwest.workspace = true
+tokio-util.workspace = true
+sha2.workspace = true
+hex.workspace = true
+tempfile.workspace = true
+subtle = "2.6"
+http-body = "1"
+bytes = "1"
+rfd = { version = "=0.17.2", optional = true }
+[dev-dependencies]
+base64 = "=0.22.1"
+rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
+reqwest.workspace = true
+
+[build-dependencies]
+sha2.workspace = true
+hex.workspace = true
+serde_json.workspace = true

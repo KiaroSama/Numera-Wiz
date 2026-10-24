@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "run_id": 40101879547,
+  "branch_head": "af6fdc0baa75953c71425b9de7e1a9ee18182814",
+  "status": "failed; correction required",
+  "observed": [
+    "WASM and dependency lock passed",
+    "native checks rejected malformed supervision test at line 1 before complete ordinary regressions/lints",
+    "the source assembly mistakenly prefixed the added test with literal undefined and omitted the original four tests",
+    "actual media engine and isolated reader phases passed; complete owner/HTTP/GUI evidence is not claimed"
+  ],
+  "correction": [
+    "restore all original supervision test source from exact head d66fc711f72eb837e30b12a3e407e4f10748387d and append the new fifth test",
+    "apply 41 exact hosted formatter hunks",
+    "reject missing/non-string or malformed source before writing review branch"
+  ],
+  "not_qualified": [
+    "new limit/progress complete native/runtime matrix",
+    "all remaining complete-product/package/resource/manual/owner gates"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "effectcraft_proposals": 296,
+  "source_rows": 307,
+  "resolutions": {
+    "distinct_capability": 147,
+    "unsupported_semantic_identity": 19,
+    "distinct_context_shared_primitive": 29,
+    "shared_descriptor": 35,
+    "shared_descriptor_with_variants": 54,
+    "split_by_explicit_selector": 1,
+    "typed_project_record": 11
+  },
+  "unified_effectcraft_target_count": 294,
+  "filmcraft_target_count_after_explicit_remaps": 275,
+  "combined_distinct_target_ids": 481,
+  "filmcraft_remaps": {
+    "nw.transition.wipe.iris_round": "nw.transition.wipe.iris",
+    "nw.transition.wipe.iris_box": "nw.transition.wipe.iris",
+    "nw.transition.wipe.iris_cross": "nw.transition.wipe.iris",
+    "nw.transition.wipe.iris_diamond": "nw.transition.wipe.iris",
+    "nw.transition.wipe.star": "nw.transition.wipe.iris"
+  },
+  "runtime_qualified": 0
+}

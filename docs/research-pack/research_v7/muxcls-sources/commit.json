@@ -1,0 +1,101 @@
+{
+  "sha": "0cf9596f7510f894babf36595efbc827fbbfaf04",
+  "node_id": "C_kwDOSjBZZtoAKDBjZjk1OTZmNzUxMGY4OTRiYWJmMzY1OTVlZmJjODI3ZmJiZmFmMDQ",
+  "commit": {
+    "author": {
+      "name": "dependabot[bot]",
+      "email": "49699333+dependabot[bot]@users.noreply.github.com",
+      "date": "2026-10-04T19:13:33Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-10-04T19:13:33Z"
+    },
+    "message": "chore(deps-dev): update ruff requirement from ~=0.16.8 to ~=0.16.10\n\nUpdates the requirements on [ruff](https://github.com/astral-sh/ruff) to permit the latest version.\n- [Release notes](https://github.com/astral-sh/ruff/releases)\n- [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/astral-sh/ruff/compare/0.16.8...0.16.10)\n\n---\nupdated-dependencies:\n- dependency-name: ruff\n  dependency-version: 0.16.10\n  dependency-type: direct:development\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+    "tree": {
+      "sha": "5da8e4543b0e46dff8e10f993b5f716739dd32dd",
+      "url": "https://api.github.com/repos/KiaroSama/MuxCls/git/trees/5da8e4543b0e46dff8e10f993b5f716739dd32dd"
+    },
+    "url": "https://api.github.com/repos/KiaroSama/MuxCls/git/commits/0cf9596f7510f894babf36595efbc827fbbfaf04",
+    "comment_count": 0,
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqwqVdCRC1aQ7uu5UhlAAAsXYQAD6Sl2tKKmKsxBr2oIEUMVSC\nVK0StC1l9BtTe0fuAORqlW1SpQdIjbY3aS3YT4GFqMkVl6j6FSlRqBVW3dFELVc+\nS6huTcju82LiJyo+Hn/wvYjjGgFoy3VwcjQXvKIKMukNn8XajW/o57hkaSN24pCa\njcLjsckMbp74HDrWptmUZheJCBk0ebVZ2+X11judcftm3ihSLpebdreFcXFGFkCZ\n+WAYk9iM8oyd+3dQpucNrUuyb0VEy9puBcmiv9tPXIx0WT7PpnNNbyZ9Q+jvQO+2\nRsukH4jCMv8ygSBmYzcz/NDXZFnEeO+W6eNVNtkj/mmuHeKfM0gDlJu2zYeyUleT\nIqthXXrCxlfNC74iCIpdOBLiVl4uLhy0FsWbgBkfE+fFnYtNh4+MuIiFvgez3uWV\n7Fvqwbi6n7jkAhLKRl7Izuco+K3bViBy/5SkFA272IXZtobHNNzlIQvvgR5wbRqX\n/gH3R0X1pjgFpuQptC0g/Mca4JJ746vb7G0DKgTJv+axgvP+yxVdVXvM58jvKU5l\nU7P9TKGYrsa3XPRc5F1vadEYvisaLyoNfvHuK/y/DxHcewSwn2AJEQiRGmNys7s0\nTQb9QfoZMDYHOfjbX9319G4/RavwRX3fYDEiizcwMVMde49TOlbWi0yeqvnt2Ie5\nzNq7KGrlR6V4EIejzwEZ\n=eFlK\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree 5da8e4543b0e46dff8e10f993b5f716739dd32dd\nparent 9092f510f17a2f0511d875c4e2a89e62a1f7658e\nauthor dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com> 1791141213 +0000\ncommitter GitHub <noreply@github.com> 1791141213 +0000\n\nchore(deps-dev): update ruff requirement from ~=0.16.8 to ~=0.16.10\n\nUpdates the requirements on [ruff](https://github.com/astral-sh/ruff) to permit the latest version.\n- [Release notes](https://github.com/astral-sh/ruff/releases)\n- [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/astral-sh/ruff/compare/0.16.8...0.16.10)\n\n---\nupdated-dependencies:\n- dependency-name: ruff\n  dependency-version: 0.16.10\n  dependency-type: direct:development\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+      "verified_at": "2026-10-04T19:13:33Z"
+    }
+  },
+  "url": "https://api.github.com/repos/KiaroSama/MuxCls/commits/0cf9596f7510f894babf36595efbc827fbbfaf04",
+  "html_url": "https://github.com/KiaroSama/MuxCls/commit/0cf9596f7510f894babf36595efbc827fbbfaf04",
+  "comments_url": "https://api.github.com/repos/KiaroSama/MuxCls/commits/0cf9596f7510f894babf36595efbc827fbbfaf04/comments",
+  "author": {
+    "login": "dependabot[bot]",
+    "id": 49699333,
+    "node_id": "MDM6Qm90NDk2OTkzMzM=",
+    "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+    "html_url": "https://github.com/apps/dependabot",
+    "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+    "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+    "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+    "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+    "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+    "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+    "type": "Bot",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "committer": {
+    "login": "web-flow",
+    "id": 19864447,
+    "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+    "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/web-flow",
+    "html_url": "https://github.com/web-flow",
+    "followers_url": "https://api.github.com/users/web-flow/followers",
+    "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+    "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+    "organizations_url": "https://api.github.com/users/web-flow/orgs",
+    "repos_url": "https://api.github.com/users/web-flow/repos",
+    "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/web-flow/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "parents": [
+    {
+      "sha": "9092f510f17a2f0511d875c4e2a89e62a1f7658e",
+      "url": "https://api.github.com/repos/KiaroSama/MuxCls/commits/9092f510f17a2f0511d875c4e2a89e62a1f7658e",
+      "html_url": "https://github.com/KiaroSama/MuxCls/commit/9092f510f17a2f0511d875c4e2a89e62a1f7658e"
+    }
+  ],
+  "stats": {
+    "total": 2,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "sha": "87b5e732bfbc31df7dc88101a984a36144c98cb8",
+      "filename": "requirements-dev.txt",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2,
+      "blob_url": "https://github.com/KiaroSama/MuxCls/blob/0cf9596f7510f894babf36595efbc827fbbfaf04/requirements-dev.txt",
+      "raw_url": "https://github.com/KiaroSama/MuxCls/raw/0cf9596f7510f894babf36595efbc827fbbfaf04/requirements-dev.txt",
+      "contents_url": "https://api.github.com/repos/KiaroSama/MuxCls/contents/requirements-dev.txt?ref=0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "patch": "@@ -13,5 +13,5 @@ pytest-cov>=7.1.0\n # rules to its default set, so an open range breaks CI on code nobody touched -\n # which is exactly what happened when these were first added. Bump these\n # deliberately, run them locally, then push.\n-ruff~=0.16.8\n+ruff~=0.16.10\n mypy~=2.3.1"
+    }
+  ]
+}

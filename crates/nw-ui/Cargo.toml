@@ -1,0 +1,22 @@
+[package]
+name = "nw-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[lints]
+workspace = true
+[lib]
+crate-type = ["rlib", "cdylib"]
+[dependencies]
+nw-domain.workspace = true
+eframe.workspace = true
+serde_json.workspace = true
+web-time = "1"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+eframe = { workspace = true, features = ["x11", "wayland"] }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "HtmlInputElement", "Document", "Element", "HtmlElement", "Node", "File", "FileList", "Blob", "Event", "EventTarget", "Window", "Location", "Storage", "History", "Crypto", "Request", "RequestInit", "RequestRedirect", "RequestCredentials", "RequestMode", "Response", "Headers", "AbortController", "AbortSignal", "ReadableStream", "ReadableStreamDefaultReader"] }
