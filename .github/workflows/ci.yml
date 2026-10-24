@@ -78,6 +78,7 @@ jobs:
     env:
       NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
       NW_CHROMEDRIVER: /usr/local/share/chromedriver-linux64/chromedriver
+      NW_BROWSER_SAVE: '1'
       NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -93,6 +94,8 @@ jobs:
         run: chmod +x target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
       - name: Install selected Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Install actual browser display and OS picker input tools
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick
       - name: Record actual browser and driver candidates
         run: |
           google-chrome --version
@@ -100,7 +103,7 @@ jobs:
       - name: Exercise embedded namespace, pairing and session boundaries
         run: cargo test --locked -p numera-wiz --features embedded-web --bin numera-wiz server::browser::tests
       - name: Boot real shared UI in the runner's Chrome
-        run: cargo test --locked -p numera-wiz --features embedded-web --bin numera-wiz server::browser::tests::packaged_browser -- --ignored --nocapture
+        run: xvfb-run -a -s '-screen 0 1600x1100x24 -nolisten tcp' cargo test --locked -p numera-wiz --features embedded-web --bin numera-wiz server::browser::tests::packaged_browser -- --ignored --nocapture
       - name: Retain actual browser evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

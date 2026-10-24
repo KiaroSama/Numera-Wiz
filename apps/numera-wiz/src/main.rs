@@ -345,12 +345,19 @@ impl nw_ui::CommandClient for NativeUiClient {
         };
         let Some(output) = output else {
             drop(nw_domain::download::SaveSession(control));
-            reply(Err("Save selection cancelled; no client file was published".into()));
+            reply(Err(
+                "Save selection cancelled; no client file was published".into(),
+            ));
             return;
         };
         let client = self.client.clone();
         self.runtime.spawn(async move {
-            reply(client.save_artifact(manifest, output, control).await.map_err(|error| error.to_string()));
+            reply(
+                client
+                    .save_artifact(manifest, output, control)
+                    .await
+                    .map_err(|error| error.to_string()),
+            );
         });
     }
     fn send(&self, request: Request, reply: nw_ui::Reply) {

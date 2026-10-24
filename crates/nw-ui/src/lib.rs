@@ -80,6 +80,8 @@ pub struct WizApp {
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
     save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
     save_status: String,
+    #[cfg(target_arch = "wasm32")]
+    focus_artifact_save: bool,
     #[cfg(not(target_arch = "wasm32"))]
     save_destination: String,
     selection_report: Option<Arc<nw_domain::reports::SelectionReport>>,
@@ -87,10 +89,17 @@ pub struct WizApp {
     report_page: usize,
 }
 impl WizApp {
-    fn save_artifact(&mut self, manifest: nw_domain::artifacts::ArtifactManifest, ctx: &egui::Context) {
-        if self.save_control.is_some() { return; }
+    fn save_artifact(
+        &mut self,
+        manifest: nw_domain::artifacts::ArtifactManifest,
+        ctx: &egui::Context,
+    ) {
+        if self.save_control.is_some() {
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
-        let destination = (!self.save_destination.trim().is_empty()).then(|| self.save_destination.clone());
+        let destination =
+            (!self.save_destination.trim().is_empty()).then(|| self.save_destination.clone());
         #[cfg(target_arch = "wasm32")]
         let destination = None;
         let control = Arc::new(nw_domain::download::SaveControl::default());
@@ -98,10 +107,17 @@ impl WizApp {
         self.save_status = "Selecting a client destination and verifying its artifact copy…".into();
         let inbox = self.save_inbox.clone();
         let repaint = ctx.clone();
-        self.client.save_artifact(manifest, destination, control, Box::new(move |result| {
-            if let Ok(mut slot) = inbox.lock() { *slot = Some(result); }
-            repaint.request_repaint();
-        }));
+        self.client.save_artifact(
+            manifest,
+            destination,
+            control,
+            Box::new(move |result| {
+                if let Ok(mut slot) = inbox.lock() {
+                    *slot = Some(result);
+                }
+                repaint.request_repaint();
+            }),
+        );
     }
     fn save_controls(&mut self, ui: &mut egui::Ui) {
         if let Some(control) = &self.save_control {
@@ -119,7 +135,9 @@ impl WizApp {
             });
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
-        if !self.save_status.is_empty() { ui.label(&self.save_status); }
+        if !self.save_status.is_empty() {
+            ui.label(&self.save_status);
+        }
     }
     fn run_reviewed(&mut self, ctx: &egui::Context) {
         if !self.waiting
@@ -203,6 +221,8 @@ impl WizApp {
             save_control: None,
             save_inbox: Arc::new(Mutex::new(None)),
             save_status: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            focus_artifact_save: false,
             #[cfg(not(target_arch = "wasm32"))]
             save_destination: String::new(),
             selection_report: None,
@@ -434,12 +454,16 @@ impl WizApp {
                     self.last_jobs = Instant::now() - Duration::from_secs(2);
                 }
                 Action::ArtifactManifest => {
+                    #[cfg(target_arch = "wasm32")]
+                    { self.focus_artifact_save = true; }
                     self.artifact_manifest =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         self.save_destination.clear();
-                        ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("artifact-save-destination")));
+                        ctx.memory_mut(|memory| {
+                            memory.request_focus(egui::Id::new("artifact-save-destination"))
+                        });
                     }
                 }
                 Action::SelectionReport(generation) => {
@@ -638,14 +662,22 @@ impl WizApp {
                         .desired_width(f32::INFINITY));
                     ui.small("An existing native destination is preserved.");
                 }
-                if ui.add_enabled(self.save_control.is_none(), egui::Button::new("Save verified copy…")).clicked() {
+                let save_button = ui.add_enabled(self.save_control.is_none(), egui::Button::new("Save verified copy…"));
+                #[cfg(target_arch = "wasm32")]
+                if self.focus_artifact_save {
+                    save_button.request_focus();
+                    self.focus_artifact_save = false;
+                }
+                if save_button.clicked() {
                     save = Some(manifest.clone());
                 }
                 if ui.button("Copy manifest URI").clicked() { ui.ctx().copy_text(manifest.manifest_uri.clone()); }
                 ui.small("Reading this output requires current job access. A copied URI does not grant access.");
             });
         }
-        if let Some(manifest) = save { self.save_artifact(manifest, ui.ctx()); }
+        if let Some(manifest) = save {
+            self.save_artifact(manifest, ui.ctx());
+        }
         if !open {
             self.artifact_manifest = None;
         }
@@ -658,7 +690,9 @@ impl WizApp {
 }
 impl Drop for WizApp {
     fn drop(&mut self) {
-        if let Some(control) = &self.save_control { control.cancel(); }
+        if let Some(control) = &self.save_control {
+            control.cancel();
+        }
     }
 }
 impl eframe::App for WizApp {
@@ -668,10 +702,15 @@ impl eframe::App for WizApp {
             self.save_control = None;
             self.save_status = match saved {
                 Ok(receipt) => {
-                    let warning = if receipt.warnings.is_empty() { String::new() } else {
+                    let warning = if receipt.warnings.is_empty() {
+                        String::new()
+                    } else {
                         format!(" Warning: {}", receipt.warnings.join(", "))
                     };
-                    format!("Saved {} verified bytes to {}.{}", receipt.encoded_byte_count, receipt.destination, warning)
+                    format!(
+                        "Saved {} verified bytes to {}.{}",
+                        receipt.encoded_byte_count, receipt.destination, warning
+                    )
                 }
                 Err(error) => format!("Client copy did not finish: {error}"),
             };

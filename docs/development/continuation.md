@@ -1185,3 +1185,34 @@ MuxCls/folder/batch, editor/project/DAG/preview/mixer/captions/effects/interchan
 remaining command/donor closure, retention/generation migration, packages,
 resources, full manuals and matching owner harness/evidence remain mandatory.
 No local build/test/GUI/media execution or owner GPU run occurred.
+
+
+## Verified client-save functional checkpoint and actual UI qualification work
+
+Run 40088110391 on 635ee48a3a943f4f04a6281074a48c94e2ec9002 passed
+every functional job: four complete native regression/Clippy/desktop targets,
+WASM and lock, complete media/owner/official SDK/lost-response/large HTTP,
+and actual native/Chrome existing input journeys. New CLI actual saves passed
+full byte equality, existing-target preservation, wrong digest and foreign-
+principal denial. New domain/platform corruption, truncation, cancellation and
+unknown-entry cases passed. The actual native Output details PNG was personally
+inspected; its Save button is not relabelled an executed Save. All 46 exact
+hosted formatter hunks are applied, preserving the public bearer-format source
+literal where the diagnostic masked it. See evidence/client-save-ci75.json.
+The actual 268633400-byte HTTP owner high-water mark was 35808 KiB, with live
+revocation/disconnect cleanup; its compiled merge identity is retained in
+evidence/artifact-http-ci75.json.
+
+The next source adds native pointer/keyboard Save controls with independent
+saved/source byte equality, real headed Chrome under Xvfb with a genuine OS
+Save picker (no mocked handle), and actual 256 MiB-plus scoped CLI copy memory
+measurement and partial-transfer SIGINT cancellation. These await their own
+CI. Native copies also join the existing cross-root destination claim namespace
+before their client publication fence; contention is a nonblocking typed error.
+The browser Save button receives focus for keyboard access.
+
+The native OS Save As picker, additional browser/platform and interrupted-client
+cleanup variants remain unqualified. All previously open complete-product,
+five-surface, package/resource/manual and owner-harness obligations remain
+mandatory; no task checkbox or preserved research member changed. No local
+source execution, GUI/media run or owner GPU run occurred.

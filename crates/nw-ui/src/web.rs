@@ -42,7 +42,9 @@ impl CommandClient for BrowserClient {
     ) {
         if destination.is_some() {
             drop(nw_domain::download::SaveSession(control));
-            reply(Err("Browser saves require a browser-selected file handle".into()));
+            reply(Err(
+                "Browser saves require a browser-selected file handle".into()
+            ));
             return;
         }
         // Start the picker synchronously while the human activation is still live.

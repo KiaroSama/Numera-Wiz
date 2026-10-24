@@ -31,6 +31,8 @@ Network frames are split into at most 128 KiB chunks. File writes drain before
 the next chunk; length and SHA-256 must match the selected manifest. Native
 copies additionally flush, sync and independently reread the entire private
 staging file before an atomic held-directory, same-filesystem no-replace link.
+Native copies join the existing cross-root destination claims; contention is an
+explicit nonblocking publication conflict.
 No cross-device copy or replacing rename substitutes for that operation.
 Only the owned temporary payload and empty workspace are removed; unknown
 entries are preserved. Cleanup failure after successful client publication is
@@ -52,3 +54,8 @@ This implementation awaits its own hosted checks and actual GUI save journeys.
 Prior report/output inspection evidence does not qualify Save As. Complete
 download resumption UX, all browser/platform variants, interrupted workspace
 retention, package/resource gates and the complete product remain required.
+
+The browser adapter follows the primary
+[Chrome File System Access guide](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access):
+invoke the actual save picker during user activation, then await writes and the
+final close. API support is detected at runtime. No mock picker qualifies it.

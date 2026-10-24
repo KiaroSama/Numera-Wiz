@@ -515,6 +515,14 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
+    async fn browser_xdo(args: &[&str]) -> std::process::Output {
+        tokio::time::timeout(Duration::from_secs(5),
+            tokio::process::Command::new("/usr/bin/xdotool").args(args).kill_on_drop(true).output())
+            .await.expect("Browser OS input deadline").expect("Browser OS input command")
+    }
+    async fn browser_input(args: &[&str]) {
+        assert!(browser_xdo(args).await.status.success(), "Browser OS input failed");
+    }
     async fn driver(
         client: &reqwest::Client,
         base: &str,
@@ -580,9 +588,22 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        let session=driver(&client,&base,reqwest::Method::POST,"/session",json!({"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:loggingPrefs":{"performance":"ALL"},"goog:chromeOptions":{"args":["--headless=new","--no-sandbox","--enable-unsafe-swiftshader","--use-angle=swiftshader","--window-size=1440,1000"]}}}})).await;
+        let headful = std::env::var_os("NW_BROWSER_SAVE").is_some();
+        let mut window_manager = if headful {
+            assert!(std::env::var_os("DISPLAY").is_some(), "Real browser file picking requires the hosted X display");
+            Some(tokio::process::Command::new("/usr/bin/openbox")
+                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+                .kill_on_drop(true).spawn().unwrap())
+        } else { None };
+        let mut chrome_args = vec!["--no-sandbox", "--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--window-size=1440,1000", "--force-device-scale-factor=1"];
+        if !headful { chrome_args.push("--headless=new"); }
+        let session=driver(&client,&base,reqwest::Method::POST,"/session",json!({"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:loggingPrefs":{"performance":"ALL"},"goog:chromeOptions":{"args":chrome_args}}}})).await;
         let id = session["sessionId"].as_str().expect("WebDriver session id");
         let route = format!("/session/{id}");
+        if headful {
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/goog/cdp/execute"),
+                json!({"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":1440,"height":861,"deviceScaleFactor":1,"mobile":false}})).await;
+        }
         let fixture = fixture().await;
         driver(
             &client,
@@ -964,6 +985,80 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
+            if headful {
+                // Release file-input interception: the save path must use the genuine OS picker.
+                driver(&client,&base,reqwest::Method::POST,&format!("{route}/goog/cdp/execute"),
+                    json!({"cmd":"Page.setInterceptFileChooserDialog","params":{"enabled":false}})).await;
+                driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":533,"y":850},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+                tokio::time::sleep(Duration::from_millis(700)).await;
+                let manifest_png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+                let manifest_png = manifest_png.as_str().unwrap();
+                let manifest_bytes = base64::engine::general_purpose::STANDARD.decode(manifest_png).unwrap();
+                std::fs::write(directory.join("browser-output-details.png"), &manifest_bytes).unwrap();
+                if manifest_bytes.len() <= 256 * 1024 { println!("NW_BROWSER_MANIFEST_IMAGE:{manifest_png}"); }
+                // The browser omits the native destination field; Save follows the four metadata rows.
+                driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),
+                    json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":100,"y":381},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+                let started = Instant::now();
+                let dialog = loop {
+                    let found = browser_xdo(&["search","--onlyvisible","--name","^Save"]).await;
+                    if found.status.success() {
+                        let found = String::from_utf8(found.stdout).unwrap();
+                        if let Some(window) = found.lines().last() { break window.to_owned(); }
+                    }
+                    if started.elapsed() >= Duration::from_secs(12) {
+                        let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+                        let png = png.as_str().unwrap();
+                        let bytes = base64::engine::general_purpose::STANDARD.decode(png).unwrap();
+                        std::fs::write(directory.join("browser-save-picker-timeout.png"), &bytes).unwrap();
+                        if bytes.len() <= 256 * 1024 { println!("NW_BROWSER_SAVE_FAILURE_IMAGE:{png}"); }
+                        panic!("Actual browser Save control did not open its real OS file picker");
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                };
+                let saved_path = directory.join("browser-client-saved-copy.mkv");
+                assert!(!saved_path.exists(), "Browser Save As qualification requires a fresh destination");
+                let status = tokio::process::Command::new("/usr/bin/import").args(["-window",&dialog])
+                    .arg(directory.join("browser-save-picker.png")).status().await.unwrap();
+                assert!(status.success());
+                browser_input(&["windowactivate","--sync",&dialog]).await;
+                browser_input(&["key","--clearmodifiers","ctrl+l"]).await;
+                browser_input(&["type","--clearmodifiers","--delay","1",saved_path.to_str().unwrap()]).await;
+                browser_input(&["key","--clearmodifiers","Return"]).await;
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                if browser_xdo(&["search","--onlyvisible","--name","^Save"]).await.status.success() {
+                    browser_input(&["key","--clearmodifiers","alt+s"]).await;
+                }
+                let started = Instant::now();
+                loop {
+                    if saved_path.exists()
+                        && let Ok(saved) = nw_platform::files::identity(&saved_path, &CancellationToken::new())
+                        && saved.sha256 == artifact.sha256 && saved.bytes == artifact.bytes { break; }
+                    if started.elapsed() >= Duration::from_secs(20) {
+                        let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+                        let png = png.as_str().unwrap();
+                        let bytes = base64::engine::general_purpose::STANDARD.decode(png).unwrap();
+                        std::fs::write(directory.join("browser-save-timeout.png"), &bytes).unwrap();
+                        if bytes.len() <= 256 * 1024 { println!("NW_BROWSER_SAVE_FAILURE_IMAGE:{png}"); }
+                        panic!("Actual browser picker/stream/close did not produce the selected verified bytes");
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                assert_eq!(std::fs::read(&saved_path).unwrap(), std::fs::read(&media.source).unwrap());
+                assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(), 1);
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+                let png = png.as_str().unwrap();
+                let bytes = base64::engine::general_purpose::STANDARD.decode(png).unwrap();
+                std::fs::write(directory.join("browser-client-saved.png"), &bytes).unwrap();
+                if bytes.len() <= 256 * 1024 { println!("NW_BROWSER_SAVE_IMAGE:{png}"); }
+                std::fs::write(directory.join("browser-client-save.json"), serde_json::to_vec_pretty(&json!({
+                    "artifact_id":format!("job-{}",job.id),"sha256":artifact.sha256,"bytes":artifact.bytes,
+                    "oracle":"Actual Output details and Save pointer input, genuine Chrome OS Save picker and independent saved/source byte equality",
+                    "producer_job_count":1,
+                    "not_qualified":["other browsers/platforms","native OS Save As picker","browser existing-file overwrite/crash guarantees"]
+                })).unwrap()).unwrap();
+            }
         }
         std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal, actual UI file intake, frozen plan review and byte-verified published output under real CSP/MIME","not_qualified":["media playback","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
         driver(
@@ -985,5 +1080,9 @@ mod tests {
         driver(&client, &base, reqwest::Method::DELETE, &route, Value::Null).await;
         process.kill().await.unwrap();
         let _ = process.wait().await;
+        if let Some(manager) = &mut window_manager {
+            let _ = manager.kill().await;
+            let _ = manager.wait().await;
+        }
     }
 }

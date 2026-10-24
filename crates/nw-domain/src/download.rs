@@ -20,7 +20,10 @@ const COMMITTING: u8 = 2;
 const FINISHED: u8 = 3;
 
 fn cancelled() -> DomainError {
-    DomainError::new("CANCELLED", "Artifact copy cancelled before client publication")
+    DomainError::new(
+        "CANCELLED",
+        "Artifact copy cancelled before client publication",
+    )
 }
 
 /// One active save, with a cancellation/publication fence independent of its producer job.
@@ -36,7 +39,10 @@ impl SaveControl {
             .state
             .compare_exchange(COPYING, CANCELLING, Ordering::AcqRel, Ordering::Acquire)
             .is_ok();
-        if accepted && let Ok(mut wake) = self.wake.lock() && let Some(wake) = wake.take() {
+        if accepted
+            && let Ok(mut wake) = self.wake.lock()
+            && let Some(wake) = wake.take()
+        {
             wake.wake();
         }
         accepted
@@ -56,7 +62,10 @@ impl SaveControl {
                 if state == CANCELLING {
                     cancelled()
                 } else {
-                    DomainError::new("COPY_STATE_CONFLICT", "Client publication was already decided")
+                    DomainError::new(
+                        "COPY_STATE_CONFLICT",
+                        "Client publication was already decided",
+                    )
                 }
             })
     }
@@ -127,12 +136,20 @@ impl DownloadVerifier {
         if manifest.schema_version != 1
             || id.is_empty()
             || id.len() > 128
-            || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
             || manifest.availability != "retained_published_object"
             || manifest.bytes_route.as_deref() != Some(route.as_str())
-            || !manifest.retrieval_methods.iter().any(|m| m == "authenticated_http_when_enabled")
+            || !manifest
+                .retrieval_methods
+                .iter()
+                .any(|m| m == "authenticated_http_when_enabled")
             || manifest.sha256.len() != 64
-            || !manifest.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || !manifest
+                .sha256
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         {
             return Err(DomainError::new(
                 "ARTIFACT_UNAVAILABLE",
@@ -224,6 +241,26 @@ mod tests {
         foreign = m;
         foreign.artifact_id = "../other".into();
         assert!(DownloadVerifier::new(&foreign).is_err());
+    }
+    #[test]
+    fn cancelling_a_pending_network_wait_wakes_it_and_returns_a_typed_stop() {
+        use std::{sync::atomic::AtomicUsize, task::{Context, Wake, Waker}};
+        struct Counter(AtomicUsize);
+        impl Wake for Counter {
+            fn wake(self: Arc<Self>) { self.0.fetch_add(1, Ordering::Relaxed); }
+        }
+        let counter = Arc::new(Counter(AtomicUsize::new(0)));
+        let waker = Waker::from(counter.clone());
+        let mut cx = Context::from_waker(&waker);
+        let control = SaveControl::default();
+        let mut pending = std::pin::pin!(control.interruptible(std::future::pending::<()>()));
+        assert!(pending.as_mut().poll(&mut cx).is_pending());
+        assert!(control.cancel());
+        assert_eq!(counter.0.load(Ordering::Relaxed), 1);
+        match pending.as_mut().poll(&mut cx) {
+            Poll::Ready(Err(error)) => assert_eq!(error.code, "CANCELLED"),
+            _ => panic!("Cancelled network wait remained live"),
+        }
     }
     #[test]
     fn cancellation_and_client_publication_have_one_winner() {
