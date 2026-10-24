@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "reviewer": "v4_manuals_finish",
+  "pinned_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "scope": "Every v3-unread/partially-read non-filter manual; every v3-unread/partially-read filters.texi section with start_line >= 18000. Root owns filter sections below 18000.",
+  "method": "Actual full-body source-text reading through bounded untruncated tool output. Indexing, hash computation and listing did not count as reading. One initial truncated developer.texi output was discarded and complete file was re-read in two bounded ranges.",
+  "source_root": "research_v2/ffmpeg-upstream",
+  "events": [
+    {
+      "file": "doc_platform.texi",
+      "start_line": 1,
+      "end_line": 349,
+      "note": "Read complete platform manual; ARM64EC explicitly unsupported, old platform recipes require current toolchain qualification."
+    },
+    {
+      "file": "doc_community.texi",
+      "start_line": 1,
+      "end_line": 182,
+      "note": "Read complete community governance and contributor conduct manual."
+    },
+    {
+      "file": "doc_fate.texi",
+      "start_line": 1,
+      "end_line": 300,
+      "note": "Read complete FATE manual; assertion level, Windows relative samples, thread/hardware modes and reference-generation distinction."
+    },
+    {
+      "file": "doc_faq.texi",
+      "start_line": 1,
+      "end_line": 686,
+      "note": "Read complete FAQ; r_frame_rate is not average, container support differs from codec support, late-stream probe blind spots and static-link closure."
+    },
+    {
+      "file": "doc_git-howto.texi",
+      "start_line": 1,
+      "end_line": 484,
+      "note": "Read all Git contribution guidance; upstream contribution workflow is not authorization to mutate user/global config or send messages."
+    },
+    {
+      "file": "doc_mailing-list-faq.texi",
+      "start_line": 1,
+      "end_line": 389,
+      "note": "Read all mailing-list FAQ; bug-report reproducibility and uncut diagnostics inform redacted support bundles, no messaging performed."
+    },
+    {
+      "file": "doc_developer.texi",
+      "start_line": 1,
+      "end_line": 600,
+      "note": "Read full first half including public API/ABI guarantees; FFmpeg C11 with C99 headers, SIMD runtime dispatch, no global stdio in libraries."
+    },
+    {
+      "file": "doc_developer.texi",
+      "start_line": 601,
+      "end_line": 1184,
+      "note": "Read full second half; major API deprecation rules, FATE and malformed-input expectations, release branch guarantees, contributor instructions not action authorization."
+    },
+    {
+      "file": "doc_general_contents.texi",
+      "start_line": 1,
+      "end_line": 530,
+      "note": "Read external dependency chapters and beginning of format matrix; optional libraries require explicit build flags, nonfree exceptions, script input trust boundary."
+    },
+    {
+      "file": "doc_general_contents.texi",
+      "start_line": 531,
+      "end_line": 1065,
+      "note": "Read complete format/image matrix and beginning of codec matrix; tables are descriptive upstream inventory, not installed-profile support proof."
+    },
+    {
+      "file": "doc_general_contents.texi",
+      "start_line": 1066,
+      "end_line": 1600,
+      "note": "Read video/audio/subtitle/protocol/device/timecode tables; mux/demux and encode/decode support independent; historical omissions require runtime qualification."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 18009,
+      "end_line": 18650,
+      "note": "Mask compositing, plane routing, motion estimation/interpolation, mix duration, morpho performance guidance, mpdecimate and MSAD prerequisites read in full range."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 18651,
+      "end_line": 19292,
+      "note": "Read negate/nlmeans/nnedi/noformat/noise/normalize/OCIO/OCR/OpenCV/oscilloscope; external file dependencies and immutable live options noted."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 19528,
+      "end_line": 19853,
+      "note": "Read owdenoise, pad and palette generation/application; anamorphic SAR-aware padding and GIF rectangle processing noted."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 19932,
+      "end_line": 20117,
+      "note": "Read phase, photosensitivity, pixelize, pixscope and pp7; field-order intent, accessibility claim limits and minimum-resolution constraints."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 20149,
+      "end_line": 20897,
+      "note": "Read prewitt, pseudocolor, PSNR stats contracts, pullup, qp, QR generation/decoding, random cache and EIA608/VITC extraction; missing metadata differs from zero."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 20921,
+      "end_line": 21059,
+      "note": "Read removegrain/removelogo/repeatfields; full-resolution mask dependency and plane mode semantics."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 21077,
+      "end_line": 21297,
+      "note": "Read rgbashift/roberts/rotate/sab; rotation angle is frame-evaluated but output geometry initialization-only."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 21817,
+      "end_line": 21981,
+      "note": "Read scharr/scroll/scdet/selectivecolor/separatefields; scene score percentage units and field order/twice-frame-rate semantics."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 22255,
+      "end_line": 22900,
+      "note": "Read shear/showinfo/palette/shuffle/signalstats/signature/siti/smartblur/sobel/spp; SI/TI explicitly legacy P.910 edition, checksum cost and shuffling seed requirements."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 22901,
+      "end_line": 23550,
+      "note": "Read spp commands, SR backends, AMF SR, SSIM, stereo conversion, streamselect, subtitle/font shaping, swap/telecine; HarfBuzz and libunibreak requirements explicit."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 23551,
+      "end_line": 24199,
+      "note": "Read telecine patterns, temporal histogram/threshold/thumbnail/tile/tiltandshift/tinterlace/temporal median/equalization/mix; thumbnail retains batch, tile needs passthrough FPS, temporal buffers scale with radii."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 24350,
+      "end_line": 24428,
+      "note": "Read transpose; symbolic directions required instead of deprecated numerical shortcuts; passthrough geometry separate."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 24520,
+      "end_line": 24659,
+      "note": "Read unsharp/untile/uspp; plane-specific strengths, multiplication of frame rate, expensive postprocessing and version gaps."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 25074,
+      "end_line": 25674,
+      "note": "Read vaguedenoiser/varblur/vectorscope/two-pass vidstab/vflip/vfrdet/vibrance/VIF/vignette options; transform files tied to exact pass1 source, time-varying vignette costly."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 25675,
+      "end_line": 26275,
+      "note": "Read vignette expressions, vmafmotion, AMF VPP, vstack, w3fdif, waveform, weave/xBR/xcorrelate; VMAF motion is a component metric, not VMAF quality score."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 26415,
+      "end_line": 26831,
+      "note": "Read xmedian/XPSNR/xstack/yadif/yaepblur/zoompan; XPSNR reference first and depth exceptions, grid/layout mutually exclusive, zoompan defaults alter rate/duration."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 27664,
+      "end_line": 28320,
+      "note": "Read OpenCL introduction through program examples; same surface layout and upload/download formats, deshake buffer horizon, kernels are executable input."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 28321,
+      "end_line": 28970,
+      "note": "Read OpenCL program remainder, remap/edge/tone-map/unsharp/xfade, VAAPI overlay/tonemap/stacks/pad. OpenCL tone-map differs from CPU, VAAPI input HDR10-only, stack variants rescale automatically."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 28971,
+      "end_line": 29620,
+      "note": "Read VAAPI pad/drawbox, VideoToolbox, Vulkan and QSV filters through buffer heading. Vulkan blend modes subset, nlmeans t VRAM tradeoff, OpenCL/Vulkan layout differences require operation-specific mapping."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 29621,
+      "end_line": 30260,
+      "note": "Read buffer/video generation/capture through mptestsrc options; ddagrab max rate not a stable-clock guarantee, gfxcapture compositor-paced and EOF on source disappearance."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 30261,
+      "end_line": 30895,
+      "note": "Read mptestsrc/frei0r/life/Perlin/QR/test sources; generators often infinite and duration rounds to full frame, randomness and Hald N^6 storage must be bounded."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 30896,
+      "end_line": 31527,
+      "note": "Read OpenCL sources, Sierpinski/zoneplate, sinks and multimedia audio scopes/bench; aphasemeter rematrixes to stereo and video output is enabled by default."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 32695,
+      "end_line": 33320,
+      "note": "Read showcqt/showcwt/showfreqs/showspatial through spectrum slide options; time-frequency/latency tradeoffs, Nyquist limit, deprecated ignored controls."
+    },
+    {
+      "file": "doc_filters.texi",
+      "start_line": 33321,
+      "end_line": 33944,
+      "note": "Read remaining showspectrum/spectrumpic/showvolume/showwaves/showwavespic; waveform rate approximate, peak vs average modes differ, whole-track picture is a scan job."
+    }
+  ],
+  "unfinished_assigned_ranges": [],
+  "limitations": [
+    "This is source/documentation reading, not implementation or runtime validation.",
+    "No application builds, FFmpeg/media execution or tests were run.",
+    "Cross-references to external websites and Doxygen are references, not automatically counted as read.",
+    "No global completeness claim outside this assignment."
+  ],
+  "line_count": 17141
+}

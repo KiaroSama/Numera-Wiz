@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "run_id": 40068124936,
+  "branch_head": "791af2591dbcea9ad81783f065f78d46b1fdde1e",
+  "boundary": "hosted original output-directory identity; development only",
+  "passed": [
+    {
+      "job_id": 120795555289,
+      "name": "dependency-lock"
+    },
+    {
+      "job_id": 120795555396,
+      "name": "media"
+    },
+    {
+      "job_id": 120795555497,
+      "name": "web"
+    },
+    {
+      "job_id": 120795854057,
+      "name": "checks (windows-2025)"
+    },
+    {
+      "job_id": 120795854080,
+      "name": "checks (macos-15)"
+    },
+    {
+      "job_id": 120795854114,
+      "name": "checks (ubuntu-24.04)"
+    },
+    {
+      "job_id": 120795854215,
+      "name": "checks (macos-15-intel)"
+    },
+    {
+      "job_id": 120796947000,
+      "name": "browser"
+    },
+    {
+      "job_id": 120797990694,
+      "name": "native-ui"
+    }
+  ],
+  "failed": [
+    "formatting"
+  ],
+  "asserted": [
+    "semantic parent key and historical field omission",
+    "parent replacement after handle drop",
+    "ordinary child changes preserve parent identity",
+    "live Windows no-delete directory lease",
+    "Unix directory replacement during preflight rejects acceptance",
+    "actual media old-parent refusal and fresh review/copy",
+    "existing real SDK lost-response/restart journey"
+  ],
+  "artifacts": [
+    {
+      "id": 12550438110,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "b5fc8e8f84bcc50f8aa006125a1a2d24c76fc15a0efb7d74bef42d1a4c014377",
+      "downloaded": false
+    },
+    {
+      "id": 12550401526,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "f7170beae70406260b3d274a843e189e981ac93f50129a5ab856a0d69dc659e0",
+      "downloaded": false
+    },
+    {
+      "id": 12549767996,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "5640dd2f9d16607bf7ea901ce2806be8b3e1e0352b69292cfaa84057cefe454c",
+      "downloaded": false
+    }
+  ],
+  "formatter_diagnostic_hunks_applied": 14,
+  "screenshots_personally_inspected": false,
+  "not_qualified": [
+    "global claims added after this run",
+    "complete T017",
+    "packages",
+    "aggregate R20",
+    "owner GPU"
+  ]
+}

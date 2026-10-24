@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "run_id": 40081501150,
+  "branch_head": "3f45408576d72357908b35152439474a9e645641",
+  "jobs": [
+    {
+      "id": 120835843006,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120835843174,
+      "name": "media",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120835843248,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120835843344,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120836160220,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success",
+      "ordinary_regressions": "success",
+      "lint": "success"
+    },
+    {
+      "id": 120836160274,
+      "name": "checks (macos-15)",
+      "conclusion": "success",
+      "ordinary_regressions": "success",
+      "lint": "success"
+    },
+    {
+      "id": 120836160287,
+      "name": "checks (windows-2025)",
+      "conclusion": "success",
+      "ordinary_regressions": "success",
+      "lint": "success"
+    },
+    {
+      "id": 120836160491,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success",
+      "ordinary_regressions": "success",
+      "lint": "success"
+    },
+    {
+      "id": 120836191499,
+      "name": "browser",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 120837575302,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "observed": [
+    "actual MOV first cleanup passed full packet/clock/extradata/side-data/metadata verification and independent raw name/title assertion",
+    "actual MOV output re-registration and second language-only remux retained its exact title",
+    "the failed fixture reached creation and registration of the following MP4 source"
+  ],
+  "observation_basis": "The logged MOV round-trip probe and subsequent MP4 iteration prove all preceding sequential hard assertions completed; the combined media test still failed and is not labeled successful.",
+  "failure": "MP4 preflight incorrectly required vendor_id=[0][0][0][0]; pinned mov_parse_stsd_video skips ISO reserved fields and reports vendor_id only for QuickTime.",
+  "correction_pending": [
+    "QuickTime requires exact FFMP; ISO MP4 requires vendor_id absence",
+    "negative unit rejects an invented MP4 vendor field",
+    "legacy raw-name snapshots are not rewritten by the new canonical-title lowering",
+    "eight exact hosted formatter hunks applied"
+  ],
+  "not_asserted": [
+    "MP4 packet/metadata qualification",
+    "complete actual media/owner/large HTTP and GUI in this run",
+    "complete F08, package/resources or GPU"
+  ],
+  "primary_source": {
+    "repository": "FFmpeg/FFmpeg",
+    "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+    "path": "libavformat/mov.c",
+    "function": "mov_parse_stsd_video"
+  },
+  "artifacts": [
+    {
+      "id": 12555107593,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "c41b604fd60d1e0ffdaec78e5a6bf46d029e25ec3440b4b1abbffddb0d2d3029",
+      "downloaded": false
+    }
+  ]
+}

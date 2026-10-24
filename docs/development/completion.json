@@ -1,0 +1,1001 @@
+{
+  "schema_version": 1,
+  "complete_release": "blocked",
+  "records": [
+    {
+      "subject_id": "R01",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R02",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R03",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R04",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R05",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R06",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R07",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R08",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R09",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R10",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R11",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R12",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R13",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R14",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R15",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R16",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R17",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "R18",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R19",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R20",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R21",
+      "subject_kind": "requirement",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "R22",
+      "subject_kind": "requirement",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F01",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F02",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F03",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F04",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F05",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F06",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F07",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F08",
+      "subject_kind": "workflow",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "F09",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F10",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F11",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F12",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F13",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F14",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "F15",
+      "subject_kind": "workflow",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD01",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD02",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD03",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD04",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD05",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD06",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD07",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD08",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD09",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD10",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD11",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD12",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD13",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD14",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD15",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD16",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD17",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD18",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD19",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD20",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD21",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD22",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD23",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD24",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD25",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD26",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD27",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD28",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD29",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD30",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD31",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD32",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD33",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "CD34",
+      "subject_kind": "command_domain",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP01",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP02",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP03",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP04",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP05",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP06",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP07",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP08",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP09",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP10",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP11",
+      "subject_kind": "work_package",
+      "status": "in_progress",
+      "evidence": []
+    },
+    {
+      "subject_id": "WP12",
+      "subject_kind": "work_package",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "subject_id": "domain.exact_time",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/time.rs"
+      ],
+      "evidence": [
+        {
+          "boundary": "unit",
+          "commit": "5bc606743cc8621347f3fc1e6eb391bc57d2eea7",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39872550273",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "domain unit assertions passed; overall run failed at later Clippy step"
+        }
+      ]
+    },
+    {
+      "subject_id": "muxcls.selection",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/mux.rs"
+      ],
+      "evidence": [
+        {
+          "boundary": "unit",
+          "commit": "5bc606743cc8621347f3fc1e6eb391bc57d2eea7",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39872550273",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "domain unit assertions passed; overall run failed at later Clippy step"
+        }
+      ]
+    },
+    {
+      "subject_id": "foundation.hosted",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "Cargo.lock",
+        ".github/workflows/ci.yml"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "build",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Locked workspace tests, Clippy and native desktop builds passed on all three targets; Linux shared WASM dependency check passed. No GUI runtime or portable package claim."
+        }
+      ]
+    },
+    {
+      "subject_id": "store.replay_primitives",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-store/src/lib.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "unit",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Restart/replay, principal/root/expiry/clock isolation, schema rejection, owner lock and terminal immutability assertions passed. Not yet integrated into the command owner."
+        }
+      ]
+    },
+    {
+      "subject_id": "transport.development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/interfaces.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "transport",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15"
+          ],
+          "observed_outcome": "Actual CLI JSON, official SDK stdio process and loopback HTTP boundary assertions passed. Full HTTP MCP client and operational media parity remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "media.cleanup_fixture",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-engine/tests/media.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "56b71696b0903e917990e6eb9d182d5cc6ad7dd0",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/39875992015",
+          "boundary": "media",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "Actual pinned minimal CPU FFmpeg profile generated a Matroska fixture; byte-identical copy and remux audio order/language/title assertions passed. Not the complete standard distribution or full preservation qualification."
+        }
+      ]
+    },
+    {
+      "subject_id": "pipeline.owner_machine_transports",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/owner_media.rs",
+        "crates/nw-service/src/runtime.rs",
+        "crates/nw-store/src/records.rs"
+      ],
+      "evidence": [
+        {
+          "boundary": "transport_media",
+          "commit": "5e8d01d65c5f4caab26024c4520a783f0f9e185a",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40020532431",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "Actual separate owner process, CLI and official SDK stdio and HTTP initialize/discover clients passed real asset/plan/job copy/remux, retry identity and independent object-right assertions. The media job passed; matrix jobs stopped on the deliberately unresolved extended lockfile, now retained from that run. GUI/browser and package boundaries remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "plans.reviewed_rights_v2",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/plans.rs",
+        "crates/nw-service/src/runtime.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "observed_outcome": "All native tests/Clippy/desktop compositions passed; Linux real engine/CLI/official SDK/native/Chrome jobs passed. Equivalent native source/output rights reviewed by two principals had one semantic hash. This is a single-source cleanup contract, not project graph or release qualification."
+        }
+      ]
+    },
+    {
+      "subject_id": "artifacts.bounded_http_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/artifacts.rs",
+        "crates/nw-service/src/runtime/artifacts.rs",
+        "apps/numera-wiz/src/server/artifacts.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "actual_linux_owner_http",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "artifact_sha256": "1d1bafa1cef444b1d34082ea03747565896c5f94e9e392746ba9d7e0e519a095",
+          "report": "docs/development/evidence/artifact-http-ci54.json",
+          "observed_outcome": "Produced 268633400-byte valid media output transferred incrementally through the authenticated owner; measured process high-water mark 34980 KiB. Live job Read/bearer withdrawal and disconnect cleanup passed. Not full aggregate R20 or packaged qualification."
+        }
+      ]
+    },
+    {
+      "subject_id": "native.cleanup_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-ui/src/lib.rs",
+        "apps/numera-wiz/tests/native_ui.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40061709915",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "artifact_sha256": "615a0326ac8cb7cef9d9ddabc4d09fa363228055daccbe2f24e0543bc8ce2648",
+          "report": "docs/development/evidence/native-copy-ci54.json",
+          "observed_outcome": "Actual CI-built native executable and mouse/keyboard input registered media, reviewed and submitted a byte-copy job. Independent output byte equality passed; completed workspace screenshot personally inspected. Output details activation is added later and is not credited by this report. Not other-platform GUI, preview or full five-surface qualification."
+        },
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Actual native Output details click completed the canonical manifest request before the independent harness SHA/length oracle. Screenshots were retained but not personally inspected for this run. Not preview, other-platform GUI, Save As or full parity."
+        },
+        {
+          "commit": "9f33c8eccc546851b4929b33cf6eedea5b55c6cb",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40071636236",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/native-manifest-ci64.json",
+          "observed_outcome": "All jobs passed. Actual Output details mouse input, independent manifest SHA/length assertion and personally inspected original native PNG show 197983 verified bytes and a Succeeded job. No package, preview, full F08 or new filesystem timestamp qualification is inferred."
+        }
+      ]
+    },
+    {
+      "subject_id": "source.original_native_objects",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/files.rs",
+        "crates/nw-domain/src/plans.rs",
+        "crates/nw-engine/src/lib.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Original native source/output-parent identity and historical omission units passed on all four native targets, including full Windows 128-bit IDs. The actual Linux media job passed physical source/parent replacement and fresh review. Every source family and filesystem/package remains unqualified."
+        }
+      ]
+    },
+    {
+      "subject_id": "owner.native_reattachment",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/src/client.rs",
+        "apps/numera-wiz/tests/interfaces.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Actual concurrent same-root startup and retained SDK stdio idle restart/principal binding passed on all four targets without extending the attachment deadline."
+        }
+      ]
+    },
+    {
+      "subject_id": "store.actual_lost_response_replay",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/support/lost_ack.rs",
+        "crates/nw-store/src/records.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "The Linux real owner/SDK journey lost both actual accepted submission responses, restarted the idle owner, and returned the same receipt/job under the same root/principal and original request. Retired versions/crash/migration remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "publication.destination_claims",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/claims.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-service/src/runtime.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Separate executable copies with distinct environments shared absent-target and alias claims on all four platforms; waiting cancellation and killed-holder unlock passed. The actual Linux engine retained its claim through the fence and cancelled a contending verified attempt. Remaining T017 boundaries stay open."
+        }
+      ]
+    },
+    {
+      "subject_id": "cleanup.filesystem_times",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/file_times.rs",
+        "crates/nw-platform/src/file_times.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-ui/src/cleanup.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "06166dea5a1310c870065d3f105c5ac56f491623",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40076950138",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/file-times-ci66.json",
+          "observed_outcome": "All native timestamp/native-publication, denial-policy, canonical-number/hash and old-store preservation regressions passed. Actual Linux required copy/remux, CLI/SDK facts and existing native/Chrome copy journeys passed. Native PNG personally inspected. Explicit control variants, generation migration, packages/resources/GPU remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "cleanup.selection_report",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/reports.rs",
+        "crates/nw-service/src/runtime.rs",
+        "crates/nw-ui/src/cleanup.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "f4d6ff05336c9f3f5ecdd77571bb55c58d92851d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40078904727",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci68.json",
+          "observed_outcome": "All four ordinary native report/rights units and actual CLI/official SDK report calls passed. Actual Chrome pointer/network-response journey and personally inspected PNG showed all three unique source/retained rows. Native report GUI, further control/page variants and complete F08 remain open."
+        },
+        {
+          "commit": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40079710323",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci69.json",
+          "observed_outcome": "All functional gates passed: four full native targets, WASM, complete actual media/transports/large HTTP and real Chrome/native report input through subsequent verified output. Actual native report and manifest PNGs personally inspected. Only one exact hosted harness formatting hunk failed; full product/package/resource/owner boundaries remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "publication.held_directory_links",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/publication.rs",
+        "crates/nw-engine/src/lib.rs",
+        "apps/numera-wiz/tests/artifact_http.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "f4d6ff05336c9f3f5ecdd77571bb55c58d92851d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40078904727",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci68.json",
+          "observed_outcome": "Held-directory no-replace/namespace-swap regressions passed in the native suites. Actual copy/remux and CLI/SDK/large owner HTTP journeys passed with exact retained payload/proof objects and transient-index cleanup. Complete recovery, retention and package/filesystem/resource qualification remain open."
+        },
+        {
+          "commit": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40079710323",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/selection-reports-ci69.json",
+          "observed_outcome": "All functional gates passed: four full native targets, WASM, complete actual media/transports/large HTTP and real Chrome/native report input through subsequent verified output. Actual native report and manifest PNGs personally inspected. Only one exact hosted harness formatting hunk failed; full product/package/resource/owner boundaries remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "cleanup.original_mov_mp4_video",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-engine/src/output_profile.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-engine/tests/media.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "0a4073d26b485e3fb87cf3ef321e73e7dc59f44b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40082246721",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/original-container-ci72.json",
+          "observed_outcome": "All native admission/legacy/tag units passed. Actual Linux MOV and MP4 MPEG-4 ordinary-video first/second round trips passed full packet/clock/extradata/side-data and independent raw name/brand assertions. Complete media/CLI/SDK/large HTTP and native shared workspace passed; Chrome report observation failed. Profile-specific five-surface variants, broader routes and all package/resource/owner gates remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "artifacts.client_copy_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/download.rs",
+        "crates/nw-platform/src/download.rs",
+        "apps/numera-wiz/src/client/download.rs",
+        "apps/numera-wiz/src/artifacts_cli.rs",
+        "crates/nw-ui/src/lib.rs",
+        "crates/nw-ui/src/web/download.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "4b40f816f6846dc9e74ea3a7eee1e2c3b44a1d0d",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40091314188",
+          "boundary": "actual_linux_scoped_cli_and_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/client-save-ci77.json",
+          "observed_outcome": "Actual 268633400-byte job-read-only CLI copy, observed 26016 KiB high-water mark, independent full byte identity and partial SIGINT cleanup. Actual native typed-destination and Save pointer input produced independently identical bytes with one producer job; PNG personally inspected. Native OS picker, Chrome Save, other platforms/packages and full R20 remain open."
+        },
+        {
+          "commit": "1a7c3f8197ae21574af6a6cd9de3f26eb564782e",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40096506818",
+          "boundary": "actual_linux_native_os_save_picker",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/client-save-ci79.json",
+          "observed_outcome": "Real typed destination/Save and genuine OS Save As both produced independently identical 197983-byte files, retained one producer job and closed normally. Actual OS-saved PNG personally inspected. Chrome reached real Save input but not a detected OS picker; browser save, other platforms, packaging and full R20 remain open."
+        },
+        {
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40100432221",
+          "artifact_sha256": "5729284030f13cacc6ec7cf48944867e15c83bd37e72e7a1c5ad6c85489b70bb",
+          "asserted_domain": "actual Linux headed Chrome genuine OS Save As through shared WASM and authenticated artifact stream",
+          "observed_outcome": "197983-byte saved/source full equality; one producer job; successful PNG personally inspected; other browsers/platforms/packages remain unqualified"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "run_id": 40075785336,
+  "branch_head": "9e72769d35bef778f76b89c001be5978dd9ef239",
+  "boundary": "filesystem access/modification timestamp policy; development evidence",
+  "jobs": [
+    {
+      "id": 120818701187,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120818701373,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120818701383,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120818701703,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120819062632,
+      "name": "checks (macos-15)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120819062634,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120819062664,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120819062674,
+      "name": "checks (windows-2025)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120820834285,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120820835381,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "asserted": [
+    "native timestamp setter, exact negative-epoch conversion and no-replace publication units on all four native targets",
+    "injected metadata denial distinguishes required from best-effort policy",
+    "new policy does not invoke a timestamp setter",
+    "canonical integer, semantic hash, historical omission and version-1-store preservation units",
+    "actual required timestamp copy and remux with independent metadata assertions",
+    "actual CLI and official SDK metadata facts",
+    "scoped private warning-message omission",
+    "complete existing Linux media, lost-response SDK and large HTTP journeys",
+    "actual Chrome shared UI journey"
+  ],
+  "failures": [
+    "formatting: 53 exact hosted diagnostic hunks applied in the following revision",
+    "Clippy: one collapsible_if in the engine metadata helper; corrected in the following revision"
+  ],
+  "not_asserted": [
+    "new native timestamp control variants",
+    "native GUI in this run: prerequisite lint failure skipped the job",
+    "old executable downgrade test",
+    "stopped-root store generation migration",
+    "complete F08, packages, resource or GPU qualification"
+  ],
+  "artifacts": [
+    {
+      "id": 12553790253,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "13acdcc5d1da7fc666873ab22c5b3f8117477d38d2214c5cfd798de7186b578f",
+      "downloaded": false
+    },
+    {
+      "id": 12553161258,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "e14ce5bc61ba8931bfac4c8ea9c100ad09e210080a0af1f10e53e9b65163d272",
+      "downloaded": false
+    }
+  ]
+}

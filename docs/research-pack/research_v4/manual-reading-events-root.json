@@ -1,0 +1,1702 @@
+[
+  {
+    "file": "doc_filters.texi",
+    "start_line": 417,
+    "end_line": 473,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546474+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 474,
+    "end_line": 552,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546488+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 553,
+    "end_line": 556,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546490+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 557,
+    "end_line": 566,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546491+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 567,
+    "end_line": 571,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546493+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 630,
+    "end_line": 694,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546494+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 695,
+    "end_line": 717,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546495+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 718,
+    "end_line": 775,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546496+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 776,
+    "end_line": 779,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546497+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 780,
+    "end_line": 784,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546498+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 785,
+    "end_line": 835,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546499+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 836,
+    "end_line": 880,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546500+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 881,
+    "end_line": 894,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546501+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 895,
+    "end_line": 915,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546502+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 916,
+    "end_line": 939,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546503+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 940,
+    "end_line": 968,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546504+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 969,
+    "end_line": 972,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546505+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 973,
+    "end_line": 978,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546506+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 979,
+    "end_line": 1025,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546507+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1026,
+    "end_line": 1029,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546508+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1030,
+    "end_line": 1063,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546509+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1064,
+    "end_line": 1184,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546510+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1185,
+    "end_line": 1188,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546511+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1189,
+    "end_line": 1204,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546512+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1205,
+    "end_line": 1208,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546513+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1209,
+    "end_line": 1240,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546515+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1241,
+    "end_line": 1268,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546516+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1269,
+    "end_line": 1314,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546517+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1315,
+    "end_line": 1318,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546519+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1383,
+    "end_line": 1434,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546520+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1435,
+    "end_line": 1439,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546521+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1562,
+    "end_line": 1684,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546522+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1685,
+    "end_line": 1688,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546523+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1689,
+    "end_line": 1712,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546526+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1713,
+    "end_line": 1800,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546527+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1801,
+    "end_line": 1829,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:14:16.546528+00:00"
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1830,
+    "end_line": 1940,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783215+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1941,
+    "end_line": 1964,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783232+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1965,
+    "end_line": 1992,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783234+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 1993,
+    "end_line": 2011,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783236+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2012,
+    "end_line": 2015,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783237+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2016,
+    "end_line": 2071,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783238+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2072,
+    "end_line": 2075,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783240+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2076,
+    "end_line": 2143,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783241+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2144,
+    "end_line": 2147,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783242+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2269,
+    "end_line": 2317,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783243+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2318,
+    "end_line": 2390,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783245+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2391,
+    "end_line": 2411,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783246+00:00",
+    "small_batch": 0
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2597,
+    "end_line": 2661,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783248+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2662,
+    "end_line": 2672,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783249+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2673,
+    "end_line": 2690,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783252+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2691,
+    "end_line": 2733,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783253+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2734,
+    "end_line": 2737,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783254+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2738,
+    "end_line": 2795,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783255+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2796,
+    "end_line": 2806,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783256+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2807,
+    "end_line": 2810,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783258+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2885,
+    "end_line": 2918,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783259+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2919,
+    "end_line": 2937,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783260+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2938,
+    "end_line": 2941,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783261+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2942,
+    "end_line": 2948,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783262+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2949,
+    "end_line": 2980,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783263+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2981,
+    "end_line": 2984,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783264+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 2985,
+    "end_line": 3042,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783265+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3095,
+    "end_line": 3149,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783266+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3150,
+    "end_line": 3167,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783268+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3168,
+    "end_line": 3171,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783269+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3172,
+    "end_line": 3178,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783271+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3220,
+    "end_line": 3260,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783272+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3261,
+    "end_line": 3267,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783275+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3268,
+    "end_line": 3305,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783276+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3306,
+    "end_line": 3309,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:13.783277+00:00",
+    "small_batch": 1
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3310,
+    "end_line": 3377,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933156+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3378,
+    "end_line": 3413,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933169+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3594,
+    "end_line": 3634,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933172+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3635,
+    "end_line": 3638,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933174+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3639,
+    "end_line": 3660,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933175+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3661,
+    "end_line": 3664,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933177+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3665,
+    "end_line": 3682,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933178+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3683,
+    "end_line": 3686,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933179+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3687,
+    "end_line": 3707,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933181+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3708,
+    "end_line": 3711,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933182+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3712,
+    "end_line": 3732,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933183+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3733,
+    "end_line": 3736,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933184+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3912,
+    "end_line": 3992,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933185+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 3993,
+    "end_line": 4013,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933186+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4014,
+    "end_line": 4089,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933189+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4090,
+    "end_line": 4110,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933190+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4111,
+    "end_line": 4196,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933191+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4197,
+    "end_line": 4221,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933192+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4289,
+    "end_line": 4321,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933194+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4322,
+    "end_line": 4347,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933195+00:00",
+    "small_batch": 2
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4348,
+    "end_line": 4365,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933196+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4366,
+    "end_line": 4380,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933197+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4381,
+    "end_line": 4409,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933199+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4410,
+    "end_line": 4442,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933200+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4443,
+    "end_line": 4464,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933201+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4465,
+    "end_line": 4517,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933202+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4518,
+    "end_line": 4612,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933203+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4613,
+    "end_line": 4660,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933204+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4661,
+    "end_line": 4664,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933207+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4665,
+    "end_line": 4704,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933208+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4705,
+    "end_line": 4708,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933209+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4709,
+    "end_line": 4725,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933211+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4726,
+    "end_line": 4729,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933212+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4730,
+    "end_line": 4747,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933214+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4748,
+    "end_line": 4783,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933216+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4784,
+    "end_line": 4807,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933217+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4808,
+    "end_line": 4811,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933218+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4812,
+    "end_line": 4826,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:28.933220+00:00",
+    "small_batch": 3
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 4827,
+    "end_line": 5029,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217768+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5030,
+    "end_line": 5033,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217786+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5034,
+    "end_line": 5044,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217789+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5045,
+    "end_line": 5128,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217790+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5129,
+    "end_line": 5143,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217792+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5144,
+    "end_line": 5168,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217793+00:00",
+    "small_batch": 4
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5169,
+    "end_line": 5185,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217794+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5186,
+    "end_line": 5189,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217796+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5190,
+    "end_line": 5303,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217797+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5304,
+    "end_line": 5333,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217798+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5334,
+    "end_line": 5369,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217799+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5370,
+    "end_line": 5433,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217801+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5434,
+    "end_line": 5491,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217802+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5492,
+    "end_line": 5536,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217803+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5537,
+    "end_line": 5558,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217804+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5559,
+    "end_line": 5639,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217807+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5640,
+    "end_line": 5660,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217808+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5661,
+    "end_line": 5698,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:45.217809+00:00",
+    "small_batch": 5
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5699,
+    "end_line": 5755,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612548+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5756,
+    "end_line": 5844,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612564+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5845,
+    "end_line": 5854,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612566+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 5924,
+    "end_line": 6004,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612568+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6005,
+    "end_line": 6013,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612569+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6014,
+    "end_line": 6034,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612572+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6035,
+    "end_line": 6071,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612573+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6072,
+    "end_line": 6093,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612575+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6094,
+    "end_line": 6097,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612576+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6098,
+    "end_line": 6114,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612577+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6226,
+    "end_line": 6309,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612578+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6310,
+    "end_line": 6322,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612579+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6323,
+    "end_line": 6384,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612581+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6385,
+    "end_line": 6388,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612582+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6389,
+    "end_line": 6400,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612583+00:00",
+    "small_batch": 6
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6401,
+    "end_line": 6471,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612584+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6472,
+    "end_line": 6475,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612586+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6476,
+    "end_line": 6510,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612588+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6511,
+    "end_line": 6527,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612589+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6528,
+    "end_line": 6641,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612590+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6642,
+    "end_line": 6687,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612592+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6688,
+    "end_line": 6691,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612593+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6692,
+    "end_line": 6764,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612594+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6765,
+    "end_line": 6787,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:52.612595+00:00",
+    "small_batch": 7
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6788,
+    "end_line": 6850,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451059+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6851,
+    "end_line": 6854,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451075+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6855,
+    "end_line": 6888,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451078+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 6889,
+    "end_line": 7014,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451080+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7015,
+    "end_line": 7018,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451081+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7019,
+    "end_line": 7034,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451083+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7035,
+    "end_line": 7061,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451084+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7062,
+    "end_line": 7065,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451085+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7066,
+    "end_line": 7108,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451086+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7109,
+    "end_line": 7274,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451087+00:00",
+    "small_batch": 8
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7275,
+    "end_line": 7361,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451089+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7362,
+    "end_line": 7365,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451090+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7366,
+    "end_line": 7451,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451094+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7452,
+    "end_line": 7476,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451097+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7477,
+    "end_line": 7495,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451098+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7496,
+    "end_line": 7511,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451099+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7512,
+    "end_line": 7531,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451100+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7847,
+    "end_line": 7851,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451102+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7852,
+    "end_line": 7886,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451103+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7887,
+    "end_line": 7900,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451104+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7901,
+    "end_line": 7954,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451105+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7955,
+    "end_line": 7997,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451106+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 7998,
+    "end_line": 8024,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451107+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8025,
+    "end_line": 8089,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451108+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8090,
+    "end_line": 8127,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451110+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8182,
+    "end_line": 8212,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:16:58.451111+00:00",
+    "small_batch": 9
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8213,
+    "end_line": 8245,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134857+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8246,
+    "end_line": 8277,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134872+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8278,
+    "end_line": 8288,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134875+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8289,
+    "end_line": 8315,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134876+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8316,
+    "end_line": 8358,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134877+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8359,
+    "end_line": 8404,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134879+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8405,
+    "end_line": 8432,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134881+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8433,
+    "end_line": 8437,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134882+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8438,
+    "end_line": 8448,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134883+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8449,
+    "end_line": 8456,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134885+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8457,
+    "end_line": 8466,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134886+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8467,
+    "end_line": 8522,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134887+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8523,
+    "end_line": 8539,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134888+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8540,
+    "end_line": 8544,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134889+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8545,
+    "end_line": 8558,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134891+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8559,
+    "end_line": 8595,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134892+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8596,
+    "end_line": 8607,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134893+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8608,
+    "end_line": 8636,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134894+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8637,
+    "end_line": 8694,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134895+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8695,
+    "end_line": 8698,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134897+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8699,
+    "end_line": 8716,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134898+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8717,
+    "end_line": 8723,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134900+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8724,
+    "end_line": 8738,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134901+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8739,
+    "end_line": 8742,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134902+00:00",
+    "small_batch": 10
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8743,
+    "end_line": 8759,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134904+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8760,
+    "end_line": 8763,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134906+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8764,
+    "end_line": 8780,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134908+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8781,
+    "end_line": 8784,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134910+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8785,
+    "end_line": 8799,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134911+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8800,
+    "end_line": 8866,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134912+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8867,
+    "end_line": 8895,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134913+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 8896,
+    "end_line": 9012,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134914+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9013,
+    "end_line": 9064,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134915+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9065,
+    "end_line": 9068,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134917+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9069,
+    "end_line": 9086,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134918+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9087,
+    "end_line": 9097,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134919+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9098,
+    "end_line": 9138,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134920+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9139,
+    "end_line": 9148,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134921+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9149,
+    "end_line": 9205,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134922+00:00",
+    "small_batch": 11
+  },
+  {
+    "file": "doc_filters.texi",
+    "start_line": 9206,
+    "end_line": 9233,
+    "reviewer": "root-v4",
+    "read_confirmed_at": "2026-10-21T19:18:03.134923+00:00",
+    "small_batch": 11
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "rows": 307,
+  "unique_source_ids": 307,
+  "canonical_capability_ids": 296,
+  "evaluated_parameters_in_records": 3032,
+  "dispositions": {
+    "composed": 211,
+    "unsupported": 19,
+    "native": 45,
+    "component": 21,
+    "application": 11
+  },
+  "coverage": {
+    "partial": 41,
+    "none": 19,
+    "core": 236,
+    "control": 11
+  },
+  "distinct_documented_filter_names": 143,
+  "unassigned_rows": 0,
+  "runtime_qualified_rows": 0,
+  "application_builds_run": 0,
+  "media_commands_run": 0,
+  "input_csv_modified": false
+}

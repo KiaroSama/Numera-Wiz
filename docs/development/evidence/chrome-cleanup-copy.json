@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "boundary": "Shared WASM utility UI media journey",
+  "status": "observed_subset",
+  "commit": "2deef857b8942fe4384128bed589ce7996a5719b",
+  "ui_source": "72fcb3ad7e5c2abfde620168e39e6865f7cb2a54",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40036274278",
+  "artifact_id": "12536893187",
+  "browser_version": "155.0.8059.39",
+  "driver_version": "155.0.8059.39 (3ff7ac5a9224be9156d7f8703a06e22890aafd34-refs/branch-heads/8059@{#935})",
+  "os": "linux",
+  "architecture": "x86_64",
+  "runner_image": "20261012.334.1",
+  "screenshot": {
+    "path": "chrome-cleanup-copy.png",
+    "sha256": "ce4c9bf369c77c32df943b65f6d8ca7e72b87ae2ff0d5d376c7fc1b3ef7d90f9",
+    "bytes": "103174"
+  },
+  "observed": [
+    "Actual same-source embedded WASM under enforced CSP/MIME",
+    "One-use origin-bound pairing and page teardown",
+    "Actual Choose media control, streamed intake and registration",
+    "Actual Review and Run controls, terminal succeeded job and independent full input/output byte equality"
+  ],
+  "output": {
+    "artifact": {
+      "bytes": "197900",
+      "path": "/tmp/.tmpzeJgl6/exports/source-clean-c841dd2120994ba982b24b53d84d475e.mkv",
+      "sha256": "a70a201d5509face31aa115e98b3bfe948e4f146865c9c21cdd408bca337cfc8"
+    },
+    "job_id": "110abed8-1de2-4047-ac56-8a371da193c6",
+    "oracle": "Full independent source/output byte equality after actual shared UI file selection, review and Run",
+    "plan_hash": "be68d1ee683e28c9afe88ace5e0b8377565c49f5d3582272050b133073a97cad",
+    "state": "succeeded",
+    "verification": "Full byte SHA-256 and length verified before no-replace publication"
+  },
+  "composition": "The production service/router and embedded namespace ran in the integration-test process. This does not qualify the complete portable worker/package lifecycle.",
+  "not_qualified": [
+    "Complete MuxCls or F01-F15",
+    "Native desktop interaction",
+    "Preview/audio/video playback",
+    "Other browser families",
+    "Standard portable media payload",
+    "Owner GPU routes"
+  ],
+  "artifact_sha256": "a97b5ea9804055eb55dba8d8e5a498c159f290f9b408d35b24d5c76549e4d8b6"
+}

@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "run_id": 40079710323,
+  "branch_head": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+  "jobs": [
+    {
+      "id": 120830516353,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830516430,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120830516477,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830516561,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830875532,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830875565,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830875583,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120830875587,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120831921625,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120831934094,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "all_functional_jobs": "success",
+  "formatting": "one exact hosted diagnostic hunk applied in the following revision",
+  "asserted": [
+    "all four native ordinary regressions, Clippy and matching desktop builds",
+    "complete engine/CLI/official SDK/lost-response and large HTTP/revocation/disconnect journeys",
+    "real native Selection report pointer input and canonical completion before independent report oracle",
+    "native Escape closes report; existing Review/keyboard Run/full-byte output and Output details controls",
+    "real Chrome report pointer/network-response and subsequent media output"
+  ],
+  "native_visual_review": {
+    "personally_inspected": true,
+    "selection_encoded_png_characters": 151424,
+    "manifest_encoded_png_characters": 174492,
+    "observed": [
+      "Selection report: one ready candidate, three unique source/retained rows",
+      "source ffv1/und and pcm_s16le/eng/fas rows",
+      "Opened Output details with 197983 verified bytes and full wrapped digest",
+      "Succeeded row after report Escape and actual Review/Run"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": 12555111434,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "9e4a60c5ce727fc37822c0ddf0bd41e166597b2895f33219db902eaa4b4df121",
+      "downloaded": false
+    },
+    {
+      "id": 12554662653,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "3b490b5715def0e00132c166bdfba2e9513c98d8201ba0b398cad98bf8e40fdb",
+      "downloaded": false
+    },
+    {
+      "id": 12554492933,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "abbf2673ba1d592716dd981266df815b0e81be4c00670ae8949a0534798f1177",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "MOV/MP4 profiles introduced after this run",
+    "all report control/page variants, folder/batch F08",
+    "complete product, migration, packages, aggregate resources or owner GPU"
+  ]
+}

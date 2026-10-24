@@ -1,0 +1,349 @@
+--- standalone/muxcls/__init__.py
++++ embedded/ffmwiz/muxcleanup/__init__.py
+@@ -1,4 +1,5 @@
+-"""MuxCls package (split from the original single-file MuxCls.py)."""
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
++"""FFmWiz Stream Cleanup Remux subsystem."""
+ from __future__ import annotations
+ 
+ APP_VERSION = "1.3.1"
+--- standalone/muxcls/app.py
++++ embedded/ffmwiz/muxcleanup/app.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import sys
+@@ -10,13 +11,17 @@
+ from .media import find_non_video_extensions, find_video_files, require_tool, scan_files
+ from .models import SelectionRules
+ from .output import resolve_output_root
+-from .processing import print_ready_for_next_task, process_files, verify_output
++from .processing import ProcessSummary, print_ready_for_next_task, process_files, verify_output
+ from .prompts import MenuBack, MenuExit, ask_output_base_path, ask_path, ask_yes_no, input_path_from_args
+ from .reporting import print_header, print_scan_report, print_setting, print_unique_summary
+ from .selection import configure_rules, revisit_last_rule_step
+ 
+ 
+-def main_menu() -> None:
++def main_menu(allow_back: bool = False) -> ProcessSummary | None:
++    # allow_back is the embedding switch: standalone MuxCls has nowhere to go
++    # back to, but inside FFmWiz the input prompt is a way out to the wizard
++    # menu. The last run's summary travels back with it so the caller can
++    # report the outcome instead of guessing at it.
+     enable_windows_ansi()
+     log_path = setup_logging()
+     print_header("MuxCls", leading_blank=False)
+@@ -43,6 +48,7 @@
+         sys.exit(1)
+ 
+     input_from_args = input_path_from_args(sys.argv[1:])
++    last_summary: ProcessSummary | None = None
+ 
+     while True:
+         input_root = input_from_args
+@@ -57,11 +63,15 @@
+                 input_root = None
+ 
+         if input_root is None:
+-            input_root = ask_path(
+-                "Input file or folder path (drag/drop here, then press Enter)",
+-                must_exist=True,
+-                allow_back=False,
+-            )
++            try:
++                input_root = ask_path(
++                    "Input file or folder path (drag/drop here, then press Enter)",
++                    must_exist=True,
++                    allow_back=allow_back,
++                )
++            except MenuBack:
++                LOGGER.info("Back requested at the input path; leaving the menu")
++                return last_summary
+         LOGGER.info("Input root: %s", input_root)
+         print()
+ 
+@@ -190,9 +200,10 @@
+             if not start_processing:
+                 LOGGER.info("User cancelled before processing")
+                 print(warn("Cancelled."))
+-                return
++                return last_summary
+ 
+             summary = process_files(media_files, input_root, output_root, rules, scan.failures)
++            last_summary = summary
+ 
+             # Reading the finished files back is the only check that the output
+             # carries the streams that were asked for. It costs one ffprobe per
+@@ -206,6 +217,8 @@
+ 
+         if not restart_input:
+             break
++
++    return last_summary
+ 
+ 
+ def main() -> None:
+--- standalone/muxcls/colors.py
++++ embedded/ffmwiz/muxcleanup/colors.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import os
+@@ -13,26 +14,30 @@
+     RED = "\033[91m"
+     GREEN = "\033[92m"
+     YELLOW = "\033[93m"
+-    BLUE = "\033[94m"
+-    MAGENTA = "\033[95m"
+-    CYAN = "\033[96m"
++    # USER-12-4: every name below that also exists in ffmwiz.core.colors.Color
++    # carries Color's value, so entering Stream Cleanup from the wizard menu
++    # does not change the colour scheme mid-session. The basic-ANSI originals
++    # (94/95/96/90) read visibly duller than the wizard's 256-colour palette.
++    BLUE = "\033[38;5;117m"
++    MAGENTA = "\033[38;5;219m"
++    CYAN = "\033[38;5;123m"
+     WHITE = "\033[97m"
+-    GRAY = "\033[90m"
+-    ORANGE = "\033[38;5;208m"
++    GRAY = "\033[38;5;252m"
++    ORANGE = "\033[38;5;222m"
+     GOLD = "\033[38;5;220m"
+     AMBER = "\033[38;5;214m"
+-    LIME = "\033[38;5;154m"
++    LIME = "\033[38;5;118m"
+     MINT = "\033[38;5;121m"
+     EMERALD = "\033[38;5;48m"
+     TEAL = "\033[38;5;37m"
+-    AQUA = "\033[38;5;51m"
++    AQUA = "\033[38;5;159m"
+     SKY = "\033[38;5;117m"
+     AZURE = "\033[38;5;75m"
+     INDIGO = "\033[38;5;99m"
+     VIOLET = "\033[38;5;135m"
+     PURPLE = "\033[38;5;141m"
+     LAVENDER = "\033[38;5;183m"
+-    PINK = "\033[38;5;213m"
++    PINK = "\033[38;5;218m"
+     ROSE = "\033[38;5;204m"
+     SILVER = "\033[38;5;250m"
+     LAUNCHER_PINK = "\033[38;2;255;50;115m"
+@@ -77,12 +82,17 @@
+     BAR_FILL = "\033[38;2;0;191;185m"
+     BAR_TRACK = "\033[38;2;214;0;68m"
+     BAR_FAIL = "\033[38;2;255;79;109m"
+-    PROGRESS_PERCENT = "\033[38;2;48;209;88m"
+-    PROGRESS_SIZE = "\033[38;2;142;238;255m"
++    # The five PROGRESS_* names below are shared with Color, so they carry
++    # Color's values: percent/size/ETA/elapsed must not change colour between
++    # the wizard's FFmpeg progress line and this one. BAR_*, PROGRESS_MUTED,
++    # PROGRESS_DONE_WORD and PROGRESS_OVERALL have no counterpart in Color and
++    # keep the upstream palette.
++    PROGRESS_PERCENT = "\033[38;5;46m"
++    PROGRESS_SIZE = "\033[38;5;119m"
+     PROGRESS_DONE_WORD = "\033[38;2;57;255;106m"
+-    PROGRESS_ETA_LABEL = "\033[38;2;255;194;71m"
+-    PROGRESS_ETA_VALUE = "\033[38;2;255;154;47m"
+-    PROGRESS_ELAPSED = "\033[38;2;217;145;69m"
++    PROGRESS_ETA_LABEL = "\033[38;2;255;78;178m"
++    PROGRESS_ETA_VALUE = "\033[38;2;255;132;206m"
++    PROGRESS_ELAPSED = "\033[38;5;180m"
+     PROGRESS_MUTED = "\033[38;2;138;143;163m"
+     PROGRESS_OVERALL = "\033[38;2;66;232;255m"
+ 
+@@ -92,7 +102,8 @@
+     C.CYAN,
+     C.MAGENTA,
+     C.YELLOW,
+-    C.BLUE,
++    # C.BLUE is deliberately absent: it now carries the same value as C.SKY
++    # below, and two identical entries make two languages indistinguishable.
+     C.ORANGE,
+     C.GOLD,
+     C.LIME,
+--- standalone/muxcls/constants.py
++++ embedded/ffmwiz/muxcleanup/constants.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import os
+--- standalone/muxcls/copying.py
++++ embedded/ffmwiz/muxcleanup/copying.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ """File-copy backends used when a video needs no remux and for non-video files.
+ 
+ Windows keeps using robocopy (unbuffered `/J` copies are noticeably faster for
+--- standalone/muxcls/logsetup.py
++++ embedded/ffmwiz/muxcleanup/logsetup.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import logging
+@@ -8,7 +9,7 @@
+ import sys
+ import time
+ from collections.abc import Sequence
+-from datetime import UTC, datetime
++from datetime import datetime, timezone
+ from pathlib import Path
+ 
+ from .colors import warn
+@@ -63,11 +64,11 @@
+     global LOG_FILE
+ 
+     try:
+-        # This module lives in the muxcls package, so the project root (where the
+-        # Logs folder belongs) is the parent of the package directory.
+-        log_root = Path(__file__).resolve().parent.parent / "Logs"
++        # This module lives in ffmwiz/muxcleanup, so the project root (where the
++        # Logs folder belongs) is two directories up from the package.
++        log_root = Path(__file__).resolve().parents[2] / "Logs"
+         log_root.mkdir(parents=True, exist_ok=True)
+-        started = datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
++        started = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+         LOG_FILE = log_root / f"muxcls_{started}_UTC.log"
+ 
+         level = logging.DEBUG if debug_enabled() else logging.INFO
+--- standalone/muxcls/media.py
++++ embedded/ffmwiz/muxcleanup/media.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import json
+@@ -174,6 +175,21 @@
+         return None
+ 
+ 
++# The code this reports when the child could not be started at all, or its
++# output could not be captured. It was 1 -- and robocopy's convention, which
++# `output.robocopy_success` implements, is that 0-7 all mean SUCCESS. So a
++# robocopy that never launched came back as rc=1 and both call sites in
++# copying.py read it as a clean run: one logged "Extra files copied ... rc=1"
++# having copied nothing, the other skipped its "robocopy failed" raise and
++# died later on the misleading "robocopy did not create the output file".
++#
++# 127 is the shell convention for "command not found" and, more to the point,
++# it is outside robocopy's success range. Every consumer here treats any
++# non-zero code as failure (`!= 0` in logsetup and processing), so raising the
++# value costs them nothing.
++LAUNCH_FAILED_RETURNCODE = 127
++
++
+ def run_with_progress(
+     args: Sequence[str],
+     total_started_at: float | None = None,
+@@ -203,7 +219,8 @@
+                 )
+             except OSError as exc:
+                 LOGGER.error("Could not start %s: %s", label, exc)
+-                return subprocess.CompletedProcess(list(args), 1, "", str(exc))
++                return subprocess.CompletedProcess(
++                    list(args), LAUNCH_FAILED_RETURNCODE, "", str(exc))
+ 
+             timed_out = False
+             capture_offset = 0
+@@ -235,7 +252,8 @@
+             stderr = stderr_file.read()
+     except OSError as exc:
+         LOGGER.exception("Failed to capture output of %s", label)
+-        return subprocess.CompletedProcess(list(args), 1, "", str(exc))
++        return subprocess.CompletedProcess(
++            list(args), LAUNCH_FAILED_RETURNCODE, "", str(exc))
+ 
+     if timed_out:
+         return subprocess.CompletedProcess(
+@@ -257,10 +275,18 @@
+ 
+     Which build of FFmpeg ran is the first question any report about a bad
+     output raises, and it is not something the user can reconstruct later.
++
++    UTF-8 explicitly, like `run_command` above. `text=True` alone decodes with
++    the OS code page, and a build whose `configuration:` line names a non-ASCII
++    path emits bytes that page has no character for. Measured on cp1252 with a
++    Cyrillic prefix: the decode raised inside subprocess's own reader thread, so
++    `except (OSError, SubprocessError)` never saw it -- a UnicodeDecodeError
++    traceback went to the console and the version came back "unknown".
+     """
+     try:
+         proc = subprocess.run(
+             [binary, "-version"], check=False, capture_output=True, text=True,
++            encoding="utf-8", errors="replace",
+             timeout=PROBE_TIMEOUT_SECONDS, stdin=subprocess.DEVNULL,
+         )
+     except (OSError, subprocess.SubprocessError) as exc:
+--- standalone/muxcls/metadata_edits.py
++++ embedded/ffmwiz/muxcleanup/metadata_edits.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ """Editing the metadata of the streams an output will keep.
+ 
+ A self-contained step inside rule configuration: which languages and indexes are
+--- standalone/muxcls/models.py
++++ embedded/ffmwiz/muxcleanup/models.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass, field
+--- standalone/muxcls/muxlogic.py
++++ embedded/ffmwiz/muxcleanup/muxlogic.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ from collections.abc import Sequence
+--- standalone/muxcls/output.py
++++ embedded/ffmwiz/muxcleanup/output.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import os
+--- standalone/muxcls/processing.py
++++ embedded/ffmwiz/muxcleanup/processing.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import time
+--- standalone/muxcls/progressview.py
++++ embedded/ffmwiz/muxcleanup/progressview.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ """A multi-row progress block that repaints in place.
+ 
+ Adapted from EVdlc's `utils/progress.py` / `utils/progress_render.py`: the same
+--- standalone/muxcls/prompts.py
++++ embedded/ffmwiz/muxcleanup/prompts.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ from collections.abc import Sequence
+--- standalone/muxcls/reporting.py
++++ embedded/ffmwiz/muxcleanup/reporting.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ from collections.abc import Sequence
+--- standalone/muxcls/selection.py
++++ embedded/ffmwiz/muxcleanup/selection.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ from .colors import C, color, info, warn
+--- standalone/muxcls/textutil.py
++++ embedded/ffmwiz/muxcleanup/textutil.py
+@@ -1,3 +1,4 @@
++# Part of the FFmWiz Stream Cleanup Remux subsystem.
+ from __future__ import annotations
+ 
+ import shutil
