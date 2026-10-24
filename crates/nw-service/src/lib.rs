@@ -68,7 +68,8 @@ impl CommandService {
         match result {
             Ok(value) => Response::success(&id, value),
             Err(error) => Response::error(&id, error),
-        }.bounded()
+        }
+        .bounded()
     }
 }
 #[cfg(test)]

@@ -63,24 +63,26 @@ revocation, listener draining, timeout and cancellation stop later body frames.
 Already delivered bytes cannot be revoked. No redirects or query bearer URLs
 are introduced. The existing HTTP 130 second total request bound still applies.
 
-New source assertions cover physical replacement, mutation, exact cross-block/
-final/EOF ranges, bounds, wrong digest, cancellation, transfer capacity, restart,
-write-only-export purpose and job revocation. The real owner fixture now exercises
-CLI, both MCP versions/transports, manifest resources and authenticated full/range
-HTTP bytes from actual produced artifacts. An isolated hosted Linux journey
-transfers a 256 MiB plus 17-byte artifact under an asserted 128 MiB process RSS
-ceiling. These newly added cases await their own hosted result; this is not a
-claim of full B7-J03 observation, packaged download or aggregate RSS qualification.
-Native Save As, browser streamed Save As, observations, retained snapshot/revision
-purposes and complete artifact retention/export management remain required work.
+Hosted run [40059650873](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40059650873)
+passed cross-platform assertions for physical replacement, mutation, exact
+cross-block/final/EOF ranges, bounds, wrong digest, cancellation, capacity,
+restart, write-only-export purpose and job revocation. Its real owner fixture
+exercised CLI, both MCP versions/transports, manifest resources and authenticated
+full/range HTTP bytes from actual produced artifacts. The isolated Linux reader
+transferred 268435473 bytes with VmHWM 3556 KiB under a 128 MiB process ceiling.
 
-The next hosted integration journey constructs a valid Matroska file larger than
-256 MiB using the pinned muxer's reserved Cues/Void region, registers it, reviews
-and submits a true byte-copy job, then hashes the complete authenticated HTTP
-response incrementally. It observes the matching protected owner's Linux process
-VmHWM under a selected 128 MiB ceiling, revokes job Read during one active stream,
-revokes one bearer during another, and checks client-disconnect index cleanup.
-The owner identity comes from matching protected root/epoch log records, never
-from an untrusted PID used as authority. The new fixture is not yet qualified.
-Protected first-party JSONL and a report are retained in CI; no runtime credentials
-or complete media bytes are uploaded as diagnostic evidence.
+The actual CI-built Linux headless owner also transferred a valid 268633400-byte
+Matroska output, created with pinned FFmpeg and published by a reviewed byte-copy
+job. Its complete HTTP response was incrementally hashed; owner VmHWM was 34388
+KiB under a selected 128 MiB ceiling. Job Read withdrawal and separate bearer
+revocation stopped subsequent body delivery before EOF and denied fresh requests.
+Client disconnect removed the temporary index. The protected root/epoch matched
+the observed owner PID; no untrusted PID was used as authority. Exact source,
+executable, component, plan and artifact identities are retained in
+[evidence/artifact-http-ci51.json](evidence/artifact-http-ci51.json). CI retains
+protected first-party JSONL diagnostics, never credentials or full media bytes.
+
+This is not complete B7-J03 observation, other-platform, packaged download or
+aggregate R20 qualification. Native Save As, browser streamed Save As,
+observations, retained snapshot/revision purposes, crash-orphan reconciliation
+and complete artifact retention/export management remain required work.

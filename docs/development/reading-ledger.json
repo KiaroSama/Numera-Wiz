@@ -1191,6 +1191,46 @@
         "Finish full encoder/filter/drawvg manual bodies.",
         "Implement all admitted output families and their multi-artifact publication/dependency/clock/resource/package qualification."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_encoders.texi",
+      "sha256": "3dc2f777ab802bc087705a41b44fc0c70dee9989a2cf8a0e8c2b33287c06e644",
+      "lines": [
+        1,
+        4801
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in contiguous ranges 1-460 through 4141-4600 and 4601-4801; external library APIs, actual binaries and devices are not credited",
+      "interpretation": [
+        "Native AAC defaults/tools and codec-specific quality/rate controls are explicit profile semantics; not all encoders share meanings for b/q.",
+        "AC-3 fixed versus floating point is not a universal speed ranking. Dialnorm/downmix metadata can alter decoded playback levels even when the encoded samples were otherwise unchanged.",
+        "Dolby Surround/Headphone/EX metadata labels do not apply the named DSP; claiming a processing effect from the label alone is incorrect.",
+        "Native Opus implements only CELT in this manual and is not an equivalent quality substitute for libopus. FDK AAC HE/VBR/profile restrictions and nonfree GPL packaging constraints cannot be hidden by a generic AAC label.",
+        "FLAC prediction/search/compression knobs change CPU cost without changing the lossless decoded claim; exact decoded/sample-count/timing verification is still required.",
+        "LC3 frame duration, high-resolution auto behavior and LAME algorithm quality versus rate-control quality are separate codec-specific semantics.",
+        "Opus channel mapping, FEC, packet-loss, DTX, phase inversion and latency mode alter the coding contract. AMR bitrates may be rounded rather than applied exactly.",
+        "AV1 tile/row thread controls and lookahead have separate resource effects. CRF/QP and preset values are codec-specific; library version and actual capability must be part of the frozen profile.",
+        "Lossless JPEG 2000 and JPEG XL require explicit modes; WebP can convert between RGB/YUV internally and its quality knob means different things in lossless and lossy modes.",
+        "x264/x265 parameter mini-languages include stats-file reads/writes, defaults, reference/GOP and SEI/caption policies. A typed admitted profile must enumerate those effects rather than expose an unconstrained option string.",
+        "MediaCodec async global-header and PTS-as-DTS behavior depend on mode/device; MediaFoundation hardware requires its D3D11 route rather than general hardware availability.",
+        "ProRes profile, quantization, alpha precision and bit constraints are explicit media/profile choices; overriding vendor metadata does not prove encoder provenance.",
+        "QSV may select a different rate-control mode at runtime and clamp bitrates; frozen admission must inspect the resolved mode, driver and capability rather than infer it from requested options.",
+        "VAAPI requires hardware surfaces and explicit upload. Async depth and frame pools consume resources; low-power modes can reduce features. VP9 reordering/superframe and HDR/SEI policies require exact qualified bitstream contracts.",
+        "Subtitle palette/even-row fixes and LRC fractional precision change representation or timing; explicit profiles and independent subtitle/clock oracles remain necessary."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T035"
+      ],
+      "unresolved": [
+        "Read full filters and drawvg bodies; finish actual codec/profile, runtime-resolution, resource, subtitle and package qualification."
+      ]
     }
   ],
   "in_progress_manual_reads": []
