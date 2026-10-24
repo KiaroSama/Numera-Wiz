@@ -162,17 +162,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(accepted["receipt_id"], replay["receipt_id"]);
     assert_eq!(accepted["result"]["job_id"], replay["result"]["job_id"]);
     assert_eq!(
-        cli.query("jobs.list", json!({}))
-            .await["items"]
+        cli.query("jobs.list", json!({})).await["items"]
             .as_array()
             .unwrap()
             .len(),
         1
     );
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"commands":["commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel"],"objects":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
-        cli.mutation(&scope, "create-operator", "access.profiles.put", profile)
+        cli.mutation(&scope, "create-operator", "access.profiles.put", profile.clone())
             .await["ok"],
         true
     );
@@ -251,6 +250,42 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let observed = fixture::probe(&media.bin, &output).await;
     assert_eq!(observed["streams"][1]["tags"]["language"], "fas");
     assert_eq!(observed["streams"][1]["tags"]["title"], "SDK stdio first");
+
+    // Delegation is an explicit object action; it never borrows the creator's authority.
+    let delegated_output = media.directory.path().join("delegated-copy.mkv");
+    let delegated_plan = cli.query("streams.clean", json!({"asset_id":registered["result"]["id"],"output":delegated_output,"intent":fixture::rules()})).await;
+    let mut delegated_policy = profile.clone();
+    delegated_policy["expected_revision"] = json!(1);
+    delegated_policy["object_grants"] = json!([
+        {"kind":"plan","id":delegated_plan["id"],"actions":["read","submit"]},
+        {"kind":"job","id":id,"actions":["read"]}
+    ]);
+    assert_eq!(cli.mutation(&scope, "delegate-plan-and-job", "access.profiles.put", delegated_policy.clone()).await["ok"], true);
+    let inspected = call!(stdio, "plans.inspect", json!({"id":delegated_plan["id"]}), json!({}));
+    assert_eq!(inspected["hash"], delegated_plan["hash"]);
+    assert!(inspected["argv_template"].is_null(), "Scoped views omit private invocation internals");
+    let shared_job = call!(stdio, "jobs.inspect", json!({"id":id}), json!({}));
+    assert!(shared_job["prepared_stages"].is_null());
+    assert!(shared_job["plan"].get("ffmpeg").is_none());
+    let control = stdio.call_tool(CallToolRequestParams::new("jobs.cancel").with_arguments(json!({"params":{"id":id},"context":{"replay_scope":operator_scope,"idempotency_key":"denied-shared-control"}}).as_object().unwrap().clone())).await.unwrap();
+    assert_eq!(serde_json::to_value(control).unwrap()["structuredContent"]["error"]["code"], "OBJECT_NOT_FOUND");
+    let delegated_job = call!(stdio, "jobs.submit", json!({"plan_id":delegated_plan["id"],"plan_hash":delegated_plan["hash"]}), json!({"replay_scope":operator_scope,"idempotency_key":"delegated-submit"}));
+    assert_eq!(cli.completed(delegated_job["job_id"].as_str().unwrap()).await["state"], "succeeded");
+    assert_eq!(std::fs::read(&media.source).unwrap(), std::fs::read(&delegated_output).unwrap());
+    delegated_policy["expected_revision"] = json!(2);
+    delegated_policy["owned_object_access"] = json!(false);
+    delegated_policy["object_grants"][0]["actions"] = json!(["read"]);
+    assert_eq!(cli.mutation(&scope, "withdraw-inherited-and-submit", "access.profiles.put", delegated_policy).await["ok"], true);
+    let visible = call!(stdio, "jobs.list", json!({}), json!({}));
+    assert_eq!(visible["total_count"], 1, "Only the explicit read grant survives withdrawal of inherited creator access");
+    assert_eq!(visible["items"][0]["id"], id);
+    let replay = stdio.call_tool(CallToolRequestParams::new("assets.register").with_arguments(json!({"params":{"path":media.source},"context":{"replay_scope":operator_scope,"idempotency_key":"register-stdio"}}).as_object().unwrap().clone())).await.unwrap();
+    let replay = serde_json::to_value(replay).unwrap();
+    assert_eq!(replay["structuredContent"]["error"]["code"], "RECEIPT_RESULT_RESTRICTED");
+    assert!(replay["structuredContent"]["result"].get("identity").is_none());
+    let mut restored = profile.clone();
+    restored["expected_revision"] = json!(3);
+    assert_eq!(cli.mutation(&scope, "restore-operator-for-http", "access.profiles.put", restored).await["ok"], true);
     stdio.cancel().await.unwrap();
 
     let bind = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

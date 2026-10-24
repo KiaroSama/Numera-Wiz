@@ -240,14 +240,24 @@ pub fn registry() -> Vec<Descriptor> {
             Query,
             crate::views::PageInput
         ),
-        row!("assets.inspect", "Inspect one authorized registered asset", Query, IdInput),
+        row!(
+            "assets.inspect",
+            "Inspect one authorized registered asset",
+            Query,
+            IdInput
+        ),
         row!(
             "assets.output_suggest",
             "Suggest an authorized new cleanup output",
             Query,
             IdInput
         ),
-        row!("jobs.list", "Page authorized job summaries in a bounded snapshot", Query, crate::views::PageInput),
+        row!(
+            "jobs.list",
+            "Page authorized job summaries in a bounded snapshot",
+            Query,
+            crate::views::PageInput
+        ),
         row!(
             "commands.list",
             "Discover implemented development commands",

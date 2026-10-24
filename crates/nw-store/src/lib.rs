@@ -16,6 +16,7 @@ const RECORDS: TableDefinition<&str, &[u8]> = TableDefinition::new("versioned_re
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
 mod records;
+mod profiles;
 fn storage(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("STORAGE_ERROR", error.to_string())
 }
@@ -129,12 +130,14 @@ impl Store {
         if signing_key.len() != 32 {
             return Err(storage("Invalid stored signing-key length"));
         }
-        Ok(Self {
+        let store = Self {
             db,
             _lock: lock,
             root_id,
             signing_key,
-        })
+        };
+        store.upgrade_access_profiles()?;
+        Ok(store)
     }
     pub fn root_id(&self) -> &str {
         &self.root_id
@@ -300,7 +303,6 @@ impl Store {
             }
             let params: SubmitInput = nw_domain::commands::parse(request.params.clone())?;
             if job.creator != principal
-                || job.plan.creator != principal
                 || job.state != JobState::Queued
                 || params.plan_id != job.plan.id
                 || params.plan_hash != job.plan.hash
@@ -696,14 +698,17 @@ mod tests {
             revision: 1,
         };
         let mut policy = AccessProfile {
+            schema_version: 2,
             id: "operator".into(),
             name: "operator".into(),
             principal: "alice".into(),
             revision: 1,
             enabled: true,
             client_sessions: false,
-            commands: std::collections::BTreeSet::from(["jobs.submit".into()]),
-            objects: Default::default(),
+            mode: nw_domain::access::ProfileMode::Operate,
+            owned_object_access: true,
+            allowed_command_ids: std::collections::BTreeSet::from(["jobs.submit".into()]),
+            object_grants: Default::default(),
             read_roots: vec![path.clone()],
             write_roots: vec![path.clone()],
         };
@@ -712,7 +717,7 @@ mod tests {
         store.put("profile/operator", &policy).unwrap();
         assert!(store.execution_allowed("test-job").is_ok());
         policy.revision = 2;
-        policy.commands.insert("jobs.inspect".into());
+        policy.allowed_command_ids.insert("jobs.inspect".into());
         store.put("profile/operator", &policy).unwrap();
         assert!(store.execution_allowed("test-job").is_ok());
         let publication = Publication {

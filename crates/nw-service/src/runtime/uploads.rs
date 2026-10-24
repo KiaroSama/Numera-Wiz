@@ -111,7 +111,7 @@ impl UploadWriter {
 impl Service {
     fn upload_allowed(&self, context: &Context) -> Result<()> {
         if let Some(profile) = self.policy(context)?
-            && !profile.commands.contains("assets.register")
+            && (!profile.allows_command("assets.register") || profile.mode != ProfileMode::Operate)
         {
             return Err(DomainError::new(
                 "PERMISSION_DENIED",
@@ -283,6 +283,10 @@ impl Service {
         Ok(ready)
     }
     pub(super) fn managed_read(&self, context: &Context, path: &Path) -> Result<()> {
+        if let Some(profile) = self.policy(context)?
+            && (profile.mode != ProfileMode::Operate || !profile.owned_object_access) {
+            return Err(DomainError::object_not_found());
+        }
         let text = files::path_text(path)?;
         let key = format!(
             "managed-read/{}/{}",
@@ -291,15 +295,6 @@ impl Service {
         );
         if self.store.get::<bool>(&key)? == Some(true) {
             return Ok(());
-        }
-        if let Some(profile) = self.policy(context)? {
-            for id in profile.objects {
-                if let Some(asset) = self.store.get::<Asset>(&named("asset", &id)?)?
-                    && asset.identity.path == text
-                {
-                    return Ok(());
-                }
-            }
         }
         for upload in self.store.list::<Upload>("upload/", 128)? {
             if upload.principal == context.principal
