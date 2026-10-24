@@ -171,10 +171,13 @@ impl WizApp {
             .iter()
             .map(|form| {
                 Ok(StreamTagPatch {
-                    kind: if form.kind == 0 {
-                        StreamKind::Audio
-                    } else {
-                        StreamKind::Subtitle
+                    kind: match form.kind {
+                        0 => StreamKind::Audio,
+                        1 => StreamKind::Subtitle,
+                        2 => StreamKind::Video,
+                        3 => StreamKind::Attachment,
+                        4 => StreamKind::Data,
+                        _ => StreamKind::Unknown,
                     },
                     source_indices: indices(&form.indices)?,
                     original_languages: values(&form.languages),
@@ -240,7 +243,8 @@ impl WizApp {
                     ui.group(|ui| {
                         ui.horizontal(|ui| {
                             ui.strong(format!("Rule {}",index+1));
-                            egui::ComboBox::from_id_salt(("patch-kind",index)).selected_text(if form.kind == 0 {"Audio"} else {"Subtitle"}).show_ui(ui,|ui| {changed |= ui.selectable_value(&mut form.kind,0,"Audio").changed();changed |= ui.selectable_value(&mut form.kind,1,"Subtitle").changed();});
+                            let kinds = ["Audio","Subtitle","Video","Attachment","Data","Unknown"];
+                            egui::ComboBox::from_id_salt(("patch-kind",index)).selected_text(kinds[form.kind]).show_ui(ui,|ui| { for (kind, label) in kinds.iter().enumerate() { changed |= ui.selectable_value(&mut form.kind,kind,*label).changed(); } });
                             if ui.small_button("Remove").clicked(){remove=Some(index);}
                         });
                         ui.horizontal(|ui| {ui.label("Original indices");changed |= ui.add(egui::TextEdit::singleline(&mut form.indices).hint_text("Blank means all matching tracks").char_limit(4096)).changed();});
@@ -254,7 +258,7 @@ impl WizApp {
             });
             ui.separator();
             ui.horizontal(|ui| {ui.label("Output");changed |= ui.add(egui::TextEdit::singleline(&mut self.output).desired_width(f32::INFINITY).char_limit(16384)).changed();});
-            ui.small("An existing destination is preserved. Changed stream layouts currently require an admitted Matroska output.");
+            ui.small("An existing destination is preserved. Changed layouts require an admitted preservation profile for the selected output container.");
             if changed {self.changed();}
             if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty(),egui::Button::new("Review cleanup plan")).clicked() {
                 match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
@@ -354,7 +358,7 @@ impl WizApp {
             .default_width(720.0)
             .show(ctx, |ui| {
                 ui.label(format!(
-                    "{} files: {} ready, {} skipped, {} rejected",
+                    "Files: {} | Ready: {} | Skipped: {} | Rejected: {}",
                     report.files.len(),
                     report.resolved_files,
                     report.skipped_files,

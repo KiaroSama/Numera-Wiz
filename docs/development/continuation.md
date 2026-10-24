@@ -1029,3 +1029,38 @@ nonsecret report to its test log, making exact measured metadata review possible
 without a local execution environment. It never emits credentials or application/
 MCP stdout. This evidence transport addition awaits its own CI. All remaining
 task-ledger work and release/owner gates remain mandatory.
+
+
+## Native selection report and measured HTTP checkpoint
+
+Run 40079710323 on d9ff1906c55e079138dbb22c54a06b972170ba04 passed every
+functional job: four native test/Clippy/desktop targets, locked WASM, complete
+engine/CLI/official SDK/lost-response/large HTTP, Chrome and actual native input.
+Only formatting failed at one new harness println; its exact hosted hunk is
+applied here. The real native Selection report and subsequent Output details
+PNGs were personally inspected. They show the correct three unique source/
+retained rows, one ready candidate, then a Succeeded job and 197983 verified
+bytes with full digest. Escape, review and keyboard Run passed in between.
+See evidence/selection-reports-ci69.json.
+
+The bounded actual owner HTTP report is now personally observed from the
+completed media log: 268633400 bytes, exact SHA-256
+fe9acf90145760f86e3d5b1f0d16e39fb9976bb3136590850d6d1edea4f04a86,
+35916 KiB owner high-water mark under the selected 131072 KiB ceiling. Live
+job Read and bearer revocation interrupted at 3801088 and 3145728 delivered
+bytes, respectively, with disconnect index cleanup. Report source
+2145e8c4b99060e5d8a26f3dda7240d364721b84 is the compiled CI merge commit;
+it is not relabeled as the branch head. Exact nonsecret report fields are in
+evidence/artifact-http-ci69.json. This remains a Linux development boundary,
+not aggregate R20 or full package qualification.
+
+New pending source adds original-family MOV/MP4 MPEG-4 Part 2 ordinary-video
+preservation profiles. Full exact packet/clock/extradata/side-data and authored
+metadata checks remain mandatory. Source brands/vendor/defaults and tag limits
+are admitted explicitly; unqualified stream/category/codec/stripping/chapter or
+cross-family routes fail before media execution. Matroska-only language/duration
+exceptions are scoped to Matroska. The human patch form exposes the canonical
+stream-kind choices, including video. No-op extension casing remains a full
+byte copy. Actual two-video MOV/MP4 fixtures remove the second track and set the
+first title/language; they await CI. See original-container-profiles.md. All
+broader container, full F08 and other task-ledger work remains mandatory.
