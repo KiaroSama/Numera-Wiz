@@ -49,14 +49,18 @@ superscript device aliases), alternate-stream separators, control/reserved
 characters and trailing dot/space normalization. They are never silently changed.
 Normal Unicode names remain admitted. Missing reviewed parents report TARGET_CHANGED.
 
-Pending hosted tests run two actual executable copies from different directories
+Hosted tests in run 40069492408 passed on Windows, Linux, ARM macOS and Intel
+macOS. They run two actual executable copies from different directories
 with different HOME/TMPDIR/TEMP/APPDATA/LOCALAPPDATA values. One holds an absent
 output claim; the other must fail for the same entry and a case/normalization
 variant. Cancellation must release a waiting attempt, and killing the holder
 must release the actual OS lock. The actual media engine test pauses one job at
 its fence, independently proves the claim is still held, cancels another verified
-attempt before its fence, then verifies the winning bytes. These tests are new
-source and await CI.
+attempt before its fence, then verifies the winning bytes. The complete Linux media job and actual
+native/Chrome input passed. Only formatting failed; its exact diagnostic hunks
+are applied. See evidence/destination-claims-ci63.json. Screenshots from that
+run have not been personally inspected; ordinary test execution is not portable
+filesystem or package qualification.
 
 This does not close T017 or qualify release packages/filesystems. Handle-relative
 Unix publication, project-UUID writer leases/checkpoint overwrite rules,

@@ -711,6 +711,111 @@
           "artifact_sha256": "615a0326ac8cb7cef9d9ddabc4d09fa363228055daccbe2f24e0543bc8ce2648",
           "report": "docs/development/evidence/native-copy-ci54.json",
           "observed_outcome": "Actual CI-built native executable and mouse/keyboard input registered media, reviewed and submitted a byte-copy job. Independent output byte equality passed; completed workspace screenshot personally inspected. Output details activation is added later and is not credited by this report. Not other-platform GUI, preview or full five-surface qualification."
+        },
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "actual_linux_native_input",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Actual native Output details click completed the canonical manifest request before the independent harness SHA/length oracle. Screenshots were retained but not personally inspected for this run. Not preview, other-platform GUI, Save As or full parity."
+        }
+      ]
+    },
+    {
+      "subject_id": "source.original_native_objects",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/files.rs",
+        "crates/nw-domain/src/plans.rs",
+        "crates/nw-engine/src/lib.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Original native source/output-parent identity and historical omission units passed on all four native targets, including full Windows 128-bit IDs. The actual Linux media job passed physical source/parent replacement and fresh review. Every source family and filesystem/package remains unqualified."
+        }
+      ]
+    },
+    {
+      "subject_id": "owner.native_reattachment",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/src/client.rs",
+        "apps/numera-wiz/tests/interfaces.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Actual concurrent same-root startup and retained SDK stdio idle restart/principal binding passed on all four targets without extending the attachment deadline."
+        }
+      ]
+    },
+    {
+      "subject_id": "store.actual_lost_response_replay",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "apps/numera-wiz/tests/support/lost_ack.rs",
+        "crates/nw-store/src/records.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "The Linux real owner/SDK journey lost both actual accepted submission responses, restarted the idle owner, and returned the same receipt/job under the same root/principal and original request. Retired versions/crash/migration remain open."
+        }
+      ]
+    },
+    {
+      "subject_id": "publication.destination_claims",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-platform/src/claims.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-service/src/runtime.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "14145ba3642042d2120304d860aef78be7235096",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/destination-claims-ci63.json",
+          "observed_outcome": "Separate executable copies with distinct environments shared absent-target and alias claims on all four platforms; waiting cancellation and killed-holder unlock passed. The actual Linux engine retained its claim through the fence and cancelled a contending verified attempt. Remaining T017 boundaries stay open."
         }
       ]
     }

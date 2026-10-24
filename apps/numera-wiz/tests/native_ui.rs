@@ -8,6 +8,7 @@ mod evidence;
 )]
 #[path = "../../../test-support/media.rs"]
 mod fixture;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use evidence::RetainLogs;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
@@ -265,6 +266,19 @@ async fn journey() {
     };
     tokio::time::sleep(Duration::from_millis(700)).await;
     screenshot(&window, &evidence.join("native-output-details.png")).await;
+    // A bounded image transport keeps visual review possible without running a local GUI.
+    {
+        use std::io::Read as _;
+        let mut png = Vec::new();
+        std::fs::File::open(evidence.join("native-output-details.png"))
+            .unwrap()
+            .take(256 * 1024 + 1)
+            .read_to_end(&mut png)
+            .unwrap();
+        if png.len() <= 256 * 1024 {
+            println!("NW_NATIVE_MANIFEST_IMAGE:{}", STANDARD.encode(png));
+        }
+    }
     let manifest = query_params(
         &root,
         "artifacts.manifest",

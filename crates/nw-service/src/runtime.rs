@@ -1707,7 +1707,8 @@ impl Service {
         };
         parent.revalidate()?;
         let destination = nw_platform::claims::Destination::reviewed(
-            Path::new(&job.plan.output), &parent.object_identity()?,
+            Path::new(&job.plan.output),
+            &parent.object_identity()?,
         )?;
         let claims = nw_platform::claims::DestinationClaims::try_acquire(vec![destination])?;
         let publication: Option<Publication> = self.store.get(&named("publication", &job.id)?)?;

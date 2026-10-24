@@ -431,7 +431,10 @@ async fn actual_copy_and_order_metadata_remux() {
         .unwrap();
     let retained_parent = directory.path().join("original-reviewed-exports");
     std::fs::rename(&reviewed_parent, &retained_parent).unwrap();
-    let missing_parent = engine.execute(&parent_plan, CancellationToken::new()).await.unwrap_err();
+    let missing_parent = engine
+        .execute(&parent_plan, CancellationToken::new())
+        .await
+        .unwrap_err();
     assert_eq!(missing_parent.code, "TARGET_CHANGED");
     std::fs::create_dir(&reviewed_parent).unwrap();
     let changed_parent = engine
@@ -472,7 +475,12 @@ async fn actual_copy_and_order_metadata_remux() {
 
     let claim_output = reviewed_parent.join("claim-race.mkv");
     let claim_plan = engine
-        .clean_plan(plan.source.clone(), &claim_output, &rules(), "fixture-owner")
+        .clean_plan(
+            plan.source.clone(),
+            &claim_output,
+            &rules(),
+            "fixture-owner",
+        )
         .unwrap();
     let fence_entered = std::sync::Arc::new(tokio::sync::Notify::new());
     let resume = std::sync::Arc::new(tokio::sync::Notify::new());
@@ -492,14 +500,26 @@ async fn actual_copy_and_order_metadata_remux() {
     let first_engine = engine.clone();
     let first_plan = claim_plan.clone();
     let first = tokio::spawn(async move {
-        first_engine.execute_observed(
-            &first_plan, CancellationToken::new(), "claim-owner-a", observer,
-        ).await
+        first_engine
+            .execute_observed(
+                &first_plan,
+                CancellationToken::new(),
+                "claim-owner-a",
+                observer,
+            )
+            .await
     });
     tokio::time::timeout(std::time::Duration::from_secs(10), fence_entered.notified())
-        .await.expect("First publication fence deadline");
-    let expected_parent = claim_plan.required_rights.as_ref().unwrap()
-        .output_create.parent_object.as_ref().unwrap();
+        .await
+        .expect("First publication fence deadline");
+    let expected_parent = claim_plan
+        .required_rights
+        .as_ref()
+        .unwrap()
+        .output_create
+        .parent_object
+        .as_ref()
+        .unwrap();
     let probe = nw_platform::claims::Destination::reviewed(&claim_output, expected_parent).unwrap();
     match nw_platform::claims::DestinationClaims::try_acquire(vec![probe]) {
         Err(error) => assert_eq!(error.code, "PUBLICATION_BUSY"),
@@ -528,22 +548,35 @@ async fn actual_copy_and_order_metadata_remux() {
     let cancellation = CancellationToken::new();
     let second_token = cancellation.clone();
     let second = tokio::spawn(async move {
-        second_engine.execute_observed(
-            &second_plan, second_token, "claim-owner-b", observer,
-        ).await
+        second_engine
+            .execute_observed(&second_plan, second_token, "claim-owner-b", observer)
+            .await
     });
-    tokio::time::timeout(std::time::Duration::from_secs(10), second_verifying.notified())
-        .await.expect("Contending verification deadline");
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        second_verifying.notified(),
+    )
+    .await
+    .expect("Contending verification deadline");
     cancellation.cancel();
     let cancelled = tokio::time::timeout(std::time::Duration::from_secs(5), second)
-        .await.expect("Contending publication cancellation deadline").unwrap().unwrap_err();
+        .await
+        .expect("Contending publication cancellation deadline")
+        .unwrap()
+        .unwrap_err();
     assert_eq!(cancelled.code, "CANCELLED");
     assert_eq!(fences.load(std::sync::atomic::Ordering::Acquire), 0);
     assert!(!claim_output.exists());
     resume.notify_one();
     tokio::time::timeout(std::time::Duration::from_secs(10), first)
-        .await.expect("Winning publication deadline").unwrap().unwrap();
-    assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&claim_output).unwrap());
+        .await
+        .expect("Winning publication deadline")
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        std::fs::read(&source).unwrap(),
+        std::fs::read(&claim_output).unwrap()
+    );
 
     let replaced_output = directory.path().join("physical-replacement.mkv");
     let replacement_plan = engine

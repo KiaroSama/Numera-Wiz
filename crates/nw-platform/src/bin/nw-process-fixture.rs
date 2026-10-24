@@ -33,8 +33,10 @@ fn main() -> std::process::ExitCode {
                 return std::process::ExitCode::FAILURE;
             };
             let result = (|| {
-                let parent = nw_platform::files::DirectoryStamp::capture_resolved(path.parent().unwrap())?;
-                let destination = nw_platform::claims::Destination::reviewed(&path, &parent.object_identity()?)?;
+                let parent =
+                    nw_platform::files::DirectoryStamp::capture_resolved(path.parent().unwrap())?;
+                let destination =
+                    nw_platform::claims::Destination::reviewed(&path, &parent.object_identity()?)?;
                 nw_platform::claims::DestinationClaims::try_acquire(vec![destination])
             })();
             match result {

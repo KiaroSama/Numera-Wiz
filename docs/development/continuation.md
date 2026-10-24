@@ -883,3 +883,23 @@ scope and remaining interrupted-initialization, handle-relative, project-writer,
 crash/multi-output/package/resource requirements. These source changes await CI.
 No full task or release gate is closed. No local compilation/test/application/
 media execution or owner GPU run was performed.
+
+
+## Cross-root publication claim hosted checkpoint
+
+Run [40069492408](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40069492408)
+on 14145ba3642042d2120304d860aef78be7235096 completed all four native
+unit/integration/Clippy/desktop targets, lock/WASM, actual engine/CLI/official SDK
+and large HTTP media, Chrome and Linux native input successfully. The real
+separate-executable-copy claim test passed on all four native targets, including
+cancellation and actual process-death unlock. The actual engine test proved the
+claim is held at its fence, cancelled another verified attempt before its fence,
+and independently verified the winner. Only formatting failed; its 43 exact
+hosted diagnostic hunks are applied. See evidence/destination-claims-ci63.json.
+No full T017/package/resource/GPU qualification is implied.
+
+The native harness now additionally prints at most 256 KiB of its retained
+Output details PNG as base64 for visual review when a local execution environment
+is unavailable. This is bounded hosted-test evidence transport, not application
+or MCP stdout. The screenshot remains in its ordinary CI artifact. The new image
+transport awaits CI; no unseen image is credited as personally inspected.

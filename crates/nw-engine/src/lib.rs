@@ -505,9 +505,11 @@ async fn publish(
 ) -> Result<FileIdentity> {
     let parent_stamp = output_parent_stamp(plan)?;
     let destination = nw_platform::claims::Destination::reviewed(
-        Path::new(&plan.output), reviewed_parent(plan)?,
+        Path::new(&plan.output),
+        reviewed_parent(plan)?,
     )?;
-    let claims = nw_platform::claims::DestinationClaims::acquire(vec![destination], cancel.clone()).await?;
+    let claims =
+        nw_platform::claims::DestinationClaims::acquire(vec![destination], cancel.clone()).await?;
     let output = files::revalidate_output(&plan.output)?;
     #[cfg(unix)]
     let parent = output
