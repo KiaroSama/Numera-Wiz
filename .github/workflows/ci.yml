@@ -283,3 +283,10 @@ jobs:
             target/fixture-ffmpeg-src/ffbuild/config.log
             target/fixture-ffmpeg-src/config.h
           if-no-files-found: warn
+      - name: Save owner transport diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: owner-media-evidence-linux
+          path: target/owner-evidence/
+          if-no-files-found: warn

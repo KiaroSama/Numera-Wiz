@@ -176,8 +176,12 @@ impl Store {
     }
     /// Inspect receipt identity before resolving any mutable target or checking its current revision.
     pub fn replay(&self, principal: &str, request: &Request, now: u64) -> Result<Option<Response>> {
-        let (key, _) = self.replay_key(principal, request, now)?;
+        self.replay_with_clock(principal, request, || Ok(now))
+    }
+    pub fn replay_with_clock(&self, principal: &str, request: &Request, clock: impl FnOnce() -> Result<u64>) -> Result<Option<Response>> {
         let read = self.db.begin_read().map_err(storage)?;
+        let now = clock()?;
+        let (key, _) = self.replay_key(principal, request, now)?;
         let table = read.open_table(RECORDS).map_err(storage)?;
         check_clock(&table, now)?;
         if let Some(value) = table.get(key.as_str()).map_err(storage)? {
@@ -203,6 +207,16 @@ impl Store {
         result: Value,
         records: &[(String, Value)],
     ) -> Result<Response> {
+        self.commit_with_clock(principal, request, || Ok(now), result, records)
+    }
+    pub fn commit_with_clock(
+        &self,
+        principal: &str,
+        request: &Request,
+        clock: impl FnOnce() -> Result<u64>,
+        result: Value,
+        records: &[(String, Value)],
+    ) -> Result<Response> {
         request.validate()?;
         if records.len() > 64 {
             return Err(DomainError::new(
@@ -210,9 +224,11 @@ impl Store {
                 "Mutation record budget exceeded",
             ));
         }
-        let (key, scope) = self.replay_key(principal, request, now)?;
         let digest = request.structural_digest();
         let write = self.db.begin_write().map_err(storage)?;
+        // Sample after writer admission, never from a request timestamp captured before waiting.
+        let now = clock()?;
+        let (key, scope) = self.replay_key(principal, request, now)?;
         let response;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;

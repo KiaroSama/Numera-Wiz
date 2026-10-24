@@ -66,7 +66,16 @@ async fn main() -> std::process::ExitCode {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error,"Operation failed");
-            let code = error.downcast_ref::<nw_domain::DomainError>().map(nw_domain::DomainError::exit_code).unwrap_or_else(|| if error.downcast_ref::<reqwest::Error>().is_some() { 8 } else { 6 });
+            let code = error
+                .downcast_ref::<nw_domain::DomainError>()
+                .map(nw_domain::DomainError::exit_code)
+                .unwrap_or_else(|| {
+                    if error.downcast_ref::<reqwest::Error>().is_some() {
+                        8
+                    } else {
+                        6
+                    }
+                });
             std::process::ExitCode::from(code)
         }
     }
@@ -114,7 +123,9 @@ async fn run() -> Result<()> {
                 .take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64)
                 .read_to_end(&mut bytes)?;
             if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
-                return Err(nw_domain::DomainError::new("RESOURCE_LIMIT", "Request exceeds 1 MiB").into());
+                return Err(
+                    nw_domain::DomainError::new("RESOURCE_LIMIT", "Request exceeds 1 MiB").into(),
+                );
             }
             print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
         }
@@ -148,12 +159,21 @@ async fn run() -> Result<()> {
                 server::serve(
                     client,
                     port,
-                    token_file.ok_or_else(|| nw_domain::DomainError::new("VALIDATION_ERROR", "HTTP bridge requires --token-file; credentials are never printed"))?,
+                    token_file.ok_or_else(|| {
+                        nw_domain::DomainError::new(
+                            "VALIDATION_ERROR",
+                            "HTTP bridge requires --token-file; credentials are never printed",
+                        )
+                    })?,
                     access_profile,
                 )
                 .await
             }
-            _ => Err(nw_domain::DomainError::new("VALIDATION_ERROR", "Unsupported transport; choose stdio or http").into()),
+            _ => Err(nw_domain::DomainError::new(
+                "VALIDATION_ERROR",
+                "Unsupported transport; choose stdio or http",
+            )
+            .into()),
         },
         Some(Mode::Serve {
             port,
@@ -168,7 +188,15 @@ async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
     let result = client.request(&request).await?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.ok {
-        return Err(result.error.unwrap_or_else(|| nw_domain::DomainError::new("INTERNAL_ERROR", "Command failed without a typed error")).into());
+        return Err(result
+            .error
+            .unwrap_or_else(|| {
+                nw_domain::DomainError::new(
+                    "INTERNAL_ERROR",
+                    "Command failed without a typed error",
+                )
+            })
+            .into());
     }
     Ok(())
 }

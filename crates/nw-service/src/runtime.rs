@@ -484,15 +484,15 @@ impl Service {
         request.validate()?;
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
-        let policy = self.policy(&context)?;
         let durable = matches!(descriptor.state_class, StateClass::DurableMutation);
         let _guard = if durable || matches!(descriptor.state_class, StateClass::Bootstrap) {
             Some(self.mutation.lock().map_err(|_| lock_error())?)
         } else {
             None
         };
-        let now = nw_platform::epoch_seconds();
-        if durable && let Some(response) = self.store.replay(&context.principal, &request, now)? {
+        let policy = self.policy(&context)?;
+        let now = self.clock.now()?;
+        if durable && let Some(response) = self.store.replay_with_clock(&context.principal, &request, || self.clock.now())? {
             return Ok(response);
         }
         if let Some(profile) = &policy
@@ -523,7 +523,7 @@ impl Service {
             }
             "access.replay_scope.create" => {
                 let _: Empty = commands::parse(params)?;
-                json!({"replay_scope":self.store.issue_scope(&context.principal, now)?,"expires_in_seconds":604800})
+                json!({"replay_scope":self.store.issue_scope_with_clock(&context.principal, || self.clock.now())?,"expires_in_seconds":604800})
             }
             "access.credentials.issue" => {
                 if policy.is_some() {
@@ -612,10 +612,10 @@ impl Service {
                     read_roots: roots(input.read_roots)?,
                     write_roots: roots(input.write_roots)?,
                 };
-                let response = self.store.commit(
+                let response = self.store.commit_with_clock(
                     &context.principal,
                     &request,
-                    nw_platform::epoch_seconds(),
+                    || self.clock.now(),
                     value(&profile)?,
                     &[(key, value(&profile)?)],
                 )?;
@@ -650,10 +650,10 @@ impl Service {
                 ))?;
                 asset.display_name = display_name;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
-                return self.store.commit(
+                return self.store.commit_with_clock(
                     &context.principal,
                     &request,
-                    nw_platform::epoch_seconds(),
+                    || self.clock.now(),
                     value(&asset)?,
                     &[
                         (named("asset", &asset.id)?, value(&asset)?),
@@ -746,7 +746,7 @@ impl Service {
                 let output = self.path(&context, Path::new(&input.output), true)?;
                 let plan =
                     self.engine()?
-                        .clean_plan(asset, &output, &input.intent, &context.principal)?;
+                        .clean_plan_at(asset, &output, &input.intent, &context.principal, now)?;
                 self.store.put(&named("plan", &plan.id)?, &plan)?;
                 value(&plan)?
             }
@@ -804,10 +804,10 @@ impl Service {
                     profile: context.profile,
                     revision: policy.as_ref().map_or(0, |profile| profile.revision),
                 };
-                let response = self.store.commit(
+                let response = self.store.commit_with_clock(
                     &context.principal,
                     &request,
-                    nw_platform::epoch_seconds(),
+                    || self.clock.now(),
                     json!({"job_id":id,"state":"queued"}),
                     &[
                         (named("job", &id)?, value(&job)?),
@@ -849,7 +849,7 @@ impl Service {
                 if job.state == JobState::Queued {
                     job.state = JobState::Cancelled;
                 }
-                let response = self.store.commit(&context.principal, &request, nw_platform::epoch_seconds(), json!({"job_id":job.id,"state":job.state,"cancel_requested":!job.state.terminal()}), &[(named("cancel", &job.id)?, json!(true)), (named("job", &job.id)?, value(&job)?)])?;
+                let response = self.store.commit_with_clock(&context.principal, &request, || self.clock.now(), json!({"job_id":job.id,"state":job.state,"cancel_requested":!job.state.terminal()}), &[(named("cancel", &job.id)?, json!(true)), (named("job", &job.id)?, value(&job)?)])?;
                 if let Some(token) = self
                     .cancellations
                     .lock()
@@ -1108,6 +1108,33 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn a_waiting_request_cannot_accept_a_profile_snapshot_from_before_revocation() {
+        let directory = tempfile::tempdir().unwrap();
+        let service = Service::open(directory.path().to_owned(), None).await.unwrap();
+        let mut profile = AccessProfile {
+            id: "waiting-reader".into(), name: "waiting-reader".into(), principal: "waiting-principal".into(),
+            revision: 1, enabled: true, client_sessions: false,
+            commands: ["access.replay_scope.create".into()].into(), objects: Default::default(), read_roots: Vec::new(), write_roots: Vec::new(),
+        };
+        service.store.put("profile/waiting-reader", &profile).unwrap();
+        let context = service.profile_context("waiting-reader").unwrap();
+        let guard = service.mutation.lock().unwrap();
+        let (started, ready) = std::sync::mpsc::channel();
+        let request_service = service.clone();
+        let runtime = tokio::runtime::Handle::current();
+        let worker = std::thread::spawn(move || {
+            let _entered = runtime.enter();
+            started.send(()).unwrap();
+            request_service.dispatch_sync(context, Request::query("access.replay_scope.create", json!({})), CancellationToken::new())
+        });
+        ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        profile.enabled = false; profile.revision = 2;
+        service.store.put("profile/waiting-reader", &profile).unwrap();
+        drop(guard);
+        assert_eq!(worker.join().unwrap().unwrap_err().code, "PERMISSION_DENIED");
+    }
     async fn mutate(
         service: &Arc<Service>,
         context: &Context,

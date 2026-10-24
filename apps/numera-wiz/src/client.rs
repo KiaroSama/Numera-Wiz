@@ -72,7 +72,11 @@ impl NativeClient {
                 .await??;
                 let record: OwnerRecord = serde_json::from_slice(&bytes)?;
                 if record.canonical_root != nw_platform::files::path_text(&self.root)? {
-                    return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Runtime record names another root").into());
+                    return Err(nw_domain::DomainError::new(
+                        "OWNER_IDENTITY_CONFLICT",
+                        "Runtime record names another root",
+                    )
+                    .into());
                 }
                 let endpoint = format!("http://127.0.0.1:{}", record.port);
                 let health = self
@@ -87,7 +91,11 @@ impl NativeClient {
                 {
                     let identity = bounded_json(health).await?;
                     if identity["epoch"] != record.epoch || identity["root_id"] != record.root_id {
-                        return Err(nw_domain::DomainError::new("OWNER_IDENTITY_CONFLICT", "Protected bootstrap and active owner differ").into());
+                        return Err(nw_domain::DomainError::new(
+                            "OWNER_IDENTITY_CONFLICT",
+                            "Protected bootstrap and active owner differ",
+                        )
+                        .into());
                     }
                     if record.build != self.build || record.registry != registry_fingerprint() {
                         return Err(nw_domain::DomainError::new("OWNER_VERSION_CONFLICT", "Another build owns this root; let its jobs/clients drain before updating").into());
@@ -126,7 +134,11 @@ impl NativeClient {
                 spawned = Some(std::time::Instant::now());
             }
             if started.elapsed() > Duration::from_secs(20) {
-                return Err(nw_domain::DomainError::new("OWNER_START_TIMEOUT", "Owner is busy, recovering, or cannot initialize the protected root").into());
+                return Err(nw_domain::DomainError::new(
+                    "OWNER_START_TIMEOUT",
+                    "Owner is busy, recovering, or cannot initialize the protected root",
+                )
+                .into());
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
@@ -180,7 +192,11 @@ impl NativeClient {
                         && attempt == 0 => {}
                 Ok(response) => {
                     bounded_json(response).await?;
-                    return Err(nw_domain::DomainError::new("TRANSPORT_ERROR", "Unexpected owner response").into());
+                    return Err(nw_domain::DomainError::new(
+                        "TRANSPORT_ERROR",
+                        "Unexpected owner response",
+                    )
+                    .into());
                 }
                 Err(error) if attempt != 0 => return Err(error.into()),
                 Err(_) => {}
@@ -188,7 +204,11 @@ impl NativeClient {
             *self.cached.lock().await = None;
             *self.credential.lock().await = None;
         }
-        Err(nw_domain::DomainError::new("TRANSPORT_ERROR", "Owner reconnect failed; original durable request identity was retained").into())
+        Err(nw_domain::DomainError::new(
+            "TRANSPORT_ERROR",
+            "Owner reconnect failed; original durable request identity was retained",
+        )
+        .into())
     }
     pub async fn internal(
         &self,
@@ -214,14 +234,20 @@ pub async fn bounded_json(mut response: reqwest::Response) -> Result<serde_json:
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await? {
         if bytes.len().saturating_add(chunk.len()) > 256 * 1024 {
-            return Err(nw_domain::DomainError::new("RESOURCE_LIMIT", "Response exceeds 256 KiB").into());
+            return Err(
+                nw_domain::DomainError::new("RESOURCE_LIMIT", "Response exceeds 256 KiB").into(),
+            );
         }
         bytes.extend_from_slice(&chunk);
     }
-    let value = nw_domain::commands::decode_json(&bytes).map_err(|_| nw_domain::DomainError::new("TRANSPORT_ERROR", "Owner returned invalid bounded JSON"))?;
+    let value = nw_domain::commands::decode_json(&bytes).map_err(|_| {
+        nw_domain::DomainError::new("TRANSPORT_ERROR", "Owner returned invalid bounded JSON")
+    })?;
     if !status.is_success() {
         let code = value["error"]["code"].as_str().unwrap_or("TRANSPORT_ERROR");
-        let message = value["error"]["message"].as_str().unwrap_or("Owner rejected the request");
+        let message = value["error"]["message"]
+            .as_str()
+            .unwrap_or("Owner rejected the request");
         return Err(nw_domain::DomainError::new(code, message).into());
     }
     Ok(value)
