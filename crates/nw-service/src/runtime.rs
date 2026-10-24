@@ -1104,14 +1104,22 @@ impl Service {
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
-                let deadline = input.probe_timeout.unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
+                let deadline = input
+                    .probe_timeout
+                    .unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
                 self.admit_probe_timeout(&context, deadline)?;
                 let path = self.path(&context, Path::new(&input.path), false)?;
-                value(&runtime.block_on(self.engine()?.probe_with_policy(&path, deadline, cancellation.clone()))?)?
+                value(&runtime.block_on(self.engine()?.probe_with_policy(
+                    &path,
+                    deadline,
+                    cancellation.clone(),
+                ))?)?
             }
             "assets.register" => {
                 let input: nw_domain::ingest::RegisterInput = commands::parse(params)?;
-                let probe_timeout = input.probe_timeout.unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
+                let probe_timeout = input
+                    .probe_timeout
+                    .unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
                 self.admit_probe_timeout(&context, probe_timeout)?;
                 let upload_id = input.upload_id.clone();
                 let (path, display_name) = match (input.path, input.upload_id) {
@@ -1684,10 +1692,18 @@ impl Service {
         }
         Ok(())
     }
-    fn admit_probe_timeout(&self, context: &Context, probe: nw_domain::execution::DeadlinePolicy) -> Result<()> {
-        self.admit_execution_limits(context, &nw_domain::execution::CleanupLimits {
-            probe, ..nw_domain::execution::CleanupLimits::default()
-        })
+    fn admit_probe_timeout(
+        &self,
+        context: &Context,
+        probe: nw_domain::execution::DeadlinePolicy,
+    ) -> Result<()> {
+        self.admit_execution_limits(
+            context,
+            &nw_domain::execution::CleanupLimits {
+                probe,
+                ..nw_domain::execution::CleanupLimits::default()
+            },
+        )
     }
     fn admit_execution_limits(
         &self,

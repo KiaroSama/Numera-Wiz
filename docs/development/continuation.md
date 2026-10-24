@@ -1544,3 +1544,30 @@ one producer job. Its successful Save PNG was personally inspected, including
 the new Execution limits control. Native UI was skipped after lint failure;
 it is not counted as a pass. This revision now requires a fresh full hosted
 run for the lint fix and source-probe policy additions.
+
+
+## Separate completed probe audit from future execution semantics
+
+Run 40104749530 on b2116a15995b9e095ac26d9e71ba9de857a38a69 passed all
+four complete native regression/Clippy/desktop targets, WASM/lock, actual engine/
+remux-progress and isolated large-reader tests. The actual owner/SDK parity
+test then found distinct hashes for otherwise equivalent native-file plans:
+the CLI's completed source probe used 30 seconds while the SDK used 120.
+This exposed an incorrect inclusion of completed-observation audit in future
+execution identity. The actual cross-principal parity assertion stays intact.
+
+The correction retains the effective source-probe timeout in probe/asset/plan
+review audit and excludes only that named field from the version-2 semantic
+source projection. Observed stream/media content, identities, required rights,
+selected paths and future execution_limits remain semantic. Invalid captured
+policies still fail validation; historical absent fields/shapes remain intact.
+The domain regression now explicitly requires equal hashes for this completed
+audit difference. All 13 exact hosted formatter hunks are applied. The remaining
+owner/HTTP/GUI steps were not qualified after the failure; this fix awaits CI.
+
+Explicit bounded batch domain work has begun separately but has no handlers,
+adapters or qualification yet and is not included in this corrective commit.
+Full native folder/companion/replacement, F01-F15, project/editor/effects/DAG/
+preview/mixer/captions/interchange, command closure, retention/migration,
+packages/resources/manuals and matching owner harness remain required.
+No archive/full-task checkbox changed and no local execution occurred.

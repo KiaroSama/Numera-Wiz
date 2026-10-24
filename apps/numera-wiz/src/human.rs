@@ -67,10 +67,18 @@ pub struct ProbePolicy {
 impl ProbePolicy {
     fn apply(self, params: &mut Value) -> Result<()> {
         let policy = match (self.probe_timeout_seconds, self.disable_probe_timeout) {
-            (Some(seconds), false) => Some(nw_domain::execution::DeadlinePolicy::Finite { seconds }),
+            (Some(seconds), false) => {
+                Some(nw_domain::execution::DeadlinePolicy::Finite { seconds })
+            }
             (None, true) => Some(nw_domain::execution::DeadlinePolicy::Disabled),
             (None, false) => None,
-            _ => return Err(DomainError::new("VALIDATION_ERROR", "Choose one explicit probe timeout policy").into()),
+            _ => {
+                return Err(DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Choose one explicit probe timeout policy",
+                )
+                .into());
+            }
         };
         if let Some(policy) = policy {
             policy.duration()?;
@@ -214,7 +222,11 @@ pub fn prepare(command: Command) -> Result<Request> {
             probe.apply(&mut params)?;
             query("media.probe", params)
         }
-        Command::Assets(Assets::Register { path, probe, identity }) => {
+        Command::Assets(Assets::Register {
+            path,
+            probe,
+            identity,
+        }) => {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             let mut request = query("assets.register", params);

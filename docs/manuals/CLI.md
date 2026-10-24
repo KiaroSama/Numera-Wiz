@@ -424,9 +424,11 @@ numera-wiz assets register INPUT --probe-timeout-seconds 30 --replay-scope SCOPE
 Protected local-owner callers can explicitly choose --disable-probe-timeout.
 Named profiles, browser sessions and scoped MCP callers receive PERMISSION_DENIED
 for that choice. Absence retains the finite 120-second compatibility default.
-The effective timeout is included in the returned probe and captured asset
-probe; it contributes to subsequent semantic plan hashes. Historical probe
-records omit the field and retain their earlier serialized shape/hash.
+The effective timeout is included in the returned probe, captured asset and
+plan review as audit metadata. A completed source probe's timeout does not
+change the semantic hash of an otherwise equivalent future execution plan.
+The future cleanup execution_limits remain part of that hash. Historical
+probe records omit the field and retain their earlier serialized shape/hash.
 
 Retain the selected probe_timeout when retrying durable registration; changing
 it with the same accepted scope/key is an idempotency conflict. Source-byte

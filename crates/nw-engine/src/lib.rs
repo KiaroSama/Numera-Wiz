@@ -124,11 +124,20 @@ impl Engine {
         creator: String,
         cancel: CancellationToken,
     ) -> Result<Asset> {
-        self.register_with_policy(path, creator, nw_domain::execution::CleanupLimits::default().probe, cancel).await
+        self.register_with_policy(
+            path,
+            creator,
+            nw_domain::execution::CleanupLimits::default().probe,
+            cancel,
+        )
+        .await
     }
     pub async fn register_with_policy(
-        &self, path: PathBuf, creator: String,
-        deadline: nw_domain::execution::DeadlinePolicy, cancel: CancellationToken,
+        &self,
+        path: PathBuf,
+        creator: String,
+        deadline: nw_domain::execution::DeadlinePolicy,
+        cancel: CancellationToken,
     ) -> Result<Asset> {
         deadline.duration()?;
         let token = cancel.clone();
@@ -140,7 +149,9 @@ impl Engine {
             Ok((identity, stamp))
         })
         .await?;
-        let probe = self.probe_with_policy(Path::new(&initial.path), deadline, cancel.clone()).await?;
+        let probe = self
+            .probe_with_policy(Path::new(&initial.path), deadline, cancel.clone())
+            .await?;
         let expected = initial.clone();
         let source_object = blocking(move || {
             files::revalidate(&expected, &cancel)?;

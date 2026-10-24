@@ -153,6 +153,10 @@ fn digest_value(mut value: Value) -> Result<String> {
     for key in ["id", "creator", "display_name"] {
         source.remove(key);
     }
+    if let Some(probe) = source.get_mut("probe").and_then(Value::as_object_mut) {
+        // The timeout of a completed source observation is audit, not future execution.
+        probe.remove("probe_timeout");
+    }
     let bytes =
         serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;
     Ok(hex::encode(Sha256::digest(bytes)))
@@ -419,15 +423,22 @@ mod tests {
         assert!(digest(&plan).is_err());
     }
     #[test]
-    fn source_probe_policy_is_captured_without_rewriting_historical_plans() {
+    fn completed_source_probe_timeout_is_audit_without_changing_execution_identity() {
         let mut plan = fixture();
         let before = plan.hash.clone();
-        assert!(serde_json::to_value(&plan.source.probe).unwrap().get("probe_timeout").is_none());
-        plan.source.probe.probe_timeout = Some(crate::execution::DeadlinePolicy::Finite { seconds: 30 });
-        assert_ne!(digest(&plan).unwrap(), before);
+        assert!(
+            serde_json::to_value(&plan.source.probe)
+                .unwrap()
+                .get("probe_timeout")
+                .is_none()
+        );
+        plan.source.probe.probe_timeout =
+            Some(crate::execution::DeadlinePolicy::Finite { seconds: 30 });
+        assert_eq!(digest(&plan).unwrap(), before);
         plan.hash = digest(&plan).unwrap();
         assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
-        plan.source.probe.probe_timeout = Some(crate::execution::DeadlinePolicy::Finite { seconds: 0 });
+        plan.source.probe.probe_timeout =
+            Some(crate::execution::DeadlinePolicy::Finite { seconds: 0 });
         assert!(digest(&plan).is_err());
     }
     #[test]

@@ -51,19 +51,42 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let (schema, exit) = cli.human(&["commands", "schema", "streams.clean"]).await;
     assert_eq!(exit, 0, "{schema}");
     let (probe, exit) = cli
-        .human(&["media", "probe", media.source.to_str().unwrap(), "--probe-timeout-seconds", "30"])
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--probe-timeout-seconds",
+            "30",
+        ])
         .await;
     assert_eq!(exit, 0, "{probe}");
     assert_eq!(probe["result"]["streams"].as_array().unwrap().len(), 3);
-    assert_eq!(probe["result"]["probe_timeout"], json!({"mode":"finite","seconds":30}));
-    let (unbounded, exit) = cli.human(&[
-        "media", "probe", media.source.to_str().unwrap(), "--disable-probe-timeout",
-    ]).await;
+    assert_eq!(
+        probe["result"]["probe_timeout"],
+        json!({"mode":"finite","seconds":30})
+    );
+    let (unbounded, exit) = cli
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--disable-probe-timeout",
+        ])
+        .await;
     assert_eq!(exit, 0, "{unbounded}");
-    assert_eq!(unbounded["result"]["probe_timeout"], json!({"mode":"disabled"}));
-    let (invalid_probe, exit) = cli.human(&[
-        "media", "probe", media.source.to_str().unwrap(), "--probe-timeout-seconds", "0",
-    ]).await;
+    assert_eq!(
+        unbounded["result"]["probe_timeout"],
+        json!({"mode":"disabled"})
+    );
+    let (invalid_probe, exit) = cli
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--probe-timeout-seconds",
+            "0",
+        ])
+        .await;
     assert_eq!(exit, 2, "{invalid_probe}");
     assert_eq!(invalid_probe["error"]["code"], "VALIDATION_ERROR");
     let intent_file = media.directory.path().join("cli-intent.json");
@@ -167,10 +190,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         updated["result"]["principal"],
         created["result"]["principal"]
     );
-    let (denied_probe, exit) = cli.human(&[
-        "--access-profile", "human-setup", "media", "probe",
-        media.source.to_str().unwrap(), "--disable-probe-timeout",
-    ]).await;
+    let (denied_probe, exit) = cli
+        .human(&[
+            "--access-profile",
+            "human-setup",
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--disable-probe-timeout",
+        ])
+        .await;
     assert_eq!(exit, 5, "{denied_probe}");
     assert_eq!(denied_probe["error"]["code"], "PERMISSION_DENIED");
     let registration_args = [
@@ -209,7 +238,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
-    assert_eq!(asset["probe"]["probe_timeout"], json!({"mode":"finite","seconds":30}));
+    assert_eq!(
+        asset["probe"]["probe_timeout"],
+        json!({"mode":"finite","seconds":30})
+    );
     let (report, exit) = cli
         .human(&[
             "streams",
