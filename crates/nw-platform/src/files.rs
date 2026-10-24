@@ -1,4 +1,7 @@
-use nw_domain::{DomainError, Result, records::{FileIdentity, NativeObjectIdentity, NativeObjectKind}};
+use nw_domain::{
+    DomainError, Result,
+    records::{FileIdentity, NativeObjectIdentity, NativeObjectKind},
+};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
@@ -227,7 +230,10 @@ impl SourceStamp {
     }
     pub fn require_object(&self, expected: &NativeObjectIdentity) -> Result<()> {
         if &self.object_identity()? != expected {
-            return Err(DomainError::new("SOURCE_CHANGED", "Registered native object no longer matches its original physical identity"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Registered native object no longer matches its original physical identity",
+            ));
         }
         Ok(())
     }
@@ -265,41 +271,80 @@ fn native_object(file: &File) -> Result<NativeObjectIdentity> {
     #[cfg(unix)]
     let (kind, volume, object) = {
         use std::os::unix::fs::MetadataExt;
-        (NativeObjectKind::UnixDeviceInode, metadata.dev().to_string(), metadata.ino().to_string())
+        (
+            NativeObjectKind::UnixDeviceInode,
+            metadata.dev().to_string(),
+            metadata.ino().to_string(),
+        )
     };
     #[cfg(windows)]
     let (kind, volume, object) = {
         let (volume, id) = windows_object(file)?;
-        (NativeObjectKind::WindowsFileId128, volume.to_string(), hex::encode(id))
+        (
+            NativeObjectKind::WindowsFileId128,
+            volume.to_string(),
+            hex::encode(id),
+        )
     };
     #[cfg(not(any(unix, windows)))]
-    return Err(DomainError::new("NATIVE_PATH_UNAVAILABLE", "No admitted native object identity on this target"));
+    return Err(DomainError::new(
+        "NATIVE_PATH_UNAVAILABLE",
+        "No admitted native object identity on this target",
+    ));
     #[cfg(any(unix, windows))]
     {
-        let created_ns = metadata.created().ok().map(|time| match time.duration_since(std::time::UNIX_EPOCH) {
-            Ok(duration) => duration.as_nanos().to_string(),
-            Err(error) => format!("-{}", error.duration().as_nanos()),
-        });
-        Ok(NativeObjectIdentity {schema_version:1,kind,volume,object,created_ns})
+        let created_ns =
+            metadata
+                .created()
+                .ok()
+                .map(|time| match time.duration_since(std::time::UNIX_EPOCH) {
+                    Ok(duration) => duration.as_nanos().to_string(),
+                    Err(error) => format!("-{}", error.duration().as_nanos()),
+                });
+        Ok(NativeObjectIdentity {
+            schema_version: 1,
+            kind,
+            volume,
+            object,
+            created_ns,
+        })
     }
 }
 #[cfg(windows)]
-#[expect(unsafe_code, reason = "One borrowed-handle Win32 FILE_ID_INFO query; its output buffer and lifetime are checked here")]
+#[expect(
+    unsafe_code,
+    reason = "One borrowed-handle Win32 FILE_ID_INFO query; its output buffer and lifetime are checked here"
+)]
 fn windows_object(file: &File) -> Result<(u64, [u8; 16])> {
     use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Storage::FileSystem::{FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx};
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
+    };
     let mut information = FILE_ID_INFO::default();
     // SAFETY: File keeps its valid disk handle alive for this call. The initialized,
     // exclusively borrowed repr(C) FILE_ID_INFO has the exact size passed to Win32.
     // No pointer is retained, and output is consumed only after a nonzero result.
-    let succeeded = unsafe { GetFileInformationByHandleEx(
-        file.as_raw_handle(), FileIdInfo, std::ptr::from_mut(&mut information).cast(),
-        std::mem::size_of::<FILE_ID_INFO>() as u32,
-    ) };
+    let succeeded = unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle(),
+            FileIdInfo,
+            std::ptr::from_mut(&mut information).cast(),
+            std::mem::size_of::<FILE_ID_INFO>() as u32,
+        )
+    };
     if succeeded == 0 {
-        return Err(DomainError::new("NATIVE_IDENTITY_UNAVAILABLE", format!("Full Windows file identity is unavailable: {}", std::io::Error::last_os_error())));
+        return Err(DomainError::new(
+            "NATIVE_IDENTITY_UNAVAILABLE",
+            format!(
+                "Full Windows file identity is unavailable: {}",
+                std::io::Error::last_os_error()
+            ),
+        ));
     }
-    Ok((information.VolumeSerialNumber, information.FileId.Identifier))
+    Ok((
+        information.VolumeSerialNumber,
+        information.FileId.Identifier,
+    ))
 }
 pub fn source_object(path: &Path) -> Result<NativeObjectIdentity> {
     SourceStamp::capture_resolved(&source_path(path)?)?.object_identity()
@@ -479,7 +524,12 @@ mod tests {
         std::fs::copy(&retained, &canonical).unwrap();
         revalidate(&identity, &CancellationToken::new()).unwrap();
         assert_ne!(source_object(&canonical).unwrap(), original);
-        assert_eq!(revalidate_source_object(&canonical, &original).unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(
+            revalidate_source_object(&canonical, &original)
+                .unwrap_err()
+                .code,
+            "SOURCE_CHANGED"
+        );
         assert_eq!(source_object(&retained).unwrap(), original);
     }
     #[test]
@@ -489,7 +539,10 @@ mod tests {
         let alias = root.path().join("alias.bin");
         std::fs::write(&source, b"same physical object").unwrap();
         std::fs::hard_link(&source, &alias).unwrap();
-        assert_eq!(source_object(&source).unwrap(), source_object(&alias).unwrap());
+        assert_eq!(
+            source_object(&source).unwrap(),
+            source_object(&alias).unwrap()
+        );
     }
     #[cfg(unix)]
     #[tokio::test]

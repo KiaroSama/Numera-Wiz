@@ -8,7 +8,7 @@ fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLog
         source: data.join("logs"),
         destination: std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/interface-evidence")
-            .join(format!("{label}-{}",uuid::Uuid::new_v4())),
+            .join(format!("{label}-{}", uuid::Uuid::new_v4())),
     }
 }
 #[test]
@@ -24,7 +24,11 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
         .arg(path)
         .output()
         .unwrap();
-    assert!(output.status.success(), "CLI owner failure: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "CLI owner failure: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(response["ok"], true);
     assert_eq!(
@@ -56,7 +60,11 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         .await
         .unwrap();
     let value = serde_json::to_value(listed).unwrap();
-    assert_eq!(value["structuredContent"]["ok"], true, "Owner command error: {}",value["structuredContent"]["error"]);
+    assert_eq!(
+        value["structuredContent"]["ok"], true,
+        "Owner command error: {}",
+        value["structuredContent"]["error"]
+    );
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/clean-resolve.json")).unwrap();
     let denied = client
@@ -150,4 +158,41 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
         client.cancel().await.unwrap();
         wait_for_idle_owner_unlock(data.path()).await;
     }).await.expect("Actual stdio restart/principal boundary deadline");
+}
+
+#[tokio::test]
+async fn concurrent_native_frontends_boot_one_owner_for_the_same_root() {
+    tokio::time::timeout(std::time::Duration::from_secs(75), async {
+        let data = tempfile::tempdir().unwrap();
+        let _logs = retain_owner_logs(data.path(), "concurrent-start");
+        let mut children = tokio::task::JoinSet::new();
+        for _ in 0..3 {
+            let root = data.path().to_owned();
+            children.spawn(async move {
+                tokio::time::timeout(std::time::Duration::from_secs(45),
+                    tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
+                        .arg("--data-dir").arg(root).arg("commands")
+                        .stdin(std::process::Stdio::null()).kill_on_drop(true).output()
+                ).await.unwrap().unwrap()
+            });
+        }
+        let mut spawned = 0;
+        while let Some(output) = children.join_next().await {
+            let output = output.unwrap();
+            spawned += String::from_utf8_lossy(&output.stderr).lines()
+                .filter(|line| line.contains("Protected owner child spawned")).count();
+            assert!(output.status.success(), "Concurrent owner attachment failed: {}", String::from_utf8_lossy(&output.stderr));
+            let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(response["ok"], true);
+        }
+        assert_eq!(spawned, 1, "Concurrent frontends launched redundant owner children");
+        wait_for_idle_owner_unlock(data.path()).await;
+        let lines = nw_platform::security::read_private(&data.path().join("logs/owner.jsonl"),2*1024*1024+1024).unwrap();
+        let owners = lines.split(|b| *b == b'\n')
+            .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+            .filter(|row| row["fields"]["message"] == "Protected structured owner logging activated")
+            .filter_map(|row| row["process_id"].as_u64())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(owners.len(), 1, "Concurrent startup initialized redundant owner processes");
+    }).await.expect("Concurrent native attachment deadline");
 }
