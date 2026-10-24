@@ -17,7 +17,10 @@ pub struct DomainError {
 }
 impl DomainError {
     pub fn object_not_found() -> Self {
-        Self::new("OBJECT_NOT_FOUND", "Object is absent or unavailable to this principal")
+        Self::new(
+            "OBJECT_NOT_FOUND",
+            "Object is absent or unavailable to this principal",
+        )
     }
     /// Stable process status for a failed synchronous CLI request.
     pub fn exit_code(&self) -> u8 {

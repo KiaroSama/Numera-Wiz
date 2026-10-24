@@ -711,7 +711,12 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
                 ),
             ));
         }
-        verify_tags(&expected.tags, &observed.tags, &format!("Output stream {}", observed.index), false)?;
+        verify_tags(
+            &expected.tags,
+            &observed.tags,
+            &format!("Output stream {}", observed.index),
+            false,
+        )?;
     }
     if !plan.resolution.preservation.chapters
         && actual.chapters.as_array().is_some_and(|v| !v.is_empty())
@@ -728,21 +733,39 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
         ));
     }
     let empty = BTreeMap::new();
-    let expected = if plan.resolution.preservation.global_tags { &plan.source.probe.global_tags } else { &empty };
+    let expected = if plan.resolution.preservation.global_tags {
+        &plan.source.probe.global_tags
+    } else {
+        &empty
+    };
     verify_tags(expected, &actual.global_tags, "Container", true)?;
     Ok(())
 }
 
-fn verify_tags(expected: &BTreeMap<String, String>, actual: &BTreeMap<String, String>, target: &str, generated_writer: bool) -> Result<()> {
+fn verify_tags(
+    expected: &BTreeMap<String, String>,
+    actual: &BTreeMap<String, String>,
+    target: &str,
+    generated_writer: bool,
+) -> Result<()> {
     for (key, value) in expected {
         // Matroska regenerates its duration tags from the independently verified packet clock.
         if key != "duration" && actual.get(key) != Some(value) {
-            return Err(DomainError::new("VERIFICATION_FAILED", format!("{target} tag {key} did not match its frozen value")));
+            return Err(DomainError::new(
+                "VERIFICATION_FAILED",
+                format!("{target} tag {key} did not match its frozen value"),
+            ));
         }
     }
     for key in actual.keys() {
-        if !expected.contains_key(key) && key != "duration" && !(generated_writer && key == "encoder") {
-            return Err(DomainError::new("VERIFICATION_FAILED", format!("{target} unexpectedly retained or introduced tag {key}")));
+        if !expected.contains_key(key)
+            && key != "duration"
+            && !(generated_writer && key == "encoder")
+        {
+            return Err(DomainError::new(
+                "VERIFICATION_FAILED",
+                format!("{target} unexpectedly retained or introduced tag {key}"),
+            ));
         }
     }
     Ok(())

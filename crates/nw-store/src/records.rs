@@ -296,7 +296,7 @@ impl Store {
                 let value = table
                     .get(key.as_str())
                     .map_err(storage)?
-                    .ok_or_else(|| DomainError::object_not_found())?;
+                    .ok_or_else(DomainError::object_not_found)?;
                 decode(value.value())?
             };
             if current.state.terminal() {
@@ -365,9 +365,10 @@ impl Store {
             let id = &publication.job_id;
             let key = format!("job/{id}");
             let mut job: Job = {
-                let value = table.get(key.as_str()).map_err(storage)?.ok_or_else(|| {
-                    DomainError::object_not_found()
-                })?;
+                let value = table
+                    .get(key.as_str())
+                    .map_err(storage)?
+                    .ok_or_else(DomainError::object_not_found)?;
                 decode(value.value())?
             };
             if job.state != JobState::Verifying {
@@ -427,9 +428,10 @@ impl Store {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             let key = format!("job/{id}");
             let mut current: Job = {
-                let value = table.get(key.as_str()).map_err(storage)?.ok_or_else(|| {
-                    DomainError::object_not_found()
-                })?;
+                let value = table
+                    .get(key.as_str())
+                    .map_err(storage)?
+                    .ok_or_else(DomainError::object_not_found)?;
                 decode(value.value())?
             };
             if current.state != JobState::Publishing {

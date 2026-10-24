@@ -289,3 +289,17 @@ and strip a custom stream tag and container artist/date, and alter only an
 authored tag before verification to prove unchanged packets cannot hide metadata
 loss. These source changes await their own hosted results. The pinned Matroska
 writer and ffmpeg mux metadata-copy paths were inspected to ground this policy.
+
+
+Run [40046149476](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40046149476)
+for 9af80f6e0509ee627072b52b8dd85c40c2f15734 passed the real engine cases
+for every authored tag, custom-tag removal, creation date, isolated tag corruption
+and isolated packet corruption. All four native unit suites passed, including
+namespace and indistinguishable lookup assertions, then Clippy rejected redundant
+object-error closures. Those are replaced with associated function references.
+The stdio fixture still expected the old revealing PERMISSION_DENIED code for a
+foreign job; it now expects OBJECT_NOT_FOUND and compares the complete typed
+error against an absent ID through the actual official SDK. This preserves denial
+and tests the required privacy boundary. Its formatter patch is applied. The
+HTTP/browser/native journeys were skipped after the failed prerequisite and
+are not credited on this source.
