@@ -46,6 +46,28 @@ lifetimes. Use `jobs.cancel` to control an accepted job before its publication f
 Domain failures are structured tool errors. Invalid protocol envelopes use SDK
 protocol errors. No custom MCP wire parser or lifecycle implementation is used.
 
+## Registered selection reports
+
+streams.clean.report uses the same asset_ids and full typed intent as the CLI
+example. It is a query, so omit replay_scope and idempotency_key. The response
+contains all candidate outcomes and bounded unique/original-index source and
+retained counts. It is source inventory and a selection preview, not verification
+or permission to submit a job. Current command, object and independent path rights
+apply. An invisible/missing member fails the entire explicit set without a partial
+report; excessive metadata returns RESOURCE_LIMIT instead of silent truncation.
+
+streams.clean exposes the shared file_times policy: new, preserve_best_effort or
+require_reviewed. Review its exact policy/snapshot and plan hash before jobs.submit.
+Metadata warnings/assertions remain in jobs.inspect; private diagnostic text is
+omitted from scoped views where required. Media packet clocks remain separate.
+
+A retained stdio bridge keeps its original root and principal binding through
+idle-owner restart. Reconnect never selects another root/profile principal.
+Actual SDK lost-response tests withhold both accepted submission responses,
+restart the owner, and replay the identical original scope/key/request to one
+original receipt/job. This does not qualify retired-command or generation
+migration replay.
+
 ## Direct HTTP
 
 Run `serve --port 1578 --access-profile operator --token-file <new-file>` or the

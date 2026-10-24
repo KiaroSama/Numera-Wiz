@@ -86,56 +86,137 @@ async fn actual_copy_and_order_metadata_remux() {
     let observed = fixture::probe(&media.bin, &seek_remux).await;
     assert_eq!(observed["streams"][0]["codec_name"], "mpeg4");
     for extension in ["mov", "mp4"] {
-        let original = directory.path().join(format!("original-two-video.{extension}"));
+        let original = directory
+            .path()
+            .join(format!("original-two-video.{extension}"));
         nw_platform::process::run(
             &ffmpeg,
             &[
-                "-hide_banner".into(), "-nostdin".into(), "-v".into(), "error".into(),
-                "-i".into(), source.to_str().unwrap().into(),
-                "-map".into(), "0:v:0".into(), "-map".into(), "0:v:0".into(),
-                "-c:v".into(), "mpeg4".into(),
-                "-map_metadata".into(), "-1".into(),
-                "-map_metadata:s".into(), "-1".into(),
-                "-f".into(), extension.into(), original.to_str().unwrap().into(),
+                "-hide_banner".into(),
+                "-nostdin".into(),
+                "-v".into(),
+                "error".into(),
+                "-i".into(),
+                source.to_str().unwrap().into(),
+                "-map".into(),
+                "0:v:0".into(),
+                "-map".into(),
+                "0:v:0".into(),
+                "-c:v".into(),
+                "mpeg4".into(),
+                "-map_metadata".into(),
+                "-1".into(),
+                "-map_metadata:s".into(),
+                "-1".into(),
+                "-f".into(),
+                extension.into(),
+                original.to_str().unwrap().into(),
             ],
-            std::time::Duration::from_secs(30), 4096, token.clone(),
-        ).await.unwrap();
-        let original_asset = engine.register(original.clone(), "fixture-owner".into(), token.clone()).await.unwrap();
+            std::time::Duration::from_secs(30),
+            4096,
+            token.clone(),
+        )
+        .await
+        .unwrap();
+        let original_asset = engine
+            .register(original.clone(), "fixture-owner".into(), token.clone())
+            .await
+            .unwrap();
         assert_eq!(original_asset.probe.streams.len(), 2);
         let mut unchanged = rules();
         unchanged.audio_selection.selector = Selector::None;
         unchanged.subtitle_selection.selector = Selector::None;
-        let same_container = directory.path().join(format!("original-case-copy.{}", extension.to_ascii_uppercase()));
-        let copy_plan = engine.clean_plan(original_asset.clone(), &same_container, &unchanged, "fixture-owner").unwrap();
+        let same_container = directory.path().join(format!(
+            "original-case-copy.{}",
+            extension.to_ascii_uppercase()
+        ));
+        let copy_plan = engine
+            .clean_plan(
+                original_asset.clone(),
+                &same_container,
+                &unchanged,
+                "fixture-owner",
+            )
+            .unwrap();
         assert_eq!(copy_plan.resolution.action, CleanAction::CopyUnchanged);
         engine.execute(&copy_plan, token.clone()).await.unwrap();
-        assert_eq!(std::fs::read(&original).unwrap(), std::fs::read(&same_container).unwrap());
+        assert_eq!(
+            std::fs::read(&original).unwrap(),
+            std::fs::read(&same_container).unwrap()
+        );
         let mut intent = rules();
         intent.audio_selection.selector = Selector::None;
         intent.subtitle_selection.selector = Selector::None;
         intent.preservation.additional_video = false;
         intent.stream_tag_patches = vec![StreamTagPatch {
-            kind: StreamKind::Video, source_indices: vec![0], original_languages: vec![],
-            language: TagPatch::Set { value: "eng".into() },
-            title: TagPatch::Set { value: "Reviewed original-container video".into() },
+            kind: StreamKind::Video,
+            source_indices: vec![0],
+            original_languages: vec![],
+            language: TagPatch::Set {
+                value: "eng".into(),
+            },
+            title: TagPatch::Set {
+                value: "Reviewed original-container video".into(),
+            },
         }];
-        let output = directory.path().join(format!("original-family-clean.{extension}"));
-        let original_plan = engine.clean_plan(original_asset, &output, &intent, "fixture-owner").unwrap();
+        let output = directory
+            .path()
+            .join(format!("original-family-clean.{extension}"));
+        let original_plan = engine
+            .clean_plan(original_asset, &output, &intent, "fixture-owner")
+            .unwrap();
         assert_eq!(original_plan.resolution.action, CleanAction::Remux);
-        assert!(original_plan.argv_template.windows(2).any(|args| args == ["-f", extension]));
-        assert!(original_plan.verification_scope.contains("Original-family MOV/MP4"));
+        assert!(
+            original_plan
+                .argv_template
+                .windows(2)
+                .any(|args| args == ["-f", extension])
+        );
+        assert!(
+            original_plan
+                .verification_scope
+                .contains("Original-family MOV/MP4")
+        );
         let result = engine.execute(&original_plan, token.clone()).await.unwrap();
         assert!(result.1.contains("Full packet read"));
         let observed = fixture::probe(&media.bin, &output).await;
         assert_eq!(observed["streams"].as_array().unwrap().len(), 1);
         assert_eq!(observed["streams"][0]["codec_name"], "mpeg4");
         assert_eq!(observed["streams"][0]["tags"]["language"], "eng");
-        assert_eq!(observed["streams"][0]["tags"]["title"], "Reviewed original-container video");
-        assert_eq!(observed["format"]["tags"]["major_brand"], original_plan.source.probe.global_tags["major_brand"]);
+        assert_eq!(
+            observed["streams"][0]["tags"]["name"],
+            "Reviewed original-container video"
+        );
+        assert_eq!(
+            observed["format"]["tags"]["major_brand"],
+            original_plan.source.probe.global_tags["major_brand"]
+        );
+        let second_asset = engine.register(output.clone(), "fixture-owner".into(), token.clone()).await.unwrap();
+        assert_eq!(second_asset.probe.streams[0].tags["title"], "Reviewed original-container video");
+        assert_eq!(second_asset.probe.stream_details[&0]["tags"]["name"], "Reviewed original-container video");
+        let mut second_intent = intent.clone();
+        second_intent.stream_tag_patches[0].language = TagPatch::Set { value: "jpn".into() };
+        second_intent.stream_tag_patches[0].title = TagPatch::Keep;
+        let second_output = directory.path().join(format!("original-family-roundtrip.{extension}"));
+        let second_plan = engine.clean_plan(second_asset, &second_output, &second_intent, "fixture-owner").unwrap();
+        engine.execute(&second_plan, token.clone()).await.unwrap();
+        let second_probe = fixture::probe(&media.bin, &second_output).await;
+        assert_eq!(second_probe["streams"][0]["tags"]["language"], "jpn");
+        assert_eq!(second_probe["streams"][0]["tags"]["name"], "Reviewed original-container video");
         let mut unsupported = intent.clone();
         unsupported.preservation.stream_tags = false;
         assert_eq!(
-            engine.clean_plan(original_plan.source.clone(), &directory.path().join(format!("unqualified-strip.{extension}")), &unsupported, "fixture-owner").unwrap_err().code,
+            engine
+                .clean_plan(
+                    original_plan.source.clone(),
+                    &directory
+                        .path()
+                        .join(format!("unqualified-strip.{extension}")),
+                    &unsupported,
+                    "fixture-owner"
+                )
+                .unwrap_err()
+                .code,
             "INCOMPATIBLE_PRESERVATION",
         );
     }

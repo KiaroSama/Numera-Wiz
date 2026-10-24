@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "run_id": 40080655520,
+  "branch_head": "5bfce86e87e63dc37f6adc45623748aad1e8bdd6",
+  "jobs": [
+    {
+      "id": 120833319173,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833319276,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120833319280,
+      "name": "media",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120833319362,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833774969,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833774980,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833775055,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833775059,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120833776084,
+      "name": "browser",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 120835172203,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "asserted": [
+    "all four native tests/Clippy/desktop targets, lock and WASM",
+    "new MOV/MP4 profile admission negatives and profile-specific tag exception units",
+    "actual media test reached MOV remux after unchanged copy and extension-case byte assertions"
+  ],
+  "failures": [
+    "actual MOV staged output failed mandatory title equality; no publication occurred",
+    "pinned movenc writes stream title to the name atom while pinned mov demux exposes that atom as name",
+    "formatting: 24 exact hosted diagnostic hunks applied in the following revision"
+  ],
+  "correction_pending": [
+    "only unambiguous MOV/MP4 stream name projects to canonical title; exact raw tags retained in stream_details",
+    "prepared remux explicitly lowers an unchanged canonical title and clears duplicate raw name metadata",
+    "ambiguous dual name/title records remain distinct at probe and are incompatible with this MOV/MP4 route",
+    "independent raw-name fixture oracle and actual second registration/remux round trip"
+  ],
+  "not_asserted": [
+    "MOV/MP4 full packet preservation pass",
+    "MP4 new fixture: not reached after MOV failure",
+    "complete owner/SDK/large HTTP and native/Chrome GUI in this run: skipped by media prerequisite",
+    "complete F08, packages, resources or GPU"
+  ],
+  "artifacts": [
+    {
+      "id": 12553999587,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "85091c7a17857d09537655a45b9d17f108bc7b3bcaf9e74b417e669211db0806",
+      "downloaded": false
+    }
+  ],
+  "primary_source": {
+    "repository": "FFmpeg/FFmpeg",
+    "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+    "inspected": [
+      "libavformat/movenc.c: mov_write_track_udta_tag and mov_write_track_metadata",
+      "libavformat/mov.c: mov_read_udta_string name mapping"
+    ]
+  }
+}

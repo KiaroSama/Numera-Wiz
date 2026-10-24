@@ -19,10 +19,13 @@ Current code includes exact rational time, strict command DTOs, the shared MuxCl
 resolver, a protected single-owner service, durable asset/plan/job acceptance and
 receipt replay, explicit access profiles, bounded process/file/media execution,
 publication journals and real CLI/official MCP adapters. The shared native/WASM
-workspace has working media intake, cleanup forms, plan review and job controls.
+workspace has working media intake, cleanup forms, bounded selection reports,
+explicit filesystem timestamp policies, plan review, job controls and output
+manifest inspection.
 CI builds hash-addressed same-source browser assets and exercises Chrome media
 selection, review and verified output. The actual Linux native window also has
-input/registration evidence. [GUI guide](docs/manuals/GUI.md) and
+actual report controls, Review/keyboard Run, byte-verified output and an opened
+Output details dialog with verified SHA-256 evidence. [GUI guide](docs/manuals/GUI.md) and
 [current CLI manual](docs/manuals/CLI.md)
 describe the actual admitted scope. Hosted
 Windows/Linux/macOS CI builds/tests the actual workspace and verifies source

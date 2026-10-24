@@ -46,3 +46,15 @@ Primary pinned source inspected: FFmpeg 9.0.2
 generation, MOV vendor fields, handler labels, 31-byte compressor labels,
 track title udta and global metadata paths. Source inspection is not runtime
 qualification.
+
+Run 40080655520 passed all four native targets, lock and WASM. The first actual
+MOV remux failed the mandatory title assertion before publication. Pinned movenc
+writes track title to a name atom; pinned mov demux reports it as name. The next
+revision explicitly projects only an unambiguous MOV/MP4 name to canonical title
+and retains all raw source tags in stream_details. Prepared argv forces exact
+unchanged title lowering and clears duplicate raw-name metadata. Dual name/title
+records remain distinct during inspection and are incompatible with this route.
+Independent fixture checks inspect the actual name atom; a second actual
+registration/remux keeps the title while changing language. These corrections
+await CI. No packet/metadata assertion is weakened; Matroska raw name tags are
+unchanged. See evidence/original-container-ci70.json.
