@@ -557,6 +557,14 @@ impl RootLock {
         Ok(Self { _file: file })
     }
 }
+impl Drop for RootLock {
+    fn drop(&mut self) {
+        // Release this lease explicitly before closing its descriptor. A child
+        // briefly retaining a duplicated open-file description must not extend
+        // ownership beyond the Rust lease's lifetime on flock platforms.
+        let _ = fs2::FileExt::unlock(&self._file);
+    }
+}
 pub fn verified_copy(
     source: &Path,
     destination: &Path,

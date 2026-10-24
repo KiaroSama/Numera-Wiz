@@ -1810,3 +1810,40 @@ are still required; a copy primitive is not a completed schema migration.
 New tests cover exact numeric/unknown fields, original signed receipt replay,
 complete-copy restart, live-source refusal, unproven-file preservation and both
 source/target locks after attachment. Hosted formatting and full CI are pending.
+
+
+## Explicit owner schema2-to3 migration integration (hosted checks pending)
+
+CI94 passes Linux/Windows/macOS Intel, core media, actual CLI/SDK transports and
+lost-response batch, large HTTP, Chrome and native GUI. macOS ARM alone reports
+OWNER_BUSY on the second completed-copy attempt; formatting also fails. This
+revision applies the15 exact hosted formatting hunks, adds source/destination
+lock diagnostics and explicitly unlocks RootLock on lease drop. The inherited
+descriptor explanation remains a hypothesis until the repeated hosted test
+passes; no flaky retry or weakened assertion was added. CI93's last SDK/native
+jobs were cancelled by the next revision and are not recorded as green.
+
+The application now holds a state-wide RootLease and resolves immutable
+activation selection in both Service and native startup. Existing stores undergo
+compatibility inspection before writable open. Dirty unknown files are repaired
+only in a separately manifested owned probe; unsupported original bytes are
+preserved. Codec2 and explicitly declared codec3 are admitted, distinct from
+application and command versions.
+
+Three owner-only canonical commands and their typed CLI paths are added:
+maintenance.plan/migrate/inspect. Migration uses the ordinary scope/key/receipt
+transaction kernel, not bootstrap. A verified immutable rollback image precedes
+the atomic source reader-floor/intent/receipt commit. A separate complete target
+is activated, preserving the same root/key and original receipts. Admission
+excludes ordinary commands/credentials/intake during cutover and refuses active
+accepted work; a pending accepted recovery keeps the owner in maintenance mode.
+Recovery handles accepted/copy/activation interruptions using the original intent.
+A reused complete copy must match its original physical hash and today's full
+raw record snapshot, even if a redb reopen changed physical transaction pages.
+
+All new store fault/replay/stale review and actual Service restart tests require
+fresh hosted CI. No current pass is claimed. Generated schemas come from actual
+Rust contracts. The full D6-J03 journey, adoption-aware rollback, legacy command
+retirement, retention, all remaining F01-F15/editor/DAG/preview/mixer/captions/
+interchange/closure, offline packages/manuals/resources and matching owner harness
+remain mandatory. No task or complete-release gate closes from this slice.

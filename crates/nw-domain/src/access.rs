@@ -240,6 +240,7 @@ pub fn ordinary_commands() -> BTreeSet<String> {
                 && !id.starts_with("access.tokens")
                 && **id != "access.credentials.issue"
                 && !id.starts_with("logs.")
+                && !id.starts_with("maintenance.")
         })
         .map(|id| (*id).to_owned())
         .collect()

@@ -69,6 +69,11 @@ enum Mode {
         #[command(subcommand)]
         command: human::Batches,
     },
+    /// Review and execute explicit owner data-generation maintenance.
+    Maintenance {
+        #[command(subcommand)]
+        command: human::Maintenance,
+    },
     Logs {
         #[command(subcommand)]
         command: human::Logs,
@@ -178,6 +183,9 @@ async fn run() -> Result<()> {
         Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
         Some(Mode::Batches { command }) => {
             human::run(&client, human::Command::Batches(command)).await
+        }
+        Some(Mode::Maintenance { command }) => {
+            human::run(&client, human::Command::Maintenance(command)).await
         }
         Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
         Some(Mode::Commands { command }) => {

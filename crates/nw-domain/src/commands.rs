@@ -222,6 +222,9 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
+        row!("maintenance.plan", "Review an idle schema2 generation migration", Query, Empty),
+        row!("maintenance.migrate", "Accept a reviewed generation migration exactly once", DurableMutation, crate::maintenance::MigrationSubmitInput),
+        row!("maintenance.inspect", "Inspect an accepted owner migration", Query, IdInput),
         row!(
             "streams.clean.batch_plan",
             "Review every explicit cleanup batch candidate",
@@ -585,6 +588,9 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
+    "maintenance.plan",
+    "maintenance.migrate",
+    "maintenance.inspect",
     "streams.clean.batch_plan",
     "batches.plan_inspect",
     "batches.submit",

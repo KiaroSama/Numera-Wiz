@@ -1,8 +1,14 @@
 //! Manifest-bound closed-store copies used by generation migration and recovery.
 //! The source is never opened writable, overwritten, repaired or deleted here.
-use crate::{storage, versions::{self, GenerationFacts}};
+use crate::{
+    storage,
+    versions::{self, GenerationFacts},
+};
 use nw_domain::{DomainError, Result, records::FileIdentity};
-use nw_platform::{files::{self, DirectoryStamp, RootLock}, security};
+use nw_platform::{
+    files::{self, DirectoryStamp, RootLock},
+    security,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -34,13 +40,17 @@ fn same_facts(expected: &GenerationFacts, actual: &GenerationFacts) -> bool {
 fn manifest_bytes(manifest: &CopyManifest) -> Result<Vec<u8>> {
     let bytes = serde_json::to_vec_pretty(manifest).map_err(storage)?;
     if bytes.len() > 65536 {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Generation copy manifest exceeds64KiB"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Generation copy manifest exceeds64KiB",
+        ));
     }
     Ok(bytes)
 }
 /// Reserve one canonical UUID workspace without claiming unrelated files as owned.
 pub fn workspace(lease: &crate::generations::RootLease, operation_id: &str) -> Result<PathBuf> {
-    let parsed = uuid::Uuid::parse_str(operation_id).map_err(|_| conflict("Copy operation identity must be a UUID"))?;
+    let parsed = uuid::Uuid::parse_str(operation_id)
+        .map_err(|_| conflict("Copy operation identity must be a UUID"))?;
     if parsed.to_string() != operation_id {
         return Err(conflict("Copy operation identity must be canonical"));
     }
@@ -52,12 +62,18 @@ pub fn workspace(lease: &crate::generations::RootLease, operation_id: &str) -> R
         member.map_err(files::io_error)?;
         count += 1;
         if count > MAX_WORKSPACES {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Retained generation workspace quota reached; nothing was evicted"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained generation workspace quota reached; nothing was evicted",
+            ));
         }
     }
     let path = parent.join(operation_id);
     if !path.try_exists().map_err(files::io_error)? && count >= MAX_WORKSPACES {
-        return Err(DomainError::new("RESOURCE_LIMIT", "At most16 generation workspaces may be retained"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "At most16 generation workspaces may be retained",
+        ));
     }
     let path = security::private_directory(&path)?;
     stamp.revalidate()?;
@@ -68,12 +84,20 @@ pub fn workspace(lease: &crate::generations::RootLease, operation_id: &str) -> R
 /// Reservations remain conservative; another disk user can still exhaust space later.
 pub fn require_copy_space(parent: &Path, bytes: u64, copies: u64) -> Result<()> {
     if bytes == 0 || bytes > versions::MAX_GENERATION_BYTES || !(1..=3).contains(&copies) {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Generation copy size/count is outside admitted limits"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Generation copy size/count is outside admitted limits",
+        ));
     }
-    let required = bytes.checked_mul(copies).and_then(|value| value.checked_add(SPACE_MARGIN))
+    let required = bytes
+        .checked_mul(copies)
+        .and_then(|value| value.checked_add(SPACE_MARGIN))
         .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Generation space estimate overflow"))?;
     if fs2::available_space(parent).map_err(files::io_error)? < required {
-        return Err(DomainError::new("SCRATCH_EXHAUSTED", "Complete retained generation copies and64MiB safety margin do not fit; source is untouched"));
+        return Err(DomainError::new(
+            "SCRATCH_EXHAUSTED",
+            "Complete retained generation copies and64MiB safety margin do not fit; source is untouched",
+        ));
     }
     Ok(())
 }
@@ -92,7 +116,10 @@ pub fn copy_closed(
     }
     lease.revalidate()?;
     let source = std::fs::canonicalize(source).map_err(files::io_error)?;
-    let _source_guard = RootLock::acquire(&source)?;
+    let _source_guard = RootLock::acquire(&source).map_err(|mut error| {
+        if error.code == "OWNER_BUSY" { error.message = "The source generation is still owned".into(); }
+        error
+    })?;
     copy_locked(lease, operation_id, role, &source, cancel)
 }
 /// The caller already retains the source's generation lock, including after redb closes.
@@ -114,11 +141,32 @@ pub(crate) fn copy_locked(
         return Err(conflict("Source length changed after closed inspection"));
     }
     let operation = workspace(lease, operation_id)?;
-    require_copy_space(&operation, source_identity.bytes.parse().map_err(storage)?, 1)?;
+    require_copy_space(
+        &operation,
+        source_identity.bytes.parse().map_err(storage)?,
+        1,
+    )?;
     let destination = security::private_directory(&operation.join(role))?;
     let destination_stamp = DirectoryStamp::capture_resolved(&destination)?;
-    let _destination_guard = RootLock::acquire(&destination)?;
-    let manifest = CopyManifest {
+    let mut retained_bytes = 0u64;
+    let mut retained_entries = 0usize;
+    for entry in std::fs::read_dir(&destination).map_err(files::io_error)? {
+        let entry = entry.map_err(files::io_error)?;
+        retained_entries += 1;
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(files::io_error)?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(conflict("Unexpected copy workspace member was preserved"));
+        }
+        retained_bytes = retained_bytes.checked_add(metadata.len()).ok_or_else(||conflict("Copy workspace byte count overflow"))?;
+        if retained_entries > 256 || retained_bytes > 2 * versions::MAX_GENERATION_BYTES {
+            return Err(DomainError::new("RESOURCE_LIMIT","Retained copy workspace entries/bytes exceed their finite quota; nothing was evicted"));
+        }
+    }
+    let _destination_guard = RootLock::acquire(&destination).map_err(|mut error| {
+        if error.code == "OWNER_BUSY" { error.message = "The copy destination is still owned".into(); }
+        error
+    })?;
+    let mut manifest = CopyManifest {
         schema_version: 1,
         operation_id: operation_id.into(),
         role: role.into(),
@@ -131,11 +179,29 @@ pub(crate) fn copy_locked(
         let bytes = security::read_private(&manifest_path, 65536)?;
         let existing: CopyManifest = serde_json::from_slice(&bytes).map_err(storage)?;
         if existing != manifest {
-            return Err(conflict("Existing workspace manifest belongs to different source facts"));
+            let mut original = existing.source.clone();
+            original.store_bytes = source_facts.store_bytes.clone();
+            if existing.schema_version != 1 || existing.operation_id != operation_id
+                || existing.role != role || original != source_facts
+                || !destination.join("store.redb").try_exists().map_err(files::io_error)?
+            {
+                return Err(conflict("Existing workspace manifest belongs to different source facts"));
+            }
+            // Reopening a writer may change redb's physical transaction pages
+            // without changing a single retained raw record. A previously completed
+            // copy is reusable only against its own original file hash AND today's
+            // complete raw-record snapshot; never relabel or overwrite its manifest.
+            manifest = existing;
         }
     } else {
-        if destination.join("store.redb").try_exists().map_err(files::io_error)? {
-            return Err(conflict("Existing database has no matching ownership manifest; it was preserved"));
+        if destination
+            .join("store.redb")
+            .try_exists()
+            .map_err(files::io_error)?
+        {
+            return Err(conflict(
+                "Existing database has no matching ownership manifest; it was preserved",
+            ));
         }
         security::write_private(&manifest_path, &manifest_bytes(&manifest)?, false)?;
     }
@@ -145,13 +211,19 @@ pub(crate) fn copy_locked(
     } else {
         files::verified_copy_expected(&source_identity, &output, cancel)?
     };
-    if actual.bytes != source_identity.bytes || actual.sha256 != source_identity.sha256 {
-        return Err(conflict("Owned copy is incomplete or differs; it was retained for explicit recovery"));
+    if actual.bytes != manifest.source_file_bytes || actual.sha256 != manifest.source_file_sha256 {
+        return Err(conflict(
+            "Owned copy is incomplete or differs; it was retained for explicit recovery",
+        ));
     }
     // A second independent database traversal proves record and metadata identity.
     let copied = versions::inspect_closed(&destination)?;
-    if !same_facts(&source_facts, &copied) {
-        return Err(conflict("Copied generation records differ from the closed source"));
+    let mut logical_copy = copied.clone();
+    logical_copy.store_bytes = source_facts.store_bytes.clone();
+    if !same_facts(&source_facts, &logical_copy) {
+        return Err(conflict(
+            "Copied generation records differ from the closed source",
+        ));
     }
     let current = versions::inspect_closed(source)?;
     if !same_facts(&source_facts, &current) {
@@ -165,16 +237,21 @@ pub(crate) fn copy_locked(
         "store_sha256":actual.sha256,
         "store_bytes":actual.bytes,
         "records_sha256":copied.records_sha256,
-    })).map_err(storage)?;
+    }))
+    .map_err(storage)?;
     let completion = destination.join("complete.json");
     if completion.try_exists().map_err(files::io_error)? {
-        if security::read_private(&completion,65536)? != complete {
+        if security::read_private(&completion, 65536)? != complete {
             return Err(conflict("Existing completion proof differs"));
         }
     } else {
         security::write_private(&completion, &complete, false)?;
     }
-    Ok(ClosedCopy { path: destination, facts: copied, file_sha256: actual.sha256 })
+    Ok(ClosedCopy {
+        path: destination,
+        facts: copied,
+        file_sha256: actual.sha256,
+    })
 }
 
 #[cfg(test)]
@@ -187,40 +264,107 @@ mod tests {
         let root = security::private_directory(&temporary.path().join("root")).unwrap();
         let source = security::private_directory(&root.join("state/generations/1")).unwrap();
         let store = Store::open(&source).unwrap();
-        store.put("exact/value", &serde_json::json!({"ticks":"9007199254740993","unknown":{"keep":true}})).unwrap();
-        let scope = store.issue_scope("alice",100).unwrap();
-        let mut request = nw_domain::commands::Request::query("assets.register",serde_json::json!({"path":"retained"}));
-        request.replay_scope=Some(scope);
-        request.idempotency_key=Some("retained-key".into());
-        let accepted=store.commit_with_clock("alice",&request,||Ok(101),serde_json::json!({"asset_id":"same"}),&[]).unwrap();
-        let root_id=store.root_id().to_owned();
+        store
+            .put(
+                "exact/value",
+                &serde_json::json!({"ticks":"9007199254740993","unknown":{"keep":true}}),
+            )
+            .unwrap();
+        let scope = store.issue_scope("alice", 100).unwrap();
+        let mut request = nw_domain::commands::Request::query(
+            "assets.register",
+            serde_json::json!({"path":"retained"}),
+        );
+        request.replay_scope = Some(scope);
+        request.idempotency_key = Some("retained-key".into());
+        let accepted = store
+            .commit_with_clock(
+                "alice",
+                &request,
+                || Ok(101),
+                serde_json::json!({"asset_id":"same"}),
+                &[],
+            )
+            .unwrap();
+        let root_id = store.root_id().to_owned();
         drop(store);
-        let lease=RootLease::acquire(&root).unwrap();
-        let operation=uuid::Uuid::new_v4().to_string();
-        let copied=copy_closed(&lease,&operation,"rollback",&source,&CancellationToken::new()).unwrap();
-        let repeated=copy_closed(&lease,&operation,"rollback",&source,&CancellationToken::new()).unwrap();
-        assert_eq!(copied.file_sha256,repeated.file_sha256);
-        assert_eq!(copied.facts,repeated.facts);
-        let copy=Store::open(&copied.path).unwrap();
-        assert_eq!(copy.root_id(),root_id);
-        assert_eq!(copy.get::<serde_json::Value>("exact/value").unwrap().unwrap()["ticks"],"9007199254740993");
-        assert_eq!(copy.replay("alice",&request,102).unwrap().unwrap().receipt_id,accepted.receipt_id);
+        let lease = RootLease::acquire(&root).unwrap();
+        let operation = uuid::Uuid::new_v4().to_string();
+        let copied = copy_closed(
+            &lease,
+            &operation,
+            "rollback",
+            &source,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        let repeated = copy_closed(
+            &lease,
+            &operation,
+            "rollback",
+            &source,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        assert_eq!(copied.file_sha256, repeated.file_sha256);
+        assert_eq!(copied.facts, repeated.facts);
+        let copy = Store::open(&copied.path).unwrap();
+        assert_eq!(copy.root_id(), root_id);
+        assert_eq!(
+            copy.get::<serde_json::Value>("exact/value")
+                .unwrap()
+                .unwrap()["ticks"],
+            "9007199254740993"
+        );
+        assert_eq!(
+            copy.replay("alice", &request, 102)
+                .unwrap()
+                .unwrap()
+                .receipt_id,
+            accepted.receipt_id
+        );
     }
     #[test]
     fn live_source_and_unproven_existing_destination_are_preserved() {
-        let temporary=tempfile::tempdir().unwrap();
-        let root=security::private_directory(&temporary.path().join("root")).unwrap();
-        let source=security::private_directory(&root.join("state/generations/1")).unwrap();
-        let store=Store::open(&source).unwrap();
-        let lease=RootLease::acquire(&root).unwrap();
-        let operation=uuid::Uuid::new_v4().to_string();
-        assert_eq!(copy_closed(&lease,&operation,"rollback",&source,&CancellationToken::new()).err().unwrap().code,"OWNER_BUSY");
+        let temporary = tempfile::tempdir().unwrap();
+        let root = security::private_directory(&temporary.path().join("root")).unwrap();
+        let source = security::private_directory(&root.join("state/generations/1")).unwrap();
+        let store = Store::open(&source).unwrap();
+        let lease = RootLease::acquire(&root).unwrap();
+        let operation = uuid::Uuid::new_v4().to_string();
+        assert_eq!(
+            copy_closed(
+                &lease,
+                &operation,
+                "rollback",
+                &source,
+                &CancellationToken::new()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "OWNER_BUSY"
+        );
         drop(store);
-        let destination=security::private_directory(&workspace(&lease,&operation).unwrap().join("rollback")).unwrap();
-        let output=destination.join("store.redb");
-        std::fs::write(&output,b"unproven").unwrap();
-        assert_eq!(copy_closed(&lease,&operation,"rollback",&source,&CancellationToken::new()).err().unwrap().code,"STORE_COPY_CONFLICT");
-        assert_eq!(std::fs::read(output).unwrap(),b"unproven");
+        let destination =
+            security::private_directory(&workspace(&lease, &operation).unwrap().join("rollback"))
+                .unwrap();
+        let output = destination.join("store.redb");
+        std::fs::write(&output, b"unproven").unwrap();
+        assert_eq!(
+            copy_closed(
+                &lease,
+                &operation,
+                "rollback",
+                &source,
+                &CancellationToken::new()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "STORE_COPY_CONFLICT"
+        );
+        assert_eq!(std::fs::read(output).unwrap(), b"unproven");
         assert!(!destination.join("copy.json").exists());
     }
 }

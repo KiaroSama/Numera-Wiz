@@ -24,6 +24,7 @@ fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &s
         ("asset/", 4096usize),
         ("batch-plan/", 128),
         ("batch/", 1024),
+        ("generation-migration/", 16),
         ("job/", 4096),
         ("profile/", 128),
         ("plan/", 512),
@@ -312,7 +313,7 @@ impl Store {
         })
     }
     /// The same replay/clock/receipt transaction kernel serves ordinary and composed mutations.
-    fn commit_composed_with_clock(
+    pub(super) fn commit_composed_with_clock(
         &self,
         principal: &str,
         request: &Request,

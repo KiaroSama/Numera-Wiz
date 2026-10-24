@@ -211,6 +211,19 @@ pub enum Batches {
     },
 }
 #[derive(Subcommand)]
+pub enum Maintenance {
+    /// Review an idle schema2 store; issue and retain a replay scope first.
+    Plan,
+    /// Submit the exact reviewed raw plan JSON with a retained mutation identity.
+    Migrate {
+        #[arg(long)]
+        plan_file: PathBuf,
+        #[command(flatten)]
+        identity: MutationIdentity,
+    },
+    Inspect { id: String },
+}
+#[derive(Subcommand)]
 pub enum Logs {
     Status,
 }
@@ -227,6 +240,7 @@ pub enum Command {
     Jobs(Jobs),
     Batches(Batches),
     Logs(Logs),
+    Maintenance(Maintenance),
     Discovery(Option<Discovery>),
 }
 fn native_path(path: &Path) -> Result<String> {
@@ -356,6 +370,15 @@ pub fn prepare(command: Command) -> Result<Request> {
         }
         Command::Batches(Batches::Cancel { id, identity }) => {
             let mut request = query("batches.cancel", json!({"id":id}));
+            identity.apply(&mut request)?;
+            request
+        }
+        Command::Maintenance(Maintenance::Plan) => query("maintenance.plan", json!({})),
+        Command::Maintenance(Maintenance::Inspect { id }) => query("maintenance.inspect", json!({"id":id})),
+        Command::Maintenance(Maintenance::Migrate { plan_file, identity }) => {
+            let plan: nw_domain::maintenance::MigrationPlan = commands::parse(document(&plan_file)?)?;
+            plan.validate_hash()?;
+            let mut request=query("maintenance.migrate", json!({"plan":plan}));
             identity.apply(&mut request)?;
             request
         }

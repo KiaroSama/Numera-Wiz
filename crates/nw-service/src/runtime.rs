@@ -1,6 +1,7 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
 mod artifacts;
 mod batches;
+mod maintenance;
 pub use artifacts::ArtifactTransfer;
 mod clock;
 mod read_model;
@@ -62,6 +63,8 @@ pub struct Service {
     root: PathBuf,
     code_roots: Vec<PathBuf>,
     mutation: Mutex<()>,
+    maintenance: std::sync::RwLock<()>,
+    root_lease: Arc<nw_store::generations::RootLease>,
     credentials: Mutex<()>,
     snapshots: Mutex<read_model::Snapshots>,
     clock: clock::SessionClock,
@@ -116,10 +119,26 @@ impl Service {
         std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
-        let store = tokio::task::spawn_blocking(move || {
-            let protected =
-                nw_platform::security::private_directory(&root.join("state/generations/1"))?;
-            Store::open(&protected)
+        let (store, root_lease) = tokio::task::spawn_blocking(move || {
+            let lease = nw_store::generations::RootLease::acquire(&root)?;
+            let selection = lease.selection()?;
+            let path = lease.path(&selection)?;
+            if selection.activation_id.is_some() && !path.join("store.redb").try_exists().map_err(files::io_error)? {
+                return Err(DomainError::new("STORE_ACTIVATION_INVALID", "Selected complete generation is missing; no empty store was initialized"));
+            }
+            let protected = nw_platform::security::private_directory(&path)?;
+            let store = Store::open(&protected)?;
+            if selection.root_id.as_deref().is_some_and(|expected| expected != store.root_id()) {
+                return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Selected store and activation root differ"));
+            }
+            let recovery = store.recover_migration(&lease, || {
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .map(|duration|duration.as_secs()).map_err(|_|DomainError::new("CLOCK_ROLLBACK","Wall clock predates Unix epoch"))
+            });
+            if let Err(error) = recovery {
+                tracing::warn!(code=%error.code, "Accepted migration remains in maintenance mode; retained copies were preserved");
+            }
+            Ok((store, lease))
         })
         .await
         .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
@@ -205,6 +224,8 @@ impl Service {
             epoch: Uuid::new_v4().to_string(),
             engine,
             mutation: Mutex::new(()),
+            maintenance: std::sync::RwLock::new(()),
+            root_lease,
             credentials: Mutex::new(()),
             snapshots: Mutex::new(read_model::Snapshots::default()),
             clock: clock::SessionClock::default(),
@@ -219,6 +240,9 @@ impl Service {
             #[cfg(test)]
             preflight_hook: Mutex::new(None),
         });
+        if service.store.pending_migration()?.is_some() {
+            return Ok(service);
+        }
         let recovering = service.clone();
         tokio::task::spawn_blocking(move || {
             recovering.recover_uploads()?;
@@ -655,6 +679,7 @@ impl Service {
         origin: Option<&str>,
         active: bool,
     ) -> Result<Context> {
+        let _admission = self.ordinary_admission()?;
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let now = self.clock.now()?;
         if token.len() > 256 {
@@ -726,6 +751,7 @@ impl Service {
         origin: Option<String>,
         expected_principal: Option<&str>,
     ) -> Result<(String, Context)> {
+        let _admission = self.ordinary_admission()?;
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let context = self.profile_context(name)?;
         if expected_principal.is_some_and(|principal| principal != context.principal) {
@@ -822,6 +848,7 @@ impl Service {
         cancellation: CancellationToken,
     ) -> Result<Response> {
         request.validate()?;
+        let _admission = self.command_admission(&request.command.id)?;
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
         let durable = matches!(descriptor.state_class, StateClass::DurableMutation);
@@ -837,6 +864,9 @@ impl Service {
                 self.store
                     .replay_with_clock(&context.principal, &request, || self.clock.now())?
         {
+            if request.command.id == "maintenance.migrate" && policy.is_none() {
+                self.store.recover_migration(&self.root_lease, || self.clock.now())?;
+            }
             return self.replay_view(&context, &request, response);
         }
         if let Some(profile) = &policy
@@ -862,6 +892,9 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "maintenance.plan" | "maintenance.migrate" | "maintenance.inspect" => {
+                return self.maintenance_command(&context, &request, &cancellation);
+            }
             "artifacts.list" => {
                 self.artifact_inventory(&context, commands::parse(params)?, &cancellation)?
             }

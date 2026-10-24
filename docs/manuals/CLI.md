@@ -436,3 +436,19 @@ identity reads, caller transport deadlines and cancellation remain independent
 boundaries. This option governs the ffprobe child rather than promising a
 whole-command filesystem/transport deadline. Browser upload filenames remain
 opaque managed inputs; this field confers no path or object authority.
+
+
+## Development data generation maintenance
+
+The owner-only commands `maintenance plan`, `maintenance migrate --plan-file
+<raw-plan.json> --replay-scope <retained-scope> --idempotency-key <retained-key>`
+and `maintenance inspect <id>` use the ordinary canonical owner interface.
+Issue your scope before preparing the plan; retain the exact raw plan and retry
+identity. A plan expires after300seconds and any intervening durable source
+change requires a new review. Accepted jobs/intake must finish or be cancelled.
+
+This explicit schema2-to3 path retains a verified rollback image, fences older
+schema2 readers and activates a separate complete target. Its development tests
+are pending fresh hosted CI. A safe rollback command and full old/new packaged
+application journey remain required. See [generation migration](../development/generation-migration.md)
+for the actual admitted behavior, finite limits and remaining qualification.
