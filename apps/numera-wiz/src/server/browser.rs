@@ -759,6 +759,9 @@ mod tests {
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":591},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
             let started = Instant::now();
             let mut report_request = None::<String>;
+            let mut completed_requests = std::collections::VecDeque::new();
+            let mut last_report_input = Instant::now();
+            let mut report_input_attempts = 1;
             let report_response = loop {
                 // Inspect actual Chrome network events in memory. Never retain
                 // raw headers, cookies, pairing proof or unrelated request bodies.
@@ -770,7 +773,6 @@ mod tests {
                     json!({"type":"performance"}),
                 )
                 .await;
-                let mut finished = false;
                 for entry in events.as_array().unwrap() {
                     let Ok(event) =
                         serde_json::from_str::<Value>(entry["message"].as_str().unwrap())
@@ -788,13 +790,15 @@ mod tests {
                         report_request = Some(params["requestId"].as_str().unwrap().to_owned());
                     }
                     if message["method"] == "Network.loadingFinished"
-                        && report_request.as_deref() == params["requestId"].as_str()
-                        && report_request.is_some()
+                        && let Some(id) = params["requestId"].as_str()
                     {
-                        finished = true;
+                        completed_requests.push_back(id.to_owned());
+                        if completed_requests.len() > 64 {
+                            completed_requests.pop_front();
+                        }
                     }
                 }
-                if finished {
+                if report_request.as_ref().is_some_and(|id| completed_requests.contains(id)) {
                     let body = driver(
                         &client,
                         &base,
@@ -811,10 +815,27 @@ mod tests {
                     )
                     .unwrap();
                 }
-                assert!(
-                    started.elapsed() < Duration::from_secs(15),
-                    "Actual browser Selection report click did not complete its canonical HTTP response"
-                );
+                if started.elapsed() >= Duration::from_secs(15) {
+                    let png = driver(&client, &base, reqwest::Method::GET, &format!("{route}/screenshot"), Value::Null).await;
+                    let png = png.as_str().unwrap();
+                    let bytes = base64::engine::general_purpose::STANDARD.decode(png).unwrap();
+                    std::fs::write(directory.join("selection-report-input-timeout.png"), &bytes).unwrap();
+                    if bytes.len() <= 256 * 1024 {
+                        println!("NW_BROWSER_FAILURE_IMAGE:{png}");
+                    }
+                    panic!(
+                        "Actual browser Selection report response deadline; request_seen={}, pointer_attempts={}, retained_finished_ids={}",
+                        report_request.is_some(), report_input_attempts, completed_requests.len()
+                    );
+                }
+                // Registration is durable before the form's final async details/
+                // output-suggestion reply. Retry only this nonmutating pointer
+                // action while no report request is observed; UI guards remain.
+                if report_request.is_none() && last_report_input.elapsed() >= Duration::from_secs(1) {
+                    driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":591},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+                    last_report_input = Instant::now();
+                    report_input_attempts += 1;
+                }
                 tokio::time::sleep(Duration::from_millis(100)).await;
             };
             assert_eq!(report_response["ok"], true, "{report_response}");

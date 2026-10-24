@@ -930,6 +930,31 @@
           "observed_outcome": "All functional gates passed: four full native targets, WASM, complete actual media/transports/large HTTP and real Chrome/native report input through subsequent verified output. Actual native report and manifest PNGs personally inspected. Only one exact hosted harness formatting hunk failed; full product/package/resource/owner boundaries remain open."
         }
       ]
+    },
+    {
+      "subject_id": "cleanup.original_mov_mp4_video",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-engine/src/output_profile.rs",
+        "crates/nw-engine/src/lib.rs",
+        "crates/nw-engine/tests/media.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "0a4073d26b485e3fb87cf3ef321e73e7dc59f44b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40082246721",
+          "boundary": "unit_and_development_transport_media",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "report": "docs/development/evidence/original-container-ci72.json",
+          "observed_outcome": "All native admission/legacy/tag units passed. Actual Linux MOV and MP4 MPEG-4 ordinary-video first/second round trips passed full packet/clock/extradata/side-data and independent raw name/brand assertions. Complete media/CLI/SDK/large HTTP and native shared workspace passed; Chrome report observation failed. Profile-specific five-surface variants, broader routes and all package/resource/owner gates remain open."
+        }
+      ]
     }
   ]
 }

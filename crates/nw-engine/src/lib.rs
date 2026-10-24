@@ -1091,24 +1091,50 @@ mod tag_tests {
             "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Original label","language":"und"}}]
         })).unwrap();
         let mut source = Asset {
-            source_object: None, display_name: "source.mov".into(), id: "a".into(), creator: "owner".into(),
-            identity: FileIdentity { path: "/source.mov".into(), bytes: "1".into(), sha256: "0".repeat(64) },
+            source_object: None,
+            display_name: "source.mov".into(),
+            id: "a".into(),
+            creator: "owner".into(),
+            identity: FileIdentity {
+                path: "/source.mov".into(),
+                bytes: "1".into(),
+                sha256: "0".repeat(64),
+            },
             probe,
         };
         let mut resolved = mux::CleanResolution {
-            action: CleanAction::Remux, streams: source.probe.streams.clone(),
-            outcomes: vec![], reasons: vec![], warnings: vec![],
+            action: CleanAction::Remux,
+            streams: source.probe.streams.clone(),
+            outcomes: vec![],
+            reasons: vec![],
+            warnings: vec![],
             preservation: nw_domain::mux::Preservation::default(),
         };
         let current = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
-        assert!(current.windows(2).any(|args| args == ["-metadata:s:0", "name="]));
-        assert!(current.windows(2).any(|args| args == ["-metadata:s:0", "title=Original label"]));
+        assert!(
+            current
+                .windows(2)
+                .any(|args| args == ["-metadata:s:0", "name="])
+        );
+        assert!(
+            current
+                .windows(2)
+                .any(|args| args == ["-metadata:s:0", "title=Original label"])
+        );
         let title = source.probe.streams[0].tags.remove("title").unwrap();
         source.probe.streams[0].tags.insert("name".into(), title);
         resolved.streams = source.probe.streams.clone();
         let legacy = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
-        assert!(!legacy.iter().any(|argument| argument == "name=" || argument == "title=Original label"));
-        assert!(legacy.windows(2).any(|args| args == ["-map_metadata:s:0", "0:s:0"]));
+        assert!(
+            !legacy
+                .iter()
+                .any(|argument| argument == "name=" || argument == "title=Original label")
+        );
+        assert!(
+            legacy
+                .windows(2)
+                .any(|args| args == ["-map_metadata:s:0", "0:s:0"])
+        );
     }
     #[test]
     fn movie_track_name_is_an_exact_title_projection_with_raw_metadata_retained() {

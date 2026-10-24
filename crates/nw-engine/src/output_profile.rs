@@ -258,7 +258,9 @@ mod tests {
             .insert("title".into(), "Separate title".into());
         assert!(profile.admit(&source, &changed).is_err());
         changed = resolution.clone();
-        changed.streams[0].tags.insert("vendor_id".into(), "[0][0][0][0]".into());
+        changed.streams[0]
+            .tags
+            .insert("vendor_id".into(), "[0][0][0][0]".into());
         assert!(profile.admit(&source, &changed).is_err());
         changed = resolution.clone();
         changed.streams[0].codec = "h264".into();
