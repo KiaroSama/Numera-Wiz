@@ -21,3 +21,9 @@ process-wrap = { version = "=10.0.1", default-features = false, features = ["tok
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 [dev-dependencies]
 tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.5", features = ["fs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }

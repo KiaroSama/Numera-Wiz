@@ -15,7 +15,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub const SCOPE: &str = "Full byte digest for unchanged copy. Remux requires full per-stream packet payload, exact original-clock timestamps, flags, codec/extradata, exposed side data and all authored tags. Matroska duration tags are regenerated from the verified packet clock; a generated container encoder tag is allowed where no authored value is retained. Canonical decoded reframing and unexposed raw side-data qualification remain pending.";
+pub const SCOPE: &str = "Full byte digest for unchanged copy. Remux requires full per-stream packet payload, exact original-clock timestamps, flags, codec/extradata, exposed side data and all authored tags. Matroska omits its explicit undefined stream language (und) from probe tags; this omission is the only admitted language normalization. Matroska duration tags are regenerated from the verified packet clock; a generated container encoder tag is allowed where no authored value is retained. Canonical decoded reframing and unexposed raw side-data qualification remain pending.";
 
 fn invalid(message: &str) -> DomainError {
     DomainError::new("VERIFICATION_FAILED", message)

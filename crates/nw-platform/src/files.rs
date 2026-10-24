@@ -28,6 +28,47 @@ pub fn source_path(path: &Path) -> Result<PathBuf> {
     }
     fs::canonicalize(path).map_err(io_error)
 }
+/// Open the checked native input without following a final link or waiting on a FIFO.
+pub fn open_regular_read(path: &Path) -> Result<File> {
+    let canonical = source_path(path)?;
+    open_regular_handle(&canonical)
+}
+fn open_regular_handle(path: &Path) -> Result<File> {
+    #[cfg(unix)]
+    let file = {
+        use rustix::fs::{Mode, OFlags};
+        let descriptor = rustix::fs::open(
+            path,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
+            Mode::empty(),
+        ).map_err(io_error)?;
+        File::from(descriptor)
+    };
+    #[cfg(windows)]
+    let file = {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+        OpenOptions::new().read(true)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .security_qos_flags(0)
+            .open(path).map_err(io_error)?
+    };
+    #[cfg(not(any(unix, windows)))]
+    let file = File::open(path).map_err(io_error)?;
+    let metadata = file.metadata().map_err(io_error)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(DomainError::new("INPUT_DENIED", "An opened ordinary regular file is required"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(DomainError::new("INPUT_DENIED", "An ordinary input cannot be a reparse point"));
+        }
+    }
+    Ok(file)
+}
 pub fn output_path(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() {
         return Err(DomainError::new(
@@ -68,7 +109,7 @@ pub fn revalidate_output(expected: &str) -> Result<PathBuf> {
 }
 pub fn identity(path: &Path, cancel: &CancellationToken) -> Result<FileIdentity> {
     let canonical = source_path(path)?;
-    let mut file = File::open(&canonical).map_err(io_error)?;
+    let mut file = open_regular_handle(&canonical)?;
     let before = file.metadata().map_err(io_error)?;
     if before.len() > 256 * 1024 * 1024 * 1024 {
         return Err(DomainError::new(
@@ -138,7 +179,7 @@ impl SourceStamp {
                 "Preflight source no longer matches its admitted canonical path",
             ));
         }
-        let file = File::open(&canonical).map_err(io_error)?;
+        let file = open_regular_handle(&canonical)?;
         Self::capture_open_resolved(&canonical, file)
     }
     /// Bind an already opened regular input to its canonical physical path.
@@ -154,7 +195,10 @@ impl SourceStamp {
         let handle = same_file::Handle::from_file(file).map_err(io_error)?;
         let metadata = handle.as_file().metadata().map_err(io_error)?;
         if !metadata.is_file() {
-            return Err(DomainError::new("INPUT_DENIED", "A regular held source is required"));
+            return Err(DomainError::new(
+                "INPUT_DENIED",
+                "A regular held source is required",
+            ));
         }
         let stamp = Self {
             path,
@@ -179,7 +223,7 @@ impl SourceStamp {
             )
         };
         let path = source_path(&self.path).map_err(|_| changed())?;
-        let current = same_file::Handle::from_file(File::open(&path).map_err(|_| changed())?)
+        let current = same_file::Handle::from_file(open_regular_handle(&path).map_err(|_| changed())?)
             .map_err(|_| changed())?;
         let metadata = current.as_file().metadata().map_err(|_| changed())?;
         if path != self.path
@@ -276,7 +320,8 @@ pub fn copy_into_staging(
         .bytes
         .parse::<u64>()
         .map_err(|_| DomainError::new("INVALID_IDENTITY", "Invalid reviewed byte length"))?;
-    let mut input = File::open(&expected.path).map_err(io_error)?;
+    let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
+    let mut input = source_stamp.held_file().try_clone().map_err(io_error)?;
     let mut buffer = vec![0; 4 * 1024 * 1024];
     let mut copied = 0u64;
     loop {
@@ -309,7 +354,9 @@ pub fn copy_into_staging(
             "Full source and staging byte digests differ",
         ));
     }
+    source_stamp.revalidate()?;
     revalidate(expected, cancel)?;
+    source_stamp.revalidate()?;
     if cancel.is_cancelled() {
         return Err(DomainError::new(
             "CANCELLED",
@@ -319,11 +366,38 @@ pub fn copy_into_staging(
     Ok((staging, actual))
 }
 pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
-    same_file::is_same_file(first, second).map_err(io_error)
+    let first = same_file::Handle::from_file(open_regular_read(first)?).map_err(io_error)?;
+    let second = same_file::Handle::from_file(open_regular_read(second)?).map_err(io_error)?;
+    Ok(first == second)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[test]
+    fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("input");
+        rustix::fs::mkfifoat(rustix::fs::CWD, &source, rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR).unwrap();
+        let started = std::time::Instant::now();
+        assert!(matches!(open_regular_handle(&source), Err(error) if error.code == "INPUT_DENIED"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
+    #[cfg(unix)]
+    #[test]
+    fn opened_input_does_not_follow_a_replaced_final_symlink() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("input");
+        let original = root.path().join("original");
+        std::fs::write(&original, b"held").unwrap();
+        std::os::unix::fs::symlink(&original, &source).unwrap();
+        assert!(open_regular_handle(&source).is_err());
+    }
+    #[test]
+    fn opened_input_rejects_a_directory() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(open_regular_handle(root.path()).is_err());
+    }
     #[test]
     fn source_acceptance_stamp_rejects_replacement_even_when_bytes_are_identical() {
         let root = tempfile::tempdir().unwrap();
@@ -356,7 +430,9 @@ mod tests {
         let original = File::open(&canonical).unwrap();
         fs::rename(&canonical, root.path().join("retained.bin")).unwrap();
         fs::write(&canonical, b"same bytes, distinct physical files").unwrap();
-        assert!(matches!(SourceStamp::capture_open_resolved(&canonical, original), Err(error) if error.code == "SOURCE_CHANGED"));
+        assert!(
+            matches!(SourceStamp::capture_open_resolved(&canonical, original), Err(error) if error.code == "SOURCE_CHANGED")
+        );
     }
     #[test]
     fn reviewed_copy_rejects_replacement_before_copy_and_publishes_nothing() {

@@ -12,7 +12,7 @@ T006 evidence: commit 56b71696b0903e917990e6eb9d182d5cc6ad7dd0, hosted run
 - [x] T002 Install official Spec Kit 1.2.2 Codex integration and resolve constitution/spec/plan/task templates in .specify/ (R01).
 - [x] T003 Preserve the exact research pack and FFmpeg manual/license corpus in docs/research-pack/ and docs/vendor/ffmpeg/n9.0.2/ (R02/R11).
 - [x] T004 Write constitution, full-scope spec, selected clarifications, plan, checklists and analysis in specs/001-numera-wiz/ (R01).
-- [ ] T005 Close actual full-body manual reading coverage in docs/development/reading-ledger.json; do not inherit the earlier researchers' claims (R02).
+- [x] T005 Close actual full-body manual reading coverage in docs/development/reading-ledger.json; do not inherit the earlier researchers' claims (R02).
 - [x] T006 Lock tested dependency closure and pass hosted three-platform foundation CI in Cargo.lock and .github/workflows/ci.yml (R04/R16/R18).
 
 ## Phase 2: Foundational contracts — WP02/WP03

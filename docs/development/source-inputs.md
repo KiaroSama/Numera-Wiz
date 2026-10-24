@@ -33,3 +33,23 @@ original to a new file at the old name. These changes await their own hosted
 results. Original OS object identities are not yet persisted in asset records;
 complete source/parent-handle leases, global output claims, reference-route
 canaries and package-level race/format qualification remain required work.
+
+
+The follow-up ordinary-file opener uses safe Rustix no-follow/nonblocking/close-on-exec
+Unix opens and checks the opened descriptor is regular. Windows opens the final
+reparse object, applies anonymous security QoS and rejects opened reparse metadata.
+Hashing, stamps, ordinary admission and verified-copy sources use this boundary.
+It does not yet lease every intermediate parent or interrupt all stalled filesystem
+I/O. Unix FIFO and replaced-symlink regressions run only in hosted tests. New direct
+OS dependency edges await the hosted resolver artifact and committed lock update.
+
+Run 40062872192 reached the actual tail-indexed MOV remux through descriptor 0
+but correctly refused publication: FFmpeg writes TrackLanguage=und and its own
+Matroska demuxer omits that undefined language from metadata. The selected source
+matroskaenc.c track-writing block and matroskadec.c track metadata block at commit
+946fcce07b6dcd0331c8cc609192aeff5e1924f8 were inspected directly. The new frozen
+verification scope admits only that exact stream language omission; known languages,
+arbitrary tags and container language metadata remain exact. Focused negative cases
+retain those distinctions. Old verification scopes require a fresh review rather
+than inheriting this change. Full packet/clock and corruption oracles remain intact.
+This follow-up also awaits hosted results.

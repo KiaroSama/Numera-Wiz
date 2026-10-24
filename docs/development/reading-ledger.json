@@ -2,7 +2,7 @@
   "schema_version": 1,
   "inherited_research_ledger": "../research-pack/research_v4/ffmpeg-section-reading-ledger.json",
   "inherited_ledger_is_personal_reading": false,
-  "complete_manual_study": "pending",
+  "complete_manual_study": "complete_preserved_48_bodies",
   "session_reading": [
     "handoff/00-front-matter-and-fixed-requirements.md",
     "handoff/01-1-workflow-and-research.md",
@@ -1262,20 +1262,18 @@
       "unresolved": [
         "Read the complete filter manual; implement and qualify admitted graphics generation, clock/state/color/alpha behavior, script budgets and matching packaged component closure."
       ]
-    }
-  ],
-  "in_progress_manual_reads": [
+    },
     {
       "path": "../vendor/ffmpeg/n9.0.2/doc_filters.texi",
       "sha256": "65661cccd35c02e12894f674b706df8e465fd6862cf0aa64db7d3383271e5a9e",
-      "lines_read": [
-        [
-          1,
-          28300
-        ]
+      "lines": [
+        1,
+        34370
       ],
-      "complete": false,
-      "notes": [
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body personally read in contiguous ranges from 1-500 through 33901-34370; truncated tool passages were re-read in full before credit. External APIs/implementations, actual effects, libraries and devices are not credited.",
+      "interpretation": [
         "The graph and each option have distinct escaping layers; slash-prefixed option values load files. Automatic scaler/resampler insertion is semantic and must be frozen. FFmpeg may support cycles, while the application canonical media DAG must reject invalid cycles.",
         "Timeline enable can bypass a processor; framesync defaults repeat secondary frames and use nearest-lower timestamp. Freeze EOF/repeat/sync policy explicitly.",
         "Compressor/gate detector, channel-link, attack/release, makeup and mode affect state and audible output; metadata/labels are not DSP. Adaptive denoising and measured threshold modes require the correct upstream prefix.",
@@ -1327,8 +1325,40 @@
         "v360 projection/stereo/rotation order/padding/interpolation and zoompan previous-frame state/duration/FPS require explicit profiles. xfade requires identical geometry, format, frame rate and time base.",
         "zscale input/output range, primaries, transfer, matrix, chroma location and nominal peak luminance are independent explicit conversion semantics.",
         "CUDA/OpenCL require an identified matching device/frame layout and explicit uploads/downloads. colorspace_cuda only converts range; it is not equivalent to software colorspace. CUDA scaling cannot convert YUV to RGB, and passthrough versus allocated frames affects decoder pool pressure.",
-        "CUDA thumbnail batches retain frames; OpenCL deshake smoothing windows add memory/latency. program_opencl loads executable kernel source as an explicit dependency; its frame index is not an exact timeline clock."
+        "CUDA thumbnail batches retain frames; OpenCL deshake smoothing windows add memory/latency. program_opencl loads executable kernel source as an explicit dependency; its frame index is not an exact timeline clock.",
+        "OpenCL tonemap uses different desaturation and scene-adaptive running averages from CPU tonemap; identical filter names do not establish an equivalent objective. VAAPI HDR/HDR-to-SDR defaults and native scalers are explicit target contracts.",
+        "Vulkan nlmeans parallelism increases VRAM without guaranteed speed; hardware variant layout, precision, alpha and driver behavior require independent evidence.",
+        "Cellular/noise sources often default to random seeds and infinite extent. Video source duration rounds up to complete frame durations; nullsrc is unprocessed data, not a black generator.",
+        "Desktop capture selects native identities, has variable compositor timing and hardware surfaces. dup_frames, resize/crop/alpha modes are explicit live-source semantics; device grants and observations remain separate from ordinary media reads.",
+        "Concat pads shorter audio to the longest segment (except last), requires segment timestamps to start at zero, and may produce VFR. Splitting audio/video independently can desynchronize joins.",
+        "EBU R128 converts to double samples, metadata mode segments into 100 ms frames, and true peak requires oversampling. Scope displays, loudness and channel/dual-mono measurements are separate from sample/timing identity.",
+        "Interleave must queue at least one frame per input and may stall until EOF for a dropping source. Latency/alatency report previous-filter delay rather than whole application presentation latency.",
+        "Metadata print accepts writable URLs. sendcmd uses its own interval/target/command grammar and half-open intervals; those dynamic state changes need canonical sampled automation and prefix/seek rules.",
+        "Select uses frame-level samples/counts and can route negative/NaN to the first output; audio selection is not a substitute for exact sample trimming. setpts operates in the declared time base and optional strip_fps changes metadata.",
+        "Constant-Q/wavelet/FFT scopes have explicit windows, overlap, future support, averaging and precision. Whole-track picture scopes require bounded input/scratch; a perceptual display is not a reconstruction oracle.",
+        "spectrumsynth without phase recreates random phase and cannot prove audio identity. sidedata removal changes interpretation independently of picture/sample payload.",
+        "ZMQ filters create independent network listeners. movie/amovie can open devices/protocol URLs with independent format options and infinite loops without timestamp rebasing; these must never bypass explicit dependency/network/device admission."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T025",
+        "T027",
+        "T028",
+        "T029",
+        "T030",
+        "T031",
+        "T032",
+        "T034",
+        "T037",
+        "T039"
+      ],
+      "unresolved": [
+        "Implement and qualify the required graph/effect/utility families with exact prefixes, clocks, colors/alpha/channels, admitted dependencies, resources and packaged component evidence."
       ]
     }
-  ]
+  ],
+  "in_progress_manual_reads": []
 }
