@@ -126,10 +126,16 @@ async fn actual_copy_and_order_metadata_remux() {
         Box::pin(async move {
             match event {
                 nw_engine::ExecutionEvent::StagingIntent(intent) => {
-                    retained.lock().unwrap().push(std::path::PathBuf::from(intent.payload));
+                    retained
+                        .lock()
+                        .unwrap()
+                        .push(std::path::PathBuf::from(intent.payload));
                 }
                 nw_engine::ExecutionEvent::Fence(publication) => {
-                    retained.lock().unwrap().push(std::path::PathBuf::from(publication.proof));
+                    retained
+                        .lock()
+                        .unwrap()
+                        .push(std::path::PathBuf::from(publication.proof));
                 }
                 _ => {}
             }
@@ -145,7 +151,10 @@ async fn actual_copy_and_order_metadata_remux() {
         assert_eq!(links.len(), 2);
         for link in links.iter() {
             assert!(nw_platform::files::same_object(link, &copy).unwrap());
-            assert_eq!(std::fs::read(link).unwrap(), std::fs::read(&source).unwrap());
+            assert_eq!(
+                std::fs::read(link).unwrap(),
+                std::fs::read(&source).unwrap()
+            );
         }
     }
     assert!(artifact.is_some());

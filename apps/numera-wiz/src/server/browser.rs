@@ -580,7 +580,7 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        let session=driver(&client,&base,reqwest::Method::POST,"/session",json!({"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"args":["--headless=new","--no-sandbox","--enable-unsafe-swiftshader","--use-angle=swiftshader","--window-size=1440,1000"]}}}})).await;
+        let session=driver(&client,&base,reqwest::Method::POST,"/session",json!({"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:loggingPrefs":{"performance":"ALL"},"goog:chromeOptions":{"args":["--headless=new","--no-sandbox","--enable-unsafe-swiftshader","--use-angle=swiftshader","--window-size=1440,1000"]}}}})).await;
         let id = session["sessionId"].as_str().expect("WebDriver session id");
         let route = format!("/session/{id}");
         let fixture = fixture().await;
@@ -752,6 +752,64 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
+            driver(&client, &base, reqwest::Method::POST, &format!("{route}/goog/cdp/execute"), json!({
+                "cmd":"Network.enable",
+                "params":{"maxTotalBufferSize":1048576,"maxResourceBufferSize":262144,"maxPostDataSize":16384}
+            })).await;
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":591},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+            let started = Instant::now();
+            let mut report_request = None::<String>;
+            let report_response = loop {
+                // Inspect actual Chrome network events in memory. Never retain
+                // raw headers, cookies, pairing proof or unrelated request bodies.
+                let events = driver(&client, &base, reqwest::Method::POST, &format!("{route}/se/log"), json!({"type":"performance"})).await;
+                let mut finished = false;
+                for entry in events.as_array().unwrap() {
+                    let Ok(event) = serde_json::from_str::<Value>(entry["message"].as_str().unwrap()) else { continue; };
+                    let message = &event["message"];
+                    let params = &message["params"];
+                    if message["method"] == "Network.requestWillBeSent"
+                        && let Some(post) = params["request"]["postData"].as_str()
+                        && let Ok(request) = nw_domain::commands::decode_json(post.as_bytes())
+                        && request["command"]["id"] == "streams.clean.report"
+                    {
+                        assert_ne!(request["request_id"], "local");
+                        report_request = Some(params["requestId"].as_str().unwrap().to_owned());
+                    }
+                    if message["method"] == "Network.loadingFinished"
+                        && report_request.as_deref() == params["requestId"].as_str()
+                        && report_request.is_some()
+                    {
+                        finished = true;
+                    }
+                }
+                if finished {
+                    let body = driver(&client, &base, reqwest::Method::POST, &format!("{route}/goog/cdp/execute"), json!({
+                        "cmd":"Network.getResponseBody","params":{"requestId":report_request}
+                    })).await;
+                    assert_eq!(body["base64Encoded"], false);
+                    break nw_domain::commands::decode_json(body["body"].as_str().unwrap().as_bytes()).unwrap();
+                }
+                assert!(started.elapsed() < Duration::from_secs(15), "Actual browser Selection report click did not complete its canonical HTTP response");
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            };
+            assert_eq!(report_response["ok"], true, "{report_response}");
+            assert_eq!(report_response["result"]["resolved_files"], 1);
+            assert_eq!(report_response["result"]["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+            std::fs::write(directory.join("selection-report.json"), serde_json::to_vec_pretty(&json!({
+                "actual_ui_response":report_response,
+                "scope":"Actual shared Selection report mouse input and real Chrome HTTP response; no direct handler invocation substituted for the UI"
+            })).unwrap()).unwrap();
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            let report_png = driver(&client, &base, reqwest::Method::GET, &format!("{route}/screenshot"), Value::Null).await;
+            let report_png = report_png.as_str().unwrap();
+            let report_bytes = base64::engine::general_purpose::STANDARD.decode(report_png).unwrap();
+            std::fs::write(directory.join("selection-report.png"), &report_bytes).unwrap();
+            if report_bytes.len() <= 256 * 1024 {
+                println!("NW_BROWSER_SELECTION_IMAGE:{report_png}");
+            }
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E00C}"},{"type":"keyUp","value":"\u{E00C}"}]}]})).await;
+            tokio::time::sleep(Duration::from_millis(150)).await;
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":570},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
             let start = Instant::now();
             loop {

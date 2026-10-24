@@ -30,6 +30,7 @@ enum Action {
     Cancel,
     Inspect,
     ArtifactManifest,
+    SelectionReport(u64),
 }
 struct Pending {
     request: Request,
@@ -76,6 +77,9 @@ pub struct WizApp {
     stream_page: usize,
     inspect: String,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
+    selection_report: Option<Arc<nw_domain::reports::SelectionReport>>,
+    report_by_index: bool,
+    report_page: usize,
 }
 impl WizApp {
     fn run_reviewed(&mut self, ctx: &egui::Context) {
@@ -157,6 +161,9 @@ impl WizApp {
             stream_page: 0,
             inspect: String::new(),
             artifact_manifest: None,
+            selection_report: None,
+            report_by_index: false,
+            report_page: 0,
         };
         app.query("assets.list", json!({}), Action::Assets, ctx);
         app
@@ -193,6 +200,7 @@ impl WizApp {
     fn changed(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.plan = None;
+        self.selection_report = None;
     }
     fn refresh_assets(&mut self, ctx: &egui::Context) {
         self.query(
@@ -385,6 +393,14 @@ impl WizApp {
                     self.artifact_manifest =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
+                Action::SelectionReport(generation) => {
+                    if generation == self.generation {
+                        self.selection_report = Some(Arc::new(
+                            serde_json::from_value(result).map_err(|error| error.to_string())?
+                        ));
+                        self.report_page = 0;
+                    }
+                }
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
@@ -569,6 +585,7 @@ impl WizApp {
         if !open {
             self.artifact_manifest = None;
         }
+        self.selection_report_window(ui.ctx());
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }

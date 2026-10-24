@@ -113,3 +113,5 @@ pub mod views;
 pub mod ingest;
 
 pub mod file_times;
+
+pub mod reports;

@@ -38,7 +38,13 @@ and a deterministic namespace swap exactly between the final check and linkat.
 The actual hosted media journey additionally observes the payload and proof
 events and independently checks both objects and all bytes against its published
 copy. The existing required-timestamp and full remux preservation oracles still
-apply. These additions await their own hosted CI; no new test is credited yet.
+apply. Run 40078001423 passed all four native targets and the actual engine and
+CLI/official SDK/lost-response media journeys. Its large owner HTTP fixture
+stopped at the old single-retained-file assertion before transfer; the following
+revision verifies exact payload/proof names and physical identity while still
+requiring all transient reader indices to disappear. Formatting changes are
+applied exactly. Native/Chrome GUI was skipped by the media prerequisite. See
+evidence/held-publication-ci67.json; no new large-HTTP or GUI pass is credited.
 
 Remaining T017 work includes project checkpoint writer leases, complete
 interrupted namespace initialization/recovery, overwrite policies, multi-output

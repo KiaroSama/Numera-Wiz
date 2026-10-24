@@ -25,7 +25,13 @@ impl RetainedStaging {
         })?;
         let name = filename(&path)?.to_owned();
         let directory = DirectoryStamp::capture_resolved(parent)?;
-        let retained = Self { file, directory, name, path, object };
+        let retained = Self {
+            file,
+            directory,
+            name,
+            path,
+            object,
+        };
         retained.revalidate()?;
         Ok(retained)
     }
@@ -73,7 +79,10 @@ impl RetainedStaging {
             || components.next().is_some()
             || filename(path)? != name
         {
-            return Err(DomainError::new("PATH_DENIED", "Publication requires one ordinary filename"));
+            return Err(DomainError::new(
+                "PATH_DENIED",
+                "Publication requires one ordinary filename",
+            ));
         }
         crate::files::validate_output_name(name)?;
         self.revalidate()?;
@@ -117,7 +126,8 @@ fn publication_error(error: std::io::Error, parent: &DirectoryStamp, name: &OsSt
         parent.held_file(),
         name,
         rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
-    ).is_ok();
+    )
+    .is_ok();
     #[cfg(not(unix))]
     let exists = std::fs::symlink_metadata(parent.path().join(name)).is_ok();
     if error.kind() == std::io::ErrorKind::AlreadyExists || exists {
@@ -126,12 +136,18 @@ fn publication_error(error: std::io::Error, parent: &DirectoryStamp, name: &OsSt
         error.kind(),
         std::io::ErrorKind::StorageFull | std::io::ErrorKind::QuotaExceeded
     ) {
-        DomainError::new("OUTPUT_STORAGE_FULL", "Publication filesystem has insufficient storage or quota")
+        DomainError::new(
+            "OUTPUT_STORAGE_FULL",
+            "Publication filesystem has insufficient storage or quota",
+        )
     } else if matches!(
         error.kind(),
         std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
     ) {
-        DomainError::new("PUBLICATION_DENIED", "Publication filesystem denied the atomic operation")
+        DomainError::new(
+            "PUBLICATION_DENIED",
+            "Publication filesystem denied the atomic operation",
+        )
     } else {
         DomainError::new(
             "PUBLICATION_UNAVAILABLE",
@@ -141,11 +157,17 @@ fn publication_error(error: std::io::Error, parent: &DirectoryStamp, name: &OsSt
 }
 fn filename(path: &Path) -> Result<&OsStr> {
     let name = path.file_name().ok_or_else(|| {
-        DomainError::new("PATH_DENIED", "An ordinary publication filename is required")
+        DomainError::new(
+            "PATH_DENIED",
+            "An ordinary publication filename is required",
+        )
     })?;
     let mut components = Path::new(name).components();
     if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
-        return Err(DomainError::new("PATH_DENIED", "Publication requires one ordinary filename"));
+        return Err(DomainError::new(
+            "PATH_DENIED",
+            "Publication requires one ordinary filename",
+        ));
     }
     Ok(name)
 }
@@ -166,7 +188,10 @@ fn open_relative(directory: &DirectoryStamp, name: &OsStr) -> Result<File> {
     #[cfg(not(unix))]
     let file = crate::files::open_regular_read(&directory.path().join(name))?;
     if !file.metadata().map_err(io_error)?.is_file() {
-        return Err(DomainError::new("TARGET_CHANGED", "Publication requires an ordinary file"));
+        return Err(DomainError::new(
+            "TARGET_CHANGED",
+            "Publication requires an ordinary file",
+        ));
     }
     Ok(file)
 }
@@ -193,13 +218,28 @@ mod tests {
         file.publish_no_replace(&parent, &output).unwrap();
         assert!(crate::files::same_object(&proof, &output).unwrap());
         assert!(crate::files::same_object(file.path(), &output).unwrap());
-        assert_eq!(std::fs::read(&output).unwrap(), b"independently verified bytes");
+        assert_eq!(
+            std::fs::read(&output).unwrap(),
+            b"independently verified bytes"
+        );
         let other = retained(&root);
-        assert_eq!(other.publish_no_replace(&parent, &output).unwrap_err().code, "OUTPUT_COLLISION");
-        assert_eq!(std::fs::read(&output).unwrap(), b"independently verified bytes");
+        assert_eq!(
+            other.publish_no_replace(&parent, &output).unwrap_err().code,
+            "OUTPUT_COLLISION"
+        );
+        assert_eq!(
+            std::fs::read(&output).unwrap(),
+            b"independently verified bytes"
+        );
         let directory = root.join("directory.mkv");
         std::fs::create_dir(&directory).unwrap();
-        assert_eq!(other.publish_no_replace(&parent, &directory).unwrap_err().code, "OUTPUT_COLLISION");
+        assert_eq!(
+            other
+                .publish_no_replace(&parent, &directory)
+                .unwrap_err()
+                .code,
+            "OUTPUT_COLLISION"
+        );
         assert!(directory.is_dir());
     }
     #[test]
@@ -208,7 +248,10 @@ mod tests {
         let root = std::fs::canonicalize(root.path()).unwrap();
         let file = retained(&root);
         for name in ["../outside", "nested/proof", ".", "..", ""] {
-            assert_eq!(file.create_proof(OsStr::new(name)).unwrap_err().code, "PATH_DENIED");
+            assert_eq!(
+                file.create_proof(OsStr::new(name)).unwrap_err().code,
+                "PATH_DENIED"
+            );
         }
         assert!(file.path().exists());
     }
@@ -233,7 +276,10 @@ mod tests {
         });
         assert_eq!(result.unwrap_err().code, "TARGET_CHANGED");
         assert!(!outside.join("result.mkv").exists());
-        assert_eq!(std::fs::read(moved.join("result.mkv")).unwrap(), b"independently verified bytes");
+        assert_eq!(
+            std::fs::read(moved.join("result.mkv")).unwrap(),
+            b"independently verified bytes"
+        );
         assert!(file.path().exists());
     }
     #[cfg(unix)]
@@ -247,8 +293,16 @@ mod tests {
         std::os::unix::fs::symlink(&outside, &output).unwrap();
         let file = retained(&root);
         let parent = DirectoryStamp::capture_resolved(&root).unwrap();
-        assert_eq!(file.publish_no_replace(&parent, &output).unwrap_err().code, "OUTPUT_COLLISION");
-        assert!(std::fs::symlink_metadata(&output).unwrap().file_type().is_symlink());
+        assert_eq!(
+            file.publish_no_replace(&parent, &output).unwrap_err().code,
+            "OUTPUT_COLLISION"
+        );
+        assert!(
+            std::fs::symlink_metadata(&output)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         assert_eq!(std::fs::read(&outside).unwrap(), b"unrelated bytes");
     }
 }
