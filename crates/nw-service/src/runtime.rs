@@ -357,6 +357,14 @@ impl Service {
         }
         Ok(())
     }
+    fn read_plan(&self, context: &Context, id: &str, action: ObjectAction) -> Result<Plan> {
+        let raw: Value = self.store.get(&named("plan", id)?)?.ok_or_else(DomainError::object_not_found)?;
+        let creator = raw.get("creator").and_then(Value::as_str).ok_or_else(DomainError::object_not_found)?;
+        self.object_action(context, ObjectKind::Plan, id, creator, action)?;
+        let plan = nw_domain::plans::decode(raw)?;
+        if plan.id != id { return Err(DomainError::new("INVALID_PLAN", "Stored plan identity does not match its key")); }
+        Ok(plan)
+    }
     fn plan_review(&self, context: &Context, plan: &Plan) -> Result<nw_domain::views::PlanReview> {
         let policy = self.policy(context)?;
         let source_visible = policy.as_ref().is_none_or(|profile| {
@@ -475,6 +483,23 @@ impl Service {
         self.path_with_purpose(context, path, write, None)
     }
     fn plan_source_path(&self, context: &Context, plan: &Plan) -> Result<PathBuf> {
+        let rights = nw_domain::plans::validate_requirements(plan)?;
+        if rights.data_root != self.store.root_id() {
+            return Err(DomainError::new("INVALID_PLAN", "Reviewed requirements belong to another data root"));
+        }
+        let managed = Path::new(&plan.source.identity.path).starts_with(self.root.join("assets"));
+        match &rights.source_read.purpose {
+            nw_domain::plans::SourcePurpose::NativeFile if managed => {
+                return Err(DomainError::new("INVALID_PLAN", "Managed input needs its creator-bound read purpose"));
+            }
+            nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal } => {
+                if !managed || principal != &context.principal {
+                    return Err(DomainError::new("INVALID_PLAN", "This creator-bound input requires a newly reviewed plan"));
+                }
+                if context.profile.is_some() { self.managed_read(context, Path::new(&plan.source.identity.path))?; }
+            }
+            _ => {}
+        }
         self.root_authority(context, Path::new(&plan.source.identity.path), false)?;
         self.path_with_purpose(
             context,
@@ -1195,13 +1220,20 @@ impl Service {
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 let output = self.path(&context, Path::new(&input.output), true)?;
-                let plan = self.engine()?.clean_plan_at(
+                let mut plan = self.engine()?.clean_plan_at(
                     asset,
                     &output,
                     &input.intent,
                     &context.principal,
                     now,
                 )?;
+                let rights = plan.required_rights.as_mut().ok_or_else(|| DomainError::new("INVALID_PLAN", "Planner omitted execution rights"))?;
+                rights.data_root = self.store.root_id().into();
+                if Path::new(&plan.source.identity.path).starts_with(self.root.join("assets")) {
+                    rights.source_read.purpose = nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal: context.principal.clone() };
+                }
+                plan.creation_audit.as_mut().ok_or_else(|| DomainError::new("INVALID_PLAN", "Planner omitted creation audit"))?.policy_revision = policy.as_ref().map_or(0, |p| p.revision);
+                plan.hash = nw_engine::plan_digest(&plan)?;
                 let response = Response::success(
                     &request.request_id,
                     value(&self.plan_review(&context, &plan)?)?,
@@ -1215,32 +1247,12 @@ impl Service {
             }
             "plans.inspect" => {
                 let input: IdInput = commands::parse(params)?;
-                let plan: Plan = self
-                    .store
-                    .get(&named("plan", &input.id)?)?
-                    .ok_or_else(DomainError::object_not_found)?;
-                self.object_action(
-                    &context,
-                    ObjectKind::Plan,
-                    &plan.id,
-                    &plan.creator,
-                    ObjectAction::Read,
-                )?;
+                let plan = self.read_plan(&context, &input.id, ObjectAction::Read)?;
                 value(&self.plan_review(&context, &plan)?)?
             }
             "jobs.submit" => {
                 let input: SubmitInput = commands::parse(params)?;
-                let plan: Plan = self
-                    .store
-                    .get(&named("plan", &input.plan_id)?)?
-                    .ok_or_else(DomainError::object_not_found)?;
-                self.object_action(
-                    &context,
-                    ObjectKind::Plan,
-                    &plan.id,
-                    &plan.creator,
-                    ObjectAction::Submit,
-                )?;
+                let plan = self.read_plan(&context, &input.plan_id, ObjectAction::Submit)?;
                 if plan.hash != input.plan_hash
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= now
                 {
@@ -1313,17 +1325,7 @@ impl Service {
                 {
                     return Ok(replay);
                 }
-                let current: Plan = self
-                    .store
-                    .get(&named("plan", &input.plan_id)?)?
-                    .ok_or_else(DomainError::object_not_found)?;
-                self.object_action(
-                    &context,
-                    ObjectKind::Plan,
-                    &current.id,
-                    &current.creator,
-                    ObjectAction::Submit,
-                )?;
+                let current = self.read_plan(&context, &input.plan_id, ObjectAction::Submit)?;
                 if current.hash != plan.hash
                     || nw_engine::plan_digest(&current)? != plan.hash
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= self.clock.now()?
@@ -1771,7 +1773,7 @@ mod tests {
             preservation: Preservation::default(),
         };
         let output = root.path().join("output.mkv");
-        let plan = service
+        let mut plan = service
             .engine()
             .unwrap()
             .clean_plan_at(
@@ -1782,6 +1784,8 @@ mod tests {
                 service.clock.now().unwrap(),
             )
             .unwrap();
+        plan.required_rights.as_mut().unwrap().data_root = service.store.root_id().into();
+        plan.hash = nw_engine::plan_digest(&plan).unwrap();
         service
             .store
             .put(&named("plan", &plan.id).unwrap(), &plan)
@@ -1798,6 +1802,67 @@ mod tests {
         );
         request.idempotency_key = Some("preflight-race".into());
         (root, service, context, request, output)
+    }
+    #[tokio::test]
+    async fn captured_managed_purpose_cannot_be_delegated_or_borrow_creator_rights() {
+        let (root, service, context, request, _) = preflight_fixture().await;
+        let mut plan = service.store.get_plan(request.params["plan_id"].as_str().unwrap()).unwrap().unwrap();
+        let managed = service.root.join("assets").join("synthetic-managed").join("source.mkv");
+        std::fs::create_dir_all(managed.parent().unwrap()).unwrap();
+        std::fs::copy(root.path().join("source.mkv"), &managed).unwrap();
+        plan.source.identity = files::identity(&managed, &CancellationToken::new()).unwrap();
+        let rights = plan.required_rights.as_mut().unwrap();
+        rights.source_read.identity = plan.source.identity.clone();
+        rights.source_read.purpose = nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal: context.principal.clone() };
+        plan.hash = nw_engine::plan_digest(&plan).unwrap();
+        let purpose = format!("managed-read/{}/{}", hex::encode(Sha256::digest(plan.source.identity.path.as_bytes())), context.principal);
+        service.store.put(&purpose, &true).unwrap();
+        assert!(service.plan_source_path(&context, &plan).is_ok());
+        let mut policy: AccessProfile = service.store.get("profile/preflight").unwrap().unwrap();
+        policy.name = "second".into(); policy.id = "second-profile".into(); policy.principal = "second-principal".into();
+        policy.object_grants = vec![nw_domain::access::ObjectGrant { kind: ObjectKind::Plan, id: plan.id.clone(), actions: [ObjectAction::Read, ObjectAction::Submit].into() }];
+        service.store.put("profile/second", &policy).unwrap();
+        let second = service.profile_context("second").unwrap();
+        assert!(service.object_action(&second, ObjectKind::Plan, &plan.id, &plan.creator, ObjectAction::Submit).is_ok());
+        assert_eq!(service.plan_source_path(&second, &plan).unwrap_err().code, "INVALID_PLAN");
+        let mut own: AccessProfile = service.store.get("profile/preflight").unwrap().unwrap();
+        own.owned_object_access = false; own.revision += 1;
+        service.store.put("profile/preflight", &own).unwrap();
+        assert_eq!(service.plan_source_path(&context, &plan).unwrap_err().code, "OBJECT_NOT_FOUND");
+        assert!(!Path::new(&plan.output).exists());
+    }
+    #[tokio::test]
+    async fn reviewed_native_rights_revalidate_current_roots_without_rehashing_audit() {
+        let (_root, service, context, request, _) = preflight_fixture().await;
+        let mut plan = service.store.get_plan(request.params["plan_id"].as_str().unwrap()).unwrap().unwrap();
+        let hash = plan.hash.clone();
+        let mut policy: AccessProfile = service.store.get("profile/preflight").unwrap().unwrap();
+        policy.revision += 1; policy.allowed_command_ids.insert("commands.list".into());
+        service.store.put("profile/preflight", &policy).unwrap();
+        assert!(service.plan_source_path(&context, &plan).is_ok());
+        assert_eq!(nw_engine::plan_digest(&plan).unwrap(), hash);
+        policy.read_roots.clear(); policy.revision += 1;
+        service.store.put("profile/preflight", &policy).unwrap();
+        assert_eq!(service.plan_source_path(&context, &plan).unwrap_err().code, "PATH_DENIED");
+        assert_eq!(nw_engine::plan_digest(&plan).unwrap(), hash);
+        plan.required_rights.as_mut().unwrap().data_root = "other-root".into();
+        assert_eq!(service.plan_source_path(&service.owner(), &plan).unwrap_err().code, "INVALID_PLAN");
+        plan.schema_version = 1; plan.required_rights = None; plan.creation_audit = None;
+        assert_eq!(service.plan_source_path(&service.owner(), &plan).unwrap_err().code, "INVALID_PLAN");
+    }
+    #[tokio::test]
+    async fn raw_plan_compatibility_errors_are_not_disclosed_before_object_authority() {
+        let (_root, service, context, request, _) = preflight_fixture().await;
+        let id = request.params["plan_id"].as_str().unwrap();
+        let mut raw: Value = service.store.get(&named("plan", id).unwrap()).unwrap().unwrap();
+        raw["schema_version"] = json!(99);
+        service.store.put(&named("plan", id).unwrap(), &raw).unwrap();
+        let mut policy: AccessProfile = service.store.get("profile/preflight").unwrap().unwrap();
+        policy.owned_object_access = false;
+        service.store.put("profile/preflight", &policy).unwrap();
+        assert_eq!(service.read_plan(&context, id, ObjectAction::Read).unwrap_err().code, "OBJECT_NOT_FOUND");
+        assert_eq!(service.read_plan(&context, "absent", ObjectAction::Read).unwrap_err().code, "OBJECT_NOT_FOUND");
+        assert_eq!(service.read_plan(&service.owner(), id, ObjectAction::Read).unwrap_err().code, "INVALID_PLAN");
     }
     #[tokio::test]
     async fn policy_revocation_is_not_held_behind_expensive_preflight() {
@@ -1915,6 +1980,9 @@ mod tests {
             },
         };
         let plan = Plan {
+            schema_version: 1,
+            required_rights: None,
+            creation_audit: None,
             id: "private-plan".into(),
             creator: owner.principal.clone(),
             hash: "synthetic-not-executable".into(),

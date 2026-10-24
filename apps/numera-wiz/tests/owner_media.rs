@@ -334,6 +334,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     // Delegation is an explicit object action; it never borrows the creator's authority.
     let delegated_output = media.directory.path().join("delegated-copy.mkv");
     let delegated_plan = cli.query("streams.clean", json!({"asset_id":registered["result"]["id"],"output":delegated_output,"intent":fixture::rules()})).await;
+    let equivalent = call!(stdio, "streams.clean", json!({"asset_id":operator_asset["id"],"output":delegated_output,"intent":fixture::rules()}), json!({}));
+    assert_ne!(equivalent["id"], delegated_plan["id"]);
+    assert_eq!(equivalent["schema_version"], 2);
+    assert_eq!(equivalent["hash"], delegated_plan["hash"], "Equivalent native-file requirements must not hash creation principal, profile revision, registration ID or review timestamp");
+    assert_eq!(equivalent["required_rights"], delegated_plan["required_rights"]);
     let mut delegated_policy = profile.clone();
     delegated_policy["expected_revision"] = json!(1);
     delegated_policy["object_grants"] = json!([

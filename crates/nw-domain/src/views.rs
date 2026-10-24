@@ -59,6 +59,9 @@ pub struct JobSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
+    pub schema_version: u32,
+    pub required_rights: Option<crate::plans::RequiredRights>,
+    pub rights_redacted: bool,
     pub id: String,
     pub hash: String,
     pub source: AssetSummary,
@@ -101,6 +104,9 @@ impl PlanReview {
         effective_actions: BTreeSet<ObjectAction>,
     ) -> Self {
         Self {
+            schema_version: plan.schema_version,
+            required_rights: (source_visible && output_visible).then(|| plan.required_rights.clone()).flatten(),
+            rights_redacted: plan.required_rights.is_some() && !(source_visible && output_visible),
             id: plan.id.clone(),
             hash: plan.hash.clone(),
             source: AssetSummary::from(&plan.source),

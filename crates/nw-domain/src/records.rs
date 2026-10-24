@@ -31,6 +31,12 @@ pub struct Asset {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
+    #[serde(default = "legacy_plan_version", skip_serializing_if = "is_legacy_plan")]
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_rights: Option<crate::plans::RequiredRights>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creation_audit: Option<crate::plans::CreationAudit>,
     pub id: String,
     pub creator: String,
     pub hash: String,
@@ -44,6 +50,8 @@ pub struct Plan {
     pub expires_at: String,
     pub verification_scope: String,
 }
+fn legacy_plan_version() -> u32 { 1 }
+fn is_legacy_plan(version: &u32) -> bool { *version == 1 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobState {

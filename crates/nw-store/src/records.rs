@@ -56,6 +56,13 @@ fn execution_policy(
 ) -> Result<()> {
     use std::path::Path;
     let source = &job.plan.source;
+    if job.plan.schema_version == 2 {
+        let rights = nw_domain::plans::validate_requirements(&job.plan)?;
+        if let nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal } = &rights.source_read.purpose
+            && (principal != &authorization.principal || !profile.owned_object_access) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Creator-bound execution authority was withdrawn"));
+        }
+    }
     if !profile.enabled
         || profile.principal != authorization.principal
         || !profile.allows_command("jobs.submit")
@@ -81,7 +88,20 @@ fn execution_policy(
     }
     Ok(())
 }
+pub(super) fn decode_job(bytes: &[u8]) -> Result<Job> {
+    let raw: Value = decode(bytes)?;
+    nw_domain::plans::decode(raw.get("plan").cloned().ok_or_else(||
+        DomainError::new("INVALID_PLAN", "Stored job has no plan"))?)?;
+    serde_json::from_value(raw).map_err(storage)
+}
 impl Store {
+    pub fn get_plan(&self, id: &str) -> Result<Option<nw_domain::records::Plan>> {
+        if id.is_empty() || id.len() > 128 || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte)) {
+            return Err(DomainError::new("VALIDATION_ERROR", "Invalid bounded plan identifier"));
+        }
+        let raw: Option<Value> = self.get(&format!("plan/{id}"))?;
+        raw.map(nw_domain::plans::decode).transpose()
+    }
     /// Visit one immutable read transaction without retaining full records in a collection.
     pub fn visit<T: DeserializeOwned>(
         &self,
@@ -320,7 +340,7 @@ impl Store {
                     .get(key.as_str())
                     .map_err(storage)?
                     .ok_or_else(DomainError::object_not_found)?;
-                decode(value.value())?
+                decode_job(value.value())?
             };
             if current.state.terminal() {
                 return Err(DomainError::new(
@@ -371,12 +391,15 @@ impl Store {
                     "Durable execution authorization missing",
                 )
             })?;
+        let job = self.inspect_job(id)?;
+        if job.plan.schema_version == 2 && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id() {
+            return Err(DomainError::new("INVALID_PLAN", "Accepted plan belongs to another data root"));
+        }
         if let Some(name) = &authorization.profile {
             let profile: AccessProfile =
                 self.get(&format!("profile/{name}"))?.ok_or_else(|| {
                     DomainError::new("PERMISSION_DENIED", "Execution profile removed")
                 })?;
-            let job = self.inspect_job(id)?;
             execution_policy(&profile, &authorization, &job)?;
         }
         Ok(())
@@ -392,8 +415,11 @@ impl Store {
                     .get(key.as_str())
                     .map_err(storage)?
                     .ok_or_else(DomainError::object_not_found)?;
-                decode(value.value())?
+                decode_job(value.value())?
             };
+            if job.plan.schema_version == 2 && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id() {
+                return Err(DomainError::new("INVALID_PLAN", "Publication plan belongs to another data root"));
+            }
             if job.state != JobState::Verifying {
                 return Err(DomainError::new(
                     "STALE_JOB_STATE",
@@ -455,7 +481,7 @@ impl Store {
                     .get(key.as_str())
                     .map_err(storage)?
                     .ok_or_else(DomainError::object_not_found)?;
-                decode(value.value())?
+                decode_job(value.value())?
             };
             if current.state != JobState::Publishing {
                 return Err(DomainError::new(
