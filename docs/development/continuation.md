@@ -1847,3 +1847,21 @@ Rust contracts. The full D6-J03 journey, adoption-aware rollback, legacy command
 retirement, retention, all remaining F01-F15/editor/DAG/preview/mixer/captions/
 interchange/closure, offline packages/manuals/resources and matching owner harness
 remain mandatory. No task or complete-release gate closes from this slice.
+
+
+## Correct allocator-only file size in migration review freshness
+
+CI95 compiles the migration integration and passes core media, actual batch SDK/
+lost response, large HTTP and browser. The actual Service migration regression
+on Linux/macOS ARM rejects the unchanged source after review: redb's physical
+file length can change across clean reopen/close without a raw key/value change.
+Review freshness now binds the original complete raw record hash/count and codec;
+the physical byte estimate stays visible in the reviewed plan, while acceptance
+rechecks actual complete-copy space and the64GiB bound. Every input/receipt/
+profile/job raw value remains hash-bound. A changed-record stale-review fixture
+still requires rejection. No semantic freshness check was removed.
+
+All49 exact hosted formatting hunks are applied. The production unused versions
+import moves into the test module. Native/store qualification had not run after
+the Service failure; no all-green result is claimed. Fresh full CI is required.
+Adoption-aware rollback remains the next implementation, not an exposed command.

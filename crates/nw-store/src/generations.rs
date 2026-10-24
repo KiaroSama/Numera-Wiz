@@ -354,8 +354,14 @@ impl RootLease {
         }
         let path = location_path(&self.root, &activation.location)?;
         let facts = versions::inspect_closed(&path)?;
-        let file_capabilities = facts.required_capabilities.iter().collect::<std::collections::BTreeSet<_>>();
-        let declared_capabilities = activation.required_capabilities.iter().collect::<std::collections::BTreeSet<_>>();
+        let file_capabilities = facts
+            .required_capabilities
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        let declared_capabilities = activation
+            .required_capabilities
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>();
         if facts.store_version == 3 && file_capabilities != declared_capabilities {
             return Err(invalid("Store and activation required capabilities differ"));
         }

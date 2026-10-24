@@ -221,7 +221,9 @@ pub enum Maintenance {
         #[command(flatten)]
         identity: MutationIdentity,
     },
-    Inspect { id: String },
+    Inspect {
+        id: String,
+    },
 }
 #[derive(Subcommand)]
 pub enum Logs {
@@ -374,11 +376,17 @@ pub fn prepare(command: Command) -> Result<Request> {
             request
         }
         Command::Maintenance(Maintenance::Plan) => query("maintenance.plan", json!({})),
-        Command::Maintenance(Maintenance::Inspect { id }) => query("maintenance.inspect", json!({"id":id})),
-        Command::Maintenance(Maintenance::Migrate { plan_file, identity }) => {
-            let plan: nw_domain::maintenance::MigrationPlan = commands::parse(document(&plan_file)?)?;
+        Command::Maintenance(Maintenance::Inspect { id }) => {
+            query("maintenance.inspect", json!({"id":id}))
+        }
+        Command::Maintenance(Maintenance::Migrate {
+            plan_file,
+            identity,
+        }) => {
+            let plan: nw_domain::maintenance::MigrationPlan =
+                commands::parse(document(&plan_file)?)?;
             plan.validate_hash()?;
-            let mut request=query("maintenance.migrate", json!({"plan":plan}));
+            let mut request = query("maintenance.migrate", json!({"plan":plan}));
             identity.apply(&mut request)?;
             request
         }
