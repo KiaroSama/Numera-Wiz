@@ -43,8 +43,7 @@ async fn forward(
     request: Request,
 ) -> Result<Response, StatusCode> {
     let (parts, body) = request.into_parts();
-    if !["/health", "/internal/credential", "/api/v1/commands"]
-        .contains(&parts.uri.path())
+    if !["/health", "/internal/credential", "/api/v1/commands"].contains(&parts.uri.path())
         || parts.uri.query().is_some()
     {
         return Err(StatusCode::NOT_FOUND);
@@ -52,9 +51,10 @@ async fn forward(
     let bytes = to_bytes(body, 1024 * 1024)
         .await
         .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE)?;
-    let mut upstream = proxy
-        .http
-        .request(parts.method, format!("{}{}", proxy.upstream, parts.uri.path()));
+    let mut upstream = proxy.http.request(
+        parts.method,
+        format!("{}{}", proxy.upstream, parts.uri.path()),
+    );
     for name in [header::AUTHORIZATION, header::CONTENT_TYPE] {
         if let Some(value) = parts.headers.get(&name) {
             upstream = upstream.header(name, value);
@@ -85,8 +85,8 @@ async fn forward(
     if submitted.as_ref().is_some_and(|request| {
         request["command"]["id"] == "jobs.submit" && request["request_id"] == LOST_REQUEST
     }) {
-        let accepted = nw_domain::commands::decode_json(&returned)
-            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        let accepted =
+            nw_domain::commands::decode_json(&returned).map_err(|_| StatusCode::BAD_GATEWAY)?;
         if !status.is_success()
             || accepted["ok"] != true
             || !accepted["receipt_id"].is_string()
@@ -162,8 +162,8 @@ async fn journey(media: &fixture::Media) {
         components: media.bin.clone(),
         request_timeout: Duration::from_secs(40),
     };
-    let evidence_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../target/owner-evidence");
+    let evidence_root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
     let _logs = evidence::RetainLogs {
         source: cli.data.join("logs"),
         destination: evidence_root.join(format!("lost-ack-{}", uuid::Uuid::new_v4())),
@@ -253,14 +253,23 @@ async fn journey(media: &fixture::Media) {
         .unwrap();
     let lost = serde_json::to_value(lost).unwrap();
     assert_eq!(lost["structuredContent"]["ok"], false);
-    assert_eq!(lost["structuredContent"]["error"]["code"], "TRANSPORT_ERROR");
+    assert_eq!(
+        lost["structuredContent"]["error"]["code"],
+        "TRANSPORT_ERROR"
+    );
     assert_eq!(lost["structuredContent"]["request_id"], LOST_REQUEST);
     assert!(lost["structuredContent"].get("receipt_id").is_none());
     assert!(lost["structuredContent"].get("result").is_none());
     let accepted = {
         let loss = proxy.loss.lock().await;
-        assert_eq!(loss.forwards, 2, "Both automatic attempts lose their response");
-        assert!(loss.identical, "Automatic retry changed request or durable identity");
+        assert_eq!(
+            loss.forwards, 2,
+            "Both automatic attempts lose their response"
+        );
+        assert!(
+            loss.identical,
+            "Automatic retry changed request or durable identity"
+        );
         loss.accepted.clone().unwrap()
     };
     let job_id = accepted["result"]["job_id"].as_str().unwrap();
@@ -324,6 +333,7 @@ async fn journey(media: &fixture::Media) {
         .unwrap(),
     )
     .unwrap();
+    tracing::info!(lost_responses = 2, output_bytes = %bytes.bytes, output_sha256 = %bytes.sha256, "Actual SDK lost-response restart retained one durable receipt and job");
     client.cancel().await.unwrap();
     wait_for_idle(&cli.data).await;
 }

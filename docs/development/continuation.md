@@ -823,3 +823,36 @@ nonsecret summary and bounded protected JSONLs. This new source awaits CI; it is
 not an observed lost-response pass. Retired command replay, crash/fence/migration
 recovery and all other open tasks remain mandatory. No local source compilation,
 tests, application/media execution or owner GPU run was performed.
+
+
+## Lost-response qualification and pending output directories
+
+Run [40067320046](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40067320046)
+on 949feccda6a2450e46d3bbb944452be2b439479b completed its entire real media
+job successfully, including the new actual lost-response/restarted-owner SDK
+journey. The test withheld both real accepted submission responses, kept the
+same stdio process and durable request, then asserted one original receipt/job
+across owner restart, unchanged root/principal and exact output bytes. The safe
+report and JSONLs are in owner-media-evidence-linux artifact 12549757211,
+GitHub-reported ZIP SHA-256
+a564bf6101216568f6665a31d6a2225a6ac133d20498d885ea2c1a37393702c6.
+This is observed test evidence; the ZIP/report has not been locally downloaded.
+Its six exact hosted formatter diagnostic hunks are applied (format artifact
+12550145850; GitHub-reported ZIP SHA-256
+12690db7a3f789d68ae6f6f201a11cb7ebab60645ac2b9ae68127af017d64edf).
+No crash, retired-version replay, migration or release gate is inferred.
+
+New unqualified source adds frozen output-directory object identity and a held
+directory stamp through preflight, staging, execution, publication and recovery.
+The semantic optional field preserves historical missing-field hashes; fresh
+execution requires a new review with the original parent identity. Fixtures
+cover replacement and child changes, Unix preflight replacement, Windows live
+namespace exclusion and actual media fresh review. See output-publication.md.
+Global destination claims, handle-relative publication and crash/retention work
+remain mandatory. No local compilation, tests, application/media or GPU execution
+was performed.
+
+Run 40067320046 subsequently finished all four native targets, WASM/lock, Chrome
+and native-window interaction successfully; only formatting failed. Its exact
+six diagnostic changes are applied. These results do not qualify the new
+output-directory identity source added after that run.

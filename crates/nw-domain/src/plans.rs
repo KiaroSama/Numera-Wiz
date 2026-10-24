@@ -32,6 +32,8 @@ pub enum SourcePurpose {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OutputCreate {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_object: Option<crate::records::NativeObjectIdentity>,
     pub path: String,
     pub collision_policy: CollisionPolicy,
 }
@@ -56,6 +58,7 @@ impl RequiredRights {
                 purpose: SourcePurpose::NativeFile,
             },
             output_create: OutputCreate {
+                parent_object: None,
                 path: output,
                 collision_policy: CollisionPolicy::NoReplace,
             },
@@ -312,6 +315,27 @@ mod tests {
         assert!(decode(serde_json::to_value(&plan).unwrap()).is_ok());
         let mut raw = serde_json::to_value(&plan).unwrap();
         raw["source"]["source_object"]["future_generation"] = 7.into();
+        raw["hash"] = digest_value(raw.clone()).unwrap().into();
+        assert!(decode(raw).is_err());
+    }
+    #[test]
+    fn reviewed_output_parent_is_semantic_and_missing_historical_fields_stay_missing() {
+        let mut plan = fixture();
+        let before = plan.hash.clone();
+        let raw = serde_json::to_value(&plan).unwrap();
+        assert!(raw["required_rights"]["output_create"].get("parent_object").is_none());
+        plan.required_rights.as_mut().unwrap().output_create.parent_object =
+            Some(crate::records::NativeObjectIdentity {
+                schema_version: 1,
+                kind: crate::records::NativeObjectKind::UnixDeviceInode,
+                volume: "10".into(),
+                object: "40".into(),
+                created_ns: Some("50".into()),
+            });
+        plan.hash = digest(&plan).unwrap();
+        assert_ne!(plan.hash, before);
+        let mut raw = serde_json::to_value(&plan).unwrap();
+        raw["required_rights"]["output_create"]["parent_object"]["future_rules"] = true.into();
         raw["hash"] = digest_value(raw.clone()).unwrap().into();
         assert!(decode(raw).is_err());
     }

@@ -179,6 +179,10 @@ impl Engine {
             files::path_text(&output)?,
         );
         required_rights.source_read.object = Some(object);
+        required_rights.output_create.parent_object = Some(
+            files::DirectoryStamp::capture_resolved(output.parent().expect("Resolved output parent"))?
+                .object_identity()?,
+        );
         let mut plan = Plan {
             schema_version: 2,
             required_rights: Some(required_rights),
@@ -208,6 +212,7 @@ impl Engine {
     pub fn validate_plan(&self, plan: &Plan) -> Result<()> {
         nw_domain::plans::validate_requirements(plan)?;
         registered_object(&plan.source)?;
+        reviewed_parent(plan)?;
         if plan_digest(plan)? != plan.hash {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -269,6 +274,7 @@ impl Engine {
         observer: Observer,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
         self.validate_plan(plan)?;
+        let output_parent = output_parent_stamp(plan)?;
         let source = plan.source.identity.clone();
         let object = registered_object(&plan.source)?.clone();
         let ffmpeg = plan.ffmpeg.clone();
@@ -283,6 +289,7 @@ impl Engine {
             files::revalidate(&ffprobe, &token)
         })
         .await?;
+        output_parent.revalidate()?;
         files::revalidate_output(&plan.output)?;
         match plan.resolution.action {
             CleanAction::Skip => Ok((
@@ -440,6 +447,7 @@ async fn prepare_staging(
     job_id: &str,
     observer: &Observer,
 ) -> Result<tempfile::NamedTempFile> {
+    let parent_stamp = output_parent_stamp(plan)?;
     let output = files::revalidate_output(&plan.output)?;
     let parent = output
         .parent()
@@ -456,6 +464,7 @@ async fn prepare_staging(
     .await?;
     blocking(move || {
         // The unpredictable workspace is journaled before any directory/file is created.
+        parent_stamp.revalidate()?;
         if directory.try_exists().map_err(io_error)? {
             return Err(DomainError::new(
                 "OUTPUT_COLLISION",
@@ -492,6 +501,7 @@ async fn publish(
     cancel: CancellationToken,
     observer: Observer,
 ) -> Result<FileIdentity> {
+    let parent_stamp = output_parent_stamp(plan)?;
     let output = files::revalidate_output(&plan.output)?;
     #[cfg(unix)]
     let parent = output
@@ -528,11 +538,16 @@ async fn publish(
         verified: verification.clone(),
         published: false,
     };
+    parent_stamp.revalidate()?;
     if let Err(error) = observer(ExecutionEvent::Fence(journal)).await {
         let _ = staging.keep();
         return Err(error);
     }
     // The committed fence is the cancellation boundary. The retained hard link proves the published object for later job-scoped byte reads.
+    if let Err(error) = parent_stamp.revalidate() {
+        let _ = staging.keep();
+        return Err(error);
+    }
     staging
         .persist_noclobber(&output)
         .map_err(|error| DomainError::new("OUTPUT_COLLISION", error.error.to_string()))?;
@@ -540,6 +555,7 @@ async fn publish(
     std::fs::File::open(parent)
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;
+    parent_stamp.revalidate()?;
     observer(ExecutionEvent::Published(artifact.clone(), verification)).await?;
     Ok(artifact)
 }
@@ -692,6 +708,24 @@ fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
     }
     Ok(())
 }
+fn reviewed_parent(plan: &Plan) -> Result<&nw_domain::records::NativeObjectIdentity> {
+    let rights = nw_domain::plans::validate_requirements(plan)?;
+    rights.output_create.parent_object.as_ref()
+        .filter(|object| object.schema_version == 1)
+        .ok_or_else(|| DomainError::new(
+            "INVALID_PLAN",
+            "Review a fresh plan with the original output directory identity",
+        ))
+}
+/// Bind the current output directory to the identity frozen in the reviewed plan.
+pub fn output_parent_stamp(plan: &Plan) -> Result<files::DirectoryStamp> {
+    let parent = Path::new(&plan.output).parent()
+        .ok_or_else(|| DomainError::new("PATH_DENIED", "Output parent required"))?;
+    let stamp = files::DirectoryStamp::capture_resolved(parent)?;
+    stamp.require_object(reviewed_parent(plan)?)?;
+    Ok(stamp)
+}
+
 fn registered_object(asset: &Asset) -> Result<&nw_domain::records::NativeObjectIdentity> {
     let object = asset.source_object.as_ref().ok_or_else(|| {
         DomainError::new(
