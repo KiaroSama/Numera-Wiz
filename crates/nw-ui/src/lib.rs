@@ -59,6 +59,7 @@ pub struct WizApp {
     output: String,
     output_needed: bool,
     intent: CleanIntent,
+    file_times: nw_domain::file_times::FileTimeRequest,
     patches: Vec<cleanup::PatchForm>,
     audio_mode: usize,
     subtitle_mode: usize,
@@ -125,6 +126,7 @@ impl WizApp {
             source: String::new(),
             output: String::new(),
             output_needed: false,
+            file_times: nw_domain::file_times::FileTimeRequest::default(),
             intent: CleanIntent {
                 audio_selection: Selection {
                     selector: Selector::All,
@@ -487,6 +489,7 @@ impl WizApp {
         });
         let mut cancel = None;
         let mut artifact = None;
+        let mut inspect_job = None;
         egui::ScrollArea::vertical()
             .id_salt("jobs")
             .max_height(145.0)
@@ -516,6 +519,12 @@ impl WizApp {
                         {
                             cancel = Some(job.id.clone());
                         }
+                        if ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Job details")).clicked() {
+                            inspect_job = Some(job.id.clone());
+                        }
+                        if job.warning_count > 0 {
+                            ui.colored_label(egui::Color32::from_rgb(237, 177, 99), format!("{} warning(s)", job.warning_count));
+                        }
                     });
                     if let Some(error) = &job.error_code {
                         ui.colored_label(egui::Color32::from_rgb(237, 143, 112), error);
@@ -527,6 +536,9 @@ impl WizApp {
                     );
                 }
             });
+        if let Some(id) = inspect_job {
+            self.query("jobs.inspect", json!({"id":id}), Action::Inspect, ui.ctx());
+        }
         if let Some(id) = artifact {
             self.query(
                 "artifacts.manifest",

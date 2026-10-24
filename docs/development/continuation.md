@@ -903,3 +903,39 @@ Output details PNG as base64 for visual review when a local execution environmen
 is unavailable. This is bounded hosted-test evidence transport, not application
 or MCP stdout. The screenshot remains in its ordinary CI artifact. The new image
 transport awaits CI; no unseen image is credited as personally inspected.
+
+
+## All-green claim and inspected native manifest checkpoint
+
+Run [40071636236](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40071636236)
+on 9f33c8eccc546851b4929b33cf6eedea5b55c6cb completed every job successfully,
+including formatting, all four native targets, WASM, actual media/transports,
+large HTTP, Chrome and native input. Its bounded actual PNG was retrieved through
+the native harness log and personally inspected. The Output details window shows
+197983 verified bytes, the full wrapped SHA-256, job ID and manifest URI control;
+the job row is Succeeded. Exact scope/artifact references are in
+native-manifest-ci64.json. This is actual CI GUI evidence, not generated imagery
+or a complete-product/package/GPU claim.
+
+## Pending filesystem timestamp and numeric-input follow-up
+
+New source adds typed new / preserve_best_effort / require_reviewed filesystem
+timestamp policies to the same cleanup command and shared controls. Required
+values are frozen in the semantic plan; native access/modification values use
+exact signed epoch nanoseconds. A metadata stage runs after mandatory content
+verification, records bounded immutable facts in the job transaction, and reports
+best-effort warnings or required assertion failure before publication. Source
+leases now remain live through metadata/publication and are checked after claim
+waiting. Current job rights gate facts; scoped diagnostics omit private messages.
+The new numeric UI parser rejects malformed CSV rather than executing a subset.
+See file-times.md for semantics, tests and unqualified control variants.
+
+The store reader envelope advances to version 2 so older readers cannot discard
+these policies/facts on a rewrite. Version-1 roots are refused and preserved;
+explicit stopped-root generation migration/rollback remains mandatory in T036.
+Historical missing fields retain serialization/hash and prior meaning within
+admitted history. App version, domain schema and store generation stay separate.
+New native/actual copy-remux/CLI-SDK/privacy/legacy fixtures await CI. Full F08,
+project/editor/effects, remaining utilities, profile/package/resource/manual/owner
+and all other task-ledger obligations remain required. No local source build,
+test/application/media execution or owner GPU run was performed.

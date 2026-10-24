@@ -594,7 +594,7 @@ pub fn copy_into_staging(
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
     let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
-    copy_from_held(expected, source_stamp, staging, cancel)
+    copy_from_held(expected, source_stamp, staging, cancel).map(|(staging, actual, _)| (staging, actual))
 }
 pub fn copy_into_staging_bound(
     expected: &FileIdentity,
@@ -602,6 +602,16 @@ pub fn copy_into_staging_bound(
     staging: tempfile::NamedTempFile,
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
+    copy_into_staging_bound_held(expected, object, staging, cancel)
+        .map(|(staging, actual, _)| (staging, actual))
+}
+/// Retain the exact source lease through post-verification metadata and publication.
+pub fn copy_into_staging_bound_held(
+    expected: &FileIdentity,
+    object: &NativeObjectIdentity,
+    staging: tempfile::NamedTempFile,
+    cancel: &CancellationToken,
+) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
     let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
     source_stamp.require_object(object)?;
     copy_from_held(expected, source_stamp, staging, cancel)
@@ -611,7 +621,7 @@ fn copy_from_held(
     source_stamp: SourceStamp,
     mut staging: tempfile::NamedTempFile,
     cancel: &CancellationToken,
-) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
+) -> Result<(tempfile::NamedTempFile, FileIdentity, SourceStamp)> {
     let expected_bytes = expected
         .bytes
         .parse::<u64>()
@@ -658,7 +668,7 @@ fn copy_from_held(
             "Copy cancelled before publication fence",
         ));
     }
-    Ok((staging, actual))
+    Ok((staging, actual, source_stamp))
 }
 pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
     let first = SourceStamp::capture_resolved(&source_path(first)?)?;

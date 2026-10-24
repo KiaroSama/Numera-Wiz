@@ -63,6 +63,7 @@ impl DomainError {
             | "INPUT_ROUTE_REQUIRED"
             | "NATIVE_PATH_UNAVAILABLE"
             | "NATIVE_IDENTITY_UNAVAILABLE"
+            | "NATIVE_FILE_TIMES_UNAVAILABLE"
             | "PUBLICATION_CLAIM_UNAVAILABLE"
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
@@ -108,3 +109,5 @@ pub mod records;
 pub mod views;
 
 pub mod ingest;
+
+pub mod file_times;

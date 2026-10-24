@@ -52,6 +52,8 @@ pub struct AssetSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobSummary {
+    #[serde(default)]
+    pub warning_count: usize,
     pub id: String,
     pub state: JobState,
     pub output_name: String,
@@ -59,6 +61,8 @@ pub struct JobSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_times: Option<crate::file_times::FileTimePlan>,
     pub schema_version: u32,
     pub required_rights: Option<crate::plans::RequiredRights>,
     pub rights_redacted: bool,
@@ -104,6 +108,7 @@ impl PlanReview {
         effective_actions: BTreeSet<ObjectAction>,
     ) -> Self {
         Self {
+            file_times: plan.file_times.clone(),
             schema_version: plan.schema_version,
             required_rights: (source_visible && output_visible)
                 .then(|| plan.required_rights.clone())
@@ -142,6 +147,8 @@ pub struct ErrorView {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JobView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_times: Option<FileTimeOutcomeView>,
     pub id: String,
     pub state: JobState,
     pub plan: PlanReview,
@@ -175,10 +182,37 @@ impl From<&Asset> for AssetSummary {
 impl From<&Job> for JobSummary {
     fn from(job: &Job) -> Self {
         Self {
+            warning_count: job.file_times.as_ref().map_or(0, |value| value.warnings.len()),
             id: job.id.clone(),
             state: job.state.clone(),
             output_name: basename(&job.plan.output),
             error_code: job.error.as_ref().map(|error| error.code.clone()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FileTimeOutcomeView {
+    pub policy: crate::file_times::FileTimeRequest,
+    pub desired: Option<crate::file_times::FileTimesSnapshot>,
+    pub observed: Option<crate::file_times::FileTimesSnapshot>,
+    pub preserved: Option<bool>,
+    pub warnings: Vec<ErrorView>,
+    pub scope: String,
+}
+impl FileTimeOutcomeView {
+    pub fn new(value: crate::file_times::FileTimeOutcome, owner: bool) -> Self {
+        Self {
+            policy: value.policy,
+            desired: value.desired,
+            observed: value.observed,
+            preserved: value.preserved,
+            warnings: value.warnings.into_iter().map(|error| ErrorView {
+                code: error.code,
+                message: owner.then_some(error.message),
+                retryable: error.retryable,
+            }).collect(),
+            scope: value.scope,
         }
     }
 }

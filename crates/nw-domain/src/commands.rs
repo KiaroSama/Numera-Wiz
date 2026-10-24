@@ -191,6 +191,8 @@ pub struct ResolveInput {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CleanInput {
+    #[serde(default)]
+    pub file_times: crate::file_times::FileTimeRequest,
     pub asset_id: String,
     pub output: String,
     pub intent: CleanIntent,
