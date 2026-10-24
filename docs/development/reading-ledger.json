@@ -264,6 +264,495 @@
         "Complete the rest of the demuxer manual separately.",
         "Qualify dependency resolvers and native package fd behavior on every required target."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_formats.texi",
+      "sha256": "01eaac2ca2dc8c6240f1cef30db8700bd98101beb3b2a46ebd7ca906d9acb885",
+      "lines": [
+        1,
+        293
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "The format body includes other manuals; reading the wrapper does not credit demuxers/muxers bodies.",
+        "Probing limits bound analysis, not complete stream absence; max_streams and buffered probe packets are separate resource controls.",
+        "avoid_negative_ts applies a common timestamp shift; inter-stream differences are preserved, while disabled requests no such shift.",
+        "max_interleave_delta=0 can retain sparse-stream packets without a timestamp-difference bound.",
+        "autobsf defaults on; a copy plan must account for admitted packet reframing instead of treating all containers as byte-identical."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_metadata.texi",
+      "sha256": "1a9e61c62d9f82f1f2bec283eeb35471a319e1886bb664303d4c10d7e6e70875",
+      "lines": [
+        1,
+        89
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "FFmetadata requires escaping equals, semicolon, hash, backslash and newline in keys/values.",
+        "Whitespace is semantic tag data and must not be trimmed incidentally.",
+        "Chapter TIMEBASE is explicit; the body states nanoseconds if absent, requiring pinned parser/output qualification rather than rounded seconds."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_scaler.texi",
+      "sha256": "05ef7135691a63b1bc02b7bc1a292111de04cda37435e657b2cc05528c390fe3",
+      "lines": [
+        1,
+        234
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "The pin exposes scaler/scaler_sub separately from deprecated algorithm selections through sws_flags.",
+        "Scaling, range conversion, gamma handling, alpha compositing and dithering are independent declared policies.",
+        "sws_backends includes CPU SIMD and Vulkan SPIR-V; CPU-only plans need a qualified backend policy rather than assuming auto cannot touch a GPU."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_resampler.texi",
+      "sha256": "493e3ae03901dc63ca4282c19f081817ab631b887fd0017b77fc0ba1f6e7aaf9",
+      "lines": [
+        1,
+        228
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "Resampling engine, channel layout/rematrix, internal/output format, dither and precision are distinct semantics.",
+        "exact_rational may fall back to a bounded phase count; it is not proof of exact project-clock sampling.",
+        "async and first_pts can insert/drop/stretch samples; they must not silently repair a preservation request.",
+        "Native swr and optional soxr support different controls; an unavailable engine cannot silently substitute another profile."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_fftools-common-opts.texi",
+      "sha256": "567a15a6eb6c3fcaa516ff93abf20b338e4bf1398e1b2524e1883ff7895f3519",
+      "lines": [
+        1,
+        440
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; referenced implementation/API manuals require separate evidence",
+      "interpretation": [
+        "max_alloc limits one FFmpeg-family heap allocation; it is not a total RSS or process-tree memory cap.",
+        "Output stream indices and per-type ordinals are distinct; metadata-based stream matching is input-only.",
+        "Dash-slash option syntax can load values from files; it is not admitted as a caller override to reserved planner options.",
+        "Log repeat/level/time flags, display verbosity and report-file output are distinct; FFREPORT/report may expose argv and must not be inherited implicitly.",
+        "Buildconf/codec/filter lists are compiled inventory, not evidence of working media, device or qualified GPU execution."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T016",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete actual aggregate process/RSS/scratch budgets and persisted bounded diagnostics."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavcodec.texi",
+      "sha256": "a80d4706d21388e5832d9ab2078fdd6c0c21dcd5de69f5018e17f7bc214ebb86",
+      "lines": [
+        1,
+        49
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavformat.texi",
+      "sha256": "df61fa8ac18bc913851e97ddd666cd10c75b9e6af8c91741fe0adb126ce5536b",
+      "lines": [
+        1,
+        49
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavfilter.texi",
+      "sha256": "2ab8b642f54084d106a6c54466ab99d09bf146b03044bfe08b4e7a10acb9dceb",
+      "lines": [
+        1,
+        45
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavdevice.texi",
+      "sha256": "a6b4adf5464bb27ddf9120bb593382d86b220a1d844975177ce41d3d3b50066d",
+      "lines": [
+        1,
+        46
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavutil.texi",
+      "sha256": "5a654e8ee602cea2a081ff022459135920413ab37d1648e94d5cafe4537ccf95",
+      "lines": [
+        1,
+        63
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libswscale.texi",
+      "sha256": "f9ec10486841c682be1bfac491372eebb0a51a122510ed7fcd3db33548fa6465",
+      "lines": [
+        1,
+        64
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libswresample.texi",
+      "sha256": "052a858e69aa6ced2642fb3b6e024a4a4a8eb3246a948c2e208c4645d9e9fb0d",
+      "lines": [
+        1,
+        71
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_authors.texi",
+      "sha256": "fb5fac6dd8f7474033e933814491a8297d8723c52be4dcbcc82eef9c4f008dd2",
+      "lines": [
+        1,
+        11
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_devices.texi",
+      "sha256": "c399576ab8e09931445713c962c25471699f33c8cef359d5d5ce2015650ff050",
+      "lines": [
+        1,
+        25
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification.",
+        "Devices share format interfaces but have private options and independent grants; ordinary fd-only file admission does not authorize device access."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_general.texi",
+      "sha256": "abf058dc4502a49ebc3185579806ce9224a7f1373d3560df5930894f146bb0bd",
+      "lines": [
+        1,
+        15
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-utils.texi",
+      "sha256": "39e9be347e6dfa9aa8aa88e409b3c7e393b668e25e748fb1043a4c0cff9274cc",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-scaler.texi",
+      "sha256": "35392efb228c8e6695a9d3d19cd71e695ef7ea2dd0bd243a1c990abd406e011f",
+      "lines": [
+        1,
+        44
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-resampler.texi",
+      "sha256": "5e1cf89af0ba868832c24beee39a59e998dd2324c79909fe48b59ca1c7c7674b",
+      "lines": [
+        1,
+        45
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffplay.texi",
+      "sha256": "94c1a468402f6f3be51ae8dbd5834b5f300c0945d06143e4a61d4e79bf9c75a7",
+      "lines": [
+        1,
+        352
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification.",
+        "FFplay is an SDL-based test player; its seek/frame-drop/unbounded-buffer defaults do not define the shared Rust preview contract.",
+        "A nearest seek point, auto-rotation, audio master clock and dropped frames need explicit project timing/display policies; they do not establish exact observation sampling."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_utils.texi",
+      "sha256": "2eca333c720c88b04934d72d10a60b3b1e4650666ab657fa9a029697b39df3a2",
+      "lines": [
+        1,
+        1129
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external API/implementation references are not credited",
+      "interpretation": [
+        "FFmpeg token/filter escaping is separate from shell escaping; argument-vector execution removes a shell layer but not filtergraph/metadata syntax.",
+        "Frame rates admit exact numerator/denominator forms; ratio syntax also admits undefined/infinite values that require domain validation.",
+        "Channel count, known channel layout and unknown layout are distinct; uppercase C and lowercase c have different semantics.",
+        "Expression evaluation uses floating-point arithmetic, state variables are expression-local, and while/root/taylor can require bounded work.",
+        "Wallclock time(0), unseeded random color/state and implicit local-time dates cannot stand in for a deterministic project clock or immutable plan."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T030",
+        "T031",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify concrete graph escaping, channel-layout and exact clock lowering against the pinned runtime."
+      ]
     }
   ]
 }

@@ -244,7 +244,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let port = bind.local_addr().unwrap().port();
     drop(bind);
     let token_file = media.directory.path().join("auth/http-token");
-    let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
+    let evidence =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
     std::fs::create_dir_all(&evidence).unwrap();
     let server_log = evidence.join("http-controller-stderr.log");
     let mut server = cli
@@ -270,9 +271,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             break;
         }
         if let Some(status) = server.try_wait().unwrap() {
-            panic!("HTTP controller exited before protected credential export: {status}; {}", std::fs::read_to_string(&server_log).unwrap());
+            panic!(
+                "HTTP controller exited before protected credential export: {status}; {}",
+                std::fs::read_to_string(&server_log).unwrap()
+            );
         }
-        assert!(started.elapsed() < Duration::from_secs(45), "HTTP controller startup deadline exceeded; {}", std::fs::read_to_string(&server_log).unwrap());
+        assert!(
+            started.elapsed() < Duration::from_secs(45),
+            "HTTP controller startup deadline exceeded; {}",
+            std::fs::read_to_string(&server_log).unwrap()
+        );
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let token =

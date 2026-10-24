@@ -242,3 +242,27 @@ semantic admission, preventing a pre-lock profile snapshot from authorizing new
 work after revocation. Writer-wait time and revocation races have focused hosted
 unit cases. Expensive media preflight still holds the semantic lock; the planned
 two-phase preflight and complete object-action model remain open obligations.
+
+
+Run [40043639649](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40043639649)
+for f0bc093039fc80e170fcf73052a8509a1c21156e has passed all four native
+checks, actual media/CLI/stdio/HTTP SDK and Chrome UI. Its finite HTTP-controller
+startup fixture now passes with diagnostics retained; the previous missing-file
+case does not establish a runtime cause. The actual native UI job also passed its full import/review/Run/byte-equality
+journey on this source. The exact hosted formatter patch
+is applied without a behavioral change in this next checkpoint.
+
+Next close the remaining first-slice obligations before checking T010-T023: full
+metadata/chapters/attachment and admitted reframing fixtures, complete source
+resolver/canary boundaries, protected staging retention/recovery and global
+destination identity, current object-action grants, bounded summary/snapshot
+projections, persisted rotating diagnostics, two-phase preflight and five-surface
+cancellation/reconnect journeys. Then continue full MuxCls, F01-F15, projects,
+editor/preview/effects, standard portable payloads and matching owner harness.
+These are required implementation work; passing the current slice is not a scope
+reduction or a complete-release claim. max_alloc is only a per-allocation limit;
+aggregate media process/RSS/scratch policy still needs actual implementation and
+measurement. Arbitrary tag preservation currently needs stronger comparison than
+the four named stream keys in verify_structure; do not infer it from packet
+hashes. Exact attachment/unknown clocks and chapter/header normalization also
+need independent output assertions before claiming their complete support.
