@@ -105,7 +105,9 @@ impl PlanReview {
     ) -> Self {
         Self {
             schema_version: plan.schema_version,
-            required_rights: (source_visible && output_visible).then(|| plan.required_rights.clone()).flatten(),
+            required_rights: (source_visible && output_visible)
+                .then(|| plan.required_rights.clone())
+                .flatten(),
             rights_redacted: plan.required_rights.is_some() && !(source_visible && output_visible),
             id: plan.id.clone(),
             hash: plan.hash.clone(),

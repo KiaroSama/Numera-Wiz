@@ -623,3 +623,26 @@ Legacy hashes/serialization are retained; new legacy submissions require a new
 review. Historical terminal facts are not rewritten. Details and migration scope
 are in `plan-rights.md`. Focused tests plus real MCP equivalent-plan assertions
 are added but await their own hosted result. No local build or execution was run.
+
+
+Run 40061156754 passed the new domain raw/digest assertions, WASM build and
+actual engine preservation tests. The ordinary Linux/macOS suites exposed a
+managed-purpose fixture error: the second profile's stored key was `second`
+while its context selected `second-profile`. The fixture now uses the same stable
+profile identity as its key, retaining the explicit Plan Read/Submit precondition
+and the independent expected managed-purpose denial. This is a test setup fix;
+production object/purpose checks are unchanged. The exact hosted formatter patch
+is applied. Full transport/UI and cross-target outcomes remain pending until
+observed; this note is not their pass record.
+
+
+The same run's real CLI/official MCP journey passed, including equivalent plan
+hashes from two different principals and registrations under identical native
+source/output rights. The valid larger-than-memory produced-output HTTP journey
+also passed with version 2 plans, including live job Read/bearer revocation and
+cleanup. All four ordinary native suites reported the same single managed-purpose
+fixture-identity failure described above; no additional test failure was found.
+Browser interaction is still in progress and native interaction was skipped after
+its prerequisite failed. Do not credit those interfaces for this source yet.
+Personal reading is 47 complete manual bodies; filters are personally read through
+line 15800 with the remaining lines explicitly pending in the reading ledger.

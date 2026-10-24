@@ -162,8 +162,14 @@ impl Engine {
         };
         let mut plan = Plan {
             schema_version: 2,
-            required_rights: Some(nw_domain::plans::RequiredRights::native(asset.identity.clone(), files::path_text(&output)?)),
-            creation_audit: Some(nw_domain::plans::CreationAudit { principal: creator.into(), policy_revision: 0 }),
+            required_rights: Some(nw_domain::plans::RequiredRights::native(
+                asset.identity.clone(),
+                files::path_text(&output)?,
+            )),
+            creation_audit: Some(nw_domain::plans::CreationAudit {
+                principal: creator.into(),
+                policy_revision: 0,
+            }),
             id: Uuid::new_v4().to_string(),
             creator: creator.into(),
             hash: String::new(),

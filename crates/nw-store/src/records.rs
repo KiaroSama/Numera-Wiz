@@ -58,9 +58,14 @@ fn execution_policy(
     let source = &job.plan.source;
     if job.plan.schema_version == 2 {
         let rights = nw_domain::plans::validate_requirements(&job.plan)?;
-        if let nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal } = &rights.source_read.purpose
-            && (principal != &authorization.principal || !profile.owned_object_access) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Creator-bound execution authority was withdrawn"));
+        if let nw_domain::plans::SourcePurpose::CreatorBoundManaged { principal } =
+            &rights.source_read.purpose
+            && (principal != &authorization.principal || !profile.owned_object_access)
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Creator-bound execution authority was withdrawn",
+            ));
         }
     }
     if !profile.enabled
@@ -90,14 +95,25 @@ fn execution_policy(
 }
 pub(super) fn decode_job(bytes: &[u8]) -> Result<Job> {
     let raw: Value = decode(bytes)?;
-    nw_domain::plans::decode(raw.get("plan").cloned().ok_or_else(||
-        DomainError::new("INVALID_PLAN", "Stored job has no plan"))?)?;
+    nw_domain::plans::decode(
+        raw.get("plan")
+            .cloned()
+            .ok_or_else(|| DomainError::new("INVALID_PLAN", "Stored job has no plan"))?,
+    )?;
     serde_json::from_value(raw).map_err(storage)
 }
 impl Store {
     pub fn get_plan(&self, id: &str) -> Result<Option<nw_domain::records::Plan>> {
-        if id.is_empty() || id.len() > 128 || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte)) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Invalid bounded plan identifier"));
+        if id.is_empty()
+            || id.len() > 128
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte))
+        {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Invalid bounded plan identifier",
+            ));
         }
         let raw: Option<Value> = self.get(&format!("plan/{id}"))?;
         raw.map(nw_domain::plans::decode).transpose()
@@ -392,8 +408,13 @@ impl Store {
                 )
             })?;
         let job = self.inspect_job(id)?;
-        if job.plan.schema_version == 2 && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id() {
-            return Err(DomainError::new("INVALID_PLAN", "Accepted plan belongs to another data root"));
+        if job.plan.schema_version == 2
+            && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id()
+        {
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Accepted plan belongs to another data root",
+            ));
         }
         if let Some(name) = &authorization.profile {
             let profile: AccessProfile =
@@ -417,8 +438,13 @@ impl Store {
                     .ok_or_else(DomainError::object_not_found)?;
                 decode_job(value.value())?
             };
-            if job.plan.schema_version == 2 && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id() {
-                return Err(DomainError::new("INVALID_PLAN", "Publication plan belongs to another data root"));
+            if job.plan.schema_version == 2
+                && nw_domain::plans::validate_requirements(&job.plan)?.data_root != self.root_id()
+            {
+                return Err(DomainError::new(
+                    "INVALID_PLAN",
+                    "Publication plan belongs to another data root",
+                ));
             }
             if job.state != JobState::Verifying {
                 return Err(DomainError::new(
