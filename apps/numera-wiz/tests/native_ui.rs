@@ -164,7 +164,9 @@ async fn journey() {
     let start = Instant::now();
     let assets = loop {
         if let Some(assets) = query(&root, "assets.list").await
-            && assets["items"].as_array().is_some_and(|items| !items.is_empty())
+            && assets["items"]
+                .as_array()
+                .is_some_and(|items| !items.is_empty())
         {
             break assets["items"].clone();
         }
@@ -174,7 +176,9 @@ async fn journey() {
         );
         tokio::time::sleep(Duration::from_millis(200)).await;
     };
-    let asset = query_params(&root, "assets.inspect", json!({"id":assets[0]["id"]})).await.unwrap();
+    let asset = query_params(&root, "assets.inspect", json!({"id":assets[0]["id"]}))
+        .await
+        .unwrap();
     assert_eq!(
         asset["identity"]["path"].as_str().unwrap(),
         std::fs::canonicalize(&media.source)
@@ -193,8 +197,9 @@ async fn journey() {
     let job = loop {
         if let Some(jobs) = query(&root, "jobs.list").await
             && let Some(summary) = jobs["items"].as_array().and_then(|jobs| jobs.first())
-            && let Some(job) = query_params(&root, "jobs.inspect", json!({"id":summary["id"]})).await
-            && let Ok(job) = serde_json::from_value::<nw_domain::records::Job>(job)
+            && let Some(job) =
+                query_params(&root, "jobs.inspect", json!({"id":summary["id"]})).await
+            && let Ok(job) = serde_json::from_value::<nw_domain::views::JobView>(job)
             && job.state.terminal()
         {
             break job;
@@ -212,7 +217,7 @@ async fn journey() {
         .expect("Native UI must produce a verified artifact");
     assert_eq!(
         std::fs::read(&media.source).unwrap(),
-        std::fs::read(&artifact.path).unwrap()
+        std::fs::read(artifact.path.as_ref().expect("Owner inspection retains the authorized output path")).unwrap()
     );
     assert_eq!(job.plan.source.id, assets[0]["id"].as_str().unwrap());
     std::fs::write(evidence.join("native-output.json"), serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"artifact":artifact,"verification":job.verification,"oracle":"Independent source/output byte equality after native input, Review and Ctrl+Enter Run"})).unwrap()).unwrap();

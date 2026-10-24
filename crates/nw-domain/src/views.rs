@@ -1,5 +1,6 @@
 //! Bounded inventory projections. Detail records are fetched explicitly by identifier.
-use crate::records::{Asset, Job, JobState};
+use crate::{records::{Asset, Job, JobState, Plan}, mux::CleanResolution, access::ObjectAction};
+use std::collections::BTreeSet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -13,9 +14,17 @@ pub struct PageInput {
     #[serde(default)]
     pub replace_snapshot: Option<String>,
 }
-fn default_limit() -> usize { 128 }
+fn default_limit() -> usize {
+    128
+}
 impl Default for PageInput {
-    fn default() -> Self { Self { limit: default_limit(), cursor: None, replace_snapshot: None } }
+    fn default() -> Self {
+        Self {
+            limit: default_limit(),
+            cursor: None,
+            replace_snapshot: None,
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SnapshotPage<T> {
@@ -44,14 +53,65 @@ pub struct JobSummary {
     pub output_name: String,
     pub error_code: Option<String>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PlanReview {
+    pub id: String,
+    pub hash: String,
+    pub source: AssetSummary,
+    pub source_path: Option<String>,
+    pub output_name: String,
+    pub output_path: Option<String>,
+    pub resolution: CleanResolution,
+    pub argv_template: Option<Vec<String>>,
+    pub created_at: String,
+    pub expires_at: String,
+    pub verification_scope: String,
+    pub policy_revision: u64,
+    pub effective_actions: BTreeSet<ObjectAction>,
+}
+impl PlanReview {
+    pub fn new(plan: &Plan, source_visible: bool, output_visible: bool, owner: bool, policy_revision: u64, effective_actions: BTreeSet<ObjectAction>) -> Self {
+        Self {
+            id: plan.id.clone(), hash: plan.hash.clone(), source: AssetSummary::from(&plan.source),
+            source_path: source_visible.then(|| plan.source.identity.path.clone()),
+            output_name: basename(&plan.output), output_path: output_visible.then(|| plan.output.clone()),
+            resolution: plan.resolution.clone(), argv_template: owner.then(|| plan.argv_template.clone()),
+            created_at: plan.created_at.clone(), expires_at: plan.expires_at.clone(), verification_scope: plan.verification_scope.clone(),
+            policy_revision, effective_actions,
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ArtifactView { pub path: Option<String>, pub bytes: String, pub sha256: String }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ErrorView { pub code: String, pub message: Option<String>, pub retryable: bool }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct JobView {
+    pub id: String,
+    pub state: JobState,
+    pub plan: PlanReview,
+    pub artifact: Option<ArtifactView>,
+    pub verification: Option<String>,
+    pub error: Option<ErrorView>,
+    pub prepared_stages: Option<Vec<Vec<String>>>,
+    pub policy_revision: u64,
+    pub effective_actions: BTreeSet<ObjectAction>,
+}
 fn basename(path: &str) -> String {
-    path.rsplit(['/', '\\']).next().unwrap_or("media").to_owned()
+    path.rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("media")
+        .to_owned()
 }
 impl From<&Asset> for AssetSummary {
     fn from(asset: &Asset) -> Self {
         Self {
             id: asset.id.clone(),
-            display_name: if asset.display_name.is_empty() { basename(&asset.identity.path) } else { asset.display_name.clone() },
+            display_name: if asset.display_name.is_empty() {
+                basename(&asset.identity.path)
+            } else {
+                asset.display_name.clone()
+            },
             bytes: asset.identity.bytes.clone(),
             stream_count: asset.probe.streams.len(),
         }
@@ -60,7 +120,9 @@ impl From<&Asset> for AssetSummary {
 impl From<&Job> for JobSummary {
     fn from(job: &Job) -> Self {
         Self {
-            id: job.id.clone(), state: job.state.clone(), output_name: basename(&job.plan.output),
+            id: job.id.clone(),
+            state: job.state.clone(),
+            output_name: basename(&job.plan.output),
             error_code: job.error.as_ref().map(|error| error.code.clone()),
         }
     }

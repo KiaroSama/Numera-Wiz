@@ -256,9 +256,9 @@ impl WizApp {
             .show(ui, |ui| {
                 ui.strong(format!("{:?}", plan.resolution.action));
                 ui.label("Source");
-                ui.label(&plan.source.identity.path);
+                ui.label(plan.source_path.as_deref().unwrap_or(&plan.source.display_name));
                 ui.label("Destination");
-                ui.label(&plan.output);
+                ui.label(plan.output_path.as_deref().unwrap_or(&plan.output_name));
                 ui.separator();
                 for outcome in &plan.resolution.outcomes {
                     ui.label(match outcome.output_index {
@@ -277,7 +277,7 @@ impl WizApp {
                 egui::CollapsingHeader::new("Invocation and identity").show(ui, |ui| {
                     ui.small(format!("Plan {}", plan.id));
                     ui.monospace(&plan.hash);
-                    for argument in &plan.argv_template {
+                    for argument in plan.argv_template.iter().flatten() {
                         ui.monospace(argument);
                     }
                 });

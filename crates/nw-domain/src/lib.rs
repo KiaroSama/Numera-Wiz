@@ -36,6 +36,7 @@ impl DomainError {
             | "INSECURE_DATA_ROOT"
             | "REPLAY_SCOPE_INVALID"
             | "REPLAY_SCOPE_EXPIRED"
+            | "RECEIPT_RESULT_RESTRICTED"
             | "CLOCK_ROLLBACK" => 5,
             "IDEMPOTENCY_CONFLICT"
             | "OBJECT_CONFLICT"

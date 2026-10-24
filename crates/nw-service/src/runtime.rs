@@ -4,7 +4,7 @@ mod read_model;
 mod uploads;
 use nw_domain::{
     DomainError, Result,
-    access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication},
+    access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication, ProfileMode, ObjectKind, ObjectAction},
     commands::{
         self, CleanInput, Empty, IdInput, PathInput, Request, Response, StateClass, SubmitInput,
     },
@@ -113,18 +113,21 @@ impl Service {
             store.put(
                 "profile/agent",
                 &AccessProfile {
+                    schema_version: 2,
                     id: "agent".into(),
                     name: "agent".into(),
                     principal: Uuid::new_v4().to_string(),
                     revision: 1,
                     enabled: true,
                     client_sessions: false,
-                    commands: BTreeSet::from([
+                    mode: ProfileMode::Discovery,
+                    owned_object_access: false,
+                    allowed_command_ids: BTreeSet::from([
                         "commands.list".into(),
                         "commands.schema".into(),
                         "access.replay_scope.create".into(),
                     ]),
-                    objects: BTreeSet::new(),
+                    object_grants: Vec::new(),
                     read_roots: vec![],
                     write_roots: vec![],
                 },
@@ -136,20 +139,23 @@ impl Service {
             store.put(
                 "profile/browser",
                 &AccessProfile {
+                    schema_version: 2,
                     id: "browser".into(),
                     name: "browser".into(),
                     principal: Uuid::new_v4().to_string(),
                     revision: 1,
                     enabled: true,
                     client_sessions: true,
-                    commands: commands::ACTIVE_COMMANDS
+                    mode: ProfileMode::Operate,
+                    owned_object_access: true,
+                    allowed_command_ids: commands::ACTIVE_COMMANDS
                         .iter()
                         .filter(|id| {
                             !id.starts_with("access.profiles") && **id != "access.credentials.issue"
                         })
                         .map(|id| (*id).into())
                         .collect(),
-                    objects: BTreeSet::new(),
+                    object_grants: Vec::new(),
                     read_roots: vec![files::path_text(&assets)?],
                     write_roots: vec![files::path_text(&exports)?],
                 },
@@ -279,16 +285,62 @@ impl Service {
             )),
         }
     }
-    fn object(&self, context: &Context, id: &str, creator: &str) -> Result<()> {
+    fn object(&self, context: &Context, _id: &str, creator: &str) -> Result<()> {
         if let Some(profile) = self.policy(context)?
-            && context.principal != creator
-            && !profile.objects.contains(id)
+            && !profile.allows_asset(creator)
         {
             return Err(DomainError::object_not_found());
         }
         Ok(())
     }
+    fn object_action(&self, context: &Context, kind: ObjectKind, id: &str, creator: &str, action: ObjectAction) -> Result<()> {
+        if let Some(profile) = self.policy(context)?
+            && !profile.allows_object(kind, id, creator, action) { return Err(DomainError::object_not_found()); }
+        Ok(())
+    }
+    fn plan_review(&self, context: &Context, plan: &Plan) -> Result<nw_domain::views::PlanReview> {
+        let policy = self.policy(context)?;
+        let source_visible = policy.as_ref().is_none_or(|profile| profile.read_roots.iter().any(|root| Path::new(&plan.source.identity.path).starts_with(root)));
+        let output_visible = policy.as_ref().is_none_or(|profile| profile.write_roots.iter().chain(&profile.read_roots).any(|root| Path::new(&plan.output).starts_with(root)));
+        let actions = [ObjectAction::Read, ObjectAction::Submit].into_iter().filter(|action| policy.as_ref().is_none_or(|profile| profile.allows_object(ObjectKind::Plan, &plan.id, &plan.creator, *action))).collect();
+        Ok(nw_domain::views::PlanReview::new(plan, source_visible, output_visible, policy.is_none(), policy.as_ref().map_or(0, |profile| profile.revision), actions))
+    }
+    fn job_view(&self, context: &Context, job: &Job) -> Result<nw_domain::views::JobView> {
+        use nw_domain::views::{JobView, ArtifactView, ErrorView};
+        let policy = self.policy(context)?;
+        let owner = policy.is_none();
+        let actions = [ObjectAction::Read, ObjectAction::Control].into_iter().filter(|action| policy.as_ref().is_none_or(|profile| profile.allows_object(ObjectKind::Job, &job.id, &job.creator, *action))).collect();
+        Ok(JobView {
+            id: job.id.clone(), state: job.state.clone(), plan: self.plan_review(context, &job.plan)?,
+            artifact: job.artifact.as_ref().map(|artifact| ArtifactView { path: policy.as_ref().is_none_or(|profile| profile.read_roots.iter().any(|root| Path::new(&artifact.path).starts_with(root))).then(|| artifact.path.clone()), bytes: artifact.bytes.clone(), sha256: artifact.sha256.clone() }),
+            verification: job.verification.clone(), error: job.error.as_ref().map(|error| ErrorView { code: error.code.clone(), message: owner.then(|| error.message.clone()), retryable: error.retryable }),
+            prepared_stages: owner.then(|| job.prepared_stages.clone()), policy_revision: policy.as_ref().map_or(0, |profile| profile.revision), effective_actions: actions,
+        })
+    }
+    fn replay_view(&self, context: &Context, request: &Request, response: Response) -> Result<Response> {
+        let Some(profile) = self.policy(context)? else { return Ok(response); };
+        let readable = match request.command.id.as_str() {
+            "assets.register" => {
+                let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| DomainError::new("STORAGE_ERROR", "Retained asset receipt has no result"))?)?;
+                profile.allows_asset(&asset.creator) && profile.read_roots.iter().any(|root| Path::new(&asset.identity.path).starts_with(root))
+            }
+            _ => true,
+        };
+        if readable { return Ok(response); }
+        let digest = hex::encode(Sha256::digest(serde_json::to_vec(&response.result).map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))?));
+        Ok(Response {
+            request_id: request.request_id.clone(), ok: false, receipt_id: response.receipt_id.clone(),
+            result: Some(json!({"receipt_id":response.receipt_id,"completion_state":"completed","result_digest":digest})),
+            error: Some(DomainError::new("RECEIPT_RESULT_RESTRICTED", "Original work completed; protected result fields are no longer readable under current grants")),
+        })
+    }
     fn path(&self, context: &Context, path: &Path, write: bool) -> Result<PathBuf> {
+        self.path_with_purpose(context, path, write, None)
+    }
+    fn plan_source_path(&self, context: &Context, plan: &Plan) -> Result<PathBuf> {
+        self.path_with_purpose(context, Path::new(&plan.source.identity.path), false, Some(&plan.source.identity))
+    }
+    fn path_with_purpose(&self, context: &Context, path: &Path, write: bool, purpose: Option<&nw_domain::records::FileIdentity>) -> Result<PathBuf> {
         if staging_path(path) {
             return Err(staging_denied());
         }
@@ -322,7 +374,10 @@ impl Service {
                 "Application and component folders cannot receive media exports. Choose another destination.",
             ));
         }
-        if !write && context.profile.is_some() && canonical.starts_with(self.root.join("assets")) {
+        if purpose.is_some_and(|identity| write || canonical != Path::new(&identity.path)) {
+            return Err(DomainError::new("INVALID_PLAN", "Captured input purpose does not match its canonical dependency"));
+        }
+        if !write && purpose.is_none() && context.profile.is_some() && canonical.starts_with(self.root.join("assets")) {
             self.managed_read(context, &canonical)?;
         }
         if let Some(profile) = self.policy(context)? {
@@ -517,10 +572,10 @@ impl Service {
                 self.store
                     .replay_with_clock(&context.principal, &request, || self.clock.now())?
         {
-            return Ok(response);
+            return self.replay_view(&context, &request, response);
         }
         if let Some(profile) = &policy
-            && !profile.commands.contains(&request.command.id)
+            && !profile.allows_command(&request.command.id)
         {
             return Err(DomainError::new(
                 "PERMISSION_DENIED",
@@ -584,20 +639,10 @@ impl Service {
                         "The default discovery profile is immutable; create a named operating profile",
                     ));
                 }
-                if input.commands.len() > 128
-                    || input.objects.len() > 256
-                    || input.read_roots.len() > 32
-                    || input.write_roots.len() > 32
-                    || input.commands.iter().any(|id| {
-                        commands::descriptor(id).is_none()
-                            || id.starts_with("access.profiles")
-                            || id == "access.credentials.issue"
-                    })
-                {
-                    return Err(DomainError::new(
-                        "VALIDATION_ERROR",
-                        "Profile rights exceed the admitted bounded policy",
-                    ));
+                input.validate()?;
+                for grant in &input.object_grants {
+                    let prefix = match grant.kind { ObjectKind::Project => "project", ObjectKind::Plan => "plan", ObjectKind::Job => "job" };
+                    if self.store.get::<Value>(&named(prefix, &grant.id)?)?.is_none() { return Err(DomainError::object_not_found()); }
                 }
                 let old: Option<AccessProfile> = self.store.get(&key)?;
                 if old.as_ref().map(|profile| profile.revision) != input.expected_revision {
@@ -622,6 +667,7 @@ impl Service {
                         .collect()
                 };
                 let profile = AccessProfile {
+                    schema_version: 2,
                     id: input.name.clone(),
                     name: input.name,
                     principal: old
@@ -631,8 +677,10 @@ impl Service {
                     revision: old.as_ref().map_or(1, |profile| profile.revision + 1),
                     enabled: input.enabled,
                     client_sessions: input.client_sessions,
-                    commands: input.commands,
-                    objects: input.objects,
+                    mode: input.mode,
+                    owned_object_access: input.owned_object_access,
+                    allowed_command_ids: input.allowed_command_ids,
+                    object_grants: input.object_grants,
                     read_roots: roots(input.read_roots)?,
                     write_roots: roots(input.write_roots)?,
                 };
@@ -697,7 +745,10 @@ impl Service {
             }
             "assets.inspect" => {
                 let input: IdInput = commands::parse(params)?;
-                let asset: Asset = self.store.get(&named("asset", &input.id)?)?.ok_or_else(DomainError::object_not_found)?;
+                let asset: Asset = self
+                    .store
+                    .get(&named("asset", &input.id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 value(&asset)?
@@ -774,7 +825,7 @@ impl Service {
                     &context.principal,
                     now,
                 )?;
-                let response = Response::success(&request.request_id, value(&plan)?).bounded();
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
                 if !response.ok {
                     return Ok(response);
                 }
@@ -787,8 +838,8 @@ impl Service {
                     .store
                     .get(&named("plan", &input.id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
-                self.object(&context, &plan.id, &plan.creator)?;
-                value(&plan)?
+                self.object_action(&context, ObjectKind::Plan, &plan.id, &plan.creator, ObjectAction::Read)?;
+                value(&self.plan_review(&context, &plan)?)?
             }
             "jobs.submit" => {
                 let input: SubmitInput = commands::parse(params)?;
@@ -796,18 +847,16 @@ impl Service {
                     .store
                     .get(&named("plan", &input.plan_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
-                self.object(&context, &plan.id, &plan.creator)?;
-                self.object(&context, &plan.source.id, &plan.source.creator)?;
+                self.object_action(&context, ObjectKind::Plan, &plan.id, &plan.creator, ObjectAction::Submit)?;
                 if plan.hash != input.plan_hash
-                    || plan.creator != context.principal
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= now
                 {
                     return Err(DomainError::new(
                         "INVALID_PLAN",
-                        "Plan hash, creator or expiry does not match the reviewed submission",
+                        "Plan hash or expiry does not match the reviewed submission",
                     ));
                 }
-                self.path(&context, Path::new(&plan.source.identity.path), false)?;
+                self.plan_source_path(&context, &plan)?;
                 self.path(&context, Path::new(&plan.output), true)?;
                 files::revalidate_output(&plan.output)?;
                 files::revalidate(&plan.source.identity, &cancellation)?;
@@ -853,8 +902,8 @@ impl Service {
             "jobs.inspect" => {
                 let input: IdInput = commands::parse(params)?;
                 let job = self.store.inspect_job(&input.id)?;
-                self.object(&context, &job.id, &job.creator)?;
-                value(&job)?
+                self.object_action(&context, ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)?;
+                value(&self.job_view(&context, &job)?)?
             }
             "jobs.list" => {
                 self.inventory_page(&context, commands::parse(params)?, true, &cancellation)?
@@ -862,7 +911,7 @@ impl Service {
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
                 let mut job = self.store.inspect_job(&input.id)?;
-                self.object(&context, &job.id, &job.creator)?;
+                self.object_action(&context, ObjectKind::Job, &job.id, &job.creator, ObjectAction::Control)?;
                 if job.state == JobState::Publishing {
                     return Err(DomainError::new(
                         "CANCELLATION_TOO_LATE",
@@ -1023,7 +1072,7 @@ impl Service {
             principal: authorization.principal,
             profile: authorization.profile,
         };
-        self.path(&context, Path::new(&job.plan.source.identity.path), false)?;
+        self.plan_source_path(&context, &job.plan)?;
         self.path(&context, Path::new(&job.plan.output), true)?;
         files::revalidate_output(&job.plan.output)?;
         Ok(())
@@ -1132,30 +1181,119 @@ impl Drop for Pending {
 mod tests {
     use super::*;
     #[tokio::test]
+    async fn delegated_metadata_read_hides_native_paths_and_does_not_grant_submit_or_control() {
+        use nw_domain::{access::ObjectGrant, records::{FileIdentity, MediaProbe}, mux::{CleanResolution, CleanAction, Preservation}};
+        let root = tempfile::tempdir().unwrap();
+        let service = Service::open(root.path().join("data"), None).await.unwrap();
+        let reader = service.profile_context("browser").unwrap();
+        let owner = service.owner();
+        let identity = FileIdentity { path: files::path_text(&root.path().join("private/source.mkv")).unwrap(), bytes: "100".into(), sha256: "00".repeat(32) };
+        let asset = Asset { id: "private-asset".into(), creator: owner.principal.clone(), display_name: "source.mkv".into(), identity: identity.clone(), probe: MediaProbe { stream_details: Default::default(), streams: Vec::new(), format: "metadata-view-only".into(), global_tags: Default::default(), chapters: json!([]), verification_scope: "Synthetic metadata view, no media execution".into() } };
+        let plan = Plan { id: "private-plan".into(), creator: owner.principal.clone(), hash: "synthetic-not-executable".into(), source: asset, output: files::path_text(&root.path().join("private/export.mkv")).unwrap(), ffmpeg: identity.clone(), ffprobe: identity.clone(), resolution: CleanResolution { action: CleanAction::CopyUnchanged, streams: Vec::new(), outcomes: Vec::new(), reasons: Vec::new(), warnings: Vec::new(), preservation: Preservation::default() }, argv_template: vec![identity.path.clone()], created_at: "1".into(), expires_at: "2".into(), verification_scope: "Synthetic metadata view".into() };
+        let job = Job { id: "private-job".into(), creator: owner.principal.clone(), plan: plan.clone(), state: JobState::Succeeded, prepared_argv: Some(vec![identity.path.clone()]), prepared_stages: vec![vec![identity.path.clone()]], owned_staging: None, artifact: Some(identity.clone()), verification: Some("Synthetic metadata view".into()), error: None };
+        service.store.put("plan/private-plan", &plan).unwrap();
+        service.store.put("job/private-job", &job).unwrap();
+        let mut policy: AccessProfile = service.store.get("profile/browser").unwrap().unwrap();
+        policy.owned_object_access = false;
+        policy.object_grants = vec![ObjectGrant { kind: ObjectKind::Job, id: job.id.clone(), actions: [ObjectAction::Read].into() }, ObjectGrant { kind: ObjectKind::Plan, id: plan.id.clone(), actions: [ObjectAction::Read].into() }];
+        service.store.put("profile/browser", &policy).unwrap();
+        let observed = service.dispatch(reader.clone(), Request::query("jobs.inspect", json!({"id":job.id}))).await;
+        assert!(observed.ok, "{observed:?}");
+        let observed = observed.result.unwrap();
+        assert!(observed["prepared_stages"].is_null());
+        assert!(observed["artifact"]["path"].is_null());
+        assert!(observed["plan"]["source_path"].is_null());
+        assert!(observed["plan"]["output_path"].is_null());
+        assert!(!observed.to_string().contains(&identity.path));
+        let submit = service.dispatch(reader.clone(), Request::query("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}))).await;
+        // Durable operations need a replay scope before performing the object lookup.
+        assert_eq!(submit.error.unwrap().code, "REPLAY_SCOPE_INVALID");
+        let scope = service.store.issue_scope(&reader.principal, service.clock.now().unwrap()).unwrap();
+        for (command, params) in [("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash})), ("jobs.cancel", json!({"id":job.id}))] {
+            let mut request = Request::query(command, params);
+            request.replay_scope = Some(scope.clone()); request.idempotency_key = Some(command.into());
+            assert_eq!(service.dispatch(reader.clone(), request).await.error.unwrap().code, "OBJECT_NOT_FOUND");
+        }
+        policy.object_grants.clear(); policy.revision += 1;
+        service.store.put("profile/browser", &policy).unwrap();
+        assert_eq!(service.dispatch(reader.clone(), Request::query("jobs.inspect", json!({"id":job.id}))).await.error.unwrap().code, "OBJECT_NOT_FOUND");
+        assert_eq!(service.dispatch(reader, Request::query("jobs.list", json!({}))).await.result.unwrap()["total_count"], 0);
+    }
+    #[tokio::test]
     async fn an_oversized_plan_response_does_not_fill_retained_plan_history() {
         use nw_domain::mux::*;
         let root = tempfile::tempdir().unwrap();
         let component = std::env::current_exe().unwrap();
         // This fixture only plans; neither synthetic executable is launched as media software.
-        let service = Service::open(root.path().join("data"), Some((component.clone(), component))).await.unwrap();
+        let service = Service::open(
+            root.path().join("data"),
+            Some((component.clone(), component)),
+        )
+        .await
+        .unwrap();
         let owner = service.owner();
         let source = root.path().join("source.mkv");
         std::fs::write(&source, b"Plan response budget fixture").unwrap();
-        let mut streams = vec![Stream { index: 0, kind: StreamKind::Video, codec: "ffv1".into(), tags: Default::default(), dispositions: Default::default() }];
-        streams.extend((1..=64).map(|index| Stream { index, kind: StreamKind::Audio, codec: "pcm_s16le".into(), tags: Default::default(), dispositions: Default::default() }));
+        let mut streams = vec![Stream {
+            index: 0,
+            kind: StreamKind::Video,
+            codec: "ffv1".into(),
+            tags: Default::default(),
+            dispositions: Default::default(),
+        }];
+        streams.extend((1..=64).map(|index| Stream {
+            index,
+            kind: StreamKind::Audio,
+            codec: "pcm_s16le".into(),
+            tags: Default::default(),
+            dispositions: Default::default(),
+        }));
         let asset = Asset {
-            id: "plan-budget-asset".into(), creator: owner.principal.clone(), display_name: "source.mkv".into(),
+            id: "plan-budget-asset".into(),
+            creator: owner.principal.clone(),
+            display_name: "source.mkv".into(),
             identity: files::identity(&source, &CancellationToken::new()).unwrap(),
-            probe: nw_domain::records::MediaProbe { streams, stream_details: Default::default(), format: "matroska,webm".into(), global_tags: Default::default(), chapters: json!([]), verification_scope: "Synthetic planner-only fixture".into() },
+            probe: nw_domain::records::MediaProbe {
+                streams,
+                stream_details: Default::default(),
+                format: "matroska,webm".into(),
+                global_tags: Default::default(),
+                chapters: json!([]),
+                verification_scope: "Synthetic planner-only fixture".into(),
+            },
         };
-        service.store.put("asset/plan-budget-asset", &asset).unwrap();
+        service
+            .store
+            .put("asset/plan-budget-asset", &asset)
+            .unwrap();
         let intent = CleanIntent {
-            audio_selection: Selection { selector: Selector::All, no_match: NoMatch::SkipFile },
-            subtitle_selection: Selection { selector: Selector::All, no_match: NoMatch::AllowEmpty },
-            audio_order: Vec::new(), subtitle_order: Vec::new(), preservation: Preservation::default(),
-            stream_tag_patches: (1..=64).map(|index| StreamTagPatch { kind: StreamKind::Audio, source_indices: vec![index], original_languages: Vec::new(), language: TagPatch::Keep, title: TagPatch::Set { value: "x".repeat(4000) } }).collect(),
+            audio_selection: Selection {
+                selector: Selector::All,
+                no_match: NoMatch::SkipFile,
+            },
+            subtitle_selection: Selection {
+                selector: Selector::All,
+                no_match: NoMatch::AllowEmpty,
+            },
+            audio_order: Vec::new(),
+            subtitle_order: Vec::new(),
+            preservation: Preservation::default(),
+            stream_tag_patches: (1..=64)
+                .map(|index| StreamTagPatch {
+                    kind: StreamKind::Audio,
+                    source_indices: vec![index],
+                    original_languages: Vec::new(),
+                    language: TagPatch::Keep,
+                    title: TagPatch::Set {
+                        value: "x".repeat(4000),
+                    },
+                })
+                .collect(),
         };
-        let request = Request::query("streams.clean", json!({"asset_id":asset.id,"output":root.path().join("output.mkv"),"intent":intent}));
+        let request = Request::query(
+            "streams.clean",
+            json!({"asset_id":asset.id,"output":root.path().join("output.mkv"),"intent":intent}),
+        );
         assert!(serde_json::to_vec(&request).unwrap().len() < commands::MAX_COMMAND_BYTES);
         let response = service.dispatch(owner, request).await;
         assert_eq!(response.error.unwrap().code, "RESOURCE_LIMIT");
@@ -1169,14 +1307,17 @@ mod tests {
             .await
             .unwrap();
         let mut profile = AccessProfile {
+            schema_version: 2,
             id: "waiting-reader".into(),
             name: "waiting-reader".into(),
             principal: "waiting-principal".into(),
             revision: 1,
             enabled: true,
             client_sessions: false,
-            commands: ["access.replay_scope.create".into()].into(),
-            objects: Default::default(),
+            mode: ProfileMode::Operate,
+            owned_object_access: true,
+            allowed_command_ids: ["access.replay_scope.create".into()].into(),
+            object_grants: Default::default(),
             read_roots: Vec::new(),
             write_roots: Vec::new(),
         };
@@ -1237,7 +1378,7 @@ mod tests {
             .unwrap();
         let mut create = Request::query(
             "access.profiles.put",
-            json!({"name":"operator","expected_revision":null,"enabled":true,"commands":["commands.list"],"objects":[],"read_roots":[],"write_roots":[]}),
+            json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list"],"object_grants":[],"read_roots":[],"write_roots":[]}),
         );
         create.replay_scope = Some(scope.clone());
         create.idempotency_key = Some("stable-create".into());
@@ -1245,7 +1386,7 @@ mod tests {
         assert!(accepted.ok, "{:?}", accepted.error);
         let token = service.credential("operator").unwrap();
         let principal = service.authenticate(&token).unwrap().principal;
-        let changed = mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"operator","expected_revision":1,"enabled":false,"commands":[],"objects":[],"read_roots":[],"write_roots":[]})).await;
+        let changed = mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"operator","expected_revision":1,"enabled":false,"mode":"operate","owned_object_access":true,"allowed_command_ids":[],"object_grants":[],"read_roots":[],"write_roots":[]})).await;
         assert!(changed.ok);
         assert!(service.authenticate(&token).is_err());
         let replay = service.dispatch(owner.clone(), create.clone()).await;
@@ -1268,7 +1409,7 @@ mod tests {
         std::fs::write(&source, b"unit fixture").unwrap();
         let service = Service::open(root.path().join("data"), None).await.unwrap();
         let owner = service.owner();
-        let asset = Asset {
+        let mut asset = Asset {
             display_name: String::new(),
             id: "owned-asset".into(),
             creator: owner.principal.clone(),
@@ -1287,7 +1428,7 @@ mod tests {
             .store
             .issue_scope(&owner.principal, nw_platform::epoch_seconds())
             .unwrap();
-        let profile = json!({"name":"reader","expected_revision":null,"enabled":true,"commands":["assets.list","streams.clean"],"objects":[],"read_roots":[root.path().to_str().unwrap()],"write_roots":[root.path().to_str().unwrap()]});
+        let profile = json!({"name":"reader","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["assets.list","streams.clean"],"object_grants":[],"read_roots":[root.path().to_str().unwrap()],"write_roots":[root.path().to_str().unwrap()]});
         assert!(
             mutate(&service, &owner, &scope, "access.profiles.put", profile)
                 .await
@@ -1339,7 +1480,9 @@ mod tests {
             serde_json::to_value(&absent).unwrap(),
             "An object lookup must not disclose whether an unauthorized ID exists"
         );
-        assert!(mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"reader","expected_revision":1,"enabled":true,"commands":["streams.clean"],"objects":["owned-asset"],"read_roots":[],"write_roots":[]})).await.ok);
+        asset.creator = reader.principal.clone();
+        service.store.put("asset/owned-asset", &asset).unwrap();
+        assert!(mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"reader","expected_revision":1,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["streams.clean"],"object_grants":[],"read_roots":[],"write_roots":[]})).await.ok);
         assert_eq!(
             service
                 .dispatch(reader, Request::query("streams.clean", params))

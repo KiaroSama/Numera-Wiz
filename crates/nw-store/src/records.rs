@@ -1,7 +1,7 @@
 //! Bounded records, replay-first acceptance and atomic execution journals.
 use super::*;
 use nw_domain::{
-    access::{AccessProfile, ExecutionAuthorization, Publication},
+    access::{AccessProfile, ExecutionAuthorization, Publication, ObjectKind, ObjectAction},
     records::{FileIdentity, JobState},
 };
 use serde_json::Value;
@@ -58,8 +58,8 @@ fn execution_policy(
     let source = &job.plan.source;
     if !profile.enabled
         || profile.principal != authorization.principal
-        || !profile.commands.contains("jobs.submit")
-        || (source.creator != authorization.principal && !profile.objects.contains(&source.id))
+        || !profile.allows_command("jobs.submit")
+        || !profile.allows_object(ObjectKind::Plan, &job.plan.id, &job.plan.creator, ObjectAction::Submit)
         || !profile
             .read_roots
             .iter()
@@ -88,7 +88,9 @@ impl Store {
         let table = read.open_table(RECORDS).map_err(storage)?;
         for row in table.range(prefix..).map_err(storage)? {
             let (key, value) = row.map_err(storage)?;
-            if !key.value().starts_with(prefix) { break; }
+            if !key.value().starts_with(prefix) {
+                break;
+            }
             visitor(decode(value.value())?)?;
         }
         Ok(())

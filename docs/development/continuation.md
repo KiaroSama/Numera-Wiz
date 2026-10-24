@@ -333,3 +333,44 @@ Oversized ephemeral cleanup-plan responses are now rejected before retaining the
 plan. The focused synthetic planner case checks that a valid bounded request whose
 resolved plan exceeds the response ceiling does not consume plan-history quota.
 No local build, ordinary test or media process was run.
+
+Run [40048149831](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40048149831)
+for a87b05acbe5c52437ca85ca3ff85aa0f7d3dc7f7 passed all four native
+test/lint/build targets, the actual media/CLI/SDK path and actual Chrome output.
+The new summary paging, cursor/lease/policy and oversized-plan tests passed at
+the unit boundary. The actual native-window import/review/Run/byte-equality job
+also passed. Only formatting failed; its exact hosted patch is applied.
+
+The current access-profile encoding is version 2: explicit discovery/operate
+mode, owned_object_access, finite allowed_command_ids and kind/action object
+grants. Read is required alongside edit/submit/control. Engine-issued existing
+objects are required for new grants. Assets remain creator-scoped, not an extra
+wildcard object grant kind. Current command and object rights apply separately
+to lists, direct inspection, plan submission and job cancellation. Accepted work
+rechecks the plan-submit action and independent input/output roots at execution
+and the durable publication fence. A transferred plan retains its reviewed hash
+and creator; the accepted job and execution authority belong to the submitter.
+Its captured managed input is an exact internal plan purpose, never a general
+managed-filename read capability. Explicit rights can survive withdrawal of
+inherited creator access; rights to other actions do not appear automatically.
+
+The narrow profile migration uses one redb transaction, retains original policy
+bytes and preserves principal, revision and explicit commands. Legacy plan/job
+grants map to their prior read/submit or read/control meaning. Nonrepresentable
+legacy asset/dangling grants fail without migrating any profile, rather than
+silently expanding or discarding rights. This is not the completed application/
+store upgrade, rollback, signing-key rotation or recovery contract.
+
+Plan-review and job-inspection DTOs now carry bounded semantic details and
+effective actions/policy revision. Native paths outside current roots are null;
+scoped views omit executable/staging/invocation internals and path-bearing error
+messages. The shared UI consumes the same plan-review DTO. Full detail section
+paging and scoped stage-command projection remain open. Asset receipt replay
+checks current creator/path rights without reopening or requiring the old target;
+revocation yields RECEIPT_RESULT_RESTRICTED with immutable safe receipt status
+and result digest, without execution. The real SDK fixture now exercises explicit
+foreign plan submission under the recipient's own roots, read without control,
+withdrawn inherited access and restricted receipt replay. These latest changes
+await hosted results. Canonical human access create/update/token verbs, complete
+required_rights payload/versioned plan hashing, artifact byte retrieval, project
+rights, full cross-surface revocation/cancellation and audit export remain required.
