@@ -121,8 +121,8 @@ impl Service {
         Ok(())
     }
     pub fn create_upload(&self, context: &Context, input: UploadInput) -> Result<UploadTicket> {
-        self.upload_allowed(context)?;
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+        self.upload_allowed(context)?;
         let expected = input.bytes.parse::<u64>().map_err(|_| {
             DomainError::new(
                 "VALIDATION_ERROR",
@@ -144,7 +144,7 @@ impl Service {
                 "Invalid filename, digest or declared upload length (maximum 1 GiB)",
             ));
         }
-        let now = nw_platform::epoch_seconds();
+        let now = self.clock.now()?;
         let mut active = 0;
         let mut count = 0;
         let mut reserved = 0u64;
@@ -209,15 +209,15 @@ impl Service {
         })
     }
     pub fn begin_upload(self: &Arc<Self>, context: &Context, id: &str) -> Result<UploadWriter> {
-        self.upload_allowed(context)?;
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+        self.upload_allowed(context)?;
         let key = named("upload", id)?;
         let mut upload: Upload = self
             .store
             .get(&key)?
             .ok_or_else(|| DomainError::new("INGEST_NOT_FOUND", "Intake handle does not exist"))?;
         if upload.principal != context.principal
-            || upload.expires <= nw_platform::epoch_seconds()
+            || upload.expires <= self.clock.now()?
             || upload.phase != "reserved"
         {
             return Err(DomainError::new(
@@ -304,7 +304,7 @@ impl Service {
         for upload in self.store.list::<Upload>("upload/", 128)? {
             if upload.principal == context.principal
                 && upload.phase == "ready"
-                && upload.expires > nw_platform::epoch_seconds()
+                && upload.expires > self.clock.now()?
                 && upload
                     .sealed
                     .as_ref()
@@ -325,7 +325,7 @@ impl Service {
             .get(&named("upload", id)?)?
             .ok_or_else(|| DomainError::new("INGEST_NOT_FOUND", "Intake handle does not exist"))?;
         if upload.principal != context.principal
-            || upload.expires <= nw_platform::epoch_seconds()
+            || upload.expires <= self.clock.now()?
             || upload.phase != "ready"
         {
             return Err(DomainError::new(
@@ -341,7 +341,7 @@ impl Service {
     }
     pub(super) fn recover_uploads(&self) -> Result<()> {
         for (key, mut upload) in self.store.rows::<Upload>("upload/", 10000)? {
-            if upload.phase == "receiving" || upload.expires <= nw_platform::epoch_seconds() {
+            if upload.phase == "receiving" || upload.expires <= self.clock.now()? {
                 let _ = std::fs::remove_file(&upload.staging);
                 upload.phase = "interrupted".into();
                 self.store.put(&key, &upload)?;

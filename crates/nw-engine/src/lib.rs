@@ -119,6 +119,16 @@ impl Engine {
         intent: &CleanIntent,
         creator: &str,
     ) -> Result<Plan> {
+        self.clean_plan_at(asset, output, intent, creator, nw_platform::epoch_seconds())
+    }
+    pub fn clean_plan_at(
+        &self,
+        asset: Asset,
+        output: &Path,
+        intent: &CleanIntent,
+        creator: &str,
+        now: u64,
+    ) -> Result<Plan> {
         let output = files::output_path(output)?;
         if output == Path::new(&asset.identity.path) {
             return Err(DomainError::new(
@@ -143,7 +153,6 @@ impl Engine {
         } else {
             vec![]
         };
-        let now = nw_platform::epoch_seconds();
         let mut plan = Plan {
             id: Uuid::new_v4().to_string(),
             creator: creator.into(),

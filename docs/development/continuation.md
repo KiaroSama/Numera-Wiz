@@ -221,3 +221,24 @@ cases use relative, absolute and network references plus valid/truncated layouts
 the actual Unicode tail-index MP4 fixture must continue passing. This is not
 a completed resolver for the rejected modes or a claim of all-package canary
 qualification. Admission I/O runs on the blocking worker, including packet scans.
+
+
+Run [40042998672](https://github.com/KiaroSama/Numera-Wiz/actions/runs/40042998672)
+on 07a27972dd46fd7c9ac0d6f398c985c7690d651c passed the actual engine
+copy/remux/changed-packet/seekable-MP4 cases and native checks on Windows, Linux
+and both macOS architectures.
+The actual CLI validation exit 2, replay conflict exit 4 and stdio media path
+passed. The owner transport journey then failed because its protected HTTP-token
+file was absent after the fixture's 10-second wait. The controller's stderr was
+discarded, so the cause is not established. The fixture now retains that log,
+fails immediately on child exit, and uses a finite 45-second startup bound
+consistent with the adapter's owner-attachment startup allowance. Do not infer
+a passing HTTP/browser/native journey from that failed media dependency.
+
+Current acceptance changes sample scope/replay/commit time after entering the
+store read/write transaction, using the same monotonic owner clock as tokens,
+plans and intake expiry. A waiting request loads its current profile only after
+semantic admission, preventing a pre-lock profile snapshot from authorizing new
+work after revocation. Writer-wait time and revocation races have focused hosted
+unit cases. Expensive media preflight still holds the semantic lock; the planned
+two-phase preflight and complete object-action model remain open obligations.

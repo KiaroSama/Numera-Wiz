@@ -140,16 +140,20 @@ impl Store {
         &self.root_id
     }
     pub fn issue_scope(&self, principal: &str, now: u64) -> Result<String> {
+        self.issue_scope_with_clock(principal, || Ok(now))
+    }
+    pub fn issue_scope_with_clock(&self, principal: &str, clock: impl FnOnce() -> Result<u64>) -> Result<String> {
         if principal.is_empty() || principal.len() > 128 {
             return Err(DomainError::new(
                 "VALIDATION_ERROR",
                 "Invalid authenticated principal identity",
             ));
         }
+        let write = self.db.begin_write().map_err(storage)?;
+        let now = clock()?;
         let expires = now.checked_add(SCOPE_TTL).ok_or_else(|| {
             DomainError::new("VALIDATION_ERROR", "Clock exceeds supported scope range")
         })?;
-        let write = self.db.begin_write().map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             check_clock(&table, now)?;
@@ -440,6 +444,34 @@ mod tests {
         mux::{CleanAction, CleanResolution, Preservation},
         records::{Asset, FileIdentity, MediaProbe, Plan},
     };
+    #[test]
+    fn scope_issuance_samples_time_after_waiting_for_the_writer() {
+        use std::sync::{Arc, atomic::{AtomicU64, Ordering}, mpsc};
+        let directory = tempfile::tempdir().unwrap();
+        let store = Arc::new(Store::open(directory.path()).unwrap());
+        let writer = store.db.begin_write().unwrap();
+        let wall = Arc::new(AtomicU64::new(40));
+        let source = wall.clone();
+        let issuer = store.clone();
+        let (started, ready) = mpsc::channel();
+        let (sampled, observed) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            issuer.issue_scope_with_clock("writer-time-fixture", || {
+                let time = source.load(Ordering::SeqCst);
+                sampled.send(time).unwrap();
+                Ok(time)
+            })
+        });
+        ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        assert_eq!(observed.recv_timeout(std::time::Duration::from_millis(100)), Err(mpsc::RecvTimeoutError::Timeout));
+        wall.store(80, Ordering::SeqCst);
+        drop(writer);
+        assert_eq!(observed.recv_timeout(std::time::Duration::from_secs(5)).unwrap(), 80);
+        let token = worker.join().unwrap().unwrap();
+        assert_eq!(store.verify_scope(&token, "writer-time-fixture", 80).unwrap().issued_at, "80");
+        assert!(store.verify_scope(&token, "writer-time-fixture", 79).is_err());
+    }
     fn job() -> Job {
         let identity = FileIdentity {
             path: "synthetic-unit-fixture".into(),

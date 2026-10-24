@@ -56,7 +56,13 @@ impl Cli {
             .unwrap();
         let value = serde_json::from_slice(&output.stdout)
             .unwrap_or_else(|_| panic!("CLI failed: {}", String::from_utf8_lossy(&output.stderr)));
-        (value, output.status.code().expect("CLI must report its synchronous exit code"))
+        (
+            value,
+            output
+                .status
+                .code()
+                .expect("CLI must report its synchronous exit code"),
+        )
     }
     async fn query(&self, id: &str, params: Value) -> Value {
         let response = self.raw(&Request::query(id, params)).await;
@@ -112,15 +118,23 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
         )
         .await;
-    let (invalid, exit) = cli.raw_with_exit(&Request::query("media.probe", json!({"path":true}))).await;
+    let (invalid, exit) = cli
+        .raw_with_exit(&Request::query("media.probe", json!({"path":true})))
+        .await;
     assert_eq!(invalid["error"]["code"], "VALIDATION_ERROR");
-    assert_eq!(exit, 2, "A typed CLI validation failure retains parseable JSON and the stable usage exit");
+    assert_eq!(
+        exit, 2,
+        "A typed CLI validation failure retains parseable JSON and the stable usage exit"
+    );
     let mut conflicting = Request::query("assets.register", json!({"path":"different-source.mkv"}));
     conflicting.replay_scope = Some(scope.clone());
     conflicting.idempotency_key = Some("register-cli".into());
     let (conflict, exit) = cli.raw_with_exit(&conflicting).await;
     assert_eq!(conflict["error"]["code"], "IDEMPOTENCY_CONFLICT");
-    assert_eq!(exit, 4, "A durable conflict is distinguishable from a media execution failure");
+    assert_eq!(
+        exit, 4,
+        "A durable conflict is distinguishable from a media execution failure"
+    );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
     let output = media.directory.path().join("cli-copy.mkv");
@@ -230,6 +244,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let port = bind.local_addr().unwrap().port();
     drop(bind);
     let token_file = media.directory.path().join("auth/http-token");
+    let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
+    std::fs::create_dir_all(&evidence).unwrap();
+    let server_log = evidence.join("http-controller-stderr.log");
     let mut server = cli
         .command()
         .args([
@@ -243,14 +260,19 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .arg(&token_file)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(std::fs::File::create(&server_log).unwrap())
         .kill_on_drop(true)
         .spawn()
         .unwrap();
-    for _ in 0..100 {
+    let started = std::time::Instant::now();
+    loop {
         if token_file.exists() {
             break;
         }
+        if let Some(status) = server.try_wait().unwrap() {
+            panic!("HTTP controller exited before protected credential export: {status}; {}", std::fs::read_to_string(&server_log).unwrap());
+        }
+        assert!(started.elapsed() < Duration::from_secs(45), "HTTP controller startup deadline exceeded; {}", std::fs::read_to_string(&server_log).unwrap());
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let token =
