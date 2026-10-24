@@ -1271,7 +1271,7 @@
       "lines_read": [
         [
           1,
-          15800
+          28300
         ]
       ],
       "complete": false,
@@ -1305,7 +1305,29 @@
         "Fade uses later-of-frame/time start and duration precedence; fieldmatch reconstructs fields but needs separate decimation. Detelecine needs the original pattern phase, and fieldorder shifts picture data rather than merely changing metadata.",
         "FPS duplicates/drops with explicit PTS rounding/start/EOF; framerate interpolates and is not valid directly for interlaced inputs. AMF FRC may use future frames and a declared duplicate/blend fallback, so route/latency/objective must be qualified.",
         "Geq expression state is per thread slice; stateful generated expressions need an explicit threading/seed policy. Missing alpha expressions can make output opaque.",
-        "Hald CLUT padding is ignored and last LUT can persist after EOF; guided fast is an approximation with subsampled guidance. Grayworld expects linear-light input. Hardware downloads/maps require exact supported formats and compatible devices, not a generic zero-copy assumption."
+        "Hald CLUT padding is ignored and last LUT can persist after EOF; guided fast is an approximation with subsampled guidance. Grayworld expects linear-light input. Hardware downloads/maps require exact supported formats and compatible devices, not a generic zero-copy assumption.",
+        "ICCdetection overwrites characterization tags by default and ICC generation may infer BT.709/sRGB; metadata defaults are not measured source characterization. Idet combines current/history classifications and can clear or trust flags after a finite analysis.",
+        "Lensfun resolves incomplete names to a best match and can load an ambient database; freeze exact resolved models/database bytes. Lens geometry correction and vignetting are different ordered operations.",
+        "Libplacebo can apply and strip film grain/Dolby Vision by default and resamples subsampled chroma even at unchanged dimensions. SAR normalization, format/alpha modes and view transform are explicit semantics.",
+        "Libplacebo peak detection is history-dependent, enabled by default and not written back as output metadata. Disable or qualify its prefix for deterministic seeks/exports. Shader caches are not automatically collected; custom shader/LUT files are admitted dependencies.",
+        "Tone/gamut algorithms, LUT interpretation, dithering and subjective color controls have distinct effects; conversion LUT can override ICC/tone/color settings. GPU/CPU emulation and round trips need actual objective/resource qualification.",
+        "VMAF requires explicit reference ordering, frame/time alignment, model/pool/subsample/thread policy and admitted log output. A perceptual score is not pixel/clock identity; the CUDA variant has separate surface/nonfree profile requirements.",
+        "LUT defaults clip to nominal component ranges; masks and plane merging use negotiated plane domains, not a generic normalized-alpha assumption. Minterpolate duplicates/blends/motion-compensates with explicit scene fallback and resource-heavy search.",
+        "Normalize smoothing and independent versus linked RGB channels affect temporal state and hue. OCIO can use ambient configuration and context-dependent file transforms; OCR/NNEDI/custom morphology need exact admitted data files.",
+        "Motion-vector side data and analysis scores require the right decoded representation and frame alignment; frame-drop and interpolation routes cannot be treated as preserved timing.",
+        "Overlay defaults to 8-bit 4:2:0 and auto alpha, repeats/synchronizes secondary input under framesync, and invalid positions can hide the overlay. Freeze working precision/alpha/clocks instead of silently accepting these defaults.",
+        "Premultiply_dynamic can choose premultiply/unpremultiply/no-op from downstream requirements; explicit association and identical picture formats are required. PSNR/SSIM compare frame pairs with equal resolution/format and are separate from timing/sample-count proofs.",
+        "Scale may convert format and changes SAR to preserve DAR; reset_sar, chroma siting, range, transfer, primaries, ICC intent, interlaced scaling and rational divisibility must be explicit. Perceptual ICC details can change with the component candidate.",
+        "Setfield/setparams/SAR tags alter interpretation without changing picture samples. Separatefields doubles cadence at half height; pullup consumes future field context and can drop frames.",
+        "Palette quantization/dithering/transparency thresholds change color/alpha; shader/model/font/LUT/bitmap/statistics files remain secondary opens. QR/text wall-clock and random expansion must not become nondeterministic export defaults.",
+        "The SITI implementation explicitly follows a superseded P.910 version; reporting must name that algorithm/version and not claim current-standard compliance from its filter name.",
+        "Subtitle burn original_size affects ASS aspect/font scaling; fontsdir supplements ambient font-provider inputs and wrap/shaping depends on exact component libraries.",
+        "Temporal medians/mixes, thumbnails, vidstab and vectorscope history consume lookback/lookahead; giant tile grids and tpad infinite modes need explicit checked extent and memory admission.",
+        "tinterlace changes cadence/geometry/field phase; trim counts versus timestamps and greedy unions do not reset clocks. tonemap needs linear float input and even none may still desaturate.",
+        "v360 projection/stereo/rotation order/padding/interpolation and zoompan previous-frame state/duration/FPS require explicit profiles. xfade requires identical geometry, format, frame rate and time base.",
+        "zscale input/output range, primaries, transfer, matrix, chroma location and nominal peak luminance are independent explicit conversion semantics.",
+        "CUDA/OpenCL require an identified matching device/frame layout and explicit uploads/downloads. colorspace_cuda only converts range; it is not equivalent to software colorspace. CUDA scaling cannot convert YUV to RGB, and passthrough versus allocated frames affects decoder pool pressure.",
+        "CUDA thumbnail batches retain frames; OpenCL deshake smoothing windows add memory/latency. program_opencl loads executable kernel source as an explicit dependency; its frame index is not an exact timeline clock."
       ]
     }
   ]

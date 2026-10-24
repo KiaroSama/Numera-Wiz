@@ -74,6 +74,17 @@ async fn actual_copy_and_order_metadata_remux() {
     );
     assert_eq!(seek_asset.probe.streams.len(), 1);
     assert_eq!(seek_asset.probe.streams[0].codec, "mpeg4");
+    let seek_remux = directory.path().join("seek-index-remux.mkv");
+    let mut seek_intent = rules();
+    seek_intent.audio_selection.no_match = NoMatch::AllowEmpty;
+    seek_intent.preservation.global_tags = false;
+    let seek_plan = engine
+        .clean_plan(seek_asset, &seek_remux, &seek_intent, "fixture-owner")
+        .unwrap();
+    assert_eq!(seek_plan.resolution.action, CleanAction::Remux);
+    engine.execute(&seek_plan, token.clone()).await.unwrap();
+    let observed = fixture::probe(&media.bin, &seek_remux).await;
+    assert_eq!(observed["streams"][0]["codec_name"], "mpeg4");
     let disguised = directory.path().join("renamed-manifest.mp4");
     std::fs::write(
         &disguised,
@@ -131,6 +142,22 @@ async fn actual_copy_and_order_metadata_remux() {
         .clean_plan(asset, &remux, &clean, "fixture-owner")
         .unwrap();
     assert_eq!(plan.resolution.action, CleanAction::Remux);
+    assert!(plan.argv_template.windows(2).any(|pair| pair == ["-i", "fd:"]));
+    assert!(plan.argv_template.windows(2).any(|pair| pair == ["-protocol_whitelist", "fd"]));
+    assert!(!plan.argv_template.contains(&plan.source.identity.path));
+    let mut old_route = plan.clone();
+    for argument in &mut old_route.argv_template {
+        if argument == "fd:" { *argument = old_route.source.identity.path.clone(); }
+    }
+    for option in ["-fd", "-blocksize"] {
+        let index = old_route.argv_template.iter().position(|argument| argument == option).unwrap();
+        old_route.argv_template.drain(index..index + 2);
+    }
+    let whitelist = old_route.argv_template.iter().position(|argument| argument == "-protocol_whitelist").unwrap();
+    old_route.argv_template[whitelist + 1] = "file".into();
+    old_route.hash = nw_engine::plan_digest(&old_route).unwrap();
+    assert_eq!(engine.execute(&old_route, token.clone()).await.unwrap_err().code, "INVALID_PLAN");
+    assert!(!remux.exists(), "A current digest does not reactivate an obsolete pathname-input route");
     let (_, verification, _) = engine.execute(&plan, token.clone()).await.unwrap();
     assert!(verification.contains("Full packet read"));
     let json = fixture::probe(&media.bin, &remux).await;
@@ -298,4 +325,28 @@ async fn actual_copy_and_order_metadata_remux() {
         !corrupt.exists(),
         "Structurally valid changed packet bytes must never publish"
     );
+    let replaced_output = directory.path().join("physical-replacement.mkv");
+    let replacement_plan = engine
+        .clean_plan(plan.source.clone(), &replaced_output, &clean, "fixture-owner")
+        .unwrap();
+    let original_source = source.clone();
+    let retained_source = directory.path().join("retained-original.mkv");
+    let observer: nw_engine::Observer = std::sync::Arc::new(move |event| {
+        let source = original_source.clone();
+        let retained = retained_source.clone();
+        Box::pin(async move {
+            if let nw_engine::ExecutionEvent::Prepared(_) = event {
+                std::fs::rename(&source, &retained).unwrap();
+                std::fs::copy(&retained, &source).unwrap();
+                assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&retained).unwrap());
+            }
+            Ok(())
+        })
+    });
+    let rejected = engine
+        .execute_observed(&replacement_plan, CancellationToken::new(), "source-replacement-fixture", observer)
+        .await.unwrap_err();
+    assert_eq!(rejected.code, "SOURCE_CHANGED");
+    assert!(!replaced_output.exists());
+    assert_eq!(engine.media_process_capacity(), (2, 2, 0), "No process was spawned; changed-input admission must return capacity");
 }

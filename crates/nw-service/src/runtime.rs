@@ -1301,15 +1301,7 @@ impl Service {
                 self.preflight_started();
                 let prepared = (|| -> Result<_> {
                     let engine = self.engine()?;
-                    if engine.ffmpeg != plan.ffmpeg
-                        || engine.ffprobe != plan.ffprobe
-                        || nw_engine::plan_digest(&plan)? != plan.hash
-                    {
-                        return Err(DomainError::new(
-                            "INVALID_PLAN",
-                            "Frozen plan or selected component identity changed",
-                        ));
-                    }
+                    engine.validate_plan(&plan)?;
                     let source =
                         files::SourceStamp::capture_resolved(Path::new(&plan.source.identity.path))
                             .map_err(|_| {

@@ -189,6 +189,28 @@ impl Engine {
         plan.hash = plan_digest(&plan)?;
         Ok(plan)
     }
+    pub fn validate_plan(&self, plan: &Plan) -> Result<()> {
+        if plan_digest(plan)? != plan.hash {
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Stored plan hash mismatch",
+            ));
+        }
+        if self.ffmpeg != plan.ffmpeg || self.ffprobe != plan.ffprobe {
+            return Err(DomainError::new(
+                "COMPONENT_CHANGED",
+                "Execution engine does not match the reviewed component identities",
+            ));
+        }
+        if plan.resolution.action == CleanAction::Remux
+            && plan.argv_template != lower_remux(&plan.source, &plan.resolution)? {
+            return Err(DomainError::new("INVALID_PLAN", "Review a fresh plan for the admitted held-file remux route"));
+        }
+        if plan.resolution.action != CleanAction::Remux && !plan.argv_template.is_empty() {
+            return Err(DomainError::new("INVALID_PLAN", "Copy/skip plans cannot contain a media subprocess"));
+        }
+        Ok(())
+    }
     pub async fn execute(
         &self,
         plan: &Plan,
@@ -215,18 +237,7 @@ impl Engine {
         job_id: &str,
         observer: Observer,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
-        if plan_digest(plan)? != plan.hash {
-            return Err(DomainError::new(
-                "INVALID_PLAN",
-                "Stored plan hash mismatch",
-            ));
-        }
-        if self.ffmpeg != plan.ffmpeg || self.ffprobe != plan.ffprobe {
-            return Err(DomainError::new(
-                "COMPONENT_CHANGED",
-                "Execution engine does not match the reviewed component identities",
-            ));
-        }
+        self.validate_plan(plan)?;
         let source = plan.source.identity.clone();
         let ffmpeg = plan.ffmpeg.clone();
         let ffprobe = plan.ffprobe.clone();
@@ -282,6 +293,22 @@ impl Engine {
         job_id: &str,
         observer: Observer,
     ) -> Result<(Option<FileIdentity>, String, Option<Vec<String>>)> {
+        let source = plan.source.identity.clone();
+        let token = cancel.clone();
+        let frozen_demuxer = admission::frozen_demuxer(&plan.source.probe.format)?;
+        let (input, source_stamp) = blocking(move || {
+            let path = Path::new(&source.path);
+            let input = admission::open(path, &token)?;
+            if input.demuxer != frozen_demuxer {
+                return Err(DomainError::new("SOURCE_CHANGED", "Held input format differs from the reviewed source"));
+            }
+            let stamp = files::SourceStamp::capture_open_resolved(
+                path, input.file.try_clone().map_err(io_error)?,
+            )?;
+            files::revalidate(&source, &token)?;
+            stamp.revalidate()?;
+            Ok((input, stamp))
+        }).await?;
         let staging = prepare_staging(plan, job_id, &observer).await?;
         let staging_name = files::path_text(staging.path())?;
         let args = plan
@@ -297,11 +324,15 @@ impl Engine {
             .collect::<Vec<_>>();
         observer(ExecutionEvent::Prepared(args.clone())).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
-        let process = nw_platform::process::run(
+        if let Err(error) = source_stamp.revalidate() {
+            return ticket.finish(Err(error));
+        }
+        let process = nw_platform::process::run_readonly(
             Path::new(&self.ffmpeg.path),
             &args,
             Duration::from_secs(10800),
             8 * 1024 * 1024,
+            input.file,
             cancel.clone(),
         )
         .await;
@@ -310,6 +341,7 @@ impl Engine {
             tracing::warn!(staging=%retained.display(),"Owned staging retained after process failure; no output was published");
             return Err(error);
         }
+        source_stamp.revalidate()?;
         staging.as_file().sync_all().map_err(io_error)?;
         if staging.as_file().metadata().map_err(io_error)?.len() == 0 {
             return Err(DomainError::new(
@@ -334,7 +366,10 @@ impl Engine {
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
         let source = plan.source.identity.clone();
         let token = cancel.clone();
-        blocking(move || files::revalidate(&source, &token)).await?;
+        blocking(move || {
+            files::revalidate(&source, &token)?;
+            source_stamp.revalidate()
+        }).await?;
         if cancel.is_cancelled() {
             return Err(DomainError::new(
                 "CANCELLED",
@@ -625,19 +660,11 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution) -> Result<Vec<S
         "-copyts",
         "-avoid_negative_ts",
         "disabled",
-        "-protocol_whitelist",
-        "file",
-        "-format_whitelist",
-        demuxer,
-        "-f",
-        demuxer,
     ]
     .map(String::from)
     .to_vec();
-    if demuxer == "mov" {
-        args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
-    }
-    args.extend(["-i".into(), asset.identity.path.clone()]);
+    args.extend(admission::options(demuxer));
+    args.extend(["-i".into(), "fd:".into()]);
     for stream in &resolution.streams {
         args.extend(["-map".into(), format!("0:{}", stream.index)]);
     }

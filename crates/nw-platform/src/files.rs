@@ -138,16 +138,32 @@ impl SourceStamp {
                 "Preflight source no longer matches its admitted canonical path",
             ));
         }
+        let file = File::open(&canonical).map_err(io_error)?;
+        Self::capture_open_resolved(&canonical, file)
+    }
+    /// Bind an already opened regular input to its canonical physical path.
+    pub fn capture_open_resolved(path: &Path, file: File) -> Result<Self> {
+        let canonical = source_path(path)?;
+        if canonical != path {
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Preflight source no longer matches its admitted canonical path",
+            ));
+        }
         let path = canonical;
-        let handle =
-            same_file::Handle::from_file(File::open(&path).map_err(io_error)?).map_err(io_error)?;
+        let handle = same_file::Handle::from_file(file).map_err(io_error)?;
         let metadata = handle.as_file().metadata().map_err(io_error)?;
-        Ok(Self {
+        if !metadata.is_file() {
+            return Err(DomainError::new("INPUT_DENIED", "A regular held source is required"));
+        }
+        let stamp = Self {
             path,
             handle,
             bytes: metadata.len(),
             modified: metadata.modified().map_err(io_error)?,
-        })
+        };
+        stamp.revalidate()?;
+        Ok(stamp)
     }
     pub(crate) fn held_file(&self) -> &File {
         self.handle.as_file()
@@ -330,6 +346,17 @@ mod tests {
         let stamp = SourceStamp::capture_resolved(&canonical).unwrap();
         fs::write(&source, b"changed length").unwrap();
         assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
+    }
+    #[test]
+    fn a_preopened_original_cannot_be_bound_to_a_replacement_at_its_old_path() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source.bin");
+        fs::write(&path, b"same bytes, distinct physical files").unwrap();
+        let canonical = source_path(&path).unwrap();
+        let original = File::open(&canonical).unwrap();
+        fs::rename(&canonical, root.path().join("retained.bin")).unwrap();
+        fs::write(&canonical, b"same bytes, distinct physical files").unwrap();
+        assert!(matches!(SourceStamp::capture_open_resolved(&canonical, original), Err(error) if error.code == "SOURCE_CHANGED"));
     }
     #[test]
     fn reviewed_copy_rejects_replacement_before_copy_and_publishes_nothing() {

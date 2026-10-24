@@ -235,25 +235,28 @@ pub fn frozen_demuxer(format: &str) -> Result<&'static str> {
 
 impl Input {
     pub fn options(&self) -> Vec<String> {
-        let mut args = [
-            "-protocol_whitelist",
-            "fd",
-            "-format_whitelist",
-            self.demuxer,
-            "-f",
-            self.demuxer,
-            "-fd",
-            "0",
-            "-blocksize",
-            "65536",
-        ]
-        .map(str::to_owned)
-        .to_vec();
-        if self.demuxer == "mov" {
-            args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
-        }
-        args
+        options(self.demuxer)
     }
+}
+pub fn options(demuxer: &str) -> Vec<String> {
+    let mut args = [
+        "-protocol_whitelist",
+        "fd",
+        "-format_whitelist",
+        demuxer,
+        "-f",
+        demuxer,
+        "-fd",
+        "0",
+        "-blocksize",
+        "65536",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    if demuxer == "mov" {
+        args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
+    }
+    args
 }
 
 #[cfg(test)]
