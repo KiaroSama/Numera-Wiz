@@ -202,15 +202,22 @@ async fn journey() {
     let started = Instant::now();
     let report_event = loop {
         let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
-        if let Some(event) = log.lines().filter_map(|line| serde_json::from_str::<Value>(line).ok()).find(|event| {
-            event["fields"]["message"] == "command.completed"
-                && event["fields"]["command"] == "streams.clean.report"
-                && event["fields"]["ok"] == true
-                && event["fields"]["request_id"] != "local"
-        }) {
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "streams.clean.report"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
             break event;
         }
-        assert!(started.elapsed() < Duration::from_secs(10), "Human Selection report input did not complete its canonical request");
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Human Selection report input did not complete its canonical request"
+        );
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -218,15 +225,27 @@ async fn journey() {
     {
         use std::io::Read as _;
         let mut png = Vec::new();
-        std::fs::File::open(evidence.join("native-selection-report.png")).unwrap()
-            .take(256 * 1024 + 1).read_to_end(&mut png).unwrap();
+        std::fs::File::open(evidence.join("native-selection-report.png"))
+            .unwrap()
+            .take(256 * 1024 + 1)
+            .read_to_end(&mut png)
+            .unwrap();
         if png.len() <= 256 * 1024 {
             println!("NW_NATIVE_SELECTION_IMAGE:{}", STANDARD.encode(png));
         }
     }
-    let report = query_params(&root, "streams.clean.report", json!({"asset_ids":[assets[0]["id"]],"intent":fixture::rules()})).await.unwrap();
+    let report = query_params(
+        &root,
+        "streams.clean.report",
+        json!({"asset_ids":[assets[0]["id"]],"intent":fixture::rules()}),
+    )
+    .await
+    .unwrap();
     assert_eq!(report["resolved_files"], 1);
-    assert_eq!(report["files"][0]["selected_original_indices"], json!([0, 1, 2]));
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
     std::fs::write(evidence.join("native-selection-report.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":report_event,"independent_report":report,"scope":"Actual Selection report pointer input completed before the harness query, retained window PNG, Escape closes the report"})).unwrap()).unwrap();
     input(&["key", "--clearmodifiers", "Escape"]).await;
     tokio::time::sleep(Duration::from_millis(150)).await;

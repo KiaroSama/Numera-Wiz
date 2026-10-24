@@ -342,6 +342,140 @@ impl WizApp {
     }
 }
 
+impl WizApp {
+    pub(super) fn selection_report_window(&mut self, ctx: &egui::Context) {
+        let Some(report) = self.selection_report.clone() else {
+            return;
+        };
+        let mut open =
+            !ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        egui::Window::new("Selection report")
+            .open(&mut open)
+            .default_width(720.0)
+            .show(ctx, |ui| {
+                ui.label(format!(
+                    "{} files: {} ready, {} skipped, {} rejected",
+                    report.files.len(),
+                    report.resolved_files,
+                    report.skipped_files,
+                    report.rejected_files,
+                ));
+                ui.small(
+                    "Source inventory and selection preview. Review an output plan before running.",
+                );
+                ui.horizontal(|ui| {
+                    let unique = ui
+                        .selectable_value(&mut self.report_by_index, false, "Unique streams")
+                        .clicked();
+                    let indices = ui
+                        .selectable_value(&mut self.report_by_index, true, "Original indices")
+                        .clicked();
+                    if unique || indices {
+                        self.report_page = 0;
+                    }
+                });
+                let rows = if self.report_by_index {
+                    &report.original_index_streams
+                } else {
+                    &report.unique_streams
+                };
+                let pages = rows.len().div_ceil(32).max(1);
+                self.report_page = self.report_page.min(pages - 1);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(self.report_page > 0, egui::Button::new("Previous"))
+                        .clicked()
+                    {
+                        self.report_page -= 1;
+                    }
+                    ui.label(format!("Page {} of {pages}", self.report_page + 1));
+                    if ui
+                        .add_enabled(self.report_page + 1 < pages, egui::Button::new("Next"))
+                        .clicked()
+                    {
+                        self.report_page += 1;
+                    }
+                });
+                egui::ScrollArea::vertical()
+                    .id_salt("selection-report-rows")
+                    .max_height(360.0)
+                    .show(ui, |ui| {
+                        egui::Grid::new("selection-report-summary")
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for label in [
+                                    "Kind", "Index", "Language", "Codec", "Source", "Retained",
+                                    "Title",
+                                ] {
+                                    ui.strong(label);
+                                }
+                                ui.end_row();
+                                for row in rows.iter().skip(self.report_page * 32).take(32) {
+                                    ui.label(if row.attached_picture {
+                                        "Cover".into()
+                                    } else {
+                                        format!("{:?}", row.kind)
+                                    });
+                                    ui.label(
+                                        row.source_index.map_or_else(
+                                            || "All".into(),
+                                            |index| index.to_string(),
+                                        ),
+                                    );
+                                    ui.label(&row.language);
+                                    ui.label(&row.codec);
+                                    ui.label(row.source_count.to_string());
+                                    ui.label(row.retained_count.to_string());
+                                    ui.add(egui::Label::new(&row.title).truncate())
+                                        .on_hover_text(&row.title);
+                                    ui.end_row();
+                                }
+                            });
+                        ui.separator();
+                        for file in &report.files {
+                            ui.push_id(&file.asset_id, |ui| {
+                                ui.collapsing(&file.display_name, |ui| {
+                                    let action = match file.action {
+                                        Some(nw_domain::mux::CleanAction::CopyUnchanged) => {
+                                            "Unchanged copy"
+                                        }
+                                        Some(nw_domain::mux::CleanAction::Remux) => {
+                                            "Stream or metadata change"
+                                        }
+                                        Some(nw_domain::mux::CleanAction::Skip) => {
+                                            "Skipped by selection policy"
+                                        }
+                                        None => "Rejected",
+                                    };
+                                    ui.label(action);
+                                    if let (Some(audio), Some(subtitles)) =
+                                        (file.matched_audio_count, file.matched_subtitle_count)
+                                    {
+                                        ui.label(format!(
+                                            "Matching audio: {audio}; subtitles: {subtitles}"
+                                        ));
+                                    }
+                                    ui.label(format!(
+                                        "Retained original indices: {:?}",
+                                        file.selected_original_indices
+                                    ));
+                                    for warning in &file.warnings {
+                                        ui.label(warning);
+                                    }
+                                    if let Some(error) = &file.error {
+                                        ui.label(&error.message);
+                                    }
+                                });
+                            });
+                        }
+                    });
+            });
+        if !open {
+            self.selection_report = None;
+        }
+    }
+}
+
 #[cfg(test)]
 mod validation_tests {
     use super::*;
@@ -352,72 +486,5 @@ mod validation_tests {
         for value in ["0,,2", "0,2,", ",0", "-1", "+1", "1.5", "1e3", "4294967296"] {
             assert!(indices(value).is_err(), "{value}");
         }
-    }
-}
-
-impl WizApp {
-    pub(super) fn selection_report_window(&mut self, ctx: &egui::Context) {
-        let Some(report) = self.selection_report.clone() else { return; };
-        let mut open = !ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
-        egui::Window::new("Selection report")
-            .open(&mut open)
-            .default_width(720.0)
-            .show(ctx, |ui| {
-                ui.label(format!(
-                    "{} files: {} ready, {} skipped, {} rejected",
-                    report.files.len(), report.resolved_files, report.skipped_files, report.rejected_files,
-                ));
-                ui.small("Source inventory and selection preview. Review an output plan before running.");
-                ui.horizontal(|ui| {
-                    let unique = ui.selectable_value(&mut self.report_by_index, false, "Unique streams").clicked();
-                    let indices = ui.selectable_value(&mut self.report_by_index, true, "Original indices").clicked();
-                    if unique || indices {
-                        self.report_page = 0;
-                    }
-                });
-                let rows = if self.report_by_index { &report.original_index_streams } else { &report.unique_streams };
-                let pages = rows.len().div_ceil(32).max(1);
-                self.report_page = self.report_page.min(pages - 1);
-                ui.horizontal(|ui| {
-                    if ui.add_enabled(self.report_page > 0, egui::Button::new("Previous")).clicked() { self.report_page -= 1; }
-                    ui.label(format!("Page {} of {pages}", self.report_page + 1));
-                    if ui.add_enabled(self.report_page + 1 < pages, egui::Button::new("Next")).clicked() { self.report_page += 1; }
-                });
-                egui::ScrollArea::vertical().id_salt("selection-report-rows").max_height(360.0).show(ui, |ui| {
-                    egui::Grid::new("selection-report-summary").striped(true).show(ui, |ui| {
-                        for label in ["Kind", "Index", "Language", "Codec", "Source", "Retained", "Title"] { ui.strong(label); }
-                        ui.end_row();
-                        for row in rows.iter().skip(self.report_page * 32).take(32) {
-                            ui.label(if row.attached_picture { "Cover".into() } else { format!("{:?}", row.kind) });
-                            ui.label(row.source_index.map_or_else(|| "All".into(), |index| index.to_string()));
-                            ui.label(&row.language);
-                            ui.label(&row.codec);
-                            ui.label(row.source_count.to_string());
-                            ui.label(row.retained_count.to_string());
-                            ui.add(egui::Label::new(&row.title).truncate()).on_hover_text(&row.title);
-                            ui.end_row();
-                        }
-                    });
-                    ui.separator();
-                    for file in &report.files {
-                        ui.push_id(&file.asset_id, |ui| { ui.collapsing(&file.display_name, |ui| {
-                            let action = match file.action {
-                                Some(nw_domain::mux::CleanAction::CopyUnchanged) => "Unchanged copy",
-                                Some(nw_domain::mux::CleanAction::Remux) => "Stream or metadata change",
-                                Some(nw_domain::mux::CleanAction::Skip) => "Skipped by selection policy",
-                                None => "Rejected",
-                            };
-                            ui.label(action);
-                            if let (Some(audio), Some(subtitles)) = (file.matched_audio_count, file.matched_subtitle_count) {
-                                ui.label(format!("Matching audio: {audio}; subtitles: {subtitles}"));
-                            }
-                            ui.label(format!("Retained original indices: {:?}", file.selected_original_indices));
-                            for warning in &file.warnings { ui.label(warning); }
-                            if let Some(error) = &file.error { ui.label(&error.message); }
-                        }); });
-                    }
-                });
-            });
-        if !open { self.selection_report = None; }
     }
 }

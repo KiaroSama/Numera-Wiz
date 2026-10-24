@@ -48,7 +48,13 @@ response, without calling a domain handler in place of the UI. Only the selected
 nonsecret report response and screenshot are retained; raw network headers,
 cookies and unrelated request bodies are never written to artifacts.
 
-These additions await their own hosted CI. Folder discovery, companion work,
+Run 40078904727 passed all four ordinary native regression suites and the full
+actual media/CLI/official SDK/large HTTP job. Its Chrome pointer/network-response
+report journey passed, and its actual PNG was personally inspected: all three
+source/retained inventory rows are visible. The native report journey was
+skipped because Clippy rejected UI items placed after a test module; that order
+and the exact hosted formatting changes are corrected in the following revision.
+See evidence/selection-reports-ci68.json. Folder discovery, companion work,
 batch plans/acceptance, original-container expansion, full accounting/progress,
 remaining donor modules, complete F08 and all product/package/resource/GPU gates
 remain mandatory. No local compilation or execution is used.

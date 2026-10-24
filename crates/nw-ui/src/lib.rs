@@ -396,7 +396,7 @@ impl WizApp {
                 Action::SelectionReport(generation) => {
                     if generation == self.generation {
                         self.selection_report = Some(Arc::new(
-                            serde_json::from_value(result).map_err(|error| error.to_string())?
+                            serde_json::from_value(result).map_err(|error| error.to_string())?,
                         ));
                         self.report_page = 0;
                     }
