@@ -4,7 +4,10 @@ mod read_model;
 mod uploads;
 use nw_domain::{
     DomainError, Result,
-    access::{AccessProfile, CredentialInput, ExecutionAuthorization, ProfileInput, Publication, ProfileMode, ObjectKind, ObjectAction},
+    access::{
+        AccessProfile, CredentialInput, ExecutionAuthorization, ObjectAction, ObjectKind,
+        ProfileInput, ProfileMode, Publication,
+    },
     commands::{
         self, CleanInput, Empty, IdInput, PathInput, Request, Response, StateClass, SubmitInput,
     },
@@ -289,54 +292,153 @@ impl Service {
         }
         Ok(())
     }
-    fn object_action(&self, context: &Context, kind: ObjectKind, id: &str, creator: &str, action: ObjectAction) -> Result<()> {
+    fn object_action(
+        &self,
+        context: &Context,
+        kind: ObjectKind,
+        id: &str,
+        creator: &str,
+        action: ObjectAction,
+    ) -> Result<()> {
         if let Some(profile) = self.policy(context)?
-            && !profile.allows_object(kind, id, creator, action) { return Err(DomainError::object_not_found()); }
+            && !profile.allows_object(kind, id, creator, action)
+        {
+            return Err(DomainError::object_not_found());
+        }
         Ok(())
     }
     fn plan_review(&self, context: &Context, plan: &Plan) -> Result<nw_domain::views::PlanReview> {
         let policy = self.policy(context)?;
-        let source_visible = policy.as_ref().is_none_or(|profile| profile.read_roots.iter().any(|root| Path::new(&plan.source.identity.path).starts_with(root)));
-        let output_visible = policy.as_ref().is_none_or(|profile| profile.write_roots.iter().chain(&profile.read_roots).any(|root| Path::new(&plan.output).starts_with(root)));
-        let actions = [ObjectAction::Read, ObjectAction::Submit].into_iter().filter(|action| policy.as_ref().is_none_or(|profile| profile.allows_object(ObjectKind::Plan, &plan.id, &plan.creator, *action))).collect();
-        Ok(nw_domain::views::PlanReview::new(plan, source_visible, output_visible, policy.is_none(), policy.as_ref().map_or(0, |profile| profile.revision), actions))
+        let source_visible = policy.as_ref().is_none_or(|profile| {
+            profile
+                .read_roots
+                .iter()
+                .any(|root| Path::new(&plan.source.identity.path).starts_with(root))
+        });
+        let output_visible = policy.as_ref().is_none_or(|profile| {
+            profile
+                .write_roots
+                .iter()
+                .chain(&profile.read_roots)
+                .any(|root| Path::new(&plan.output).starts_with(root))
+        });
+        let actions = [ObjectAction::Read, ObjectAction::Submit]
+            .into_iter()
+            .filter(|action| {
+                policy.as_ref().is_none_or(|profile| {
+                    profile.allows_object(ObjectKind::Plan, &plan.id, &plan.creator, *action)
+                })
+            })
+            .collect();
+        Ok(nw_domain::views::PlanReview::new(
+            plan,
+            source_visible,
+            output_visible,
+            policy.is_none(),
+            policy.as_ref().map_or(0, |profile| profile.revision),
+            actions,
+        ))
     }
     fn job_view(&self, context: &Context, job: &Job) -> Result<nw_domain::views::JobView> {
-        use nw_domain::views::{JobView, ArtifactView, ErrorView};
+        use nw_domain::views::{ArtifactView, ErrorView, JobView};
         let policy = self.policy(context)?;
         let owner = policy.is_none();
-        let actions = [ObjectAction::Read, ObjectAction::Control].into_iter().filter(|action| policy.as_ref().is_none_or(|profile| profile.allows_object(ObjectKind::Job, &job.id, &job.creator, *action))).collect();
+        let actions = [ObjectAction::Read, ObjectAction::Control]
+            .into_iter()
+            .filter(|action| {
+                policy.as_ref().is_none_or(|profile| {
+                    profile.allows_object(ObjectKind::Job, &job.id, &job.creator, *action)
+                })
+            })
+            .collect();
         Ok(JobView {
-            id: job.id.clone(), state: job.state.clone(), plan: self.plan_review(context, &job.plan)?,
-            artifact: job.artifact.as_ref().map(|artifact| ArtifactView { path: policy.as_ref().is_none_or(|profile| profile.read_roots.iter().any(|root| Path::new(&artifact.path).starts_with(root))).then(|| artifact.path.clone()), bytes: artifact.bytes.clone(), sha256: artifact.sha256.clone() }),
-            verification: job.verification.clone(), error: job.error.as_ref().map(|error| ErrorView { code: error.code.clone(), message: owner.then(|| error.message.clone()), retryable: error.retryable }),
-            prepared_stages: owner.then(|| job.prepared_stages.clone()), policy_revision: policy.as_ref().map_or(0, |profile| profile.revision), effective_actions: actions,
+            id: job.id.clone(),
+            state: job.state.clone(),
+            plan: self.plan_review(context, &job.plan)?,
+            artifact: job.artifact.as_ref().map(|artifact| ArtifactView {
+                path: policy
+                    .as_ref()
+                    .is_none_or(|profile| {
+                        profile
+                            .read_roots
+                            .iter()
+                            .any(|root| Path::new(&artifact.path).starts_with(root))
+                    })
+                    .then(|| artifact.path.clone()),
+                bytes: artifact.bytes.clone(),
+                sha256: artifact.sha256.clone(),
+            }),
+            verification: job.verification.clone(),
+            error: job.error.as_ref().map(|error| ErrorView {
+                code: error.code.clone(),
+                message: owner.then(|| error.message.clone()),
+                retryable: error.retryable,
+            }),
+            prepared_stages: owner.then(|| job.prepared_stages.clone()),
+            policy_revision: policy.as_ref().map_or(0, |profile| profile.revision),
+            effective_actions: actions,
         })
     }
-    fn replay_view(&self, context: &Context, request: &Request, response: Response) -> Result<Response> {
-        let Some(profile) = self.policy(context)? else { return Ok(response); };
+    fn replay_view(
+        &self,
+        context: &Context,
+        request: &Request,
+        response: Response,
+    ) -> Result<Response> {
+        let Some(profile) = self.policy(context)? else {
+            return Ok(response);
+        };
         let readable = match request.command.id.as_str() {
             "assets.register" => {
-                let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| DomainError::new("STORAGE_ERROR", "Retained asset receipt has no result"))?)?;
-                profile.allows_asset(&asset.creator) && profile.read_roots.iter().any(|root| Path::new(&asset.identity.path).starts_with(root))
+                let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
+                    DomainError::new("STORAGE_ERROR", "Retained asset receipt has no result")
+                })?)?;
+                profile.allows_asset(&asset.creator)
+                    && profile
+                        .read_roots
+                        .iter()
+                        .any(|root| Path::new(&asset.identity.path).starts_with(root))
             }
             _ => true,
         };
-        if readable { return Ok(response); }
-        let digest = hex::encode(Sha256::digest(serde_json::to_vec(&response.result).map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))?));
+        if readable {
+            return Ok(response);
+        }
+        let digest = hex::encode(Sha256::digest(
+            serde_json::to_vec(&response.result)
+                .map_err(|error| DomainError::new("SERIALIZATION_FAILED", error.to_string()))?,
+        ));
         Ok(Response {
-            request_id: request.request_id.clone(), ok: false, receipt_id: response.receipt_id.clone(),
-            result: Some(json!({"receipt_id":response.receipt_id,"completion_state":"completed","result_digest":digest})),
-            error: Some(DomainError::new("RECEIPT_RESULT_RESTRICTED", "Original work completed; protected result fields are no longer readable under current grants")),
+            request_id: request.request_id.clone(),
+            ok: false,
+            receipt_id: response.receipt_id.clone(),
+            result: Some(
+                json!({"receipt_id":response.receipt_id,"completion_state":"completed","result_digest":digest}),
+            ),
+            error: Some(DomainError::new(
+                "RECEIPT_RESULT_RESTRICTED",
+                "Original work completed; protected result fields are no longer readable under current grants",
+            )),
         })
     }
     fn path(&self, context: &Context, path: &Path, write: bool) -> Result<PathBuf> {
         self.path_with_purpose(context, path, write, None)
     }
     fn plan_source_path(&self, context: &Context, plan: &Plan) -> Result<PathBuf> {
-        self.path_with_purpose(context, Path::new(&plan.source.identity.path), false, Some(&plan.source.identity))
+        self.path_with_purpose(
+            context,
+            Path::new(&plan.source.identity.path),
+            false,
+            Some(&plan.source.identity),
+        )
     }
-    fn path_with_purpose(&self, context: &Context, path: &Path, write: bool, purpose: Option<&nw_domain::records::FileIdentity>) -> Result<PathBuf> {
+    fn path_with_purpose(
+        &self,
+        context: &Context,
+        path: &Path,
+        write: bool,
+        purpose: Option<&nw_domain::records::FileIdentity>,
+    ) -> Result<PathBuf> {
         if staging_path(path) {
             return Err(staging_denied());
         }
@@ -371,9 +473,16 @@ impl Service {
             ));
         }
         if purpose.is_some_and(|identity| write || canonical != Path::new(&identity.path)) {
-            return Err(DomainError::new("INVALID_PLAN", "Captured input purpose does not match its canonical dependency"));
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Captured input purpose does not match its canonical dependency",
+            ));
         }
-        if !write && purpose.is_none() && context.profile.is_some() && canonical.starts_with(self.root.join("assets")) {
+        if !write
+            && purpose.is_none()
+            && context.profile.is_some()
+            && canonical.starts_with(self.root.join("assets"))
+        {
             self.managed_read(context, &canonical)?;
         }
         if let Some(profile) = self.policy(context)? {
@@ -429,7 +538,8 @@ impl Service {
                 "Credential is missing or revoked",
             )
         })?;
-        if credential.revoked || credential.epoch != self.epoch
+        if credential.revoked
+            || credential.epoch != self.epoch
             || now >= credential.expires
             || now.saturating_sub(credential.last_active) >= 7200
             || credential.origin.as_deref() != origin
@@ -477,7 +587,8 @@ impl Service {
         let now = self.clock.now()?;
         let mut live = 0;
         for (key, credential) in self.store.rows::<Credential>("credential/", 10000)? {
-            if credential.revoked || credential.epoch != self.epoch
+            if credential.revoked
+                || credential.epoch != self.epoch
                 || credential.expires <= now
                 || now.saturating_sub(credential.last_active) >= 7200
                 || credential.audience != self.origin_generation(credential.origin.as_deref())?
@@ -503,7 +614,9 @@ impl Service {
             &Credential {
                 context,
                 epoch: self.epoch.clone(),
-                expires: now.checked_add(8 * 3600).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Credential clock range exhausted"))?,
+                expires: now.checked_add(8 * 3600).ok_or_else(|| {
+                    DomainError::new("RESOURCE_LIMIT", "Credential clock range exhausted")
+                })?,
                 last_active: now,
                 audience: self.origin_generation(origin.as_deref())?,
                 origin,
@@ -612,28 +725,80 @@ impl Service {
                 json!({"bearer":self.credential_for_origin(&input.profile, input.port.map(|port| format!("http://127.0.0.1:{port}")))?,"profile":input.profile,"expires_in_seconds":28800})
             }
             "access.tokens.issue" => {
-                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Token issuance requires native owner authority")); }
+                if policy.is_some() {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Token issuance requires native owner authority",
+                    ));
+                }
                 let input: nw_domain::access::TokenIssueInput = commands::parse(params)?;
-                if input.port == 0 { return Err(DomainError::new("VALIDATION_ERROR", "Select an explicit nonzero listener port")); }
-                let bearer = self.credential_for_origin(&input.for_access_profile, Some(format!("http://127.0.0.1:{}", input.port)))?;
+                if input.port == 0 {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Select an explicit nonzero listener port",
+                    ));
+                }
+                let bearer = self.credential_for_origin(
+                    &input.for_access_profile,
+                    Some(format!("http://127.0.0.1:{}", input.port)),
+                )?;
                 let token_id = hex::encode(Sha256::digest(bearer.as_bytes()));
-                let credential: Credential = self.store.get(&format!("credential/{token_id}"))?.ok_or_else(|| DomainError::new("STORAGE_ERROR", "Issued credential was not retained"))?;
+                let credential: Credential = self
+                    .store
+                    .get(&format!("credential/{token_id}"))?
+                    .ok_or_else(|| {
+                        DomainError::new("STORAGE_ERROR", "Issued credential was not retained")
+                    })?;
                 json!({"token_id":token_id,"principal":credential.context.principal,"expires_at":credential.expires.to_string(),"bearer":bearer})
             }
             "access.tokens.revoke" => {
-                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Token revocation requires native owner authority")); }
+                if policy.is_some() {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Token revocation requires native owner authority",
+                    ));
+                }
                 let input: nw_domain::access::TokenRevokeInput = commands::parse(params)?;
-                if input.token_id.len() != 64 || !input.token_id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) { return Err(DomainError::new("VALIDATION_ERROR", "Token ID must be the lowercase SHA-256 identifier")); }
+                if input.token_id.len() != 64
+                    || !input
+                        .token_id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Token ID must be the lowercase SHA-256 identifier",
+                    ));
+                }
                 let _credential_guard = self.credentials.lock().map_err(|_| lock_error())?;
                 let key = format!("credential/{}", input.token_id);
-                let mut credential: Credential = self.store.get(&key)?.ok_or_else(DomainError::object_not_found)?;
+                let mut credential: Credential = self
+                    .store
+                    .get(&key)?
+                    .ok_or_else(DomainError::object_not_found)?;
                 credential.revoked = true;
-                return self.store.commit_with_clock(&context.principal, &request, || self.clock.now(), json!({"token_id":input.token_id,"revoked":true}), &[(key, value(&credential)?)])
+                return self.store.commit_with_clock(
+                    &context.principal,
+                    &request,
+                    || self.clock.now(),
+                    json!({"token_id":input.token_id,"revoked":true}),
+                    &[(key, value(&credential)?)],
+                );
             }
             "access.profiles.inspect" => {
-                if policy.is_some() { return Err(DomainError::new("PERMISSION_DENIED", "Policy inspection requires owner authority")); }
+                if policy.is_some() {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Policy inspection requires owner authority",
+                    ));
+                }
                 let input: nw_domain::access::ProfileNameInput = commands::parse(params)?;
-                value(&self.store.get::<AccessProfile>(&named("profile", &input.name)?)?.ok_or_else(DomainError::object_not_found)?)?
+                value(
+                    &self
+                        .store
+                        .get::<AccessProfile>(&named("profile", &input.name)?)?
+                        .ok_or_else(DomainError::object_not_found)?,
+                )?
             }
             "access.profiles.list" => {
                 let _: Empty = commands::parse(params)?;
@@ -654,9 +819,29 @@ impl Service {
                 }
                 let input: ProfileInput = if request.command.id == "access.profiles.create" {
                     let create: nw_domain::access::ProfileCreateInput = commands::parse(params)?;
-                    ProfileInput { name: create.name, expected_revision: None, enabled: true, client_sessions: false, mode: ProfileMode::Operate, owned_object_access: true, allowed_command_ids: nw_domain::access::ordinary_commands(), object_grants: Vec::new(), read_roots: create.read_roots, write_roots: create.write_roots }
-                } else { commands::parse(params)? };
-                if request.command.id == "access.profiles.update" && input.expected_revision.is_none() { return Err(DomainError::new("VALIDATION_ERROR", "Policy update requires an exact expected revision")); }
+                    ProfileInput {
+                        name: create.name,
+                        expected_revision: None,
+                        enabled: true,
+                        client_sessions: false,
+                        mode: ProfileMode::Operate,
+                        owned_object_access: true,
+                        allowed_command_ids: nw_domain::access::ordinary_commands(),
+                        object_grants: Vec::new(),
+                        read_roots: create.read_roots,
+                        write_roots: create.write_roots,
+                    }
+                } else {
+                    commands::parse(params)?
+                };
+                if request.command.id == "access.profiles.update"
+                    && input.expected_revision.is_none()
+                {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Policy update requires an exact expected revision",
+                    ));
+                }
                 let key = named("profile", &input.name)?;
                 if input.name == "agent" {
                     return Err(DomainError::new(
@@ -666,11 +851,26 @@ impl Service {
                 }
                 input.validate()?;
                 for grant in &input.object_grants {
-                    let prefix = match grant.kind { ObjectKind::Project => "project", ObjectKind::Plan => "plan", ObjectKind::Job => "job" };
-                    if self.store.get::<Value>(&named(prefix, &grant.id)?)?.is_none() { return Err(DomainError::object_not_found()); }
+                    let prefix = match grant.kind {
+                        ObjectKind::Project => "project",
+                        ObjectKind::Plan => "plan",
+                        ObjectKind::Job => "job",
+                    };
+                    if self
+                        .store
+                        .get::<Value>(&named(prefix, &grant.id)?)?
+                        .is_none()
+                    {
+                        return Err(DomainError::object_not_found());
+                    }
                 }
                 let old: Option<AccessProfile> = self.store.get(&key)?;
-                if request.command.id == "access.profiles.create" && old.is_some() { return Err(DomainError::new("OBJECT_CONFLICT", "An access profile with that name already exists; inspect and update its exact revision")); }
+                if request.command.id == "access.profiles.create" && old.is_some() {
+                    return Err(DomainError::new(
+                        "OBJECT_CONFLICT",
+                        "An access profile with that name already exists; inspect and update its exact revision",
+                    ));
+                }
                 if old.as_ref().map(|profile| profile.revision) != input.expected_revision {
                     return Err(DomainError::new(
                         "STALE_REVISION",
@@ -700,7 +900,14 @@ impl Service {
                         .as_ref()
                         .map(|profile| profile.principal.clone())
                         .unwrap_or_else(|| Uuid::new_v4().to_string()),
-                    revision: old.as_ref().map_or(Ok(1), |profile| profile.revision.checked_add(1).ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Access-policy revision range exhausted")))?,
+                    revision: old.as_ref().map_or(Ok(1), |profile| {
+                        profile.revision.checked_add(1).ok_or_else(|| {
+                            DomainError::new(
+                                "RESOURCE_LIMIT",
+                                "Access-policy revision range exhausted",
+                            )
+                        })
+                    })?,
                     enabled: input.enabled,
                     client_sessions: input.client_sessions,
                     mode: input.mode,
@@ -851,7 +1058,11 @@ impl Service {
                     &context.principal,
                     now,
                 )?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if !response.ok {
                     return Ok(response);
                 }
@@ -864,7 +1075,13 @@ impl Service {
                     .store
                     .get(&named("plan", &input.id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
-                self.object_action(&context, ObjectKind::Plan, &plan.id, &plan.creator, ObjectAction::Read)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Plan,
+                    &plan.id,
+                    &plan.creator,
+                    ObjectAction::Read,
+                )?;
                 value(&self.plan_review(&context, &plan)?)?
             }
             "jobs.submit" => {
@@ -873,7 +1090,13 @@ impl Service {
                     .store
                     .get(&named("plan", &input.plan_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
-                self.object_action(&context, ObjectKind::Plan, &plan.id, &plan.creator, ObjectAction::Submit)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Plan,
+                    &plan.id,
+                    &plan.creator,
+                    ObjectAction::Submit,
+                )?;
                 if plan.hash != input.plan_hash
                     || plan.expires_at.parse::<u64>().unwrap_or(0) <= now
                 {
@@ -928,7 +1151,13 @@ impl Service {
             "jobs.inspect" => {
                 let input: IdInput = commands::parse(params)?;
                 let job = self.store.inspect_job(&input.id)?;
-                self.object_action(&context, ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Job,
+                    &job.id,
+                    &job.creator,
+                    ObjectAction::Read,
+                )?;
                 value(&self.job_view(&context, &job)?)?
             }
             "jobs.list" => {
@@ -937,7 +1166,13 @@ impl Service {
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
                 let mut job = self.store.inspect_job(&input.id)?;
-                self.object_action(&context, ObjectKind::Job, &job.id, &job.creator, ObjectAction::Control)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Job,
+                    &job.id,
+                    &job.creator,
+                    ObjectAction::Control,
+                )?;
                 if job.state == JobState::Publishing {
                     return Err(DomainError::new(
                         "CANCELLATION_TOO_LATE",
@@ -1127,6 +1362,7 @@ impl Service {
             }
             ExecutionEvent::Prepared(argv) => {
                 self.store.execution_allowed(id)?;
+                self.validate_job_paths(&self.store.inspect_job(id)?)?;
                 self.store.update_job(id, |job| {
                     if job.prepared_stages.len() >= 32 {
                         return Err(DomainError::new(
@@ -1208,22 +1444,90 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn delegated_metadata_read_hides_native_paths_and_does_not_grant_submit_or_control() {
-        use nw_domain::{access::ObjectGrant, records::{FileIdentity, MediaProbe}, mux::{CleanResolution, CleanAction, Preservation}};
+        use nw_domain::{
+            access::ObjectGrant,
+            mux::{CleanAction, CleanResolution, Preservation},
+            records::{FileIdentity, MediaProbe},
+        };
         let root = tempfile::tempdir().unwrap();
         let service = Service::open(root.path().join("data"), None).await.unwrap();
         let reader = service.profile_context("browser").unwrap();
         let owner = service.owner();
-        let identity = FileIdentity { path: files::path_text(&root.path().join("private/source.mkv")).unwrap(), bytes: "100".into(), sha256: "00".repeat(32) };
-        let asset = Asset { id: "private-asset".into(), creator: owner.principal.clone(), display_name: "source.mkv".into(), identity: identity.clone(), probe: MediaProbe { stream_details: Default::default(), streams: Vec::new(), format: "metadata-view-only".into(), global_tags: Default::default(), chapters: json!([]), verification_scope: "Synthetic metadata view, no media execution".into() } };
-        let plan = Plan { id: "private-plan".into(), creator: owner.principal.clone(), hash: "synthetic-not-executable".into(), source: asset, output: files::path_text(&root.path().join("private/export.mkv")).unwrap(), ffmpeg: identity.clone(), ffprobe: identity.clone(), resolution: CleanResolution { action: CleanAction::CopyUnchanged, streams: Vec::new(), outcomes: Vec::new(), reasons: Vec::new(), warnings: Vec::new(), preservation: Preservation::default() }, argv_template: vec![identity.path.clone()], created_at: "1".into(), expires_at: "2".into(), verification_scope: "Synthetic metadata view".into() };
-        let job = Job { id: "private-job".into(), creator: owner.principal.clone(), plan: plan.clone(), state: JobState::Succeeded, prepared_argv: Some(vec![identity.path.clone()]), prepared_stages: vec![vec![identity.path.clone()]], owned_staging: None, artifact: Some(identity.clone()), verification: Some("Synthetic metadata view".into()), error: None };
+        let identity = FileIdentity {
+            path: files::path_text(&root.path().join("private/source.mkv")).unwrap(),
+            bytes: "100".into(),
+            sha256: "00".repeat(32),
+        };
+        let asset = Asset {
+            id: "private-asset".into(),
+            creator: owner.principal.clone(),
+            display_name: "source.mkv".into(),
+            identity: identity.clone(),
+            probe: MediaProbe {
+                stream_details: Default::default(),
+                streams: Vec::new(),
+                format: "metadata-view-only".into(),
+                global_tags: Default::default(),
+                chapters: json!([]),
+                verification_scope: "Synthetic metadata view, no media execution".into(),
+            },
+        };
+        let plan = Plan {
+            id: "private-plan".into(),
+            creator: owner.principal.clone(),
+            hash: "synthetic-not-executable".into(),
+            source: asset,
+            output: files::path_text(&root.path().join("private/export.mkv")).unwrap(),
+            ffmpeg: identity.clone(),
+            ffprobe: identity.clone(),
+            resolution: CleanResolution {
+                action: CleanAction::CopyUnchanged,
+                streams: Vec::new(),
+                outcomes: Vec::new(),
+                reasons: Vec::new(),
+                warnings: Vec::new(),
+                preservation: Preservation::default(),
+            },
+            argv_template: vec![identity.path.clone()],
+            created_at: "1".into(),
+            expires_at: "2".into(),
+            verification_scope: "Synthetic metadata view".into(),
+        };
+        let job = Job {
+            id: "private-job".into(),
+            creator: owner.principal.clone(),
+            plan: plan.clone(),
+            state: JobState::Succeeded,
+            prepared_argv: Some(vec![identity.path.clone()]),
+            prepared_stages: vec![vec![identity.path.clone()]],
+            owned_staging: None,
+            artifact: Some(identity.clone()),
+            verification: Some("Synthetic metadata view".into()),
+            error: None,
+        };
         service.store.put("plan/private-plan", &plan).unwrap();
         service.store.put("job/private-job", &job).unwrap();
         let mut policy: AccessProfile = service.store.get("profile/browser").unwrap().unwrap();
         policy.owned_object_access = false;
-        policy.object_grants = vec![ObjectGrant { kind: ObjectKind::Job, id: job.id.clone(), actions: [ObjectAction::Read].into() }, ObjectGrant { kind: ObjectKind::Plan, id: plan.id.clone(), actions: [ObjectAction::Read].into() }];
+        policy.object_grants = vec![
+            ObjectGrant {
+                kind: ObjectKind::Job,
+                id: job.id.clone(),
+                actions: [ObjectAction::Read].into(),
+            },
+            ObjectGrant {
+                kind: ObjectKind::Plan,
+                id: plan.id.clone(),
+                actions: [ObjectAction::Read].into(),
+            },
+        ];
         service.store.put("profile/browser", &policy).unwrap();
-        let observed = service.dispatch(reader.clone(), Request::query("jobs.inspect", json!({"id":job.id}))).await;
+        let observed = service
+            .dispatch(
+                reader.clone(),
+                Request::query("jobs.inspect", json!({"id":job.id})),
+            )
+            .await;
         assert!(observed.ok, "{observed:?}");
         let observed = observed.result.unwrap();
         assert!(observed["prepared_stages"].is_null());
@@ -1231,19 +1535,64 @@ mod tests {
         assert!(observed["plan"]["source_path"].is_null());
         assert!(observed["plan"]["output_path"].is_null());
         assert!(!observed.to_string().contains(&identity.path));
-        let submit = service.dispatch(reader.clone(), Request::query("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}))).await;
+        let submit = service
+            .dispatch(
+                reader.clone(),
+                Request::query(
+                    "jobs.submit",
+                    json!({"plan_id":plan.id,"plan_hash":plan.hash}),
+                ),
+            )
+            .await;
         // Durable operations need a replay scope before performing the object lookup.
         assert_eq!(submit.error.unwrap().code, "REPLAY_SCOPE_INVALID");
-        let scope = service.store.issue_scope(&reader.principal, service.clock.now().unwrap()).unwrap();
-        for (command, params) in [("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash})), ("jobs.cancel", json!({"id":job.id}))] {
+        let scope = service
+            .store
+            .issue_scope(&reader.principal, service.clock.now().unwrap())
+            .unwrap();
+        for (command, params) in [
+            (
+                "jobs.submit",
+                json!({"plan_id":plan.id,"plan_hash":plan.hash}),
+            ),
+            ("jobs.cancel", json!({"id":job.id})),
+        ] {
             let mut request = Request::query(command, params);
-            request.replay_scope = Some(scope.clone()); request.idempotency_key = Some(command.into());
-            assert_eq!(service.dispatch(reader.clone(), request).await.error.unwrap().code, "OBJECT_NOT_FOUND");
+            request.replay_scope = Some(scope.clone());
+            request.idempotency_key = Some(command.into());
+            assert_eq!(
+                service
+                    .dispatch(reader.clone(), request)
+                    .await
+                    .error
+                    .unwrap()
+                    .code,
+                "OBJECT_NOT_FOUND"
+            );
         }
-        policy.object_grants.clear(); policy.revision += 1;
+        policy.object_grants.clear();
+        policy.revision += 1;
         service.store.put("profile/browser", &policy).unwrap();
-        assert_eq!(service.dispatch(reader.clone(), Request::query("jobs.inspect", json!({"id":job.id}))).await.error.unwrap().code, "OBJECT_NOT_FOUND");
-        assert_eq!(service.dispatch(reader, Request::query("jobs.list", json!({}))).await.result.unwrap()["total_count"], 0);
+        assert_eq!(
+            service
+                .dispatch(
+                    reader.clone(),
+                    Request::query("jobs.inspect", json!({"id":job.id}))
+                )
+                .await
+                .error
+                .unwrap()
+                .code,
+            "OBJECT_NOT_FOUND"
+        );
+        assert_eq!(
+            service
+                .dispatch(reader, Request::query("jobs.list", json!({})))
+                .await
+                .result
+                .unwrap()["total_count"],
+            0
+        );
     }
     #[tokio::test]
     async fn an_oversized_plan_response_does_not_fill_retained_plan_history() {

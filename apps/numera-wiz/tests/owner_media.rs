@@ -23,9 +23,25 @@ struct Cli {
 }
 impl Cli {
     async fn human(&self, args: &[&str]) -> (Value, i32) {
-        let child = self.command().args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true).spawn().unwrap();
-        let output = tokio::time::timeout(Duration::from_secs(45), child.wait_with_output()).await.unwrap().unwrap();
-        let value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| panic!("Human CLI failed: {}", String::from_utf8_lossy(&output.stderr)));
+        let child = self
+            .command()
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let output = tokio::time::timeout(Duration::from_secs(45), child.wait_with_output())
+            .await
+            .unwrap()
+            .unwrap();
+        let value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
+            panic!(
+                "Human CLI failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+        });
         (value, output.status.code().unwrap())
     }
     fn command(&self) -> tokio::process::Command {
@@ -116,29 +132,105 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .as_str()
         .unwrap()
         .to_owned();
-    let (created, status) = cli.human(&["access", "profiles", "create", "--name", "human-setup", "--read-root", media.directory.path().to_str().unwrap(), "--write-root", media.directory.path().to_str().unwrap(), "--json"]).await;
+    let (created, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "create",
+            "--name",
+            "human-setup",
+            "--read-root",
+            media.directory.path().to_str().unwrap(),
+            "--write-root",
+            media.directory.path().to_str().unwrap(),
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 0, "{created}");
     assert_eq!(created["result"]["mode"], "operate");
     assert_eq!(created["result"]["owned_object_access"], true);
-    assert!(created["result"]["allowed_command_ids"].as_array().unwrap().iter().all(|id| !id.as_str().unwrap().starts_with("access.profiles") && !id.as_str().unwrap().starts_with("access.tokens")));
-    let (duplicate, status) = cli.human(&["access", "profiles", "create", "--name", "human-setup", "--json"]).await;
+    assert!(
+        created["result"]["allowed_command_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|id| !id.as_str().unwrap().starts_with("access.profiles")
+                && !id.as_str().unwrap().starts_with("access.tokens"))
+    );
+    let (duplicate, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "create",
+            "--name",
+            "human-setup",
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 4);
     assert_eq!(duplicate["error"]["code"], "OBJECT_CONFLICT");
     let grants_file = media.directory.path().join("auth/replacement-grants.json");
-    let (inspected, status) = cli.human(&["access", "profiles", "inspect", "--name", "human-setup", "--grants-out", grants_file.to_str().unwrap(), "--json"]).await;
+    let (inspected, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "inspect",
+            "--name",
+            "human-setup",
+            "--grants-out",
+            grants_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 0);
-    assert_eq!(inspected["result"]["principal"], created["result"]["principal"]);
-    let (denied, status) = cli.human(&["--access-profile", "human-setup", "access", "profiles", "inspect", "--name", "human-setup", "--json"]).await;
+    assert_eq!(
+        inspected["result"]["principal"],
+        created["result"]["principal"]
+    );
+    let (denied, status) = cli
+        .human(&[
+            "--access-profile",
+            "human-setup",
+            "access",
+            "profiles",
+            "inspect",
+            "--name",
+            "human-setup",
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 5);
-    assert_eq!(denied["error"]["code"], "PERMISSION_DENIED", "Scoped CLI never borrows its native bootstrap's owner authority");
-    let mut grants: Value = serde_json::from_slice(&nw_platform::security::read_private(&grants_file, 1024 * 1024).unwrap()).unwrap();
+    assert_eq!(
+        denied["error"]["code"], "PERMISSION_DENIED",
+        "Scoped CLI never borrows its native bootstrap's owner authority"
+    );
+    let mut grants: Value = serde_json::from_slice(
+        &nw_platform::security::read_private(&grants_file, 1024 * 1024).unwrap(),
+    )
+    .unwrap();
     grants["owned_object_access"] = json!(false);
     std::fs::write(&grants_file, serde_json::to_vec(&grants).unwrap()).unwrap();
-    let (updated, status) = cli.human(&["access", "profiles", "update", "--name", "human-setup", "--expected-revision", "1", "--grants-file", grants_file.to_str().unwrap(), "--json"]).await;
+    let (updated, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "update",
+            "--name",
+            "human-setup",
+            "--expected-revision",
+            "1",
+            "--grants-file",
+            grants_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 0, "{updated}");
     assert_eq!(updated["result"]["revision"], 2);
     assert_eq!(updated["result"]["owned_object_access"], false);
-    assert_eq!(updated["result"]["principal"], created["result"]["principal"]);
+    assert_eq!(
+        updated["result"]["principal"],
+        created["result"]["principal"]
+    );
     let registered = cli
         .mutation(
             &scope,
@@ -317,7 +409,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     let shared_job = call!(stdio, "jobs.inspect", json!({"id":id}), json!({}));
     assert!(shared_job["prepared_stages"].is_null());
-    assert!(shared_job["plan"].get("ffmpeg").is_none());
+    assert!(shared_job["plan"]["ffmpeg"].get("path").is_none());
+    assert!(shared_job["plan"]["ffmpeg"]["sha256"].is_string());
     let control = stdio.call_tool(CallToolRequestParams::new("jobs.cancel").with_arguments(json!({"params":{"id":id},"context":{"replay_scope":operator_scope,"idempotency_key":"denied-shared-control"}}).as_object().unwrap().clone())).await.unwrap();
     assert_eq!(
         serde_json::to_value(control).unwrap()["structuredContent"]["error"]["code"],
@@ -429,23 +522,70 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         String::from_utf8(nw_platform::security::read_private(&token_file, 256).unwrap()).unwrap();
     let issued_file = media.directory.path().join("auth/revocation-token");
     let selected_port = port.to_string();
-    let issue_args = ["access", "tokens", "issue", "--for-access-profile", "operator", "--port", &selected_port, "--out", issued_file.to_str().unwrap(), "--json"];
+    let issue_args = [
+        "access",
+        "tokens",
+        "issue",
+        "--for-access-profile",
+        "operator",
+        "--port",
+        &selected_port,
+        "--out",
+        issued_file.to_str().unwrap(),
+        "--json",
+    ];
     let (issued, status) = cli.human(&issue_args).await;
     assert_eq!(status, 0, "{issued}");
-    let issued_bearer = String::from_utf8(nw_platform::security::read_private(&issued_file, 256).unwrap()).unwrap();
-    assert!(!issued.to_string().contains(&issued_bearer), "Token stdout contains metadata only");
+    let issued_bearer =
+        String::from_utf8(nw_platform::security::read_private(&issued_file, 256).unwrap()).unwrap();
+    assert!(
+        !issued.to_string().contains(&issued_bearer),
+        "Token stdout contains metadata only"
+    );
     let (collision, status) = cli.human(&issue_args).await;
     assert_eq!(status, 4);
     assert_eq!(collision["error"]["code"], "OUTPUT_COLLISION");
-    assert_eq!(nw_platform::security::read_private(&issued_file, 256).unwrap(), issued_bearer.as_bytes());
-    let direct = reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).build().unwrap();
+    assert_eq!(
+        nw_platform::security::read_private(&issued_file, 256).unwrap(),
+        issued_bearer.as_bytes()
+    );
+    let direct = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
     let endpoint = format!("http://127.0.0.1:{port}/api/v1/commands");
-    let response = direct.post(&endpoint).bearer_auth(&issued_bearer).json(&Request::query("commands.list", json!({}))).send().await.unwrap();
+    let response = direct
+        .post(&endpoint)
+        .bearer_auth(&issued_bearer)
+        .json(&Request::query("commands.list", json!({})))
+        .send()
+        .await
+        .unwrap();
     assert!(response.status().is_success());
-    let (revoked, status) = cli.human(&["access", "tokens", "revoke", "--token-id", issued["token_id"].as_str().unwrap(), "--json"]).await;
+    let (revoked, status) = cli
+        .human(&[
+            "access",
+            "tokens",
+            "revoke",
+            "--token-id",
+            issued["token_id"].as_str().unwrap(),
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 0, "{revoked}");
     assert_eq!(revoked["result"]["revoked"], true);
-    assert_eq!(direct.post(&endpoint).bearer_auth(&issued_bearer).json(&Request::query("commands.list", json!({}))).send().await.unwrap().status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        direct
+            .post(&endpoint)
+            .bearer_auth(&issued_bearer)
+            .json(&Request::query("commands.list", json!({})))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
     for (ordinal, lifecycle) in [
         ClientLifecycleMode::Initialize,
         ClientLifecycleMode::Discover {
@@ -503,10 +643,28 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     // Browser intake bytes use their own bounded route; canonical registration/job
     // acceptance still uses the same official SDK and durable receipt contracts.
     let browser_token_file = media.directory.path().join("auth/browser-token");
-    let (issued, status) = cli.human(&["access", "tokens", "issue", "--for-access-profile", "browser", "--port", &port.to_string(), "--out", browser_token_file.to_str().unwrap(), "--json"]).await;
+    let (issued, status) = cli
+        .human(&[
+            "access",
+            "tokens",
+            "issue",
+            "--for-access-profile",
+            "browser",
+            "--port",
+            &port.to_string(),
+            "--out",
+            browser_token_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
     assert_eq!(status, 0, "{issued}");
-    let browser_bearer = String::from_utf8(nw_platform::security::read_private(&browser_token_file, 256).unwrap()).unwrap();
-    assert!(!issued.to_string().contains(&browser_bearer), "Token issuance must never print a bearer");
+    let browser_bearer =
+        String::from_utf8(nw_platform::security::read_private(&browser_token_file, 256).unwrap())
+            .unwrap();
+    assert!(
+        !issued.to_string().contains(&browser_bearer),
+        "Token issuance must never print a bearer"
+    );
     let bearer = browser_bearer.as_str();
     let client = reqwest::Client::builder()
         .no_proxy()

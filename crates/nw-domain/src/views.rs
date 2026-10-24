@@ -2,7 +2,7 @@
 use crate::{
     access::ObjectAction,
     mux::CleanResolution,
-    records::{Asset, Job, JobState, Plan},
+    records::{Asset, FileIdentity, Job, JobState, Plan},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,9 @@ pub struct PlanReview {
     pub id: String,
     pub hash: String,
     pub source: AssetSummary,
+    pub source_sha256: String,
+    pub ffmpeg: ComponentSummary,
+    pub ffprobe: ComponentSummary,
     pub source_path: Option<String>,
     pub output_name: String,
     pub output_path: Option<String>,
@@ -72,6 +75,21 @@ pub struct PlanReview {
     pub verification_scope: String,
     pub policy_revision: u64,
     pub effective_actions: BTreeSet<ObjectAction>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ComponentSummary {
+    pub file_name: String,
+    pub bytes: String,
+    pub sha256: String,
+}
+impl From<&FileIdentity> for ComponentSummary {
+    fn from(identity: &FileIdentity) -> Self {
+        Self {
+            file_name: basename(&identity.path),
+            bytes: identity.bytes.clone(),
+            sha256: identity.sha256.clone(),
+        }
+    }
 }
 impl PlanReview {
     pub fn new(
@@ -86,6 +104,9 @@ impl PlanReview {
             id: plan.id.clone(),
             hash: plan.hash.clone(),
             source: AssetSummary::from(&plan.source),
+            source_sha256: plan.source.identity.sha256.clone(),
+            ffmpeg: ComponentSummary::from(&plan.ffmpeg),
+            ffprobe: ComponentSummary::from(&plan.ffprobe),
             source_path: source_visible.then(|| plan.source.identity.path.clone()),
             output_name: basename(&plan.output),
             output_path: output_visible.then(|| plan.output.clone()),

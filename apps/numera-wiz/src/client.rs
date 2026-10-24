@@ -172,13 +172,25 @@ impl NativeClient {
         Ok(token)
     }
     pub async fn request(&self, request: &Request) -> Result<Response> {
-        Ok(serde_json::from_value(self.scoped_post("api/v1/commands", &serde_json::to_value(request)?).await?)?)
+        Ok(serde_json::from_value(
+            self.scoped_post("api/v1/commands", &serde_json::to_value(request)?)
+                .await?,
+        )?)
     }
+    #[cfg(feature = "desktop")]
     pub async fn client_lease(&self, id: &str, release: bool) -> Result<()> {
-        self.scoped_post("api/v1/lease", &serde_json::json!({"id":id,"release":release})).await?;
+        self.scoped_post(
+            "api/v1/lease",
+            &serde_json::json!({"id":id,"release":release}),
+        )
+        .await?;
         Ok(())
     }
-    async fn scoped_post(&self, route: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+    async fn scoped_post(
+        &self,
+        route: &str,
+        body: &serde_json::Value,
+    ) -> Result<serde_json::Value> {
         for attempt in 0..2 {
             let record = self.attach().await?;
             let token = self.scoped_token(&record).await?;
@@ -223,7 +235,11 @@ impl NativeClient {
         body: serde_json::Value,
     ) -> Result<serde_json::Value> {
         if self.profile.is_some() {
-            return Err(nw_domain::DomainError::new("PERMISSION_DENIED", "Internal owner controls are not available to a scoped adapter").into());
+            return Err(nw_domain::DomainError::new(
+                "PERMISSION_DENIED",
+                "Internal owner controls are not available to a scoped adapter",
+            )
+            .into());
         }
         self.scoped_post(route, &body).await
     }

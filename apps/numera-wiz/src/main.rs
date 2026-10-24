@@ -1,6 +1,6 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
-mod client;
 mod access;
+mod client;
 mod mcp;
 mod server;
 mod web_assets;
@@ -30,7 +30,12 @@ struct Args {
 #[derive(Subcommand)]
 enum Mode {
     /// Create and inspect explicit policies, or issue/revoke file-delivered credentials.
-    Access { #[arg(long, global = true)] json: bool, #[command(subcommand)] command: access::AccessCommand },
+    Access {
+        #[arg(long, global = true)]
+        json: bool,
+        #[command(subcommand)]
+        command: access::AccessCommand,
+    },
     #[command(name = "__owner", hide = true)]
     Owner,
     /// Discover active development commands and their qualification limits.
@@ -98,17 +103,24 @@ async fn run() -> Result<()> {
         return server::run_owner(root, args.components_dir).await;
     }
     let profile = match &args.command {
-        Some(Mode::Bridge {
-            transport,
-            ..
-        }) if transport == "stdio" => Some(args.access_profile.clone().unwrap_or_else(|| "agent".into())),
+        Some(Mode::Bridge { transport, .. }) if transport == "stdio" => Some(
+            args.access_profile
+                .clone()
+                .unwrap_or_else(|| "agent".into()),
+        ),
         Some(Mode::Bridge { .. } | Mode::Serve { .. }) => None,
         _ => args.access_profile.clone(),
     };
     let client = NativeClient::new(root, args.components_dir, profile).await?;
     match args.command {
         Some(Mode::Owner) => unreachable!("owner was dispatched before frontend initialization"),
-        Some(Mode::Access { command, json }) => { tracing::debug!(json_output=json, "Access command uses structured JSON output"); access::run(&client, command).await },
+        Some(Mode::Access { command, json }) => {
+            tracing::debug!(
+                json_output = json,
+                "Access command uses structured JSON output"
+            );
+            access::run(&client, command).await
+        }
         Some(Mode::Commands) => {
             print_response(
                 &client,
@@ -181,14 +193,35 @@ async fn run() -> Result<()> {
             port,
             token_file,
             open_browser,
-        }) => server::serve_browser(client, port, token_file, args.access_profile.unwrap_or_else(|| "browser".into()), open_browser).await,
+        }) => {
+            server::serve_browser(
+                client,
+                port,
+                token_file,
+                args.access_profile.unwrap_or_else(|| "browser".into()),
+                open_browser,
+            )
+            .await
+        }
         None => desktop(client).await,
     }
 }
 async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
-    if matches!(request.command.id.as_str(), "access.tokens.issue" | "access.credentials.issue") {
-        let error = nw_domain::DomainError::new("VALIDATION_ERROR", "Use access tokens issue --for-access-profile NAME --out FILE; raw credential responses are never printed");
-        println!("{}", serde_json::to_string_pretty(&nw_domain::commands::Response::error(&request.request_id, error.clone()))?);
+    if matches!(
+        request.command.id.as_str(),
+        "access.tokens.issue" | "access.credentials.issue"
+    ) {
+        let error = nw_domain::DomainError::new(
+            "VALIDATION_ERROR",
+            "Use access tokens issue --for-access-profile NAME --out FILE; raw credential responses are never printed",
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&nw_domain::commands::Response::error(
+                &request.request_id,
+                error.clone()
+            ))?
+        );
         return Err(error.into());
     }
     let result = client.request(&request).await?;
@@ -225,11 +258,7 @@ async fn desktop(client: NativeClient) -> Result<()> {
     let task = tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
-            if heartbeat
-                .client_lease(&heartbeat_id, false)
-                .await
-                .is_err()
-            {
+            if heartbeat.client_lease(&heartbeat_id, false).await.is_err() {
                 break;
             }
         }

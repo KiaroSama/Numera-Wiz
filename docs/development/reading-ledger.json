@@ -810,6 +810,184 @@
       "unresolved": [
         "Qualify actual native payload dependencies, device/clock behavior and descriptor/file permissions per target."
       ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_community.texi",
+      "sha256": "cfc63c474573fa734d8966bb158e55c6a53fc978923f1ceef9f9cf0d135d575b",
+      "lines": [
+        1,
+        182
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "This pinned body describes upstream governance and technical/community conflict resolution, not Numera runtime authorization or media support.",
+        "Upstream contributor roles and example contact addresses confer no authority to send messages on the user's behalf."
+      ],
+      "tasks": [
+        "T005",
+        "T039"
+      ],
+      "unresolved": [
+        "No current community membership or contact availability was inferred from this archived body."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_fate.texi",
+      "sha256": "07b49cf2c33b20d04b828166ce569f6d7d57e4b2791b113bcd6b134e7960ecba",
+      "lines": [
+        1,
+        300
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "FATE is a regression suite whose enabled tests, sample set, compiler/CPU, threads and hardware configuration must be identified with results.",
+        "The GEN flag regenerates missing/mismatched references; generated references are not independent preservation evidence.",
+        "Preserve sample identity across old checkouts; optional wrappers and HWACCEL alter the tested execution boundary."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T035",
+        "T037"
+      ],
+      "unresolved": [
+        "Qualify the selected standard component build with pinned samples and retained actual logs in CI; no FATE run was performed by reading this body."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_decoders.texi",
+      "sha256": "242db22415822bcf09e891e6063b1fcbe3760b4670cfc601bca110afe87776c8",
+      "lines": [
+        1,
+        690
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Compiled decoder presence and external-library configuration are separate from container admission and actual runtime/hardware qualification.",
+        "QSV async_depth trades buffering/latency and gpu_copy can perform GPU transfers; CPU-only policy must exclude these routes deliberately.",
+        "AC-3 DRC and AV1 film-grain/layer/operating-point defaults alter decoded semantics and must be frozen for preview/export/decoded oracles.",
+        "Subtitle decoders can access font/config/IFO files or dump images, while ARIB layout, teletext whitespace/duration and DVD forced-only/palette choices change the result."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T027"
+      ],
+      "unresolved": [
+        "Complete decoder dependency/canary admission for the standard payload, including subtitle fonts/configuration/palette file opens; the minimal fixture does not qualify those libraries."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_mailing-list-faq.texi",
+      "sha256": "7ba38b8b16e6b94d6054d64da6dfa17738c874b693d85fe8ee9f62b36b7ac0f6",
+      "lines": [
+        1,
+        389
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Minimal reproducible FFmpeg commands and text diagnostics are separate evidence from third-party wrapper behavior or screenshots.",
+        "The pinned body recommends complete console diagnostics for upstream reports; any future user-authorized export still needs protected-data redaction and explicit inclusion choices."
+      ],
+      "tasks": [
+        "T005",
+        "T039"
+      ],
+      "unresolved": [
+        "No upstream message, subscription, sample upload or contact action was requested or performed."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_git-howto.texi",
+      "sha256": "aeaced97ff2709f2c4ca829054712787658e63ff9d583eb48f2752ba124db182",
+      "lines": [
+        1,
+        484
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Review exact diffs and the intended source/branch before publication; upstream workflows are contextual documentation, not authorization to modify this repository's main branch.",
+        "Regression suites do not establish correctness of new behavior without new meaningful assertions."
+      ],
+      "tasks": [
+        "T005",
+        "T035",
+        "T040"
+      ],
+      "unresolved": [
+        "Keep Numera's one-branch/draft-PR rule and hosted-only build/test mandate; no upstream git/mailing workflow was executed."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_faq.texi",
+      "sha256": "88bbf6e78d9e9effabdafc095a1194502e09e2cf4a3534fd16f2d6acfa224487",
+      "lines": [
+        1,
+        686
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Container recognition does not imply support for every codec/stream; finite initial probe scans can miss later streams in header-poor formats.",
+        "Concat filter, demuxer and protocol are different semantic/authority operations; file-byte joining is only valid for specific admitted representations.",
+        "Auto-inserted resampling/channel conversion, interlace settings, SAR/DAR and quality options can change output semantics and cannot stand in for preservation proofs.",
+        "r_frame_rate is not an exact VFR timeline or an average frame rate; retain timestamp/time-base data. Background ffmpeg requires nostdin or an explicit admitted stdin route."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T015",
+        "T025",
+        "T028",
+        "T029",
+        "T035"
+      ],
+      "unresolved": [
+        "Complete late-stream, joining, format/channel and actual standard-profile output fixtures; historical platform/codec examples are not current compatibility recommendations."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_codecs.texi",
+      "sha256": "a6d8697c6847d5f1d5b2e34edfec900064c52425091fe5fa9ab0d75c23ea2c46",
+      "lines": [
+        1,
+        1043
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body in ranges 1-120, 121-650 and 651-1043; decoder/encoder includes are not credited by this wrapper read",
+      "interpretation": [
+        "Generic codec options can be ignored by specific codecs; a typed admitted codec/profile must resolve supported options explicitly.",
+        "bitexact excludes IDCT variability; automatic DCT/IDCT, thread defaults and frame-thread delay do not establish CPU/GPU decoded equivalence.",
+        "Cropping alignment and hardware treatment differ, while skip_frame/skip_alpha/lowres/DRC and side-data export choices alter decoded semantics.",
+        "Color primaries, transfer, matrix, range, chroma location and alpha mode are separate facts from actual pixel conversion.",
+        "codec_whitelist defaults to all decoders; max_pixels limits image dimensions but is not an aggregate RSS/process-tree budget."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T030",
+        "T034"
+      ],
+      "unresolved": [
+        "Read the encoder include separately and qualify typed options/cropping/side-data/timing/color behavior against actual admitted component profiles.",
+        "Finish explicit decoder dependency admission and process-tree/RSS/scratch qualification; no codec invocation was run by reading this body."
+      ]
     }
   ]
 }

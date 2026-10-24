@@ -303,7 +303,8 @@ async fn scan(
     observer(ExecutionEvent::Prepared(prepared)).await?;
     let ledger = Arc::new(Mutex::new(Ledger::new(probe)?));
     let consumer = ledger.clone();
-    nw_platform::process::stream_readonly(
+    let ticket = engine.process_budget.acquire(&cancel).await?;
+    let process = nw_platform::process::stream_readonly(
         Path::new(&engine.ffprobe.path),
         &args,
         Duration::from_secs(10800),
@@ -316,7 +317,8 @@ async fn scan(
         }),
         cancel,
     )
-    .await?;
+    .await;
+    ticket.finish(process)?;
     let ledger = Arc::try_unwrap(ledger)
         .map_err(|_| invalid("Packet consumer did not finish"))?
         .into_inner()
