@@ -189,7 +189,8 @@ impl Store {
             self.db.begin_control_write()
         } else {
             self.db.begin_write()
-        }.map_err(storage)?;
+        }
+        .map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             table.remove(key).map_err(storage)?;
@@ -206,11 +207,15 @@ impl Store {
                 "Transaction record budget exceeded",
             ));
         }
-        let write = if records.iter().all(|(key,_)|key.starts_with("credential/")) {
+        let write = if records
+            .iter()
+            .all(|(key, _)| key.starts_with("credential/"))
+        {
             self.db.begin_control_write()
         } else {
             self.db.begin_write()
-        }.map_err(storage)?;
+        }
+        .map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
             for (key, value) in records {
@@ -334,7 +339,8 @@ impl Store {
             self.db.begin_control_write()
         } else {
             self.db.begin_write()
-        }.map_err(storage)?;
+        }
+        .map_err(storage)?;
         let now = clock()?;
         let (key, scope) = self.replay_key(principal, request, now)?;
         let response;

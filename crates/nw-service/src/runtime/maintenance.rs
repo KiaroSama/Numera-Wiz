@@ -155,9 +155,26 @@ mod tests {
         let owner = restarted.owner();
         assert_eq!(owner.principal, principal);
         assert_eq!(restarted.root_lease.selection().unwrap().generation, 3);
-        let activation=restarted.root_lease.selection().unwrap().activation_id.unwrap();
-        assert_eq!(restarted.store.adoption_revision(&migration_id,&activation).unwrap(),"0");
-        assert_eq!(nw_platform::files::RootLock::acquire(&restarted.root.join("state/generations/1")).err().unwrap().code,"OWNER_BUSY");
+        let activation = restarted
+            .root_lease
+            .selection()
+            .unwrap()
+            .activation_id
+            .unwrap();
+        assert_eq!(
+            restarted
+                .store
+                .adoption_revision(&migration_id, &activation)
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            nw_platform::files::RootLock::acquire(&restarted.root.join("state/generations/1"))
+                .err()
+                .unwrap()
+                .code,
+            "OWNER_BUSY"
+        );
 
         assert_eq!(
             restarted
@@ -178,14 +195,39 @@ mod tests {
         let retained: AccessProfile = restarted.store.get("profile/retained").unwrap().unwrap();
         assert_eq!(profile_before.principal, retained.principal);
         assert_eq!(profile_before.revision, retained.revision);
-        assert_eq!(restarted.store.adoption_revision(&migration_id,&activation).unwrap(),"0","Read-only reopen and exact receipt replay do not adopt");
-        let new_scope=restarted.dispatch(restarted.owner(),Request::query("access.replay_scope.create",json!({}))).await.result.unwrap()["replay_scope"].as_str().unwrap().to_owned();
-        let mut fresh=Request::query("access.profiles.create",json!({"name":"new-after-migration","read_roots":[],"write_roots":[]}));
-        fresh.replay_scope=Some(new_scope);
-        fresh.idempotency_key=Some("new-accepted-business-state".into());
-        let accepted=restarted.dispatch(restarted.owner(),fresh).await;
-        assert!(accepted.ok,"{:?}",accepted.error);
-        assert_eq!(restarted.store.adoption_revision(&migration_id,&activation).unwrap(),"1");
-
+        assert_eq!(
+            restarted
+                .store
+                .adoption_revision(&migration_id, &activation)
+                .unwrap(),
+            "0",
+            "Read-only reopen and exact receipt replay do not adopt"
+        );
+        let new_scope = restarted
+            .dispatch(
+                restarted.owner(),
+                Request::query("access.replay_scope.create", json!({})),
+            )
+            .await
+            .result
+            .unwrap()["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let mut fresh = Request::query(
+            "access.profiles.create",
+            json!({"name":"new-after-migration","read_roots":[],"write_roots":[]}),
+        );
+        fresh.replay_scope = Some(new_scope);
+        fresh.idempotency_key = Some("new-accepted-business-state".into());
+        let accepted = restarted.dispatch(restarted.owner(), fresh).await;
+        assert!(accepted.ok, "{:?}", accepted.error);
+        assert_eq!(
+            restarted
+                .store
+                .adoption_revision(&migration_id, &activation)
+                .unwrap(),
+            "1"
+        );
     }
 }

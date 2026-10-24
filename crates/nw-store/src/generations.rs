@@ -285,14 +285,24 @@ impl RootLease {
         let guard = RootLock::acquire(&state)?;
         let stamp = DirectoryStamp::capture_resolved(&state)?;
         let history = activations(&root)?;
-        let legacy_guard = if history.last().is_some_and(|(record,_)|matches!(&record.location,GenerationLocation::Workspace{..})) {
-            let legacy=root.join("state/generations/1");
-            if !legacy.join("store.redb").try_exists().map_err(files::io_error)? {
-                return Err(invalid("Legacy reader fence is missing; no empty legacy generation was initialized"));
+        let legacy_guard = if history.last().is_some_and(|(record, _)| {
+            matches!(&record.location, GenerationLocation::Workspace { .. })
+        }) {
+            let legacy = root.join("state/generations/1");
+            if !legacy
+                .join("store.redb")
+                .try_exists()
+                .map_err(files::io_error)?
+            {
+                return Err(invalid(
+                    "Legacy reader fence is missing; no empty legacy generation was initialized",
+                ));
             }
-            let legacy=security::private_directory(&legacy)?;
+            let legacy = security::private_directory(&legacy)?;
             Some(RootLock::acquire(&legacy)?)
-        } else {None};
+        } else {
+            None
+        };
         Ok(Arc::new(Self {
             root,
             state,
@@ -457,7 +467,8 @@ impl Store {
             .open(path.join("store.redb"))
             .map_err(versions::database_error)?;
         let track_adoption = crate::adoption::enabled(&database)?;
-        self.db.attach_generation(database, &path, guard, track_adoption)
+        self.db
+            .attach_generation(database, &path, guard, track_adoption)
     }
 }
 #[cfg(test)]

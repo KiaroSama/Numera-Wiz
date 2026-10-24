@@ -84,18 +84,48 @@ pub fn inspect_closed(generation: &Path) -> Result<GenerationFacts> {
             .ok_or_else(unsupported)?
             .value(),
     )?;
-    let required_capabilities: Vec<String> = if [2,3].contains(&store_version) {
-        table.get("meta/required-capabilities").map_err(storage)?
-            .map(|value|crate::decode(value.value())).transpose()?.unwrap_or_default()
-    } else { Vec::new() };
-    if required_capabilities.len()>64 || required_capabilities.iter().any(|value|value.is_empty()||value.len()>128) {
-        return Err(DomainError::new("RESOURCE_LIMIT","Required generation capabilities exceed bounded metadata limits"));
+    let required_capabilities: Vec<String> = if [2, 3].contains(&store_version) {
+        table
+            .get("meta/required-capabilities")
+            .map_err(storage)?
+            .map(|value| crate::decode(value.value()))
+            .transpose()?
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    if required_capabilities.len() > 64
+        || required_capabilities
+            .iter()
+            .any(|value| value.is_empty() || value.len() > 128)
+    {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Required generation capabilities exceed bounded metadata limits",
+        ));
     }
-    let known_json = store_version==2 || (store_version==3 && !required_capabilities.is_empty()
-        && required_capabilities.iter().all(|value|crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str())));
-    if store_version==3 && known_json && required_capabilities.iter().any(|value|value=="adoption_guard.v1") {
-        let raw=table.get("meta/rollback-guard").map_err(storage)?.ok_or_else(||DomainError::new("STORE_RECOVERY_REQUIRED","Required adoption history is missing; original bytes were not opened writable"))?;
-        let guard:crate::adoption::Guard=crate::decode(raw.value())?;
+    let known_json = store_version == 2
+        || (store_version == 3
+            && !required_capabilities.is_empty()
+            && required_capabilities
+                .iter()
+                .all(|value| crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str())));
+    if store_version == 3
+        && known_json
+        && required_capabilities
+            .iter()
+            .any(|value| value == "adoption_guard.v1")
+    {
+        let raw = table
+            .get("meta/rollback-guard")
+            .map_err(storage)?
+            .ok_or_else(|| {
+                DomainError::new(
+                    "STORE_RECOVERY_REQUIRED",
+                    "Required adoption history is missing; original bytes were not opened writable",
+                )
+            })?;
+        let guard: crate::adoption::Guard = crate::decode(raw.value())?;
         guard.validate()?;
     }
     let root = table
@@ -345,23 +375,24 @@ mod tests {
     }
     #[test]
     fn future_binary_records_are_not_decoded_with_the_old_json_codec_or_opened_writable() {
-        let temporary=tempfile::tempdir().unwrap();
-        let store=Store::open(temporary.path()).unwrap();
-        let write=store.db.begin_write().unwrap();
+        let temporary = tempfile::tempdir().unwrap();
+        let store = Store::open(temporary.path()).unwrap();
+        let write = store.db.begin_write().unwrap();
         {
-            let mut table=write.open_table(RECORDS).unwrap();
-            table.insert("meta/schema",b"999".as_slice()).unwrap();
-            table.insert("future/binary",[0xff,0x00,0x81].as_slice()).unwrap();
+            let mut table = write.open_table(RECORDS).unwrap();
+            table.insert("meta/schema", b"999".as_slice()).unwrap();
+            table
+                .insert("future/binary", [0xff, 0x00, 0x81].as_slice())
+                .unwrap();
         }
         write.commit().unwrap();
         drop(store);
-        let path=temporary.path().join("store.redb");
-        let before=file_hash(&path);
+        let path = temporary.path().join("store.redb");
+        let before = file_hash(&path);
         match Store::open(temporary.path()) {
-            Err(error)=>assert_eq!(error.code,"STORE_VERSION_UNSUPPORTED"),
-            Ok(_)=>panic!("Unknown future binary codec was opened"),
+            Err(error) => assert_eq!(error.code, "STORE_VERSION_UNSUPPORTED"),
+            Ok(_) => panic!("Unknown future binary codec was opened"),
         }
-        assert_eq!(file_hash(&path),before);
+        assert_eq!(file_hash(&path), before);
     }
-
 }

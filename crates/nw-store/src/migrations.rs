@@ -89,7 +89,10 @@ impl Store {
         let result = (|| {
             let facts = lease.inspect_selected()?;
             if facts.record_count > crate::versions::MAX_GENERATION_RECORDS.saturating_sub(16) {
-                return Err(DomainError::new("RESOURCE_LIMIT","A new migration requires capacity for its complete retained metadata and receipt"));
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "A new migration requires capacity for its complete retained metadata and receipt",
+                ));
             }
             if facts.store_version != 2 {
                 return Err(invalid("The reviewed source must use schema2"));
@@ -207,7 +210,10 @@ impl Store {
         // New acceptance reserves metadata capacity without changing the frozen
         // schema1 plan digest/validation used to recover previously accepted work.
         if plan.source_records > crate::versions::MAX_GENERATION_RECORDS.saturating_sub(16) {
-            return Err(DomainError::new("RESOURCE_LIMIT","Source leaves no bounded capacity for a new migration receipt and metadata"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Source leaves no bounded capacity for a new migration receipt and metadata",
+            ));
         }
         if plan.root_id != self.root_id()
             || plan.application_build != application_build
