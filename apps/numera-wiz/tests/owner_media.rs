@@ -279,10 +279,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         std::fs::read(&output).unwrap()
     );
     let artifact_id = format!("job-{id}");
-    let manifest = cli.query("artifacts.manifest", json!({"artifact_id":artifact_id})).await;
+    let manifest = cli
+        .query("artifacts.manifest", json!({"artifact_id":artifact_id}))
+        .await;
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
     let chunk = cli.query("artifacts.read_chunk", json!({"artifact_id":artifact_id,"expected_sha256":manifest["sha256"],"offset":"3","length":29})).await;
-    assert_eq!(STANDARD.decode(chunk["data_base64"].as_str().unwrap()).unwrap(), std::fs::read(&output).unwrap()[3..32]);
+    assert_eq!(
+        STANDARD
+            .decode(chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[3..32]
+    );
     let replay = cli
         .mutation(&scope, "submit-cli", "jobs.submit", submit)
         .await;
@@ -384,14 +391,35 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(observed["streams"][1]["tags"]["title"], "SDK stdio first");
 
     let stdio_artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
-    let stdio_manifest = call!(stdio, "artifacts.manifest", json!({"artifact_id":stdio_artifact_id}), json!({}));
-    let resource = stdio.read_resource(rmcp::model::ReadResourceRequestParams::new(stdio_manifest["manifest_uri"].as_str().unwrap())).await.unwrap();
+    let stdio_manifest = call!(
+        stdio,
+        "artifacts.manifest",
+        json!({"artifact_id":stdio_artifact_id}),
+        json!({})
+    );
+    let resource = stdio
+        .read_resource(rmcp::model::ReadResourceRequestParams::new(
+            stdio_manifest["manifest_uri"].as_str().unwrap(),
+        ))
+        .await
+        .unwrap();
     let resource = serde_json::to_value(resource).unwrap();
     assert_eq!(resource["contents"][0]["mimeType"], "application/json");
-    let contents: Value = serde_json::from_str(resource["contents"][0]["text"].as_str().unwrap()).unwrap();
+    let contents: Value =
+        serde_json::from_str(resource["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(contents["sha256"], job["artifact"]["sha256"]);
-    let chunk = call!(stdio, "artifacts.read_chunk", json!({"artifact_id":stdio_artifact_id,"expected_sha256":contents["sha256"],"offset":"131067","length":31}), json!({}));
-    assert_eq!(STANDARD.decode(chunk["data_base64"].as_str().unwrap()).unwrap(), std::fs::read(&output).unwrap()[131067..131098]);
+    let chunk = call!(
+        stdio,
+        "artifacts.read_chunk",
+        json!({"artifact_id":stdio_artifact_id,"expected_sha256":contents["sha256"],"offset":"131067","length":31}),
+        json!({})
+    );
+    assert_eq!(
+        STANDARD
+            .decode(chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[131067..131098]
+    );
     // Delegation is an explicit object action; it never borrows the creator's authority.
     let delegated_output = media.directory.path().join("delegated-copy.mkv");
     let delegated_plan = cli.query("streams.clean", json!({"asset_id":registered["result"]["id"],"output":delegated_output,"intent":fixture::rules()})).await;
@@ -492,12 +520,38 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
 
     let mut modern_command = cli.command();
     modern_command.args(["bridge", "--access-profile", "operator"]);
-    let modern_stdio = ().serve_with_lifecycle(TokioChildProcess::new(modern_command).unwrap(), ClientLifecycleMode::Discover { preferred_versions: vec![ProtocolVersion::V_2026_07_28] }).await.unwrap();
-    let modern_manifest = modern_stdio.read_resource(rmcp::model::ReadResourceRequestParams::new(stdio_manifest["manifest_uri"].as_str().unwrap())).await.unwrap();
+    let modern_stdio = ()
+        .serve_with_lifecycle(
+            TokioChildProcess::new(modern_command).unwrap(),
+            ClientLifecycleMode::Discover {
+                preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+            },
+        )
+        .await
+        .unwrap();
+    let modern_manifest = modern_stdio
+        .read_resource(rmcp::model::ReadResourceRequestParams::new(
+            stdio_manifest["manifest_uri"].as_str().unwrap(),
+        ))
+        .await
+        .unwrap();
     let modern_manifest = serde_json::to_value(modern_manifest).unwrap();
-    assert_eq!(modern_manifest["contents"][0]["mimeType"], "application/json");
-    let modern_chunk = call!(modern_stdio, "artifacts.read_chunk", json!({"artifact_id":stdio_artifact_id,"expected_sha256":stdio_manifest["sha256"],"offset":"0","length":29}), json!({}));
-    assert_eq!(STANDARD.decode(modern_chunk["data_base64"].as_str().unwrap()).unwrap(), std::fs::read(&output).unwrap()[..29]);
+    assert_eq!(
+        modern_manifest["contents"][0]["mimeType"],
+        "application/json"
+    );
+    let modern_chunk = call!(
+        modern_stdio,
+        "artifacts.read_chunk",
+        json!({"artifact_id":stdio_artifact_id,"expected_sha256":stdio_manifest["sha256"],"offset":"0","length":29}),
+        json!({})
+    );
+    assert_eq!(
+        STANDARD
+            .decode(modern_chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[..29]
+    );
     modern_stdio.cancel().await.unwrap();
 
     let bind = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -663,12 +717,32 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             std::fs::read(output).unwrap()
         );
         let artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
-        let manifest = call!(http, "artifacts.manifest", json!({"artifact_id":artifact_id}), json!({}));
-        let resource = http.read_resource(rmcp::model::ReadResourceRequestParams::new(manifest["manifest_uri"].as_str().unwrap())).await.unwrap();
+        let manifest = call!(
+            http,
+            "artifacts.manifest",
+            json!({"artifact_id":artifact_id}),
+            json!({})
+        );
+        let resource = http
+            .read_resource(rmcp::model::ReadResourceRequestParams::new(
+                manifest["manifest_uri"].as_str().unwrap(),
+            ))
+            .await
+            .unwrap();
         let resource = serde_json::to_value(resource).unwrap();
         assert_eq!(resource["contents"][0]["mimeType"], "application/json");
-        let chunk = call!(http, "artifacts.read_chunk", json!({"artifact_id":artifact_id,"expected_sha256":manifest["sha256"],"offset":"0","length":31}), json!({}));
-        assert_eq!(STANDARD.decode(chunk["data_base64"].as_str().unwrap()).unwrap(), std::fs::read(&media.source).unwrap()[..31]);
+        let chunk = call!(
+            http,
+            "artifacts.read_chunk",
+            json!({"artifact_id":artifact_id,"expected_sha256":manifest["sha256"],"offset":"0","length":31}),
+            json!({})
+        );
+        assert_eq!(
+            STANDARD
+                .decode(chunk["data_base64"].as_str().unwrap())
+                .unwrap(),
+            std::fs::read(&media.source).unwrap()[..31]
+        );
         http.cancel().await.unwrap();
     }
 
@@ -804,27 +878,92 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     // The browser profile has write-only exports. Its job purpose still admits exact output reads.
     let artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
-    let manifest = call!(browser, "artifacts.manifest", json!({"artifact_id":artifact_id}), json!({}));
+    let manifest = call!(
+        browser,
+        "artifacts.manifest",
+        json!({"artifact_id":artifact_id}),
+        json!({})
+    );
     assert!(!manifest.to_string().contains(cli.data.to_str().unwrap()));
     let bytes_url = format!("{endpoint}{}", manifest["bytes_route"].as_str().unwrap());
     let etag = format!("\"{}\"", manifest["sha256"].as_str().unwrap());
-    let response = client.get(&bytes_url).bearer_auth(bearer).header("If-Match", &etag).send().await.unwrap();
+    let response = client
+        .get(&bytes_url)
+        .bearer_auth(bearer)
+        .header("If-Match", &etag)
+        .send()
+        .await
+        .unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     assert_eq!(response.headers()["cache-control"], "no-store");
     assert_eq!(response.headers()["etag"], etag);
     assert_eq!(response.bytes().await.unwrap().as_ref(), fixture_bytes);
-    for (range, start, end) in [("bytes=3-19", 3, 20), ("bytes=-13", fixture_bytes.len()-13, fixture_bytes.len()), ("bytes=131067-131097", 131067, 131098)] {
-        let response = client.get(&bytes_url).bearer_auth(bearer).header("Range", range).header("If-Match", &etag).send().await.unwrap();
+    for (range, start, end) in [
+        ("bytes=3-19", 3, 20),
+        ("bytes=-13", fixture_bytes.len() - 13, fixture_bytes.len()),
+        ("bytes=131067-131097", 131067, 131098),
+    ] {
+        let response = client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("Range", range)
+            .header("If-Match", &etag)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), reqwest::StatusCode::PARTIAL_CONTENT);
-        assert_eq!(response.bytes().await.unwrap().as_ref(), &fixture_bytes[start..end]);
+        assert_eq!(
+            response.bytes().await.unwrap().as_ref(),
+            &fixture_bytes[start..end]
+        );
     }
-    assert_eq!(client.get(&bytes_url).bearer_auth(bearer).header("Range", "bytes=0-1,4-5").send().await.unwrap().status(), reqwest::StatusCode::RANGE_NOT_SATISFIABLE);
-    assert_eq!(client.get(&bytes_url).bearer_auth(bearer).header("If-Match", format!("\"{}\"", "0".repeat(64))).send().await.unwrap().status(), reqwest::StatusCode::PRECONDITION_FAILED);
-    assert_eq!(client.get(&bytes_url).bearer_auth(&token).send().await.unwrap().status(), reqwest::StatusCode::NOT_FOUND, "A copied output route supplies no object authority");
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("Range", "bytes=0-1,4-5")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::RANGE_NOT_SATISFIABLE
+    );
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("If-Match", format!("\"{}\"", "0".repeat(64)))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::PRECONDITION_FAILED
+    );
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::NOT_FOUND,
+        "A copied output route supplies no object authority"
+    );
     let original = std::path::Path::new(destination["output"].as_str().unwrap());
     std::fs::rename(original, original.with_extension("retained-original")).unwrap();
     std::fs::write(original, &fixture_bytes).unwrap();
-    assert_eq!(client.get(&bytes_url).bearer_auth(bearer).send().await.unwrap().status(), reqwest::StatusCode::PRECONDITION_FAILED, "Identical replacement bytes are not the published physical object");
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::PRECONDITION_FAILED,
+        "Identical replacement bytes are not the published physical object"
+    );
     browser.cancel().await.unwrap();
     let status = cli.query("logs.status", json!({})).await;
     assert_eq!(status["configured"], true);

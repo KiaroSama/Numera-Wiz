@@ -98,10 +98,22 @@ impl Service {
     ) -> Result<Value> {
         self.inventory_projection(context, input, jobs, false, cancellation)
     }
-    pub(super) fn artifact_inventory(&self, context: &Context, input: PageInput, cancellation: &CancellationToken) -> Result<Value> {
+    pub(super) fn artifact_inventory(
+        &self,
+        context: &Context,
+        input: PageInput,
+        cancellation: &CancellationToken,
+    ) -> Result<Value> {
         self.inventory_projection(context, input, true, true, cancellation)
     }
-    fn inventory_projection(&self, context: &Context, input: PageInput, jobs: bool, artifacts: bool, cancellation: &CancellationToken) -> Result<Value> {
+    fn inventory_projection(
+        &self,
+        context: &Context,
+        input: PageInput,
+        jobs: bool,
+        artifacts: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<Value> {
         if !(1..=512).contains(&input.limit)
             || input
                 .cursor
@@ -118,7 +130,9 @@ impl Service {
                 "Page limit must be 1..512 and cursor must be bounded",
             ));
         }
-        let projection = if artifacts { "artifacts.summary.v1" } else if jobs {
+        let projection = if artifacts {
+            "artifacts.summary.v1"
+        } else if jobs {
             "jobs.summary.v1"
         } else {
             "assets.summary.v1"
@@ -221,11 +235,22 @@ impl Service {
                     )
                 }) {
                     if artifacts {
-                        if job.state == JobState::Succeeded && job.owned_staging.is_some() && let Some(identity) = &job.artifact {
+                        if job.state == JobState::Succeeded
+                            && job.owned_staging.is_some()
+                            && let Some(identity) = &job.artifact
+                        {
                             let id = format!("job-{}", job.id);
-                            snapshot.push(&nw_domain::artifacts::ArtifactSummary { artifact_id: id.clone(), manifest_uri: format!("numera://artifact/{id}/manifest"), job_id: job.id.clone(), encoded_byte_count: identity.bytes.clone(), sha256: identity.sha256.clone() })?;
+                            snapshot.push(&nw_domain::artifacts::ArtifactSummary {
+                                artifact_id: id.clone(),
+                                manifest_uri: format!("numera://artifact/{id}/manifest"),
+                                job_id: job.id.clone(),
+                                encoded_byte_count: identity.bytes.clone(),
+                                sha256: identity.sha256.clone(),
+                            })?;
                         }
-                    } else { snapshot.push(&JobSummary::from(&job))?; }
+                    } else {
+                        snapshot.push(&JobSummary::from(&job))?;
+                    }
                 }
                 Ok(())
             })?;

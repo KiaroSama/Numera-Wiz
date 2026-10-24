@@ -216,9 +216,24 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("artifacts.list", "List current job-readable artifact manifests", Query, crate::views::PageInput),
-        row!("artifacts.manifest", "Inspect an authorized published artifact", Query, crate::artifacts::ManifestInput),
-        row!("artifacts.read_chunk", "Read a bounded verified artifact byte range", Query, crate::artifacts::ChunkInput),
+        row!(
+            "artifacts.list",
+            "List current job-readable artifact manifests",
+            Query,
+            crate::views::PageInput
+        ),
+        row!(
+            "artifacts.manifest",
+            "Inspect an authorized published artifact",
+            Query,
+            crate::artifacts::ManifestInput
+        ),
+        row!(
+            "artifacts.read_chunk",
+            "Read a bounded verified artifact byte range",
+            Query,
+            crate::artifacts::ChunkInput
+        ),
         row!(
             "logs.status",
             "Inspect bounded protected owner logging status",

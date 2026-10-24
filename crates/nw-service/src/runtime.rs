@@ -1678,7 +1678,8 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub(super) async fn preflight_fixture() -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
+    pub(super) async fn preflight_fixture()
+    -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
         use nw_domain::{mux::*, records::MediaProbe};
         let root = tempfile::tempdir().unwrap();
         let programs = root.path().join("programs");

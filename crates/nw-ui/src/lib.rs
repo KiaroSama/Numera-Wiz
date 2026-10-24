@@ -380,7 +380,8 @@ impl WizApp {
                     self.last_jobs = Instant::now() - Duration::from_secs(2);
                 }
                 Action::ArtifactManifest => {
-                    self.artifact_manifest = Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
+                    self.artifact_manifest =
+                        Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
                 Action::Inspect => {
                     self.inspect =
@@ -495,7 +496,16 @@ impl WizApp {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
                         ui.label(format!("{:?}", job.state));
                         ui.label(&job.output_name);
-                        if job.state == nw_domain::records::JobState::Succeeded && ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Output details")).clicked() { artifact = Some(format!("job-{}", job.id)); }
+                        if job.state == nw_domain::records::JobState::Succeeded
+                            && ui
+                                .add_enabled(
+                                    !self.waiting && self.pending.is_none(),
+                                    egui::Button::new("Output details"),
+                                )
+                                .clicked()
+                        {
+                            artifact = Some(format!("job-{}", job.id));
+                        }
                         if !job.state.terminal()
                             && ui
                                 .add_enabled(
@@ -517,7 +527,14 @@ impl WizApp {
                     );
                 }
             });
-        if let Some(id) = artifact { self.query("artifacts.manifest", json!({"artifact_id":id}), Action::ArtifactManifest, ui.ctx()); }
+        if let Some(id) = artifact {
+            self.query(
+                "artifacts.manifest",
+                json!({"artifact_id":id}),
+                Action::ArtifactManifest,
+                ui.ctx(),
+            );
+        }
         let mut open = self.artifact_manifest.is_some();
         if let Some(manifest) = &self.artifact_manifest {
             egui::Window::new("Output details").open(&mut open).show(ui.ctx(), |ui| {
@@ -528,7 +545,9 @@ impl WizApp {
                 ui.small("Reading this output requires current job access. A copied URI does not grant access.");
             });
         }
-        if !open { self.artifact_manifest = None; }
+        if !open {
+            self.artifact_manifest = None;
+        }
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }
