@@ -21,6 +21,29 @@ struct LegacyProfile {
 
 impl Store {
     pub(super) fn upgrade_access_profiles(&self) -> Result<()> {
+        // Opening a current generation must not create a spurious adoption fact
+        // from an empty writer commit. Validate current profiles in a read snapshot.
+        let needs_upgrade = {
+            let read=self.db.begin_read().map_err(storage)?;
+            let table=read.open_table(RECORDS).map_err(storage)?;
+            let mut needs=false;
+            let mut count=0usize;
+            for row in table.range("profile/"..).map_err(storage)? {
+                let (key,value)=row.map_err(storage)?;
+                if !key.value().starts_with("profile/") {break;}
+                count+=1;
+                if count>128 {return Err(DomainError::new("RESOURCE_LIMIT","Profile migration exceeds retained quota"));}
+                let shape:serde_json::Value=decode(value.value())?;
+                if shape.get("schema_version").is_some() {
+                    let current:AccessProfile=decode(value.value())?;
+                    if current.schema_version!=2 {
+                        return Err(DomainError::new("STORE_SCHEMA_UNSUPPORTED","Access profile version is not supported"));
+                    }
+                } else {needs=true;}
+            }
+            needs
+        };
+        if !needs_upgrade {return Ok(());}
         let write = self.db.begin_write().map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;

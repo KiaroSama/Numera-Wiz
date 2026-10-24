@@ -235,3 +235,67 @@ async fn concurrent_native_frontends_boot_one_owner_for_the_same_root() {
     .await
     .expect("Concurrent native attachment deadline");
 }
+
+
+async fn migration_cli(root:&std::path::Path,args:&[&str])->serde_json::Value {
+    let mut command=tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
+    command.arg("--data-dir").arg(root).args(args).kill_on_drop(true);
+    let output=tokio::time::timeout(std::time::Duration::from_secs(60),command.output()).await.unwrap().unwrap();
+    assert!(output.stdout.len()<=nw_domain::commands::MAX_RESULT_BYTES,"CLI result exceeded bounded JSON");
+    let response:serde_json::Value=serde_json::from_slice(&output.stdout).unwrap_or_else(|_|panic!("CLI JSON failed:{}",String::from_utf8_lossy(&output.stderr)));
+    assert!(output.status.success() && response["ok"]==true,"CLI migration failed:{response};{}",String::from_utf8_lossy(&output.stderr));
+    response
+}
+#[tokio::test]
+async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart() {
+    let _case=OWNER_CASE.lock().await;
+    tokio::time::timeout(std::time::Duration::from_secs(180),async {
+        use nw_domain::commands::Request;
+        use serde_json::json;
+        let data=tempfile::tempdir().unwrap();
+        let _logs=retain_owner_logs(data.path(),"migration-cli");
+        let input=nw_platform::security::private_directory(&data.path().join("requests")).unwrap();
+        let issued=migration_cli(data.path(),&["access","replay-scope","create"]).await;
+        let scope=issued["result"]["replay_scope"].as_str().unwrap().to_owned();
+        let mut original=Request::query("access.profiles.create",json!({"name":"before-migration","read_roots":[],"write_roots":[]}));
+        original.request_id="original-profile".into();
+        original.replay_scope=Some(scope.clone());
+        original.idempotency_key=Some("original-profile-key".into());
+        let request=input.join("original.json");
+        nw_platform::security::write_private(&request,&serde_json::to_vec(&original).unwrap(),false).unwrap();
+        let before=migration_cli(data.path(),&["request","--file",request.to_str().unwrap()]).await;
+        let reviewed=migration_cli(data.path(),&["maintenance","plan"]).await;
+        let plan=input.join("review-λ.json");
+        nw_platform::security::write_private(&plan,&serde_json::to_vec(&reviewed["result"]).unwrap(),false).unwrap();
+        let submit=["maintenance","migrate","--plan-file",plan.to_str().unwrap(),"--replay-scope",&scope,"--idempotency-key","one-generation","--request-id","actual-migration"];
+        let accepted=migration_cli(data.path(),&submit).await;
+        assert!(accepted["receipt_id"].is_string());
+        let id=accepted["result"]["migration_id"].as_str().unwrap();
+        let state=migration_cli(data.path(),&["maintenance","inspect",id]).await;
+        assert_eq!(state["result"]["phase"],"succeeded");
+        let replay=migration_cli(data.path(),&["request","--file",request.to_str().unwrap()]).await;
+        assert_eq!(replay["receipt_id"],before["receipt_id"]);
+        assert_eq!(replay["result"],before["result"]);
+        let runtime=data.path().join("runtime/owner.json");
+        let prior:serde_json::Value=serde_json::from_slice(&nw_platform::security::read_private(&runtime,16384).unwrap()).unwrap();
+        wait_for_idle_owner_unlock(data.path()).await;
+        let retried=migration_cli(data.path(),&submit).await;
+        assert_eq!(retried["receipt_id"],accepted["receipt_id"]);
+        assert_eq!(retried["result"],accepted["result"]);
+        let current:serde_json::Value=serde_json::from_slice(&nw_platform::security::read_private(&runtime,16384).unwrap()).unwrap();
+        assert_ne!(prior["epoch"],current["epoch"],"The test must reconnect to a new real owner");
+        assert_eq!(prior["root_id"],current["root_id"]);
+        let replay=migration_cli(data.path(),&["request","--file",request.to_str().unwrap()]).await;
+        assert_eq!(replay["receipt_id"],before["receipt_id"]);
+        assert_eq!(replay["result"],before["result"]);
+        let profiles=migration_cli(data.path(),&["access","profiles","list"]).await;
+        assert_eq!(profiles["result"].as_array().unwrap().len(),3,"Replay must not create a second profile");
+        wait_for_idle_owner_unlock(data.path()).await;
+        let lease=nw_store::generations::RootLease::acquire(data.path()).unwrap();
+        let selected=lease.selection().unwrap();
+        assert_eq!(selected.generation,3);
+        let store=nw_store::Store::open(&lease.path(&selected).unwrap()).unwrap();
+        assert_eq!(store.adoption_revision(id,selected.activation_id.as_deref().unwrap()).unwrap(),"0");
+        assert_eq!(store.list::<nw_domain::maintenance::MigrationRecord>("generation-migration/",16).unwrap().len(),1);
+    }).await.expect("Actual CLI migration/restart deadline");
+}

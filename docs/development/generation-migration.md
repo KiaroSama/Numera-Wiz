@@ -47,7 +47,7 @@ per-copy directory retention to256files/128GiB, with64MiB free-space margin.
 Development tests exercise ordinary Service admission and restart, accepted
 migration interruptions after acceptance/copy/activation, original receipt replay,
 source reader floors, raw numeric/unknown fields, full copy proof and stale-review
-refusal. They require a new hosted run; no pass is inferred from source alone.
+refusal. CI96 passes all13 jobs and the24 store/30 Service regressions on all four native targets. The next actual typed CLI and adoption-counter additions require a new hosted run.
 
 Still mandatory: safe adoption-aware rollback with retained control receipts,
 actual prior/new packaged binaries and fault matrix, project journals and unsaved
@@ -56,3 +56,16 @@ and collection, standard offline packages, resource budgets and owner hardware
 qualification. No dummy command version is introduced to manufacture retirement
 evidence. Existing schema2 legacy receipts remain opaque and exactly preserved;
 their original command/principal/scope cannot be inferred from a receipt-key hash.
+
+
+The next revision installs an explicit adoption guard in the same transaction as
+the migration reader floor/receipt. Every later ordinary business writer updates
+it in that same redb transaction. Receipt replay and rejected transactions abort
+the tentative update. Ephemeral scope/credential writes and maintenance control
+receipts are exempt. Existing schema3 files without trusted adoption metadata
+remain ineligible for assumed safe rollback. Declared missing/invalid guards block
+writable open. The guard adds a required reader capability, preventing a reader
+that cannot record adoption from acknowledging untracked new work.
+
+Rollback itself remains unexposed until its restoration, legacy-path publication,
+activation/recovery and post-ack refusal are complete and qualified.

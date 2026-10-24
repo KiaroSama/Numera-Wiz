@@ -17,6 +17,7 @@ const RECORDS: TableDefinition<&str, &[u8]> = TableDefinition::new("versioned_re
 const STORE_SCHEMA: &[u8] = b"2";
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
+mod adoption;
 pub mod copies;
 pub mod generations;
 mod live;
@@ -137,8 +138,9 @@ impl Store {
         if signing_key.len() != 32 {
             return Err(storage("Invalid stored signing-key length"));
         }
+        let track_adoption = adoption::enabled(&db)?;
         let store = Self {
-            db: live::DatabaseSlot::new(db, root.clone(), lock),
+            db: live::DatabaseSlot::new(db, root.clone(), lock, track_adoption),
             root_id,
             signing_key,
         };
@@ -162,7 +164,7 @@ impl Store {
                 "Invalid authenticated principal identity",
             ));
         }
-        let write = self.db.begin_write().map_err(storage)?;
+        let write = self.db.begin_control_write().map_err(storage)?;
         let now = clock()?;
         let expires = now.checked_add(SCOPE_TTL).ok_or_else(|| {
             DomainError::new("VALIDATION_ERROR", "Clock exceeds supported scope range")
