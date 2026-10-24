@@ -1369,3 +1369,31 @@ packages/resources/manuals and matching owner-harness evidence are still
 mandatory. Typed timeout/progress and ordinary composable CLI expansion remain
 design work, with no source yet. No local build/test/GUI/media or owner GPU run
 occurred. Public/single-review-branch/draft/main boundaries remain intact.
+
+
+## Ordinary typed CLI and observed Chrome chooser title
+
+Run 40098707444 on 47830b118f2c6167c01608b4526b932eb35c4e71 passed all
+four complete native targets, WASM/lock, complete actual media/CLI/official SDK
+and large-copy/cancellation/revocation assertions. Native typed and genuine OS
+Save As passed again. Personally inspected native Save PNG and Chrome root
+desktop PNG show Chrome really opened its OS Save picker, with the title
+"Warning: this site can see edits you make". The test title matcher excluded
+that title; its saved-file oracle was not reached. This revision includes the
+observed title and the exact four hosted formatter hunks. No browser Save pass
+is inferred before the next actual file oracle succeeds.
+
+New ordinary media/assets/streams/plans/jobs/artifacts/logs/discovery CLI commands
+lower to the existing 28-command canonical port. Durable mutation commands
+require an explicit retained scope/key and derive stable retry request IDs.
+JSON documents are bounded and decoded strictly; paths receive the same current
+canonical grants. The actual owner/media integration now exercises typed CLI
+probe/register/report/plan/submit/manifest/chunk and separate-process retry
+identities before its existing SDK, authorization and media assertions.
+This source awaits hosted CI. No new domain command or permission is implied.
+The manual and a complete keep-all intent example accompany it.
+
+All full product, MuxCls/batch/companion/editor, timeout/progress, migration/
+retention, package/resource/manual and matching owner-harness work remains
+required. No full task checkbox changed; no local build/test/GUI/media or owner
+GPU run occurred. Public/single-review-branch/draft/main boundaries remain intact.

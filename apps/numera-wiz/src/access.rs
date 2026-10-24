@@ -11,6 +11,10 @@ use std::{io::Read, path::PathBuf};
 
 #[derive(Subcommand)]
 pub enum AccessCommand {
+    ReplayScope {
+        #[command(subcommand)]
+        command: ReplayScope,
+    },
     Profiles {
         #[command(subcommand)]
         command: Profiles,
@@ -19,6 +23,10 @@ pub enum AccessCommand {
         #[command(subcommand)]
         command: Tokens,
     },
+}
+#[derive(Subcommand)]
+pub enum ReplayScope {
+    Create,
 }
 #[derive(Subcommand)]
 pub enum Profiles {
@@ -100,6 +108,9 @@ async fn durable(client: &NativeClient, id: &str, params: Value) -> Result<Respo
 pub async fn run(client: &NativeClient, command: AccessCommand) -> Result<()> {
     tracing::info!("Access setup command started; credentials are excluded from diagnostics");
     match command {
+        AccessCommand::ReplayScope { command: ReplayScope::Create } => {
+            print_response(client, Request::query("access.replay_scope.create", json!({}))).await
+        }
         AccessCommand::Profiles { command } => match command {
             Profiles::Create {
                 name,

@@ -1167,7 +1167,13 @@ mod tests {
                     json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":100,"y":381},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
                 let started = Instant::now();
                 let dialog = loop {
-                    let found = browser_xdo(&["search", "--onlyvisible", "--name", "[Ss]ave|[Ff]ile|[Cc]hoose"]).await;
+                    let found = browser_xdo(&[
+                        "search",
+                        "--onlyvisible",
+                        "--name",
+                        "^([Ss]ave|[Ff]ile|[Cc]hoose|Warning: this site can see edits you make)",
+                    ])
+                    .await;
                     if found.status.success() {
                         let found = String::from_utf8(found.stdout).unwrap();
                         if let Some(window) = found.lines().last() {
@@ -1194,7 +1200,8 @@ mod tests {
                         }
                         browser_desktop_diagnostic(
                             &directory.join("browser-save-picker-desktop-timeout.png"),
-                        ).await;
+                        )
+                        .await;
                         panic!("Actual browser Save control did not open its real OS file picker");
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -1224,10 +1231,15 @@ mod tests {
                 .await;
                 browser_input(&["key", "--clearmodifiers", "Return"]).await;
                 tokio::time::sleep(Duration::from_millis(250)).await;
-                if browser_xdo(&["search", "--onlyvisible", "--name", "[Ss]ave|[Ff]ile|[Cc]hoose"])
-                    .await
-                    .status
-                    .success()
+                if browser_xdo(&[
+                    "search",
+                    "--onlyvisible",
+                    "--name",
+                    "^([Ss]ave|[Ff]ile|[Cc]hoose|Warning: this site can see edits you make)",
+                ])
+                .await
+                .status
+                .success()
                 {
                     browser_input(&["key", "--clearmodifiers", "alt+s"]).await;
                 }
@@ -1260,7 +1272,8 @@ mod tests {
                         }
                         browser_desktop_diagnostic(
                             &directory.join("browser-save-desktop-timeout.png"),
-                        ).await;
+                        )
+                        .await;
                         panic!(
                             "Actual browser picker/stream/close did not produce the selected verified bytes"
                         );
