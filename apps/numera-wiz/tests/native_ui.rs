@@ -10,6 +10,7 @@ mod evidence;
 mod fixture;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use evidence::RetainLogs;
+use tokio_util::sync::CancellationToken;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
 use std::{
@@ -340,6 +341,44 @@ async fn journey() {
     assert_eq!(manifest["sha256"], artifact.sha256);
     assert_eq!(manifest["encoded_byte_count"], artifact.bytes);
     std::fs::write(evidence.join("native-manifest.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":manifest_event,"manifest":manifest,"scope":"Actual Output details mouse input, canonical completion before the independent manifest query, and retained dialog screenshot"})).unwrap()).unwrap();
+    // Coordinates match the personally inspected CI75 Output details screenshot.
+    // Real pointer/keyboard input edits the destination and activates Save.
+    let saved_path = evidence.join("native-client-saved-copy.mkv");
+    assert!(!saved_path.exists());
+    click(&window, "300", "400").await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&["type", "--clearmodifiers", "--delay", "1", saved_path.to_str().unwrap()]).await;
+    click(&window, "100", "436").await;
+    let started = Instant::now();
+    loop {
+        if saved_path.exists()
+            && let Ok(saved) = nw_platform::files::identity(&saved_path, &CancellationToken::new())
+            && saved.sha256 == artifact.sha256
+            && saved.bytes == artifact.bytes
+        {
+            break;
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot(&window, &evidence.join("native-client-save-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-client-save-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 { println!("NW_NATIVE_SAVE_FAILURE_IMAGE:{}", STANDARD.encode(png)); }
+            panic!("Native human Save verified copy controls did not publish the selected bytes");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(std::fs::read(&saved_path).unwrap(), std::fs::read(&media.source).unwrap());
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-client-saved.png")).await;
+    let png = std::fs::read(evidence.join("native-client-saved.png")).unwrap();
+    if png.len() <= 256 * 1024 { println!("NW_NATIVE_SAVE_IMAGE:{}", STANDARD.encode(png)); }
+    let producer_job_count = query(&root, "jobs.list").await.unwrap()["items"].as_array().unwrap().len();
+    assert_eq!(producer_job_count, 1);
+    std::fs::write(evidence.join("native-client-save.json"), serde_json::to_vec_pretty(&json!({
+        "artifact_id":manifest["artifact_id"], "sha256":artifact.sha256, "bytes":artifact.bytes,
+        "oracle":"Actual destination-field pointer/keyboard input and Save button pointer activation; independent saved/source byte equality",
+        "producer_job_count":producer_job_count,
+        "not_qualified":["native OS Save As picker", "other desktop platforms", "browser file handles"]
+    })).unwrap()).unwrap();
     let record: Value = serde_json::from_slice(
         &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
     )

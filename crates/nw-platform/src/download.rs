@@ -9,7 +9,10 @@ use nw_domain::{
     download::{DownloadVerifier, SaveControl, SaveReceipt},
 };
 use sha2::{Digest, Sha256};
-use std::{io::{Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}};
+use std::{
+    io::{Read, Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+};
 
 pub struct ClientCopy {
     output: PathBuf,
@@ -55,12 +58,20 @@ impl ClientCopy {
     }
     pub fn write(&mut self, bytes: &[u8]) -> Result<()> {
         let verifier = self.verifier.as_mut().ok_or_else(|| {
-            DomainError::new("COPY_STATE_CONFLICT", "Client verification is already finished")
+            DomainError::new(
+                "COPY_STATE_CONFLICT",
+                "Client verification is already finished",
+            )
         })?;
         verifier.push(bytes)?;
-        self.staging.as_mut().ok_or_else(|| {
-            DomainError::new("COPY_STATE_CONFLICT", "Client staging is unavailable")
-        })?.client_write_handle().write_all(bytes).map_err(io_error)?;
+        self.staging
+            .as_mut()
+            .ok_or_else(|| {
+                DomainError::new("COPY_STATE_CONFLICT", "Client staging is unavailable")
+            })?
+            .client_write_handle()
+            .write_all(bytes)
+            .map_err(io_error)?;
         self.copied = verifier.received_bytes();
         Ok(())
     }
@@ -70,7 +81,10 @@ impl ClientCopy {
     pub fn finish(mut self, control: &SaveControl) -> Result<SaveReceipt> {
         control.check()?;
         let verifier = self.verifier.take().ok_or_else(|| {
-            DomainError::new("COPY_STATE_CONFLICT", "Client verification is already finished")
+            DomainError::new(
+                "COPY_STATE_CONFLICT",
+                "Client verification is already finished",
+            )
         })?;
         let mut receipt = verifier.finish(path_text(&self.output)?)?;
         let staging = self.staging.as_mut().ok_or_else(|| {
@@ -87,22 +101,42 @@ impl ClientCopy {
         loop {
             control.check()?;
             let count = file.read(&mut buffer).map_err(io_error)?;
-            if count == 0 { break; }
+            if count == 0 {
+                break;
+            }
             hash.update(&buffer[..count]);
             total = total.checked_add(count as u64).ok_or_else(|| {
                 DomainError::new("ARTIFACT_CHANGED", "Client staging byte count overflowed")
             })?;
         }
-        if total.to_string() != receipt.encoded_byte_count || hex::encode(hash.finalize()) != receipt.sha256 {
-            return Err(DomainError::new("ARTIFACT_CHANGED", "Flushed client staging did not match the selected artifact"));
+        if total.to_string() != receipt.encoded_byte_count
+            || hex::encode(hash.finalize()) != receipt.sha256
+        {
+            return Err(DomainError::new(
+                "ARTIFACT_CHANGED",
+                "Flushed client staging did not match the selected artifact",
+            ));
         }
         self.parent.revalidate()?;
+        let destination = crate::claims::Destination::reviewed(
+            &self.output,
+            &self.parent.object_identity()?,
+        )?;
+        // Client copies participate in the same cross-root writer namespace.
+        // Contention is explicit and nonblocking; no held filesystem write is dropped.
+        let claims = crate::claims::DestinationClaims::try_acquire(vec![destination])?;
+        claims.revalidate()?;
+        control.check()?;
         // Once this wins, cancellation reports that publication is already underway.
         control.begin_commit()?;
-        self.staging.as_ref().expect("Staging was checked")
+        self.staging
+            .as_ref()
+            .expect("Staging was checked")
             .publish_no_replace(&self.parent, &self.output)?;
         if self.cleanup().is_err() {
-            receipt.warnings.push("CLIENT_STAGING_CLEANUP_PENDING".into());
+            receipt
+                .warnings
+                .push("CLIENT_STAGING_CLEANUP_PENDING".into());
         }
         Ok(receipt)
     }
@@ -153,7 +187,9 @@ mod tests {
         let m = manifest(&bytes);
         let output = root.path().join("saved.bin");
         let mut copy = ClientCopy::create(&output, &m).unwrap();
-        for chunk in bytes.chunks(ARTIFACT_CHUNK_BYTES) { copy.write(chunk).unwrap(); }
+        for chunk in bytes.chunks(ARTIFACT_CHUNK_BYTES) {
+            copy.write(chunk).unwrap();
+        }
         let receipt = copy.finish(&SaveControl::default()).unwrap();
         assert_eq!(receipt.sha256, m.sha256);
         assert!(receipt.warnings.is_empty());
@@ -161,9 +197,14 @@ mod tests {
         assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
         let collision = root.path().join("collision.bin");
         let mut copy = ClientCopy::create(&collision, &m).unwrap();
-        for chunk in bytes.chunks(ARTIFACT_CHUNK_BYTES) { copy.write(chunk).unwrap(); }
+        for chunk in bytes.chunks(ARTIFACT_CHUNK_BYTES) {
+            copy.write(chunk).unwrap();
+        }
         std::fs::write(&collision, b"original").unwrap();
-        assert_eq!(copy.finish(&SaveControl::default()).unwrap_err().code, "OUTPUT_COLLISION");
+        assert_eq!(
+            copy.finish(&SaveControl::default()).unwrap_err().code,
+            "OUTPUT_COLLISION"
+        );
         assert_eq!(std::fs::read(&collision).unwrap(), b"original");
         assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 2);
     }
@@ -174,7 +215,10 @@ mod tests {
         let truncated = root.path().join("truncated");
         let mut copy = ClientCopy::create(&truncated, &m).unwrap();
         copy.write(b"ab").unwrap();
-        assert_eq!(copy.finish(&SaveControl::default()).unwrap_err().code, "ARTIFACT_CHANGED");
+        assert_eq!(
+            copy.finish(&SaveControl::default()).unwrap_err().code,
+            "ARTIFACT_CHANGED"
+        );
         assert!(!truncated.exists());
         let changed = root.path().join("changed");
         let mut copy = ClientCopy::create(&changed, &m).unwrap();
@@ -182,7 +226,10 @@ mod tests {
         let file = copy.staging.as_mut().unwrap().client_write_handle();
         file.seek(SeekFrom::Start(0)).unwrap();
         file.write_all(b"abd").unwrap();
-        assert_eq!(copy.finish(&SaveControl::default()).unwrap_err().code, "ARTIFACT_CHANGED");
+        assert_eq!(
+            copy.finish(&SaveControl::default()).unwrap_err().code,
+            "ARTIFACT_CHANGED"
+        );
         assert!(!changed.exists());
         let cancelled = root.path().join("cancelled");
         let mut copy = ClientCopy::create(&cancelled, &m).unwrap();
