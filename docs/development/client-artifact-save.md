@@ -101,3 +101,19 @@ ownership failure is not retried against a newly resolved pathname. A regression
 renames the selected parent, redirects it to an unrelated empty replacement,
 then verifies that both the replacement and retained original payload survive.
 These latest source/control corrections await their own CI.
+
+CI78 again passed all four native targets, complete media and large scoped
+copy/cancellation/revocation. Its Unix cleanup-redirect regression passed.
+The native OS picker opened and the UI reported verified saved bytes, but the
+harness replaced only the selected stem and left a duplicate extension, so its
+independent expected-path oracle failed. This is not a full picker pass.
+The next input selects the complete name after Ctrl+L before typing the path.
+
+Chrome still reported a cancelled network event after displaying the correct
+report; its exact mechanism is unresolved and browser Save was not reached.
+The following test-only observer captures only bounded canonical report HTTP
+responses and forwards their original status, headers and bytes unchanged.
+It correlates them with the actual Chrome-observed pointer request. There is
+no direct business call or mocked response. The real report dialog PNG and
+independent Save As file oracle remain required. Artifact/upload byte routes
+are not intercepted by the command-response observer.

@@ -1497,6 +1497,234 @@
       "read_scope": "complete_body",
       "lines": 589,
       "interpretation": "All/language/title/original-index selection, explicit no-track choices, stable back/revisit state, retained-stream metadata edits and folder companion defaults are real behavior. Automatic attachment removal when subtitles are absent/removed is the confirmed coupling defect; Rust preserves independent attachment policy. A single audio track remains a choice. These bodies do not qualify complete F08."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/constants.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "8db5cb8e33f60ecbd7c1e2a5ce0ab16b779432ef",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 99,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/constants.py",
+        "standalone_git_blob_sha": "32e3863e08b459dde984251c040c737d1c5581cb",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/copying.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "fc1d33834046ebd544015b420e56c9646f54fb74",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 331,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/copying.py",
+        "standalone_git_blob_sha": "cb33fa2f71e2d1289599d4b2166bb3eefda0faa2",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/metadata_edits.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "8fc0fb97c9690e9b87558a14e03460c003459786",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 231,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/metadata_edits.py",
+        "standalone_git_blob_sha": "cf4a8f3109df824d65fb4fb230f64979a2099889",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/models.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "f63964eb5b72d5aeb77d46260ada02ff730e84d7",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 180,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/models.py",
+        "standalone_git_blob_sha": "1ab144405bc5f173f6c6e86bfee92aa79b0d6ee6",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/muxlogic.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "9e14e462a1dfe6c9113e6f9bac6b38bae3fe7079",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 265,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+        "standalone_git_blob_sha": "0d458aaef747551b972a41d972221e07267aa4e9",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/output.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "e57caa44ddff23ac6d46694573a3a8c33337e5e9",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 275,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/output.py",
+        "standalone_git_blob_sha": "76035c056702441b5fb85e426245092cd297c1d8",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/processing.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "3f612ba83b671e71b2f08a6a4dbc97c25ad8defe",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 458,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/processing.py",
+        "standalone_git_blob_sha": "5118adf5184586cc40abc1f27871ac6c4dec8085",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/progressview.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "d4c1854070160180844a1adfe70168c08ea20452",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 407,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/progressview.py",
+        "standalone_git_blob_sha": "ac00eb813b28dca1d079c7a71a35aae66f7f2535",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/prompts.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "31b1dd3110768872c002641a2fdba0a7fd9f7f75",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 314,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/prompts.py",
+        "standalone_git_blob_sha": "282cfa035bae8a75593c01b0150b03a7d304dcf3",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/reporting.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "2ed1bc6a25eda9dc41218681771de165d833c389",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 410,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/reporting.py",
+        "standalone_git_blob_sha": "c199e4a47b372f846b8d5a3cdbf7df6fca67385a",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/selection.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "3e19f796437a4a2dd64d17426d5321b3d56c9df5",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 590,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/selection.py",
+        "standalone_git_blob_sha": "6e41f183bfbca7def676c419f59c8110fbef62de",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/textutil.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "687549c8659656a59981639d8a4f5db9f289a31b",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 327,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/textutil.py",
+        "standalone_git_blob_sha": "f87ffd9671607b9d0e416346c1211a10dc213a90",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/__init__.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "e4ccf3362b83f6ba20f53577187b925269d7b119",
+      "read_scope": "complete_body",
+      "lines": 6,
+      "interpretation": "Embedded namespace/docstring differs while APP_VERSION remains 1.3.1. This is source provenance, not a Numera release or runtime dependency."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/app.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "65163294e020ecf502b0649682f74371694701f2",
+      "read_scope": "complete_body",
+      "lines": 246,
+      "interpretation": "The embedded entry adds allow_back and returns the last ProcessSummary to the host wizard. Back/cancel before work is not a produced result; failed media/companions remain in aggregate outcome. PATH discovery, sys.exit and optional postpublication verification are donor behaviors to replace with the shared Rust client/owner and mandatory verification."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/logsetup.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "c4df0f4d2fc3967f30a5c6a3aa92a68064654a2b",
+      "read_scope": "complete_body",
+      "lines": 121,
+      "interpretation": "Embedding moves Logs two directories above the package and uses timezone.utc rather than UTC. UTC provenance is retained; debug-only command disclosure, ambient timeout settings, unsanitized argv and post-capture truncation do not replace bounded protected Rust logging."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/media.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "74ce65ba26f69f78b71320ad4a2629263f84b3a4",
+      "read_scope": "complete_body",
+      "lines": 408,
+      "interpretation": "The embedded runner fixes false robocopy success by changing launch/capture failure from 1 to 127 and explicitly decodes version text as UTF-8 with replacement. Rust retains proper typed launch/capture errors instead of return-code conventions, uses bounded strict probe/diagnostic handling and owned process groups. Float NaN/infinity timeout acceptance, complete capture rereads, recursive inventory memory and termination claims remain donor defects; explicit deadline/progress/discovery work is still required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/colors.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "2c695618f6d17a1de5af8cb1afe7df4fc28ed159",
+      "read_scope": "complete_body",
+      "lines": 275,
+      "interpretation": "Embedded ANSI names align with the parent wizard palette and remove the duplicate blue/sky language entry. Console presentation does not become another GUI theme/engine. Rust protocol/JSON output remains plain and external control sequences must be handled safely."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/support/ext00b.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "01dfad3afd94316eb8c05325253edf63ac3f367c",
+      "read_scope": "complete_body",
+      "lines": 566,
+      "interpretation": "The integration adapter clears/restores argv, maps only actual media/companion failures to an aggregate code, distinguishes leaving before work, and releases terminal ownership. It does not implement a machine-config API from base_answers. Full body also includes source-dependent GPU probes, crop previews and join helpers: actual qualified device probing is separate from a compiled encoder list and remains owner-harness work; no GPU result is inferred or executed here."
     }
   ]
 }

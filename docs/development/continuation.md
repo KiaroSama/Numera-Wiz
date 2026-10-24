@@ -1290,3 +1290,47 @@ complete. All full F01-F15/MuxCls/folder/batch, project/editor/effects/DAG/previ
 mixer/captions/interchange, command/donor closure, retention/migration, packages/
 resources/manuals and matching owner-harness gates remain required. No local
 build/test/GUI/media or owner GPU run occurred. Main/public/draft boundaries hold.
+
+
+## Native OS picker observation, Chrome response tap and embedded-source closure
+
+Run 40093194869 on a49054ee162246cacc14ff902c722e0dcfa08e5d passed
+all four native targets, WASM/lock and the entire actual media suite, including
+the new Unix redirect cleanup regression. The scoped client copied 268633400
+bytes with observed 26016 KiB HWM; preparation before the cancellation boundary
+took 45979 ms, independently showing why a 40-second setup bound was insufficient
+on this hosted run. Confirmed drain, cleanup and all HTTP revocation assertions
+passed. The exact compiled merge/binary/component report is artifact-http-ci78.json.
+
+Both GUI jobs failed their new observations. Native typed-path Save passed;
+the real OS picker opened and its screenshot was personally inspected. The
+failure desktop image reports 197983 verified bytes saved, but the path ends
+.mkv.mkv because the picker selected a stem rather than the entire name. The
+independent expected-path oracle therefore failed and no full OS picker pass
+is inferred. Both OS picker inputs now Ctrl+A after Ctrl+L before typing.
+
+Chrome still displayed the correct report while recording a cancelled network
+event; 141 debugger-body attempts could not recover it. That exact event cause
+remains unresolved; Save was not reached. The next test-only bounded observer
+records the actual canonical report HTTP response, forwards original status/
+headers/body bytes unchanged and correlates it to the Chrome-observed real
+pointer request. No handler invocation or mocked response substitutes for the
+UI. The same 15-second bound, report assertions, actual PNG and independent
+real-picker/save file oracle remain. Artifact/upload streams are untouched.
+All 15 exact hosted formatting hunks are applied. See client-save-ci78.json.
+
+Embedded MuxCls reading now covers all 17 module executable bodies and the
+integration adapter: 12 bodies were fetched on both sides, Git IDs checked,
+and proven character-identical to their personally read standalone counterparts
+after removing one attribution comment. The other five embedded bodies and
+the full ext00b adapter were personally read. The ledger distinguishes this
+verified shared-body method from a fresh complete-body reading. The complete
+standalone-vs-embedded patch was read too. It confirms embedded 127 launch/
+capture failure, UTF-8 version decoding, returned aggregate/back semantics and
+palette/log-path differences. No preserved research member changed and no
+runtime Python/PowerShell/robocopy dependency was introduced.
+
+Typed disabled/finite cleanup policies, full progress/discovery/batch/companion
+work and all other full-product/five-surface/package/resource/manual/owner gates
+remain required. No timeout/progress feature source has been added yet. No task
+checkbox changed; no local build/test/GUI/media or owner GPU run occurred.
