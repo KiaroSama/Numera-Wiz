@@ -34,6 +34,6 @@ new legacy jobs. Future schema versions fail explicitly.
 
 This batch adds focused domain/store/service assertions and an actual official
 MCP cross-principal equivalent-plan hash assertion to the hosted owner journey.
-Its hosted qualification is pending. This is the current single-source cleanup
+Hosted run 40061709915 passed all four native test/lint/desktop targets, the WASM build, actual engine and CLI/official MCP journeys, actual Linux native input and Chrome interaction. Its cross-principal equivalent-plan assertion passed. Native and large-output evidence is retained in `evidence/native-copy-ci54.json` and `evidence/artifact-http-ci54.json`. This is the current single-source cleanup
 contract; multi-source project/dependency graphs, observations, device/network
 purposes and the full release acceptance matrix remain required work.

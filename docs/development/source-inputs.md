@@ -1,0 +1,35 @@
+# Ordinary source handles
+
+The current ordinary input route classifies a bounded content prefix before
+probing, forces the captured demuxer, and denies automatic external dependencies.
+MOV admission also walks bounded box/reference records and rejects external URL,
+alias and compressed/reference modes. This does not implement concat/HLS/image
+sequence/IMF dependency resolution; those remain required explicit routes.
+
+Probe and packet verification inherit an admitted regular file on descriptor 0
+using FFmpeg's seekable `fd:` protocol. The pending remux change uses the same
+route: the reviewed argv names `fd:`, explicit demuxer, descriptor and block size.
+It never asks FFmpeg to reopen the source pathname. The plan's source identity
+and required rights still identify which native file supplies that descriptor.
+
+At remux stage admission, the engine holds an independent physical/change stamp
+for that exact opened file. It verifies the full reviewed source digest, checks
+the stamp after process admission, after child completion and after full output/
+packet verification. Identical-content replacement of the native pathname is a
+change, not the held input. A pre-spawn rejection releases process capacity;
+uncertain process termination keeps its existing quarantine contract. This is
+additional to full source SHA-256 verification, never a metadata-only substitute.
+
+A valid plan digest does not reactivate an obsolete pathname-input remux argv.
+Current route validation runs at acceptance preflight and before execution;
+a mismatch requires a fresh review without rewriting the historic hash.
+No-op copies retain the separate Rust verified-copy route.
+
+New hosted cases assert a real tail-indexed MOV-to-Matroska seekable remux,
+existing full packet/tag/clock preservation, refusal of an obsolete route, and
+replacement by identical source bytes after stage preparation with no publication
+and no lost process slot. A cross-platform unit also attempts to bind a preopened
+original to a new file at the old name. These changes await their own hosted
+results. Original OS object identities are not yet persisted in asset records;
+complete source/parent-handle leases, global output claims, reference-route
+canaries and package-level race/format qualification remain required work.

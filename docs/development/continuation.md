@@ -646,3 +646,37 @@ Browser interaction is still in progress and native interaction was skipped afte
 its prerequisite failed. Do not credit those interfaces for this source yet.
 Personal reading is 47 complete manual bodies; filters are personally read through
 line 15800 with the remaining lines explicitly pending in the reading ledger.
+
+
+## Pending held-file remux qualification
+
+Remux lowering now freezes the same seekable descriptor-0 ordinary input route
+used by probe/packet verification. Stage admission binds an already opened file
+to a held physical/change stamp, retaining it through processing and final source
+verification. Current route validation also rejects obsolete pathname argv before
+new acceptance, without changing historical hashes. A changed-input rejection
+before spawn settles and returns its process ticket. New actual-media cases cover
+a tail-indexed MOV remux and identical-content source replacement after prepared
+argv, while existing packet/tag/clock oracles remain mandatory. Cross-platform
+units cover a preopened original at a replaced name. These source changes are
+pending CI; see `source-inputs.md` for exact scope and remaining identity/lease,
+reference-route, global output and package obligations. No local execution ran.
+
+
+## Version 2 hosted checkpoint
+
+Run 40061709915 on head 7a327cdc2d0cc63f9a8701da9dcc76208129ad0b completed
+all jobs successfully: lock/format, WASM, four native unit/lint/desktop targets,
+actual engine and CLI/official MCP journeys, real Linux native window input and
+Chrome interaction. Cross-principal equivalent plans retained one semantic hash.
+The large valid output transferred 268633400 bytes through the actual owner HTTP
+route with a 34980 KiB process high-water mark; active job Read and bearer
+withdrawal interrupted streams and denied new requests. Exact scoped reports are
+in evidence/artifact-http-ci54.json and evidence/native-copy-ci54.json. The native
+completed-workspace screenshot was personally inspected: Succeeded and Output
+details are visible; opening that dialog is not credited yet. These development
+results do not qualify packages, aggregate R20, full product surfaces or GPU.
+Held-file remux source changes below this checkpoint still await their own CI.
+
+Personal reading is 47 complete bodies and the filters body through line 28300;
+all later filter lines remain pending. No local compilation or media execution ran.
