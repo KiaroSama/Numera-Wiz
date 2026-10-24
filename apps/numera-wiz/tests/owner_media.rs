@@ -771,6 +771,27 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         fixture_bytes
     );
     browser.cancel().await.unwrap();
+    let status = cli.query("logs.status", json!({})).await;
+    assert_eq!(status["configured"], true);
+    assert_eq!(status["writer_healthy"], true);
+    assert_eq!(status["retained_file_limit"], 5);
+    let logs = std::path::Path::new(status["directory"].as_str().unwrap());
+    let mut events = 0;
+    for entry in std::fs::read_dir(logs).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|extension| extension == "jsonl") {
+            let bytes = nw_platform::security::read_private(&path, 2 * 1024 * 1024 + 1024).unwrap();
+            let text = String::from_utf8(bytes.clone()).unwrap();
+            for value in [&token, &issued_bearer, &browser_bearer] { assert!(!text.contains(value.as_str()), "Protected logs must not contain a transport bearer"); }
+            for line in bytes.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()) {
+                let row = nw_domain::commands::decode_json(line).unwrap();
+                assert!(["INFO", "WARNING", "ERROR", "DEBUG"].contains(&row["level"].as_str().unwrap()));
+                assert!(row["timestamp"].is_string());
+                if row.get("fields").is_some() { events += 1; }
+            }
+        }
+    }
+    assert!(events > 0, "Actual detached-owner work must produce protected structured events");
     server.kill().await.unwrap();
     server.wait().await.unwrap();
 }
