@@ -581,6 +581,131 @@ mod tests {
             params: serde_json::json!({"plan_id":"test-plan","plan_hash":"unit-plan-hash"}),
         }
     }
+    // Synthetic queue facts exercise storage only; these are never media/runtime evidence.
+    fn batch_fixture(store: &Store, count: usize, persist: usize) -> (
+        nw_domain::batches::BatchPlan, nw_domain::batches::Batch,
+        Vec<Plan>, Request, nw_domain::access::ExecutionAuthorization,
+    ) {
+        use nw_domain::batches::*;
+        let mut children = Vec::new();
+        let mut items = Vec::new();
+        for index in 0..count {
+            let mut plan = job().plan;
+            plan.schema_version = 2;
+            plan.id = format!("child-{index}");
+            plan.source.id = format!("asset-{index}");
+            plan.source.identity.path = format!("/synthetic/source-{index}.mkv");
+            plan.source.identity.sha256 = format!("{index:064x}");
+            plan.output = format!("/synthetic/output-{index}.mkv");
+            let mut rights = nw_domain::plans::RequiredRights::native(plan.source.identity.clone(), plan.output.clone());
+            rights.data_root = store.root_id().into();
+            plan.required_rights = Some(rights);
+            plan.creation_audit = Some(nw_domain::plans::CreationAudit { principal: "alice".into(), policy_revision: 0 });
+            plan.hash = nw_domain::plans::digest(&plan).unwrap();
+            if index < persist { store.put(&format!("plan/{}",plan.id), &plan).unwrap(); }
+            items.push(PlannedItem {
+                index: index as u32, asset_id: plan.source.id.clone(), source_sha256: plan.source.identity.sha256.clone(),
+                source_bytes: plan.source.identity.bytes.clone(), output_name: format!("output-{index}.mkv"),
+                requested_output: plan.output.clone(), plan: Some(PlanReference { id: plan.id.clone(), hash: plan.hash.clone() }),
+                action: Some(plan.resolution.action.clone()), error: None,
+            });
+            children.push(plan);
+        }
+        let mut plan = BatchPlan {
+            schema_version: 1, id: "batch-plan".into(), creator: "alice".into(), data_root: store.root_id().into(),
+            hash: String::new(), created_at: "100".into(), expires_at: "1000".into(),
+            failure_policy: FailurePolicy::RejectAll, unresolved_policy: UnresolvedPolicy::Reject,
+            unresolved: Vec::new(), items,
+        };
+        plan.hash = plan.digest().unwrap();
+        store.put("batch-plan/batch-plan", &plan).unwrap();
+        let batch = Batch {
+            schema_version: 1, id: "batch".into(), creator: "alice".into(), plan_id: plan.id.clone(),
+            plan_hash: plan.hash.clone(), accepted_at: "99999".into(),
+            members: (0..count).map(|index| BatchMember { index: index as u32, job_id: Some(format!("batch-job-{index}")) }).collect(),
+        };
+        let mut request = Request::query("batches.submit", serde_json::json!({"plan_id":plan.id,"plan_hash":plan.hash}));
+        request.replay_scope = Some(store.issue_scope("alice", 100).unwrap());
+        request.idempotency_key = Some("accept-batch".into());
+        let auth = nw_domain::access::ExecutionAuthorization { principal: "alice".into(), profile: None, revision: 0 };
+        (plan, batch, children, request, auth)
+    }
+    #[test]
+    fn full_bounded_batch_and_receipt_commit_together_and_replay_ignores_new_targets() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let (plan, batch, _children, request, auth) = batch_fixture(&store, 64, 64);
+        let accepted = store.accept_batch_with_clock("alice", &request, &plan, &batch, &auth, || Ok(102)).unwrap();
+        assert_eq!(accepted.result.as_ref().unwrap()["accepted_jobs"], 64);
+        assert_eq!(accepted.result.as_ref().unwrap()["accepted_at"], "102");
+        let stored: nw_domain::batches::Batch = store.get("batch/batch").unwrap().unwrap();
+        assert_eq!(stored.accepted_at, "102", "The writer admission clock replaces caller audit time");
+        assert_eq!(store.list::<Job>("job/", 128).unwrap().len(), 64);
+        for index in 0..64 {
+            assert_eq!(store.inspect_job(&format!("batch-job-{index}")).unwrap().state, JobState::Queued);
+            assert!(store.get::<nw_domain::access::ExecutionAuthorization>(&format!("job-auth/batch-job-{index}")).unwrap().is_some());
+        }
+        drop(store);
+        let store = Store::open(root.path()).unwrap();
+        let mut invalid = plan.clone();
+        invalid.hash = "not-a-valid-new-plan".into();
+        let mut retry = request.clone();
+        retry.request_id = "separate-process-retry".into();
+        let replay = store.accept_batch_with_clock("alice", &retry, &invalid, &batch, &auth, || Ok(103)).unwrap();
+        assert_eq!(replay.receipt_id, accepted.receipt_id);
+        assert_eq!(replay.request_id, "separate-process-retry");
+        assert_eq!(store.list::<Job>("job/", 128).unwrap().len(), 64);
+        retry.params["plan_hash"] = "changed".into();
+        assert_eq!(store.accept_batch_with_clock("alice", &retry, &plan, &batch, &auth, || Ok(103)).unwrap_err().code, "IDEMPOTENCY_CONFLICT");
+        let mut ordinary = Request::query("assets.register", serde_json::json!({"path":"/synthetic/source"}));
+        ordinary.replay_scope = request.replay_scope.clone();
+        ordinary.idempotency_key = Some("ordinary-budget".into());
+        let records = (0..65).map(|index| (format!("unit/budget-{index}"), serde_json::json!(true))).collect::<Vec<_>>();
+        assert_eq!(store.commit_with_clock("alice", &ordinary, || Ok(104), serde_json::json!({}), &records).unwrap_err().code, "RESOURCE_LIMIT");
+    }
+    #[test]
+    fn late_child_failure_rolls_back_every_job_group_and_receipt_before_a_safe_retry() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let (plan, batch, children, request, auth) = batch_fixture(&store, 2, 1);
+        assert_eq!(store.accept_batch_with_clock("alice", &request, &plan, &batch, &auth, || Ok(101)).unwrap_err().code, "INVALID_PLAN");
+        assert!(store.get::<nw_domain::batches::Batch>("batch/batch").unwrap().is_none());
+        assert!(store.list::<Job>("job/", 8).unwrap().is_empty());
+        assert!(store.replay("alice", &request, 101).unwrap().is_none());
+        store.put(&format!("plan/{}",children[1].id), &children[1]).unwrap();
+        let accepted = store.accept_batch_with_clock("alice", &request, &plan, &batch, &auth, || Ok(102)).unwrap();
+        assert!(accepted.ok);
+        assert_eq!(store.list::<Job>("job/", 8).unwrap().len(), 2);
+    }
+    #[test]
+    fn batch_cancellation_journals_requests_without_claiming_a_running_writer_stopped() {
+        use nw_domain::batches::CancelMember;
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(root.path()).unwrap();
+        let (plan, batch, _children, accepted, auth) = batch_fixture(&store, 2, 2);
+        store.accept_batch_with_clock("alice", &accepted, &plan, &batch, &auth, || Ok(101)).unwrap();
+        store.transition_job("batch-job-0", JobState::Queued, JobState::Running).unwrap();
+        let mut request = Request::query("batches.cancel", serde_json::json!({"id":batch.id}));
+        request.replay_scope = accepted.replay_scope.clone();
+        request.idempotency_key = Some("cancel-batch".into());
+        let patches = [
+            CancelMember { job_id: "batch-job-0".into(), expected_state: JobState::Running },
+            CancelMember { job_id: "batch-job-1".into(), expected_state: JobState::Queued },
+        ];
+        let result = serde_json::json!({"batch_id":batch.id});
+        let response = store.cancel_batch_with_clock("alice", &request, &batch, &patches, result.clone(), || Ok(102)).unwrap();
+        assert_eq!(store.inspect_job("batch-job-0").unwrap().state, JobState::Running);
+        assert_eq!(store.inspect_job("batch-job-1").unwrap().state, JobState::Cancelled);
+        for id in ["batch-job-0", "batch-job-1"] {
+            assert_eq!(store.get::<bool>(&format!("cancel/{id}")).unwrap(), Some(true));
+        }
+        let replay = store.cancel_batch_with_clock("alice", &request, &batch, &patches, result.clone(), || Ok(103)).unwrap();
+        assert_eq!(replay.receipt_id, response.receipt_id);
+        request.idempotency_key = Some("stale-patch".into());
+        let wrong = [CancelMember { job_id: "batch-job-1".into(), expected_state: JobState::Queued }];
+        assert_eq!(store.cancel_batch_with_clock("alice", &request, &batch, &wrong, result, || Ok(103)).unwrap_err().code, "STALE_JOB_STATE");
+        assert!(store.replay("alice", &request, 103).unwrap().is_none());
+    }
     #[test]
     fn receipt_and_queued_job_survive_restart_and_replay_precedes_target_validation() {
         let root = tempfile::tempdir().unwrap();

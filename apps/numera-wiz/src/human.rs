@@ -176,6 +176,35 @@ pub enum Jobs {
     },
 }
 #[derive(Subcommand)]
+pub enum Batches {
+    List {
+        #[command(flatten)]
+        page: Page,
+    },
+    /// Preview an explicit bounded candidate document using the shared cleanup planner.
+    Plan {
+        #[arg(long)]
+        file: PathBuf,
+    },
+    PlanInspect { id: String },
+    Submit {
+        #[arg(long)]
+        plan: String,
+        #[arg(long)]
+        plan_hash: String,
+        #[command(flatten)]
+        identity: MutationIdentity,
+    },
+    Inspect { id: String },
+    Cancel {
+        id: String,
+        #[command(flatten)]
+        identity: MutationIdentity,
+    },
+    /// Observe an accepted batch; Ctrl+C stops waiting and leaves accepted jobs running.
+    Wait { id: String },
+}
+#[derive(Subcommand)]
 pub enum Logs {
     Status,
 }
@@ -190,6 +219,7 @@ pub enum Command {
     Streams(Streams),
     Plans(Plans),
     Jobs(Jobs),
+    Batches(Batches),
     Logs(Logs),
     Discovery(Option<Discovery>),
 }
@@ -291,6 +321,27 @@ pub fn prepare(command: Command) -> Result<Request> {
             identity.apply(&mut request)?;
             request
         }
+        Command::Batches(Batches::List { page }) => query("batches.list", page.params()),
+        Command::Batches(Batches::Plan { file }) => {
+            let mut input: nw_domain::batches::CleanBatchInput = commands::parse(document(&file)?)?;
+            input.validate()?;
+            for item in &mut input.items {
+                item.output = native_path(Path::new(&item.output))?;
+            }
+            query("streams.clean.batch_plan", serde_json::to_value(input)?)
+        }
+        Command::Batches(Batches::PlanInspect { id }) => query("batches.plan_inspect", json!({"id":id})),
+        Command::Batches(Batches::Inspect { id } | Batches::Wait { id }) => query("batches.inspect", json!({"id":id})),
+        Command::Batches(Batches::Submit { plan, plan_hash, identity }) => {
+            let mut request = query("batches.submit", json!({"plan_id":plan,"plan_hash":plan_hash}));
+            identity.apply(&mut request)?;
+            request
+        }
+        Command::Batches(Batches::Cancel { id, identity }) => {
+            let mut request = query("batches.cancel", json!({"id":id}));
+            identity.apply(&mut request)?;
+            request
+        }
         Command::Logs(Logs::Status) => query("logs.status", json!({})),
         Command::Discovery(None | Some(Discovery::List)) => query("commands.list", json!({})),
         Command::Discovery(Some(Discovery::Schema { id })) => {
@@ -301,6 +352,9 @@ pub fn prepare(command: Command) -> Result<Request> {
     Ok(commands::decode_request(&serde_json::to_vec(&request)?)?)
 }
 pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
+    if let Command::Batches(Batches::Wait { id }) = &command {
+        return wait_batch(client, id).await;
+    }
     match prepare(command) {
         Ok(request) => print_response(client, request).await,
         Err(error) => {
@@ -322,6 +376,52 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     }
 }
 
+async fn wait_batch(client: &NativeClient, id: &str) -> Result<()> {
+    loop {
+        let request = query("batches.inspect", json!({"id":id}));
+        let mut response = tokio::select! {
+            response = client.request(&request) => match response {
+                Ok(response) => response,
+                Err(error) => {
+                    let public = error.downcast_ref::<DomainError>().cloned().unwrap_or_else(|| DomainError::new("TRANSPORT_ERROR", "Batch observation connection failed; accepted jobs remain owned by the worker"));
+                    println!("{}", serde_json::to_string_pretty(&Response::error("batch-wait", public.clone()))?);
+                    return Err(public.into());
+                }
+            },
+            signal = tokio::signal::ctrl_c() => {
+                signal?;
+                let error = DomainError::new("CANCELLED", "Stopped waiting; accepted batch jobs continue");
+                println!("{}", serde_json::to_string_pretty(&Response::error("batch-wait", error.clone()))?);
+                return Err(error.into());
+            }
+        };
+        if !response.ok {
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            return Err(response.error.unwrap_or_else(|| DomainError::new("BATCH_UNAVAILABLE", "Batch inspection failed")).into());
+        }
+        let result: nw_domain::batches::BatchResult = commands::parse(response.result.clone().ok_or_else(|| DomainError::new("INVALID_BATCH", "Batch inspection omitted its result"))?)?;
+        if result.complete {
+            let error = if result.failed == 0 && result.interrupted == 0 && result.cancelled == 0 { None }
+                else if result.failed == 0 && result.interrupted == 0 && result.succeeded == 0 && result.cancelled > 0 {
+                    Some(DomainError::new("CANCELLED", "Batch cancellation completed without a published success"))
+                } else { Some(DomainError::new("PARTIAL_BATCH_FAILURE", "Batch completed with failed, interrupted or cancelled candidates")) };
+            response.ok = error.is_none();
+            response.error = error.clone();
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            return error.map_or(Ok(()), |error| Err(error.into()));
+        }
+        tracing::debug!(batch_id=id, finished=result.finished,total=result.total,"batch.wait.progress");
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            signal = tokio::signal::ctrl_c() => {
+                signal?;
+                let error = DomainError::new("CANCELLED", "Stopped waiting; accepted batch jobs continue");
+                println!("{}", serde_json::to_string_pretty(&Response::error("batch-wait", error.clone()))?);
+                return Err(error.into());
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

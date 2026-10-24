@@ -22,6 +22,8 @@ fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &s
     }
     for (prefix, limit) in [
         ("asset/", 4096usize),
+        ("batch-plan/", 128),
+        ("batch/", 1024),
         ("job/", 4096),
         ("profile/", 128),
         ("plan/", 512),
@@ -281,16 +283,32 @@ impl Store {
         result: Value,
         records: &[(String, Value)],
     ) -> Result<Response> {
-        request.validate()?;
-        if records.len() > 64 {
-            return Err(DomainError::new(
-                "RESOURCE_LIMIT",
-                "Mutation record budget exceeded",
-            ));
+        self.commit_records_with_clock(principal, request, clock, result, records, 64)
+    }
+    fn commit_records_with_clock(
+        &self, principal: &str, request: &Request, clock: impl FnOnce() -> Result<u64>,
+        result: Value, records: &[(String, Value)], record_limit: usize,
+    ) -> Result<Response> {
+        if records.len() > record_limit || record_limit > 129 {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Mutation record budget exceeded"));
         }
+        self.commit_composed_with_clock(principal, request, clock, |table, _now| {
+            for (record_key, value) in records {
+                valid_key(record_key)?;
+                record_quota(table, record_key)?;
+                table.insert(record_key.as_str(), encode(value)?.as_slice()).map_err(storage)?;
+            }
+            Ok(result)
+        })
+    }
+    /// The same replay/clock/receipt transaction kernel serves ordinary and composed mutations.
+    fn commit_composed_with_clock(
+        &self, principal: &str, request: &Request, clock: impl FnOnce() -> Result<u64>,
+        compose: impl FnOnce(&mut redb::Table<'_, &'static str, &'static [u8]>, u64) -> Result<Value>,
+    ) -> Result<Response> {
+        request.validate()?;
         let digest = request.structural_digest();
         let write = self.db.begin_write().map_err(storage)?;
-        // Sample after writer admission, never from a request timestamp captured before waiting.
         let now = clock()?;
         let (key, scope) = self.replay_key(principal, request, now)?;
         let response;
@@ -300,50 +318,151 @@ impl Store {
             if let Some(value) = table.get(key.as_str()).map_err(storage)? {
                 let receipt: Receipt = decode(value.value())?;
                 if receipt.digest != digest {
-                    return Err(DomainError::new(
-                        "IDEMPOTENCY_CONFLICT",
-                        "Scope/key content conflict",
-                    ));
+                    return Err(DomainError::new("IDEMPOTENCY_CONFLICT", "Scope/key content conflict"));
                 }
                 let mut response = receipt.response;
                 response.request_id = request.request_id.clone();
                 return Ok(response);
             }
+            let result = compose(&mut table, now)?;
             response = {
                 let mut response = Response::success(&request.request_id, result);
                 response.receipt_id = Some(Uuid::new_v4().to_string());
                 response
             };
-            if serde_json::to_vec(&response).map_err(storage)?.len()
-                > nw_domain::commands::MAX_RESULT_BYTES
-            {
-                return Err(DomainError::new(
-                    "RESOURCE_LIMIT",
-                    "Mutation result exceeds its admitted response budget before acceptance",
-                ));
-            }
-            for (record_key, value) in records {
-                valid_key(record_key)?;
-                record_quota(&table, record_key)?;
-                table
-                    .insert(record_key.as_str(), encode(value)?.as_slice())
-                    .map_err(storage)?;
+            if serde_json::to_vec(&response).map_err(storage)?.len() > nw_domain::commands::MAX_RESULT_BYTES {
+                return Err(DomainError::new("RESOURCE_LIMIT", "Mutation result exceeds its admitted response budget before acceptance"));
             }
             record_quota(&table, &key)?;
             let receipt = Receipt {
-                digest,
-                response: response.clone(),
+                digest, response: response.clone(),
                 expires_at: scope.expires_at.parse().map_err(storage)?,
             };
-            table
-                .insert(key.as_str(), encode(&receipt)?.as_slice())
-                .map_err(storage)?;
-            table
-                .insert("meta/clock", now.to_string().as_bytes())
-                .map_err(storage)?;
+            table.insert(key.as_str(), encode(&receipt)?.as_slice()).map_err(storage)?;
+            table.insert("meta/clock", now.to_string().as_bytes()).map_err(storage)?;
         }
         write.commit().map_err(storage)?;
         Ok(response)
+    }
+    /// Stream child plans through one atomic receipt transaction; retain one full plan at a time.
+    pub fn accept_batch_with_clock(
+        &self, principal: &str, request: &Request, plan: &nw_domain::batches::BatchPlan,
+        batch: &nw_domain::batches::Batch, authorization: &ExecutionAuthorization,
+        clock: impl FnOnce() -> Result<u64>,
+    ) -> Result<Response> {
+        use nw_domain::batches::SubmitBatchInput;
+        if request.command.id != "batches.submit" {
+            return Err(DomainError::new("INVALID_ACCEPTANCE", "This primitive accepts cleanup batches only"));
+        }
+        self.commit_composed_with_clock(principal, request, clock, |table, now| {
+            if batch.creator != principal || authorization.principal != principal || plan.data_root != self.root_id() {
+                return Err(DomainError::new("INVALID_ACCEPTANCE", "Batch acceptance principal/root differs"));
+            }
+            plan.admits_submission()?;
+            batch.validate(plan)?;
+            let input: SubmitBatchInput = nw_domain::commands::parse(request.params.clone())?;
+            if input.plan_id != plan.id || input.plan_hash != plan.hash || plan.expires_at.parse::<u64>().unwrap_or(0) <= now {
+                return Err(DomainError::new("INVALID_ACCEPTANCE", "Batch acceptance must match the current reviewed plan"));
+            }
+            let batch_key = format!("batch/{}",batch.id);
+            if table.get(batch_key.as_str()).map_err(storage)?.is_some() {
+                return Err(DomainError::new("OBJECT_CONFLICT", "Batch identity already exists"));
+            }
+            let mut accepted = batch.clone();
+            accepted.accepted_at = now.to_string();
+            record_quota(table, &batch_key)?;
+            table.insert(batch_key.as_str(), encode(&accepted)?.as_slice()).map_err(storage)?;
+            let auth_bytes = encode(authorization)?;
+            let mut count = 0usize;
+            for (member, item) in accepted.members.iter().zip(&plan.items) {
+                let Some(id) = &member.job_id else { continue };
+                let reference = item.plan.as_ref().ok_or_else(|| DomainError::new("INVALID_ACCEPTANCE", "Rejected candidate cannot start a job"))?;
+                let child: nw_domain::records::Plan = {
+                    let value = table.get(format!("plan/{}",reference.id).as_str()).map_err(storage)?
+                        .ok_or_else(|| DomainError::new("INVALID_PLAN", "Batch child plan is missing"))?;
+                    nw_domain::plans::decode(decode(value.value())?)?
+                };
+                if child.hash != reference.hash || child.source.id != item.asset_id
+                    || child.source.identity.bytes != item.source_bytes || child.source.identity.sha256 != item.source_sha256
+                    || Some(&child.resolution.action) != item.action.as_ref()
+                    || child.output != item.requested_output
+                    || child.output.rsplit(['/', '\\']).next() != Some(item.output_name.as_str())
+                    || child.expires_at.parse::<u64>().unwrap_or(0) <= now
+                    || nw_domain::plans::validate_requirements(&child)?.data_root != self.root_id()
+                {
+                    return Err(DomainError::new("INVALID_ACCEPTANCE", "Child plan differs from its frozen batch outcome"));
+                }
+                let key = format!("job/{id}");
+                let auth_key = format!("job-auth/{id}");
+                if table.get(key.as_str()).map_err(storage)?.is_some()
+                    || table.get(auth_key.as_str()).map_err(storage)?.is_some()
+                {
+                    return Err(DomainError::new("OBJECT_CONFLICT", "New batch job identity already exists"));
+                }
+                let job = Job {
+                    remux_progress: None, progress: None, file_times: None,
+                    id: id.clone(), creator: principal.into(), plan: child, state: JobState::Queued,
+                    prepared_argv: None, prepared_stages: Vec::new(), owned_staging: None,
+                    artifact: None, verification: None, error: None,
+                };
+                record_quota(table, &key)?;
+                table.insert(key.as_str(), encode(&job)?.as_slice()).map_err(storage)?;
+                table.insert(auth_key.as_str(), auth_bytes.as_slice()).map_err(storage)?;
+                count += 1;
+            }
+            Ok(serde_json::json!({
+                "batch_id":accepted.id,"plan_id":accepted.plan_id,"plan_hash":accepted.plan_hash,
+                "members":accepted.members,"accepted_jobs":count,"accepted_at":accepted.accepted_at,
+                "rejected_candidates":plan.items.iter().filter(|item| item.error.is_some()).count(),
+            }))
+        })
+    }
+    /// Cancellation patches and their scoped receipt commit together before tokens are signalled.
+    pub fn cancel_batch_with_clock(
+        &self, principal: &str, request: &Request, batch: &nw_domain::batches::Batch,
+        patches: &[nw_domain::batches::CancelMember], result: Value,
+        clock: impl FnOnce() -> Result<u64>,
+    ) -> Result<Response> {
+        if request.command.id != "batches.cancel" || patches.len() > nw_domain::batches::MAX_BATCH_ITEMS {
+            return Err(DomainError::new("INVALID_ACCEPTANCE", "Invalid bounded batch cancellation"));
+        }
+        self.commit_composed_with_clock(principal, request, clock, |table, _now| {
+            let input: nw_domain::commands::IdInput = nw_domain::commands::parse(request.params.clone())?;
+            let stored: nw_domain::batches::Batch = {
+                let value = table.get(format!("batch/{}",input.id).as_str()).map_err(storage)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                decode(value.value())?
+            };
+            if input.id != batch.id || stored.id != batch.id || stored.plan_id != batch.plan_id
+                || stored.plan_hash != batch.plan_hash || stored.members.len() != batch.members.len()
+                || !stored.members.iter().zip(&batch.members).all(|(a,b)| a.index == b.index && a.job_id == b.job_id)
+            {
+                return Err(DomainError::new("INVALID_BATCH", "Batch changed before cancellation"));
+            }
+            let mut seen = std::collections::BTreeSet::new();
+            for patch in patches {
+                if !seen.insert(&patch.job_id)
+                    || !stored.members.iter().any(|member| member.job_id.as_deref() == Some(patch.job_id.as_str()))
+                {
+                    return Err(DomainError::new("INVALID_BATCH", "Cancellation contains an unknown/duplicate child"));
+                }
+                let key = format!("job/{}",patch.job_id);
+                let mut job: Job = {
+                    let value = table.get(key.as_str()).map_err(storage)?.ok_or_else(DomainError::object_not_found)?;
+                    decode_job(value.value())?
+                };
+                if job.state != patch.expected_state || !matches!(job.state, JobState::Queued | JobState::Running | JobState::Verifying) {
+                    return Err(DomainError::new("STALE_JOB_STATE", "A child passed its cancellable boundary"));
+                }
+                if job.state == JobState::Queued {
+                    job.state = JobState::Cancelled;
+                    table.insert(key.as_str(), encode(&job)?.as_slice()).map_err(storage)?;
+                }
+                let cancel = format!("cancel/{}",job.id);
+                table.insert(cancel.as_str(), encode(&true)?.as_slice()).map_err(storage)?;
+            }
+            Ok(result)
+        })
     }
     pub fn update_job(&self, id: &str, update: impl FnOnce(&mut Job) -> Result<()>) -> Result<Job> {
         let write = self.db.begin_write().map_err(storage)?;

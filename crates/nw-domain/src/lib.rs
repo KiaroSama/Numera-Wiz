@@ -82,6 +82,8 @@ impl DomainError {
             | "INVALID_IDENTITY"
             | "INVALID_ACCEPTANCE"
             | "INVALID_RECORD"
+            | "BATCH_REJECTED"
+            | "UNRESOLVED_SOURCE_INDEX"
             | "SOURCE_OUTPUT_ALIAS"
             | "VIDEO_REQUIRED"
             | "INCOMPATIBLE_PRESERVATION"
@@ -105,6 +107,7 @@ impl DomainError {
 pub type Result<T> = std::result::Result<T, DomainError>;
 
 pub mod access;
+pub mod batches;
 pub mod artifacts;
 pub mod diagnostics;
 pub mod plans;
