@@ -17,6 +17,7 @@ const RECORDS: TableDefinition<&str, &[u8]> = TableDefinition::new("versioned_re
 const STORE_SCHEMA: &[u8] = b"2";
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
+pub mod copies;
 pub mod generations;
 mod live;
 mod profiles;

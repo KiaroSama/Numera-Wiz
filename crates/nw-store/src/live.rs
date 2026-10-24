@@ -57,7 +57,7 @@ impl Write {
 }
 struct Attachment {
     database: Option<Database>,
-    _guard: nw_platform::files::RootLock,
+    _guards: Vec<nw_platform::files::RootLock>,
     path: PathBuf,
 }
 pub(super) struct DatabaseSlot {
@@ -74,7 +74,7 @@ impl DatabaseSlot {
             database: RwLock::new(Attachment {
                 database: Some(database),
                 path,
-                _guard: guard,
+                _guards: vec![guard],
             }),
             active: Arc::new(AtomicUsize::new(0)),
         }
@@ -168,11 +168,12 @@ impl DatabaseSlot {
                 "A generation cannot replace an attached database",
             ));
         }
-        *state = Attachment {
-            database: Some(database),
-            path: path.to_owned(),
-            _guard: guard,
-        };
+        // Historical owners lock generation1 rather than the state directory. Keep
+        // every prior generation lease until this Store is dropped, including during
+        // a closed cutover; selecting another generation must not release that fence.
+        state._guards.push(guard);
+        state.database = Some(database);
+        state.path = path.to_owned();
         Ok(())
     }
 }
