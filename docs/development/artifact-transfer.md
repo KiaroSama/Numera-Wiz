@@ -12,7 +12,8 @@ job workspace. Recovery retains that proof after acknowledgement as well. Reads
 require a successful job, matching committed publication facts, matching owned
 workspace and the same physical object at the public and proof paths. A replaced
 public file is ARTIFACT_CHANGED, including a replacement with identical content.
-Older development jobs whose proof was already removed remain unavailable for
+A versioned publication byte purpose distinguishes retained proofs from earlier
+development journals. Older jobs whose proof was already removed remain unavailable for
 byte retrieval; their historical success facts are not rewritten or fabricated.
 
 Every transfer first scans the held object, verifies the complete published SHA-256

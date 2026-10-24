@@ -721,6 +721,7 @@ mod tests {
         store.put("profile/operator", &policy).unwrap();
         assert!(store.execution_allowed("test-job").is_ok());
         let publication = Publication {
+            read_purpose_version: 1,
             job_id: "test-job".into(),
             proof: "unit-journal-proof".into(),
             output: job.plan.output.clone(),

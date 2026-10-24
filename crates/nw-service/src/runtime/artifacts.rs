@@ -86,6 +86,9 @@ impl Service {
                     "Retained physical publication proof is unavailable",
                 )
             })?;
+        if publication.read_purpose_version != 1 {
+            return Err(DomainError::new("ARTIFACT_UNAVAILABLE", "A supported retained publication byte-read purpose is unavailable"));
+        }
         let intent = job.owned_staging.as_ref().ok_or_else(|| {
             DomainError::new(
                 "ARTIFACT_UNAVAILABLE",
@@ -182,7 +185,7 @@ impl Service {
         transfer.ensure_current()?;
         Ok(transfer)
     }
-    fn artifact_manifest(
+    pub(super) fn artifact_manifest(
         self: &Arc<Self>,
         context: &Context,
         id: &str,
@@ -223,7 +226,7 @@ impl Service {
             max_chunk_bytes: ARTIFACT_CHUNK_BYTES as u32,
         })
     }
-    fn artifact_chunk(
+    pub(super) fn artifact_chunk(
         self: &Arc<Self>,
         context: Context,
         input: ChunkInput,
@@ -298,6 +301,7 @@ mod tests {
             error: None,
         };
         let publication = Publication {
+            read_purpose_version: 1,
             job_id: id.clone(),
             proof: files::path_text(&proof).unwrap(),
             output: identity.path.clone(),
@@ -459,5 +463,16 @@ mod tests {
                 .code,
             "ARTIFACT_CHANGED"
         );
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    #[test]
+    fn older_publication_has_no_invented_byte_purpose() {
+        let value = json!({"job_id":"old-job","proof":"removed-proof","output":"old-output","identity":{"path":"old-output","bytes":"1","sha256":"00"},"verified":"Historical development fact","published":true});
+        let publication: Publication = serde_json::from_value(value).unwrap();
+        assert_eq!(publication.read_purpose_version, 0);
     }
 }
