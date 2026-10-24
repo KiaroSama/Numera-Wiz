@@ -30,10 +30,31 @@ matching nothing means: skip this file, retain an empty selection, or reject it.
 An audio-only source is not silently treated as a supported video cleanup job.
 
 Partial order fields use comma-separated original indices. Unlisted retained
-streams follow in their original order. Preservation checkboxes independently
+streams follow in their original order. Invalid comma-separated numbers reject
+the whole entry; empty cells, signs, fractions, exponents and overflow are not
+silently ignored. Preservation checkboxes independently
 control extra video, cover pictures, attachments, data, unknown streams, tags,
 dispositions and chapters. Tag rules match the original inventory and support
-Keep, Set and Clear. Later explicit edits win for each field.
+Keep, Set and Clear. Choose the explicit stream kind, including video, and use
+original indices/languages to limit the rule. Later explicit edits win for each
+field. The source is unchanged.
+
+Selection report opens the same owner's source inventory and pure rule preview.
+It shows every candidate as ready, skipped or rejected, with separate source and
+retained counts. Switch between unique streams and original indices; tables use
+pages of 32 rows. Per-file details show original retained indices, matches,
+warnings and errors. Escape closes the report. Changing the form invalidates
+it. This is registered metadata, not a fresh media probe or a produced output.
+The current human form selects one asset; the canonical report also accepts a
+bounded explicit set. Folder discovery and batch execution remain required.
+
+File timestamps has three policies. Preserve timestamps is the default and
+records a warning if exact access/modification values cannot be retained.
+Require reviewed timestamps freezes the source values in the plan and refuses
+publication if exact retention fails. New timestamps leaves the new object's
+times. These are filesystem times, separate from packet timestamps. Output
+ownership, permissions and ACLs follow owned-staging policy. Reading the output
+later can change its access time.
 
 Review the suggested destination or enter an authorized new destination. Review
 cleanup plan freezes the selected source identity, component identities, outcomes,
@@ -53,8 +74,9 @@ The job area shows accepted work, progress states, terminal outcomes and failure
 Cancel requests cancellation before the durable publication fence; cancellation
 after that fence is reported as too late. Closing a client releases its client
 lease while accepted jobs continue in the owner. Inspect the accepted job through
-the common command interface for its frozen plan, prepared stages, verification
-and published artifact.
+Job details control for its frozen plan, prepared stages, exact timestamp
+outcomes, warnings, verification and published artifact. The summary indicates
+recorded warning counts.
 
 For a successful job, Output details requests its currently authorized artifact
 manifest and displays verified size, SHA-256 and job identity. Copy manifest URI
@@ -73,6 +95,19 @@ Hosted Chrome has exercised Choose media, streamed intake, Review and Run with
 an independent byte-equality assertion. Hosted Linux X11 has exercised the actual
 CI desktop executable, native path entry, registration, Review and keyboard Run,
 with independent byte equality. The retained native screenshot and JSON report
-identify the candidate head, actual CI merge commit and executable digest. Windows/macOS compilation is separate from native interaction
+identify the candidate head, actual CI merge commit and executable digest.
+Run 40079710323 additionally exercised actual native Selection report input,
+canonical completion, Escape and the subsequent output workflow; its report
+and opened manifest PNGs were personally inspected. Real Chrome report input
+was checked against the browser's actual canonical HTTP response. Windows/macOS compilation is separate from native interaction
 qualification. Neither screenshot establishes preview, playback, complete
 five-surface parity or the full initial application scope.
+
+## Container profiles under qualification
+
+The source adds an initial original-family MOV/MP4 MPEG-4 Part 2 ordinary-video
+packet-copy route alongside Matroska. It is undergoing separate media CI. It
+never silently drops unsupported retained streams, transcodes, changes brands
+or strips required tags. An incompatible combination fails before execution.
+See [profile scope](../development/original-container-profiles.md) for exact
+limits and pending evidence. This is not full MOV/MP4 or complete F08 support.

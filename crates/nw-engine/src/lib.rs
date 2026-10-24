@@ -1,15 +1,15 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
 mod budget;
-mod preservation;
 mod output_profile;
-use output_profile::OutputProfile;
+mod preservation;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
     records::{Asset, FileIdentity, MediaProbe, Plan},
 };
 use nw_platform::files::{self, io_error};
+use output_profile::OutputProfile;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -191,8 +191,14 @@ impl Engine {
             OutputProfile::Matroska
         };
         if resolution.action == CleanAction::CopyUnchanged
-            && Path::new(&asset.identity.path).extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase)
-                != output.extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase)
+            && Path::new(&asset.identity.path)
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase)
+                != output
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_ascii_lowercase)
         {
             return Err(DomainError::new(
                 "CONTAINER_CHANGE_REQUIRED",
@@ -684,6 +690,11 @@ fn parse_tags(value: &Value) -> BTreeMap<String, String> {
         .unwrap_or_default()
 }
 pub fn parse_probe(value: Value) -> Result<MediaProbe> {
+    let format = value["format"]["format_name"]
+        .as_str()
+        .ok_or_else(|| DomainError::new("INVALID_PROBE", "Missing container format"))?
+        .to_owned();
+    let movie = matches!(format.as_str(), "mov" | "mov,mp4,m4a,3gp,3g2,mj2");
     let rows = value["streams"]
         .as_array()
         .ok_or_else(|| DomainError::new("INVALID_PROBE", "Probe did not return stream records"))?;
@@ -720,14 +731,17 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
             index,
             kind,
             codec: row["codec_name"].as_str().unwrap_or("unknown").into(),
-            tags: parse_tags(&row["tags"]),
+            tags: {
+                let mut tags = parse_tags(&row["tags"]);
+                if movie && !tags.contains_key("title") && let Some(name) = tags.remove("name") {
+                    tags.insert("title".into(), name);
+                }
+                tags
+            },
             dispositions,
         });
     }
-    let format = value["format"]["format_name"]
-        .as_str()
-        .ok_or_else(|| DomainError::new("INVALID_PROBE", "Missing container format"))?
-        .into();
+
     Ok(MediaProbe {
         stream_details: rows
             .iter()
@@ -745,7 +759,11 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
             .get("chapters")
             .cloned()
             .unwrap_or_else(|| serde_json::json!([])),
-        verification_scope: "Bounded metadata probe; not a full decode or packet scan".into(),
+        verification_scope: if movie {
+            "Bounded metadata probe; not a full decode or packet scan. Unambiguous MOV/MP4 stream name is the canonical title; exact raw tags remain in stream_details."
+        } else {
+            "Bounded metadata probe; not a full decode or packet scan"
+        }.into(),
     })
 }
 pub fn plan_digest(plan: &Plan) -> Result<String> {
@@ -861,7 +879,11 @@ fn registered_object(asset: &Asset) -> Result<&nw_domain::records::NativeObjectI
     }
     Ok(object)
 }
-fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution, profile: OutputProfile) -> Result<Vec<String>> {
+fn lower_remux(
+    asset: &Asset,
+    resolution: &mux::CleanResolution,
+    profile: OutputProfile,
+) -> Result<Vec<String>> {
     let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
     let mut args = [
         "-hide_banner",
@@ -914,6 +936,13 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution, profile: Output
             .iter()
             .find(|s| s.index == stream.index)
             .ok_or_else(|| DomainError::new("INVALID_PLAN", "Missing source stream"))?;
+        let movie_name_alias = demuxer == "mov"
+            && asset.probe.stream_details.get(&original.index).is_some_and(|row| {
+                row["tags"].get("name").is_some() && row["tags"].get("title").is_none()
+            });
+        if movie_name_alias {
+            args.extend([format!("-metadata:s:{index}"), "name=".into()]);
+        }
         for tag in original
             .tags
             .keys()
@@ -922,6 +951,7 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution, profile: Output
         {
             if original.tags.get(tag) != stream.tags.get(tag)
                 || !resolution.preservation.stream_tags
+                || (movie_name_alias && tag.as_str() == "title")
             {
                 args.extend([
                     format!("-metadata:s:{index}"),
@@ -943,7 +973,11 @@ fn lower_remux(asset: &Asset, resolution: &mux::CleanResolution, profile: Output
             },
         ]);
     }
-    args.extend(["-f".into(), profile.muxer().into(), "@owned_staging@".into()]);
+    args.extend([
+        "-f".into(),
+        profile.muxer().into(),
+        "@owned_staging@".into(),
+    ]);
     Ok(args)
 }
 fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
@@ -1009,9 +1043,15 @@ fn verify_tags(
     let matroska = profile == OutputProfile::Matroska;
     for (key, value) in expected {
         // Matroska regenerates its duration tags from the independently verified packet clock.
-        let undefined_stream_language =
-            matroska && !generated_writer && key == "language" && value == "und" && !actual.contains_key(key);
-        if !(matroska && key == "duration") && !undefined_stream_language && actual.get(key) != Some(value) {
+        let undefined_stream_language = matroska
+            && !generated_writer
+            && key == "language"
+            && value == "und"
+            && !actual.contains_key(key);
+        if !(matroska && key == "duration")
+            && !undefined_stream_language
+            && actual.get(key) != Some(value)
+        {
             return Err(DomainError::new(
                 "VERIFICATION_FAILED",
                 format!("{target} tag {key} did not match its frozen value"),
@@ -1036,6 +1076,30 @@ fn verify_tags(
 mod tag_tests {
     use super::*;
     #[test]
+    fn movie_track_name_is_an_exact_title_projection_with_raw_metadata_retained() {
+        for format in ["mov,mp4,m4a,3gp,3g2,mj2", "matroska,webm"] {
+            let input = serde_json::json!({
+                "format":{"format_name":format},
+                "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Exact mixed-case title"}}]
+            });
+            let probe = parse_probe(input).unwrap();
+            assert_eq!(probe.stream_details[&0]["tags"]["name"], "Exact mixed-case title");
+            if format.starts_with("mov") {
+                assert_eq!(probe.streams[0].tags.get("title").unwrap(), "Exact mixed-case title");
+                assert!(!probe.streams[0].tags.contains_key("name"));
+            } else {
+                assert_eq!(probe.streams[0].tags.get("name").unwrap(), "Exact mixed-case title");
+                assert!(!probe.streams[0].tags.contains_key("title"));
+            }
+        }
+        let ambiguous = parse_probe(serde_json::json!({
+            "format":{"format_name":"mov"},
+            "streams":[{"index":0,"codec_type":"video","codec_name":"mpeg4","tags":{"name":"Original name","title":"Separate title"}}]
+        })).unwrap();
+        assert_eq!(ambiguous.streams[0].tags.get("name").unwrap(), "Original name");
+        assert_eq!(ambiguous.streams[0].tags.get("title").unwrap(), "Separate title");
+    }
+    #[test]
     fn mov_mp4_never_borrow_matroska_language_or_duration_exceptions() {
         let empty = BTreeMap::new();
         for profile in [OutputProfile::QuickTimeMpeg4, OutputProfile::IsoMp4Mpeg4] {
@@ -1052,9 +1116,27 @@ mod tag_tests {
         let english = BTreeMap::from([("language".into(), "eng".into())]);
         let empty = BTreeMap::new();
         assert!(verify_tags(&undefined, &empty, "Stream", false, OutputProfile::Matroska).is_ok());
-        assert!(verify_tags(&undefined, &empty, "Container", true, OutputProfile::Matroska).is_err());
+        assert!(
+            verify_tags(
+                &undefined,
+                &empty,
+                "Container",
+                true,
+                OutputProfile::Matroska
+            )
+            .is_err()
+        );
         assert!(verify_tags(&english, &empty, "Stream", false, OutputProfile::Matroska).is_err());
-        assert!(verify_tags(&undefined, &english, "Stream", false, OutputProfile::Matroska).is_err());
+        assert!(
+            verify_tags(
+                &undefined,
+                &english,
+                "Stream",
+                false,
+                OutputProfile::Matroska
+            )
+            .is_err()
+        );
         assert!(verify_tags(&empty, &english, "Stream", false, OutputProfile::Matroska).is_err());
         let arbitrary = BTreeMap::from([("review_note".into(), "und".into())]);
         assert!(verify_tags(&arbitrary, &empty, "Stream", false, OutputProfile::Matroska).is_err());

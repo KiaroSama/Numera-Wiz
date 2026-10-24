@@ -1064,3 +1064,29 @@ stream-kind choices, including video. No-op extension casing remains a full
 byte copy. Actual two-video MOV/MP4 fixtures remove the second track and set the
 first title/language; they await CI. See original-container-profiles.md. All
 broader container, full F08 and other task-ledger work remains mandatory.
+
+
+## MOV/MP4 title diagnosis and pending correction
+
+Run 40080655520 on 5bfce86e87e63dc37f6adc45623748aad1e8bdd6 passed
+all four native test/Clippy/desktop targets, lock and WASM. Its real media fixture
+reached MOV remux after the unchanged/case-extension copy assertions, then failed
+the mandatory title equality before publication. No MOV/MP4 packet preservation,
+remaining owner/HTTP or GUI result is credited. Its 24 exact formatter hunks are
+applied. See evidence/original-container-ci70.json.
+
+Pinned movenc writes track title into a name atom; pinned mov demux exposes it
+as name. This revision maps only unambiguous MOV/MP4 stream name to canonical
+title and retains exact raw tags in stream_details. Ambiguous name/title records
+remain visible and incompatible in this output route. Prepared argv clears the
+raw alias and explicitly writes unchanged canonical title when needed, including
+MOV-source -> Matroska preservation. The independent fixture reads physical name
+metadata and then re-registers/remuxes it while keeping title and changing language.
+New units cover raw retention, Matroska isolation and dual-value non-merging.
+These corrections await CI. No media, metadata, clock or publication oracle is
+relaxed. No local source compilation or execution was performed.
+
+README and human/CLI/MCP manuals now cover actual source reports, strict numeric
+indices, timestamp policies/facts, report limits, fixed grants, store compatibility,
+replay identity and the observed native/Chrome boundaries. Full manuals and all
+remaining task-ledger obligations remain mandatory.

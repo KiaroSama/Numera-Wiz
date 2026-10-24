@@ -44,7 +44,8 @@ its earlier credentials. Owner and client requests have finite timeouts and limi
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope
 creation, access-profile create/update/inspect/put/list, file-delivered token
 issue/revoke, scoped internal credential issuance, media probe, source
-registration/list/inspect/output suggestion, cleanup planning/inspection and job
+registration/list/inspect/output suggestion, bounded cleanup selection reports,
+cleanup planning/inspection and job
 submit/inspect/list/cancel, artifact list/manifest/chunk retrieval and owner log
 status. `commands.list` and `commands.schema` return generated
 current parameter schemas. This list does not promise the remaining mandate scope.
@@ -71,6 +72,56 @@ patches, preservation flags, output, argv and verification scope. `jobs.submit`
 requires that exact `plan_id` and `plan_hash`; it returns a durable `job_id`.
 Inspect jobs until terminal. A no-match skip produces no output artifact. A failed
 job remains a successful inspection query with failure facts in the returned job.
+
+## Selection report and filesystem times
+
+streams.clean.report is a query requiring current command, asset and path rights.
+It accepts 1-64 distinct explicit asset IDs and the full common intent. For example:
+
+```json
+{
+  "api_version": 1,
+  "request_id": "selection-report-1",
+  "command": {"id": "streams.clean.report", "version": 1},
+  "params": {
+    "asset_ids": ["<registered-asset-id>"],
+    "intent": {
+      "audio_selection": {"selector": {"mode": "all"}, "no_match": "skip_file"},
+      "subtitle_selection": {"selector": {"mode": "all"}, "no_match": "allow_empty"},
+      "preservation": {
+        "additional_video": true, "attached_pictures": true,
+        "attachments": true, "data": true, "unknown": true,
+        "global_tags": true, "stream_tags": true,
+        "chapters": true, "dispositions": true
+      }
+    }
+  }
+}
+```
+
+The report includes every resolved, skipped or rejected candidate, original
+selected indices, matches, warnings and errors. Unique and original-index
+summaries keep source and retained counts separate. This query does not verify
+output compatibility or create a plan/job. Requests containing a missing or
+invisible asset fail without a partial inventory. A changed access-policy
+revision invalidates the result. At most 512 combined summary rows, 64 KiB of
+retained text and a 224 KiB report are admitted; request a smaller explicit set
+after RESOURCE_LIMIT. Existing profiles need an explicit owner revision update
+to add this command; future registry entries never expand stored grants.
+
+streams.clean additionally accepts file_times: new, preserve_best_effort (the
+default), or require_reviewed. Required access/modification times are captured
+during review and contribute to the plan hash. Best-effort failure records
+FILE_TIMES_NOT_PRESERVED; required failure is FILE_TIMES_REQUIRED before the
+publication fence. jobs.inspect exposes exact signed decimal-string Unix-epoch
+nanoseconds and the observed assertion scope. No floating-point timestamp
+conversion or source ACL/permission cloning is implied. Later reads naturally
+can change access time. These policies do not alter packet timestamps.
+
+The current durable reader envelope is version 2. Older version-1 roots are
+refused and preserved, without an automatic reset or in-place upgrade. Explicit
+stopped-root generation migration/rollback remains required work; do not delete
+state to bypass STORE_SCHEMA_UNSUPPORTED.
 
 ## Human file workflow
 
