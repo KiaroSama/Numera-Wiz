@@ -1688,3 +1688,43 @@ with independent owner/media/HTTP suites now parallel after the same source
 component artifact. The actual hash verifier reports807 manifest members;
 the earlier unsupported808 count in new ci87 evidence is corrected. No
 archived file, support CSV, full-task checkbox or release gate is changed.
+
+## Thirteen complete hosted jobs pass, including real native batches
+
+CI89 (40118215359) on303524aff82fe6c40c0f6945a58d416d75b33213 passed
+all13 jobs. Its compiled merge is5e70d0feec2995e8b424667239872182e72985f4.
+Formatting/lock/WASM, all four complete native targets with Clippy and hash
+verification, actual engine/memory, both owner transport suites, independent
+large HTTP and both real GUI journeys are green. Windows discovery and the
+explicit three-concurrent-frontends/same-root case pass with the unchanged
+20s bootstrap bound. Independent HTTP copy/revocation passes after owning
+its own diagnostics setup. These are scoped CI observations, not packaged
+startup or full aggregate resource qualification.
+
+Native and Chrome each pass actual second-file intake, two media checkboxes,
+batch Review and Run pointer input, both verified child outputs and exact
+independent full source/output bytes. Original typed/genuine OS Save As checks
+retain their one-producer oracle before the batch. Both successful Save and
+completed-batch PNGs were personally inspected on both surfaces. The actual
+SDK batch loses both automatic accepted responses and recovers the same
+receipt/group/two-member IDs after the owner epoch changes; exactly two jobs
+and one group remain. The single-job lost-response case also passes.
+Full facts and GitHub-reported ZIP digests are retained in ci89 evidence.
+
+The shared batch view now replaces internal Debug formatting with human
+action/state/timestamp/seconds labels; this presentation-only revision awaits
+its own hosted check. No extra test mirrors that reversible text change.
+
+The next required foundation is stopped-generation migration and older-reader
+compatibility before adding intake/companion/project job kinds. The exact
+migration and one-job-state-machine clauses were re-read. Current durable
+records are plain JSON; schema2 is the raw meta/schema store marker, not a
+per-record envelope. Pinned redb4.4.0 source confirms ReadOnlyDatabase cannot
+repair an unclean database; migration design must protect the original and
+perform repair only under the declared ownership/compatible generation path.
+No migration is implemented or inferred from this design.
+
+All folder/probe-failure/companion/replacement, F01-F15, project/editor/effects/
+DAG/preview/mixer/captions/interchange, closure, retention, migration, standard
+offline packages/resources/full manuals and matching owner harness obligations
+remain mandatory. No full-task checkbox, support CSV or release gate is closed.

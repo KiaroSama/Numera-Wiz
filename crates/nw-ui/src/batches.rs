@@ -12,6 +12,36 @@ use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
 use web_time::Instant;
 
+fn deadline_label(policy: nw_domain::execution::DeadlinePolicy) -> String {
+    match policy {
+        nw_domain::execution::DeadlinePolicy::Finite { seconds } => format!("{seconds} s"),
+        nw_domain::execution::DeadlinePolicy::Disabled => "Disabled".into(),
+    }
+}
+fn action_label(action: &Option<nw_domain::mux::CleanAction>) -> &'static str {
+    match action {
+        Some(nw_domain::mux::CleanAction::CopyUnchanged) => "Copy unchanged",
+        Some(nw_domain::mux::CleanAction::Remux) => "Remux",
+        Some(nw_domain::mux::CleanAction::Skip) => "Skip",
+        None => "Rejected",
+    }
+}
+fn state_label(state: &Option<nw_domain::records::JobState>) -> &'static str {
+    use nw_domain::records::JobState;
+    match state {
+        Some(JobState::Queued) => "Queued",
+        Some(JobState::Running) => "Running",
+        Some(JobState::Verifying) => "Verifying",
+        Some(JobState::Publishing) => "Publishing",
+        Some(JobState::Succeeded) => "Succeeded",
+        Some(JobState::Failed) => "Failed",
+        Some(JobState::Cancelled) => "Cancelled",
+        Some(JobState::Interrupted) => "Interrupted",
+        Some(JobState::Skipped) => "Skipped",
+        None => "Rejected during review",
+    }
+}
+
 pub(super) struct Candidate {
     asset_id: String,
     name: String,
@@ -259,7 +289,12 @@ impl WizApp {
                     ui.label(format!("{} explicit candidates",self.batch.candidates.len()));
                 });
                 ui.label("Select files with the media checkboxes. The current stream selection, file-time policy and execution limits apply to every candidate.");
-                ui.label(format!("File times: {:?} | Probe: {:?} | Operation: {:?}",self.file_times,self.execution_limits.probe,self.execution_limits.operation));
+                let times = match self.file_times {
+                    nw_domain::file_times::FileTimeRequest::New => "New timestamps",
+                    nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
+                    nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
+                };
+                ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
                 let mut changed = false;
                 ui.add_enabled_ui(idle,|ui| {
                     ui.horizontal(|ui| {
@@ -295,7 +330,7 @@ impl WizApp {
                     egui::ScrollArea::vertical().id_salt("batch-preview").max_height(170.0).show(ui,|ui| {
                         for item in &plan.items {
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}. {} | {:?} | {} bytes",item.index+1,item.output_name,item.action,item.source_bytes));
+                                ui.label(format!("{}. {} | {} | {} bytes",item.index+1,item.output_name,action_label(&item.action),item.source_bytes));
                                 if let Some(reference) = &item.plan
                                     && ui.add_enabled(idle,egui::Button::new("Plan details")).clicked() {
                                     self.query("plans.inspect",json!({"id":reference.id}),Action::Inspect,ui.ctx());
@@ -318,7 +353,7 @@ impl WizApp {
                     egui::ScrollArea::vertical().id_salt("batch-result").max_height(180.0).show(ui,|ui| {
                         for item in &result.items {
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}. {} | {:?}",item.index+1,item.output_name,item.state));
+                                ui.label(format!("{}. {} | {}",item.index+1,item.output_name,state_label(&item.state)));
                                 if let Some(id) = &item.job_id
                                     && ui.add_enabled(idle,egui::Button::new("Job details")).clicked() {
                                     self.query("jobs.inspect",json!({"id":id}),Action::Inspect,ui.ctx());
