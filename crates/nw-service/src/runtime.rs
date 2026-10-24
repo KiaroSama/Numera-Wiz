@@ -1320,6 +1320,7 @@ impl Service {
                 self.plan_source_path(&context, &plan)?;
                 self.path(&context, Path::new(&plan.output), true)?;
                 files::revalidate_output(&plan.output)?;
+                let output_parent = nw_engine::output_parent_stamp(&plan)?;
                 drop(guard);
                 #[cfg(test)]
                 self.preflight_started();
@@ -1373,7 +1374,8 @@ impl Service {
                     source.revalidate()?;
                     ffmpeg.revalidate()?;
                     ffprobe.revalidate()?;
-                    Ok((source, ffmpeg, ffprobe))
+                    output_parent.revalidate()?;
+                    Ok((source, ffmpeg, ffprobe, output_parent))
                 })();
                 let accept_guard = self.mutation.lock().map_err(|_| lock_error())?;
                 if let Some(replay) =
@@ -1395,7 +1397,8 @@ impl Service {
                 self.path(&context, Path::new(&plan.output), true)?;
                 files::revalidate_output(&plan.output)?;
                 let policy = self.policy(&context)?;
-                let (source, ffmpeg, ffprobe) = prepared?;
+                let (source, ffmpeg, ffprobe, output_parent) = prepared?;
+                output_parent.revalidate()?;
                 source.revalidate()?;
                 for component in [ffmpeg, ffprobe] {
                     component.revalidate().map_err(|_| {
@@ -1632,6 +1635,7 @@ impl Service {
         self.plan_source_path(&context, &job.plan)?;
         self.path(&context, Path::new(&job.plan.output), true)?;
         files::revalidate_output(&job.plan.output)?;
+        nw_engine::output_parent_stamp(&job.plan)?.revalidate()?;
         Ok(())
     }
     fn execution_event(&self, id: &str, event: ExecutionEvent) -> Result<()> {
@@ -1690,6 +1694,18 @@ impl Service {
         Ok(())
     }
     fn reconcile(&self, job: &Job) -> Result<()> {
+        let parent = match nw_engine::output_parent_stamp(&job.plan) {
+            Ok(parent) => parent,
+            Err(error) => {
+                self.store.update_job(&job.id, |job| {
+                    job.state = JobState::Interrupted;
+                    job.error = Some(error);
+                    Ok(())
+                })?;
+                return Ok(());
+            }
+        };
+        parent.revalidate()?;
         let publication: Option<Publication> = self.store.get(&named("publication", &job.id)?)?;
         if let Some(publication) = publication
             && Path::new(&publication.output)
@@ -1708,6 +1724,7 @@ impl Service {
             if actual.sha256 == publication.identity.sha256
                 && actual.bytes == publication.identity.bytes
             {
+                parent.revalidate()?;
                 self.store
                     .published(&job.id, actual, publication.verified)?;
                 return Ok(());
@@ -2007,6 +2024,46 @@ mod tests {
                 .code,
             "INVALID_PLAN"
         );
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn output_directory_replacement_during_preflight_cannot_accept_a_job() {
+        let (root, service, context, mut request, _) = preflight_fixture().await;
+        let parent = root.path().join("reviewed-exports");
+        std::fs::create_dir(&parent).unwrap();
+        let parent = std::fs::canonicalize(parent).unwrap();
+        let output = parent.join("output.mkv");
+        let mut plan = service.store
+            .get_plan(request.params["plan_id"].as_str().unwrap()).unwrap().unwrap();
+        plan.output = files::path_text(&output).unwrap();
+        let rights = plan.required_rights.as_mut().unwrap();
+        rights.output_create.path = plan.output.clone();
+        rights.output_create.parent_object =
+            Some(files::DirectoryStamp::capture_resolved(&parent).unwrap().object_identity().unwrap());
+        plan.hash = nw_engine::plan_digest(&plan).unwrap();
+        request.params["plan_hash"] = json!(plan.hash);
+        service.store.put(&named("plan", &plan.id).unwrap(), &plan).unwrap();
+        let (started, ready) = std::sync::mpsc::channel();
+        let (resume, waiting) = std::sync::mpsc::channel();
+        let waiting = Mutex::new(waiting);
+        *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
+            started.send(()).unwrap();
+            waiting.lock().unwrap()
+                .recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+        }));
+        let worker = service.clone();
+        let task = tokio::spawn(async move { worker.dispatch(context, request).await });
+        tokio::task::spawn_blocking(move || {
+            ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap()
+        }).await.unwrap();
+        std::fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
+        std::fs::create_dir(&parent).unwrap();
+        resume.send(()).unwrap();
+        let rejected = task.await.unwrap();
+        assert!(!rejected.ok);
+        assert_eq!(rejected.error.unwrap().code, "TARGET_CHANGED");
+        assert!(service.store.list::<Job>("job/", 4096).unwrap().is_empty());
+        assert!(!output.exists());
     }
     #[tokio::test]
     async fn policy_revocation_is_not_held_behind_expensive_preflight() {

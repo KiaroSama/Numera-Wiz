@@ -418,6 +418,30 @@ async fn actual_copy_and_order_metadata_remux() {
         std::fs::read(&persisted_source).unwrap(),
         std::fs::read(&persisted_output).unwrap()
     );
+    let reviewed_parent = directory.path().join("reviewed-exports");
+    std::fs::create_dir(&reviewed_parent).unwrap();
+    let parent_output = reviewed_parent.join("original-parent-copy.mkv");
+    let parent_plan = engine
+        .clean_plan(plan.source.clone(), &parent_output, &rules(), "fixture-owner")
+        .unwrap();
+    let retained_parent = directory.path().join("original-reviewed-exports");
+    std::fs::rename(&reviewed_parent, &retained_parent).unwrap();
+    std::fs::create_dir(&reviewed_parent).unwrap();
+    let changed_parent = engine
+        .execute(&parent_plan, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert_eq!(changed_parent.code, "TARGET_CHANGED");
+    assert!(!parent_output.exists());
+    assert!(std::fs::read_dir(&reviewed_parent).unwrap().next().is_none());
+    assert!(std::fs::read_dir(&retained_parent).unwrap().next().is_none());
+    let fresh_parent_plan = engine
+        .clean_plan(plan.source.clone(), &parent_output, &rules(), "fixture-owner")
+        .unwrap();
+    assert_ne!(fresh_parent_plan.hash, parent_plan.hash);
+    engine.execute(&fresh_parent_plan, CancellationToken::new()).await.unwrap();
+    assert_eq!(std::fs::read(&source).unwrap(), std::fs::read(&parent_output).unwrap());
+
     let replaced_output = directory.path().join("physical-replacement.mkv");
     let replacement_plan = engine
         .clean_plan(

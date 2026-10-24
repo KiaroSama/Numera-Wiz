@@ -59,5 +59,9 @@ original replay scope/key/body. The restarted owner must return the original
 receipt/job even though its destination now exists. Exact output, one stored job,
 root/principal stability and changed owner epoch are asserted. Only fixture
 transport is altered; there is no alternate handler or product fault flag.
-The new lost-response assertion awaits hosted CI. It does not stand in for
-retired-version replay or crash/publication/upgrade recovery qualification.
+The lost-response assertion passed in the complete hosted media job of run
+40067320046 on 949feccda6a2450e46d3bbb944452be2b439479b. The report is
+retained in owner-media-evidence-linux, artifact 12549757211, with GitHub-reported
+ZIP SHA-256 a564bf6101216568f6665a31d6a2225a6ac133d20498d885ea2c1a37393702c6.
+It does not stand in for retired-version replay or crash/publication/upgrade
+recovery qualification.

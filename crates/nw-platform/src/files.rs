@@ -174,6 +174,103 @@ pub fn revalidate(expected: &FileIdentity, cancel: &CancellationToken) -> Result
     }
     Ok(())
 }
+/// Held identity of a reviewed output directory; child changes do not change its identity.
+pub struct DirectoryStamp {
+    path: PathBuf,
+    file: File,
+    object: NativeObjectIdentity,
+}
+impl DirectoryStamp {
+    pub fn capture_resolved(path: &Path) -> Result<Self> {
+        if !path.is_absolute() || fs::canonicalize(path).map_err(io_error)? != path {
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "Output directory must retain its canonical reviewed path",
+            ));
+        }
+        let file = open_directory_handle(path)?;
+        let object = native_object(&file)?;
+        let stamp = Self {
+            path: path.to_owned(),
+            file,
+            object,
+        };
+        stamp.revalidate()?;
+        Ok(stamp)
+    }
+    pub fn object_identity(&self) -> Result<NativeObjectIdentity> {
+        self.revalidate()?;
+        Ok(self.object.clone())
+    }
+    pub fn require_object(&self, expected: &NativeObjectIdentity) -> Result<()> {
+        self.revalidate()?;
+        if &self.object != expected {
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "The original reviewed output directory has been replaced",
+            ));
+        }
+        Ok(())
+    }
+    pub fn revalidate(&self) -> Result<()> {
+        if fs::canonicalize(&self.path).map_err(io_error)? != self.path
+            || native_object(&self.file)? != self.object
+            || native_object(&open_directory_handle(&self.path)?)? != self.object
+        {
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "The held output directory no longer names its original reviewed object",
+            ));
+        }
+        Ok(())
+    }
+}
+fn open_directory_handle(path: &Path) -> Result<File> {
+    #[cfg(unix)]
+    let file = {
+        use rustix::fs::{Mode, OFlags};
+        File::from(
+            rustix::fs::open(
+                path,
+                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::empty(),
+            )
+            .map_err(io_error)?,
+        )
+    };
+    #[cfg(windows)]
+    let file = {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+            FILE_SHARE_READ, FILE_SHARE_WRITE,
+        };
+        // Excluding delete sharing retains the parent namespace while this lease is live.
+        OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .security_qos_flags(0)
+            .open(path)
+            .map_err(io_error)?
+    };
+    #[cfg(not(any(unix, windows)))]
+    let file = File::open(path).map_err(io_error)?;
+    let metadata = file.metadata().map_err(io_error)?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(DomainError::new("TARGET_CHANGED", "An ordinary output directory is required"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(DomainError::new("TARGET_CHANGED", "Output directories cannot be reparse points"));
+        }
+    }
+    Ok(file)
+}
+
 /// Hold physical identity and a cheap change stamp across expensive preflight and acceptance.
 /// This supplements the full content digest; metadata is never a replacement for that digest.
 pub struct SourceStamp {
@@ -510,6 +607,57 @@ pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reviewed_directory_identity_rejects_replacement_after_its_handle_closes() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("exports");
+        fs::create_dir(&parent).unwrap();
+        let parent = fs::canonicalize(parent).unwrap();
+        let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
+        let original = stamp.object_identity().unwrap();
+        drop(stamp);
+        fs::rename(&parent, parent.with_file_name("original-exports")).unwrap();
+        fs::create_dir(&parent).unwrap();
+        let replacement = DirectoryStamp::capture_resolved(&parent).unwrap();
+        assert_eq!(replacement.require_object(&original).unwrap_err().code, "TARGET_CHANGED");
+    }
+    #[cfg(unix)]
+    #[test]
+    fn held_directory_detects_replacement_without_relying_on_child_metadata() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("exports");
+        fs::create_dir(&parent).unwrap();
+        let parent = fs::canonicalize(parent).unwrap();
+        let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
+        fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
+        fs::create_dir(&parent).unwrap();
+        assert_eq!(stamp.revalidate().unwrap_err().code, "TARGET_CHANGED");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn held_windows_directory_excludes_namespace_delete_until_its_lease_ends() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("exports");
+        fs::create_dir(&parent).unwrap();
+        let parent = fs::canonicalize(parent).unwrap();
+        let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
+        let moved = parent.with_file_name("retained-exports");
+        assert!(fs::rename(&parent, &moved).is_err());
+        stamp.revalidate().unwrap();
+        drop(stamp);
+        fs::rename(&parent, &moved).unwrap();
+    }
+    #[test]
+    fn changing_directory_children_keeps_the_reviewed_parent_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = fs::canonicalize(root.path()).unwrap();
+        let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
+        let original = stamp.object_identity().unwrap();
+        fs::write(parent.join("another-output.mkv"), b"independent child").unwrap();
+        stamp.require_object(&original).unwrap();
+        fs::remove_file(parent.join("another-output.mkv")).unwrap();
+        stamp.require_object(&original).unwrap();
+    }
     #[test]
     fn original_object_survives_handle_drop_but_rejects_identical_replacement() {
         let root = tempfile::tempdir().unwrap();
