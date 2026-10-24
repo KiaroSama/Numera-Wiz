@@ -519,11 +519,20 @@ impl WizApp {
                         {
                             cancel = Some(job.id.clone());
                         }
-                        if ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Job details")).clicked() {
+                        if ui
+                            .add_enabled(
+                                !self.waiting && self.pending.is_none(),
+                                egui::Button::new("Job details"),
+                            )
+                            .clicked()
+                        {
                             inspect_job = Some(job.id.clone());
                         }
                         if job.warning_count > 0 {
-                            ui.colored_label(egui::Color32::from_rgb(237, 177, 99), format!("{} warning(s)", job.warning_count));
+                            ui.colored_label(
+                                egui::Color32::from_rgb(237, 177, 99),
+                                format!("{} warning(s)", job.warning_count),
+                            );
                         }
                     });
                     if let Some(error) = &job.error_code {

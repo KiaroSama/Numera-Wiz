@@ -72,7 +72,10 @@ fn invalid(message: &str) -> DomainError {
 /// No historical plan is silently upgraded or rehashed.
 pub fn digest(plan: &Plan) -> Result<String> {
     match plan.schema_version {
-        1 if plan.required_rights.is_none() && plan.creation_audit.is_none() && plan.file_times.is_none() => {
+        1 if plan.required_rights.is_none()
+            && plan.creation_audit.is_none()
+            && plan.file_times.is_none() =>
+        {
             let mut legacy = plan.clone();
             legacy.hash.clear();
             let bytes =
@@ -80,7 +83,9 @@ pub fn digest(plan: &Plan) -> Result<String> {
             Ok(hex::encode(Sha256::digest(bytes)))
         }
         2 => {
-            if let Some(policy) = &plan.file_times { policy.validate()?; }
+            if let Some(policy) = &plan.file_times {
+                policy.validate()?;
+            }
             validate_requirements(plan)?;
             digest_value(serde_json::to_value(plan).map_err(|_| invalid("Cannot encode plan"))?)
         }
@@ -352,17 +357,25 @@ mod tests {
     fn file_time_policy_and_reviewed_values_are_semantic_without_upgrading_history() {
         let mut plan = fixture();
         let original = plan.hash.clone();
-        assert!(serde_json::to_value(&plan).unwrap().get("file_times").is_none());
+        assert!(
+            serde_json::to_value(&plan)
+                .unwrap()
+                .get("file_times")
+                .is_none()
+        );
         plan.file_times = Some(crate::file_times::FileTimePlan::PreserveBestEffort);
         assert_ne!(digest(&plan).unwrap(), original);
         plan.file_times = Some(crate::file_times::FileTimePlan::RequireReviewed {
             times: crate::file_times::FileTimesSnapshot {
-                accessed_ns: "100".into(), modified_ns: "200".into(),
+                accessed_ns: "100".into(),
+                modified_ns: "200".into(),
             },
         });
         plan.hash = digest(&plan).unwrap();
         let before = plan.hash.clone();
-        if let Some(crate::file_times::FileTimePlan::RequireReviewed { times }) = &mut plan.file_times {
+        if let Some(crate::file_times::FileTimePlan::RequireReviewed { times }) =
+            &mut plan.file_times
+        {
             times.modified_ns = "300".into();
         }
         assert_ne!(digest(&plan).unwrap(), before);

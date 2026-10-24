@@ -594,7 +594,8 @@ pub fn copy_into_staging(
     cancel: &CancellationToken,
 ) -> Result<(tempfile::NamedTempFile, FileIdentity)> {
     let source_stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
-    copy_from_held(expected, source_stamp, staging, cancel).map(|(staging, actual, _)| (staging, actual))
+    copy_from_held(expected, source_stamp, staging, cancel)
+        .map(|(staging, actual, _)| (staging, actual))
 }
 pub fn copy_into_staging_bound(
     expected: &FileIdentity,

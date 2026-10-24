@@ -57,8 +57,12 @@ New hosted fixtures cover real native timestamp setting through verified copy
 and no-replace rename on all native targets, injected denial under both policies,
 exact negative-epoch conversion, unchanged new timestamps, semantic hashes and
 legacy omission, independent required copy/remux timestamps, actual CLI/SDK job
-facts and scoped warning-message privacy. These additions await their own CI.
-The ordinary shared UI has functional controls but all new control variants still
+facts and scoped warning-message privacy. Run 40075785336 passed these native
+regressions on all four targets and the complete real Linux media/CLI/SDK and
+Chrome journeys. Its formatter and one Clippy collapsible_if check failed; the
+following revision applies the exact hosted format changes and simplifies that
+condition. Native UI was skipped by the failed prerequisite. Scoped evidence is
+in evidence/file-times-ci65.json. The ordinary shared UI has functional controls but all new control variants still
 need their explicit native/browser input journeys. This does not close full F08,
 copy/retention/resource/filesystem package qualification or owner GPU gates.
 

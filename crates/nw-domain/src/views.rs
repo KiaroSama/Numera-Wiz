@@ -182,7 +182,10 @@ impl From<&Asset> for AssetSummary {
 impl From<&Job> for JobSummary {
     fn from(job: &Job) -> Self {
         Self {
-            warning_count: job.file_times.as_ref().map_or(0, |value| value.warnings.len()),
+            warning_count: job
+                .file_times
+                .as_ref()
+                .map_or(0, |value| value.warnings.len()),
             id: job.id.clone(),
             state: job.state.clone(),
             output_name: basename(&job.plan.output),
@@ -207,11 +210,15 @@ impl FileTimeOutcomeView {
             desired: value.desired,
             observed: value.observed,
             preserved: value.preserved,
-            warnings: value.warnings.into_iter().map(|error| ErrorView {
-                code: error.code,
-                message: owner.then_some(error.message),
-                retryable: error.retryable,
-            }).collect(),
+            warnings: value
+                .warnings
+                .into_iter()
+                .map(|error| ErrorView {
+                    code: error.code,
+                    message: owner.then_some(error.message),
+                    retryable: error.retryable,
+                })
+                .collect(),
             scope: value.scope,
         }
     }
