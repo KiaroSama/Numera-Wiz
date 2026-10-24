@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "full_release": "blocked",
+  "source_head": "7a51b68219436ac92efe149ce8193db3e62e5594",
+  "compiled_merge": "934e32b32f65060950fbea15acad390260fa61ad",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40117174946",
+  "observed": {
+    "batch_media_job": 120941331059,
+    "batch_media_report": {
+      "case": "two_source_cleanup_batch",
+      "cli_batch": "56847b33-392d-4944-a3ef-a5e3010c8428",
+      "confirmed_cancelled": 2,
+      "copy_full_byte_equality": true,
+      "http_batch": "c3875506-6f4f-4e26-b52a-0d435497472f",
+      "independent_retained_packet_equality": true,
+      "partial_exit": 9,
+      "scope": "Explicit candidates only; directory expansion, companions, replacement and GUI batching remain separate qualification",
+      "sdk_batch": "dc8dd0ca-824f-4a01-aaf9-b3c5d4ade47d",
+      "skipped": 2,
+      "source_commit": "934e32b32f65060950fbea15acad390260fa61ad",
+      "transports": [
+        "typed_cli",
+        "official_sdk_stdio",
+        "official_sdk_streamable_http"
+      ]
+    },
+    "batch_sdk_lost_response_restart": {
+      "test_passed": true,
+      "lost_accepted_responses": 2,
+      "unchanged_automatic_retry": true,
+      "owner_epoch_changed": true,
+      "same_principal_root_receipt_group_and_member_ids": true,
+      "retained_jobs": 2,
+      "retained_groups": 1,
+      "independent_source_output_bytes": true,
+      "scope": "Assertions in the actually compiled and passed owner_batch test; original helper JSON retained in the GitHub-reported artifact, not downloaded or independently re-hashed here"
+    },
+    "browser_job": 120941331010,
+    "browser_batch": {
+      "two_actual_file_intakes": true,
+      "two_media_checkboxes": true,
+      "review_and_run_pointer_input": true,
+      "review_starts_no_jobs": true,
+      "terminal_children": 2,
+      "per_child_source_output_full_byte_equality": true,
+      "original_single_producer_save_oracle_kept": true,
+      "final_total_producer_jobs": 3,
+      "completed_png_personally_inspected": true
+    },
+    "browser_genuine_os_save": {
+      "source_saved_bytes": "197983",
+      "producer_jobs": 1,
+      "png_personally_inspected": true
+    },
+    "complete_ordinary_targets": [
+      "ubuntu-24.04",
+      "macos-15",
+      "macos-15-intel"
+    ],
+    "research_verifier_observed_manifest_files": 807
+  },
+  "not_qualified": {
+    "windows": "Discovery owner startup reached20s while independent unoptimized interface cases ran concurrently; next revision isolates cases without changing20s or same-root3frontend concurrency",
+    "artifact_http": "Independent test failed before copying at diagnostics File::create ENOENT; next revision creates its own evidence directory before first use",
+    "native_batch_ui": "Skipped because the full checks matrix contained Windows failure; next revision permits independent matching Linux artifact evidence, all matrix jobs remain required",
+    "formatting": "37 unique hosted formatter hunks applied next revision"
+  },
+  "github_reported_artifacts": [
+    {
+      "id": 12570600242,
+      "name": "owner-batch-evidence-linux",
+      "zip_bytes": 2867,
+      "github_zip_digest": "sha256:e68e0751d3d302e0b2e57d900c15c6ae3b2fcb8d2ee4520c84d297ef7fa11902",
+      "downloaded": false
+    },
+    {
+      "id": 12569266411,
+      "name": "browser-boot-evidence-linux-chrome",
+      "zip_bytes": 1098822,
+      "github_zip_digest": "sha256:eabf93fb4fa2f1ca637a65ad8594b203f94f669a6f3460d2bbfe543f497ee07a",
+      "downloaded": false
+    }
+  ],
+  "mandatory_open": [
+    "Folder/probe-failure intake",
+    "Companions",
+    "Reviewed replacement",
+    "GUI cancellation",
+    "Full F01-F15/editor/effects/DAG/preview/mixer/captions/interchange",
+    "Command/donor closure",
+    "Retention/generation migration",
+    "Standard offline portable packages/resources/full manuals",
+    "Matching owner hardware harness"
+  ]
+}

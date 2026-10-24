@@ -159,9 +159,21 @@ pub async fn verify(media: &fixture::Media, second: Option<&std::path::Path>) {
         .expect("Actual lost-response SDK restart deadline");
 }
 async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
-    let label = if second.is_some() { "lost-batch-ack" } else { "lost-ack" };
-    let command_id = if second.is_some() { "batches.submit" } else { "jobs.submit" };
-    let result_key = if second.is_some() { "batch_id" } else { "job_id" };
+    let label = if second.is_some() {
+        "lost-batch-ack"
+    } else {
+        "lost-ack"
+    };
+    let command_id = if second.is_some() {
+        "batches.submit"
+    } else {
+        "jobs.submit"
+    };
+    let result_key = if second.is_some() {
+        "batch_id"
+    } else {
+        "job_id"
+    };
     let cli = Cli {
         data: media.directory.path().join(format!("{label}-data")),
         components: media.bin.clone(),
@@ -237,19 +249,35 @@ async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
         json!({"replay_scope":scope["replay_scope"],"idempotency_key":"lost-ack-register"})
     );
     let output = media.directory.path().join(format!("{label}-copy.mkv"));
-    let second_output = media.directory.path().join(format!("{label}-second-copy.mkv"));
+    let second_output = media
+        .directory
+        .path()
+        .join(format!("{label}-second-copy.mkv"));
     let plan = if let Some(second) = second {
-        let second_asset = call!(client, "assets.register", json!({"path":second}),
-            json!({"replay_scope":scope["replay_scope"],"idempotency_key":"lost-ack-register-second"}));
-        call!(client,"streams.clean.batch_plan",json!({
-            "items":[{"asset_id":asset["id"],"output":output},{"asset_id":second_asset["id"],"output":second_output}],
-            "intent":fixture::rules(),"file_times":"new",
-            "execution_limits":nw_domain::execution::CleanupLimits::default(),
-            "failure_policy":"reject_all","unresolved_policy":"reject"
-        }),json!({}))
+        let second_asset = call!(
+            client,
+            "assets.register",
+            json!({"path":second}),
+            json!({"replay_scope":scope["replay_scope"],"idempotency_key":"lost-ack-register-second"})
+        );
+        call!(
+            client,
+            "streams.clean.batch_plan",
+            json!({
+                "items":[{"asset_id":asset["id"],"output":output},{"asset_id":second_asset["id"],"output":second_output}],
+                "intent":fixture::rules(),"file_times":"new",
+                "execution_limits":nw_domain::execution::CleanupLimits::default(),
+                "failure_policy":"reject_all","unresolved_policy":"reject"
+            }),
+            json!({})
+        )
     } else {
-        call!(client,"streams.clean",
-            json!({"asset_id":asset["id"],"output":output,"intent":fixture::rules()}),json!({}))
+        call!(
+            client,
+            "streams.clean",
+            json!({"asset_id":asset["id"],"output":output,"intent":fixture::rules()}),
+            json!({})
+        )
     };
     let arguments = json!({
         "params":{"plan_id":plan["id"],"plan_hash":plan["hash"]},
@@ -289,15 +317,33 @@ async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
     };
     let expected_jobs = if second.is_some() { 2 } else { 1 };
     let member_ids = if second.is_some() {
-        accepted["result"]["members"].as_array().unwrap().iter()
-            .map(|member| member["job_id"].as_str().unwrap().to_owned()).collect::<Vec<_>>()
-    } else { vec![accepted["result"]["job_id"].as_str().unwrap().to_owned()] };
-    assert_eq!(member_ids.len(),expected_jobs);
-    for id in &member_ids { assert_eq!(cli.completed(id).await["state"],"succeeded"); }
+        accepted["result"]["members"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|member| member["job_id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    } else {
+        vec![accepted["result"]["job_id"].as_str().unwrap().to_owned()]
+    };
+    assert_eq!(member_ids.len(), expected_jobs);
+    for id in &member_ids {
+        assert_eq!(cli.completed(id).await["state"], "succeeded");
+    }
     if let Some(second) = second {
-        assert_eq!(std::fs::read(second).unwrap(),std::fs::read(&second_output).unwrap());
-        let group = cli.query("batches.inspect",json!({"id":accepted["result"]["batch_id"]})).await;
-        assert_eq!(group["total"],2); assert_eq!(group["succeeded"],2); assert_eq!(group["complete"],true);
+        assert_eq!(
+            std::fs::read(second).unwrap(),
+            std::fs::read(&second_output).unwrap()
+        );
+        let group = cli
+            .query(
+                "batches.inspect",
+                json!({"id":accepted["result"]["batch_id"]}),
+            )
+            .await;
+        assert_eq!(group["total"], 2);
+        assert_eq!(group["succeeded"], 2);
+        assert_eq!(group["complete"], true);
     }
     assert_eq!(
         std::fs::read(&media.source).unwrap(),
@@ -335,38 +381,43 @@ async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
     assert_eq!(next_claims["principal"], first_claims["principal"]);
     assert_eq!(next_claims["root"], first_claims["root"]);
     let jobs = cli.query("jobs.list", json!({})).await;
-    assert_eq!(jobs["total_count"],expected_jobs);
-    let mut observed = jobs["items"].as_array().unwrap().iter().map(|job| job["id"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
-    let mut expected = member_ids.clone(); observed.sort(); expected.sort(); assert_eq!(observed,expected);
+    assert_eq!(jobs["total_count"], expected_jobs);
+    let mut observed = jobs["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|job| job["id"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    let mut expected = member_ids.clone();
+    observed.sort();
+    expected.sort();
+    assert_eq!(observed, expected);
     if second.is_some() {
-        let batches = cli.query("batches.list",json!({})).await;
-        assert_eq!(batches["total_count"],1);
-        assert_eq!(batches["items"][0]["id"],accepted["result"]["batch_id"]);
+        let batches = cli.query("batches.list", json!({})).await;
+        assert_eq!(batches["total_count"], 1);
+        assert_eq!(batches["items"][0]["id"], accepted["result"]["batch_id"]);
     }
     let bytes = nw_platform::files::identity(&output, &CancellationToken::new()).unwrap();
     std::fs::create_dir_all(&evidence_root).unwrap();
+    let report = json!({
+        "schema_version":1, "source_commit":std::env::var("GITHUB_SHA").ok(),
+        "boundary":"actual_owner_official_sdk_stdio", "lost_accepted_responses":2,
+        "automatic_retry_request_unchanged":true, "same_receipt_after_restart":true,
+        "same_job_after_restart":true, "same_member_set_after_restart":true,
+        "durable_job_count":expected_jobs, "command":command_id,
+        "accepted_identity":accepted["result"][result_key], "member_ids":member_ids,
+        "root_and_principal_unchanged":true, "owner_epoch_changed":true,
+        "output_bytes":bytes.bytes, "output_sha256":bytes.sha256, "owner_log_only":true
+    });
     std::fs::write(
         evidence_root.join(format!("{label}-restart.json")),
-        serde_json::to_vec_pretty(&json!({
-            "schema_version":1,
-            "boundary":"actual_owner_official_sdk_stdio",
-            "lost_accepted_responses":2,
-            "automatic_retry_request_unchanged":true,
-            "same_receipt_after_restart":true,
-            "same_job_after_restart":true,
-            "durable_job_count":expected_jobs,
-            "command":command_id,"accepted_identity":accepted["result"][result_key],
-            "member_ids":member_ids,
-            "root_and_principal_unchanged":true,
-            "owner_epoch_changed":true,
-            "output_bytes":bytes.bytes,
-            "output_sha256":bytes.sha256,
-            "owner_log_only":true
-        }))
-        .unwrap(),
+        serde_json::to_vec_pretty(&report).unwrap(),
     )
     .unwrap();
-    tracing::info!(lost_responses = 2, output_bytes = %bytes.bytes, output_sha256 = %bytes.sha256, "Actual SDK lost-response restart retained one durable receipt and job");
+    println!("NW_LOST_ACK_RESTART_REPORT:{report}");
+    tracing::info!(lost_responses = 2, durable_jobs = expected_jobs, command = command_id,
+        output_bytes = %bytes.bytes, output_sha256 = %bytes.sha256,
+        "Actual SDK lost-response restart retained one receipt and its original job set");
     client.cancel().await.unwrap();
     wait_for_idle(&cli.data).await;
 }

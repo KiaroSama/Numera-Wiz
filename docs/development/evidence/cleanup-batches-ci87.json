@@ -33,5 +33,5 @@
     "Reviewed replacement",
     "Full product/standard portable packages/migration/owner harness"
   ],
-  "unchanged_research_members": 808
+  "research_preservation": "Research files were not edited by this change. The independently observed ci88 macOS ARM verifier reports 807 preserved manifest members; this document does not invent an archive-wide item count."
 }

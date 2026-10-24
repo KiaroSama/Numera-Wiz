@@ -175,6 +175,7 @@ async fn journey() {
         request_timeout: Duration::from_secs(150),
     };
     let evidence = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
+    std::fs::create_dir_all(&evidence).unwrap();
     let _logs = RetainLogs {
         source: cli.data.join("logs"),
         destination: evidence.join("large-owner-logs"),

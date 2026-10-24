@@ -1,6 +1,11 @@
 //! CLI and actual official-SDK stdio parity and authorization regressions.
 use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 use std::process::Command;
+// These cases launch independent unoptimized owners. Isolate those workloads so
+// hosted VM contention does not consume the unchanged 20-second bootstrap budget.
+// The dedicated same-root case below still starts three frontends concurrently.
+static OWNER_CASE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[path = "support/evidence.rs"]
 mod evidence;
 fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLogs {
@@ -13,6 +18,7 @@ fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLog
 }
 #[test]
 fn cli_stdout_is_canonical_json_and_index_zero_survives() {
+    let _case = OWNER_CASE.blocking_lock();
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
     let data = tempfile::tempdir().unwrap();
@@ -44,6 +50,7 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
 }
 #[tokio::test]
 async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
+    let _case = OWNER_CASE.lock().await;
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
     let data = tempfile::tempdir().unwrap();
     let _logs = retain_owner_logs(data.path(), "discovery");
@@ -101,6 +108,7 @@ async fn wait_for_idle_owner_unlock(root: &std::path::Path) {
 }
 #[tokio::test]
 async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
+    let _case = OWNER_CASE.lock().await;
     tokio::time::timeout(std::time::Duration::from_secs(120), async {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         use serde_json::Value;
@@ -162,6 +170,7 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
 
 #[tokio::test]
 async fn concurrent_native_frontends_boot_one_owner_for_the_same_root() {
+    let _case = OWNER_CASE.lock().await;
     tokio::time::timeout(std::time::Duration::from_secs(75), async {
         let data = tempfile::tempdir().unwrap();
         let _logs = retain_owner_logs(data.path(), "concurrent-start");
