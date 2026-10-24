@@ -70,6 +70,32 @@ registry/source assets and exact same origin. Pairing cannot create caller-selec
 roots or profiles. Agent profiles cannot retain editor leases unless the owner
 explicitly enabled that right in their stored profile.
 
+## Artifact manifests and bytes
+
+The server advertises resources without subscription or list-change promises.
+resources/list uses current-authority artifact summaries with the existing
+30-second cursor binding. resources/read accepts
+`numera://artifact/{artifact_id}/manifest` and returns application/json text at
+most 64 KiB. The manifest's media MIME is a separate field; no whole movie is
+returned as a blob resource. Returned URIs and HTTP routes are lookup locations,
+not permissions or credentials.
+
+The same artifacts.manifest query is available as a typed tool. Call
+artifacts.read_chunk with artifact_id, expected_sha256, decimal-string offset
+and a length from 1 through 131072. Read its bounded structured result; base64 is
+not duplicated into a large text block. The current profile must allow that
+command and the producing job's Read action for every read. Removing job Read
+also removes its exact output-byte purpose, even if the client retained a URI.
+A substituted output is ARTIFACT_CHANGED even when replacement content matches.
+
+A direct client can stream the manifest's relative bytes route on the already
+running public origin using its own bearer header. Single ranges, strong digest
+If-Match and no-store attachment delivery support controlled resumption. Stdio
+can read chunks through its existing private bridge without starting public HTTP.
+Do not transmit the private runtime record/token or put credentials in query URLs.
+These transfer handlers do not yet provide previews.observe image/audio content;
+that separate observation and graph/revision qualification remains required.
+
 ## Evidence and scope
 
 Actual CLI/SDK CPU media journeys assert byte-copy identity, remux order/tags and

@@ -440,12 +440,6 @@ pub fn decode_json(bytes: &[u8]) -> Result<Value> {
         }
     }
 
-    if bytes.len() > 256 * 1024 {
-        return Err(DomainError::new(
-            "RESOURCE_LIMIT",
-            "JSON request exceeds 256 KiB",
-        ));
-    }
     #[derive(Debug)]
     struct Strict(Value);
     impl<'de> Deserialize<'de> for Strict {
@@ -584,4 +578,24 @@ pub fn registry_fingerprint() -> String {
     hex::encode(Sha256::digest(
         serde_json::to_vec(&value).expect("registry serializes"),
     ))
+}
+
+#[cfg(test)]
+mod request_budget_tests {
+    use super::*;
+    #[test]
+    fn strict_request_decoder_admits_the_documented_one_mib_boundary() {
+        let input = format!(r#"{{"value":"{}"}}"#, "x".repeat(MAX_COMMAND_BYTES - 12));
+        assert_eq!(input.len(), MAX_COMMAND_BYTES);
+        assert_eq!(
+            decode_json(input.as_bytes()).unwrap()["value"]
+                .as_str()
+                .unwrap()
+                .len(),
+            MAX_COMMAND_BYTES - 12
+        );
+        let mut oversized = input.into_bytes();
+        oversized.push(b' ');
+        assert_eq!(decode_json(&oversized).unwrap_err().code, "RESOURCE_LIMIT");
+    }
 }
