@@ -290,8 +290,14 @@ fn apply_tag(tags: &mut BTreeMap<String, String>, name: &str, patch: &TagPatch) 
 }
 /// Validate bounded selector/order/tag input before batch allocation or source work.
 pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
-    if intent.stream_tag_patches.len() > 256 || intent.audio_order.len() > 256 || intent.subtitle_order.len() > 256 {
-        return Err(DomainError::new("RESOURCE_LIMIT", "At most 256 order entries and tag patches are admitted"));
+    if intent.stream_tag_patches.len() > 256
+        || intent.audio_order.len() > 256
+        || intent.subtitle_order.len() > 256
+    {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "At most 256 order entries and tag patches are admitted",
+        ));
     }
     validate_selector(&intent.audio_selection.selector)?;
     validate_selector(&intent.subtitle_selection.selector)?;

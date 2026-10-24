@@ -477,7 +477,9 @@ impl Service {
                         .iter()
                         .any(|root| Path::new(&asset.identity.path).starts_with(root))
             }
-            "batches.submit" | "batches.cancel" => self.batch_receipt_readable(context, &response)?,
+            "batches.submit" | "batches.cancel" => {
+                self.batch_receipt_readable(context, &response)?
+            }
             _ => true,
         };
         if readable {
@@ -1035,15 +1037,22 @@ impl Service {
                         ObjectKind::Plan => "plan",
                         ObjectKind::Job => "job",
                     };
-                    let present = self.store.get::<Value>(&named(prefix, &grant.id)?)?.is_some();
+                    let present = self
+                        .store
+                        .get::<Value>(&named(prefix, &grant.id)?)?
+                        .is_some();
                     let composed_prefix = match grant.kind {
                         ObjectKind::Project => None,
                         ObjectKind::Plan => Some("batch-plan"),
                         ObjectKind::Job => Some("batch"),
                     };
                     let composed = if let Some(prefix) = composed_prefix {
-                        self.store.get::<Value>(&named(prefix, &grant.id)?)?.is_some()
-                    } else { false };
+                        self.store
+                            .get::<Value>(&named(prefix, &grant.id)?)?
+                            .is_some()
+                    } else {
+                        false
+                    };
                     if !present && !composed {
                         return Err(DomainError::object_not_found());
                     }
@@ -1364,12 +1373,23 @@ impl Service {
                 value(&self.inspect_batch(&context, &input.id)?)?
             }
             "batches.submit" => {
-                let _preflight_permit = self.batch_preflights.clone().try_acquire_owned()
-                    .map_err(|_| DomainError::new("RESOURCE_LIMIT", "Batch preflight capacity reached; retry the same request"))?;
+                let _preflight_permit =
+                    self.batch_preflights
+                        .clone()
+                        .try_acquire_owned()
+                        .map_err(|_| {
+                            DomainError::new(
+                                "RESOURCE_LIMIT",
+                                "Batch preflight capacity reached; retry the same request",
+                            )
+                        })?;
                 let input: nw_domain::batches::SubmitBatchInput = commands::parse(params)?;
                 let plan = self.read_batch_plan(&context, &input.plan_id, ObjectAction::Submit)?;
                 if plan.hash != input.plan_hash {
-                    return Err(DomainError::new("INVALID_PLAN", "Batch hash differs from the reviewed submission"));
+                    return Err(DomainError::new(
+                        "INVALID_PLAN",
+                        "Batch hash differs from the reviewed submission",
+                    ));
                 }
                 self.batch_child_command(&context, "jobs.submit")?;
                 plan.admits_submission()?;
@@ -1378,38 +1398,72 @@ impl Service {
                 self.preflight_started();
                 let prepared = self.prepare_batch_submission(&context, &plan, now, &cancellation);
                 let accept_guard = self.mutation.lock().map_err(|_| lock_error())?;
-                if let Some(replay) = self.refresh_acceptance(&context, &request, &cancellation, &accept_guard)? {
+                if let Some(replay) =
+                    self.refresh_acceptance(&context, &request, &cancellation, &accept_guard)?
+                {
                     return Ok(replay);
                 }
-                let current = self.read_batch_plan(&context, &input.plan_id, ObjectAction::Submit)?;
+                let current =
+                    self.read_batch_plan(&context, &input.plan_id, ObjectAction::Submit)?;
                 if current.hash != plan.hash {
-                    return Err(DomainError::new("INVALID_PLAN", "Batch changed while preparing acceptance"));
+                    return Err(DomainError::new(
+                        "INVALID_PLAN",
+                        "Batch changed while preparing acceptance",
+                    ));
                 }
                 let prepared = prepared?;
                 self.revalidate_batch_submission(&context, &current, &prepared, self.clock.now()?)?;
-                let admitted = current.items.iter().filter(|item| item.plan.is_some()).count();
-                if self.pending.load(Ordering::Acquire).saturating_add(admitted) > 128 {
-                    return Err(DomainError::new("RESOURCE_LIMIT", "Durable job queue cannot admit this whole batch"));
+                let admitted = current
+                    .items
+                    .iter()
+                    .filter(|item| item.plan.is_some())
+                    .count();
+                if self
+                    .pending
+                    .load(Ordering::Acquire)
+                    .saturating_add(admitted)
+                    > 128
+                {
+                    return Err(DomainError::new(
+                        "RESOURCE_LIMIT",
+                        "Durable job queue cannot admit this whole batch",
+                    ));
                 }
                 let policy = self.policy(&context)?;
                 let batch = nw_domain::batches::Batch {
-                    schema_version: 1, id: Uuid::new_v4().to_string(), creator: context.principal.clone(),
-                    plan_id: current.id.clone(), plan_hash: current.hash.clone(),
-                    members: current.items.iter().map(|item| nw_domain::batches::BatchMember {
-                        index: item.index, job_id: item.plan.as_ref().map(|_| Uuid::new_v4().to_string()),
-                    }).collect(),
+                    schema_version: 1,
+                    id: Uuid::new_v4().to_string(),
+                    creator: context.principal.clone(),
+                    plan_id: current.id.clone(),
+                    plan_hash: current.hash.clone(),
+                    members: current
+                        .items
+                        .iter()
+                        .map(|item| nw_domain::batches::BatchMember {
+                            index: item.index,
+                            job_id: item.plan.as_ref().map(|_| Uuid::new_v4().to_string()),
+                        })
+                        .collect(),
                     accepted_at: self.clock.now()?.to_string(),
                 };
                 let authorization = ExecutionAuthorization {
-                    principal: context.principal.clone(), profile: context.profile.clone(),
+                    principal: context.principal.clone(),
+                    profile: context.profile.clone(),
                     revision: policy.as_ref().map_or(0, |profile| profile.revision),
                 };
                 let response = self.store.accept_batch_with_clock(
-                    &context.principal, &request, &current, &batch, &authorization, || self.clock.now(),
+                    &context.principal,
+                    &request,
+                    &current,
+                    &batch,
+                    &authorization,
+                    || self.clock.now(),
                 )?;
                 // Retain the same acceptance guard through scheduling/reservation.
                 for member in &batch.members {
-                    if let Some(id) = &member.job_id && let Err(error) = self.schedule(id.clone()) {
+                    if let Some(id) = &member.job_id
+                        && let Err(error) = self.schedule(id.clone())
+                    {
                         tracing::error!(code=%error.code,batch_id=%batch.id,"Batch acceptance is durable; restart resumes retained queued children");
                     }
                 }
@@ -1424,21 +1478,47 @@ impl Service {
                 for member in &batch.members {
                     let Some(id) = &member.job_id else { continue };
                     let job = self.store.inspect_job(id)?;
-                    self.object_action(&context, ObjectKind::Job, id, &job.creator, ObjectAction::Control)?;
-                    let requested = matches!(job.state, JobState::Queued | JobState::Running | JobState::Verifying);
+                    self.object_action(
+                        &context,
+                        ObjectKind::Job,
+                        id,
+                        &job.creator,
+                        ObjectAction::Control,
+                    )?;
+                    let requested = matches!(
+                        job.state,
+                        JobState::Queued | JobState::Running | JobState::Verifying
+                    );
                     if requested {
-                        patches.push(nw_domain::batches::CancelMember { job_id: id.clone(), expected_state: job.state.clone() });
+                        patches.push(nw_domain::batches::CancelMember {
+                            job_id: id.clone(),
+                            expected_state: job.state.clone(),
+                        });
                     }
-                    let reason = if job.state == JobState::Publishing { "publication_committed" }
-                        else if job.state.terminal() { "already_terminal" } else { "request_accepted" };
+                    let reason = if job.state == JobState::Publishing {
+                        "publication_committed"
+                    } else if job.state.terminal() {
+                        "already_terminal"
+                    } else {
+                        "request_accepted"
+                    };
                     outcomes.push(json!({"index":member.index,"job_id":id,"state":if job.state == JobState::Queued { JobState::Cancelled } else { job.state },"cancel_requested":requested,"reason":reason}));
                 }
                 let response = self.store.cancel_batch_with_clock(
-                    &context.principal, &request, &batch, &patches,
-                    json!({"batch_id":batch.id,"members":outcomes}), || self.clock.now(),
+                    &context.principal,
+                    &request,
+                    &batch,
+                    &patches,
+                    json!({"batch_id":batch.id,"members":outcomes}),
+                    || self.clock.now(),
                 )?;
                 for patch in &patches {
-                    if let Some(token) = self.cancellations.lock().map_err(|_| lock_error())?.get(&patch.job_id) {
+                    if let Some(token) = self
+                        .cancellations
+                        .lock()
+                        .map_err(|_| lock_error())?
+                        .get(&patch.job_id)
+                    {
                         token.cancel();
                     }
                 }
@@ -1768,7 +1848,12 @@ impl Service {
         }
         Ok(())
     }
-    pub(super) fn prepare_cleanup(&self, context: &Context, input: CleanInput, now: u64) -> Result<Plan> {
+    pub(super) fn prepare_cleanup(
+        &self,
+        context: &Context,
+        input: CleanInput,
+        now: u64,
+    ) -> Result<Plan> {
         self.admit_execution_limits(context, &input.execution_limits)?;
         let asset: Asset = self
             .store
@@ -1786,21 +1871,19 @@ impl Service {
             now,
         )?;
         plan.execution_limits = Some(input.execution_limits);
-        let rights = plan.required_rights.as_mut().ok_or_else(|| {
-            DomainError::new("INVALID_PLAN", "Planner omitted execution rights")
-        })?;
+        let rights = plan
+            .required_rights
+            .as_mut()
+            .ok_or_else(|| DomainError::new("INVALID_PLAN", "Planner omitted execution rights"))?;
         rights.data_root = self.store.root_id().into();
         if Path::new(&plan.source.identity.path).starts_with(self.root.join("assets")) {
-            rights.source_read.purpose =
-                nw_domain::plans::SourcePurpose::CreatorBoundManaged {
-                    principal: context.principal.clone(),
-                };
+            rights.source_read.purpose = nw_domain::plans::SourcePurpose::CreatorBoundManaged {
+                principal: context.principal.clone(),
+            };
         }
         plan.creation_audit
             .as_mut()
-            .ok_or_else(|| {
-                DomainError::new("INVALID_PLAN", "Planner omitted creation audit")
-            })?
+            .ok_or_else(|| DomainError::new("INVALID_PLAN", "Planner omitted creation audit"))?
             .policy_revision = self.policy(context)?.as_ref().map_or(0, |p| p.revision);
         plan.hash = nw_engine::plan_digest(&plan)?;
         Ok(plan)

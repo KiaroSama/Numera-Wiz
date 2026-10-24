@@ -1609,3 +1609,43 @@ Directory/companion/replacement, full F01-F15/editor/effects, command closure,
 retention/generation migration, packages/resources/manuals and owner harness
 remain mandatory. The existing single-file GUI/save regressions remain intact.
 Main and archived research remain unchanged; no release/full-task gate is closed.
+
+## Shared batch UI and actual human input regressions prepared
+
+First run 40115483799 builds WASM successfully. All four ordinary checks
+found the same two test-only lint problems (unused ClientServiceExt and an
+unused shared completion helper). The import is removed; the actual batch test
+now separately inspects a completed child and compares its artifact size with
+the group row. No lint suppression or weakened assertion was added. All 123
+exact hosted formatter hunks are applied.
+
+Shared Rust UI source now includes bounded media checkboxes, canonical output
+suggestions, explicit rejected/unresolved policies, frozen Review and Run,
+current per-child states/verified-success byte totals, cancellation requests,
+history and authorized child/artifact inspection. Transport retry retains the
+same mutation identity. Native and Chrome harnesses append genuine two-source
+checkbox/Review/Run input after retaining the original single-producer Save
+oracles. Each independently compares both outputs with their corresponding
+sources. Coordinates and compiler/runtime results still await hosted execution;
+none of these new source paths is counted as a pass.
+
+Two more complete donor test bodies were personally read (app_flow and
+processing_rules). They reinforce retaining probe failures and summing only
+successful per-file changes; their patched tools are not media qualification.
+The required directory intake manifest must retain failures before registration,
+which explicit registered-asset batches cannot yet represent. All full product
+requirements and the release block remain open.
+
+The ci87 media job 120935770003 subsequently passed all actual engine,
+isolated larger-than-memory artifact reader, new two-source batch, existing
+typed CLI/official SDK/lost-response restart and larger HTTP copy/revocation
+suites. The batch case ran 135.56 seconds and retained equal future hashes
+across completed probe audit/principals, per-stream raw packet equality for
+the remux, full byte equality for copy, stable receipt/member retry, explicit
+partial exit 9, two no-output skips and two confirmed cancellations under a
+held publication claim. Its exact compiled merge is
+1a528d8a5082144f45293ef317e04aa50e5c63ad. Scoped client/owner HWM for the
+268633400-byte copy was 26632/31888 KiB. Full facts are recorded in ci87 evidence.
+All four ordinary targets still fail the same two test-only lint issues;
+shared GUI batch and batch-specific lost accepted response/restart are next
+revision sources, not passes. No full gate or research row is advanced.

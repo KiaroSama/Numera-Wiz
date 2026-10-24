@@ -1757,6 +1757,22 @@
       "read_scope": "complete_body",
       "lines": 221,
       "interpretation": "Complete body pins relative-tree roots, single-file suffixes, numbered collisions before review, nested-output rejection, directory-boundary exclusion, companion classification and stable presentation order. Its string-case/resolve examples do not qualify symlink/reparse aliases, Unicode/case filesystem identity or external replacement races. New batch traversal must remain bounded and preserve every candidate/error; publication cannot silently renumber after review."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_app_flow.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "4ca878ec64195c426476fbcb59b9117dcfd29bbe",
+      "read_scope": "complete_body",
+      "lines": 237,
+      "interpretation": "Complete body covers missing tools, empty discovery, explicit refusal after unreadable probes, reviewed confirmation before work, conventional exit reporting and optional donor post-run verification. Every external tool/process call is patched: this is decision coverage, not real media or OS evidence. Numera keeps mandatory per-output verification. Explicit registered-asset batches now retain planning rejections; discovery/probe failures still require the mandatory folder intake manifest instead of silently omitting unregistered files."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_processing_rules.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "70351b31281d3e4fc60b300f003bc77578e0993a",
+      "read_scope": "complete_body",
+      "lines": 357,
+      "interpretation": "Complete body covers video-required precedence over no-audio skips, explicit Audio None, retained probe failures, failed-output cleanup, existing-output safety, finite remux budgets, N/A progress with actual byte fallback and signed per-success output-minus-input accounting. Its FFmpeg runners write fake bytes: they do not qualify actual preservation or publication. New batch totals separately retain rejected/skipped/cancelled/interrupted rows and exclude them from successful byte deltas. Full discovery/probe-failure intake, companion counts and reviewed replacement remain required."
     }
   ]
 }

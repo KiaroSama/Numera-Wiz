@@ -222,12 +222,42 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("streams.clean.batch_plan", "Review every explicit cleanup batch candidate", Query, crate::batches::CleanBatchInput),
-        row!("batches.plan_inspect", "Inspect an authorized frozen cleanup batch", Query, IdInput),
-        row!("batches.submit", "Atomically accept reviewed child jobs with one receipt", DurableMutation, crate::batches::SubmitBatchInput),
-        row!("batches.list", "List authorized accepted batch identities", Query, crate::views::PageInput),
-        row!("batches.inspect", "Inspect current authorized batch member outcomes", Query, IdInput),
-        row!("batches.cancel", "Journal cancellation requests for controllable batch members", DurableMutation, IdInput),
+        row!(
+            "streams.clean.batch_plan",
+            "Review every explicit cleanup batch candidate",
+            Query,
+            crate::batches::CleanBatchInput
+        ),
+        row!(
+            "batches.plan_inspect",
+            "Inspect an authorized frozen cleanup batch",
+            Query,
+            IdInput
+        ),
+        row!(
+            "batches.submit",
+            "Atomically accept reviewed child jobs with one receipt",
+            DurableMutation,
+            crate::batches::SubmitBatchInput
+        ),
+        row!(
+            "batches.list",
+            "List authorized accepted batch identities",
+            Query,
+            crate::views::PageInput
+        ),
+        row!(
+            "batches.inspect",
+            "Inspect current authorized batch member outcomes",
+            Query,
+            IdInput
+        ),
+        row!(
+            "batches.cancel",
+            "Journal cancellation requests for controllable batch members",
+            DurableMutation,
+            IdInput
+        ),
         row!(
             "artifacts.list",
             "List current job-readable artifact manifests",

@@ -186,7 +186,9 @@ pub enum Batches {
         #[arg(long)]
         file: PathBuf,
     },
-    PlanInspect { id: String },
+    PlanInspect {
+        id: String,
+    },
     Submit {
         #[arg(long)]
         plan: String,
@@ -195,14 +197,18 @@ pub enum Batches {
         #[command(flatten)]
         identity: MutationIdentity,
     },
-    Inspect { id: String },
+    Inspect {
+        id: String,
+    },
     Cancel {
         id: String,
         #[command(flatten)]
         identity: MutationIdentity,
     },
     /// Observe an accepted batch; Ctrl+C stops waiting and leaves accepted jobs running.
-    Wait { id: String },
+    Wait {
+        id: String,
+    },
 }
 #[derive(Subcommand)]
 pub enum Logs {
@@ -330,10 +336,21 @@ pub fn prepare(command: Command) -> Result<Request> {
             }
             query("streams.clean.batch_plan", serde_json::to_value(input)?)
         }
-        Command::Batches(Batches::PlanInspect { id }) => query("batches.plan_inspect", json!({"id":id})),
-        Command::Batches(Batches::Inspect { id } | Batches::Wait { id }) => query("batches.inspect", json!({"id":id})),
-        Command::Batches(Batches::Submit { plan, plan_hash, identity }) => {
-            let mut request = query("batches.submit", json!({"plan_id":plan,"plan_hash":plan_hash}));
+        Command::Batches(Batches::PlanInspect { id }) => {
+            query("batches.plan_inspect", json!({"id":id}))
+        }
+        Command::Batches(Batches::Inspect { id } | Batches::Wait { id }) => {
+            query("batches.inspect", json!({"id":id}))
+        }
+        Command::Batches(Batches::Submit {
+            plan,
+            plan_hash,
+            identity,
+        }) => {
+            let mut request = query(
+                "batches.submit",
+                json!({"plan_id":plan,"plan_hash":plan_hash}),
+            );
             identity.apply(&mut request)?;
             request
         }
@@ -397,20 +414,44 @@ async fn wait_batch(client: &NativeClient, id: &str) -> Result<()> {
         };
         if !response.ok {
             println!("{}", serde_json::to_string_pretty(&response)?);
-            return Err(response.error.unwrap_or_else(|| DomainError::new("BATCH_UNAVAILABLE", "Batch inspection failed")).into());
+            return Err(response
+                .error
+                .unwrap_or_else(|| DomainError::new("BATCH_UNAVAILABLE", "Batch inspection failed"))
+                .into());
         }
-        let result: nw_domain::batches::BatchResult = commands::parse(response.result.clone().ok_or_else(|| DomainError::new("INVALID_BATCH", "Batch inspection omitted its result"))?)?;
+        let result: nw_domain::batches::BatchResult =
+            commands::parse(response.result.clone().ok_or_else(|| {
+                DomainError::new("INVALID_BATCH", "Batch inspection omitted its result")
+            })?)?;
         if result.complete {
-            let error = if result.failed == 0 && result.interrupted == 0 && result.cancelled == 0 { None }
-                else if result.failed == 0 && result.interrupted == 0 && result.succeeded == 0 && result.cancelled > 0 {
-                    Some(DomainError::new("CANCELLED", "Batch cancellation completed without a published success"))
-                } else { Some(DomainError::new("PARTIAL_BATCH_FAILURE", "Batch completed with failed, interrupted or cancelled candidates")) };
+            let error = if result.failed == 0 && result.interrupted == 0 && result.cancelled == 0 {
+                None
+            } else if result.failed == 0
+                && result.interrupted == 0
+                && result.succeeded == 0
+                && result.cancelled > 0
+            {
+                Some(DomainError::new(
+                    "CANCELLED",
+                    "Batch cancellation completed without a published success",
+                ))
+            } else {
+                Some(DomainError::new(
+                    "PARTIAL_BATCH_FAILURE",
+                    "Batch completed with failed, interrupted or cancelled candidates",
+                ))
+            };
             response.ok = error.is_none();
             response.error = error.clone();
             println!("{}", serde_json::to_string_pretty(&response)?);
             return error.map_or(Ok(()), |error| Err(error.into()));
         }
-        tracing::debug!(batch_id=id, finished=result.finished,total=result.total,"batch.wait.progress");
+        tracing::debug!(
+            batch_id = id,
+            finished = result.finished,
+            total = result.total,
+            "batch.wait.progress"
+        );
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
             signal = tokio::signal::ctrl_c() => {
