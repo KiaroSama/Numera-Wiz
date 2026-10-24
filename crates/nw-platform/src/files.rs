@@ -121,6 +121,32 @@ pub fn revalidate(expected: &FileIdentity, cancel: &CancellationToken) -> Result
     }
     Ok(())
 }
+/// Hold physical identity and a cheap change stamp across expensive preflight and acceptance.
+/// This supplements the full content digest; metadata is never a replacement for that digest.
+pub struct SourceStamp {
+    path: PathBuf,
+    handle: same_file::Handle,
+    bytes: u64,
+    modified: std::time::SystemTime,
+}
+impl SourceStamp {
+    pub fn capture_resolved(path: &Path) -> Result<Self> {
+        let canonical = source_path(path)?;
+        if canonical != path { return Err(DomainError::new("SOURCE_CHANGED", "Preflight source no longer matches its admitted canonical path")); }
+        let path = canonical;
+        let handle = same_file::Handle::from_file(File::open(&path).map_err(io_error)?).map_err(io_error)?;
+        let metadata = handle.as_file().metadata().map_err(io_error)?;
+        Ok(Self { path, handle, bytes: metadata.len(), modified: metadata.modified().map_err(io_error)? })
+    }
+    pub fn revalidate(&self) -> Result<()> {
+        let changed = || DomainError::new("SOURCE_CHANGED", "Source physical identity or change stamp no longer matches preflight");
+        let path = source_path(&self.path).map_err(|_| changed())?;
+        let current = same_file::Handle::from_file(File::open(&path).map_err(|_| changed())?).map_err(|_| changed())?;
+        let metadata = current.as_file().metadata().map_err(|_| changed())?;
+        if path != self.path || current != self.handle || metadata.len() != self.bytes || metadata.modified().map_err(|_| changed())? != self.modified { return Err(changed()); }
+        Ok(())
+    }
+}
 pub fn private_root(path: &Path) -> Result<PathBuf> {
     fs::create_dir_all(path).map_err(io_error)?;
     let root = fs::canonicalize(path).map_err(io_error)?;
@@ -253,6 +279,21 @@ pub fn same_object(first: &Path, second: &Path) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn source_acceptance_stamp_rejects_replacement_even_when_bytes_are_identical() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        fs::write(&source, b"Identical content does not prove the same physical source").unwrap();
+        let canonical = source_path(&source).unwrap();
+        let stamp = SourceStamp::capture_resolved(&canonical).unwrap();
+        stamp.revalidate().unwrap();
+        fs::rename(&source, root.path().join("retained-original.bin")).unwrap();
+        fs::write(&source, b"Identical content does not prove the same physical source").unwrap();
+        assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
+        let stamp = SourceStamp::capture_resolved(&canonical).unwrap();
+        fs::write(&source, b"changed length").unwrap();
+        assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
+    }
     #[test]
     fn reviewed_copy_rejects_replacement_before_copy_and_publishes_nothing() {
         let root = tempfile::tempdir().unwrap();

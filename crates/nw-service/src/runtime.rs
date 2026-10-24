@@ -36,6 +36,8 @@ pub struct Context {
     pub principal: String,
     pub profile: Option<String>,
 }
+#[cfg(test)]
+type PreflightHook = Arc<dyn Fn() + Send + Sync>;
 #[derive(Serialize, Deserialize)]
 struct Credential {
     context: Context,
@@ -66,6 +68,8 @@ pub struct Service {
     pending: Arc<AtomicUsize>,
     cancellations: Mutex<HashMap<String, CancellationToken>>,
     events: broadcast::Sender<String>,
+    #[cfg(test)]
+    preflight_hook: Mutex<Option<PreflightHook>>,
 }
 fn lock_error() -> DomainError {
     DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned")
@@ -205,6 +209,8 @@ impl Service {
             pending: Arc::new(AtomicUsize::new(0)),
             cancellations: Mutex::new(HashMap::new()),
             events,
+            #[cfg(test)]
+            preflight_hook: Mutex::new(None),
         });
         let recovering = service.clone();
         tokio::task::spawn_blocking(move || {
@@ -225,6 +231,22 @@ impl Service {
             principal: format!("owner-{}", self.store.root_id()),
             profile: None,
         }
+    }
+    #[cfg(test)]
+    fn preflight_started(&self) {
+        let hook = self.preflight_hook.lock().unwrap().clone();
+        if let Some(hook) = hook { hook(); }
+    }
+    fn refresh_acceptance(&self, context: &Context, request: &Request, cancellation: &CancellationToken, _guard: &std::sync::MutexGuard<'_, ()>) -> Result<Option<Response>> {
+        let policy = self.policy(context)?;
+        if let Some(response) = self.store.replay_with_clock(&context.principal, request, || self.clock.now())? {
+            return self.replay_view(context, request, response).map(Some);
+        }
+        if policy.as_ref().is_some_and(|profile| !profile.allows_command(&request.command.id)) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Current command authority was revoked during preflight"));
+        }
+        if cancellation.is_cancelled() { return Err(DomainError::new("CANCELLED", "Request cancelled before fresh acceptance")); }
+        Ok(None)
     }
     pub fn client_lease_allowed(&self, context: &Context) -> Result<()> {
         if let Some(profile) = self.policy(context)?
@@ -425,12 +447,22 @@ impl Service {
         self.path_with_purpose(context, path, write, None)
     }
     fn plan_source_path(&self, context: &Context, plan: &Plan) -> Result<PathBuf> {
+        self.root_authority(context, Path::new(&plan.source.identity.path), false)?;
         self.path_with_purpose(
             context,
             Path::new(&plan.source.identity.path),
             false,
             Some(&plan.source.identity),
         )
+    }
+    fn root_authority(&self, context: &Context, canonical: &Path, write: bool) -> Result<()> {
+        if let Some(profile) = self.policy(context)? {
+            let roots = if write { &profile.write_roots } else { &profile.read_roots };
+            if !roots.iter().any(|root| canonical.starts_with(Path::new(root))) {
+                return Err(DomainError::new("PATH_DENIED", "Current profile has no grant for this native path"));
+            }
+        }
+        Ok(())
     }
     fn path_with_purpose(
         &self,
@@ -670,7 +702,7 @@ impl Service {
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
         let durable = matches!(descriptor.state_class, StateClass::DurableMutation);
-        let _guard = if durable || matches!(descriptor.state_class, StateClass::Bootstrap) {
+        let guard = if durable || matches!(descriptor.state_class, StateClass::Bootstrap) {
             Some(self.mutation.lock().map_err(|_| lock_error())?)
         } else {
             None
@@ -936,6 +968,7 @@ impl Service {
             }
             "assets.register" => {
                 let input: nw_domain::ingest::RegisterInput = commands::parse(params)?;
+                let upload_id = input.upload_id.clone();
                 let (path, display_name) = match (input.path, input.upload_id) {
                     (Some(path), None) => {
                         (self.path(&context, Path::new(&path), false)?, String::new())
@@ -948,13 +981,34 @@ impl Service {
                         ));
                     }
                 };
-                let mut asset = runtime.block_on(self.engine()?.register(
-                    path,
-                    context.principal.clone(),
-                    cancellation.clone(),
-                ))?;
+                let engine = self.engine()?;
+                let selected_path = path.clone();
+                drop(guard);
+                #[cfg(test)]
+                self.preflight_started();
+                let prepared = (|| -> Result<_> {
+                    let stamp = files::SourceStamp::capture_resolved(&path).map_err(|_| DomainError::new("SOURCE_CHANGED", "Admitted source changed before preflight"))?;
+                    let result = runtime.block_on(engine.register(path, context.principal.clone(), cancellation.clone()));
+                    stamp.revalidate()?;
+                    let asset = result?;
+                    Ok((asset, stamp))
+                })();
+                let accept_guard = self.mutation.lock().map_err(|_| lock_error())?;
+                if let Some(replay) = self.refresh_acceptance(&context, &request, &cancellation, &accept_guard)? { return Ok(replay); }
+                self.root_authority(&context, &selected_path, false)?;
+                if self.path(&context, &selected_path, false)? != selected_path {
+                    return Err(DomainError::new("SOURCE_CHANGED", "Preflight source now resolves to a different native path"));
+                }
+                if let Some(id) = upload_id {
+                    let (current, _) = self.resolve_upload(&context, &id)?;
+                    if current != selected_path { return Err(DomainError::new("SOURCE_CHANGED", "Managed input changed during preflight")); }
+                }
+                let (mut asset, stamp) = prepared?;
+                stamp.revalidate()?;
                 asset.display_name = display_name;
-                self.path(&context, Path::new(&asset.identity.path), false)?;
+                if self.path(&context, Path::new(&asset.identity.path), false)? != Path::new(&asset.identity.path) {
+                    return Err(DomainError::new("SOURCE_CHANGED", "Registered source now resolves to a different native path"));
+                }
                 return self.store.commit_with_clock(
                     &context.principal,
                     &request,
@@ -1108,7 +1162,38 @@ impl Service {
                 self.plan_source_path(&context, &plan)?;
                 self.path(&context, Path::new(&plan.output), true)?;
                 files::revalidate_output(&plan.output)?;
-                files::revalidate(&plan.source.identity, &cancellation)?;
+                drop(guard);
+                #[cfg(test)]
+                self.preflight_started();
+                let prepared = (|| -> Result<_> {
+                    let engine = self.engine()?;
+                    if engine.ffmpeg != plan.ffmpeg || engine.ffprobe != plan.ffprobe || nw_engine::plan_digest(&plan)? != plan.hash {
+                        return Err(DomainError::new("INVALID_PLAN", "Frozen plan or selected component identity changed"));
+                    }
+                    let source = files::SourceStamp::capture_resolved(Path::new(&plan.source.identity.path)).map_err(|_| DomainError::new("SOURCE_CHANGED", "Reviewed source changed before preflight"))?;
+                    let ffmpeg = files::SourceStamp::capture_resolved(Path::new(&plan.ffmpeg.path)).map_err(|_| DomainError::new("COMPONENT_CHANGED", "Reviewed FFmpeg component changed before preflight"))?;
+                    let ffprobe = files::SourceStamp::capture_resolved(Path::new(&plan.ffprobe.path)).map_err(|_| DomainError::new("COMPONENT_CHANGED", "Reviewed ffprobe component changed before preflight"))?;
+                    files::revalidate(&plan.source.identity, &cancellation)?;
+                    for component in [&plan.ffmpeg, &plan.ffprobe] {
+                        files::revalidate(component, &cancellation).map_err(|error| if error.code == "SOURCE_CHANGED" { DomainError::new("COMPONENT_CHANGED", "Reviewed component bytes changed during preflight") } else { error })?;
+                    }
+                    source.revalidate()?; ffmpeg.revalidate()?; ffprobe.revalidate()?;
+                    Ok((source, ffmpeg, ffprobe))
+                })();
+                let accept_guard = self.mutation.lock().map_err(|_| lock_error())?;
+                if let Some(replay) = self.refresh_acceptance(&context, &request, &cancellation, &accept_guard)? { return Ok(replay); }
+                let current: Plan = self.store.get(&named("plan", &input.plan_id)?)?.ok_or_else(DomainError::object_not_found)?;
+                self.object_action(&context, ObjectKind::Plan, &current.id, &current.creator, ObjectAction::Submit)?;
+                if current.hash != plan.hash || nw_engine::plan_digest(&current)? != plan.hash || plan.expires_at.parse::<u64>().unwrap_or(0) <= self.clock.now()? {
+                    return Err(DomainError::new("INVALID_PLAN", "Reviewed plan changed or expired during preflight"));
+                }
+                self.plan_source_path(&context, &plan)?;
+                self.path(&context, Path::new(&plan.output), true)?;
+                files::revalidate_output(&plan.output)?;
+                let policy = self.policy(&context)?;
+                let (source, ffmpeg, ffprobe) = prepared?;
+                source.revalidate()?;
+                for component in [ffmpeg, ffprobe] { component.revalidate().map_err(|_| DomainError::new("COMPONENT_CHANGED", "Reviewed component identity changed before acceptance"))?; }
                 if self.pending.load(Ordering::Acquire) >= 128 {
                     return Err(DomainError::new(
                         "RESOURCE_LIMIT",
@@ -1442,6 +1527,85 @@ impl Drop for Pending {
 #[cfg(test)]
 mod tests {
     use super::*;
+    async fn preflight_fixture() -> (tempfile::TempDir, Arc<Service>, Context, Request, PathBuf) {
+        use nw_domain::{mux::*, records::MediaProbe};
+        let root = tempfile::tempdir().unwrap();
+        let programs = root.path().join("programs");
+        std::fs::create_dir(&programs).unwrap();
+        let ffmpeg = programs.join("ffmpeg"); let ffprobe = programs.join("ffprobe");
+        // Synthetic components are hashed for plan identity; no media executable is launched.
+        std::fs::write(&ffmpeg, b"preflight identity fixture").unwrap();
+        std::fs::write(&ffprobe, b"preflight identity fixture").unwrap();
+        let service = Service::open(root.path().join("data"), Some((ffmpeg, ffprobe))).await.unwrap();
+        let canonical_root = files::path_text(&std::fs::canonicalize(root.path()).unwrap()).unwrap();
+        let profile = AccessProfile { schema_version: 2, id: "preflight".into(), name: "preflight".into(), principal: "preflight-principal".into(), revision: 1, enabled: true, client_sessions: false, mode: ProfileMode::Operate, owned_object_access: true, allowed_command_ids: ["jobs.submit".into(), "access.replay_scope.create".into()].into(), object_grants: Vec::new(), read_roots: vec![canonical_root.clone()], write_roots: vec![canonical_root] };
+        service.store.put("profile/preflight", &profile).unwrap();
+        let context = service.profile_context("preflight").unwrap();
+        let source = root.path().join("source.mkv");
+        std::fs::write(&source, b"synthetic preflight bytes, not a media container").unwrap();
+        let asset = Asset { id: "preflight-asset".into(), creator: context.principal.clone(), display_name: "source.mkv".into(), identity: files::identity(&source, &CancellationToken::new()).unwrap(), probe: MediaProbe { stream_details: Default::default(), streams: vec![Stream { index: 0, kind: StreamKind::Video, codec: "ffv1".into(), tags: Default::default(), dispositions: Default::default() }, Stream { index: 1, kind: StreamKind::Audio, codec: "pcm_s16le".into(), tags: Default::default(), dispositions: Default::default() }], format: "synthetic-preflight".into(), global_tags: Default::default(), chapters: json!([]), verification_scope: "Synthetic preflight race, not actual media evidence".into() } };
+        let intent = CleanIntent { audio_selection: Selection { selector: Selector::All, no_match: NoMatch::SkipFile }, subtitle_selection: Selection { selector: Selector::All, no_match: NoMatch::AllowEmpty }, audio_order: Vec::new(), subtitle_order: Vec::new(), stream_tag_patches: Vec::new(), preservation: Preservation::default() };
+        let output = root.path().join("output.mkv");
+        let plan = service.engine().unwrap().clean_plan_at(asset, &output, &intent, &context.principal, service.clock.now().unwrap()).unwrap();
+        service.store.put(&named("plan", &plan.id).unwrap(), &plan).unwrap();
+        let mut request = Request::query("jobs.submit", json!({"plan_id":plan.id,"plan_hash":plan.hash}));
+        request.replay_scope = Some(service.store.issue_scope(&context.principal, service.clock.now().unwrap()).unwrap());
+        request.idempotency_key = Some("preflight-race".into());
+        (root, service, context, request, output)
+    }
+    #[tokio::test]
+    async fn policy_revocation_is_not_held_behind_expensive_preflight() {
+        let (_root, service, context, request, output) = preflight_fixture().await;
+        let (started, ready) = std::sync::mpsc::channel();
+        let (resume, waiting) = std::sync::mpsc::channel();
+        let waiting = Mutex::new(waiting);
+        *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
+            started.send(()).unwrap();
+            waiting.lock().unwrap().recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+        }));
+        let worker = service.clone();
+        let task = tokio::spawn(async move { worker.dispatch(context, request).await });
+        tokio::task::spawn_blocking(move || ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap()).await.unwrap();
+        let owner = service.owner();
+        let scope = service.store.issue_scope(&owner.principal, service.clock.now().unwrap()).unwrap();
+        let changed = tokio::time::timeout(std::time::Duration::from_secs(5), mutate(&service, &owner, &scope, "access.profiles.update", json!({"name":"preflight","expected_revision":1,"enabled":false,"mode":"operate","owned_object_access":true,"allowed_command_ids":[],"object_grants":[],"read_roots":[],"write_roots":[]}))).await;
+        resume.send(()).unwrap();
+        let response = task.await.unwrap();
+        assert!(changed.expect("Revocation was blocked by preflight").ok);
+        assert_eq!(response.error.unwrap().code, "PERMISSION_DENIED");
+        assert!(service.store.list::<Job>("job/", 4096).unwrap().is_empty());
+        assert!(!output.exists());
+    }
+    #[tokio::test]
+    async fn a_receipt_accepted_during_preflight_wins_over_its_later_source_failure() {
+        let (root, service, context, request, _output) = preflight_fixture().await;
+        let (started, ready) = std::sync::mpsc::channel();
+        let (resume, waiting) = std::sync::mpsc::channel();
+        let waiting = Mutex::new(waiting);
+        let entered = AtomicUsize::new(0);
+        *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
+            if entered.fetch_add(1, Ordering::AcqRel) == 0 {
+                started.send(()).unwrap();
+                waiting.lock().unwrap().recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+            }
+        }));
+        let worker = service.clone(); let effective = context.clone(); let original = request.clone();
+        let first = tokio::spawn(async move { worker.dispatch(effective, original).await });
+        tokio::task::spawn_blocking(move || ready.recv_timeout(std::time::Duration::from_secs(5)).unwrap()).await.unwrap();
+        let accepted = service.dispatch(context, request).await;
+        assert!(accepted.ok, "{accepted:?}");
+        std::fs::remove_file(root.path().join("source.mkv")).unwrap();
+        resume.send(()).unwrap();
+        let repeated = first.await.unwrap();
+        assert!(repeated.ok, "{repeated:?}");
+        assert_eq!(accepted.receipt_id, repeated.receipt_id);
+        assert_eq!(accepted.result, repeated.result);
+        assert_eq!(service.store.list::<Job>("job/", 4096).unwrap().len(), 1);
+        let id = accepted.result.unwrap()["job_id"].as_str().unwrap().to_owned();
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !service.store.inspect_job(&id).unwrap().state.terminal() { tokio::time::sleep(std::time::Duration::from_millis(10)).await; }
+        }).await.unwrap();
+    }
     #[tokio::test]
     async fn delegated_metadata_read_hides_native_paths_and_does_not_grant_submit_or_control() {
         use nw_domain::{

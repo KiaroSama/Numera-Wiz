@@ -245,6 +245,8 @@ async fn desktop(_client: NativeClient) -> Result<()> {
 }
 #[cfg(feature = "desktop")]
 async fn desktop(client: NativeClient) -> Result<()> {
+    let bootstrap_started = std::time::Instant::now();
+    tracing::info!("Native desktop bootstrap started");
     client.attach().await?;
     let port: std::sync::Arc<dyn nw_ui::CommandClient> = std::sync::Arc::new(NativeUiClient {
         client: client.clone(),
@@ -253,6 +255,7 @@ async fn desktop(client: NativeClient) -> Result<()> {
     let session = uuid::Uuid::new_v4().simple().to_string();
     let lease = uuid::Uuid::new_v4().to_string();
     client.client_lease(&lease, false).await?;
+    tracing::info!(elapsed_ms=bootstrap_started.elapsed().as_millis(), "Native desktop owner and lease are ready");
     let heartbeat = client.clone();
     let heartbeat_id = lease.clone();
     let task = tokio::spawn(async move {
@@ -270,7 +273,11 @@ async fn desktop(client: NativeClient) -> Result<()> {
             viewport: eframe::egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0]),
             ..Default::default()
         },
-        Box::new(move |cc| Ok(Box::new(nw_ui::WizApp::new(cc, port, session)))),
+        Box::new(move |cc| {
+            let workspace = nw_ui::WizApp::new(cc, port, session);
+            tracing::info!(elapsed_ms=bootstrap_started.elapsed().as_millis(), "Shared native workspace constructed");
+            Ok(Box::new(workspace))
+        }),
     );
     task.abort();
     let _ = client.client_lease(&lease, true).await;

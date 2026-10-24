@@ -140,11 +140,12 @@ async fn journey() {
             panic!("Native application exited before showing its workspace: {status}");
         }
         assert!(
-            start.elapsed() < Duration::from_secs(30),
-            "Native workspace did not open"
+            start.elapsed() < Duration::from_secs(60),
+            "Native workspace did not open within the functional CI deadline; inspect retained startup timings"
         );
         tokio::time::sleep(Duration::from_millis(200)).await;
     };
+    std::fs::write(evidence.join("native-startup.json"), serde_json::to_vec_pretty(&json!({"visible_window_ms":start.elapsed().as_millis().to_string(),"functional_deadline_seconds":60,"scope":"Unoptimized development executable under hosted X11/software GL; not packaged startup or memory qualification"})).unwrap()).unwrap();
     input(&["windowsize", &window, "1440", "861"]).await;
     input(&["windowactivate", "--sync", &window]).await;
     tokio::time::sleep(Duration::from_millis(700)).await;
