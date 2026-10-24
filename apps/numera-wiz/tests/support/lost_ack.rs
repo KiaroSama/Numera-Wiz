@@ -27,6 +27,8 @@ struct Loss {
     identical: bool,
 }
 struct Proxy {
+    command: &'static str,
+    result_key: &'static str,
     upstream: String,
     http: reqwest::Client,
     loss: Mutex<Loss>,
@@ -83,14 +85,14 @@ async fn forward(
         None
     };
     if submitted.as_ref().is_some_and(|request| {
-        request["command"]["id"] == "jobs.submit" && request["request_id"] == LOST_REQUEST
+        request["command"]["id"] == proxy.command && request["request_id"] == LOST_REQUEST
     }) {
         let accepted =
             nw_domain::commands::decode_json(&returned).map_err(|_| StatusCode::BAD_GATEWAY)?;
         if !status.is_success()
             || accepted["ok"] != true
             || !accepted["receipt_id"].is_string()
-            || !accepted["result"]["job_id"].is_string()
+            || !accepted["result"][proxy.result_key].is_string()
         {
             return Err(StatusCode::BAD_GATEWAY);
         }
@@ -102,7 +104,7 @@ async fn forward(
         if let (Some(original), Some(previous)) = (&loss.original_body, &loss.accepted) {
             let identical = original.as_slice() == bytes.as_ref()
                 && previous["receipt_id"] == accepted["receipt_id"]
-                && previous["result"]["job_id"] == accepted["result"]["job_id"];
+                && previous["result"] == accepted["result"];
             loss.identical &= identical;
         } else {
             loss.original_body = Some(bytes.to_vec());
@@ -151,14 +153,17 @@ async fn wait_for_idle(root: &std::path::Path) {
     }
 }
 
-pub async fn verify(media: &fixture::Media) {
-    tokio::time::timeout(Duration::from_secs(240), journey(media))
+pub async fn verify(media: &fixture::Media, second: Option<&std::path::Path>) {
+    tokio::time::timeout(Duration::from_secs(240), journey(media, second))
         .await
         .expect("Actual lost-response SDK restart deadline");
 }
-async fn journey(media: &fixture::Media) {
+async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
+    let label = if second.is_some() { "lost-batch-ack" } else { "lost-ack" };
+    let command_id = if second.is_some() { "batches.submit" } else { "jobs.submit" };
+    let result_key = if second.is_some() { "batch_id" } else { "job_id" };
     let cli = Cli {
-        data: media.directory.path().join("lost-ack-data"),
+        data: media.directory.path().join(format!("{label}-data")),
         components: media.bin.clone(),
         request_timeout: Duration::from_secs(40),
     };
@@ -188,6 +193,8 @@ async fn journey(media: &fixture::Media) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let proxy = Arc::new(Proxy {
+        command: command_id,
+        result_key,
         upstream: format!("http://127.0.0.1:{}", original["port"].as_u64().unwrap()),
         http: reqwest::Client::builder()
             .no_proxy()
@@ -229,13 +236,21 @@ async fn journey(media: &fixture::Media) {
         json!({"path":media.source}),
         json!({"replay_scope":scope["replay_scope"],"idempotency_key":"lost-ack-register"})
     );
-    let output = media.directory.path().join("lost-ack-copy.mkv");
-    let plan = call!(
-        client,
-        "streams.clean",
-        json!({"asset_id":asset["id"],"output":output,"intent":fixture::rules()}),
-        json!({})
-    );
+    let output = media.directory.path().join(format!("{label}-copy.mkv"));
+    let second_output = media.directory.path().join(format!("{label}-second-copy.mkv"));
+    let plan = if let Some(second) = second {
+        let second_asset = call!(client, "assets.register", json!({"path":second}),
+            json!({"replay_scope":scope["replay_scope"],"idempotency_key":"lost-ack-register-second"}));
+        call!(client,"streams.clean.batch_plan",json!({
+            "items":[{"asset_id":asset["id"],"output":output},{"asset_id":second_asset["id"],"output":second_output}],
+            "intent":fixture::rules(),"file_times":"new",
+            "execution_limits":nw_domain::execution::CleanupLimits::default(),
+            "failure_policy":"reject_all","unresolved_policy":"reject"
+        }),json!({}))
+    } else {
+        call!(client,"streams.clean",
+            json!({"asset_id":asset["id"],"output":output,"intent":fixture::rules()}),json!({}))
+    };
     let arguments = json!({
         "params":{"plan_id":plan["id"],"plan_hash":plan["hash"]},
         "context":{
@@ -246,7 +261,7 @@ async fn journey(media: &fixture::Media) {
     });
     let lost = client
         .call_tool(
-            CallToolRequestParams::new("jobs.submit")
+            CallToolRequestParams::new(command_id)
                 .with_arguments(arguments.as_object().unwrap().clone()),
         )
         .await
@@ -272,8 +287,18 @@ async fn journey(media: &fixture::Media) {
         );
         loss.accepted.clone().unwrap()
     };
-    let job_id = accepted["result"]["job_id"].as_str().unwrap();
-    assert_eq!(cli.completed(job_id).await["state"], "succeeded");
+    let expected_jobs = if second.is_some() { 2 } else { 1 };
+    let member_ids = if second.is_some() {
+        accepted["result"]["members"].as_array().unwrap().iter()
+            .map(|member| member["job_id"].as_str().unwrap().to_owned()).collect::<Vec<_>>()
+    } else { vec![accepted["result"]["job_id"].as_str().unwrap().to_owned()] };
+    assert_eq!(member_ids.len(),expected_jobs);
+    for id in &member_ids { assert_eq!(cli.completed(id).await["state"],"succeeded"); }
+    if let Some(second) = second {
+        assert_eq!(std::fs::read(second).unwrap(),std::fs::read(&second_output).unwrap());
+        let group = cli.query("batches.inspect",json!({"id":accepted["result"]["batch_id"]})).await;
+        assert_eq!(group["total"],2); assert_eq!(group["succeeded"],2); assert_eq!(group["complete"],true);
+    }
     assert_eq!(
         std::fs::read(&media.source).unwrap(),
         std::fs::read(&output).unwrap()
@@ -291,7 +316,7 @@ async fn journey(media: &fixture::Media) {
     // Keep the same SDK/stdio process and the exact original durable command.
     let replayed = client
         .call_tool(
-            CallToolRequestParams::new("jobs.submit")
+            CallToolRequestParams::new(command_id)
                 .with_arguments(arguments.as_object().unwrap().clone()),
         )
         .await
@@ -301,7 +326,7 @@ async fn journey(media: &fixture::Media) {
     assert_eq!(replayed["ok"], true, "Replay error: {}", replayed["error"]);
     assert_eq!(replayed["request_id"], LOST_REQUEST);
     assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
-    assert_eq!(replayed["result"]["job_id"], accepted["result"]["job_id"]);
+    assert_eq!(replayed["result"], accepted["result"]);
     let restarted = runtime(&runtime_path);
     assert_eq!(restarted["root_id"], original["root_id"]);
     assert_ne!(restarted["epoch"], original["epoch"]);
@@ -310,12 +335,18 @@ async fn journey(media: &fixture::Media) {
     assert_eq!(next_claims["principal"], first_claims["principal"]);
     assert_eq!(next_claims["root"], first_claims["root"]);
     let jobs = cli.query("jobs.list", json!({})).await;
-    assert_eq!(jobs["total_count"], 1);
-    assert_eq!(jobs["items"][0]["id"], accepted["result"]["job_id"]);
+    assert_eq!(jobs["total_count"],expected_jobs);
+    let mut observed = jobs["items"].as_array().unwrap().iter().map(|job| job["id"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    let mut expected = member_ids.clone(); observed.sort(); expected.sort(); assert_eq!(observed,expected);
+    if second.is_some() {
+        let batches = cli.query("batches.list",json!({})).await;
+        assert_eq!(batches["total_count"],1);
+        assert_eq!(batches["items"][0]["id"],accepted["result"]["batch_id"]);
+    }
     let bytes = nw_platform::files::identity(&output, &CancellationToken::new()).unwrap();
     std::fs::create_dir_all(&evidence_root).unwrap();
     std::fs::write(
-        evidence_root.join("lost-ack-restart.json"),
+        evidence_root.join(format!("{label}-restart.json")),
         serde_json::to_vec_pretty(&json!({
             "schema_version":1,
             "boundary":"actual_owner_official_sdk_stdio",
@@ -323,7 +354,9 @@ async fn journey(media: &fixture::Media) {
             "automatic_retry_request_unchanged":true,
             "same_receipt_after_restart":true,
             "same_job_after_restart":true,
-            "one_durable_job":true,
+            "durable_job_count":expected_jobs,
+            "command":command_id,"accepted_identity":accepted["result"][result_key],
+            "member_ids":member_ids,
             "root_and_principal_unchanged":true,
             "owner_epoch_changed":true,
             "output_bytes":bytes.bytes,

@@ -1193,5 +1193,5 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     server.kill().await.unwrap();
     server.wait().await.unwrap();
-    lost_ack::verify(&media).await;
+    lost_ack::verify(&media, None).await;
 }

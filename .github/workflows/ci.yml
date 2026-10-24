@@ -279,14 +279,6 @@ jobs:
         run: cargo test --locked -p nw-engine --test media -- --ignored --nocapture
       - name: Transfer an artifact larger than the isolated reader memory budget
         run: cargo test --locked -p nw-platform --test artifact_memory -- --ignored --nocapture
-      - name: Exercise actual owner and official SDK transport media parity
-        env:
-          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
-        run: cargo test --locked -p numera-wiz --test owner_media --test owner_batch -- --ignored --nocapture
-      - name: Exercise actual larger-than-memory HTTP publication and revocation
-        env:
-          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
-        run: cargo test --locked -p numera-wiz --test artifact_http -- --ignored --nocapture
       - name: Save fixture components and actual configuration
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -297,10 +289,112 @@ jobs:
             target/fixture-ffmpeg-src/ffbuild/config.log
             target/fixture-ffmpeg-src/config.h
           if-no-files-found: warn
-      - name: Save owner transport diagnostics
+
+  owner-batch:
+    needs: [media]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ffmpeg-development-fixture-profile-linux
+          path: target
+      - name: Restore admitted fixture execution permissions
+        run: chmod +x target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
+      - name: Restore matching Rust compilation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+          key: media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
+          restore-keys: |
+            media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Install matching hosted toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Exercise actual two-source batches and lost accepted response restart
+        run: cargo test --locked -p numera-wiz --test owner_batch -- --ignored --nocapture
+      - name: Retain actual owner diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: owner-batch-evidence-linux
+          path: target/owner-evidence/
+          if-no-files-found: error
+
+  owner-transports:
+    needs: [media]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ffmpeg-development-fixture-profile-linux
+          path: target
+      - name: Restore admitted fixture execution permissions
+        run: chmod +x target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
+      - name: Restore matching Rust compilation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+          key: media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
+          restore-keys: |
+            media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Install matching hosted toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Exercise actual typed CLI and official SDK transport media parity
+        run: cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture
+      - name: Retain actual owner diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: owner-media-evidence-linux
           path: target/owner-evidence/
-          if-no-files-found: warn
+          if-no-files-found: error
+
+  artifact-http:
+    needs: [media]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ffmpeg-development-fixture-profile-linux
+          path: target
+      - name: Restore admitted fixture execution permissions
+        run: chmod +x target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
+      - name: Restore matching Rust compilation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+          key: media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
+          restore-keys: |
+            media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Install matching hosted toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Exercise actual larger-than-memory HTTP publication, cancellation and revocation
+        run: cargo test --locked -p numera-wiz --test artifact_http -- --ignored --nocapture
+      - name: Retain actual owner diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: artifact-http-evidence-linux
+          path: target/owner-evidence/
+          if-no-files-found: error
+

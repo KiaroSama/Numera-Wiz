@@ -176,7 +176,9 @@ async fn run() -> Result<()> {
         }
         Some(Mode::Plans { command }) => human::run(&client, human::Command::Plans(command)).await,
         Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
-        Some(Mode::Batches { command }) => human::run(&client, human::Command::Batches(command)).await,
+        Some(Mode::Batches { command }) => {
+            human::run(&client, human::Command::Batches(command)).await
+        }
         Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
         Some(Mode::Commands { command }) => {
             human::run(&client, human::Command::Discovery(command)).await

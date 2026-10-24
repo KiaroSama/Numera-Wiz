@@ -107,7 +107,10 @@ impl Service {
         self.inventory_projection(context, input, true, true, false, cancellation)
     }
     pub(super) fn batch_inventory(
-        &self, context: &Context, input: PageInput, cancellation: &CancellationToken,
+        &self,
+        context: &Context,
+        input: PageInput,
+        cancellation: &CancellationToken,
     ) -> Result<Value> {
         self.inventory_projection(context, input, false, false, true, cancellation)
     }
@@ -232,24 +235,46 @@ impl Service {
             }
         };
         if batches {
-            self.store.visit("batch/", |batch: nw_domain::batches::Batch| {
-                check_cancel()?;
-                if batch.schema_version != 1 || batch.members.len() > nw_domain::batches::MAX_BATCH_ITEMS {
-                    return Err(DomainError::new("INVALID_BATCH", "Unknown batch summary record"));
-                }
-                let readable = policy.as_ref().is_none_or(|profile| {
-                    profile.allows_object(ObjectKind::Job, &batch.id, &batch.creator, ObjectAction::Read)
-                        && batch.members.iter().filter_map(|member| member.job_id.as_ref()).all(|id| {
-                            profile.allows_object(ObjectKind::Job, id, &batch.creator, ObjectAction::Read)
-                        })
-                });
-                if readable {
-                    snapshot.push(&nw_domain::batches::BatchSummary {
-                        id: batch.id, plan_id: batch.plan_id, total: batch.members.len(), accepted_at: batch.accepted_at,
-                    })?;
-                }
-                Ok(())
-            })?;
+            self.store
+                .visit("batch/", |batch: nw_domain::batches::Batch| {
+                    check_cancel()?;
+                    if batch.schema_version != 1
+                        || batch.members.len() > nw_domain::batches::MAX_BATCH_ITEMS
+                    {
+                        return Err(DomainError::new(
+                            "INVALID_BATCH",
+                            "Unknown batch summary record",
+                        ));
+                    }
+                    let readable = policy.as_ref().is_none_or(|profile| {
+                        profile.allows_object(
+                            ObjectKind::Job,
+                            &batch.id,
+                            &batch.creator,
+                            ObjectAction::Read,
+                        ) && batch
+                            .members
+                            .iter()
+                            .filter_map(|member| member.job_id.as_ref())
+                            .all(|id| {
+                                profile.allows_object(
+                                    ObjectKind::Job,
+                                    id,
+                                    &batch.creator,
+                                    ObjectAction::Read,
+                                )
+                            })
+                    });
+                    if readable {
+                        snapshot.push(&nw_domain::batches::BatchSummary {
+                            id: batch.id,
+                            plan_id: batch.plan_id,
+                            total: batch.members.len(),
+                            accepted_at: batch.accepted_at,
+                        })?;
+                    }
+                    Ok(())
+                })?;
         } else if jobs {
             self.store.visit("job/", |job: Job| {
                 check_cancel()?;

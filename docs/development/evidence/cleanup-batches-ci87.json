@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "full_release": "blocked",
+  "source_head": "802143f54ddafa11511f316a24fb69ae60982cec",
+  "compiled_merge": "1a528d8a5082144f45293ef317e04aa50e5c63ad",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40115483799",
+  "media_job": 120935770003,
+  "observed_report": {
+    "case": "two_source_cleanup_batch",
+    "cli_batch": "5ad1c63a-b1d7-4693-aba1-81d70c2a7cc2",
+    "confirmed_cancelled": 2,
+    "copy_full_byte_equality": true,
+    "http_batch": "8bfc16f8-b09f-4389-93cb-6f5f349a143a",
+    "independent_retained_packet_equality": true,
+    "partial_exit": 9,
+    "scope": "Explicit candidates only; directory expansion, companions, replacement and GUI batching remain separate qualification",
+    "sdk_batch": "c5d9355d-4939-49f6-aaf8-7afd99256be6",
+    "skipped": 2,
+    "source_commit": "1a528d8a5082144f45293ef317e04aa50e5c63ad",
+    "transports": [
+      "typed_cli",
+      "official_sdk_stdio",
+      "official_sdk_streamable_http"
+    ]
+  },
+  "report_scope": "Actual two-source typed CLI and official SDK stdio/HTTP; remux retained per-stream raw packet equality, byte-copy full equality, stable receipts, explicit reject/continue partial result exit9, all-skip no-output accounting, held-publication cancellation confirmed2, snapshot paging, principal-scope/default-agent denials",
+  "not_qualified": [
+    "Shared GUI batch source not in this run",
+    "Batch lost accepted response/restart (added next revision)",
+    "Four complete ordinary regression targets: blocked by two test-only lint errors",
+    "Directory/probe-failure intake and companions",
+    "Reviewed replacement",
+    "Full product/standard portable packages/migration/owner harness"
+  ],
+  "unchanged_research_members": 808
+}

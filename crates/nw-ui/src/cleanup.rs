@@ -160,7 +160,7 @@ fn patch(mode: usize, text: &str) -> TagPatch {
     }
 }
 impl WizApp {
-    fn normalized_intent(&self) -> Result<CleanIntent, String> {
+    pub(super) fn normalized_intent(&self) -> Result<CleanIntent, String> {
         let mut intent = self.intent.clone();
         intent.audio_selection.selector = selector(self.audio_mode, &self.audio_values)?;
         intent.subtitle_selection.selector = selector(self.subtitle_mode, &self.subtitle_values)?;

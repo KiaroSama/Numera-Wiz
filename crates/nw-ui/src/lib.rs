@@ -1,5 +1,6 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod cleanup;
+mod batches;
 pub mod client;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
@@ -31,6 +32,12 @@ enum Action {
     Inspect,
     ArtifactManifest,
     SelectionReport(u64),
+    BatchOutput(u64, usize),
+    BatchPlan(u64),
+    BatchSubmit,
+    BatchInspect,
+    BatchCancel,
+    BatchHistory,
 }
 struct Pending {
     request: Request,
@@ -88,6 +95,7 @@ pub struct WizApp {
     selection_report: Option<Arc<nw_domain::reports::SelectionReport>>,
     report_by_index: bool,
     report_page: usize,
+    batch: batches::BatchUi,
 }
 impl WizApp {
     fn save_artifact(
@@ -230,6 +238,7 @@ impl WizApp {
             selection_report: None,
             report_by_index: false,
             report_page: 0,
+            batch: batches::BatchUi::default(),
         };
         app.query("assets.list", json!({}), Action::Assets, ctx);
         app
@@ -267,6 +276,7 @@ impl WizApp {
         self.generation = self.generation.wrapping_add(1);
         self.plan = None;
         self.selection_report = None;
+        self.batch.invalidate();
     }
     fn refresh_assets(&mut self, ctx: &egui::Context) {
         self.query(
@@ -358,6 +368,9 @@ impl WizApp {
                             self.assets.clear();
                             self.assets_cursor = None;
                             self.assets_snapshot = None;
+                        }
+                        Action::BatchHistory => {
+                            self.batch_history_expired();
                         }
                         Action::Jobs => {
                             self.jobs.clear();
@@ -478,6 +491,10 @@ impl WizApp {
                         self.report_page = 0;
                     }
                 }
+                Action::BatchOutput(_, _) | Action::BatchPlan(_) | Action::BatchSubmit
+                | Action::BatchInspect | Action::BatchCancel | Action::BatchHistory => {
+                    self.receive_batch(received.action, result)?;
+                }
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
@@ -501,15 +518,14 @@ impl WizApp {
     }
     fn catalog(&mut self, ui: &mut egui::Ui) {
         ui.heading("Media");
-        if ui
-            .add_enabled(
-                !self.waiting && self.pending.is_none(),
-                egui::Button::new("Refresh media"),
-            )
-            .clicked()
-        {
-            self.refresh_assets(ui.ctx());
-        }
+        ui.horizontal(|ui| {
+            if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Refresh media")).clicked() {
+                self.refresh_assets(ui.ctx());
+            }
+            if ui.button(format!("Batch ({})",self.batch.candidates.len())).clicked() {
+                self.batch.open = true;
+            }
+        });
         if self.assets_cursor.is_some()
             && ui
                 .add_enabled(
@@ -527,17 +543,22 @@ impl WizApp {
         }
         ui.separator();
         let mut select = None;
+        let mut batch_changes = Vec::new();
         egui::ScrollArea::vertical()
             .id_salt("asset-catalog")
             .show(ui, |ui| {
                 for asset in &self.assets {
                     let name = asset.display_name.as_str();
-                    if ui
-                        .selectable_label(self.selected.as_ref() == Some(&asset.id), name)
-                        .clicked()
-                    {
-                        select = Some(asset.id.clone());
-                    }
+                    ui.horizontal(|ui| {
+                        let mut included = self.batch.contains(&asset.id);
+                        if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Checkbox::without_text(&mut included))
+                            .on_hover_text("Include in cleanup batch").changed() {
+                            batch_changes.push((asset.clone(),included));
+                        }
+                        if ui.selectable_label(self.selected.as_ref() == Some(&asset.id), name).clicked() {
+                            select = Some(asset.id.clone());
+                        }
+                    });
                     ui.small(format!(
                         "{} streams · {} bytes",
                         asset.stream_count, asset.bytes
@@ -547,6 +568,7 @@ impl WizApp {
                     ui.label("Add a file to inspect its streams and prepare cleanup.");
                 }
             });
+        for (asset,included) in batch_changes { self.batch_select(&asset,included); }
         if let Some(id) = select {
             self.query("assets.inspect", json!({"id":id}), Action::Asset, ui.ctx());
         }
@@ -750,6 +772,7 @@ impl eframe::App for WizApp {
         }
         self.receive(ctx);
         self.schedule_output(ctx);
+        self.schedule_batch(ctx);
         if !self.waiting
             && self.pending.is_none()
             && self.jobs.iter().any(|job| !job.state.terminal())
@@ -820,7 +843,12 @@ impl eframe::App for WizApp {
                 egui::Key::Enter,
             ))
         }) {
-            self.run_reviewed(ui.ctx());
+            if self.batch.open { self.run_reviewed_batch(ui.ctx()); }
+            else { self.run_reviewed(ui.ctx()); }
+        }
+        if (self.batch.open || self.artifact_manifest.is_some())
+            && ui.ctx().input_mut(|input| input.consume_key(egui::Modifiers::NONE,egui::Key::Escape)) {
+            if self.batch.open { self.batch.open = false; } else { self.artifact_manifest = None; }
         }
         egui::Panel::top("navigation").show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -865,6 +893,7 @@ impl eframe::App for WizApp {
                 egui::ScrollArea::vertical().max_height(180.0).show(ui,|ui| { ui.add(egui::TextEdit::multiline(&mut self.inspect).code_editor().interactive(false).desired_width(f32::INFINITY)); });
             });
         });
+        self.batch_window(ui.ctx());
     }
 }
 #[cfg(target_arch = "wasm32")]

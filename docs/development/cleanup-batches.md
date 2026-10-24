@@ -1,6 +1,6 @@
 # Explicit cleanup batch development contract
 
-This composition is under development and awaits its hosted CI run. It does not
+This composition is under development. Its first hosted build passes WASM; the first full check found two test-only lint issues, corrected in the next revision. Actual batch media and GUI results are not yet qualified. It does not
 qualify the full folder/companion/replacement workflow, editor, portable packages,
 migration or owner hardware harness.
 
@@ -93,6 +93,13 @@ reviewed engine paths; its local file picker is not an engine filesystem grant.
 
 The new records currently use the development schema-2 root. Stopped-generation
 compatibility, downgrade rejection and migration remain mandatory before release.
-Full directory expansion, companion policy, reviewed replacement, shared GUI batch
-controls and genuine native/browser batch journeys remain required follow-up work.
+Shared native/WASM batch controls and actual two-source native/browser input journeys
+are now included as source and await their hosted execution. Media checkboxes retain
+an explicit set across pages. Batch Review freezes every output/policy; Run submits
+that exact proposal. Ctrl/Cmd+Enter runs the reviewed batch while its window is open.
+Escape closes the batch or output-details window without cancelling accepted jobs.
+The same transport retry keeps the original request identity. History and individual
+job/output inspection use the canonical authorized queries. Full directory expansion,
+companion policy, reviewed replacement and GUI cancellation qualification remain
+required follow-up work.
 No archive support row or full-task checkbox is qualified by this document.
