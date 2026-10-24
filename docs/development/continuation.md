@@ -1897,3 +1897,30 @@ a Unicode data filename while command/schema/help text remains English.
 These changes require fresh hosted CI. No rollback command is exposed yet;
 full old/new packaged application rollback/retirement/retention and all other
 mandated product scope remain mandatory and no full-task gate is closed.
+
+
+## Adoption and actual migration CLI qualification follow-up
+
+CI97 passes the full Linux and macOS ARM checks, including the new actual CLI
+migration/real owner restart and all transactional adoption/future-codec cases.
+Existing core media, actual SDK transports/batches, large HTTP and Chrome pass.
+Windows passes its four original interface cases but the new combined migration
+journey hits its aggregate180second test deadline before the later store/Service
+tests run. The long sequence included9 fresh CLI processes and2 natural idle
+owner drains. This is an unqualified new functional journey, not a product
+startup deadline pass or aggregate R20 evidence.
+
+All28 exact hosted formatting hunks are applied. The actual new scope, plan,
+migrate, inspect and exact migration retry remain5 real typed CLI invocations.
+Unrelated original profile acceptance/replays and profile inventory use the real
+protected owner HTTP endpoint with the same exact canonical request and current
+protected runtime record, avoiding4 unnecessary executable-hash/bootstrap
+cycles. Every original receipt/root/epoch/object-count/adoption assertion remains.
+Safe command-ID-only per-step timing diagnostics are added. The functional
+journey's total deadline is240seconds for these sequential steps and2 natural
+drains; each process/request is still bounded at60seconds and the actual product
+bootstrap remains20seconds. No scoped performance gate is widened or claimed.
+
+Fresh full checks remain required. Adoption-aware rollback restoration and its
+actual prior-binary qualification remain in progress, with no rollback command
+exposed and all complete-product obligations open.

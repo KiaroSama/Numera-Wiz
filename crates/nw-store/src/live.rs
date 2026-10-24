@@ -115,7 +115,7 @@ impl DatabaseSlot {
     pub(super) fn begin_control_write(&self) -> std::result::Result<Write, TransactionError> {
         self.begin_write_kind(false)
     }
-    fn begin_write_kind(&self, adopting:bool) -> std::result::Result<Write, TransactionError> {
+    fn begin_write_kind(&self, adopting: bool) -> std::result::Result<Write, TransactionError> {
         // Read guards permit readers and concurrent writer admission to progress.
         // The redb writer remains the sole transaction serialization authority.
         let state = self.database.read().map_err(StorageError::from)?;
@@ -126,7 +126,8 @@ impl DatabaseSlot {
         let lease = self.lease();
         let inner = database.begin_write()?;
         if adopting && state.track_adoption {
-            crate::adoption::mark(&inner).map_err(|error|StorageError::from(std::io::Error::other(error.to_string())))?;
+            crate::adoption::mark(&inner)
+                .map_err(|error| StorageError::from(std::io::Error::other(error.to_string())))?;
         }
         Ok(Write {
             inner: Some(inner),
@@ -152,7 +153,7 @@ impl DatabaseSlot {
         drop(state.database.take());
         Ok(())
     }
-    pub(super) fn reopen(&self, database: Database, track_adoption:bool) -> Result<()> {
+    pub(super) fn reopen(&self, database: Database, track_adoption: bool) -> Result<()> {
         let mut state = self.database.write().map_err(|_| {
             DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
         })?;
@@ -171,7 +172,7 @@ impl DatabaseSlot {
         database: Database,
         path: &Path,
         guard: nw_platform::files::RootLock,
-        track_adoption:bool,
+        track_adoption: bool,
     ) -> Result<()> {
         let mut state = self.database.write().map_err(|_| {
             DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
