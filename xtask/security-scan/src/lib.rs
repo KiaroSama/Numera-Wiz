@@ -30,7 +30,11 @@ impl<T, E> PrivateResult<T> for std::result::Result<T, E> {
 }
 
 pub fn require(condition: bool, category: &'static str) -> Result<()> {
-    if condition { Ok(()) } else { Err(ScanFailure(category)) }
+    if condition {
+        Ok(())
+    } else {
+        Err(ScanFailure(category))
+    }
 }
 
 /// Callers supply fixed categories only, never paths, child output or errors.
