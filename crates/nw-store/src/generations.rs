@@ -519,6 +519,125 @@ mod tests {
             "STORE_VERSION_UNSUPPORTED"
         );
         assert_eq!(activations(&root).unwrap().len(), 2);
+        owned_acl_evidence_preserves_activation_selection(
+            &root,
+            &lease,
+            &generation,
+            &root_id,
+            &first,
+        );
+    }
+    fn owned_acl_evidence_preserves_activation_selection(
+        root: &Path,
+        lease: &RootLease,
+        generation: &Path,
+        root_id: &str,
+        first: &[u8],
+    ) {
+        use std::io::Write as _;
+
+        let directory = root.join("state/activations");
+        let paths = [
+            directory.join("0000000001.json"),
+            directory.join("0000000002.json"),
+        ];
+        let bytes = paths.each_ref().map(|path| std::fs::read(path).unwrap());
+        assert_eq!(bytes[0].as_slice(), first);
+        let records: [Activation; 2] = bytes
+            .each_ref()
+            .map(|bytes| serde_json::from_slice(bytes).unwrap());
+        assert_eq!(records[0].sequence, 1);
+        assert_eq!(records[1].sequence, 2);
+        let ids = records.each_ref().map(|record| record.id.clone());
+        assert_ne!(ids[0], ids[1]);
+        let assert_raw_unchanged = || {
+            for (path, expected) in paths.iter().zip(&bytes) {
+                assert_eq!(std::fs::read(path).unwrap(), *expected);
+            }
+        };
+        let assert_selection_unchanged = || {
+            assert_eq!(
+                active_generation_path(root)
+                    .expect("Owned auxiliary files must preserve the active generation path"),
+                generation
+            );
+            let selected = lease
+                .selection()
+                .expect("Owned auxiliary files must preserve the activation selection");
+            assert_eq!(selected.generation, 1);
+            assert_eq!(selected.store_version, Some(2));
+            assert_eq!(selected.root_id.as_deref(), Some(root_id));
+            assert_eq!(selected.activation_id.as_deref(), Some(ids[1].as_str()));
+            assert_eq!(selected.location, GenerationLocation::LegacyOne {});
+            assert_eq!(lease.path(&selected).unwrap(), generation);
+            let history = activations(root).unwrap();
+            assert_eq!(history.len(), 2);
+            for ((record, hash), (id, raw)) in history.iter().zip(ids.iter().zip(&bytes)) {
+                assert_eq!(&record.id, id);
+                assert_eq!(record.root_id, root_id);
+                assert_eq!(*hash, hex::encode(Sha256::digest(raw)));
+            }
+            assert_raw_unchanged();
+        };
+        assert_selection_unchanged();
+
+        // Hold a real producer-named file throughout the reader's enumeration window.
+        let mut evidence = tempfile::Builder::new()
+            .prefix(security::ACL_EVIDENCE_PREFIX)
+            .tempfile_in(&directory)
+            .unwrap();
+        evidence.write_all(b"Owned ACL evidence fixture").unwrap();
+        assert_selection_unchanged();
+        assert!(evidence.path().is_file());
+        evidence.close().unwrap();
+        assert_selection_unchanged();
+
+        let unknown = tempfile::Builder::new()
+            .prefix("unexpected-activation-")
+            .tempfile_in(&directory)
+            .unwrap();
+        assert_eq!(
+            active_generation_path(root).unwrap_err().code,
+            "STORE_ACTIVATION_INVALID"
+        );
+        assert_eq!(
+            lease.selection().unwrap_err().code,
+            "STORE_ACTIVATION_INVALID"
+        );
+        assert_raw_unchanged();
+        unknown.close().unwrap();
+        assert_selection_unchanged();
+
+        // Reserved auxiliary names are ignored as records but still consume the budget.
+        let mut reserved = Vec::new();
+        for _ in 0..MAX_DIRECTORY_ENTRIES - paths.len() {
+            reserved.push(
+                tempfile::Builder::new()
+                    .prefix(".credential-budget-")
+                    .tempfile_in(&directory)
+                    .unwrap(),
+            );
+        }
+        assert_eq!(
+            std::fs::read_dir(&directory).unwrap().count(),
+            MAX_DIRECTORY_ENTRIES
+        );
+        assert_selection_unchanged();
+        let overflow = tempfile::Builder::new()
+            .prefix(".credential-budget-")
+            .tempfile_in(&directory)
+            .unwrap();
+        assert_eq!(
+            active_generation_path(root).unwrap_err().code,
+            "RESOURCE_LIMIT"
+        );
+        assert_eq!(lease.selection().unwrap_err().code, "RESOURCE_LIMIT");
+        assert_raw_unchanged();
+        overflow.close().unwrap();
+        for entry in reserved {
+            entry.close().unwrap();
+        }
+        assert_selection_unchanged();
     }
     #[test]
     fn a_generation_switch_preserves_the_same_store_identity_key_and_receipt_kernel() {

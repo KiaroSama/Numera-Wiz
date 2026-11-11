@@ -8,6 +8,11 @@ use std::{
     process::Command,
 };
 
+/// Prefix of owned Windows ACL evidence files created inside protected directories.
+/// This name participates in directory-reader protocols, so producer and reader
+/// regression fixtures share it.
+pub const ACL_EVIDENCE_PREFIX: &str = "acl-check-";
+
 fn denied(message: impl Into<String>) -> DomainError {
     DomainError::new("INSECURE_DATA_ROOT", message)
 }
@@ -112,7 +117,7 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
             .ok_or_else(|| denied("Protected file parent is required"))?
     };
     let scratch = tempfile::Builder::new()
-        .prefix("acl-check-")
+        .prefix(ACL_EVIDENCE_PREFIX)
         .tempfile_in(scratch_parent)
         .map_err(|error| diagnostic_io_error("acl.scratch_create", error))?;
     let check = scratch.path().to_owned();
