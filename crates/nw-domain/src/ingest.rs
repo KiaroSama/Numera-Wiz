@@ -78,19 +78,18 @@ pub struct RegisterFolderInput {
 }
 impl RegisterFolderInput {
     pub fn validate(&self) -> crate::Result<()> {
-        let invalid = || crate::DomainError::new(
-            "VALIDATION_ERROR",
-            "Folder intake needs a bounded native root and at most 32 distinct normalized relative exclusions",
-        );
+        let invalid = || {
+            crate::DomainError::new(
+                "VALIDATION_ERROR",
+                "Folder intake needs a bounded native root and at most 32 distinct normalized relative exclusions",
+            )
+        };
         if self.path.is_empty() || self.path.len() > 4096 || self.exclude_relative.len() > 32 {
             return Err(invalid());
         }
         let mut exclusions = std::collections::BTreeSet::new();
         for path in &self.exclude_relative {
-            if !relative_path(path)
-                || path.contains('\\')
-                || !exclusions.insert(path)
-            {
+            if !relative_path(path) || path.contains('\\') || !exclusions.insert(path) {
                 return Err(invalid().field("exclude_relative"));
             }
         }
@@ -103,7 +102,9 @@ impl RegisterFolderInput {
 fn relative_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= 4096
-        && path.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -159,7 +160,8 @@ impl FolderSnapshot {
     pub fn digest(&self) -> crate::Result<String> {
         use sha2::{Digest, Sha256};
         self.input.validate()?;
-        let invalid = || crate::DomainError::new("INVALID_RECORD", "Invalid folder intake snapshot");
+        let invalid =
+            || crate::DomainError::new("INVALID_RECORD", "Invalid folder intake snapshot");
         if self.schema_version != 1
             || self.id.is_empty()
             || self.id.len() > 128
@@ -171,7 +173,10 @@ impl FolderSnapshot {
             || self.entries.len() > MAX_FOLDER_ENTRIES
             || self.visited_entries as usize > MAX_FOLDER_VISITS
             || self.visited_directories as usize > MAX_FOLDER_DIRECTORIES
-            || !self.created_at.parse::<u64>().is_ok_and(|time| time.to_string() == self.created_at)
+            || !self
+                .created_at
+                .parse::<u64>()
+                .is_ok_and(|time| time.to_string() == self.created_at)
             || (self.complete && self.scan_error.is_some())
         {
             return Err(invalid());
@@ -216,13 +221,19 @@ impl FolderSnapshot {
         unhashed.hash.clear();
         let bytes = serde_json::to_vec(&unhashed).map_err(|_| invalid())?;
         if bytes.len().saturating_add(64) > MAX_FOLDER_BYTES {
-            return Err(crate::DomainError::new("RESOURCE_LIMIT", "Folder manifest exceeds its bounded record budget"));
+            return Err(crate::DomainError::new(
+                "RESOURCE_LIMIT",
+                "Folder manifest exceeds its bounded record budget",
+            ));
         }
         Ok(hex::encode(Sha256::digest(bytes)))
     }
     pub fn validate_hash(&self) -> crate::Result<()> {
         if self.digest()? != self.hash {
-            return Err(crate::DomainError::new("INVALID_RECORD", "Folder snapshot differs from its retained digest"));
+            return Err(crate::DomainError::new(
+                "INVALID_RECORD",
+                "Folder snapshot differs from its retained digest",
+            ));
         }
         Ok(())
     }
@@ -274,16 +285,20 @@ impl FolderReview {
             visited_entries: snapshot.visited_entries,
             visited_directories: snapshot.visited_directories,
             scan_error: snapshot.scan_error.as_ref().map(error_view),
-            entries: snapshot.entries.iter().map(|entry| FolderEntryReview {
-                index: entry.index,
-                relative_path: entry.relative_path.clone(),
-                kind: entry.kind,
-                outcome: entry.outcome,
-                identity: entry.identity.clone(),
-                source_object: entry.source_object.clone(),
-                asset_id: entry.asset_id.clone(),
-                error: entry.error.as_ref().map(error_view),
-            }).collect(),
+            entries: snapshot
+                .entries
+                .iter()
+                .map(|entry| FolderEntryReview {
+                    index: entry.index,
+                    relative_path: entry.relative_path.clone(),
+                    kind: entry.kind,
+                    outcome: entry.outcome,
+                    identity: entry.identity.clone(),
+                    source_object: entry.source_object.clone(),
+                    asset_id: entry.asset_id.clone(),
+                    error: entry.error.as_ref().map(error_view),
+                })
+                .collect(),
         }
     }
 }

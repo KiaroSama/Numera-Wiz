@@ -37,7 +37,9 @@ fn run() -> Result<()> {
         "package-development" => package::development(root),
         "record-ci-evidence" => package::evidence(root),
         "help" => {
-            println!("xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | record-ci-evidence");
+            println!(
+                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | record-ci-evidence"
+            );
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),

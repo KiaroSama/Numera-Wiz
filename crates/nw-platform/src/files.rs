@@ -319,7 +319,10 @@ impl DirectoryStamp {
         #[cfg(not(any(unix, windows)))]
         {
             let _ = &mut visit;
-            return Err(DomainError::new("NATIVE_IDENTITY_UNAVAILABLE", "Held-directory enumeration is unavailable on this platform"));
+            return Err(DomainError::new(
+                "NATIVE_IDENTITY_UNAVAILABLE",
+                "Held-directory enumeration is unavailable on this platform",
+            ));
         }
         self.revalidate()
     }
@@ -988,7 +991,16 @@ mod tests {
         assert_eq!(stamp.revalidate().unwrap_err().code, "TARGET_CHANGED");
         fs::write(parent.join("unreviewed.mkv"), b"not enumerated").unwrap();
         let mut visited = 0;
-        assert_eq!(stamp.for_each_entry(|_| { visited += 1; Ok(()) }).unwrap_err().code, "TARGET_CHANGED");
+        assert_eq!(
+            stamp
+                .for_each_entry(|_| {
+                    visited += 1;
+                    Ok(())
+                })
+                .unwrap_err()
+                .code,
+            "TARGET_CHANGED"
+        );
         assert_eq!(visited, 0);
     }
     #[cfg(windows)]
@@ -1014,12 +1026,30 @@ mod tests {
         fs::write(parent.join("another-output.mkv"), b"independent child").unwrap();
         stamp.require_object(&original).unwrap();
         let mut names = Vec::new();
-        stamp.for_each_entry(|path| { names.push(path.file_name().unwrap().to_owned()); Ok(()) }).unwrap();
+        stamp
+            .for_each_entry(|path| {
+                names.push(path.file_name().unwrap().to_owned());
+                Ok(())
+            })
+            .unwrap();
         assert_eq!(names, vec![std::ffi::OsString::from("another-output.mkv")]);
-        assert_eq!(stamp.for_each_entry(|_| Err(DomainError::new("RESOURCE_LIMIT", "Bounded visitor stopped"))).unwrap_err().code, "RESOURCE_LIMIT");
+        assert_eq!(
+            stamp
+                .for_each_entry(|_| Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Bounded visitor stopped"
+                )))
+                .unwrap_err()
+                .code,
+            "RESOURCE_LIMIT"
+        );
         fs::remove_file(parent.join("another-output.mkv")).unwrap();
         stamp.require_object(&original).unwrap();
-        stamp.for_each_entry(|_| panic!("Removed children must not reappear through a shared stream position")).unwrap();
+        stamp
+            .for_each_entry(|_| {
+                panic!("Removed children must not reappear through a shared stream position")
+            })
+            .unwrap();
     }
     #[test]
     fn original_object_survives_handle_drop_but_rejects_identical_replacement() {

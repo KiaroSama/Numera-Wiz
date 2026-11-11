@@ -3,8 +3,8 @@ use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
     ingest::{
-        CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits, FolderReview,
-        RegisterFolderInput,
+        CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits,
+        FolderReview, RegisterFolderInput,
     },
     records::Asset,
     views::{AssetSummary, ErrorView},
@@ -261,7 +261,10 @@ impl WizApp {
                 CompanionIntakePolicy::Exclude => "Companion files excluded",
             });
             if let Some(deadline) = review.input.probe_timeout {
-                ui.label(format!("Recorded probe deadline: {}", deadline_label(deadline)));
+                ui.label(format!(
+                    "Recorded probe deadline: {}",
+                    deadline_label(deadline)
+                ));
             } else {
                 ui.label("Probe deadline used the engine default at registration");
             }

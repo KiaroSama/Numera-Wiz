@@ -1,8 +1,8 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod batches;
 mod cleanup;
-mod folders;
 pub mod client;
+mod folders;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{

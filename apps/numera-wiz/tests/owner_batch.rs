@@ -139,30 +139,78 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     std::fs::create_dir_all(intake.join("excluded")).unwrap();
     std::fs::copy(&media.source, intake.join("-first-فارسی.mkv")).unwrap();
     std::fs::copy(&second, intake.join("nested-é/second.mkv")).unwrap();
-    std::fs::write(intake.join("broken.mkv"), b"Unsupported media remains visible").unwrap();
+    std::fs::write(
+        intake.join("broken.mkv"),
+        b"Unsupported media remains visible",
+    )
+    .unwrap();
     std::fs::write(intake.join("notes.txt"), b"Companion byte inventory only").unwrap();
     std::fs::write(intake.join("excluded/hidden.mkv"), b"Must not be probed").unwrap();
     let folder_params = json!({"path":intake,"recursive":true,"exclude_relative":["excluded"],
         "companion_policy":"inventory","probe_timeout":{"mode":"finite","seconds":30}});
-    let (folder_reply, status) = cli.human(&[
-        "assets", "register-folder", intake.to_str().unwrap(), "--recursive",
-        "--exclude-relative", "excluded", "--companion-policy", "inventory",
-        "--probe-timeout-seconds", "30", "--replay-scope", &scope,
-        "--idempotency-key", "folder-native",
-    ]).await;
+    let (folder_reply, status) = cli
+        .human(&[
+            "assets",
+            "register-folder",
+            intake.to_str().unwrap(),
+            "--recursive",
+            "--exclude-relative",
+            "excluded",
+            "--companion-policy",
+            "inventory",
+            "--probe-timeout-seconds",
+            "30",
+            "--replay-scope",
+            &scope,
+            "--idempotency-key",
+            "folder-native",
+        ])
+        .await;
     assert_eq!(status, 0, "{folder_reply}");
     let owner_folder = folder_reply["result"].clone();
     assert_eq!(owner_folder["complete"], true);
     let folder_entries = owner_folder["entries"].as_array().unwrap();
     assert_eq!(folder_entries.len(), 5);
-    assert_eq!(folder_entries.iter().filter(|entry| entry["outcome"] == "registered").count(), 2);
-    assert!(folder_entries.iter().any(|entry| entry["relative_path"] == "broken.mkv" && entry["error"].is_object()));
-    assert!(folder_entries.iter().any(|entry| entry["relative_path"] == "excluded" && entry["outcome"] == "excluded"));
-    assert!(folder_entries.iter().any(|entry| entry["relative_path"] == "notes.txt" && entry["outcome"] == "companion_inventoried"));
-    let folder_replay = cli.mutation(&scope, "folder-native", "assets.register_folder", folder_params.clone()).await;
+    assert_eq!(
+        folder_entries
+            .iter()
+            .filter(|entry| entry["outcome"] == "registered")
+            .count(),
+        2
+    );
+    assert!(
+        folder_entries
+            .iter()
+            .any(|entry| entry["relative_path"] == "broken.mkv" && entry["error"].is_object())
+    );
+    assert!(
+        folder_entries
+            .iter()
+            .any(|entry| entry["relative_path"] == "excluded" && entry["outcome"] == "excluded")
+    );
+    assert!(
+        folder_entries
+            .iter()
+            .any(|entry| entry["relative_path"] == "notes.txt"
+                && entry["outcome"] == "companion_inventoried")
+    );
+    let folder_replay = cli
+        .mutation(
+            &scope,
+            "folder-native",
+            "assets.register_folder",
+            folder_params.clone(),
+        )
+        .await;
     assert_eq!(folder_replay["receipt_id"], folder_reply["receipt_id"]);
     assert_eq!(folder_replay["result"], owner_folder);
-    let inspected_folder = cli.human(&["assets", "folder-inspect", owner_folder["id"].as_str().unwrap()]).await;
+    let inspected_folder = cli
+        .human(&[
+            "assets",
+            "folder-inspect",
+            owner_folder["id"].as_str().unwrap(),
+        ])
+        .await;
     assert_eq!(inspected_folder.1, 0);
     assert_eq!(inspected_folder.0["result"], owner_folder);
     let mut assets = Vec::new();
@@ -210,32 +258,79 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             json!({"replay_scope":sdk_scope,"idempotency_key":format!("register-{ordinal}")})
         ));
     }
-    let sdk_folder = call!(stdio, "assets.register_folder", folder_params,
-        json!({"replay_scope":sdk_scope,"idempotency_key":"folder-sdk"}));
-    let sdk_folder_inspected = call!(stdio, "assets.folder_inspect", json!({"id":sdk_folder["id"]}), json!({}));
+    let sdk_folder = call!(
+        stdio,
+        "assets.register_folder",
+        folder_params,
+        json!({"replay_scope":sdk_scope,"idempotency_key":"folder-sdk"})
+    );
+    let sdk_folder_inspected = call!(
+        stdio,
+        "assets.folder_inspect",
+        json!({"id":sdk_folder["id"]}),
+        json!({})
+    );
     assert_eq!(sdk_folder_inspected, sdk_folder);
     let sdk_folder_entries = sdk_folder["entries"].as_array().unwrap();
-    let native_projection = folder_entries.iter().map(|entry| json!({
-        "path":entry["relative_path"],"kind":entry["kind"],"outcome":entry["outcome"],
-        "sha256":entry["identity"]["sha256"],"error_code":entry["error"]["code"]
-    })).collect::<Vec<_>>();
-    let sdk_projection = sdk_folder_entries.iter().map(|entry| json!({
-        "path":entry["relative_path"],"kind":entry["kind"],"outcome":entry["outcome"],
-        "sha256":entry["identity"]["sha256"],"error_code":entry["error"]["code"]
-    })).collect::<Vec<_>>();
+    let native_projection = folder_entries
+        .iter()
+        .map(|entry| {
+            json!({
+                "path":entry["relative_path"],"kind":entry["kind"],"outcome":entry["outcome"],
+                "sha256":entry["identity"]["sha256"],"error_code":entry["error"]["code"]
+            })
+        })
+        .collect::<Vec<_>>();
+    let sdk_projection = sdk_folder_entries
+        .iter()
+        .map(|entry| {
+            json!({
+                "path":entry["relative_path"],"kind":entry["kind"],"outcome":entry["outcome"],
+                "sha256":entry["identity"]["sha256"],"error_code":entry["error"]["code"]
+            })
+        })
+        .collect::<Vec<_>>();
     assert_eq!(native_projection, sdk_projection);
-    assert!(sdk_folder_entries.iter().filter(|entry| entry["error"].is_object()).all(|entry| entry["error"]["message"].is_null()));
-    let first_folder_asset = sdk_folder_entries.iter().find(|entry| entry["relative_path"] == "-first-فارسی.mkv").unwrap();
+    assert!(
+        sdk_folder_entries
+            .iter()
+            .filter(|entry| entry["error"].is_object())
+            .all(|entry| entry["error"]["message"].is_null())
+    );
+    let first_folder_asset = sdk_folder_entries
+        .iter()
+        .find(|entry| entry["relative_path"] == "-first-فارسی.mkv")
+        .unwrap();
     let folder_output = media.directory.path().join("folder-copy.mkv");
-    let folder_plan = call!(stdio, "streams.clean", json!({"asset_id":first_folder_asset["asset_id"],
-        "output":folder_output,"intent":fixture::rules()}), json!({}));
+    let folder_plan = call!(
+        stdio,
+        "streams.clean",
+        json!({"asset_id":first_folder_asset["asset_id"],
+        "output":folder_output,"intent":fixture::rules()}),
+        json!({})
+    );
     assert_eq!(folder_plan["resolution"]["action"], "copy_unchanged");
-    let folder_accepted = call!(stdio, "jobs.submit", json!({"plan_id":folder_plan["id"],"plan_hash":folder_plan["hash"]}),
-        json!({"replay_scope":sdk_scope,"idempotency_key":"folder-copy-job"}));
-    let (folder_completed, status) = cli.human(&["jobs", "wait", folder_accepted["job_id"].as_str().unwrap(), "--timeout-seconds", "30"]).await;
+    let folder_accepted = call!(
+        stdio,
+        "jobs.submit",
+        json!({"plan_id":folder_plan["id"],"plan_hash":folder_plan["hash"]}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"folder-copy-job"})
+    );
+    let (folder_completed, status) = cli
+        .human(&[
+            "jobs",
+            "wait",
+            folder_accepted["job_id"].as_str().unwrap(),
+            "--timeout-seconds",
+            "30",
+        ])
+        .await;
     assert_eq!(status, 0, "{folder_completed}");
     assert_eq!(folder_completed["result"]["state"], "succeeded");
-    assert_eq!(std::fs::read(&folder_output).unwrap(), std::fs::read(&media.source).unwrap());
+    assert_eq!(
+        std::fs::read(&folder_output).unwrap(),
+        std::fs::read(&media.source).unwrap()
+    );
     let mut intent = fixture::rules();
     intent.audio_selection.selector = Selector::Languages {
         values: vec!["eng".into()],

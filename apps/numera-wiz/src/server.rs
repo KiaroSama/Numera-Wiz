@@ -829,7 +829,11 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert!(rpc(&response.text().await.unwrap())["result"]["tools"].is_array());
-        for content_type in ["application/jsonp", "application/json-patch+json", "text/plain"] {
+        for content_type in [
+            "application/jsonp",
+            "application/json-patch+json",
+            "text/plain",
+        ] {
             assert_eq!(
                 request()
                     .header(header::CONTENT_TYPE, content_type)

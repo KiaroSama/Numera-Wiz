@@ -407,11 +407,17 @@ mod tests {
         std::fs::write(source.join("excluded").join("hidden.mkv"), b"not scanned").unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink(source.join("nested"), source.join("link")).unwrap();
-        let scope = service.store.issue_scope(&owner.principal, service.clock.now().unwrap()).unwrap();
-        let mut request = Request::query("assets.register_folder", json!({
-            "path":source,"recursive":true,"exclude_relative":["excluded"],
-            "companion_policy":"inventory"
-        }));
+        let scope = service
+            .store
+            .issue_scope(&owner.principal, service.clock.now().unwrap())
+            .unwrap();
+        let mut request = Request::query(
+            "assets.register_folder",
+            json!({
+                "path":source,"recursive":true,"exclude_relative":["excluded"],
+                "companion_policy":"inventory"
+            }),
+        );
         request.replay_scope = Some(scope);
         request.idempotency_key = Some("folder-intake".into());
         let registered = service.dispatch(owner.clone(), request.clone()).await;
@@ -419,44 +425,104 @@ mod tests {
         let snapshot = registered.result.clone().unwrap();
         assert_eq!(snapshot["complete"], true);
         let entries = snapshot["entries"].as_array().unwrap();
-        let names = entries.iter().map(|entry| entry["relative_path"].as_str().unwrap()).collect::<Vec<_>>();
+        let names = entries
+            .iter()
+            .map(|entry| entry["relative_path"].as_str().unwrap())
+            .collect::<Vec<_>>();
         assert!(names.windows(2).all(|pair| pair[0] < pair[1]));
-        let media = entries.iter().find(|entry| entry["relative_path"] == "z-invalid.MKV").unwrap();
+        let media = entries
+            .iter()
+            .find(|entry| entry["relative_path"] == "z-invalid.MKV")
+            .unwrap();
         assert_eq!(media["outcome"], "probe_failed");
         assert_eq!(media["error"]["code"], "COMPONENT_UNAVAILABLE");
-        let companion = entries.iter().find(|entry| entry["relative_path"] == "nested/notes.txt").unwrap();
+        let companion = entries
+            .iter()
+            .find(|entry| entry["relative_path"] == "nested/notes.txt")
+            .unwrap();
         assert_eq!(companion["outcome"], "companion_inventoried");
-        assert_eq!(companion["identity"]["sha256"], hex::encode(Sha256::digest(b"companion")));
+        assert_eq!(
+            companion["identity"]["sha256"],
+            hex::encode(Sha256::digest(b"companion"))
+        );
         assert!(entries.iter().any(|entry| entry["relative_path"] == "excluded" && entry["outcome"] == "excluded"));
         assert!(!names.iter().any(|name| name.contains("hidden.mkv")));
         #[cfg(unix)]
-        assert!(entries.iter().any(|entry| entry["relative_path"] == "link" && entry["error"]["code"] == "PATH_DENIED"));
-        assert_eq!(service.dispatch(owner.clone(), request.clone()).await.receipt_id, registered.receipt_id);
-        let inspected = service.dispatch(owner.clone(), Request::query("assets.folder_inspect", json!({"id":snapshot["id"]}))).await;
+        assert!(entries.iter().any(
+            |entry| entry["relative_path"] == "link" && entry["error"]["code"] == "PATH_DENIED"
+        ));
+        assert_eq!(
+            service
+                .dispatch(owner.clone(), request.clone())
+                .await
+                .receipt_id,
+            registered.receipt_id
+        );
+        let inspected = service
+            .dispatch(
+                owner.clone(),
+                Request::query("assets.folder_inspect", json!({"id":snapshot["id"]})),
+            )
+            .await;
         assert_eq!(inspected.result, Some(snapshot.clone()));
-        let denied = service.dispatch(browser.clone(), Request::query("assets.folder_inspect", json!({"id":snapshot["id"]}))).await;
+        let denied = service
+            .dispatch(
+                browser.clone(),
+                Request::query("assets.folder_inspect", json!({"id":snapshot["id"]})),
+            )
+            .await;
         assert_eq!(denied.error.unwrap().code, "OBJECT_NOT_FOUND");
-        std::fs::write(source.join("nested").join("notes.txt"), b"changed after intake").unwrap();
-        let inspected = service.dispatch(owner.clone(), Request::query("assets.folder_inspect", json!({"id":snapshot["id"]}))).await;
+        std::fs::write(
+            source.join("nested").join("notes.txt"),
+            b"changed after intake",
+        )
+        .unwrap();
+        let inspected = service
+            .dispatch(
+                owner.clone(),
+                Request::query("assets.folder_inspect", json!({"id":snapshot["id"]})),
+            )
+            .await;
         assert_eq!(inspected.result, Some(snapshot));
 
         let mut browser_request = Request::query("assets.register_folder", request.params.clone());
-        browser_request.replay_scope = Some(service.store.issue_scope(&browser.principal, service.clock.now().unwrap()).unwrap());
+        browser_request.replay_scope = Some(
+            service
+                .store
+                .issue_scope(&browser.principal, service.clock.now().unwrap())
+                .unwrap(),
+        );
         browser_request.idempotency_key = Some("browser-folder".into());
-        let denied = service.dispatch(browser.clone(), browser_request.clone()).await;
+        let denied = service
+            .dispatch(browser.clone(), browser_request.clone())
+            .await;
         assert_eq!(denied.error.unwrap().code, "PATH_DENIED");
         let mut profile: AccessProfile = service.store.get("profile/browser").unwrap().unwrap();
-        profile.read_roots.push(files::path_text(&std::fs::canonicalize(&source).unwrap()).unwrap());
+        profile
+            .read_roots
+            .push(files::path_text(&std::fs::canonicalize(&source).unwrap()).unwrap());
         profile.revision += 1;
         service.store.put("profile/browser", &profile).unwrap();
-        let browser_registered = service.dispatch(browser.clone(), browser_request.clone()).await;
+        let browser_registered = service
+            .dispatch(browser.clone(), browser_request.clone())
+            .await;
         assert!(browser_registered.ok, "{:?}", browser_registered.error);
         let browser_snapshot = browser_registered.result.clone().unwrap();
-        assert!(browser_snapshot["entries"].as_array().unwrap().iter().filter(|entry| entry["error"].is_object()).all(|entry| entry["error"]["message"].is_null()));
+        assert!(
+            browser_snapshot["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry["error"].is_object())
+                .all(|entry| entry["error"]["message"].is_null())
+        );
         profile.owned_object_access = false;
         profile.revision += 1;
         service.store.put("profile/browser", &profile).unwrap();
-        let inspect = Request::query("assets.folder_inspect", json!({"id":browser_snapshot["id"]}));
+        let inspect = Request::query(
+            "assets.folder_inspect",
+            json!({"id":browser_snapshot["id"]}),
+        );
         let denied = service.dispatch(browser.clone(), inspect.clone()).await;
         assert_eq!(denied.error.unwrap().code, "OBJECT_NOT_FOUND");
         profile.owned_object_access = true;
@@ -473,14 +539,24 @@ mod tests {
         let boundary = folder.path().join("boundary");
         std::fs::create_dir(&boundary).unwrap();
         for index in 0..nw_domain::ingest::MAX_FOLDER_ENTRIES {
-            std::fs::write(boundary.join(format!("{index:02}.txt")), b"excluded companion").unwrap();
+            std::fs::write(
+                boundary.join(format!("{index:02}.txt")),
+                b"excluded companion",
+            )
+            .unwrap();
         }
         request.params = json!({"path":boundary,"recursive":true,"exclude_relative":[],"companion_policy":"exclude"});
         request.idempotency_key = Some("folder-exact-limit".into());
         let exact = service.dispatch(owner.clone(), request.clone()).await;
         assert!(exact.ok, "{:?}", exact.error);
         assert_eq!(exact.result.as_ref().unwrap()["complete"], true);
-        assert_eq!(exact.result.as_ref().unwrap()["entries"].as_array().unwrap().len(), nw_domain::ingest::MAX_FOLDER_ENTRIES);
+        assert_eq!(
+            exact.result.as_ref().unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            nw_domain::ingest::MAX_FOLDER_ENTRIES
+        );
         std::fs::write(boundary.join("extra.txt"), b"not silently omitted").unwrap();
         request.idempotency_key = Some("folder-over-limit".into());
         let incomplete = service.dispatch(owner, request).await;
@@ -488,6 +564,9 @@ mod tests {
         let incomplete = incomplete.result.unwrap();
         assert_eq!(incomplete["complete"], false);
         assert_eq!(incomplete["scan_error"]["code"], "RESOURCE_LIMIT");
-        assert_eq!(incomplete["entries"].as_array().unwrap().len(), nw_domain::ingest::MAX_FOLDER_ENTRIES);
+        assert_eq!(
+            incomplete["entries"].as_array().unwrap().len(),
+            nw_domain::ingest::MAX_FOLDER_ENTRIES
+        );
     }
 }

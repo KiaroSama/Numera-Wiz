@@ -444,7 +444,11 @@ pub fn prepare(command: Command) -> Result<Request> {
     Ok(commands::decode_request(&serde_json::to_vec(&request)?)?)
 }
 pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
-    if let Command::Jobs(Jobs::Wait { id, timeout_seconds }) = &command {
+    if let Command::Jobs(Jobs::Wait {
+        id,
+        timeout_seconds,
+    }) = &command
+    {
         return wait_job(client, id, *timeout_seconds).await;
     }
     if let Command::Batches(Batches::Wait { id }) = &command {
@@ -473,11 +477,13 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
 
 async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Result<()> {
     use nw_domain::records::JobState;
-    let deadline = tokio::time::Instant::now()
-        + std::time::Duration::from_secs(u64::from(timeout_seconds));
+    let deadline =
+        tokio::time::Instant::now() + std::time::Duration::from_secs(u64::from(timeout_seconds));
     let outcome = async {
         loop {
-            let mut response = client.request(&query("jobs.inspect", json!({"id":id}))).await?;
+            let mut response = client
+                .request(&query("jobs.inspect", json!({"id":id})))
+                .await?;
             if !response.ok {
                 let error = response.error.clone().unwrap_or_else(|| {
                     DomainError::new("OBJECT_NOT_FOUND", "Job observation is unavailable")
@@ -485,16 +491,27 @@ async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Resu
                 response.error = Some(error);
                 return Ok::<_, anyhow::Error>(response);
             }
-            let job: nw_domain::views::JobView = commands::parse(response.result.clone().ok_or_else(|| {
-                DomainError::new("INVALID_RECORD", "Job observation omitted its result")
-            })?)?;
+            let job: nw_domain::views::JobView =
+                commands::parse(response.result.clone().ok_or_else(|| {
+                    DomainError::new("INVALID_RECORD", "Job observation omitted its result")
+                })?)?;
             if job.state.terminal() {
                 let error = match job.state {
                     JobState::Succeeded => None,
-                    JobState::Cancelled => Some(DomainError::new("CANCELLED", "Accepted job was cancelled")),
-                    JobState::Skipped => Some(DomainError::new("CAPABILITY_UNAVAILABLE", "Job was skipped and produced no verified output")),
+                    JobState::Cancelled => {
+                        Some(DomainError::new("CANCELLED", "Accepted job was cancelled"))
+                    }
+                    JobState::Skipped => Some(DomainError::new(
+                        "CAPABILITY_UNAVAILABLE",
+                        "Job was skipped and produced no verified output",
+                    )),
                     _ => Some(match job.error {
-                        Some(error) => DomainError::new(&error.code, error.message.unwrap_or_else(|| "Accepted job did not succeed".into())),
+                        Some(error) => DomainError::new(
+                            &error.code,
+                            error
+                                .message
+                                .unwrap_or_else(|| "Accepted job did not succeed".into()),
+                        ),
                         None => DomainError::new("JOB_FAILED", "Accepted job did not succeed"),
                     }),
                 };
@@ -521,10 +538,19 @@ async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Resu
             DomainError::new("CANCELLED", "Stopped waiting; the accepted job remains owned by the worker").into()
         }
     };
-    let public = error.downcast_ref::<DomainError>().cloned().unwrap_or_else(|| {
-        DomainError::new("TRANSPORT_ERROR", "Job observation failed; accepted work remains owned by the worker")
-    });
-    println!("{}", serde_json::to_string_pretty(&Response::error("job-wait", public))?);
+    let public = error
+        .downcast_ref::<DomainError>()
+        .cloned()
+        .unwrap_or_else(|| {
+            DomainError::new(
+                "TRANSPORT_ERROR",
+                "Job observation failed; accepted work remains owned by the worker",
+            )
+        });
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&Response::error("job-wait", public))?
+    );
     Err(error)
 }
 
@@ -623,7 +649,8 @@ mod tests {
         let wait = prepare(Command::Jobs(Jobs::Wait {
             id: "accepted-job".into(),
             timeout_seconds: 30,
-        })).unwrap();
+        }))
+        .unwrap();
         assert_eq!(wait.command.id, "jobs.inspect");
         assert_eq!(wait.params, json!({"id":"accepted-job"}));
         assert!(wait.idempotency_key.is_none() && wait.replay_scope.is_none());

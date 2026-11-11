@@ -26,8 +26,8 @@ pub fn verify(root: &Path) -> Result<()> {
         let extension = path.extension().and_then(|value| value.to_str());
         if extension.is_some_and(|extension| {
             [
-                "py", "pyc", "c", "h", "cc", "cpp", "cxx", "hpp", "go", "sh", "ps1",
-                "bat", "cmd", "js", "ts", "tsx", "jsx", "html", "wasm",
+                "py", "pyc", "c", "h", "cc", "cpp", "cxx", "hpp", "go", "sh", "ps1", "bat", "cmd",
+                "js", "ts", "tsx", "jsx", "html", "wasm",
             ]
             .contains(&extension)
         }) {
@@ -79,7 +79,11 @@ pub fn verify(root: &Path) -> Result<()> {
             "scope": "Tracked sources only; generated browser glue and external component builds are not first-party sources"
         }))?,
     )?;
-    tracing::info!(rust_files, tests = tests.len(), "Rust source boundary and original test inventory verified");
+    tracing::info!(
+        rust_files,
+        tests = tests.len(),
+        "Rust source boundary and original test inventory verified"
+    );
     Ok(())
 }
 
