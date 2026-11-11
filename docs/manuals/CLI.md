@@ -61,6 +61,11 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `artifacts list` / `artifacts manifest --artifact-id ID` | Page authorized outputs or inspect one exact object. |
 | `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
 | `logs status` | Inspect owner log health under current owner authority. |
+| `projects create/inspect`, `sequences create/inspect` | Create and inspect durable project/sequence state. |
+| `clips place/move/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
+
+See the [project command guide](PROJECTS.md) for exact fractions, expected
+revisions, typed examples, source rights and bounded snapshot/history behavior.
 
 List commands accept `--limit`, `--cursor` and `--replace-snapshot`.
 Cleanup planning accepts `--file-times new|preserve_best_effort|require_reviewed`.
@@ -169,10 +174,11 @@ nanoseconds and the observed assertion scope. No floating-point timestamp
 conversion or source ACL/permission cloning is implied. Later reads naturally
 can change access time. These policies do not alter packet timestamps.
 
-The current durable reader envelope is version 2. Older version-1 roots are
-refused and preserved, without an automatic reset or in-place upgrade. Explicit
-stopped-root generation migration/rollback remains required work; do not delete
-state to bypass STORE_SCHEMA_UNSUPPORTED.
+The durable reader supports version-2 roots and explicitly activated version-3
+generations. Older version-1 roots are refused and preserved, without automatic
+reset or in-place upgrade. The owner-only copy/migration route is described below;
+its retained rollback image is not an exposed rollback controller. Never delete
+state to bypass a schema or ownership error.
 
 ## Human file workflow
 
@@ -217,8 +223,9 @@ uses the existing listener's authenticated bytes route, single Range and strong
 SHA-256 ETag/If-Match, rather than repeated media dumps into agent text. The
 manifest gives a relative route, never a token. It does not start a listener.
 Transfer buffers are bounded and cancellation/revocation stops subsequent frames.
-Native/browser Save As controls and full retained-artifact lifecycle remain open;
-the shared Output details control currently inspects verified manifest metadata.
+Native/browser Save As streams verified client copies through the shared controls.
+The complete retained-artifact lifecycle remains open; see the save instructions
+below and the GUI guide for the exercised development scope.
 
 ## Authority and errors
 
@@ -447,10 +454,11 @@ Issue your scope before preparing the plan; retain the exact raw plan and retry
 identity. A plan expires after300seconds and any intervening durable source
 change requires a new review. Accepted jobs/intake must finish or be cancelled.
 
-This explicit schema2-to3 path retains a verified rollback image, fences older
-schema2 readers and activates a separate complete target. Its development tests
-are pending fresh hosted CI. A safe rollback command and full old/new packaged
-application journey remain required. See [generation migration](../development/generation-migration.md)
+This explicit schema2-to3 path retains a verified rollback image, fences the
+legacy source and activates a separate complete target. Current four-target
+ordinary tests exercise same-build typed CLI migration/replay/restart and
+schema3 adoption rollback on failed project acceptance. A safe rollback command
+and actual prior/new packaged-binary preservation remain required. See [generation migration](../development/generation-migration.md)
 for the actual admitted behavior, finite limits and remaining qualification.
 
 

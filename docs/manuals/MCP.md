@@ -156,3 +156,35 @@ response is resolved with its original replay scope/key.
 `jobs wait` is a native CLI observer, not a new MCP tool. MCP clients poll the
 existing authorized `jobs.inspect` projection and use `jobs.cancel` for accepted
 job cancellation. SDK request cancellation retains its independent lifetime.
+
+
+## Project context
+
+The ten [project/edit/history commands](PROJECTS.md) use the same backend as CLI.
+A project read supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
+also supplies the captured decimal-string `expected_revision` there, alongside
+its retained `request_id`, `replay_scope` and `idempotency_key` in context:
+
+```json
+{
+  "params": {
+    "clip_ids": ["<clip-uuid>"],
+    "delta": {"num":"1","den":"4"},
+    "collision": "reject",
+    "link_policy": "expand"
+  },
+  "context": {
+    "project": {"id":"<project-uuid>","expected_revision":"5"},
+    "request_id": "move-1",
+    "replay_scope": "<retained-scope>",
+    "idempotency_key": "move-1"
+  }
+}
+```
+
+Use this input for `clips.move`; creation has no project context. Queries omit
+expected_revision entirely. Keep the original context on retry, even if the head
+has advanced. Project Read/Edit, command permission and source-byte rights remain
+separate. Existing profiles require an explicit owner policy update for the new
+commands; these adapters never widen grants. GUI project controls, checkpoint
+files and general decoded render/preview are still unfinished.

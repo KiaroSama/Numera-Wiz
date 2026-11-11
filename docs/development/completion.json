@@ -1017,6 +1017,31 @@
           "observed_outcome": "All 13 expanded jobs passed. Actual native/Chrome Scan, Inspect, Open and reopened/failure/companion PNGs personally inspected; independent source identity and exactly 3 producer jobs. Full F08, companion copying/replacement, other GUI platforms and timestamp-preserving in-place mutation regression remain open."
         }
       ]
+    },
+    {
+      "subject_id": "projects.core_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/projects.rs",
+        "crates/nw-domain/src/projects/edit.rs",
+        "crates/nw-domain/src/projects/json.rs",
+        "crates/nw-store/src/projects.rs",
+        "crates/nw-platform/src/project_lease.rs",
+        "crates/nw-service/src/runtime/projects.rs",
+        "crates/nw-service/src/runtime/projects/queries.rs",
+        "apps/numera-wiz/src/human/projects.rs",
+        "apps/numera-wiz/src/mcp.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "b464e8183995e064f6610c615036e3d242a7a301",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/43056099112",
+          "asserted_domain": "Four-target project state/edit/history/receipt/MVCC regression entrypoints and current CLI/official SDK registered-media cases; existing cleanup GUI regressions",
+          "report": "docs/development/evidence/project-core-43056099112.json",
+          "observed_outcome": "All 13 required jobs passed and exact source-head check-run association verified. Five independent backend findings addressed without changing the 179 original test identities/categories or widening limits. Actual schema3 project rollback/adoption,512-source history branch, duplicate opaque keys, no-change replay, linked video operations, retained-read growth/absoluteTTL release passed. This does not qualify prior/new binary preservation, mixed audio/video linked variants, project GUI/checkpoints, general render/preview or complete v1."
+        }
+      ]
     }
   ]
 }

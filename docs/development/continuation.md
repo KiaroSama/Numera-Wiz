@@ -1995,3 +1995,38 @@ symptom fixed. CI96 remains the latest completely green13-job baseline.
 The full rollback controller/restoration/owned replacement work remains a
 separate unexposed draft until its fault/adoption/receipt/legacy-binary tests and
 all interface wiring are complete. No complete-product gate closes.
+
+
+## Project state backend: reviewed four-target CI checkpoint
+
+Source `b464e8183995e064f6610c615036e3d242a7a301` passed all 13 required jobs in
+[run 43056099112](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43056099112),
+attempt 1. The commit check-run API confirms all 13 belong to that exact source
+HEAD. The original 179 test identities/categories remain 131 unit and 48 async;
+platform cfg selects the original applicable subset. See the scoped
+[evidence record](evidence/project-core-43056099112.json) and
+[project command guide](../manuals/PROJECTS.md).
+
+Ten real shared project/sequence/clip/history handlers now provide revision-checked
+state edits, atomic receipts/indexes/history, separate object/source authority,
+UUID writer leases and bounded MVCC reads. Independent source re-review accepted
+all five corrections: exact create history shape; affected unsupported/missing
+reference semantics; retained-source branch headroom; byte-preserving zero-delta
+no-change; recursive opaque duplicate-key rejection and atomic overlays. The
+original lifecycle/receipt algorithms were preserved.
+
+Four-target ordinary suites and Clippy passed the 512-source history branch,
+schema3 failed-project adoption/clock/receipt rollback, linked video move/split/
+group/lift/undo and actual read-ticket growth/30-second TTL/release assertions.
+Real typed CLI and official SDK registered-media cases passed. Native/Chrome
+cleanup/folder screenshots were downloaded/hash-verified and their readable
+retained failure/companion views personally inspected; they are existing GUI
+regression evidence, not project-workbench evidence.
+
+The next gate runs actual prior `9a171e9`/current packaged executables through controlled
+owner restarts, exact old/new raw records, migration/replay, adoption and retained
+rollback proof. It has not passed yet. Shared project controls/catalog, portable
+checkpoints, mixed audio/video linked variants, general compiler/decoded preview/
+export, remaining utility/effect domains, standard offline FFmpeg packaging and
+owner hardware qualification remain mandatory. No on-open repair of defective
+pre-fix development project records or complete-version 1 claim is made.
