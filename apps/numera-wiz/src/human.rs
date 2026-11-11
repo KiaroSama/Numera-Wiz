@@ -1,7 +1,6 @@
 //! Ordinary composable CLI commands lower to the existing canonical request port.
 use crate::{client::NativeClient, print_response};
 mod projects;
-pub use projects::{Projects, Sequences, Clips, History};
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use nw_domain::{
@@ -9,6 +8,7 @@ use nw_domain::{
     commands::{self, Request, Response},
     mux::{CleanIntent, Stream},
 };
+pub use projects::{Clips, History, Projects, Sequences};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -666,22 +666,53 @@ mod tests {
         assert!(wait.idempotency_key.is_none() && wait.replay_scope.is_none());
         use clap::Parser;
         #[derive(Parser)]
-        struct ProjectCli { #[command(subcommand)] command: Projects }
+        struct ProjectCli {
+            #[command(subcommand)]
+            command: Projects,
+        }
         let id = "11111111-1111-4111-8111-111111111111";
         let inspected = ProjectCli::try_parse_from(["test", "inspect", "--project", id]).unwrap();
         let inspected = prepare(Command::Projects(inspected.command)).unwrap();
         assert_eq!(inspected.command.id, "projects.inspect");
         assert_eq!(inspected.project.as_ref().unwrap().id, id);
-        assert!(serde_json::to_value(&inspected).unwrap()["project"].get("expected_revision").is_none());
+        assert!(
+            serde_json::to_value(&inspected).unwrap()["project"]
+                .get("expected_revision")
+                .is_none()
+        );
         #[derive(Parser)]
-        struct ClipCli { #[command(subcommand)] command: Clips }
-        let make_move = || ClipCli::try_parse_from(["test", "move", "--project", id, "--expected-revision", "4", "--clip", id, "--delta", "-1/4", "--replay-scope", "retained-scope", "--idempotency-key", "same-move"]).unwrap().command;
+        struct ClipCli {
+            #[command(subcommand)]
+            command: Clips,
+        }
+        let make_move = || {
+            ClipCli::try_parse_from([
+                "test",
+                "move",
+                "--project",
+                id,
+                "--expected-revision",
+                "4",
+                "--clip",
+                id,
+                "--delta",
+                "-1/4",
+                "--replay-scope",
+                "retained-scope",
+                "--idempotency-key",
+                "same-move",
+            ])
+            .unwrap()
+            .command
+        };
         let moved = prepare(Command::Clips(make_move())).unwrap();
         let retry = prepare(Command::Clips(make_move())).unwrap();
         assert_eq!(moved.structural_digest(), retry.structural_digest());
         assert_eq!(moved.request_id, retry.request_id);
-        assert_eq!(moved.project.as_ref().unwrap().expected_revision.as_deref(), Some("4"));
+        assert_eq!(
+            moved.project.as_ref().unwrap().expected_revision.as_deref(),
+            Some("4")
+        );
         assert_eq!(moved.params["delta"], json!({"num":"-1","den":"4"}));
-
     }
 }

@@ -21,7 +21,10 @@ fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &s
         return Ok(());
     }
     if table.len().map_err(storage)? >= 49000 {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Generation record headroom exhausted"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Generation record headroom exhausted",
+        ));
     }
     for (prefix, limit) in [
         ("asset/", 4096usize),

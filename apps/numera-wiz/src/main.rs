@@ -188,10 +188,16 @@ async fn run() -> Result<()> {
             access::run(&client, command).await
         }
         Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
-        Some(Mode::Projects { command }) => human::run(&client, human::Command::Projects(command)).await,
-        Some(Mode::Sequences { command }) => human::run(&client, human::Command::Sequences(command)).await,
+        Some(Mode::Projects { command }) => {
+            human::run(&client, human::Command::Projects(command)).await
+        }
+        Some(Mode::Sequences { command }) => {
+            human::run(&client, human::Command::Sequences(command)).await
+        }
         Some(Mode::Clips { command }) => human::run(&client, human::Command::Clips(command)).await,
-        Some(Mode::History { command }) => human::run(&client, human::Command::History(command)).await,
+        Some(Mode::History { command }) => {
+            human::run(&client, human::Command::History(command)).await
+        }
         Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
         Some(Mode::Assets { command }) => {
             human::run(&client, human::Command::Assets(command)).await

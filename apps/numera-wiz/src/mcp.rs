@@ -71,12 +71,13 @@ fn tool(name: &str) -> Option<Tool> {
         let write = descriptor.project_context == commands::ProjectContextRule::RequiredWrite;
         let mut project = serde_json::json!({"type":"object","properties":{"id":{"type":"string","format":"uuid"}},"required":["id"],"additionalProperties":false});
         if write {
-            project["properties"]["expected_revision"] = serde_json::json!({"type":"string","pattern":"^(0|[1-9][0-9]*)$"});
-            project["required"] = serde_json::json!(["id","expected_revision"]);
+            project["properties"]["expected_revision"] =
+                serde_json::json!({"type":"string","pattern":"^(0|[1-9][0-9]*)$"});
+            project["required"] = serde_json::json!(["id", "expected_revision"]);
         }
         schema["properties"]["context"]["properties"]["project"] = project;
         schema["properties"]["context"]["required"] = serde_json::json!(["project"]);
-        schema["required"] = serde_json::json!(["params","context"]);
+        schema["required"] = serde_json::json!(["params", "context"]);
     }
     if let Some(definitions) = definitions {
         schema.as_object_mut()?.insert("$defs".into(), definitions);

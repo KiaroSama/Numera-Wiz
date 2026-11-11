@@ -20,10 +20,16 @@ pub struct CommandRef {
 #[serde(deny_unknown_fields)]
 pub struct ProjectRef {
     pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "project_revision_field")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "project_revision_field"
+    )]
     pub expected_revision: Option<String>,
 }
-fn project_revision_field<'de, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Option<String>, D::Error> {
+fn project_revision_field<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error> {
     String::deserialize(deserializer).map(Some)
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -68,15 +74,32 @@ impl Request {
                 "request_id must contain 1-128 bytes",
             ));
         }
-        let descriptor = descriptor(&self.command.id).ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Command is not registered"))?;
+        let descriptor = descriptor(&self.command.id)
+            .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Command is not registered"))?;
         match (descriptor.project_context, &self.project) {
             (ProjectContextRule::Forbidden, None) => {}
-            (ProjectContextRule::RequiredRead, Some(project)) if project.expected_revision.is_none() => { crate::projects::validate_id(&project.id)?; }
+            (ProjectContextRule::RequiredRead, Some(project))
+                if project.expected_revision.is_none() =>
+            {
+                crate::projects::validate_id(&project.id)?;
+            }
             (ProjectContextRule::RequiredWrite, Some(project)) => {
                 crate::projects::validate_id(&project.id)?;
-                crate::projects::Revision::parse(project.expected_revision.as_deref().ok_or_else(|| DomainError::new("VALIDATION_ERROR", "Project writes require expected_revision"))?)?;
+                crate::projects::Revision::parse(
+                    project.expected_revision.as_deref().ok_or_else(|| {
+                        DomainError::new(
+                            "VALIDATION_ERROR",
+                            "Project writes require expected_revision",
+                        )
+                    })?,
+                )?;
             }
-            _ => return Err(DomainError::new("VALIDATION_ERROR", "Project context does not match this command's read/write contract")),
+            _ => {
+                return Err(DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Project context does not match this command's read/write contract",
+                ));
+            }
         }
         if !self.params.is_object() {
             return Err(DomainError::new(
@@ -164,14 +187,22 @@ pub enum StateClass {
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum ProjectContextRule { #[default] Forbidden, RequiredRead, RequiredWrite }
+pub enum ProjectContextRule {
+    #[default]
+    Forbidden,
+    RequiredRead,
+    RequiredWrite,
+}
 impl ProjectContextRule {
-    fn forbidden(&self) -> bool { *self == Self::Forbidden }
+    fn forbidden(&self) -> bool {
+        *self == Self::Forbidden
+    }
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
         "projects.inspect" | "sequences.inspect" => ProjectContextRule::RequiredRead,
-        "sequences.create" | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
+        "sequences.create" | "clips.place" | "clips.move" | "clips.split" | "clips.remove"
+        | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
 }
@@ -240,16 +271,66 @@ pub fn registry() -> Vec<Descriptor> {
         };
     }
     vec![
-        row!("projects.create", "Create a durable project", DurableMutation, crate::projects::CreateInput),
-        row!("projects.inspect", "Read a bounded captured project projection", Query, crate::projects::views::InspectInput),
-        row!("sequences.inspect", "Read captured sequence tracks or intervals", Query, crate::projects::views::SequenceInspectInput),
-        row!("sequences.create", "Create a sequence and explicit tracks", DurableMutation, crate::projects::SequenceInput),
-        row!("clips.place", "Place a finite generator or authorized registered stream", DurableMutation, crate::projects::PlaceInput),
-        row!("clips.move", "Move the complete linked clip selection", DurableMutation, crate::projects::MoveInput),
-        row!("clips.split", "Split exact source and sequence intervals", DurableMutation, crate::projects::SplitInput),
-        row!("clips.remove", "Lift the linked clip selection", DurableMutation, crate::projects::RemoveInput),
-        row!("history.undo", "Compensate the latest retained project edit", DurableMutation, Empty),
-        row!("history.redo", "Reapply a retained project edit", DurableMutation, Empty),
+        row!(
+            "projects.create",
+            "Create a durable project",
+            DurableMutation,
+            crate::projects::CreateInput
+        ),
+        row!(
+            "projects.inspect",
+            "Read a bounded captured project projection",
+            Query,
+            crate::projects::views::InspectInput
+        ),
+        row!(
+            "sequences.inspect",
+            "Read captured sequence tracks or intervals",
+            Query,
+            crate::projects::views::SequenceInspectInput
+        ),
+        row!(
+            "sequences.create",
+            "Create a sequence and explicit tracks",
+            DurableMutation,
+            crate::projects::SequenceInput
+        ),
+        row!(
+            "clips.place",
+            "Place a finite generator or authorized registered stream",
+            DurableMutation,
+            crate::projects::PlaceInput
+        ),
+        row!(
+            "clips.move",
+            "Move the complete linked clip selection",
+            DurableMutation,
+            crate::projects::MoveInput
+        ),
+        row!(
+            "clips.split",
+            "Split exact source and sequence intervals",
+            DurableMutation,
+            crate::projects::SplitInput
+        ),
+        row!(
+            "clips.remove",
+            "Lift the linked clip selection",
+            DurableMutation,
+            crate::projects::RemoveInput
+        ),
+        row!(
+            "history.undo",
+            "Compensate the latest retained project edit",
+            DurableMutation,
+            Empty
+        ),
+        row!(
+            "history.redo",
+            "Reapply a retained project edit",
+            DurableMutation,
+            Empty
+        ),
         row!(
             "maintenance.plan",
             "Review an idle schema2 generation migration",
@@ -507,29 +588,59 @@ mod tests {
     #[test]
     fn duplicate_context_is_rejected() {
         assert!(parse::<PathInput>(serde_json::json!({"path":"a","project_id":"wrong"})).is_err());
-        use crate::projects::{Revision, EntityId, EntityEnvelope, Bin};
-        for revision in ["", "+1", "01", "-1", "18446744073709551616"] { assert!(Revision::parse(revision).is_err()); }
+        use crate::projects::{Bin, EntityEnvelope, EntityId, Revision};
+        for revision in ["", "+1", "01", "-1", "18446744073709551616"] {
+            assert!(Revision::parse(revision).is_err());
+        }
         assert!(serde_json::from_value::<Revision>(serde_json::json!(1)).is_err());
         assert!(EntityId::parse("not-a-server-uuid").is_err());
         let id = "11111111-1111-4111-8111-111111111111";
-        let mut read = Request::query("projects.inspect", serde_json::json!({"projection":"summary"}));
-        read.project = Some(ProjectRef { id: id.into(), expected_revision: None });
+        let mut read = Request::query(
+            "projects.inspect",
+            serde_json::json!({"projection":"summary"}),
+        );
+        read.project = Some(ProjectRef {
+            id: id.into(),
+            expected_revision: None,
+        });
         read.validate().unwrap();
-        assert!(serde_json::to_value(&read).unwrap()["project"].get("expected_revision").is_none());
-        let mut null_revision = serde_json::to_value(&read).unwrap(); null_revision["project"]["expected_revision"] = Value::Null;
+        assert!(
+            serde_json::to_value(&read).unwrap()["project"]
+                .get("expected_revision")
+                .is_none()
+        );
+        let mut null_revision = serde_json::to_value(&read).unwrap();
+        null_revision["project"]["expected_revision"] = Value::Null;
         assert!(serde_json::from_value::<Request>(null_revision).is_err());
         read.project.as_mut().unwrap().expected_revision = Some("0".into());
         assert!(read.validate().is_err());
-        read.command.id = "clips.move".into(); read.validate().unwrap();
-        read.command.id = "jobs.list".into(); assert!(read.validate().is_err());
-        let mut entity = EntityEnvelope::new(&crate::projects::ProjectId::parse(id).unwrap(), EntityId::parse(id).unwrap(), "bin", None, "Opaque extension".into(), &Bin { member_count: 0, locked: false }).unwrap();
+        read.command.id = "clips.move".into();
+        read.validate().unwrap();
+        read.command.id = "jobs.list".into();
+        assert!(read.validate().is_err());
+        let mut entity = EntityEnvelope::new(
+            &crate::projects::ProjectId::parse(id).unwrap(),
+            EntityId::parse(id).unwrap(),
+            "bin",
+            None,
+            "Opaque extension".into(),
+            &Bin {
+                member_count: 0,
+                locked: false,
+            },
+        )
+        .unwrap();
         entity.payload_json = r#"{"member_count":0,"locked":false,"future":{"integer":900719925474099312345678901,"decimal":0.123456789012345678901}}"#.into();
         entity.payload_sha256 = crate::projects::hash(entity.payload_json.as_bytes());
-        entity.update(&Bin { member_count: 1, locked: false }).unwrap();
+        entity
+            .update(&Bin {
+                member_count: 1,
+                locked: false,
+            })
+            .unwrap();
         assert!(entity.payload_json.contains("900719925474099312345678901"));
         assert!(entity.payload_json.contains("0.123456789012345678901"));
         assert_eq!(entity.payload::<Bin>("bin").unwrap().member_count, 1);
-
     }
 }
 
@@ -676,7 +787,6 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.remove",
     "history.undo",
     "history.redo",
-
     "maintenance.plan",
     "maintenance.migrate",
     "maintenance.inspect",

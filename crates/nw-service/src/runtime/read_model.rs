@@ -31,15 +31,36 @@ pub(super) struct Snapshots {
     project_write_estimate: usize,
 }
 impl Snapshots {
-    pub(super) fn clear_project_reads(&mut self) { self.projects.clear(); self.project_write_estimate = 0; }
-    fn expire(&mut self) {
-        self.entries.retain(|_, entry| entry.created.elapsed() < LEASE);
-        self.projects.retain(|_, entry| !entry.expired());
-        if self.projects.is_empty() { self.project_write_estimate = 0; }
+    pub(super) fn clear_project_reads(&mut self) {
+        self.projects.clear();
+        self.project_write_estimate = 0;
     }
-    fn count(&self) -> usize { self.entries.len() + self.projects.len() }
-    fn principal_count(&self, principal: &str) -> usize { self.entries.values().filter(|s| s.principal == principal).count() + self.projects.values().filter(|s| s.principal() == principal).count() }
-    fn bytes(&self) -> usize { self.entries.values().map(|s| s.bytes).sum::<usize>() + self.projects.values().map(|s| s.bytes()).sum::<usize>() }
+    fn expire(&mut self) {
+        self.entries
+            .retain(|_, entry| entry.created.elapsed() < LEASE);
+        self.projects.retain(|_, entry| !entry.expired());
+        if self.projects.is_empty() {
+            self.project_write_estimate = 0;
+        }
+    }
+    fn count(&self) -> usize {
+        self.entries.len() + self.projects.len()
+    }
+    fn principal_count(&self, principal: &str) -> usize {
+        self.entries
+            .values()
+            .filter(|s| s.principal == principal)
+            .count()
+            + self
+                .projects
+                .values()
+                .filter(|s| s.principal() == principal)
+                .count()
+    }
+    fn bytes(&self) -> usize {
+        self.entries.values().map(|s| s.bytes).sum::<usize>()
+            + self.projects.values().map(|s| s.bytes()).sum::<usize>()
+    }
 }
 fn expired() -> DomainError {
     DomainError::new(
@@ -210,7 +231,8 @@ impl Service {
         {
             cache.entries.remove(&id);
         }
-        if cache.count() >= MAX_SNAPSHOTS || cache.principal_count(&context.principal) >= MAX_PER_PRINCIPAL
+        if cache.count() >= MAX_SNAPSHOTS
+            || cache.principal_count(&context.principal) >= MAX_PER_PRINCIPAL
         {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",
@@ -343,9 +365,7 @@ impl Service {
         {
             return Err(expired());
         }
-        if cache.bytes() + snapshot.bytes + MAX_PAGE_BYTES
-            > MAX_GLOBAL_BYTES
-        {
+        if cache.bytes() + snapshot.bytes + MAX_PAGE_BYTES > MAX_GLOBAL_BYTES {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",
                 "Global summary snapshot budget reached",

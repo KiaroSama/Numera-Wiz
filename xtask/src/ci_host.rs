@@ -56,23 +56,43 @@ pub fn linux_dependencies() -> Result<()> {
     // ubuntu.com DNS names. Independent HTTPS mirrors retain Ubuntu's signed
     // release/package hash chain. Never accept stale indexes or bypass signing.
     for (archive, security) in [
-        ("https://mirrors.edge.kernel.org/ubuntu/", "https://mirrors.edge.kernel.org/ubuntu/"),
-        ("https://mirrors.mit.edu/ubuntu/", "https://mirrors.mit.edu/ubuntu/"),
-        ("https://archive.ubuntu.com/ubuntu/", "https://security.ubuntu.com/ubuntu/"),
+        (
+            "https://mirrors.edge.kernel.org/ubuntu/",
+            "https://mirrors.edge.kernel.org/ubuntu/",
+        ),
+        (
+            "https://mirrors.mit.edu/ubuntu/",
+            "https://mirrors.mit.edu/ubuntu/",
+        ),
+        (
+            "https://archive.ubuntu.com/ubuntu/",
+            "https://security.ubuntu.com/ubuntu/",
+        ),
     ] {
         prepare_sources(archive, security)?;
         if apt("90s", "update", &[]).is_ok() {
             tracing::info!(%selection, archive, "Authenticated Ubuntu GUI dependency indexes are ready");
             return apt("240s", "install", packages);
         }
-        tracing::warn!(archive, "Ubuntu index refresh failed; trying the next authenticated mirror");
+        tracing::warn!(
+            archive,
+            "Ubuntu index refresh failed; trying the next authenticated mirror"
+        );
     }
-    bail!("No Ubuntu mirror supplied complete authenticated indexes; GUI prerequisites remain unverified")
+    bail!(
+        "No Ubuntu mirror supplied complete authenticated indexes; GUI prerequisites remain unverified"
+    )
 }
 
 fn prepare_sources(archive: &str, security: &str) -> Result<()> {
-    let sources = format!("Types: deb\nURIs: {archive}\nSuites: noble noble-updates noble-backports\nComponents: main restricted universe multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n\nTypes: deb\nURIs: {security}\nSuites: noble-security\nComponents: main restricted universe multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n");
-    tracing::info!(archive, security, "Preparing authenticated Ubuntu GUI dependency sources");
+    let sources = format!(
+        "Types: deb\nURIs: {archive}\nSuites: noble noble-updates noble-backports\nComponents: main restricted universe multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n\nTypes: deb\nURIs: {security}\nSuites: noble-security\nComponents: main restricted universe multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n"
+    );
+    tracing::info!(
+        archive,
+        security,
+        "Preparing authenticated Ubuntu GUI dependency sources"
+    );
     let mut writer = Command::new("sudo")
         .args([
             "--non-interactive",
@@ -129,7 +149,9 @@ fn apt(deadline: &str, operation: &str, packages: &[&str]) -> Result<()> {
         .context("Start hosted package setup")?
         .success()
     {
-        bail!("Hosted Ubuntu {operation} failed or exceeded its deadline; GUI prerequisites remain unverified");
+        bail!(
+            "Hosted Ubuntu {operation} failed or exceeded its deadline; GUI prerequisites remain unverified"
+        );
     }
     Ok(())
 }

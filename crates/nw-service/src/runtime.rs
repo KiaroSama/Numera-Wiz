@@ -5,8 +5,8 @@ mod maintenance;
 pub use artifacts::ArtifactTransfer;
 mod clock;
 mod folders;
-mod read_model;
 mod projects;
+mod read_model;
 mod uploads;
 use nw_domain::{
     DomainError, Result,
@@ -496,7 +496,10 @@ impl Service {
             return Ok(response);
         };
         let readable = match request.command.id.as_str() {
-            "projects.create" | "sequences.create" | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => self.project_receipt_readable(context, &response)?,
+            "projects.create" | "sequences.create" | "clips.place" | "clips.move"
+            | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
+                self.project_receipt_readable(context, &response)?
+            }
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -857,7 +860,10 @@ impl Service {
         request.validate()?;
         let _admission = self.command_admission(&request.command.id)?;
         if ["maintenance.plan", "maintenance.migrate"].contains(&request.command.id.as_str()) {
-            self.snapshots.lock().map_err(|_| lock_error())?.clear_project_reads();
+            self.snapshots
+                .lock()
+                .map_err(|_| lock_error())?
+                .clear_project_reads();
         }
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
@@ -903,7 +909,9 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
-            "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect" | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
+            "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
+            | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo"
+            | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);
             }
@@ -2215,8 +2223,14 @@ impl Service {
 impl Drop for Service {
     fn drop(&mut self) {
         // Release MVCC transactions before Store/root ownership fields are dropped.
-        self.snapshots.get_mut().unwrap_or_else(std::sync::PoisonError::into_inner).clear_project_reads();
-        self.project_writers.get_mut().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
+        self.snapshots
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear_project_reads();
+        self.project_writers
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
     }
 }
 struct Pending(Arc<AtomicUsize>);
