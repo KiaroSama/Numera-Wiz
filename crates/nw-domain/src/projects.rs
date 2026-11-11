@@ -337,7 +337,8 @@ impl EntityEnvelope {
             serde_json::from_str(&encoded).map_err(|e| invalid(e.to_string()))?;
         original.extend(fields);
         let mut candidate = self.clone();
-        candidate.payload_json = serde_json::to_string(&original).map_err(|e| invalid(e.to_string()))?;
+        candidate.payload_json =
+            serde_json::to_string(&original).map_err(|e| invalid(e.to_string()))?;
         candidate.payload_sha256 = hash(candidate.payload_json.as_bytes());
         candidate.validate()?;
         *self = candidate;

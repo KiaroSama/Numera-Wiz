@@ -1,7 +1,7 @@
 //! Validate opaque JSON recursively without ever decoding a number as f64/Value.
 use super::{Result, invalid, limit};
-use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
+use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde_json::value::RawValue;
 use std::collections::BTreeSet;
 
@@ -18,13 +18,19 @@ fn visit(raw: &str, depth: usize) -> Result<()> {
     let mut decoder = serde_json::Deserializer::from_str(text);
     let visitor = Containers { depth };
     match text.as_bytes().first() {
-        Some(b'{') => decoder.deserialize_map(visitor).map_err(|e| invalid(e.to_string()))?,
-        Some(b'[') => decoder.deserialize_seq(visitor).map_err(|e| invalid(e.to_string()))?,
+        Some(b'{') => decoder
+            .deserialize_map(visitor)
+            .map_err(|e| invalid(e.to_string()))?,
+        Some(b'[') => decoder
+            .deserialize_seq(visitor)
+            .map_err(|e| invalid(e.to_string()))?,
         _ => return Ok(()), // RawValue already checked scalar syntax, preserving numeric text.
     }
     decoder.end().map_err(|e| invalid(e.to_string()))
 }
-struct Containers { depth: usize }
+struct Containers {
+    depth: usize,
+}
 impl<'de> Visitor<'de> for Containers {
     type Value = ();
     fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

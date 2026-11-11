@@ -387,7 +387,13 @@ impl Store {
     }
 }
 fn retained_source_count(history: &ProjectHistory) -> usize {
-    history.undo.iter().chain(&history.redo).flat_map(|entry| entry.source_ids.iter()).collect::<BTreeSet<_>>().len()
+    history
+        .undo
+        .iter()
+        .chain(&history.redo)
+        .flat_map(|entry| entry.source_ids.iter())
+        .collect::<BTreeSet<_>>()
+        .len()
 }
 fn patch_sources(patch: &ProjectPatch) -> Result<Vec<EntityId>> {
     let mut ids = BTreeSet::new();
@@ -502,17 +508,43 @@ fn index_rows(
             "track" | "sequence" => {
                 let mut targets = BTreeSet::new();
                 let mut ancestors = BTreeMap::new();
-                for target in entity.owner_id.iter().chain(entity.references.iter().map(|r| &r.target)) {
-                    targets.insert(scope_ancestor(table, header, target, &entity.semantic_scope, changes, after, &mut ancestors)?);
+                for target in entity
+                    .owner_id
+                    .iter()
+                    .chain(entity.references.iter().map(|r| &r.target))
+                {
+                    targets.insert(scope_ancestor(
+                        table,
+                        header,
+                        target,
+                        &entity.semantic_scope,
+                        changes,
+                        after,
+                        &mut ancestors,
+                    )?);
                 }
-                if targets.is_empty() { return Err(domain::invalid("Scoped semantic node requires an ancestor target")); }
+                if targets.is_empty() {
+                    return Err(domain::invalid(
+                        "Scoped semantic node requires an ancestor target",
+                    ));
+                }
                 targets.into_iter().collect()
             }
-            _ => entity.owner_id.iter().cloned().chain(entity.references.iter().map(|r| r.target.clone())).collect(),
+            _ => entity
+                .owner_id
+                .iter()
+                .cloned()
+                .chain(entity.references.iter().map(|r| r.target.clone()))
+                .collect(),
         }
-    } else { Vec::new() };
+    } else {
+        Vec::new()
+    };
     for target in targets {
-        rows.push((format!("project-dependency/{project}/{target}/{}", entity.id), encode(&entity.id)?));
+        rows.push((
+            format!("project-dependency/{project}/{target}/{}", entity.id),
+            encode(&entity.id)?,
+        ));
     }
     Ok(rows)
 }
@@ -529,24 +561,39 @@ fn scope_ancestor(
     let mut next = target.clone();
     let mut seen = BTreeSet::new();
     loop {
-        if !seen.insert(next.clone()) { return Err(domain::invalid("Semantic scope ownership cycle")); }
-        if seen.len() > MAX_CLOSURE { return Err(domain::limit("Semantic scope ancestor budget exceeded")); }
+        if !seen.insert(next.clone()) {
+            return Err(domain::invalid("Semantic scope ownership cycle"));
+        }
+        if seen.len() > MAX_CLOSURE {
+            return Err(domain::limit("Semantic scope ancestor budget exceeded"));
+        }
         let entity = if let Some(entity) = ancestors.get(&next) {
             entity.clone()
         } else {
-            if ancestors.len() >= MAX_CLOSURE { return Err(domain::limit("Declared scope targets exceed 256 ancestors")); }
+            if ancestors.len() >= MAX_CLOSURE {
+                return Err(domain::limit("Declared scope targets exceed 256 ancestors"));
+            }
             let entity: EntityEnvelope = if let Some((before, following)) = changes.get(&next) {
-                (if after { following } else { before }).clone().ok_or_else(DomainError::object_not_found)?
+                (if after { following } else { before })
+                    .clone()
+                    .ok_or_else(DomainError::object_not_found)?
             } else {
-                table_value(table, &entity_key(&header.id, &next))?.ok_or_else(DomainError::object_not_found)?
+                table_value(table, &entity_key(&header.id, &next))?
+                    .ok_or_else(DomainError::object_not_found)?
             };
             ancestors.insert(next.clone(), entity.clone());
             entity
         };
-        if entity.id != next || entity.project_id != header.id { return Err(domain::invalid("Semantic scope target identity differs")); }
+        if entity.id != next || entity.project_id != header.id {
+            return Err(domain::invalid("Semantic scope target identity differs"));
+        }
         entity.validate()?;
-        if entity.kind == kind { return Ok(next); }
-        next = entity.owner_id.ok_or_else(|| domain::invalid("Declared semantic scope has no matching ancestor"))?;
+        if entity.kind == kind {
+            return Ok(next);
+        }
+        next = entity
+            .owner_id
+            .ok_or_else(|| domain::invalid("Declared semantic scope has no matching ancestor"))?;
     }
 }
 impl ProjectReadSnapshot {

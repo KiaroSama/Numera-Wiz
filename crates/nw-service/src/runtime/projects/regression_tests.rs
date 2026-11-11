@@ -122,18 +122,37 @@ impl Fixture {
         self.install_envelopes(vec![entity]);
     }
     fn install_envelopes(&self, entities: Vec<EntityEnvelope>) {
-        let read = self.service.store.project_read(self.project.as_str()).unwrap();
-        let request = self.move_request(0, 0, &format!("install-fixture-{}", read.header().revision));
-        let changes = entities.into_iter().map(|entity| EntityChange {
-            before:read.raw_entity(&entity.id).unwrap(), after:Some(entity.bytes().unwrap()), id:entity.id,
-        }).collect();
+        let read = self
+            .service
+            .store
+            .project_read(self.project.as_str())
+            .unwrap();
+        let request =
+            self.move_request(0, 0, &format!("install-fixture-{}", read.header().revision));
+        let changes = entities
+            .into_iter()
+            .map(|entity| EntityChange {
+                before: read.raw_entity(&entity.id).unwrap(),
+                after: Some(entity.bytes().unwrap()),
+                id: entity.id,
+            })
+            .collect();
         let prepared = ProjectCommit {
-            header:read.header().clone(), expected_header:Some(read.header_raw().into()),
-            patch:ProjectPatch { changes }, operation_id:OperationId::parse(Uuid::new_v4().to_string()).unwrap(),
-            history_action:HistoryAction::Normal, created:json!({}), expected_records:Vec::new(),
+            header: read.header().clone(),
+            expected_header: Some(read.header_raw().into()),
+            patch: ProjectPatch { changes },
+            operation_id: OperationId::parse(Uuid::new_v4().to_string()).unwrap(),
+            history_action: HistoryAction::Normal,
+            created: json!({}),
+            expected_records: Vec::new(),
         };
         drop(read);
-        self.service.store.commit_project_with_clock(&self.context.principal,&request,prepared,||self.service.clock.now()).unwrap();
+        self.service
+            .store
+            .commit_project_with_clock(&self.context.principal, &request, prepared, || {
+                self.service.clock.now()
+            })
+            .unwrap();
     }
     async fn accept(&self, request: Request) -> Value {
         let response = self.service.dispatch(self.context.clone(), request).await;
@@ -142,18 +161,6 @@ impl Fixture {
         response.result.unwrap()
     }
     async fn reject_unchanged(&self, request: Request, code: &str) {
-        let before = self.service.store.project_read(self.project.as_str()).unwrap().header_raw().to_owned();
-        let history = self.history_hash();
-        let response = self.service.dispatch(self.context.clone(),request.clone()).await;
-        assert_eq!(response.error.unwrap().code,code);
-        assert!(response.receipt_id.is_none());
-        assert_eq!(self.service.store.project_read(self.project.as_str()).unwrap().header_raw(),before);
-        assert_eq!(self.history_hash(),history);
-        assert!(self.service.store.replay_with_clock(&self.context.principal,&request,||self.service.clock.now()).unwrap().is_none());
-    }
-    async fn expect_blocked(&self, clip: usize, key: &str, failures: &mut Vec<String>) {
-        for delta in [1, 0] {
-        let key = format!("{key}-delta-{delta}");
         let before = self
             .service
             .store
@@ -161,48 +168,89 @@ impl Fixture {
             .unwrap()
             .header_raw()
             .to_owned();
-        let entity_before = self.raw(&self.clips[clip]);
-        let history_before = self.history_hash();
-        let request = self.move_request(clip, delta, &key);
+        let history = self.history_hash();
         let response = self
             .service
             .dispatch(self.context.clone(), request.clone())
             .await;
-        let code = response
-            .error
-            .as_ref()
-            .map(|e| e.code.as_str())
-            .unwrap_or("accepted");
-        let recognized = [
-            "PROJECT_READ_ONLY",
-            "UNSUPPORTED_SEMANTIC_NODE",
-            "OBJECT_NOT_FOUND",
-            "PROJECT_CORRUPT",
-            "VALIDATION_ERROR",
-        ]
-        .contains(&code);
-        let current = self
-            .service
-            .store
-            .project_read(self.project.as_str())
-            .unwrap();
-        let unchanged = current.header_raw() == before
-            && self.raw(&self.clips[clip]) == entity_before
-            && self.history_hash() == history_before;
-        let no_receipt = self
-            .service
-            .store
-            .replay_with_clock(&self.context.principal, &request, || {
-                self.service.clock.now()
-            })
-            .unwrap()
-            .is_none();
-        if response.ok || !recognized || response.receipt_id.is_some() || !unchanged || !no_receipt
-        {
-            failures.push(format!(
-                "{key}: result={code}, unchanged={unchanged}, no_receipt={no_receipt}"
-            ));
-        }
+        assert_eq!(response.error.unwrap().code, code);
+        assert!(response.receipt_id.is_none());
+        assert_eq!(
+            self.service
+                .store
+                .project_read(self.project.as_str())
+                .unwrap()
+                .header_raw(),
+            before
+        );
+        assert_eq!(self.history_hash(), history);
+        assert!(
+            self.service
+                .store
+                .replay_with_clock(&self.context.principal, &request, || self
+                    .service
+                    .clock
+                    .now())
+                .unwrap()
+                .is_none()
+        );
+    }
+    async fn expect_blocked(&self, clip: usize, key: &str, failures: &mut Vec<String>) {
+        for delta in [1, 0] {
+            let key = format!("{key}-delta-{delta}");
+            let before = self
+                .service
+                .store
+                .project_read(self.project.as_str())
+                .unwrap()
+                .header_raw()
+                .to_owned();
+            let entity_before = self.raw(&self.clips[clip]);
+            let history_before = self.history_hash();
+            let request = self.move_request(clip, delta, &key);
+            let response = self
+                .service
+                .dispatch(self.context.clone(), request.clone())
+                .await;
+            let code = response
+                .error
+                .as_ref()
+                .map(|e| e.code.as_str())
+                .unwrap_or("accepted");
+            let recognized = [
+                "PROJECT_READ_ONLY",
+                "UNSUPPORTED_SEMANTIC_NODE",
+                "OBJECT_NOT_FOUND",
+                "PROJECT_CORRUPT",
+                "VALIDATION_ERROR",
+            ]
+            .contains(&code);
+            let current = self
+                .service
+                .store
+                .project_read(self.project.as_str())
+                .unwrap();
+            let unchanged = current.header_raw() == before
+                && self.raw(&self.clips[clip]) == entity_before
+                && self.history_hash() == history_before;
+            let no_receipt = self
+                .service
+                .store
+                .replay_with_clock(&self.context.principal, &request, || {
+                    self.service.clock.now()
+                })
+                .unwrap()
+                .is_none();
+            if response.ok
+                || !recognized
+                || response.receipt_id.is_some()
+                || !unchanged
+                || !no_receipt
+            {
+                failures.push(format!(
+                    "{key}: result={code}, unchanged={unchanged}, no_receipt={no_receipt}"
+                ));
+            }
         }
     }
 }
@@ -383,7 +431,6 @@ pub(in crate::runtime) async fn compatibility_and_zero_delta() {
     );
 }
 
-
 pub(in crate::runtime) async fn linked_edits() {
     let fixture = Fixture::new().await;
     let group = EntityId::parse(Uuid::new_v4().to_string()).unwrap();
@@ -395,77 +442,164 @@ pub(in crate::runtime) async fn linked_edits() {
         entity.update(&clip).unwrap();
     }
     // A one-way edge exercises incoming expansion when selecting its target.
-    first.references.push(EntityReference { role:"link".into(), target:second.id.clone() });
-    fixture.install_envelopes(vec![first,second]);
+    first.references.push(EntityReference {
+        role: "link".into(),
+        target: second.id.clone(),
+    });
+    fixture.install_envelopes(vec![first, second]);
     let mut locked = fixture.entity(&fixture.clips[0]);
     let mut clip: Clip = locked.payload("clip").unwrap();
-    clip.locked=true;
+    clip.locked = true;
     locked.update(&clip).unwrap();
     fixture.install_future_envelope(locked.clone());
-    fixture.reject_unchanged(fixture.move_request(2,1,"linked-locked"),"ENTITY_LOCKED").await;
-    fixture.reject_unchanged(fixture.move_request(2,0,"linked-locked-zero"),"ENTITY_LOCKED").await;
-    clip.locked=false;
+    fixture
+        .reject_unchanged(fixture.move_request(2, 1, "linked-locked"), "ENTITY_LOCKED")
+        .await;
+    fixture
+        .reject_unchanged(
+            fixture.move_request(2, 0, "linked-locked-zero"),
+            "ENTITY_LOCKED",
+        )
+        .await;
+    clip.locked = false;
     locked.update(&clip).unwrap();
     fixture.install_future_envelope(locked);
     fixture.reject_unchanged(fixture.request("clips.split","linked-off-grid",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"1","den":"3"},"link_policy":"expand"})),"OFF_GRID").await;
     let boundary=fixture.accept(fixture.request("clips.split","linked-boundary",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"0","den":"1"},"link_policy":"expand"}))).await;
-    assert_eq!(boundary["no_change"],true);
-    let moved=fixture.accept(fixture.move_request(2,1,"linked-incoming-move")).await;
-    assert_eq!(moved["changed_ids"].as_array().unwrap().len(),2);
-    for id in [&fixture.clips[0],&fixture.clips[2]] {
-        assert_eq!(fixture.entity(id).payload::<Clip>("clip").unwrap().sequence_start,nw_domain::time::Rational::new(1,4).unwrap());
+    assert_eq!(boundary["no_change"], true);
+    let moved = fixture
+        .accept(fixture.move_request(2, 1, "linked-incoming-move"))
+        .await;
+    assert_eq!(moved["changed_ids"].as_array().unwrap().len(), 2);
+    for id in [&fixture.clips[0], &fixture.clips[2]] {
+        assert_eq!(
+            fixture
+                .entity(id)
+                .payload::<Clip>("clip")
+                .unwrap()
+                .sequence_start,
+            nw_domain::time::Rational::new(1, 4).unwrap()
+        );
     }
     let split=fixture.accept(fixture.request("clips.split","linked-split",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"3","den":"4"},"link_policy":"expand"}))).await;
-    let right_ids=split["created"]["clip_ids"].as_array().unwrap().iter().map(|id|EntityId::parse(id.as_str().unwrap()).unwrap()).collect::<Vec<_>>();
-    assert_eq!(right_ids.len(),2);
-    let right_entities=right_ids.iter().map(|id|fixture.entity(id)).collect::<Vec<_>>();
-    let right_group=right_entities[0].payload::<Clip>("clip").unwrap().link_group_id.unwrap();
-    assert_ne!(right_group,group);
+    let right_ids = split["created"]["clip_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| EntityId::parse(id.as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(right_ids.len(), 2);
+    let right_entities = right_ids
+        .iter()
+        .map(|id| fixture.entity(id))
+        .collect::<Vec<_>>();
+    let right_group = right_entities[0]
+        .payload::<Clip>("clip")
+        .unwrap()
+        .link_group_id
+        .unwrap();
+    assert_ne!(right_group, group);
     for right in &right_entities {
-        let right_clip: Clip=right.payload("clip").unwrap();
-        assert_eq!(right_clip.link_group_id.as_ref(),Some(&right_group));
-        let left_id=[&fixture.clips[0],&fixture.clips[2]].into_iter().find(|id|fixture.entity(id).payload::<Clip>("clip").unwrap().source_id==right_clip.source_id).unwrap();
-        let left: Clip=fixture.entity(left_id).payload("clip").unwrap();
-        assert_eq!(left.link_group_id.as_ref(),Some(&group));
-        assert_eq!(left.source_range.start,nw_domain::time::Rational::ZERO);
-        assert_eq!(left.source_range.end,right_clip.source_range.start);
-        assert_eq!(right_clip.source_range.end,nw_domain::time::Rational::new(1,1).unwrap());
-        assert_eq!(left.end().unwrap(),right_clip.sequence_start);
-        assert_ne!(left.occurrence_id,right_clip.occurrence_id);
-        for reference in right.references.iter().filter(|r|r.role=="link") {
-            assert!(right_ids.contains(&reference.target),"Right split edge must target the right closure");
+        let right_clip: Clip = right.payload("clip").unwrap();
+        assert_eq!(right_clip.link_group_id.as_ref(), Some(&right_group));
+        let left_id = [&fixture.clips[0], &fixture.clips[2]]
+            .into_iter()
+            .find(|id| {
+                fixture
+                    .entity(id)
+                    .payload::<Clip>("clip")
+                    .unwrap()
+                    .source_id
+                    == right_clip.source_id
+            })
+            .unwrap();
+        let left: Clip = fixture.entity(left_id).payload("clip").unwrap();
+        assert_eq!(left.link_group_id.as_ref(), Some(&group));
+        assert_eq!(left.source_range.start, nw_domain::time::Rational::ZERO);
+        assert_eq!(left.source_range.end, right_clip.source_range.start);
+        assert_eq!(
+            right_clip.source_range.end,
+            nw_domain::time::Rational::new(1, 1).unwrap()
+        );
+        assert_eq!(left.end().unwrap(), right_clip.sequence_start);
+        assert_ne!(left.occurrence_id, right_clip.occurrence_id);
+        for reference in right.references.iter().filter(|r| r.role == "link") {
+            assert!(
+                right_ids.contains(&reference.target),
+                "Right split edge must target the right closure"
+            );
         }
     }
     // Remove explicit right edges after proving their remapping: the following
     // move/lift must now expand the shared group index on its own.
-    let grouped_only = right_entities.into_iter().map(|mut entity| {
-        entity.references.retain(|reference| reference.role != "link");
-        entity
-    }).collect();
+    let grouped_only = right_entities
+        .into_iter()
+        .map(|mut entity| {
+            entity
+                .references
+                .retain(|reference| reference.role != "link");
+            entity
+        })
+        .collect();
     fixture.install_envelopes(grouped_only);
-    let left_bytes=[fixture.raw(&fixture.clips[0]),fixture.raw(&fixture.clips[2])];
+    let left_bytes = [
+        fixture.raw(&fixture.clips[0]),
+        fixture.raw(&fixture.clips[2]),
+    ];
     let moved=fixture.accept(fixture.request("clips.move","right-group-move",json!({"clip_ids":[right_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"}))).await;
-    assert_eq!(moved["changed_ids"].as_array().unwrap().len(),2);
-    assert_eq!([fixture.raw(&fixture.clips[0]),fixture.raw(&fixture.clips[2])],left_bytes);
-    let right_before=right_ids.iter().map(|id|fixture.raw(id)).collect::<Vec<_>>();
-    fixture.accept(fixture.request("clips.remove","right-group-lift",json!({"clip_ids":[right_ids[0]],"mode":"lift","link_policy":"expand"}))).await;
-    let read=fixture.service.store.project_read(fixture.project.as_str()).unwrap();
-    for id in &right_ids { assert!(read.raw_entity(id).unwrap().is_none()); }
-    for id in &fixture.sources { assert!(read.raw_entity(id).unwrap().is_some()); }
+    assert_eq!(moved["changed_ids"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        [
+            fixture.raw(&fixture.clips[0]),
+            fixture.raw(&fixture.clips[2])
+        ],
+        left_bytes
+    );
+    let right_before = right_ids
+        .iter()
+        .map(|id| fixture.raw(id))
+        .collect::<Vec<_>>();
+    fixture
+        .accept(fixture.request(
+            "clips.remove",
+            "right-group-lift",
+            json!({"clip_ids":[right_ids[0]],"mode":"lift","link_policy":"expand"}),
+        ))
+        .await;
+    let read = fixture
+        .service
+        .store
+        .project_read(fixture.project.as_str())
+        .unwrap();
+    for id in &right_ids {
+        assert!(read.raw_entity(id).unwrap().is_none());
+    }
+    for id in &fixture.sources {
+        assert!(read.raw_entity(id).unwrap().is_some());
+    }
     drop(read);
-    fixture.accept(fixture.request("history.undo","right-group-restore",json!({}))).await;
-    for (id,before) in right_ids.iter().zip(right_before) { assert_eq!(fixture.raw(id),before); }
+    fixture
+        .accept(fixture.request("history.undo", "right-group-restore", json!({})))
+        .await;
+    for (id, before) in right_ids.iter().zip(right_before) {
+        assert_eq!(fixture.raw(id), before);
+    }
 
     let different = Fixture::new().await;
-    let mut first=different.entity(&different.clips[0]);
-    let mut second=different.entity(&different.clips[2]);
-    first.references.push(EntityReference { role:"link".into(),target:second.id.clone() });
-    let mut shorter: Clip=second.payload("clip").unwrap();
-    shorter.duration=nw_domain::time::Rational::new(1,2).unwrap();
-    shorter.source_range.end=shorter.duration;
+    let mut first = different.entity(&different.clips[0]);
+    let mut second = different.entity(&different.clips[2]);
+    first.references.push(EntityReference {
+        role: "link".into(),
+        target: second.id.clone(),
+    });
+    let mut shorter: Clip = second.payload("clip").unwrap();
+    shorter.duration = nw_domain::time::Rational::new(1, 2).unwrap();
+    shorter.source_range.end = shorter.duration;
     second.update(&shorter).unwrap();
-    different.install_envelopes(vec![first,second]);
-    let incoming=different.accept(different.move_request(2,1,"incoming-edge-without-group")).await;
-    assert_eq!(incoming["changed_ids"].as_array().unwrap().len(),2);
+    different.install_envelopes(vec![first, second]);
+    let incoming = different
+        .accept(different.move_request(2, 1, "incoming-edge-without-group"))
+        .await;
+    assert_eq!(incoming["changed_ids"].as_array().unwrap().len(), 2);
     different.reject_unchanged(different.request("clips.split","linked-non-interior",json!({"clip_id":different.clips[0],"at_sequence":{"num":"1","den":"1"},"link_policy":"expand"})),"VALIDATION_ERROR").await;
 }
