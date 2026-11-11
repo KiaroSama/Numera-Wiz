@@ -79,13 +79,21 @@ impl Engine {
         deadline.duration()?;
         let canonical = files::source_path(path)?;
         if path.is_absolute() && canonical != path {
-            return Err(DomainError::new("SOURCE_CHANGED", "Admitted probe source now resolves to another native location"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Admitted probe source now resolves to another native location",
+            ));
         }
         let admission_cancel = cancel.clone();
         let input = blocking(move || admission::open(&canonical, &admission_cancel)).await?;
         self.probe_input(input, deadline, cancel).await
     }
-    async fn probe_input(&self, input: admission::Input, deadline: nw_domain::execution::DeadlinePolicy, cancel: CancellationToken) -> Result<MediaProbe> {
+    async fn probe_input(
+        &self,
+        input: admission::Input,
+        deadline: nw_domain::execution::DeadlinePolicy,
+        cancel: CancellationToken,
+    ) -> Result<MediaProbe> {
         let mut args = [
             "-v",
             "error",
@@ -147,10 +155,17 @@ impl Engine {
     ) -> Result<Asset> {
         deadline.duration()?;
         let stamp = blocking(move || {
-            let path = if path.is_absolute() { path } else { files::source_path(&path)? };
+            let path = if path.is_absolute() {
+                path
+            } else {
+                files::source_path(&path)?
+            };
             files::SourceStamp::capture_resolved(&path)
-        }).await?;
-        self.register_held_with_policy(stamp, creator, deadline, 256 * 1024 * 1024 * 1024, cancel).await.map(|(asset, _)| asset)
+        })
+        .await?;
+        self.register_held_with_policy(stamp, creator, deadline, 256 * 1024 * 1024 * 1024, cancel)
+            .await
+            .map(|(asset, _)| asset)
     }
     /// Consume a held, authorized source sequentially for hashes, admission and fd-only probing.
     /// The returned lease remains available for acceptance-time physical/path revalidation.
@@ -175,24 +190,31 @@ impl Engine {
             let input = admission::from_file(stamp.try_clone_file()?, &admission_cancel)?;
             stamp.revalidate()?;
             Ok((input, stamp))
-        }).await?;
+        })
+        .await?;
         let probe = self.probe_input(input, deadline, cancel.clone()).await?;
         let expected = initial.clone();
         let (source_object, stamp) = blocking(move || {
             if stamp.identity_with_limit(&cancel, maximum_source_bytes)? != expected {
-                return Err(DomainError::new("SOURCE_CHANGED", "Reviewed bytes no longer match their identity"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Reviewed bytes no longer match their identity",
+                ));
             }
             Ok((stamp.object_identity()?, stamp))
         })
         .await?;
-        Ok((Asset {
-            source_object: Some(source_object),
-            display_name: String::new(),
-            id: Uuid::new_v4().to_string(),
-            creator,
-            identity: initial,
-            probe,
-        }, stamp))
+        Ok((
+            Asset {
+                source_object: Some(source_object),
+                display_name: String::new(),
+                id: Uuid::new_v4().to_string(),
+                creator,
+                identity: initial,
+                probe,
+            },
+            stamp,
+        ))
     }
     pub fn media_process_capacity(&self) -> (usize, usize, usize) {
         self.process_budget.status()

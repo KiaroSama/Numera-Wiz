@@ -202,9 +202,16 @@ impl Service {
         let input: RegisterFolderInput = commands::parse(request.params.clone())?;
         input.validate()?;
         self.folder_intake_allowed(context)?;
-        let _preflight = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("RESOURCE_LIMIT", "Folder intake and batch preflight capacity is full")
-        })?;
+        let _preflight = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Folder intake and batch preflight capacity is full",
+                )
+            })?;
         let deadline = input
             .probe_timeout
             .unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
@@ -315,8 +322,18 @@ impl Service {
             result,
             &records,
         )?;
-        if response.result.as_ref().and_then(|result| result["id"].as_str()) == Some(scan.snapshot.id.as_str()) {
-            let media_failure_count = scan.snapshot.entries.iter().filter(|entry| entry.kind == FolderEntryKind::Media && entry.error.is_some()).count();
+        if response
+            .result
+            .as_ref()
+            .and_then(|result| result["id"].as_str())
+            == Some(scan.snapshot.id.as_str())
+        {
+            let media_failure_count = scan
+                .snapshot
+                .entries
+                .iter()
+                .filter(|entry| entry.kind == FolderEntryKind::Media && entry.error.is_some())
+                .count();
             tracing::info!(request_id=%request.request_id, snapshot_id=%scan.snapshot.id,
                 snapshot_hash=%scan.snapshot.hash, registered_count=scan.assets.len(),
                 media_failure_count, entry_count=scan.snapshot.entries.len(),
@@ -488,17 +505,31 @@ impl FolderScan<'_> {
                         )),
                     );
                 } else {
-                    let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "Discovered directory needs an ordinary name"))?;
+                    let name = path.file_name().ok_or_else(|| {
+                        DomainError::new(
+                            "PATH_DENIED",
+                            "Discovered directory needs an ordinary name",
+                        )
+                    })?;
                     match stamp.child_directory(name) {
                         Ok(child) => self.visit(Arc::new(child), depth + 1, deadline)?,
                         Err(error) => {
                             if self.cancel.is_cancelled() {
-                                return Err(DomainError::new("CANCELLED", "Folder directory admission cancelled"));
+                                return Err(DomainError::new(
+                                    "CANCELLED",
+                                    "Folder directory admission cancelled",
+                                ));
                             }
                             self.service.folder_intake_allowed(self.context)?;
-                            self.service.root_authority(self.context, &self.root, false)?;
+                            self.service
+                                .root_authority(self.context, &self.root, false)?;
                             self.snapshot.complete = false;
-                            self.row(relative, FolderEntryKind::Directory, FolderEntryOutcome::Rejected, Some(error));
+                            self.row(
+                                relative,
+                                FolderEntryKind::Directory,
+                                FolderEntryOutcome::Rejected,
+                                Some(error),
+                            );
                         }
                     }
                 }
@@ -550,13 +581,18 @@ impl FolderScan<'_> {
                     "Discovered source resolved outside its recorded relative path",
                 ));
             }
-            let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "Discovered source needs an ordinary name"))?;
+            let name = path.file_name().ok_or_else(|| {
+                DomainError::new("PATH_DENIED", "Discovered source needs an ordinary name")
+            })?;
             let stamp = parent.open_child_source(name)?;
             let object = stamp.object_identity()?;
             let source_bytes = stamp.byte_len()?;
             let remaining = MAX_FOLDER_SOURCE_BYTES.saturating_sub(self.source_bytes);
             if source_bytes > remaining {
-                return Err(DomainError::new("RESOURCE_LIMIT", "Folder intake exceeds its 4 GiB aggregate source-size budget"));
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Folder intake exceeds its 4 GiB aggregate source-size budget",
+                ));
             }
             self.source_bytes += source_bytes;
             let (identity, asset, stamp) = if kind == FolderEntryKind::Media {
@@ -583,11 +619,18 @@ impl FolderScan<'_> {
                 asset.display_name = relative.clone();
                 (asset.identity.clone(), Some(asset), stamp)
             } else {
-                (stamp.identity_with_limit(self.cancel, source_bytes)?, None, stamp)
+                (
+                    stamp.identity_with_limit(self.cancel, source_bytes)?,
+                    None,
+                    stamp,
+                )
             };
             stamp.revalidate()?;
             if identity.bytes != source_bytes.to_string() {
-                return Err(DomainError::new("SOURCE_CHANGED", "Source size differs from its held intake reservation"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Source size differs from its held intake reservation",
+                ));
             }
             Ok((identity, object, asset, stamp))
         })();

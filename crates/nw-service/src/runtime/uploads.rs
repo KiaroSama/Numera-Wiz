@@ -420,7 +420,12 @@ mod tests {
         );
         request.replay_scope = Some(scope);
         request.idempotency_key = Some("folder-intake".into());
-        let busy = service.batch_preflights.clone().acquire_many_owned(2).await.unwrap();
+        let busy = service
+            .batch_preflights
+            .clone()
+            .acquire_many_owned(2)
+            .await
+            .unwrap();
         let limited = service.dispatch(owner.clone(), request.clone()).await;
         assert_eq!(limited.error.unwrap().code, "RESOURCE_LIMIT");
         assert!(limited.receipt_id.is_none());

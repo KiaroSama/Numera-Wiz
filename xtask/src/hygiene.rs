@@ -30,8 +30,10 @@ pub fn verify(root: &Path) -> Result<()> {
                 "js", "ts", "tsx", "jsx", "html", "wasm",
             ]
             .contains(&extension)
-                || ["zip", "gz", "tgz", "bz2", "xz", "7z", "exe", "dll", "so", "dylib"]
-                    .contains(&extension)
+                || [
+                    "zip", "gz", "tgz", "bz2", "xz", "7z", "exe", "dll", "so", "dylib",
+                ]
+                .contains(&extension)
         }) {
             bail!("Non-Rust source, a binary payload or an archive is tracked: {name}");
         }

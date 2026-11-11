@@ -682,11 +682,18 @@ mod tests {
                 {"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
     }
     async fn browser_key(client: &reqwest::Client, base: &str, route: &str, key: &str) {
-        driver(client,base,reqwest::Method::POST,&format!("{route}/actions"),json!({
-            "actions":[{"type":"key","id":"keyboard","actions":[
-                {"type":"keyDown","value":key},{"type":"pause","duration":100},
-                {"type":"keyUp","value":key}]}]
-        })).await;
+        driver(
+            client,
+            base,
+            reqwest::Method::POST,
+            &format!("{route}/actions"),
+            json!({
+                "actions":[{"type":"key","id":"keyboard","actions":[
+                    {"type":"keyDown","value":key},{"type":"pause","duration":100},
+                    {"type":"keyUp","value":key}]}]
+            }),
+        )
+        .await;
     }
     async fn observed_folder_command(
         fixture: &Fixture,
@@ -701,7 +708,10 @@ mod tests {
         loop {
             {
                 let mut responses = fixture.observed_reports.lock().await;
-                if let Some(index) = responses.iter().position(|response| response.command_id == command) {
+                if let Some(index) = responses
+                    .iter()
+                    .position(|response| response.command_id == command)
+                {
                     let observed = responses.remove(index).unwrap();
                     assert_ne!(observed.request_id, "local");
                     assert_eq!(observed.status, 200);
@@ -711,8 +721,17 @@ mod tests {
                 }
             }
             if started.elapsed() >= Duration::from_secs(10) {
-                let png = driver(client,base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-                let bytes = base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap();
+                let png = driver(
+                    client,
+                    base,
+                    reqwest::Method::GET,
+                    &format!("{route}/screenshot"),
+                    Value::Null,
+                )
+                .await;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap();
                 std::fs::write(directory.join("folder-input-timeout.png"), &bytes).unwrap();
                 if bytes.len() <= 256 * 1024 {
                     println!("NW_BROWSER_FOLDER_FAILURE_IMAGE:{}", png.as_str().unwrap());
@@ -1627,30 +1646,69 @@ mod tests {
             let folder_source = folder.join("a-registered.mkv");
             std::fs::copy(&media.source, &folder_source).unwrap();
             std::fs::write(folder.join("b-probe-failure.mkv"), b"Invalid media fixture").unwrap();
-            std::fs::write(folder.join("c-companion.txt"), b"Inventory is not copying\n").unwrap();
-            let source_identity = nw_platform::files::identity(&folder_source, &CancellationToken::new()).unwrap();
-            let profile: nw_domain::access::AccessProfile = fixture.owner.service.store.get("profile/browser").unwrap().unwrap();
-            let granted_root = std::fs::canonicalize(&folder).unwrap().to_str().unwrap().to_owned();
+            std::fs::write(
+                folder.join("c-companion.txt"),
+                b"Inventory is not copying\n",
+            )
+            .unwrap();
+            let source_identity =
+                nw_platform::files::identity(&folder_source, &CancellationToken::new()).unwrap();
+            let profile: nw_domain::access::AccessProfile = fixture
+                .owner
+                .service
+                .store
+                .get("profile/browser")
+                .unwrap()
+                .unwrap();
+            let granted_root = std::fs::canonicalize(&folder)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned();
             assert!(!profile.read_roots.contains(&granted_root));
             let mut read_roots = profile.read_roots.clone();
             read_roots.push(granted_root.clone());
             let owner = fixture.owner.service.owner();
-            let scope = fixture.owner.service.dispatch(owner.clone(), nw_domain::commands::Request::query(
-                "access.replay_scope.create", json!({}),
-            )).await;
+            let scope = fixture
+                .owner
+                .service
+                .dispatch(
+                    owner.clone(),
+                    nw_domain::commands::Request::query("access.replay_scope.create", json!({})),
+                )
+                .await;
             assert!(scope.ok);
-            let mut grant = nw_domain::commands::Request::query("access.profiles.update",json!(nw_domain::access::ProfileInput {
-                name: profile.name.clone(), expected_revision: Some(profile.revision),
-                enabled: profile.enabled, client_sessions: profile.client_sessions,
-                mode: profile.mode, owned_object_access: profile.owned_object_access,
-                allowed_command_ids: profile.allowed_command_ids.clone(), object_grants: profile.object_grants.clone(),
-                read_roots, write_roots: profile.write_roots.clone(),
-            }));
-            grant.replay_scope = Some(scope.result.unwrap()["replay_scope"].as_str().unwrap().to_owned());
+            let mut grant = nw_domain::commands::Request::query(
+                "access.profiles.update",
+                json!(nw_domain::access::ProfileInput {
+                    name: profile.name.clone(),
+                    expected_revision: Some(profile.revision),
+                    enabled: profile.enabled,
+                    client_sessions: profile.client_sessions,
+                    mode: profile.mode,
+                    owned_object_access: profile.owned_object_access,
+                    allowed_command_ids: profile.allowed_command_ids.clone(),
+                    object_grants: profile.object_grants.clone(),
+                    read_roots,
+                    write_roots: profile.write_roots.clone(),
+                }),
+            );
+            grant.replay_scope = Some(
+                scope.result.unwrap()["replay_scope"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            );
             grant.idempotency_key = Some("hosted-browser-folder-grant".into());
             let grant = fixture.owner.service.dispatch(owner, grant).await;
             assert!(grant.ok, "{:?}", grant.error);
-            let updated: nw_domain::access::AccessProfile = fixture.owner.service.store.get("profile/browser").unwrap().unwrap();
+            let updated: nw_domain::access::AccessProfile = fixture
+                .owner
+                .service
+                .store
+                .get("profile/browser")
+                .unwrap()
+                .unwrap();
             assert_eq!(updated.principal, profile.principal);
             assert_eq!(updated.write_roots, profile.write_roots);
             assert_eq!(updated.allowed_command_ids, profile.allowed_command_ids);
@@ -1662,24 +1720,71 @@ mod tests {
             // batch leaves the folder header at viewport 276,659.
             browser_click(&client, &base, &route, 276, 659).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-expanded.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-expanded.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             browser_key(&client, &base, &route, "\u{E004}").await;
-            let mut keys = vec![json!({"type":"keyDown","value":"\u{E009}"}),json!({"type":"keyDown","value":"a"}),json!({"type":"keyUp","value":"a"}),json!({"type":"keyUp","value":"\u{E009}"})];
+            let mut keys = vec![
+                json!({"type":"keyDown","value":"\u{E009}"}),
+                json!({"type":"keyDown","value":"a"}),
+                json!({"type":"keyUp","value":"a"}),
+                json!({"type":"keyUp","value":"\u{E009}"}),
+            ];
             for character in folder.to_str().unwrap().chars() {
                 let value = character.to_string();
                 keys.push(json!({"type":"keyDown","value":value}));
                 keys.push(json!({"type":"keyUp","value":value}));
             }
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":keys}]})).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-path.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            driver(
+                &client,
+                &base,
+                reqwest::Method::POST,
+                &format!("{route}/actions"),
+                json!({"actions":[{"type":"key","id":"keyboard","actions":keys}]}),
+            )
+            .await;
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-path.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             for _ in 0..4 {
                 browser_key(&client, &base, &route, "\u{E004}").await;
             }
             browser_key(&client, &base, &route, " ").await;
-            let registration_response = observed_folder_command(&fixture,&client,&base,&route,&directory,"assets.register_folder").await;
-            let snapshot: nw_domain::ingest::FolderReview = serde_json::from_value(registration_response["result"].clone()).unwrap();
+            let registration_response = observed_folder_command(
+                &fixture,
+                &client,
+                &base,
+                &route,
+                &directory,
+                "assets.register_folder",
+            )
+            .await;
+            let snapshot: nw_domain::ingest::FolderReview =
+                serde_json::from_value(registration_response["result"].clone()).unwrap();
             use nw_domain::ingest::FolderEntryOutcome;
             assert!(snapshot.complete);
             assert!(snapshot.scan_error.is_none());
@@ -1687,50 +1792,169 @@ mod tests {
             assert_eq!(snapshot.limits.manifest_entries, 32);
             assert!(!snapshot.input.recursive);
             assert_eq!(snapshot.input.path, folder.to_str().unwrap());
-            let retained: nw_domain::ingest::FolderSnapshot = fixture.owner.service.store.get(&format!("folder/{}",snapshot.id)).unwrap().unwrap();
+            let retained: nw_domain::ingest::FolderSnapshot = fixture
+                .owner
+                .service
+                .store
+                .get(&format!("folder/{}", snapshot.id))
+                .unwrap()
+                .unwrap();
             retained.validate_hash().unwrap();
             assert_eq!(retained.hash, snapshot.hash);
             assert_eq!(retained.creator, updated.principal);
-            let registered = snapshot.entries.iter().find(|entry|entry.relative_path == "a-registered.mkv").unwrap();
+            let registered = snapshot
+                .entries
+                .iter()
+                .find(|entry| entry.relative_path == "a-registered.mkv")
+                .unwrap();
             assert_eq!(registered.outcome, FolderEntryOutcome::Registered);
             let asset_id = registered.asset_id.as_ref().unwrap();
             assert_eq!(registered.identity.as_ref().unwrap(), &source_identity);
-            let failed = snapshot.entries.iter().find(|entry|entry.relative_path == "b-probe-failure.mkv").unwrap();
+            let failed = snapshot
+                .entries
+                .iter()
+                .find(|entry| entry.relative_path == "b-probe-failure.mkv")
+                .unwrap();
             assert_eq!(failed.outcome, FolderEntryOutcome::ProbeFailed);
             assert!(failed.error.is_some());
             assert!(failed.asset_id.is_none());
-            let companion = snapshot.entries.iter().find(|entry|entry.relative_path == "c-companion.txt").unwrap();
+            let companion = snapshot
+                .entries
+                .iter()
+                .find(|entry| entry.relative_path == "c-companion.txt")
+                .unwrap();
             assert_eq!(companion.outcome, FolderEntryOutcome::CompanionInventoried);
             assert!(companion.asset_id.is_none());
-            assert_eq!(companion.identity.as_ref().unwrap(), &nw_platform::files::identity(&folder.join("c-companion.txt"), &CancellationToken::new()).unwrap());
+            assert_eq!(
+                companion.identity.as_ref().unwrap(),
+                &nw_platform::files::identity(
+                    &folder.join("c-companion.txt"),
+                    &CancellationToken::new()
+                )
+                .unwrap()
+            );
             tokio::time::sleep(Duration::from_millis(700)).await;
             browser_key(&client, &base, &route, "\u{E004}").await;
             browser_key(&client, &base, &route, "\u{E004}").await;
             browser_key(&client, &base, &route, " ").await;
-            let inspect_response = observed_folder_command(&fixture,&client,&base,&route,&directory,"assets.folder_inspect").await;
+            let inspect_response = observed_folder_command(
+                &fixture,
+                &client,
+                &base,
+                &route,
+                &directory,
+                "assets.folder_inspect",
+            )
+            .await;
             assert_eq!(inspect_response["result"]["id"], snapshot.id);
             assert_eq!(inspect_response["result"]["hash"], snapshot.hash);
             browser_key(&client, &base, &route, "\u{E004}").await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-snapshot.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-snapshot.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             browser_key(&client, &base, &route, "\u{E004}").await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-registered-entry.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-registered-entry.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"wheel","id":"folder-scroll","actions":[{"type":"scroll","x":700,"y":740,"deltaX":0,"deltaY":480,"duration":400,"origin":"viewport"}]}]})).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-failures-companion.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-failures-companion.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E008}"},{"type":"keyDown","value":"\u{E004}"},{"type":"keyUp","value":"\u{E004}"},{"type":"keyUp","value":"\u{E008}"}]}]})).await;
             browser_key(&client, &base, &route, "\u{E004}").await;
             browser_key(&client, &base, &route, " ").await;
-            let opened_response = observed_folder_command(&fixture,&client,&base,&route,&directory,"assets.inspect").await;
+            let opened_response = observed_folder_command(
+                &fixture,
+                &client,
+                &base,
+                &route,
+                &directory,
+                "assets.inspect",
+            )
+            .await;
             assert_eq!(opened_response["result"]["id"].as_str().unwrap(), asset_id);
-            assert_eq!(opened_response["result"]["identity"], json!(source_identity));
-            assert_eq!(opened_response["result"]["display_name"], "a-registered.mkv");
-            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Asset>("asset/",128).unwrap().len(),3,"Inspect and Open must not register another source");
-            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(),3,"Folder intake and Open must not create media jobs");
+            assert_eq!(
+                opened_response["result"]["identity"],
+                json!(source_identity)
+            );
+            assert_eq!(
+                opened_response["result"]["display_name"],
+                "a-registered.mkv"
+            );
+            assert_eq!(
+                fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Asset>("asset/", 128)
+                    .unwrap()
+                    .len(),
+                3,
+                "Inspect and Open must not register another source"
+            );
+            assert_eq!(
+                fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Job>("job/", 128)
+                    .unwrap()
+                    .len(),
+                3,
+                "Folder intake and Open must not create media jobs"
+            );
             tokio::time::sleep(Duration::from_millis(700)).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-opened-media.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-opened-media.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             std::fs::write(directory.join("folder-intake.json"),serde_json::to_vec_pretty(&json!({
                 "source":crate::web_assets::UI_SOURCE,"registration_response":registration_response,
                 "inspect_response":inspect_response,"opened_response":opened_response,

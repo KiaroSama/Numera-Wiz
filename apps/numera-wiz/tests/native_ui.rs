@@ -676,7 +676,11 @@ async fn journey() {
     let folder_source = folder.join("a-registered.mkv");
     std::fs::copy(&media.source, &folder_source).unwrap();
     std::fs::write(folder.join("b-probe-failure.mkv"), b"Invalid media fixture").unwrap();
-    std::fs::write(folder.join("c-companion.txt"), b"Inventory is not copying\n").unwrap();
+    std::fs::write(
+        folder.join("c-companion.txt"),
+        b"Inventory is not copying\n",
+    )
+    .unwrap();
     let source_identity =
         nw_platform::files::identity(&folder_source, &CancellationToken::new()).unwrap();
     let after = std::fs::read_to_string(root.join("logs/owner.jsonl"))
@@ -778,10 +782,18 @@ async fn journey() {
     screenshot(&window, &evidence.join("native-folder-snapshot.png")).await;
     input(&["key", "--clearmodifiers", "Tab"]).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
-    screenshot(&window, &evidence.join("native-folder-registered-entry.png")).await;
+    screenshot(
+        &window,
+        &evidence.join("native-folder-registered-entry.png"),
+    )
+    .await;
     input(&["mousemove", "--window", &window, "700", "740"]).await;
     input(&["click", "--repeat", "6", "--delay", "100", "5"]).await;
-    screenshot(&window, &evidence.join("native-folder-failures-companion.png")).await;
+    screenshot(
+        &window,
+        &evidence.join("native-folder-failures-companion.png"),
+    )
+    .await;
     input(&["key", "--clearmodifiers", "shift+Tab"]).await;
     input(&["key", "--clearmodifiers", "Tab"]).await;
     let after_open = std::fs::read_to_string(root.join("logs/owner.jsonl"))

@@ -35,7 +35,10 @@ pub fn source_path(path: &Path) -> Result<PathBuf> {
 pub fn open_regular_read(path: &Path) -> Result<File> {
     let canonical = source_path(path)?;
     if path.is_absolute() && canonical != path {
-        return Err(DomainError::new("SOURCE_CHANGED", "Admitted source pathname now resolves to another object location"));
+        return Err(DomainError::new(
+            "SOURCE_CHANGED",
+            "Admitted source pathname now resolves to another object location",
+        ));
     }
     open_regular_handle(&canonical)
 }
@@ -43,11 +46,16 @@ fn open_regular_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
     let file = {
         use rustix::fs::{Mode, OFlags};
-        let parent = path.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "A source parent is required"))?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| DomainError::new("PATH_DENIED", "A source parent is required"))?;
         let directory = open_directory_handle(parent)?;
-        let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "A source filename is required"))?;
+        let name = path
+            .file_name()
+            .ok_or_else(|| DomainError::new("PATH_DENIED", "A source filename is required"))?;
         let descriptor = rustix::fs::openat(
-            &directory, name,
+            &directory,
+            name,
             OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
             Mode::empty(),
         )
@@ -187,7 +195,13 @@ fn identity_observed(
     on_bytes(0)?;
     let canonical = source_path(path)?;
     let mut file = open_regular_handle(&canonical)?;
-    identity_opened_observed(canonical, &mut file, cancel, 256 * 1024 * 1024 * 1024, on_bytes)
+    identity_opened_observed(
+        canonical,
+        &mut file,
+        cancel,
+        256 * 1024 * 1024 * 1024,
+        on_bytes,
+    )
 }
 fn identity_opened_observed(
     canonical: PathBuf,
@@ -205,7 +219,10 @@ fn identity_opened_observed(
         ));
     }
     if before.len() > maximum_bytes {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Opened source exceeds its admitted identity byte budget"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Opened source exceeds its admitted identity byte budget",
+        ));
     }
     let mut hash = Sha256::new();
     let mut buffer = vec![0; 1024 * 1024];
@@ -250,10 +267,16 @@ fn identity_opened_observed(
 }
 pub fn revalidate(expected: &FileIdentity, cancel: &CancellationToken) -> Result<()> {
     let bytes = expected.bytes.parse::<u64>().map_err(|_| {
-        DomainError::new("INVALID_IDENTITY", "Expected source length must be a decimal string")
+        DomainError::new(
+            "INVALID_IDENTITY",
+            "Expected source length must be a decimal string",
+        )
     })?;
     if bytes.to_string() != expected.bytes {
-        return Err(DomainError::new("INVALID_IDENTITY", "Expected source length must be canonical"));
+        return Err(DomainError::new(
+            "INVALID_IDENTITY",
+            "Expected source length must be canonical",
+        ));
     }
     // A frozen path is already canonical. Do not normalize a new alias and read
     // another location before discovering that its identity differs.
@@ -365,9 +388,19 @@ impl DirectoryStamp {
         #[cfg(unix)]
         let file = {
             use rustix::fs::{Mode, OFlags};
-            File::from(rustix::fs::openat(&self.file, name,
-                OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
-                Mode::empty()).map_err(io_error)?)
+            File::from(
+                rustix::fs::openat(
+                    &self.file,
+                    name,
+                    OFlags::RDONLY
+                        | OFlags::NOFOLLOW
+                        | OFlags::NONBLOCK
+                        | OFlags::CLOEXEC
+                        | OFlags::NOCTTY,
+                    Mode::empty(),
+                )
+                .map_err(io_error)?,
+            )
         };
         #[cfg(not(unix))]
         let file = open_regular_handle(&self.path.join(name))?;
@@ -382,13 +415,23 @@ impl DirectoryStamp {
         #[cfg(unix)]
         let file = {
             use rustix::fs::{Mode, OFlags};
-            File::from(rustix::fs::openat(&self.file, name,
-                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-                Mode::empty()).map_err(io_error)?)
+            File::from(
+                rustix::fs::openat(
+                    &self.file,
+                    name,
+                    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                    Mode::empty(),
+                )
+                .map_err(io_error)?,
+            )
         };
         #[cfg(not(unix))]
         let file = open_directory_handle(&self.path.join(name))?;
-        let child = Self { path: self.path.join(name), object: native_object(&file)?, file };
+        let child = Self {
+            path: self.path.join(name),
+            object: native_object(&file)?,
+            file,
+        };
         child.revalidate()?;
         self.revalidate()?;
         Ok(child)
@@ -396,11 +439,21 @@ impl DirectoryStamp {
 }
 fn child_name(name: &std::ffi::OsStr) -> Result<()> {
     let mut parts = Path::new(name).components();
-    if !matches!(parts.next(), Some(std::path::Component::Normal(part)) if part == name) || parts.next().is_some() {
-        return Err(DomainError::new("PATH_DENIED", "A held parent accepts exactly one ordinary child name"));
+    if !matches!(parts.next(), Some(std::path::Component::Normal(part)) if part == name)
+        || parts.next().is_some()
+    {
+        return Err(DomainError::new(
+            "PATH_DENIED",
+            "A held parent accepts exactly one ordinary child name",
+        ));
     }
     #[cfg(windows)]
-    windows_output_name(name.to_str().ok_or_else(|| DomainError::new("NATIVE_PATH_UNAVAILABLE", "A child name must be representable"))?)?;
+    windows_output_name(name.to_str().ok_or_else(|| {
+        DomainError::new(
+            "NATIVE_PATH_UNAVAILABLE",
+            "A child name must be representable",
+        )
+    })?)?;
     Ok(())
 }
 fn directory_changed(error: impl std::fmt::Display) -> DomainError {
@@ -413,16 +466,28 @@ fn open_directory_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
     let file = {
         use rustix::fs::{Mode, OFlags};
-        if !path.is_absolute() { return Err(DomainError::new("PATH_DENIED", "An absolute directory is required")); }
+        if !path.is_absolute() {
+            return Err(DomainError::new(
+                "PATH_DENIED",
+                "An absolute directory is required",
+            ));
+        }
         let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
-        let mut descriptor = rustix::fs::open(Path::new("/"), flags, Mode::empty()).map_err(io_error)?;
+        let mut descriptor =
+            rustix::fs::open(Path::new("/"), flags, Mode::empty()).map_err(io_error)?;
         for part in path.components() {
             match part {
-                std::path::Component::RootDir => {},
+                std::path::Component::RootDir => {}
                 std::path::Component::Normal(name) => {
-                    descriptor = rustix::fs::openat(&descriptor, name, flags, Mode::empty()).map_err(io_error)?;
+                    descriptor = rustix::fs::openat(&descriptor, name, flags, Mode::empty())
+                        .map_err(io_error)?;
                 }
-                _ => return Err(DomainError::new("PATH_DENIED", "Directory ancestry must contain ordinary components only")),
+                _ => {
+                    return Err(DomainError::new(
+                        "PATH_DENIED",
+                        "Directory ancestry must contain ordinary components only",
+                    ));
+                }
             }
         }
         File::from(descriptor)
@@ -531,9 +596,16 @@ impl SourceStamp {
         self.handle.as_file().try_clone().map_err(io_error)
     }
     /// Hash only the retained source handle. Path checks never select the content reader.
-    pub fn identity_with_limit(&self, cancel: &CancellationToken, maximum_bytes: u64) -> Result<FileIdentity> {
+    pub fn identity_with_limit(
+        &self,
+        cancel: &CancellationToken,
+        maximum_bytes: u64,
+    ) -> Result<FileIdentity> {
         let mut file = self.try_clone_file()?;
-        let identity = identity_opened_observed(self.path.clone(), &mut file, cancel, maximum_bytes, |_| Ok(()))?;
+        let identity =
+            identity_opened_observed(self.path.clone(), &mut file, cancel, maximum_bytes, |_| {
+                Ok(())
+            })?;
         self.revalidate()?;
         Ok(identity)
     }
@@ -1085,7 +1157,9 @@ mod tests {
         let parent = fs::canonicalize(parent).unwrap();
         let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
         fs::write(parent.join("source.bin"), b"reviewed source bytes").unwrap();
-        let source = stamp.open_child_source(std::ffi::OsStr::new("source.bin")).unwrap();
+        let source = stamp
+            .open_child_source(std::ffi::OsStr::new("source.bin"))
+            .unwrap();
         let mut held_reader = source.try_clone_file().unwrap();
         fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
         fs::create_dir(&parent).unwrap();
@@ -1109,8 +1183,21 @@ mod tests {
         fs::remove_file(parent.join("unreviewed.mkv")).unwrap();
         fs::remove_dir(&parent).unwrap();
         std::os::unix::fs::symlink(&outside, &parent).unwrap();
-        assert_eq!(stamp.open_child_source(std::ffi::OsStr::new("source.bin")).err().unwrap().code, "TARGET_CHANGED");
-        assert_eq!(source.identity_with_limit(&CancellationToken::new(), 1024).unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(
+            stamp
+                .open_child_source(std::ffi::OsStr::new("source.bin"))
+                .err()
+                .unwrap()
+                .code,
+            "TARGET_CHANGED"
+        );
+        assert_eq!(
+            source
+                .identity_with_limit(&CancellationToken::new(), 1024)
+                .unwrap_err()
+                .code,
+            "SOURCE_CHANGED"
+        );
         assert!(open_regular_read(&parent.join("source.bin")).is_err());
         held_reader.seek(SeekFrom::Start(0)).unwrap();
         let mut bytes = Vec::new();
@@ -1165,11 +1252,25 @@ mod tests {
             })
             .unwrap();
         fs::create_dir(parent.join("nested")).unwrap();
-        let nested = stamp.child_directory(std::ffi::OsStr::new("nested")).unwrap();
+        let nested = stamp
+            .child_directory(std::ffi::OsStr::new("nested"))
+            .unwrap();
         fs::write(parent.join("nested/source.bin"), b"held child").unwrap();
-        let child = nested.open_child_source(std::ffi::OsStr::new("source.bin")).unwrap();
-        assert_eq!(child.identity_with_limit(&CancellationToken::new(), 10).unwrap().sha256, hex::encode(Sha256::digest(b"held child")));
-        assert!(nested.open_child_source(std::ffi::OsStr::new("../source.bin")).is_err());
+        let child = nested
+            .open_child_source(std::ffi::OsStr::new("source.bin"))
+            .unwrap();
+        assert_eq!(
+            child
+                .identity_with_limit(&CancellationToken::new(), 10)
+                .unwrap()
+                .sha256,
+            hex::encode(Sha256::digest(b"held child"))
+        );
+        assert!(
+            nested
+                .open_child_source(std::ffi::OsStr::new("../source.bin"))
+                .is_err()
+        );
     }
     #[test]
     fn original_object_survives_handle_drop_but_rejects_identical_replacement() {
@@ -1259,7 +1360,13 @@ mod tests {
         let bytes = expected.bytes.parse::<u64>().unwrap();
         assert_eq!(stamp.byte_len().unwrap(), bytes);
         assert_eq!(stamp.identity_with_limit(&cancel, bytes).unwrap(), expected);
-        assert_eq!(stamp.identity_with_limit(&cancel, bytes - 1).unwrap_err().code, "RESOURCE_LIMIT");
+        assert_eq!(
+            stamp
+                .identity_with_limit(&cancel, bytes - 1)
+                .unwrap_err()
+                .code,
+            "RESOURCE_LIMIT"
+        );
         revalidate(&expected, &cancel).unwrap();
         fs::rename(&source, root.path().join("retained-original.bin")).unwrap();
         fs::write(
@@ -1274,7 +1381,10 @@ mod tests {
         assert_eq!(stamp.byte_len().unwrap_err().code, "SOURCE_CHANGED");
         // The bound applies again to a later identity pass, before it hashes replacement bytes.
         fs::write(&source, vec![0; bytes as usize + 1]).unwrap();
-        assert_eq!(revalidate(&expected, &cancel).unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(
+            revalidate(&expected, &cancel).unwrap_err().code,
+            "SOURCE_CHANGED"
+        );
     }
     #[test]
     fn a_preopened_original_cannot_be_bound_to_a_replacement_at_its_old_path() {
