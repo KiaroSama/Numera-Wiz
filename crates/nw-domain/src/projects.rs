@@ -1,5 +1,6 @@
 //! Exact, bounded project records. Payload JSON remains opaque until a known codec is needed.
 pub mod edit;
+mod json;
 pub mod views;
 use crate::{DomainError, Result, time::Rational};
 use schemars::JsonSchema;
@@ -279,8 +280,7 @@ impl EntityEnvelope {
         {
             return Err(limit("Entity payload or reference budget exceeded"));
         }
-        let _: Box<RawValue> =
-            serde_json::from_str(&self.payload_json).map_err(|e| invalid(e.to_string()))?;
+        json::validate(&self.payload_json)?;
         if hash(self.payload_json.as_bytes()) != self.payload_sha256 {
             return Err(DomainError::new(
                 "PROJECT_CORRUPT",
@@ -294,14 +294,16 @@ impl EntityEnvelope {
             && self.kind_version == 1
             && ["bin", "sequence", "track", "clip", "source_binding"].contains(&self.kind.as_str())
     }
-    pub fn semantics(&self) -> Result<()> {
-        if self.envelope_version != 1
-            || !["project", "sequence", "track", "entity", "annotation"]
+    pub fn envelope_semantics_supported(&self) -> bool {
+        self.envelope_version == 1
+            && ["project", "sequence", "track", "entity", "annotation"]
                 .contains(&self.semantic_scope.as_str())
-            || self.references.iter().any(|r| {
-                !["ownership", "semantic_input", "source", "link"].contains(&r.role.as_str())
+            && self.references.iter().all(|r| {
+                ["ownership", "semantic_input", "source", "link"].contains(&r.role.as_str())
             })
-        {
+    }
+    pub fn semantics(&self) -> Result<()> {
+        if !self.envelope_semantics_supported() {
             return Err(DomainError::new(
                 "PROJECT_READ_ONLY",
                 "Unsupported envelope reference/scope semantics",
@@ -327,15 +329,19 @@ impl EntityEnvelope {
     }
     /// Overlay only known top-level fields; opaque extension values retain their original number/text bytes.
     pub fn update(&mut self, payload: &impl Serialize) -> Result<()> {
+        self.validate()?;
         let mut original: BTreeMap<String, Box<RawValue>> =
             serde_json::from_str(&self.payload_json).map_err(|e| invalid(e.to_string()))?;
         let encoded = serde_json::to_string(payload).map_err(|e| invalid(e.to_string()))?;
         let fields: BTreeMap<String, Box<RawValue>> =
             serde_json::from_str(&encoded).map_err(|e| invalid(e.to_string()))?;
         original.extend(fields);
-        self.payload_json = serde_json::to_string(&original).map_err(|e| invalid(e.to_string()))?;
-        self.payload_sha256 = hash(self.payload_json.as_bytes());
-        self.validate()
+        let mut candidate = self.clone();
+        candidate.payload_json = serde_json::to_string(&original).map_err(|e| invalid(e.to_string()))?;
+        candidate.payload_sha256 = hash(candidate.payload_json.as_bytes());
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
     }
     pub fn bytes(&self) -> Result<String> {
         let raw = serde_json::to_string(self).map_err(|e| invalid(e.to_string()))?;

@@ -139,7 +139,9 @@ impl<R: ProjectRead> Edit<'_, R> {
         }
         grid_tick(clip.sequence_start, track.grid)?;
         grid_tick(clip.end()?, track.grid)?;
-        let source: SourceBinding = self.get(&clip.source_id)?.payload("source_binding")?;
+        let source_entity = self.get(&clip.source_id)?;
+        source_entity.semantics()?;
+        let source: SourceBinding = source_entity.payload("source_binding")?;
         source_valid(&source, &clip.source_range, track.kind)?;
         Ok(track)
     }
@@ -356,7 +358,12 @@ pub fn resolve_edit<R: ProjectRead>(
                     "Move requires collision:reject and link_policy:expand",
                 ));
             }
-            for mut entity in expand_links(read, &input.clip_ids)? {
+            let selected = expand_links(read, &input.clip_ids)?;
+            if input.delta == Rational::ZERO {
+                validate_unchanged(read, &selected)?;
+                return edit.finish(json!({}));
+            }
+            for mut entity in selected {
                 let mut clip: Clip = entity.payload("clip")?;
                 edit.clip_context(&clip)?;
                 clip.sequence_start = clip.sequence_start.checked_add(input.delta)?;
@@ -372,6 +379,7 @@ pub fn resolve_edit<R: ProjectRead>(
             }
             let primary: Clip = read.entity(&input.clip_id)?.payload("clip")?;
             if input.at_sequence == primary.sequence_start || input.at_sequence == primary.end()? {
+                validate_unchanged(read, &expand_links(read, std::slice::from_ref(&input.clip_id))?)?;
                 return edit.finish(json!({"clip_ids":[],"no_change":true}));
             }
             let mut right_ids = Vec::new();
@@ -446,58 +454,76 @@ pub fn resolve_edit<R: ProjectRead>(
     };
     edit.finish(created)
 }
-/// Check only the affected semantic closure. Ownership visits ancestors, never sibling clips.
+// Validate a semantic no-op against the same complete closure without rewriting its bytes.
+fn validate_unchanged<R: ProjectRead>(read: &R, selected: &[EntityEnvelope]) -> Result<()> {
+    let changes = selected.iter().map(|entity| {
+        let raw = read.raw_entity(&entity.id)?.ok_or_else(DomainError::object_not_found)?;
+        Ok(EntityChange { id:entity.id.clone(), before:Some(raw.clone()), after:Some(raw) })
+    }).collect::<Result<Vec<_>>>()?;
+    let patch = ProjectPatch { changes };
+    check_compatibility(read, &patch)?;
+    validate_patch_clips(read, &patch)
+}
+/// Check both images of the affected closure. Ownership visits ancestors, never siblings.
 pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Result<()> {
     read.header().writable()?;
     let mut queue: VecDeque<_> = patch.changes.iter().map(|c| c.id.clone()).collect();
     queue.push_back(read.header().root_bin_id.clone());
     let mut seen = BTreeSet::new();
     while let Some(id) = queue.pop_front() {
-        if !seen.insert(id.clone()) {
-            continue;
-        }
+        if !seen.insert(id.clone()) { continue; }
         if seen.len() > MAX_CLOSURE {
             return Err(limit("Affected semantic closure exceeds 256 entities"));
         }
-        let raw = patch
-            .changes
-            .iter()
-            .find(|c| c.id == id)
-            .and_then(|c| c.before.as_ref().or(c.after.as_ref()))
-            .cloned()
-            .or(read.raw_entity(&id)?);
-        if let Some(raw) = raw {
-            let entity: EntityEnvelope =
-                serde_json::from_str(&raw).map_err(|e| invalid(e.to_string()))?;
+        let images = if let Some(change) = patch.changes.iter().find(|c| c.id == id) {
+            change.before.iter().map(|raw| (raw.clone(), false)).chain(change.after.iter().map(|raw| (raw.clone(), true))).collect::<Vec<_>>()
+        } else {
+            vec![(read.raw_entity(&id)?.ok_or_else(DomainError::object_not_found)?, true)]
+        };
+        if images.is_empty() { return Err(DomainError::object_not_found()); }
+        for (raw, after_image) in images {
+            let entity: EntityEnvelope = serde_json::from_str(&raw).map_err(|e| invalid(e.to_string()))?;
+            if entity.id != id || entity.project_id != read.header().id {
+                return Err(DomainError::new("PROJECT_CORRUPT", "Affected entity identity differs"));
+            }
             entity.validate()?;
             entity.semantics()?;
+            let mut required = Vec::new();
             let locked = if entity.known() {
                 match entity.kind.as_str() {
                     "bin" => entity.payload::<Bin>("bin")?.locked,
                     "sequence" => entity.payload::<Sequence>("sequence")?.locked,
-                    "track" => entity.payload::<Track>("track")?.locked,
-                    "clip" => entity.payload::<Clip>("clip")?.locked,
+                    "track" => {
+                        let track: Track = entity.payload("track")?;
+                        required.push(track.sequence_id);
+                        track.locked
+                    }
+                    "clip" => {
+                        let clip: Clip = entity.payload("clip")?;
+                        required.extend([clip.sequence_id, clip.track_id, clip.source_id]);
+                        // A link-group identity is an index key, not a required entity row.
+                        if let Some(group) = clip.link_group_id {
+                            queue.extend(read.dependents(&group, MAX_CLOSURE)?);
+                        }
+                        clip.locked
+                    }
                     _ => false,
                 }
-            } else {
-                false
-            };
+            } else { false };
             if locked {
-                return Err(DomainError::new(
-                    "ENTITY_LOCKED",
-                    "Affected ownership/semantic closure contains a locked entity",
-                ));
+                return Err(DomainError::new("ENTITY_LOCKED", "Affected ownership/semantic closure contains a locked entity"));
             }
-            if let Some(owner) = entity.owner_id {
-                queue.push_back(owner);
+            required.extend(entity.owner_id);
+            required.extend(entity.references.into_iter().map(|r| r.target));
+            // Before images can refer to jointly deleted entities, while after images
+            // must refer to entities that actually survive or are inserted by this patch.
+            for target in required {
+                let exists = if let Some(change) = patch.changes.iter().find(|c| c.id == target) {
+                    if after_image { change.after.is_some() } else { change.before.is_some() }
+                } else { read.raw_entity(&target)?.is_some() };
+                if !exists { return Err(DomainError::object_not_found()); }
+                queue.push_back(target);
             }
-            queue.extend(
-                entity
-                    .references
-                    .into_iter()
-                    .filter(|r| r.role == "semantic_input" || r.role == "link")
-                    .map(|r| r.target),
-            );
         }
         queue.extend(read.dependents(&id, MAX_CLOSURE)?);
     }

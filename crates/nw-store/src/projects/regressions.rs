@@ -336,7 +336,7 @@ fn retained_reference_branch() {
         sources.push(EntityId::parse(placed["created"]["source_id"].as_str().unwrap()).unwrap());
     }
     // Every original operation is admitted through the real resolver and receipt transaction.
-    for pair in clips.chunks_exact(2) {
+    for pair in clips.as_chunks::<2>().0 {
         fixture.apply(ProjectEditIntent::Move(MoveInput {
             clip_ids: pair.to_vec(),
             delta: Rational::new(1, 4).unwrap(),

@@ -7,6 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const HISTORY_OPERATIONS: usize = 256;
 const HISTORY_BYTES: usize = 32 * 1024 * 1024;
+// Reserve three quarters of the unchanged 512 index/reference-write allowance
+// for a branch edit. Evict complete oldest originals; never drop current sources.
+const HISTORY_SOURCES: usize = MAX_INDEX_WRITES / 4;
 const JOURNAL_OPERATIONS: u64 = 512;
 const PROJECT_GENERATION_LIMIT: u64 = 48000;
 const PAGE_BYTES: usize = 240 * 1024;
@@ -302,11 +305,12 @@ impl Store {
                         let bytes = encode(&stored)?;
                         if bytes.len() > MAX_PATCH_BYTES { return Err(domain::limit("Original patch exceeds 128 KiB")); }
                         let source_ids = patch_sources(&prepared.patch)?;
+                        if source_ids.len() > HISTORY_SOURCES { return Err(domain::limit("One original operation exceeds retained source headroom")); }
                         for id in &source_ids { *retained_delta.entry(id.clone()).or_default() += 1; }
                         history.retained_bytes += bytes.len();
                         history.undo.push(HistoryEntry { id: prepared.operation_id.clone(), revision: header.revision, bytes: bytes.len(), source_ids });
                         rows.insert(format!("project-patch/{project}/{}", prepared.operation_id), Some(bytes));
-                        while history.undo.len() + history.redo.len() > HISTORY_OPERATIONS || history.retained_bytes > HISTORY_BYTES {
+                        while history.undo.len() + history.redo.len() > HISTORY_OPERATIONS || history.retained_bytes > HISTORY_BYTES || retained_source_count(&history) > HISTORY_SOURCES {
                             let entry = history.undo.remove(0); history.retained_bytes -= entry.bytes; history.history_floor = header.revision.0;
                             rows.insert(format!("project-patch/{project}/{}", entry.id), None);
                             for id in entry.source_ids { *retained_delta.entry(id).or_default() -= 1; }
@@ -345,6 +349,8 @@ impl Store {
                     }
                 }
             }
+            live_delta.retain(|_, delta| *delta != 0);
+            retained_delta.retain(|_, delta| *delta != 0);
             let sources: BTreeSet<_> = live_delta.keys().chain(retained_delta.keys()).cloned().collect();
             for source in sources {
                 let key = format!("project-reference/{project}/{source}");
@@ -379,6 +385,9 @@ impl Store {
             else { Ok(json!({"project_id":project,"base_revision":base,"revision":header.revision,"operation_id":prepared.operation_id,"created":prepared.created,"changed_ids":prepared.patch.changes.iter().map(|c|&c.id).collect::<Vec<_>>(),"history":history.summary()})) }
         })
     }
+}
+fn retained_source_count(history: &ProjectHistory) -> usize {
+    history.undo.iter().chain(&history.redo).flat_map(|entry| entry.source_ids.iter()).collect::<BTreeSet<_>>().len()
 }
 fn patch_sources(patch: &ProjectPatch) -> Result<Vec<EntityId>> {
     let mut ids = BTreeSet::new();
@@ -484,34 +493,61 @@ fn index_rows(
             ));
         }
     }
-    if !entity.known() {
-        let targets: Vec<_> = if entity.envelope_version != 1
-            || !["project", "sequence", "track", "entity", "annotation"]
-                .contains(&entity.semantic_scope.as_str())
-            || entity.references.iter().any(|r| {
-                !["ownership", "semantic_input", "source", "link"].contains(&r.role.as_str())
-            })
-            || entity.semantic_scope == "project"
-        {
-            vec![header.root_bin_id.clone()]
-        } else if entity.semantic_scope == "annotation" {
-            Vec::new()
-        } else {
-            entity
-                .owner_id
-                .iter()
-                .cloned()
-                .chain(entity.references.iter().map(|r| r.target.clone()))
-                .collect()
-        };
-        for target in targets {
-            rows.push((
-                format!("project-dependency/{project}/{target}/{}", entity.id),
-                encode(&entity.id)?,
-            ));
+    let targets = if !entity.envelope_semantics_supported() {
+        // Envelope support is independent of whether a payload codec is known.
+        vec![header.root_bin_id.clone()]
+    } else if !entity.known() && entity.enabled && entity.semantic_scope != "annotation" {
+        match entity.semantic_scope.as_str() {
+            "project" => vec![header.root_bin_id.clone()],
+            "track" | "sequence" => {
+                let mut targets = BTreeSet::new();
+                let mut ancestors = BTreeMap::new();
+                for target in entity.owner_id.iter().chain(entity.references.iter().map(|r| &r.target)) {
+                    targets.insert(scope_ancestor(table, header, target, &entity.semantic_scope, changes, after, &mut ancestors)?);
+                }
+                if targets.is_empty() { return Err(domain::invalid("Scoped semantic node requires an ancestor target")); }
+                targets.into_iter().collect()
+            }
+            _ => entity.owner_id.iter().cloned().chain(entity.references.iter().map(|r| r.target.clone())).collect(),
         }
+    } else { Vec::new() };
+    for target in targets {
+        rows.push((format!("project-dependency/{project}/{target}/{}", entity.id), encode(&entity.id)?));
     }
     Ok(rows)
+}
+// Resolve declared scope through bounded ownership, including newly prepared ancestors.
+fn scope_ancestor(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    header: &ProjectHeader,
+    target: &EntityId,
+    kind: &str,
+    changes: &BTreeMap<EntityId, EntityPair>,
+    after: bool,
+    ancestors: &mut BTreeMap<EntityId, EntityEnvelope>,
+) -> Result<EntityId> {
+    let mut next = target.clone();
+    let mut seen = BTreeSet::new();
+    loop {
+        if !seen.insert(next.clone()) { return Err(domain::invalid("Semantic scope ownership cycle")); }
+        if seen.len() > MAX_CLOSURE { return Err(domain::limit("Semantic scope ancestor budget exceeded")); }
+        let entity = if let Some(entity) = ancestors.get(&next) {
+            entity.clone()
+        } else {
+            if ancestors.len() >= MAX_CLOSURE { return Err(domain::limit("Declared scope targets exceed 256 ancestors")); }
+            let entity: EntityEnvelope = if let Some((before, following)) = changes.get(&next) {
+                (if after { following } else { before }).clone().ok_or_else(DomainError::object_not_found)?
+            } else {
+                table_value(table, &entity_key(&header.id, &next))?.ok_or_else(DomainError::object_not_found)?
+            };
+            ancestors.insert(next.clone(), entity.clone());
+            entity
+        };
+        if entity.id != next || entity.project_id != header.id { return Err(domain::invalid("Semantic scope target identity differs")); }
+        entity.validate()?;
+        if entity.kind == kind { return Ok(next); }
+        next = entity.owner_id.ok_or_else(|| domain::invalid("Declared semantic scope has no matching ancestor"))?;
+    }
 }
 impl ProjectReadSnapshot {
     pub fn header(&self) -> &ProjectHeader {

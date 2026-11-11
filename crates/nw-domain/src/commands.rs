@@ -641,6 +641,9 @@ mod tests {
         assert!(entity.payload_json.contains("900719925474099312345678901"));
         assert!(entity.payload_json.contains("0.123456789012345678901"));
         assert_eq!(entity.payload::<Bin>("bin").unwrap().member_count, 1);
+        let original = entity.bytes().unwrap();
+        assert!(entity.update(&serde_json::json!({"oversized": "x".repeat(crate::projects::MAX_PAYLOAD_BYTES)})).is_err());
+        assert_eq!(entity.bytes().unwrap(), original, "A rejected overlay must retain the exact original envelope");
         // I5: opaque extensions must reject ambiguity before any known-field overlay.
         let mut duplicate_failures = Vec::new();
         for (case, payload) in [
@@ -655,6 +658,10 @@ mod tests {
             (
                 "nested_array",
                 r#"{"member_count":0,"locked":false,"future":[{"a":1,"a":2}]}"#,
+            ),
+            (
+                "escaped_duplicate",
+                r#"{"member_count":0,"locked":false,"future":{"a":1,"\u0061":2}}"#,
             ),
         ] {
             let mut ambiguous = entity.clone();

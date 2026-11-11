@@ -533,3 +533,97 @@ impl Service {
         });
     }
 }
+
+#[cfg(test)]
+pub(super) async fn exercise_real_snapshot_lifetime() {
+    use nw_domain::commands::ProjectRef;
+    let temporary = tempfile::tempdir().unwrap();
+    let service = Service::open(temporary.path().join("data"), None).await.unwrap();
+    let context = service.owner();
+    let scope = service.store.issue_scope_with_clock(&context.principal, || service.clock.now()).unwrap();
+    let mut create = Request::query("projects.create", json!({"name":"Actual MVCC lifetime"}));
+    create.replay_scope = Some(scope.clone());
+    create.idempotency_key = Some("cow-create".into());
+    let created = service.dispatch(context.clone(),create).await;
+    assert!(created.ok,"{:?}",created.error);
+    let created = created.result.unwrap();
+    let project = created["project_id"].as_str().unwrap();
+    let bin = created["root_bin_id"].as_str().unwrap();
+    let sequence = |revision: u64| {
+        let mut request = Request::query("sequences.create",json!({"name":format!("Sequence {revision}"),"settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}));
+        request.project = Some(ProjectRef { id:project.into(), expected_revision:Some(revision.to_string()) });
+        request.replay_scope = Some(scope.clone());
+        request.idempotency_key = Some(format!("cow-sequence-{revision}"));
+        request
+    };
+    for revision in 0..2 {
+        let response = service.dispatch(context.clone(),sequence(revision)).await;
+        assert!(response.ok,"{:?}",response.error);
+    }
+    let blob = "x".repeat(512 * 1024);
+    service.store.put("unit/project-cow-churn",&json!({"iteration":0,"bytes":blob})).unwrap();
+    let page_request = |cursor: Option<Value>| {
+        let mut request = Request::query("projects.inspect",json!({"projection":"bin_page","bin_id":bin,"limit":1,"cursor":cursor}));
+        request.project = Some(ProjectRef { id:project.into(), expected_revision:None });
+        request
+    };
+    let first = service.dispatch(context.clone(),page_request(None)).await;
+    assert!(first.ok,"{:?}",first.error);
+    let first = first.result.unwrap();
+    let ticket = first["snapshot_id"].as_str().unwrap().to_owned();
+    assert_eq!(service.store.close_generation(&service.root_lease).unwrap_err().code,"OWNER_BUSY");
+    let moved = service.dispatch(context.clone(),sequence(2)).await;
+    assert!(moved.ok,"{:?}",moved.error);
+    let old_page = service.dispatch(context.clone(),page_request(Some(first["next_cursor"].clone()))).await;
+    assert!(old_page.ok,"{:?}",old_page.error);
+    let old_page = old_page.result.unwrap();
+    assert_eq!(old_page["project_revision"],"2");
+    assert_eq!(old_page["total_count"],2);
+    assert_eq!(service.store.project_read(project).unwrap().header().revision,Revision(3));
+    let baseline = service.snapshots.lock().unwrap().projects[&ticket].generation_bytes;
+    let growth_created = service.snapshots.lock().unwrap().projects[&ticket].created;
+    let mut observed_growth = false;
+    // Real ordinary writes retain old redb pages. No synthetic pressure argument is used.
+    for iteration in 1..=128 {
+        service.store.put("unit/project-cow-churn",&json!({"iteration":iteration,"bytes":blob})).unwrap();
+        observed_growth |= service.store.project_generation_bytes().unwrap().saturating_sub(baseline) > 32 * 1024 * 1024;
+        if observed_growth { break; }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(observed_growth,"Write fixture must actually grow the retained generation beyond the observation threshold");
+    tokio::time::timeout(Duration::from_secs(4),async {
+        loop {
+            if !service.snapshots.lock().unwrap().projects.contains_key(&ticket) { break; }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }).await.expect("Background growth observation must release the actual read");
+    assert!(growth_created.elapsed() < LEASE,"Growth expiry must precede the independent TTL limit");
+    let stale = service.dispatch(context.clone(),page_request(Some(first["next_cursor"].clone()))).await;
+    assert_eq!(stale.error.unwrap().code,"SNAPSHOT_EXPIRED");
+    // Successful close proves the cache released the real database read lease.
+    service.store.close_generation(&service.root_lease).unwrap();
+    service.store.reopen_current_generation(&service.root_lease).unwrap();
+
+    let fresh = service.dispatch(context.clone(),page_request(None)).await;
+    assert!(fresh.ok,"{:?}",fresh.error);
+    let fresh = fresh.result.unwrap();
+    let ticket = fresh["snapshot_id"].as_str().unwrap().to_owned();
+    let started = service.snapshots.lock().unwrap().projects[&ticket].created;
+    assert_eq!(service.store.close_generation(&service.root_lease).unwrap_err().code,"OWNER_BUSY");
+    let mut writes = 0u64;
+    // Do not query or invoke pressure cleanup during this real absolute TTL interval.
+    tokio::time::timeout(LEASE + Duration::from_secs(5),async {
+        loop {
+            service.store.put("unit/project-ttl-unrelated",&writes).unwrap();
+            writes += 1;
+            if !service.snapshots.lock().unwrap().projects.contains_key(&ticket) { break; }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    }).await.expect("Background TTL reaper must run during unrelated writes");
+    assert!(started.elapsed() >= LEASE);
+    assert!(writes > 1);
+    service.store.close_generation(&service.root_lease).unwrap();
+    service.store.reopen_current_generation(&service.root_lease).unwrap();
+    let stale = service.dispatch(context,page_request(Some(fresh["next_cursor"].clone()))).await;
+    assert_eq!(stale.error.unwrap().code,"SNAPSHOT_EXPIRED");
+}
