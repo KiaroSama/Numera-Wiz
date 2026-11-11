@@ -3103,6 +3103,402 @@ mod tests {
             service.dispatch(owner, create).await.error.unwrap().code,
             "IDEMPOTENCY_CONFLICT"
         );
+
+        // Project edits must use the same acceptance, scoped replay and restart path.
+        // A finite authored source exercises exact editing without pretending to decode media.
+        let owner = service.owner();
+        let create_project: Request = serde_json::from_value(json!({
+            "api_version":1,"request_id":Uuid::new_v4().to_string(),
+            "command":{"id":"projects.create","version":1},
+            "params":{"name":"Project core replay"},
+            "replay_scope":scope,"idempotency_key":"project-core-create"
+        }))
+        .unwrap();
+        let created = service.dispatch(owner.clone(), create_project.clone()).await;
+        assert!(created.ok, "projects.create: {:?}", created.error);
+        let created_result = created.result.clone().unwrap();
+        let project_id = created_result["project_id"].as_str().unwrap().to_owned();
+        let bin_id = created_result["root_bin_id"].as_str().unwrap().to_owned();
+        assert!(!project_id.is_empty());
+        assert!(!bin_id.is_empty());
+        assert_ne!(project_id, bin_id);
+        assert_eq!(created_result["revision"], "0");
+        assert_eq!(
+            created_result["history"],
+            json!({"can_undo":false,"can_redo":false})
+        );
+        assert!(created.receipt_id.is_some());
+        let duplicate = service.dispatch(owner.clone(), create_project).await;
+        assert!(duplicate.ok, "{:?}", duplicate.error);
+        assert_eq!(duplicate.receipt_id, created.receipt_id);
+        assert_eq!(duplicate.result, created.result);
+
+        let editor_created = mutate(
+            &service,
+            &owner,
+            &scope,
+            "access.profiles.put",
+            json!({"name":"project-editor","expected_revision":null,"enabled":true,
+                "mode":"operate","owned_object_access":false,
+                "allowed_command_ids":["access.replay_scope.create","projects.create",
+                    "projects.inspect","sequences.inspect","sequences.create","clips.place","clips.move",
+                    "clips.split","clips.remove","history.undo","history.redo"],
+                "object_grants":[{"kind":"project","id":project_id,"actions":["read","edit"]}],
+                "read_roots":[],"write_roots":[]}),
+        )
+        .await;
+        assert!(editor_created.ok, "{:?}", editor_created.error);
+        let editor = service.profile_context("project-editor").unwrap();
+        let editor_principal = editor.principal.clone();
+        let bootstrap: Request = serde_json::from_value(json!({
+            "api_version":1,"request_id":Uuid::new_v4().to_string(),
+            "command":{"id":"access.replay_scope.create","version":1},"params":{}
+        }))
+        .unwrap();
+        let bootstrapped = service.dispatch(editor.clone(), bootstrap).await;
+        assert!(bootstrapped.ok, "{:?}", bootstrapped.error);
+        let editor_scope = bootstrapped.result.unwrap()["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let project_request = |id: &str, params: Value, durable: Option<(&str, &str)>| {
+            let mut wire = json!({"api_version":1,"request_id":Uuid::new_v4().to_string(),
+                "command":{"id":id,"version":1},"project":{"id":project_id},"params":params});
+            if let Some((revision, key)) = durable {
+                wire["project"]["expected_revision"] = json!(revision);
+                wire["replay_scope"] = json!(editor_scope);
+                wire["idempotency_key"] = json!(key);
+            }
+            serde_json::from_value::<Request>(wire).unwrap()
+        };
+        let successful = |response: Response| {
+            assert!(response.ok, "{:?}", response.error);
+            response.result.unwrap()
+        };
+        let next_revision = |result: &Value, previous: &str| {
+            assert_eq!(result["base_revision"], previous);
+            let revision = result["revision"].as_str().unwrap();
+            let value = revision.parse::<u64>().unwrap();
+            assert_eq!(revision, value.to_string());
+            assert_eq!(value, previous.parse::<u64>().unwrap() + 1);
+            revision.to_owned()
+        };
+        let summary = service
+            .dispatch(
+                editor.clone(),
+                project_request("projects.inspect", json!({"projection":"summary"}), None),
+            )
+            .await;
+        assert!(summary.receipt_id.is_none());
+        let summary = successful(summary);
+        assert_eq!(summary["project_revision"], "0");
+        assert_eq!(summary["project_id"], project_id);
+        assert_eq!(summary["root_bin_id"], bin_id);
+        let mut snapshot = summary["snapshot_id"].as_str().unwrap().to_owned();
+        let mut revision = "0".to_owned();
+        let sequence = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "sequences.create",
+                        json!({"name":"Project core sequence",
+                            "settings":{"width":64,"height":48,
+                                "frame_rate":{"num":"4","den":"1"},
+                                "sample_rate":48000,"audio_layout":"stereo"},
+                            "tracks":[{"kind":"video","name":"Video"}]}),
+                        Some((&revision, "project-sequence")),
+                    ),
+                )
+                .await,
+        );
+        revision = next_revision(&sequence, &revision);
+        let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap().to_owned();
+        assert_eq!(sequence["created"]["tracks"].as_array().unwrap().len(), 1);
+        let track_id = sequence["created"]["tracks"][0]["id"].as_str().unwrap().to_owned();
+        assert_eq!(sequence["created"]["tracks"][0]["kind"], "video");
+        let placed = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "clips.place",
+                        json!({"sequence_id":sequence_id,"track_id":track_id,
+                            "source":{"kind":"solid_color","rgba":[0,0,0,1],
+                                "duration":{"num":"4","den":"1"}},
+                            "source_range":{"start":{"num":"0","den":"1"},
+                                "end":{"num":"2","den":"1"}},
+                            "sequence_start":{"num":"0","den":"1"},"collision":"reject"}),
+                        Some((&revision, "project-place")),
+                    ),
+                )
+                .await,
+        );
+        revision = next_revision(&placed, &revision);
+        assert_eq!(placed["created"]["clip_ids"].as_array().unwrap().len(), 1);
+        let left_id = placed["created"]["clip_ids"][0].as_str().unwrap().to_owned();
+        let source_id = placed["created"]["source_id"].as_str().unwrap().to_owned();
+        let first_page = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request("projects.inspect", json!({"projection":"bin_page",
+                        "bin_id":bin_id,"limit":1,"replace_snapshot":snapshot}), None),
+                )
+                .await,
+        );
+        assert_eq!(first_page["project_revision"], revision);
+        assert_eq!(first_page["total_count"], 2);
+        assert_eq!(first_page["items"].as_array().unwrap().len(), 1);
+        assert!(first_page["items"][0].get("payload_json").is_none());
+        snapshot = first_page["snapshot_id"].as_str().unwrap().to_owned();
+        let cursor = first_page["next_cursor"].as_str().unwrap().to_owned();
+        let bin_revision = revision.clone();
+        let split = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request("clips.split", json!({"clip_id":left_id,
+                        "at_sequence":{"num":"1","den":"2"},"link_policy":"expand"}),
+                        Some((&revision, "project-split"))),
+                )
+                .await,
+        );
+        revision = next_revision(&split, &revision);
+        assert_eq!(split["created"]["clip_ids"].as_array().unwrap().len(), 1);
+        let right_id = split["created"]["clip_ids"][0].as_str().unwrap().to_owned();
+        assert_ne!(right_id, left_id);
+        let second_page = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request("projects.inspect", json!({"projection":"bin_page",
+                        "bin_id":bin_id,"limit":1,"revision":bin_revision,"cursor":cursor}), None),
+                )
+                .await,
+        );
+        assert_eq!(second_page["snapshot_id"], snapshot);
+        assert_eq!(second_page["project_revision"], bin_revision);
+        assert_eq!(second_page["items"].as_array().unwrap().len(), 1);
+        assert!(second_page["next_cursor"].is_null());
+        let mut bin_ids = vec![
+            first_page["items"][0]["id"].as_str().unwrap().to_owned(),
+            second_page["items"][0]["id"].as_str().unwrap().to_owned(),
+        ];
+        bin_ids.sort();
+        let mut expected_bin_ids = vec![sequence_id.clone(), source_id.clone()];
+        expected_bin_ids.sort();
+        assert_eq!(bin_ids, expected_bin_ids);
+        let left = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request("projects.inspect", json!({"projection":"entity",
+                        "entity_id":left_id,"replace_snapshot":snapshot}), None),
+                )
+                .await,
+        );
+        assert_eq!(left["project_revision"], revision);
+        assert_eq!(left["entity"]["id"], left_id);
+        assert_eq!(left["entity"]["source_id"], source_id);
+        assert_eq!(left["entity"]["sequence_start"], json!({"num":"0","den":"1"}));
+        assert_eq!(left["entity"]["duration"], json!({"num":"1","den":"2"}));
+        assert_eq!(left["entity"]["source_range"], json!({
+            "start":{"num":"0","den":"1"},"end":{"num":"1","den":"2"}}));
+        snapshot = left["snapshot_id"].as_str().unwrap().to_owned();
+        let right = successful(
+            service
+                .dispatch(
+                    editor.clone(),
+                    project_request("projects.inspect", json!({"projection":"entity",
+                        "entity_id":right_id,"revision":revision}), None),
+                )
+                .await,
+        );
+        assert_eq!(right["project_revision"], revision);
+        assert_eq!(right["entity"]["id"], right_id);
+        assert_eq!(right["entity"]["source_id"], source_id);
+        assert_eq!(right["entity"]["sequence_start"], json!({"num":"1","den":"2"}));
+        assert_eq!(right["entity"]["duration"], json!({"num":"3","den":"2"}));
+        assert_eq!(right["entity"]["source_range"], json!({
+            "start":{"num":"1","den":"2"},"end":{"num":"2","den":"1"}}));
+        let right_source = right["entity"]["source_range"].clone();
+        let right_duration = right["entity"]["duration"].clone();
+        let move_params = json!({"clip_ids":[right_id],"delta":{"num":"1","den":"4"},
+            "collision":"reject","link_policy":"expand"});
+        let stale_revision = revision.clone();
+        let moved = successful(
+            service
+                .dispatch(editor.clone(), project_request("clips.move", move_params.clone(),
+                    Some((&revision, "project-move"))))
+                .await,
+        );
+        revision = next_revision(&moved, &revision);
+        let stale = service
+            .dispatch(editor.clone(), project_request("clips.move", move_params.clone(),
+                Some((&stale_revision, "project-stale-fresh-key"))))
+            .await;
+        assert!(!stale.ok);
+        assert!(stale.receipt_id.is_none());
+        assert_eq!(stale.error.unwrap().code, "STALE_REVISION");
+        let after_stale = successful(
+            service
+                .dispatch(editor.clone(), project_request("projects.inspect", json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .await,
+        );
+        assert_eq!(after_stale["project_revision"], revision);
+        assert_eq!(after_stale["entity"]["sequence_start"], json!({"num":"3","den":"4"}));
+        assert_eq!(after_stale["entity"]["source_range"], right_source);
+        assert_eq!(after_stale["entity"]["duration"], right_duration);
+        snapshot = after_stale["snapshot_id"].as_str().unwrap().to_owned();
+        let remove_request = project_request("clips.remove", json!({"clip_ids":[right_id],
+            "mode":"lift","link_policy":"expand"}), Some((&revision, "project-remove")));
+        let removed = service.dispatch(editor.clone(), remove_request.clone()).await;
+        assert!(removed.ok, "{:?}", removed.error);
+        assert!(removed.receipt_id.is_some());
+        revision = next_revision(removed.result.as_ref().unwrap(), &revision);
+        let missing = service
+            .dispatch(editor.clone(), project_request("projects.inspect", json!({
+                "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+            .await;
+        assert!(!missing.ok);
+        assert!(missing.receipt_id.is_none());
+        assert_eq!(missing.error.unwrap().code, "OBJECT_NOT_FOUND");
+        for (command, key, present) in [
+            ("history.undo", "project-undo-remove", true),
+            ("history.redo", "project-redo-remove", false),
+            ("history.undo", "project-undo-again", true),
+        ] {
+            let changed = successful(
+                service
+                    .dispatch(editor.clone(), project_request(command, json!({}), Some((&revision, key))))
+                    .await,
+            );
+            revision = next_revision(&changed, &revision);
+            assert_eq!(changed["history"]["can_redo"], present);
+            let inspected = service
+                .dispatch(editor.clone(), project_request("projects.inspect", json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .await;
+            assert!(inspected.receipt_id.is_none());
+            if present {
+                let inspected = successful(inspected);
+                assert_eq!(inspected["project_revision"], revision);
+                assert_eq!(inspected["entity"]["id"], right_id);
+                assert_eq!(inspected["entity"]["sequence_start"], json!({"num":"3","den":"4"}));
+                assert_eq!(inspected["entity"]["source_range"], right_source);
+                assert_eq!(inspected["entity"]["duration"], right_duration);
+                snapshot = inspected["snapshot_id"].as_str().unwrap().to_owned();
+            } else {
+                assert!(!inspected.ok);
+                assert_eq!(inspected.error.unwrap().code, "OBJECT_NOT_FOUND");
+            }
+        }
+        let branched = successful(
+            service
+                .dispatch(editor.clone(), project_request("clips.move", move_params,
+                    Some((&revision, "project-branch-move"))))
+                .await,
+        );
+        revision = next_revision(&branched, &revision);
+        assert_eq!(revision, "9");
+        assert_eq!(branched["history"]["can_redo"], false);
+        let no_redo = service
+            .dispatch(editor.clone(), project_request("history.redo", json!({}),
+                Some((&revision, "project-redo-cleared"))))
+            .await;
+        assert!(!no_redo.ok);
+        assert!(no_redo.receipt_id.is_none());
+        assert_eq!(no_redo.error.unwrap().code, "NOTHING_TO_REDO");
+        let retry = service.dispatch(editor.clone(), remove_request.clone()).await;
+        assert!(retry.ok, "{:?}", retry.error);
+        assert_eq!(retry.receipt_id, removed.receipt_id);
+        assert_eq!(retry.result, removed.result);
+        let retained = successful(
+            service
+                .dispatch(editor.clone(), project_request("projects.inspect", json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .await,
+        );
+        assert_eq!(retained["project_revision"], revision);
+        assert_eq!(retained["entity"]["id"], right_id);
+        assert_eq!(retained["entity"]["sequence_start"], json!({"num":"1","den":"1"}));
+        assert_eq!(retained["entity"]["source_range"], right_source);
+        assert_eq!(retained["entity"]["duration"], right_duration);
+
+        // Restart must retain both current entities and the earlier accepted receipt.
+        drop(service);
+        let service = Service::open(root.path().to_owned(), None).await.unwrap();
+        let editor = service.profile_context("project-editor").unwrap();
+        assert_eq!(editor.principal, editor_principal);
+        let restart_retry = service.dispatch(editor.clone(), remove_request).await;
+        assert!(restart_retry.ok, "{:?}", restart_retry.error);
+        assert_eq!(restart_retry.receipt_id, removed.receipt_id);
+        assert_eq!(restart_retry.result, removed.result);
+        let restarted = successful(
+            service
+                .dispatch(editor.clone(), project_request("projects.inspect", json!({
+                    "projection":"entity","entity_id":right_id}), None))
+                .await,
+        );
+        assert_eq!(restarted["project_revision"], revision);
+        assert_eq!(restarted["entity"], retained["entity"]);
+        let restarted_summary = successful(
+            service
+                .dispatch(editor.clone(), project_request("projects.inspect", json!({"projection":"summary",
+                    "revision":revision}), None))
+                .await,
+        );
+        assert_eq!(restarted_summary["project_revision"], revision);
+        assert_eq!(restarted_summary["history"]["can_redo"], false);
+        let tracks = successful(
+            service
+                .dispatch(editor.clone(), project_request("sequences.inspect", json!({
+                    "sequence_id":sequence_id,"projection":"track_page","limit":1,
+                    "revision":revision}), None))
+                .await,
+        );
+        assert_eq!(tracks["project_revision"], revision);
+        assert_eq!(tracks["snapshot_id"], restarted_summary["snapshot_id"]);
+        assert_eq!(tracks["items"].as_array().unwrap().len(), 1);
+        assert!(tracks["next_cursor"].is_null());
+        let discovered_track = tracks["items"][0]["id"].as_str().unwrap().to_owned();
+        assert_eq!(discovered_track, track_id);
+        assert_eq!(tracks["items"][0]["kind"], "video");
+        let viewport = successful(
+            service
+                .dispatch(editor.clone(), project_request("sequences.inspect", json!({
+                    "sequence_id":sequence_id,"projection":"viewport","track_ids":[discovered_track],
+                    "range":{"start":{"num":"0","den":"1"},"end":{"num":"3","den":"1"}},
+                    "limit":2,"revision":revision}), None))
+                .await,
+        );
+        assert_eq!(viewport["project_revision"], revision);
+        assert_eq!(viewport["snapshot_id"], tracks["snapshot_id"]);
+        assert_eq!(viewport["items"].as_array().unwrap().len(), 2);
+        assert!(viewport["next_cursor"].is_null());
+        assert_eq!(viewport["items"][0]["id"], left_id);
+        assert_eq!(viewport["items"][0]["track_id"], discovered_track);
+        assert_eq!(viewport["items"][0]["sequence_start"], json!({"num":"0","den":"1"}));
+        assert_eq!(viewport["items"][0]["duration"], json!({"num":"1","den":"2"}));
+        assert_eq!(viewport["items"][1]["id"], right_id);
+        assert_eq!(viewport["items"][1]["track_id"], discovered_track);
+        assert_eq!(viewport["items"][1]["sequence_start"], json!({"num":"1","den":"1"}));
+        assert_eq!(viewport["items"][1]["duration"], right_duration);
+        assert!(viewport["items"][1].get("payload_json").is_none());
+        let boundary_viewport = successful(
+            service
+                .dispatch(editor, project_request("sequences.inspect", json!({
+                    "sequence_id":sequence_id,"projection":"viewport","track_ids":[discovered_track],
+                    "range":{"start":{"num":"1","den":"2"},"end":{"num":"3","den":"1"}},
+                    "limit":2,"revision":revision}), None))
+                .await,
+        );
+        assert_eq!(boundary_viewport["project_revision"], revision);
+        assert_eq!(boundary_viewport["snapshot_id"], viewport["snapshot_id"]);
+        assert_eq!(boundary_viewport["items"].as_array().unwrap().len(), 1);
+        assert_eq!(boundary_viewport["items"][0]["id"], right_id);
     }
     #[tokio::test]
     async fn file_grants_and_object_rights_are_checked_independently() {
