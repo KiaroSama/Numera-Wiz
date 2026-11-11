@@ -2161,6 +2161,7 @@ dependencies = [
  "nw-service",
  "nw-store",
  "nw-ui",
+ "redb",
  "reqwest",
  "rfd",
  "rmcp",
