@@ -1,5 +1,7 @@
 //! Short-lived, authorization-bound inventory snapshots containing summaries only.
 use super::*;
+#[path = "projects/queries.rs"]
+mod project_queries;
 use nw_domain::views::{AssetSummary, JobSummary, PageInput, SnapshotPage};
 use std::time::{Duration, Instant};
 
@@ -25,6 +27,19 @@ struct Snapshot {
 #[derive(Default)]
 pub(super) struct Snapshots {
     entries: HashMap<String, Snapshot>,
+    projects: HashMap<String, project_queries::ProjectTicket>,
+    project_write_estimate: usize,
+}
+impl Snapshots {
+    pub(super) fn clear_project_reads(&mut self) { self.projects.clear(); self.project_write_estimate = 0; }
+    fn expire(&mut self) {
+        self.entries.retain(|_, entry| entry.created.elapsed() < LEASE);
+        self.projects.retain(|_, entry| !entry.expired());
+        if self.projects.is_empty() { self.project_write_estimate = 0; }
+    }
+    fn count(&self) -> usize { self.entries.len() + self.projects.len() }
+    fn principal_count(&self, principal: &str) -> usize { self.entries.values().filter(|s| s.principal == principal).count() + self.projects.values().filter(|s| s.principal() == principal).count() }
+    fn bytes(&self) -> usize { self.entries.values().map(|s| s.bytes).sum::<usize>() + self.projects.values().map(|s| s.bytes()).sum::<usize>() }
 }
 fn expired() -> DomainError {
     DomainError::new(
@@ -156,9 +171,7 @@ impl Service {
                 "Snapshot service is busy; retry the same query",
             )
         })?;
-        cache
-            .entries
-            .retain(|_, snapshot| snapshot.created.elapsed() < LEASE);
+        cache.expire();
         if let Some(cursor) = input.cursor {
             let mut parts = cursor.split(':');
             let id = parts.next().ok_or_else(expired)?;
@@ -197,13 +210,7 @@ impl Service {
         {
             cache.entries.remove(&id);
         }
-        if cache.entries.len() >= MAX_SNAPSHOTS
-            || cache
-                .entries
-                .values()
-                .filter(|snapshot| snapshot.principal == context.principal)
-                .count()
-                >= MAX_PER_PRINCIPAL
+        if cache.count() >= MAX_SNAPSHOTS || cache.principal_count(&context.principal) >= MAX_PER_PRINCIPAL
         {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",
@@ -336,12 +343,7 @@ impl Service {
         {
             return Err(expired());
         }
-        if cache
-            .entries
-            .values()
-            .map(|entry| entry.bytes)
-            .sum::<usize>()
-            + snapshot.bytes
+        if cache.bytes() + snapshot.bytes + MAX_PAGE_BYTES
             > MAX_GLOBAL_BYTES
         {
             return Err(DomainError::new(
@@ -533,6 +535,8 @@ mod tests {
                 .code,
             "VALIDATION_ERROR"
         );
+        crate::runtime::projects::tests::indexed_snapshot_and_edit_cases().await;
+        crate::runtime::projects::tests::held_source_current_grants().await;
     }
     #[test]
     fn page_byte_ceiling_wins_over_row_count_without_truncating_items() {

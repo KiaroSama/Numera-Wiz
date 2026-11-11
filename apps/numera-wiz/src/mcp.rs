@@ -67,6 +67,17 @@ fn tool(name: &str) -> Option<Tool> {
     let definitions = params.as_object_mut()?.remove("$defs");
     let mut schema = serde_json::json!({"type":"object","properties":{"params":params},"required":["params"],"additionalProperties":false});
     schema["properties"]["context"] = serde_json::json!({"type":"object","properties":{"request_id":{"type":"string","maxLength":128},"replay_scope":{"type":"string","maxLength":2048},"idempotency_key":{"type":"string","maxLength":128}},"additionalProperties":false});
+    if descriptor.project_context != commands::ProjectContextRule::Forbidden {
+        let write = descriptor.project_context == commands::ProjectContextRule::RequiredWrite;
+        let mut project = serde_json::json!({"type":"object","properties":{"id":{"type":"string","format":"uuid"}},"required":["id"],"additionalProperties":false});
+        if write {
+            project["properties"]["expected_revision"] = serde_json::json!({"type":"string","pattern":"^(0|[1-9][0-9]*)$"});
+            project["required"] = serde_json::json!(["id","expected_revision"]);
+        }
+        schema["properties"]["context"]["properties"]["project"] = project;
+        schema["properties"]["context"]["required"] = serde_json::json!(["project"]);
+        schema["required"] = serde_json::json!(["params","context"]);
+    }
     if let Some(definitions) = definitions {
         schema.as_object_mut()?.insert("$defs".into(), definitions);
     }
@@ -185,6 +196,7 @@ impl ServerHandler for Bridge {
         #[derive(serde::Deserialize, Default)]
         #[serde(deny_unknown_fields)]
         struct Metadata {
+            project: Option<commands::ProjectRef>,
             request_id: Option<String>,
             replay_scope: Option<String>,
             idempotency_key: Option<String>,
@@ -201,6 +213,7 @@ impl ServerHandler for Bridge {
         if let Some(id) = metadata.request_id {
             canonical.request_id = id;
         }
+        canonical.project = metadata.project;
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
         let response = self.execute(canonical, &context).await?;

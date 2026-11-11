@@ -129,3 +129,5 @@ pub mod reports;
 pub mod download;
 
 pub mod maintenance;
+
+pub mod projects;

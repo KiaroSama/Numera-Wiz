@@ -24,6 +24,7 @@ mod live;
 pub mod migrations;
 mod profiles;
 mod records;
+pub mod projects;
 pub mod versions;
 fn storage(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("STORAGE_ERROR", error.to_string())
@@ -66,6 +67,8 @@ pub struct Store {
     db: live::DatabaseSlot,
     root_id: String,
     signing_key: Vec<u8>,
+    #[cfg(test)]
+    project_fail_after_rows: std::sync::atomic::AtomicBool,
 }
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
@@ -143,6 +146,8 @@ impl Store {
             db: live::DatabaseSlot::new(db, root.clone(), lock, track_adoption),
             root_id,
             signing_key,
+            #[cfg(test)]
+            project_fail_after_rows: std::sync::atomic::AtomicBool::new(false),
         };
         store.upgrade_access_profiles()?;
         Ok(store)
@@ -788,6 +793,7 @@ mod tests {
             .unwrap();
         assert!(accepted.ok);
         assert_eq!(store.list::<Job>("job/", 8).unwrap().len(), 2);
+        projects::exercise_atomic_projects();
     }
     #[test]
     fn batch_cancellation_journals_requests_without_claiming_a_running_writer_stopped() {

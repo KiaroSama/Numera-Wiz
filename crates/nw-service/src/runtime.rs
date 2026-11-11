@@ -6,6 +6,7 @@ pub use artifacts::ArtifactTransfer;
 mod clock;
 mod folders;
 mod read_model;
+mod projects;
 mod uploads;
 use nw_domain::{
     DomainError, Result,
@@ -68,6 +69,7 @@ pub struct Service {
     root_lease: Arc<nw_store::generations::RootLease>,
     credentials: Mutex<()>,
     snapshots: Mutex<read_model::Snapshots>,
+    project_writers: Mutex<HashMap<String, nw_platform::project_lease::ProjectWriterLease>>,
     clock: clock::SessionClock,
     origins: Mutex<HashMap<String, u64>>,
     requests: Arc<Semaphore>,
@@ -229,6 +231,7 @@ impl Service {
             root_lease,
             credentials: Mutex::new(()),
             snapshots: Mutex::new(read_model::Snapshots::default()),
+            project_writers: Mutex::new(HashMap::new()),
             clock: clock::SessionClock::default(),
             origins: Mutex::new(HashMap::new()),
             requests: Arc::new(Semaphore::new(16)),
@@ -241,6 +244,7 @@ impl Service {
             #[cfg(test)]
             preflight_hook: Mutex::new(None),
         });
+        Self::start_snapshot_reaper(&service);
         if service.store.pending_migration()?.is_some() {
             return Ok(service);
         }
@@ -492,6 +496,7 @@ impl Service {
             return Ok(response);
         };
         let readable = match request.command.id.as_str() {
+            "projects.create" | "sequences.create" | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -851,6 +856,9 @@ impl Service {
     ) -> Result<Response> {
         request.validate()?;
         let _admission = self.command_admission(&request.command.id)?;
+        if ["maintenance.plan", "maintenance.migrate"].contains(&request.command.id.as_str()) {
+            self.snapshots.lock().map_err(|_| lock_error())?.clear_project_reads();
+        }
         let descriptor = commands::descriptor(&request.command.id)
             .ok_or_else(|| DomainError::new("UNKNOWN_COMMAND", "Unregistered command"))?;
         let durable = matches!(descriptor.state_class, StateClass::DurableMutation);
@@ -895,6 +903,10 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect" | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
+                drop(guard);
+                return self.project_command(&context, &request, &cancellation);
+            }
             "assets.register_folder" | "assets.folder_inspect" => {
                 drop(guard);
                 return self.folder_command(&context, &request, &cancellation);
@@ -2200,6 +2212,13 @@ impl Service {
         Ok(())
     }
 }
+impl Drop for Service {
+    fn drop(&mut self) {
+        // Release MVCC transactions before Store/root ownership fields are dropped.
+        self.snapshots.get_mut().unwrap_or_else(std::sync::PoisonError::into_inner).clear_project_reads();
+        self.project_writers.get_mut().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
+    }
+}
 struct Pending(Arc<AtomicUsize>);
 impl Drop for Pending {
     fn drop(&mut self) {
@@ -3114,7 +3133,9 @@ mod tests {
             "replay_scope":scope,"idempotency_key":"project-core-create"
         }))
         .unwrap();
-        let created = service.dispatch(owner.clone(), create_project.clone()).await;
+        let created = service
+            .dispatch(owner.clone(), create_project.clone())
+            .await;
         assert!(created.ok, "projects.create: {:?}", created.error);
         let created_result = created.result.clone().unwrap();
         let project_id = created_result["project_id"].as_str().unwrap().to_owned();
@@ -3213,9 +3234,15 @@ mod tests {
                 .await,
         );
         revision = next_revision(&sequence, &revision);
-        let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap().to_owned();
+        let sequence_id = sequence["created"]["sequence_id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert_eq!(sequence["created"]["tracks"].as_array().unwrap().len(), 1);
-        let track_id = sequence["created"]["tracks"][0]["id"].as_str().unwrap().to_owned();
+        let track_id = sequence["created"]["tracks"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert_eq!(sequence["created"]["tracks"][0]["kind"], "video");
         let placed = successful(
             service
@@ -3236,14 +3263,21 @@ mod tests {
         );
         revision = next_revision(&placed, &revision);
         assert_eq!(placed["created"]["clip_ids"].as_array().unwrap().len(), 1);
-        let left_id = placed["created"]["clip_ids"][0].as_str().unwrap().to_owned();
+        let left_id = placed["created"]["clip_ids"][0]
+            .as_str()
+            .unwrap()
+            .to_owned();
         let source_id = placed["created"]["source_id"].as_str().unwrap().to_owned();
         let first_page = successful(
             service
                 .dispatch(
                     editor.clone(),
-                    project_request("projects.inspect", json!({"projection":"bin_page",
-                        "bin_id":bin_id,"limit":1,"replace_snapshot":snapshot}), None),
+                    project_request(
+                        "projects.inspect",
+                        json!({"projection":"bin_page",
+                        "bin_id":bin_id,"limit":1,"replace_snapshot":snapshot}),
+                        None,
+                    ),
                 )
                 .await,
         );
@@ -3258,9 +3292,12 @@ mod tests {
             service
                 .dispatch(
                     editor.clone(),
-                    project_request("clips.split", json!({"clip_id":left_id,
+                    project_request(
+                        "clips.split",
+                        json!({"clip_id":left_id,
                         "at_sequence":{"num":"1","den":"2"},"link_policy":"expand"}),
-                        Some((&revision, "project-split"))),
+                        Some((&revision, "project-split")),
+                    ),
                 )
                 .await,
         );
@@ -3272,8 +3309,12 @@ mod tests {
             service
                 .dispatch(
                     editor.clone(),
-                    project_request("projects.inspect", json!({"projection":"bin_page",
-                        "bin_id":bin_id,"limit":1,"revision":bin_revision,"cursor":cursor}), None),
+                    project_request(
+                        "projects.inspect",
+                        json!({"projection":"bin_page",
+                        "bin_id":bin_id,"limit":1,"revision":bin_revision,"cursor":cursor}),
+                        None,
+                    ),
                 )
                 .await,
         );
@@ -3293,35 +3334,55 @@ mod tests {
             service
                 .dispatch(
                     editor.clone(),
-                    project_request("projects.inspect", json!({"projection":"entity",
-                        "entity_id":left_id,"replace_snapshot":snapshot}), None),
+                    project_request(
+                        "projects.inspect",
+                        json!({"projection":"entity",
+                        "entity_id":left_id,"replace_snapshot":snapshot}),
+                        None,
+                    ),
                 )
                 .await,
         );
         assert_eq!(left["project_revision"], revision);
         assert_eq!(left["entity"]["id"], left_id);
         assert_eq!(left["entity"]["source_id"], source_id);
-        assert_eq!(left["entity"]["sequence_start"], json!({"num":"0","den":"1"}));
+        assert_eq!(
+            left["entity"]["sequence_start"],
+            json!({"num":"0","den":"1"})
+        );
         assert_eq!(left["entity"]["duration"], json!({"num":"1","den":"2"}));
-        assert_eq!(left["entity"]["source_range"], json!({
-            "start":{"num":"0","den":"1"},"end":{"num":"1","den":"2"}}));
+        assert_eq!(
+            left["entity"]["source_range"],
+            json!({
+            "start":{"num":"0","den":"1"},"end":{"num":"1","den":"2"}})
+        );
         snapshot = left["snapshot_id"].as_str().unwrap().to_owned();
         let right = successful(
             service
                 .dispatch(
                     editor.clone(),
-                    project_request("projects.inspect", json!({"projection":"entity",
-                        "entity_id":right_id,"revision":revision}), None),
+                    project_request(
+                        "projects.inspect",
+                        json!({"projection":"entity",
+                        "entity_id":right_id,"revision":revision}),
+                        None,
+                    ),
                 )
                 .await,
         );
         assert_eq!(right["project_revision"], revision);
         assert_eq!(right["entity"]["id"], right_id);
         assert_eq!(right["entity"]["source_id"], source_id);
-        assert_eq!(right["entity"]["sequence_start"], json!({"num":"1","den":"2"}));
+        assert_eq!(
+            right["entity"]["sequence_start"],
+            json!({"num":"1","den":"2"})
+        );
         assert_eq!(right["entity"]["duration"], json!({"num":"3","den":"2"}));
-        assert_eq!(right["entity"]["source_range"], json!({
-            "start":{"num":"1","den":"2"},"end":{"num":"2","den":"1"}}));
+        assert_eq!(
+            right["entity"]["source_range"],
+            json!({
+            "start":{"num":"1","den":"2"},"end":{"num":"2","den":"1"}})
+        );
         let right_source = right["entity"]["source_range"].clone();
         let right_duration = right["entity"]["duration"].clone();
         let move_params = json!({"clip_ids":[right_id],"delta":{"num":"1","den":"4"},
@@ -3329,38 +3390,73 @@ mod tests {
         let stale_revision = revision.clone();
         let moved = successful(
             service
-                .dispatch(editor.clone(), project_request("clips.move", move_params.clone(),
-                    Some((&revision, "project-move"))))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "clips.move",
+                        move_params.clone(),
+                        Some((&revision, "project-move")),
+                    ),
+                )
                 .await,
         );
         revision = next_revision(&moved, &revision);
         let stale = service
-            .dispatch(editor.clone(), project_request("clips.move", move_params.clone(),
-                Some((&stale_revision, "project-stale-fresh-key"))))
+            .dispatch(
+                editor.clone(),
+                project_request(
+                    "clips.move",
+                    move_params.clone(),
+                    Some((&stale_revision, "project-stale-fresh-key")),
+                ),
+            )
             .await;
         assert!(!stale.ok);
         assert!(stale.receipt_id.is_none());
         assert_eq!(stale.error.unwrap().code, "STALE_REVISION");
         let after_stale = successful(
             service
-                .dispatch(editor.clone(), project_request("projects.inspect", json!({
-                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "projects.inspect",
+                        json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}),
+                        None,
+                    ),
+                )
                 .await,
         );
         assert_eq!(after_stale["project_revision"], revision);
-        assert_eq!(after_stale["entity"]["sequence_start"], json!({"num":"3","den":"4"}));
+        assert_eq!(
+            after_stale["entity"]["sequence_start"],
+            json!({"num":"3","den":"4"})
+        );
         assert_eq!(after_stale["entity"]["source_range"], right_source);
         assert_eq!(after_stale["entity"]["duration"], right_duration);
         snapshot = after_stale["snapshot_id"].as_str().unwrap().to_owned();
-        let remove_request = project_request("clips.remove", json!({"clip_ids":[right_id],
-            "mode":"lift","link_policy":"expand"}), Some((&revision, "project-remove")));
-        let removed = service.dispatch(editor.clone(), remove_request.clone()).await;
+        let remove_request = project_request(
+            "clips.remove",
+            json!({"clip_ids":[right_id],
+            "mode":"lift","link_policy":"expand"}),
+            Some((&revision, "project-remove")),
+        );
+        let removed = service
+            .dispatch(editor.clone(), remove_request.clone())
+            .await;
         assert!(removed.ok, "{:?}", removed.error);
         assert!(removed.receipt_id.is_some());
         revision = next_revision(removed.result.as_ref().unwrap(), &revision);
         let missing = service
-            .dispatch(editor.clone(), project_request("projects.inspect", json!({
-                "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+            .dispatch(
+                editor.clone(),
+                project_request(
+                    "projects.inspect",
+                    json!({
+                "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}),
+                    None,
+                ),
+            )
             .await;
         assert!(!missing.ok);
         assert!(missing.receipt_id.is_none());
@@ -3372,21 +3468,34 @@ mod tests {
         ] {
             let changed = successful(
                 service
-                    .dispatch(editor.clone(), project_request(command, json!({}), Some((&revision, key))))
+                    .dispatch(
+                        editor.clone(),
+                        project_request(command, json!({}), Some((&revision, key))),
+                    )
                     .await,
             );
             revision = next_revision(&changed, &revision);
             assert_eq!(changed["history"]["can_redo"], present);
             let inspected = service
-                .dispatch(editor.clone(), project_request("projects.inspect", json!({
-                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "projects.inspect",
+                        json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}),
+                        None,
+                    ),
+                )
                 .await;
             assert!(inspected.receipt_id.is_none());
             if present {
                 let inspected = successful(inspected);
                 assert_eq!(inspected["project_revision"], revision);
                 assert_eq!(inspected["entity"]["id"], right_id);
-                assert_eq!(inspected["entity"]["sequence_start"], json!({"num":"3","den":"4"}));
+                assert_eq!(
+                    inspected["entity"]["sequence_start"],
+                    json!({"num":"3","den":"4"})
+                );
                 assert_eq!(inspected["entity"]["source_range"], right_source);
                 assert_eq!(inspected["entity"]["duration"], right_duration);
                 snapshot = inspected["snapshot_id"].as_str().unwrap().to_owned();
@@ -3397,33 +3506,57 @@ mod tests {
         }
         let branched = successful(
             service
-                .dispatch(editor.clone(), project_request("clips.move", move_params,
-                    Some((&revision, "project-branch-move"))))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "clips.move",
+                        move_params,
+                        Some((&revision, "project-branch-move")),
+                    ),
+                )
                 .await,
         );
         revision = next_revision(&branched, &revision);
         assert_eq!(revision, "9");
         assert_eq!(branched["history"]["can_redo"], false);
         let no_redo = service
-            .dispatch(editor.clone(), project_request("history.redo", json!({}),
-                Some((&revision, "project-redo-cleared"))))
+            .dispatch(
+                editor.clone(),
+                project_request(
+                    "history.redo",
+                    json!({}),
+                    Some((&revision, "project-redo-cleared")),
+                ),
+            )
             .await;
         assert!(!no_redo.ok);
         assert!(no_redo.receipt_id.is_none());
         assert_eq!(no_redo.error.unwrap().code, "NOTHING_TO_REDO");
-        let retry = service.dispatch(editor.clone(), remove_request.clone()).await;
+        let retry = service
+            .dispatch(editor.clone(), remove_request.clone())
+            .await;
         assert!(retry.ok, "{:?}", retry.error);
         assert_eq!(retry.receipt_id, removed.receipt_id);
         assert_eq!(retry.result, removed.result);
         let retained = successful(
             service
-                .dispatch(editor.clone(), project_request("projects.inspect", json!({
-                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}), None))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "projects.inspect",
+                        json!({
+                    "projection":"entity","entity_id":right_id,"replace_snapshot":snapshot}),
+                        None,
+                    ),
+                )
                 .await,
         );
         assert_eq!(retained["project_revision"], revision);
         assert_eq!(retained["entity"]["id"], right_id);
-        assert_eq!(retained["entity"]["sequence_start"], json!({"num":"1","den":"1"}));
+        assert_eq!(
+            retained["entity"]["sequence_start"],
+            json!({"num":"1","den":"1"})
+        );
         assert_eq!(retained["entity"]["source_range"], right_source);
         assert_eq!(retained["entity"]["duration"], right_duration);
 
@@ -3438,25 +3571,46 @@ mod tests {
         assert_eq!(restart_retry.result, removed.result);
         let restarted = successful(
             service
-                .dispatch(editor.clone(), project_request("projects.inspect", json!({
-                    "projection":"entity","entity_id":right_id}), None))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "projects.inspect",
+                        json!({
+                    "projection":"entity","entity_id":right_id}),
+                        None,
+                    ),
+                )
                 .await,
         );
         assert_eq!(restarted["project_revision"], revision);
         assert_eq!(restarted["entity"], retained["entity"]);
         let restarted_summary = successful(
             service
-                .dispatch(editor.clone(), project_request("projects.inspect", json!({"projection":"summary",
-                    "revision":revision}), None))
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "projects.inspect",
+                        json!({"projection":"summary",
+                    "revision":revision}),
+                        None,
+                    ),
+                )
                 .await,
         );
         assert_eq!(restarted_summary["project_revision"], revision);
         assert_eq!(restarted_summary["history"]["can_redo"], false);
         let tracks = successful(
             service
-                .dispatch(editor.clone(), project_request("sequences.inspect", json!({
+                .dispatch(
+                    editor.clone(),
+                    project_request(
+                        "sequences.inspect",
+                        json!({
                     "sequence_id":sequence_id,"projection":"track_page","limit":1,
-                    "revision":revision}), None))
+                    "revision":revision}),
+                        None,
+                    ),
+                )
                 .await,
         );
         assert_eq!(tracks["project_revision"], revision);
@@ -3480,11 +3634,20 @@ mod tests {
         assert!(viewport["next_cursor"].is_null());
         assert_eq!(viewport["items"][0]["id"], left_id);
         assert_eq!(viewport["items"][0]["track_id"], discovered_track);
-        assert_eq!(viewport["items"][0]["sequence_start"], json!({"num":"0","den":"1"}));
-        assert_eq!(viewport["items"][0]["duration"], json!({"num":"1","den":"2"}));
+        assert_eq!(
+            viewport["items"][0]["sequence_start"],
+            json!({"num":"0","den":"1"})
+        );
+        assert_eq!(
+            viewport["items"][0]["duration"],
+            json!({"num":"1","den":"2"})
+        );
         assert_eq!(viewport["items"][1]["id"], right_id);
         assert_eq!(viewport["items"][1]["track_id"], discovered_track);
-        assert_eq!(viewport["items"][1]["sequence_start"], json!({"num":"1","den":"1"}));
+        assert_eq!(
+            viewport["items"][1]["sequence_start"],
+            json!({"num":"1","den":"1"})
+        );
         assert_eq!(viewport["items"][1]["duration"], right_duration);
         assert!(viewport["items"][1].get("payload_json").is_none());
         let boundary_viewport = successful(

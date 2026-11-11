@@ -30,6 +30,23 @@ macro_rules! call {
         value["structuredContent"]["result"].clone()
     }};
 }
+// These SDK mutations use distinct scope/key identities and real registered source facts.
+macro_rules! project_sdk {
+    ($client:expr, $scope:expr, $asset:expr, $tag:expr) => {{
+        let project = call!($client,"projects.create",json!({"name":format!("SDK project {}",$tag)}),json!({"replay_scope":$scope,"idempotency_key":format!("project-create-{}",$tag)}));
+        let id = project["project_id"].as_str().unwrap();
+        let sequence = call!($client,"sequences.create",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),json!({"project":{"id":id,"expected_revision":"0"},"replay_scope":$scope,"idempotency_key":format!("project-sequence-{}",$tag)}));
+        let placed = call!($client,"clips.place",json!({"sequence_id":sequence["created"]["sequence_id"],"track_id":sequence["created"]["tracks"][0]["id"],"source":{"kind":"registered","asset_id":$asset["id"],"stream_index":0},"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"}),json!({"project":{"id":id,"expected_revision":"1"},"replay_scope":$scope,"idempotency_key":format!("project-place-{}",$tag)}));
+        let inspected = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["clip_ids"][0],"revision":"2"}),json!({"project":{"id":id}}));
+        let source = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["source_id"],"revision":"2"}),json!({"project":{"id":id}}));
+        assert_eq!(inspected["snapshot_id"],source["snapshot_id"]);
+        assert_eq!(source["entity"]["asset_id"],$asset["id"]);
+        assert_eq!(source["entity"]["content_sha256"],$asset["identity"]["sha256"]);
+        assert_eq!(source["entity"]["extent_verification"],"pending");
+        assert!(source["entity"].get("identity").is_none() && source["entity"].get("probe").is_none());
+        json!({"start":inspected["entity"]["sequence_start"],"duration":inspected["entity"]["duration"],"source_range":inspected["entity"]["source_range"],"content_sha256":source["entity"]["content_sha256"],"stream_index":source["entity"]["stream_index"],"media_kind":source["entity"]["media_kind"]})
+    }};
+}
 #[path = "support/lost_ack.rs"]
 mod lost_ack;
 
@@ -242,6 +259,28 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         asset["probe"]["probe_timeout"],
         json!({"mode":"finite","seconds":30})
     );
+    let (project_created, exit) = cli.human(&["projects","create","--name","CLI project","--replay-scope",&scope,"--idempotency-key","project-create-cli"]).await;
+    assert_eq!(exit,0,"{project_created}");
+    let cli_project=project_created["result"]["project_id"].as_str().unwrap();
+    let (project_sequence,exit)=cli.human(&["sequences","create","--project",cli_project,"--expected-revision","0","--name","Sequence","--width","64","--height","48","--frame-rate","4/1","--video-track","Video","--replay-scope",&scope,"--idempotency-key","project-sequence-cli"]).await;
+    assert_eq!(exit,0,"{project_sequence}");
+    let sequence_id=project_sequence["result"]["created"]["sequence_id"].as_str().unwrap();
+    let track_id=project_sequence["result"]["created"]["tracks"][0]["id"].as_str().unwrap();
+    let place_args=["clips","place","--project",cli_project,"--expected-revision","1","--sequence",sequence_id,"--track",track_id,"--asset",asset["id"].as_str().unwrap(),"--stream-index","0","--source-start","0","--source-end","1","--sequence-start","0","--replay-scope",&scope,"--idempotency-key","project-place-cli"];
+    let (project_placed,exit)=cli.human(&place_args).await; assert_eq!(exit,0,"{project_placed}");
+    let (project_retried,exit)=cli.human(&place_args).await; assert_eq!(exit,0,"{project_retried}"); assert_eq!(project_placed["receipt_id"],project_retried["receipt_id"]);
+    let clip_id=project_placed["result"]["created"]["clip_ids"][0].as_str().unwrap(); let binding_id=project_placed["result"]["created"]["source_id"].as_str().unwrap();
+    let (clip,exit)=cli.human(&["projects","inspect","--project",cli_project,"--projection","entity","--entity",clip_id,"--revision","2"]).await; assert_eq!(exit,0,"{clip}");
+    let (binding,exit)=cli.human(&["projects","inspect","--project",cli_project,"--projection","entity","--entity",binding_id,"--revision","2"]).await; assert_eq!(exit,0,"{binding}");
+    assert_eq!(binding["result"]["entity"]["asset_id"],asset["id"]);
+    let cli_project_semantics=json!({"start":clip["result"]["entity"]["sequence_start"],"duration":clip["result"]["entity"]["duration"],"source_range":clip["result"]["entity"]["source_range"],"content_sha256":binding["result"]["entity"]["content_sha256"],"stream_index":binding["result"]["entity"]["stream_index"],"media_kind":binding["result"]["entity"]["media_kind"]});
+    let reader=json!({"name":"project-only-reader","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":false,"allowed_command_ids":["projects.inspect","assets.inspect","media.probe"],"object_grants":[{"kind":"project","id":cli_project,"actions":["read"]}],"read_roots":[],"write_roots":[]});
+    assert_eq!(cli.mutation(&scope,"project-reader-profile","access.profiles.put",reader).await["ok"],true);
+    let (project_visible,exit)=cli.human(&["--access-profile","project-only-reader","projects","inspect","--project",cli_project,"--projection","entity","--entity",binding_id]).await; assert_eq!(exit,0,"{project_visible}");
+    assert_eq!(project_visible["result"]["entity"]["asset_id"],asset["id"]);
+    assert!(!project_visible.to_string().contains(media.source.to_str().unwrap()));
+    let (source_denied,exit)=cli.human(&["--access-profile","project-only-reader","assets","inspect",asset["id"].as_str().unwrap()]).await; assert_ne!(exit,0); assert_eq!(source_denied["error"]["code"],"OBJECT_NOT_FOUND");
+    let (path_denied,exit)=cli.human(&["--access-profile","project-only-reader","media","probe",media.source.to_str().unwrap()]).await; assert_ne!(exit,0); assert_eq!(path_denied["error"]["code"],"PATH_DENIED");
     let (report, exit) = cli
         .human(&[
             "streams",
@@ -447,7 +486,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -504,6 +543,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
+    let stdio_project_semantics=project_sdk!(stdio,operator_scope,operator_asset,"stdio");
+    assert_eq!(stdio_project_semantics,cli_project_semantics);
     let report = call!(
         stdio,
         "streams.clean.report",
@@ -872,6 +913,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
+        let http_project_semantics=project_sdk!(http,scope,asset,format!("http-{ordinal}"));
+        assert_eq!(http_project_semantics,cli_project_semantics);
         let report = call!(
             http,
             "streams.clean.report",

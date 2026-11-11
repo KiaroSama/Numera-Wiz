@@ -214,7 +214,7 @@ fn prepare(destinations: &[Destination]) -> Result<Vec<File>> {
     }
     Ok(files)
 }
-fn open_lock(path: &Path) -> Result<File> {
+pub(crate) fn open_lock(path: &Path) -> Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create_new(true);
     #[cfg(unix)]
@@ -231,7 +231,7 @@ fn open_lock(path: &Path) -> Result<File> {
     security::verify_private_file(path, 0)?;
     files::open_regular_read(path)
 }
-fn namespace() -> Result<PathBuf> {
+pub(crate) fn namespace() -> Result<PathBuf> {
     #[cfg(unix)]
     let root = {
         let uid = rustix::process::geteuid().as_raw();
