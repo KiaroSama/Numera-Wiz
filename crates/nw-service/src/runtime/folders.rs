@@ -596,36 +596,34 @@ impl FolderScan<'_> {
                 ));
             }
             self.source_bytes += source_bytes;
-            let (identity, asset, stamp) = if kind == FolderEntryKind::Media {
-                let (mut asset, stamp) = tokio::runtime::Handle::current().block_on(
-                    self.service.engine()?.register_held_with_policy(
+            let (identity, asset, stamp) =
+                if kind == FolderEntryKind::Media {
+                    let (mut asset, stamp) = tokio::runtime::Handle::current().block_on(
+                        self.service.engine()?.register_held_with_policy(
+                            stamp,
+                            self.context.principal.clone(),
+                            deadline,
+                            source_bytes,
+                            self.cancel.clone(),
+                        ),
+                    )?;
+                    if !asset.probe.streams.iter().any(|stream| {
+                        stream.kind == StreamKind::Video && !stream.attached_picture()
+                    }) {
+                        return Err(DomainError::new(
+                            "VIDEO_REQUIRED",
+                            "Cleanup folder candidates require an admitted ordinary video stream",
+                        ));
+                    }
+                    asset.display_name = relative.clone();
+                    (asset.identity.clone(), Some(asset), stamp)
+                } else {
+                    (
+                        stamp.identity_with_limit(self.cancel, source_bytes)?,
+                        None,
                         stamp,
-                        self.context.principal.clone(),
-                        deadline,
-                        source_bytes,
-                        self.cancel.clone(),
-                    ),
-                )?;
-                if !asset
-                    .probe
-                    .streams
-                    .iter()
-                    .any(|stream| stream.kind == StreamKind::Video && !stream.attached_picture())
-                {
-                    return Err(DomainError::new(
-                        "VIDEO_REQUIRED",
-                        "Cleanup folder candidates require an admitted ordinary video stream",
-                    ));
-                }
-                asset.display_name = relative.clone();
-                (asset.identity.clone(), Some(asset), stamp)
-            } else {
-                (
-                    stamp.identity_with_limit(self.cancel, source_bytes)?,
-                    None,
-                    stamp,
-                )
-            };
+                    )
+                };
             stamp.revalidate()?;
             if identity.bytes != source_bytes.to_string() {
                 return Err(DomainError::new(
