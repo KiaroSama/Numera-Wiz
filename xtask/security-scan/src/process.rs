@@ -363,7 +363,7 @@ impl Running {
     fn cleanup(&mut self, deadline: Instant, fault: Option<FixtureFault>) -> Result<NoChildren> {
         let start = Instant::now();
         let end = (start + GRACE).min(deadline);
-        if let Err(e) = self.direct_signal(Signal::Term) {
+        if let Err(e) = self.direct_signal(Signal::TERM) {
             self.fail(e);
         }
         let mut killed = false;
@@ -377,7 +377,7 @@ impl Running {
                         && self.stderr_pipe.is_none())
                     || Instant::now() + Duration::from_millis(100) >= end)
             {
-                if let Err(e) = self.direct_signal(Signal::Kill) {
+                if let Err(e) = self.direct_signal(Signal::KILL) {
                     self.fail(e);
                 }
                 self.group = None;
@@ -388,7 +388,7 @@ impl Running {
                 self.fail(e);
             }
             // Existing owned handles remain actionable even if discovery fails.
-            if let Err(e) = self.signal_adopted(if killed { Signal::Kill } else { Signal::Term }) {
+            if let Err(e) = self.signal_adopted(if killed { Signal::KILL } else { Signal::TERM }) {
                 self.fail(e);
             }
             if killed {

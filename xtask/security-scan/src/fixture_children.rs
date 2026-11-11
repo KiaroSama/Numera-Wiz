@@ -137,7 +137,7 @@ fn child(mode: &str, root: &Path) -> Result<()> {
                 .spawn()
                 .private("SECURITY_FIXTURE_SPAWN")?;
             await_ready(&root.join("leaf-ready"))?;
-            os::kill_process(os::getpid(), Signal::Kill).private("SECURITY_FIXTURE_SIGNAL")?;
+            os::kill_process(os::getpid(), Signal::KILL).private("SECURITY_FIXTURE_SIGNAL")?;
             forever()
         }
         "pressure" => {
@@ -161,8 +161,8 @@ fn child(mode: &str, root: &Path) -> Result<()> {
             readiness(root, "writer-ready")?;
             forever()
         }
-        "cancel" => cancellation(root, Signal::Term),
-        "cancel-int" => cancellation(root, Signal::Int),
+        "cancel" => cancellation(root, Signal::TERM),
+        "cancel-int" => cancellation(root, Signal::INT),
         "unrelated" => unrelated(root),
         "fault-registration" | "fault-discovery" | "fault-probe" | "fault-cleanup"
         | "fault-subreaper" => fault(root, mode),

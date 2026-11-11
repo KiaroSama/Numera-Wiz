@@ -88,7 +88,14 @@ pub fn identity(path: &Path) -> Result<String> {
     Ok(format!("{}:{}", meta.dev(), meta.ino()))
 }
 pub fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(64);
+    for &byte in digest.as_slice() {
+        output.push(char::from(HEX[usize::from(byte >> 4)]));
+        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    output
 }
 pub fn executable_hash(path: &Path) -> Result<String> {
     Ok(hash(&read(path, 128 * MIB)?))
