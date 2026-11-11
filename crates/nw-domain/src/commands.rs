@@ -643,7 +643,11 @@ mod tests {
         assert_eq!(entity.payload::<Bin>("bin").unwrap().member_count, 1);
         let original = entity.bytes().unwrap();
         assert!(entity.update(&serde_json::json!({"oversized": "x".repeat(crate::projects::MAX_PAYLOAD_BYTES)})).is_err());
-        assert_eq!(entity.bytes().unwrap(), original, "A rejected overlay must retain the exact original envelope");
+        assert_eq!(
+            entity.bytes().unwrap(),
+            original,
+            "A rejected overlay must retain the exact original envelope"
+        );
         // I5: opaque extensions must reject ambiguity before any known-field overlay.
         let mut duplicate_failures = Vec::new();
         for (case, payload) in [
