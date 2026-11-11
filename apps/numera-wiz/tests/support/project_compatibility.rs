@@ -259,7 +259,7 @@ fn configuration(evidence: &Evidence) -> Result<Configuration> {
     Ok(Configuration { old, new })
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 struct OwnerRecord {
     canonical_root: String,
     root_id: String,
@@ -317,6 +317,7 @@ struct Owner {
     record: OwnerRecord,
     http: reqwest::Client,
     lease: String,
+    last_lease_renewal: Option<Instant>,
     binary: Binary,
     last_project_query: Option<tokio::time::Instant>,
 }
@@ -412,6 +413,7 @@ impl Owner {
             record: ready,
             http,
             lease: uuid::Uuid::new_v4().to_string(),
+            last_lease_renewal: None,
             binary: binary.clone(),
             last_project_query: None,
         };
@@ -445,9 +447,50 @@ impl Owner {
             self.child.try_wait()?.is_none(),
             "Controlled owner exited while leased"
         );
+        // Measure from request start, conservatively preceding server acceptance.
+        let renewed_at = Instant::now();
         self.private("/internal/lease", &json!({"id":self.lease,"public":false}))
             .await?;
+        self.last_lease_renewal = Some(renewed_at);
         Ok(())
+    }
+    async fn cli_boundary(&mut self, root: &Path) -> Result<u64> {
+        ensure!(
+            self.child
+                .try_wait()
+                .map_err(|_| anyhow::anyhow!("Retained owner child status unavailable"))?
+                .is_none(),
+            "Retained owner child exited before CLI ownership check"
+        );
+        let bytes = security::read_private(&root.join("runtime/owner.json"), 16384)
+            .map_err(|_| anyhow::anyhow!("Protected owner record unavailable"))?;
+        let observed: OwnerRecord = serde_json::from_slice(&bytes)
+            .map_err(|_| anyhow::anyhow!("Protected owner record invalid"))?;
+        ensure!(
+            observed == self.record,
+            "Protected owner record changed from the retained original"
+        );
+        self.health_unchanged()
+            .await
+            .map_err(|_| anyhow::anyhow!("Retained owner health/identity check failed"))?;
+        let lease_age_ms = u64::try_from(
+            self.last_lease_renewal
+                .context("Controlled owner lease has never been renewed")?
+                .elapsed()
+                .as_millis(),
+        )
+        .context("Controlled owner lease age exceeds evidence range")?;
+        self.renew()
+            .await
+            .map_err(|_| anyhow::anyhow!("Retained owner same-lease renewal failed"))?;
+        ensure!(
+            self.child
+                .try_wait()
+                .map_err(|_| anyhow::anyhow!("Retained owner child status unavailable"))?
+                .is_none(),
+            "Retained owner child exited during CLI ownership check"
+        );
+        Ok(lease_age_ms)
     }
     async fn command(&mut self, request: &Value, evidence: &Evidence) -> Result<Value> {
         self.renew().await?;
@@ -497,8 +540,16 @@ impl Owner {
                 json!({"phase":"project-read-tickets-expired","epoch":self.record.epoch}),
             )?;
         }
+        ensure!(
+            self.child
+                .try_wait()
+                .map_err(|_| anyhow::anyhow!("Controlled owner stop-release child status unavailable"))?
+                .is_none(),
+            "Controlled owner exited before stop-release"
+        );
         self.private("/internal/lease", &json!({"id":self.lease,"release":true}))
-            .await?;
+            .await
+            .map_err(|_| anyhow::anyhow!("Controlled owner stop-release request failed"))?;
         let status = tokio::time::timeout(Duration::from_secs(40), self.child.wait())
             .await
             .context("Owner did not gracefully drain after lease release")??;
@@ -536,13 +587,26 @@ fn same_receipt(original: &Value, replay: &Value) -> Result<()> {
     Ok(())
 }
 async fn cli(
+    owner: &mut Owner,
     binary: &Binary,
     root: &Path,
     args: &[&str],
     evidence: &Evidence,
     label: &str,
 ) -> Result<(Value, i32, Captured)> {
+    // Healthy native attachment precedes this gate in both packaged clients.
+    // Holding it prevents an unexpected owner death from spawning a replacement.
+    let _bootstrap_gate = RootLock::acquire(&root.join("runtime"))
+        .map_err(|_| anyhow::anyhow!("Typed CLI runtime bootstrap guard unavailable"))?;
+    let prehash_lease_age_ms = owner
+        .cli_boundary(root)
+        .await
+        .context("Typed CLI prehash ownership boundary")?;
     binary.verify()?;
+    let posthash_lease_age_ms = owner
+        .cli_boundary(root)
+        .await
+        .context("Typed CLI posthash-before-spawn ownership boundary")?;
     let mut child = Command::new(&binary.path)
         .arg("--data-dir")
         .arg(root)
@@ -557,6 +621,10 @@ async fn cli(
     let status = tokio::time::timeout(Duration::from_secs(45), child.wait())
         .await
         .context("Actual typed CLI deadline")??;
+    let post_cli_lease_age_ms = owner
+        .cli_boundary(root)
+        .await
+        .context("Typed CLI post-CLI ownership boundary")?;
     let output = stdout.await??;
     let error = stderr.await??;
     ensure!(output.total <= MAX_BODY as u64, "CLI output exceeds bound");
@@ -564,7 +632,7 @@ async fn cli(
         .code()
         .context("CLI must return a synchronous exit code")?;
     let value = serde_json::from_slice(&output.bytes).unwrap_or(Value::Null);
-    evidence.record(json!({"phase":"cli","binary":binary.label,"command":label,"exit_code":code,"stdout_bytes":output.total,"stdout_sha256":sha(&output.bytes),"stderr_bytes":error.total,"retained_stderr_sha256":sha(&error.bytes),"receipt_id":value["receipt_id"],"error_code":value["error"]["code"]}))?;
+    evidence.record(json!({"phase":"cli","binary":binary.label,"command":label,"exit_code":code,"stdout_bytes":output.total,"stdout_sha256":sha(&output.bytes),"stderr_bytes":error.total,"retained_stderr_sha256":sha(&error.bytes),"receipt_id":value["receipt_id"],"error_code":value["error"]["code"],"checked_owner":{"root_id":owner.record.root_id,"epoch":owner.record.epoch,"build":owner.record.build,"registry":owner.record.registry,"port":owner.record.port,"retained_child_alive":true,"protected_record_unchanged":true,"canonical_root_unchanged":true,"runtime_bootstrap_guard_held":true},"lease_age_ms":{"prehash":prehash_lease_age_ms,"posthash":posthash_lease_age_ms,"post_cli":post_cli_lease_age_ms}}))?;
     Ok((value, code, error))
 }
 
@@ -1255,6 +1323,7 @@ async fn legacy_reads(
     same_receipt(accepted, &owner.command(original, evidence).await?)
 }
 async fn migration_cli(
+    owner: &mut Owner,
     binary: &Binary,
     root: &Path,
     plan_file: &Path,
@@ -1274,6 +1343,7 @@ async fn migration_cli(
         "compat-old-copy",
     ];
     let (response, code, _) = cli(
+        owner,
         binary,
         root,
         &args,
@@ -1434,6 +1504,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     );
     legacy_reads(&mut owner, &original, &accepted, evidence).await?;
     let (_, conflict_code, conflict_stderr) = cli(
+        &mut owner,
         &configuration.new,
         &root,
         &["commands", "list"],
@@ -1477,6 +1548,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         .await?;
     let migration_scope = text(&issued["result"], "replay_scope")?;
     let (reviewed, code, _) = cli(
+        &mut owner,
         &configuration.old,
         &root,
         &["maintenance", "plan"],
@@ -1507,6 +1579,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     );
     retain_request(&requests, &migration_request)?;
     let migration_accepted = migration_cli(
+        &mut owner,
         &configuration.old,
         &root,
         &plan_file,
@@ -1535,6 +1608,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     same_receipt(
         &migration_accepted,
         &migration_cli(
+            &mut owner,
             &configuration.old,
             &root,
             &plan_file,
@@ -1544,6 +1618,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         .await?,
     )?;
     let (inspected, code, _) = cli(
+        &mut owner,
         &configuration.old,
         &root,
         &["maintenance", "inspect", &migration_id],
@@ -1587,6 +1662,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     same_receipt(
         &migration_accepted,
         &migration_cli(
+            &mut owner,
             &configuration.new,
             &root,
             &plan_file,
@@ -1653,6 +1729,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     same_receipt(
         &migration_accepted,
         &migration_cli(
+            &mut owner,
             &configuration.old,
             &root,
             &plan_file,
@@ -1662,6 +1739,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         .await?,
     )?;
     let (not_required, code, _) = cli(
+        &mut owner,
         &configuration.old,
         &root,
         &["maintenance", "plan"],
