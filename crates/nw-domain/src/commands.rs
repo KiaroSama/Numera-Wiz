@@ -403,6 +403,18 @@ pub fn registry() -> Vec<Descriptor> {
             crate::ingest::RegisterInput
         ),
         row!(
+            "assets.register_folder",
+            "Register a bounded native folder snapshot with per-file outcomes",
+            DurableMutation,
+            crate::ingest::RegisterFolderInput
+        ),
+        row!(
+            "assets.folder_inspect",
+            "Inspect an immutable creator-scoped folder intake snapshot",
+            Query,
+            IdInput
+        ),
+        row!(
             "streams.clean.resolve",
             "Resolve MuxCls selection without I/O",
             Query,
@@ -631,6 +643,8 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.credentials.issue",
     "media.probe",
     "assets.register",
+    "assets.register_folder",
+    "assets.folder_inspect",
     "assets.list",
     "assets.inspect",
     "assets.output_suggest",

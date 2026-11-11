@@ -142,3 +142,16 @@ operation budgets. Disabled deadlines require protected local-owner authority;
 a scoped browser session receives a permission error. Active job rows show
 measured copy/verification-stage bytes. See the CLI manual for exact fields,
 bounds and the distinction between a stage and the whole job.
+
+
+## Authorized folder intake
+
+Expand Folder intake below Command details. Enter an absolute path on the
+engine's computer, select recursion, exact relative exclusions and companion
+inventory/exclusion, then register with the existing durable retry mechanism.
+A browser picker uploads selected file bytes; it does not grant a native folder.
+Inspect a retained snapshot ID to review its hash, completeness, bounds and
+per-file outcomes. Open a successfully registered asset or include it in the
+existing cleanup batch; review and submit that batch separately. Companion
+inventory does not create copied companion outputs. Current folder controls
+require their own hosted interaction evidence before claiming GUI qualification.

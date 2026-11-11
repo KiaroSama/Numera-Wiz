@@ -98,6 +98,23 @@ pub enum Media {
 }
 #[derive(Subcommand)]
 pub enum Assets {
+    /// Register a bounded folder snapshot, retaining individual probe failures.
+    RegisterFolder {
+        path: PathBuf,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long = "exclude-relative")]
+        exclude_relative: Vec<String>,
+        #[arg(long, default_value = "inventory", value_parser = ["inventory", "exclude"])]
+        companion_policy: String,
+        #[command(flatten)]
+        probe: ProbePolicy,
+        #[command(flatten)]
+        identity: MutationIdentity,
+    },
+    FolderInspect {
+        id: String,
+    },
     Register {
         path: PathBuf,
         #[command(flatten)]
@@ -154,6 +171,12 @@ pub enum Plans {
 }
 #[derive(Subcommand)]
 pub enum Jobs {
+    /// Observe an accepted job; Ctrl+C stops waiting while the owner keeps the job.
+    Wait {
+        id: String,
+        #[arg(long, default_value_t = 1800, value_parser = clap::value_parser!(u32).range(1..=86400))]
+        timeout_seconds: u32,
+    },
     Submit {
         #[arg(long)]
         plan: String,
@@ -285,6 +308,25 @@ pub fn prepare(command: Command) -> Result<Request> {
             identity.apply(&mut request)?;
             request
         }
+        Command::Assets(Assets::RegisterFolder {
+            path,
+            recursive,
+            exclude_relative,
+            companion_policy,
+            probe,
+            identity,
+        }) => {
+            let mut params = json!({"path":native_path(&path)?,"recursive":recursive,"exclude_relative":exclude_relative,"companion_policy":companion_policy});
+            probe.apply(&mut params)?;
+            let input: nw_domain::ingest::RegisterFolderInput = commands::parse(params.clone())?;
+            input.validate()?;
+            let mut request = query("assets.register_folder", params);
+            identity.apply(&mut request)?;
+            request
+        }
+        Command::Assets(Assets::FolderInspect { id }) => {
+            query("assets.folder_inspect", json!({"id":id}))
+        }
         Command::Assets(Assets::List { page }) => query("assets.list", page.params()),
         Command::Assets(Assets::Inspect { id }) => query("assets.inspect", json!({"id":id})),
         Command::Assets(Assets::Output { id }) => query("assets.output_suggest", json!({"id":id})),
@@ -336,7 +378,9 @@ pub fn prepare(command: Command) -> Result<Request> {
             identity.apply(&mut request)?;
             request
         }
-        Command::Jobs(Jobs::Inspect { id }) => query("jobs.inspect", json!({"id":id})),
+        Command::Jobs(Jobs::Inspect { id } | Jobs::Wait { id, .. }) => {
+            query("jobs.inspect", json!({"id":id}))
+        }
         Command::Jobs(Jobs::List { page }) => query("jobs.list", page.params()),
         Command::Jobs(Jobs::Cancel { id, identity }) => {
             let mut request = query("jobs.cancel", json!({"id":id}));
@@ -400,6 +444,9 @@ pub fn prepare(command: Command) -> Result<Request> {
     Ok(commands::decode_request(&serde_json::to_vec(&request)?)?)
 }
 pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
+    if let Command::Jobs(Jobs::Wait { id, timeout_seconds }) = &command {
+        return wait_job(client, id, *timeout_seconds).await;
+    }
     if let Command::Batches(Batches::Wait { id }) = &command {
         return wait_batch(client, id).await;
     }
@@ -422,6 +469,63 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
             Err(error)
         }
     }
+}
+
+async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Result<()> {
+    use nw_domain::records::JobState;
+    let deadline = tokio::time::Instant::now()
+        + std::time::Duration::from_secs(u64::from(timeout_seconds));
+    let outcome = async {
+        loop {
+            let mut response = client.request(&query("jobs.inspect", json!({"id":id}))).await?;
+            if !response.ok {
+                let error = response.error.clone().unwrap_or_else(|| {
+                    DomainError::new("OBJECT_NOT_FOUND", "Job observation is unavailable")
+                });
+                response.error = Some(error);
+                return Ok::<_, anyhow::Error>(response);
+            }
+            let job: nw_domain::views::JobView = commands::parse(response.result.clone().ok_or_else(|| {
+                DomainError::new("INVALID_RECORD", "Job observation omitted its result")
+            })?)?;
+            if job.state.terminal() {
+                let error = match job.state {
+                    JobState::Succeeded => None,
+                    JobState::Cancelled => Some(DomainError::new("CANCELLED", "Accepted job was cancelled")),
+                    JobState::Skipped => Some(DomainError::new("CAPABILITY_UNAVAILABLE", "Job was skipped and produced no verified output")),
+                    _ => Some(match job.error {
+                        Some(error) => DomainError::new(&error.code, error.message.unwrap_or_else(|| "Accepted job did not succeed".into())),
+                        None => DomainError::new("JOB_FAILED", "Accepted job did not succeed"),
+                    }),
+                };
+                response.ok = error.is_none();
+                response.error = error.clone();
+                return Ok(response);
+            }
+            tracing::debug!(job_id = id, state = ?job.state, "job.wait.progress");
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    };
+    let error: anyhow::Error = tokio::select! {
+        result = outcome => match result {
+            Ok(response) => {
+                let error = response.error.clone();
+                println!("{}", serde_json::to_string_pretty(&response)?);
+                return error.map_or(Ok(()), |error| Err(error.into()));
+            }
+            Err(error) => error,
+        },
+        _ = tokio::time::sleep_until(deadline) => DomainError::new("TIMEOUT", "Stopped waiting at the selected deadline; the accepted job remains owned by the worker").into(),
+        signal = tokio::signal::ctrl_c() => {
+            signal?;
+            DomainError::new("CANCELLED", "Stopped waiting; the accepted job remains owned by the worker").into()
+        }
+    };
+    let public = error.downcast_ref::<DomainError>().cloned().unwrap_or_else(|| {
+        DomainError::new("TRANSPORT_ERROR", "Job observation failed; accepted work remains owned by the worker")
+    });
+    println!("{}", serde_json::to_string_pretty(&Response::error("job-wait", public))?);
+    Err(error)
 }
 
 async fn wait_batch(client: &NativeClient, id: &str) -> Result<()> {
@@ -516,5 +620,12 @@ mod tests {
         assert_eq!(first.replay_scope.as_deref(), Some("retained-scope"));
         assert_eq!(first.idempotency_key.as_deref(), Some("same-operation"));
         assert_eq!(first.params, second.params);
+        let wait = prepare(Command::Jobs(Jobs::Wait {
+            id: "accepted-job".into(),
+            timeout_seconds: 30,
+        })).unwrap();
+        assert_eq!(wait.command.id, "jobs.inspect");
+        assert_eq!(wait.params, json!({"id":"accepted-job"}));
+        assert!(wait.idempotency_key.is_none() && wait.replay_scope.is_none());
     }
 }

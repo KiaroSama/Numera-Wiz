@@ -4,6 +4,7 @@ mod batches;
 mod maintenance;
 pub use artifacts::ArtifactTransfer;
 mod clock;
+mod folders;
 mod read_model;
 mod uploads;
 use nw_domain::{
@@ -491,6 +492,7 @@ impl Service {
             return Ok(response);
         };
         let readable = match request.command.id.as_str() {
+            "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
                     DomainError::new("STORAGE_ERROR", "Retained asset receipt has no result")
@@ -893,6 +895,10 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "assets.register_folder" | "assets.folder_inspect" => {
+                drop(guard);
+                return self.folder_command(&context, &request, &cancellation);
+            }
             "maintenance.plan" | "maintenance.migrate" | "maintenance.inspect" => {
                 return self.maintenance_command(&context, &request, &cancellation);
             }

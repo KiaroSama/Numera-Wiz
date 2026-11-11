@@ -1,64 +1,94 @@
+<p align="center">
+  <img src="assets/branding/numera-wiz.png" width="240" height="240" alt="Numera Wiz official logo">
+</p>
+
 # Numera Wiz
 
-Rust media editing and utilities powered by a local FFmpeg engine, with a shared
-native/browser UI, CLI and official MCP transports.
+[![Rust CI](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml?query=branch%3Arewrite%2Frust-completion)
+[![Rust](https://img.shields.io/badge/Rust-1.99.1-DEA584?logo=rust)](rust-toolchain.toml)
+[![Platforms](https://img.shields.io/badge/builds-Windows%20%7C%20Linux%20%7C%20macOS-blue)](.github/workflows/ci.yml)
+[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20HTTP-blue)](docs/agents/README.md)
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
-**Development branch; complete application release is not yet qualified.**
-All implementation is on `implementation/numera-wiz-v1` for the owner's review.
-The main branch intentionally retains only the repository bootstrap.
+A **Pure Rust** media application with a local **FFmpeg/ffprobe** engine, shared
+native/browser workspace, CLI and official MCP transports. FFmWiz and MuxCls
+supply behavioral references for media utilities and the CLI; their Python or
+PowerShell runtimes are not part of this repository or application.
 
-Read the [authoritative revision 7 mandate](docs/research-pack/Numera-Wiz-Implementation-Mandate-EN.md),
-[execution specification](specs/001-numera-wiz/spec.md),
-[task ledger](specs/001-numera-wiz/tasks.md) and
-[continuation record](docs/development/continuation.md).
+**Version 1 is in development.** The review branch contains working cleanup,
+registration, planning, job and artifact flows. The complete editor, utility
+families and offline portable release described by the
+[implementation mandate](docs/research-pack/Numera-Wiz-Implementation-Mandate-EN.md)
+remain unfinished. A green development CI is evidence for its exercised scope.
+Current work and required gaps are recorded in the
+[continuation record](docs/development/continuation.md) and
+[completion ledger](docs/development/completion.json).
 
-The full research pack is preserved with original hashes. Offline FFmpeg manual
-sources and licenses are under `docs/vendor/ffmpeg/n9.0.2`.
+## Implemented workflows
 
-Current code includes exact rational time, strict command DTOs, the shared MuxCls
-resolver, a protected single-owner service, durable asset/plan/job acceptance and
-receipt replay, explicit access profiles, bounded process/file/media execution,
-publication journals and real CLI/official MCP adapters. The shared native/WASM
-workspace has working media intake, cleanup forms, bounded selection reports,
-explicit filesystem timestamp policies, plan review, job controls and output
-manifest inspection. CLI, actual Linux native Save controls and actual headed
-Chrome Save As deliver verified client copies, including genuine OS Save dialogs
-and independent saved/source byte equality. Other browser/desktop/package
-variants remain under qualification. Ordinary composable CLI commands use the
-same registry and retain explicit durable retry identities.
-CI builds hash-addressed same-source browser assets and exercises Chrome media
-selection, review and verified output. The actual Linux native window also has
-actual report controls, Review/keyboard Run, byte-verified output and an opened
-Output details dialog with verified SHA-256 evidence. [GUI guide](docs/manuals/GUI.md) and
-[current CLI manual](docs/manuals/CLI.md)
-describe the actual admitted scope. Hosted
-Windows/Linux/macOS CI builds/tests the actual workspace and verifies source
-provenance. This does not claim completion of the full MuxCls rewrite, F01-F15,
-editing, five-surface parity, offline portable packaging or GPU qualification.
+- Native and streamed browser media intake; exact original-index stream selection
+  and metadata/tag/order resolution, using the shared MuxCls rules.
+- Authorized folder intake with deterministic relative paths, retained probe
+  failures, explicit bounds/exclusions and companion inventories. Inventory does
+  not copy companions or qualify the whole MuxCls utility.
+- Immutable command review, exactly-once durable acceptance, bounded FFmpeg/copy
+  execution, cancellation, recovery and verified no-replace output publication.
+- CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped
+  operator profiles, bounded artifact transfer and verified client Save As.
+- Rust repository automation; no first-party Python, shell, C, Go or JavaScript
+  source. Browser glue is generated during the hosted WASM build.
 
-## Human setup
+## Human setup and builds
 
-There is no complete portable release download yet. Do not use unqualified
-source snapshots as a finished media application. Build/test evidence is available
-in the branch's GitHub Actions runs. The intended Windows installation area is
-`G:\Program Files\Numera Wiz`; another selected drive/path is supported by design.
+[GitHub Actions](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml)
+checks out the exact source HEAD and builds Windows x64, Linux x64, macOS ARM64
+and macOS Intel artifacts with matching embedded browser assets. Native builds
+run before ordinary regression/lint checks; a failed prerequisite build remains
+a failure. Inspect all checks on the latest commit before using an artifact.
 
-## Agent setup
+Development packages include the executable, manuals, source/dependency records
+and SHA-256 manifests. They are unsigned review artifacts; the standard bundled
+FFmpeg profile and full offline portable qualification are still required. They
+are not a finished release download. Ordinary compilation and media tests run
+in hosted CI. Owner hardware qualification uses matching prebuilt artifacts.
 
-Read `AGENTS.md` and `.specify/memory/constitution.md`. Official Spec Kit 1.2.2
-Codex skills are included. Continue the selected tasks rather than restarting a
-whole research pass. Installed command spelling is `$speckit-constitution`,
-`$speckit-specify`, `$speckit-clarify`, `$speckit-plan`, `$speckit-checklist`,
-`$speckit-tasks`, `$speckit-analyze`, `$speckit-implement`, `$speckit-converge`.
+See the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
+[MCP manual](docs/manuals/MCP.md) and [agent setup](docs/agents/README.md).
+The CLI exposes `commands list`, `commands schema <id>`, `media probe`,
+`assets register-folder`, `streams clean`, `jobs submit`, `jobs wait`,
+`jobs cancel`, batch controls and `artifacts save`. Parameters, access grants
+and durable retry identities are documented in those manuals.
 
-The development application exposes `numera-wiz bridge` for official stdio MCP
-and direct HTTP at configurable loopback port `1578`. The [MCP guide](docs/manuals/MCP.md)
-records the current typed operation and authentication boundary; the complete
-application and packaged client walkthroughs are still required.
-No source build or ordinary media test is required on the owner's machine.
-Actual GPU qualification uses the matching CI-built harness on the RTX 4070 Ti.
+## Skills, plugins and MCP
+
+The [Numera Wiz plugin](integrations/numera-wiz/README.md) contains the project's
+own skill, native Claude Code/Codex/Cursor packaging and portable MCP client
+configurations. It calls the same Rust `numera-wiz bridge` executable. No Node
+or Python service is introduced. Native client loading/qualification is reported
+separately from manifest validation and the official-SDK hosted tests.
+
+MCP uses stdio or direct loopback HTTP on configurable port `1578`. Discovery
+comes from actual shared command descriptors. The default `agent` profile can
+discover capabilities; the owner must explicitly grant operation, object and
+filesystem rights before an agent changes media. The skill explains how to probe,
+review, submit, observe, cancel/retry and read authorized results.
+
+## Source policy and contributing
+
+Spec Kit, feature specifications and private `.ai/` memory are local-only and
+ignored. Third-party executable source snapshots are excluded, including from
+compressed repository archives. Pinned source URLs and original hashes remain
+under [research provenance](docs/research/README.md); the original supplied
+research companion is kept outside this repository. Offline FFmpeg manuals and
+licenses remain in `docs/vendor/ffmpeg/n9.0.2`.
+
+The [upstream review](docs/research/upstream-review-2026-11-11.md) identifies
+actual source changes and compatibility gates. `xtask verify-research` checks
+retained document hashes, the tracked Pure Rust boundary and the original Rust
+test inventory. [Contributing](CONTRIBUTING.md) describes review and validation.
 
 ## License
 
-GPL-3.0-or-later for first-party code. See [LICENSE](LICENSE) and
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for retained upstream material.
+First-party code: **GPL-3.0-or-later**. See [LICENSE](LICENSE) and
+[third-party notices](THIRD-PARTY-NOTICES.md). The official owner-supplied logo
+is preserved byte for byte; its hash is recorded in [branding](assets/branding/README.md).

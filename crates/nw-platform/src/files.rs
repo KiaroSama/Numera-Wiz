@@ -292,6 +292,37 @@ impl DirectoryStamp {
         }
         Ok(())
     }
+    /// Stream names from the held directory. The visitor enforces entry/name/cancellation budgets.
+    /// A Unix namespace swap cannot redirect enumeration to an unreviewed directory.
+    pub fn for_each_entry(&self, mut visit: impl FnMut(PathBuf) -> Result<()>) -> Result<()> {
+        self.revalidate()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let directory = rustix::fs::Dir::read_from(&self.file).map_err(io_error)?;
+            for entry in directory {
+                let entry = entry.map_err(io_error)?;
+                let name = entry.file_name().to_bytes();
+                if name == b"." || name == b".." {
+                    continue;
+                }
+                visit(self.path.join(std::ffi::OsStr::from_bytes(name)))?;
+            }
+        }
+        #[cfg(windows)]
+        {
+            // The held Windows directory excludes delete sharing until enumeration ends.
+            for entry in fs::read_dir(&self.path).map_err(io_error)? {
+                visit(entry.map_err(io_error)?.path())?;
+            }
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = &mut visit;
+            return Err(DomainError::new("NATIVE_IDENTITY_UNAVAILABLE", "Held-directory enumeration is unavailable on this platform"));
+        }
+        self.revalidate()
+    }
 }
 fn directory_changed(error: impl std::fmt::Display) -> DomainError {
     DomainError::new(
@@ -955,6 +986,10 @@ mod tests {
         fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
         fs::create_dir(&parent).unwrap();
         assert_eq!(stamp.revalidate().unwrap_err().code, "TARGET_CHANGED");
+        fs::write(parent.join("unreviewed.mkv"), b"not enumerated").unwrap();
+        let mut visited = 0;
+        assert_eq!(stamp.for_each_entry(|_| { visited += 1; Ok(()) }).unwrap_err().code, "TARGET_CHANGED");
+        assert_eq!(visited, 0);
     }
     #[cfg(windows)]
     #[test]
@@ -978,8 +1013,13 @@ mod tests {
         let original = stamp.object_identity().unwrap();
         fs::write(parent.join("another-output.mkv"), b"independent child").unwrap();
         stamp.require_object(&original).unwrap();
+        let mut names = Vec::new();
+        stamp.for_each_entry(|path| { names.push(path.file_name().unwrap().to_owned()); Ok(()) }).unwrap();
+        assert_eq!(names, vec![std::ffi::OsString::from("another-output.mkv")]);
+        assert_eq!(stamp.for_each_entry(|_| Err(DomainError::new("RESOURCE_LIMIT", "Bounded visitor stopped"))).unwrap_err().code, "RESOURCE_LIMIT");
         fs::remove_file(parent.join("another-output.mkv")).unwrap();
         stamp.require_object(&original).unwrap();
+        stamp.for_each_entry(|_| panic!("Removed children must not reappear through a shared stream position")).unwrap();
     }
     #[test]
     fn original_object_survives_handle_drop_but_rejects_identical_replacement() {

@@ -422,7 +422,8 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
         .with_allowed_hosts([host.clone()])
         .with_allowed_origins([origin.clone()])
         .enforce_origin_validation()
-        .with_legacy_session_mode(false);
+        .with_legacy_session_mode(false)
+        .with_cancellation_token(listener_stop.child_token());
     config.max_request_body_bytes = commands::MAX_COMMAND_BYTES;
     let service = owner.service.clone();
     let mcp = StreamableHttpService::new(
@@ -702,11 +703,16 @@ mod tests {
             slots: Arc::new(Semaphore::new(32)),
             pairing: Mutex::new(HashMap::new()),
         });
-        let routes = router(owner.clone(), port, false, owner.stop.clone());
+        let listener_stop = CancellationToken::new();
+        let routes = router(owner.clone(), port, false, listener_stop.clone());
         let task = tokio::spawn(async move {
             axum::serve(listener, routes).await.unwrap();
         });
-        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
         let endpoint = format!("http://127.0.0.1:{port}");
         assert_eq!(
             client
@@ -773,6 +779,177 @@ mod tests {
                 .unwrap()
                 .status(),
             StatusCode::BAD_REQUEST
+        );
+
+        // Exercise the registered authenticated MCP boundary, including rmcp 3.9's
+        // exact media-type parsing. Substring matches must not admit lookalikes.
+        let mcp_endpoint = format!("{endpoint}/mcp");
+        let list = json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}});
+        let request = || {
+            client
+                .post(&mcp_endpoint)
+                .bearer_auth(&token)
+                .header("MCP-Protocol-Version", "2025-11-25")
+                .body(list.to_string())
+        };
+        let rpc = |body: &str| {
+            serde_json::from_str::<Value>(body)
+                .ok()
+                .or_else(|| {
+                    body.lines()
+                        .filter_map(|line| line.strip_prefix("data:"))
+                        .find_map(|data| serde_json::from_str::<Value>(data.trim()).ok())
+                })
+                .expect("A JSON or SSE JSON-RPC response is required")
+        };
+        for content_type in ["application/json", "Application/JSON; charset=UTF-8"] {
+            let response = request()
+                .header(header::CONTENT_TYPE, content_type)
+                .header(header::ACCEPT, "application/json, text/event-stream")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{content_type}");
+            let result = rpc(&response.text().await.unwrap());
+            assert_eq!(result["id"], 1);
+            assert!(
+                result["result"]["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|tool| tool["name"] == "commands.list")
+            );
+        }
+        let response = request()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "Application/JSON; note=\"a,b;c\";q=1")
+            .header(header::ACCEPT, "TEXT/EVENT-STREAM; q=0.5")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(rpc(&response.text().await.unwrap())["result"]["tools"].is_array());
+        for content_type in ["application/jsonp", "application/json-patch+json", "text/plain"] {
+            assert_eq!(
+                request()
+                    .header(header::CONTENT_TYPE, content_type)
+                    .header(header::ACCEPT, "application/json, text/event-stream")
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "{content_type}"
+            );
+        }
+        for accept in [
+            "application/json, text/event-stream;q=0",
+            "application/json;q=0.000, text/event-stream",
+            "application/jsonp, text/event-stream",
+            "application/json, text/event-stream-extra",
+            "text/plain; note=\"application/json, text/event-stream\"",
+        ] {
+            assert_eq!(
+                request()
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::ACCEPT, accept)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::NOT_ACCEPTABLE,
+                "{accept}"
+            );
+        }
+
+        // Standard headers must describe the actual named command. Current tool
+        // schemas have no x-mcp-header annotations, so this does not claim coverage
+        // of the SDK's annotated Mcp-Param validation path.
+        let call = json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+            "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},
+            "name":"commands.list","arguments":{"params":{}}
+        }});
+        let modern = || {
+            client
+                .post(&mcp_endpoint)
+                .bearer_auth(&token)
+                .header("MCP-Protocol-Version", "2026-07-28")
+                .header(header::ACCEPT, "application/json, text/event-stream")
+                .json(&call)
+        };
+        let response = modern()
+            .header("Mcp-Method", "tools/call")
+            .header("Mcp-Name", "commands.list")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            rpc(&response.text().await.unwrap())["result"]["structuredContent"]["ok"],
+            true
+        );
+        for (label, method, name, duplicate_method) in [
+            (
+                "method mismatch",
+                "tools/list",
+                axum::http::HeaderValue::from_static("commands.list"),
+                false,
+            ),
+            (
+                "name mismatch",
+                "tools/call",
+                axum::http::HeaderValue::from_static("jobs.cancel"),
+                false,
+            ),
+            (
+                "duplicate method",
+                "tools/call",
+                axum::http::HeaderValue::from_static("commands.list"),
+                true,
+            ),
+            (
+                "non-ASCII name",
+                "tools/call",
+                axum::http::HeaderValue::from_bytes(b"\xff").unwrap(),
+                false,
+            ),
+        ] {
+            let mut request = modern()
+                .header("Mcp-Method", method)
+                .header("Mcp-Name", name);
+            if duplicate_method {
+                request = request.header("Mcp-Method", method);
+            }
+            let response = request.send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{label}");
+            let error: Value = response.json().await.unwrap();
+            assert_eq!(error["id"], 2, "{label}");
+            assert_eq!(error["error"]["code"], -32020, "{label}");
+        }
+
+        // A public listener's lifetime is separate from its native owner. This
+        // fixture has no media engine and makes no accepted-media-job claim.
+        listener_stop.cancel();
+        assert!(!owner.stop.is_cancelled());
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert!(
+            owner
+                .service
+                .dispatch(
+                    owner.service.owner(),
+                    commands::Request::query("commands.list", json!({})),
+                )
+                .await
+                .ok
         );
         task.abort();
     }

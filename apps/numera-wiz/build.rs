@@ -26,7 +26,10 @@ fn main() {
             .expect("valid UI manifest");
     assert_eq!(
         manifest["source"].as_str(),
-        env::var("GITHUB_SHA").ok().as_deref(),
+        env::var("NW_SOURCE_SHA")
+            .or_else(|_| env::var("GITHUB_SHA"))
+            .ok()
+            .as_deref(),
         "UI source identity mismatch"
     );
     let assets = manifest["assets"].as_array().expect("asset records");
@@ -51,6 +54,7 @@ fn main() {
             [
                 "application/wasm",
                 "application/javascript",
+                "image/png",
                 "text/css",
                 "text/html; charset=utf-8"
             ]

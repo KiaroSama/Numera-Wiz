@@ -400,7 +400,7 @@ async fn journey(media: &fixture::Media, second: Option<&std::path::Path>) {
     let bytes = nw_platform::files::identity(&output, &CancellationToken::new()).unwrap();
     std::fs::create_dir_all(&evidence_root).unwrap();
     let report = json!({
-        "schema_version":1, "source_commit":std::env::var("GITHUB_SHA").ok(),
+        "schema_version":1, "source_commit":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),
         "boundary":"actual_owner_official_sdk_stdio", "lost_accepted_responses":2,
         "automatic_retry_request_unchanged":true, "same_receipt_after_restart":true,
         "same_job_after_restart":true, "same_member_set_after_restart":true,

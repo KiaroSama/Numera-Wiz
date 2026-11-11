@@ -1,6 +1,6 @@
 # MCP manual - development implementation
 
-The adapters use official rmcp 3.6.0 and the implemented 2025-11-25 initialize and
+The adapters use official rmcp 3.9.0 and the implemented 2025-11-25 initialize and
 2026-07-28 discover lifecycle profiles. They forward typed operations to the same
 protected owner as the native/browser UI and CLI. Hosted integration runs actual
 media jobs through stdio and both direct-HTTP lifecycle profiles. Named external
@@ -135,3 +135,24 @@ current job rights and revocation. Native CLI clients may also use
 artifacts save with the selected digest and their own local destination; this
 is client delivery, not another server mutation or permission to write a path
 named by an agent. No private owner bearer or query-token URL is returned.
+
+
+## Repository-owned client integration
+
+The [agent installation guide](../agents/README.md) and
+[plugin package](../../integrations/numera-wiz/README.md) provide the project
+skill, native client manifests and portable stdio/HTTP configurations. These
+files call the Rust bridge. Manifest validation does not establish that a named
+client loaded the plugin or exercised the media workflow.
+
+`assets.register_folder` and `assets.folder_inspect` expose the same bounded
+folder intake used by the CLI and shared workspace. An immutable review records
+completeness, bounds, failures, companion inventories and successful media IDs.
+The default discovery-only agent remains unable to register or inspect host
+folders until the owner explicitly grants registration, owned-object and root
+rights. Companions are inventory only, not copied artifacts. A lost mutation
+response is resolved with its original replay scope/key.
+
+`jobs wait` is a native CLI observer, not a new MCP tool. MCP clients poll the
+existing authorized `jobs.inspect` projection and use `jobs.cancel` for accepted
+job cancellation. SDK request cancellation retains its independent lifetime.

@@ -336,7 +336,11 @@ async fn desktop(client: NativeClient) -> Result<()> {
         "Numera Wiz",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
-            viewport: eframe::egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0]),
+            viewport: eframe::egui::ViewportBuilder::default()
+                .with_inner_size([1280.0, 800.0])
+                .with_icon(eframe::icon_data::from_png_bytes(include_bytes!(
+                    "../../../assets/branding/numera-wiz.png"
+                ))?),
             ..Default::default()
         },
         Box::new(move |cc| {

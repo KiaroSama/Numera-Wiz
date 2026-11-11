@@ -1,3 +1,34 @@
+# Current owner direction — 2026-11-11
+
+The active task is the complete attached version 1 mandate, Pure Rust with
+FFmpeg, plus repository-owned agent skills/plugins and full CLI/MCP access to
+implemented capabilities. The single new review branch is
+`rewrite/rust-completion`; no merge or release is authorized. Earlier branch-only
+and no-close policies below are historical and superseded by the owner's explicit
+request to consolidate other branches/PRs and remove local-only planning/source
+files from Git history. A local pre-cleanup Git bundle preserves recovery.
+
+Spec Kit and feature specifications remain local only. Upstream executable source
+snapshots are external; schema-2 research metadata records the separation. Current
+changes add bounded folder registration/inspection and shared controls, CLI job
+waiting, client plugin packages, rmcp 3.9.0 listener cancellation, current CI action
+pins, exact source-HEAD builds/provenance, Pure Rust/test-inventory enforcement,
+four native development package targets and the exact owner-supplied logo. Hosted
+validation of this candidate remains pending until current-head results are linked.
+
+The full first version remains unfinished: authoritative projects/edit history,
+timeline/DAG/render compiler, preview/audio transport, the remaining utility/effect
+families and command domains, complete MuxCls companions/replacement, retention and
+rollback qualification, standard offline FFmpeg packages, full manuals/resource
+proof and the matching owner hardware report. Existing cleanup plans/jobs cannot
+be relabeled as a general editor pipeline. The current fixture profile cannot
+satisfy standard codec/filter delivery. Preserve legacy hashes/receipts while
+adding a versioned general multi-source/stage/output model.
+
+The following record is historical evidence, not the current repository policy.
+
+---
+
 # Continuation - Numera Wiz
 
 Objective: implement the full revision 7 mandate in public

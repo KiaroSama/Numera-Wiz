@@ -1,0 +1,1081 @@
+{
+  "schema_version": 1,
+  "baseline": "4d2ca7de44071103db8bca0795b7d6d6adba79ff",
+  "scope": "Rust authored test entry points; generated dependency tests and doctests are separate",
+  "tests": [
+    {
+      "path": "apps/numera-wiz/src/client.rs",
+      "name": "reconnect_keeps_root_and_principal_anchors_after_cache_eviction",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/human.rs",
+      "name": "durable_cli_retry_keeps_identity_and_never_allocates_a_fresh_scope",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/server.rs",
+      "name": "actual_http_checks_host_origin_bearer_and_profile",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/server/artifacts.rs",
+      "name": "exact_single_ranges_and_invalid_amplification",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/server/browser.rs",
+      "name": "embedded_namespace_pairing_and_leases_enforce_the_actual_http_boundary",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/server/browser.rs",
+      "name": "old_pairing_proof_cannot_reactivate_when_the_same_origin_reopens",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/src/server/browser.rs",
+      "name": "packaged_browser_boots_shared_wasm_under_the_enforced_policy",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "apps/numera-wiz/src/server/listener.rs",
+      "name": "private_editor_lease_does_not_keep_a_public_listener_or_its_old_tokens_live",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/artifact_http.rs",
+      "name": "large_published_output_streams_with_bounded_owner_memory_and_revocation",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "apps/numera-wiz/tests/interfaces.rs",
+      "name": "cli_stdout_is_canonical_json_and_index_zero_survives",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/interfaces.rs",
+      "name": "official_stdio_discovery_is_clean_and_does_not_inherit_owner",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/interfaces.rs",
+      "name": "official_stdio_reconnects_after_idle_without_changing_its_principal",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/interfaces.rs",
+      "name": "concurrent_native_frontends_boot_one_owner_for_the_same_root",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/interfaces.rs",
+      "name": "actual_typed_migration_cli_replays_before_and_after_real_owner_restart",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "apps/numera-wiz/tests/native_ui.rs",
+      "name": "native_window_imports_real_media_through_the_human_controls",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "apps/numera-wiz/tests/owner_batch.rs",
+      "name": "real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "apps/numera-wiz/tests/owner_media.rs",
+      "name": "cli_and_both_official_mcp_transports_share_real_verified_jobs",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "crates/nw-domain/src/access.rs",
+      "name": "action_grants_do_not_confer_other_actions_or_inherited_creator_access",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/access.rs",
+      "name": "write_actions_require_read_and_must_match_the_resource_kind",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/artifacts.rs",
+      "name": "download_names_are_bounded_single_portable_components",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/artifacts.rs",
+      "name": "range_rejects_noncanonical_overflow_and_unbounded_lengths",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/batches.rs",
+      "name": "every_terminal_candidate_finishes_but_only_verified_success_changes_size_totals",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/batches.rs",
+      "name": "rejected_candidates_require_an_explicit_continue_policy",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/commands.rs",
+      "name": "digest_excludes_correlation_but_not_semantics",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/commands.rs",
+      "name": "duplicate_context_is_rejected",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/commands.rs",
+      "name": "structural_depth_budget_ignores_brackets_in_strings",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/commands.rs",
+      "name": "duplicate_nested_parameters_are_not_last_writer_wins",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/commands.rs",
+      "name": "strict_request_decoder_admits_the_documented_one_mib_boundary",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/download.rs",
+      "name": "selected_identity_rejects_changed_truncated_excess_and_foreign_route_bytes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/download.rs",
+      "name": "cancelling_a_pending_network_wait_wakes_it_and_returns_a_typed_stop",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/download.rs",
+      "name": "cancellation_and_client_publication_have_one_winner",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/execution.rs",
+      "name": "deadline_is_typed_and_nonfinite_or_ambiguous_values_are_rejected",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/file_times.rs",
+      "name": "snapshots_reject_noncanonical_and_nonfinite_values",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/maintenance.rs",
+      "name": "migration_hash_binds_data_versions_and_rollback_generation_without_creation_noise",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "unit_selection_and_tag_actions_never_discard_extra_fields",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "index_zero_and_independent_attachments",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "patches_use_original_language_and_last_explicit_field",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "no_match_and_exact_language_are_explicit",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "donor_unknown_language_labels_remain_selectable",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/mux.rs",
+      "name": "no_op_copy_and_metadata_only_remux_are_distinct",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "equivalent_native_requirements_have_one_hash_across_creators_and_reviews",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "media_and_required_purposes_are_semantic_but_policy_revisions_are_not",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "original_native_object_is_a_frozen_semantic_requirement",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "reviewed_output_parent_is_semantic_and_missing_historical_fields_stay_missing",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "file_time_policy_and_reviewed_values_are_semantic_without_upgrading_history",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "explicit_execution_limits_are_frozen_and_old_hashes_remain_unchanged",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "completed_source_probe_timeout_is_audit_without_changing_execution_identity",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "raw_unknown_semantics_cannot_disappear_during_typed_decoding",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/plans.rs",
+      "name": "legacy_hash_and_serialized_shape_are_not_upgraded",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/reports.rs",
+      "name": "grouping_preserves_original_indices_and_counts_skip_and_rejection_separately",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/reports.rs",
+      "name": "missing_and_unknown_languages_share_one_summary_without_erasing_original_titles",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/reports.rs",
+      "name": "cover_pictures_are_not_merged_with_ordinary_video_in_the_inventory",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/reports.rs",
+      "name": "inventory_backpressure_never_silently_truncates_source_metadata",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/time.rs",
+      "name": "exact_vfr_keep_and_retime",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-domain/src/time.rs",
+      "name": "wire_is_lossless_and_invalid_values_fail",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/admission.rs",
+      "name": "renamed_reference_documents_have_no_ordinary_file_route",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/admission.rs",
+      "name": "external_mov_references_are_rejected_before_any_probe",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/budget.rs",
+      "name": "pressure_and_cancel_never_spawn_or_release_another_tasks_capacity",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/budget.rs",
+      "name": "uncertain_reap_and_dropped_supervisor_quarantine_capacity",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/lib.rs",
+      "name": "lowering_distinguishes_current_title_projection_from_a_legacy_raw_name_snapshot",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/lib.rs",
+      "name": "movie_track_name_is_an_exact_title_projection_with_raw_metadata_retained",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/lib.rs",
+      "name": "mov_mp4_never_borrow_matroska_language_or_duration_exceptions",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/lib.rs",
+      "name": "only_matroska_undefined_stream_language_has_the_declared_omission",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/output_profile.rs",
+      "name": "iso_profile_refuses_unrepresentable_tags_streams_defaults_and_brand_changes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/preservation.rs",
+      "name": "packet_json_is_incremental_bounded_and_complete",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/preservation.rs",
+      "name": "packet_clock_comparison_uses_exact_rationals",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/progress.rs",
+      "name": "progress_is_incremental_bounded_and_unknown_is_not_zero",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/src/progress.rs",
+      "name": "malformed_duplicate_nonfinite_and_truncated_progress_is_rejected",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-engine/tests/media.rs",
+      "name": "actual_copy_and_order_metadata_remux",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "crates/nw-engine/tests/media.rs",
+      "name": "actual_remux_progress_is_reported_without_announcing_verified_output",
+      "kind": "async",
+      "ignored": true
+    },
+    {
+      "path": "crates/nw-platform/src/artifacts.rs",
+      "name": "exact_cross_block_final_and_rejected_ranges_use_bounded_buffers",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/artifacts.rs",
+      "name": "substituted_identical_content_and_in_place_mutation_do_not_return_bytes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/artifacts.rs",
+      "name": "wrong_digest_and_cancellation_fail_without_byte_delivery",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/download.rs",
+      "name": "real_client_copy_verifies_flushed_bytes_and_preserves_a_late_collision",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/download.rs",
+      "name": "truncated_changed_disk_and_cancelled_copies_never_publish",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/download.rs",
+      "name": "failed_cleanup_is_not_retried_against_a_redirected_empty_directory",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/download.rs",
+      "name": "cleanup_removes_only_the_owned_payload_and_preserves_unknown_entries",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/file_times.rs",
+      "name": "exact_reviewed_times_survive_verified_copy_and_no_replace_publication",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/file_times.rs",
+      "name": "timestamp_failure_warns_only_for_the_explicit_best_effort_policy",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/file_times.rs",
+      "name": "new_timestamp_policy_never_invokes_a_timestamp_writer",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/file_times.rs",
+      "name": "exact_negative_epoch_values_round_trip_without_float",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "observed_copy_measures_each_full_pass_without_publishing_early",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "observed_copy_drains_the_current_boundary_before_timeout_or_cancellation",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "windows_output_names_reject_devices_streams_and_silently_trimmed_aliases",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "reviewed_directory_identity_rejects_replacement_after_its_handle_closes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "held_directory_detects_replacement_without_relying_on_child_metadata",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "held_windows_directory_excludes_namespace_delete_until_its_lease_ends",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "changing_directory_children_keeps_the_reviewed_parent_identity",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "original_object_survives_handle_drop_but_rejects_identical_replacement",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "native_object_identity_is_shared_by_hard_links_without_granting_a_path",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "opened_input_rejects_fifo_without_waiting_for_a_writer",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "opened_input_does_not_follow_a_replaced_final_symlink",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "opened_input_rejects_a_directory",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "source_acceptance_stamp_rejects_replacement_even_when_bytes_are_identical",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "a_preopened_original_cannot_be_bound_to_a_replacement_at_its_old_path",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "reviewed_copy_rejects_replacement_before_copy_and_publishes_nothing",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "copy_verifies_new_bytes_and_preserves_existing_destination",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "cancellation_cannot_report_a_preexisting_file_as_output",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/files.rs",
+      "name": "changed_output_parent_alias_is_rejected_without_creating_any_artifact",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging.rs",
+      "name": "human_diagnostics_redact_credentials_and_escape_injected_lines",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging/persisted.rs",
+      "name": "structured_records_escape_text_redact_secrets_and_keep_safe_identifiers",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging/persisted.rs",
+      "name": "structured_capture_is_bounded_before_json_parsing",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging/persisted.rs",
+      "name": "rotation_keeps_only_the_five_owned_files_and_preserves_an_unowned_collision",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging/persisted.rs",
+      "name": "interrupted_tail_is_archived_instead_of_being_spliced_into_a_new_record",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/logging/persisted.rs",
+      "name": "interrupted_link_rotation_recovers_without_appending_to_two_archive_names",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/publication.rs",
+      "name": "publication_and_proof_are_the_verified_object_and_never_replace_any_entry",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/publication.rs",
+      "name": "proof_names_cannot_escape_the_owned_directory",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/publication.rs",
+      "name": "final_namespace_swap_cannot_publish_into_the_replacement_or_symlink_target",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/publication.rs",
+      "name": "a_final_symlink_collision_is_preserved_without_touching_its_target",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/security.rs",
+      "name": "private_parent_does_not_substitute_for_the_credential_files_own_dacl",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/security.rs",
+      "name": "local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/security.rs",
+      "name": "credentials_are_protected_and_existing_exports_are_preserved",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/src/security.rs",
+      "name": "an_existing_shared_directory_is_rejected",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/artifact_memory.rs",
+      "name": "artifact_larger_than_selected_reader_memory_budget_streams_exactly",
+      "kind": "unit",
+      "ignored": true
+    },
+    {
+      "path": "crates/nw-platform/tests/claims.rs",
+      "name": "independent_portable_copies_share_absent_destination_and_alias_claims",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/supervision.rs",
+      "name": "independent_pipe_draining_stays_bounded_under_flood",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/supervision.rs",
+      "name": "cancellation_waits_for_termination_and_reaping",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/supervision.rs",
+      "name": "rejected_streamed_stdout_terminates_and_reaps_the_producer",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/supervision.rs",
+      "name": "launch_failure_and_child_failure_remain_distinct",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-platform/tests/supervision.rs",
+      "name": "explicit_finite_policy_times_out_and_disabled_policy_still_cancels",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/lib.rs",
+      "name": "discovery_agent_never_inherits_local_user_authority",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/lib.rs",
+      "name": "inert_future_operations_are_not_advertised",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "disabled_deadlines_require_owner_at_review_and_submission",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "parameter_errors_obey_the_result_budget_as_well_as_successful_queries",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "selection_report_requires_current_asset_and_path_rights_and_rejects_mixed_disclosure",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "captured_managed_purpose_cannot_be_delegated_or_borrow_creator_rights",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "reviewed_native_rights_revalidate_current_roots_without_rehashing_audit",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "raw_plan_compatibility_errors_are_not_disclosed_before_object_authority",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "output_directory_replacement_during_preflight_cannot_accept_a_job",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "policy_revocation_is_not_held_behind_expensive_preflight",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "a_receipt_accepted_during_preflight_wins_over_its_later_source_failure",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "delegated_metadata_read_hides_native_paths_and_does_not_grant_submit_or_control",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "an_oversized_plan_response_does_not_fill_retained_plan_history",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "a_waiting_request_cannot_accept_a_profile_snapshot_from_before_revocation",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "profile_replay_precedes_current_revision_and_revocation_invalidates_credentials",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "file_grants_and_object_rights_are_checked_independently",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "staging_and_proof_namespaces_are_not_general_media_paths",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "reattachment_cannot_issue_for_a_replacement_profile_principal",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "public_credentials_are_bound_to_origin_and_owner_epoch",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime.rs",
+      "name": "broad_owner_authority_cannot_publish_media_into_component_namespaces",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/artifacts.rs",
+      "name": "output_purpose_needs_current_job_rights_but_no_general_export_read_grant",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/artifacts.rs",
+      "name": "replaced_output_capacity_and_restart_do_not_invent_publication_identity",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/artifacts.rs",
+      "name": "older_publication_has_no_invented_byte_purpose",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/clock.rs",
+      "name": "stalled_wall_time_cannot_extend_idle_or_absolute_credential_lifetimes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/clock.rs",
+      "name": "backward_wall_time_fails_closed_for_the_remaining_owner_epoch",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/maintenance.rs",
+      "name": "actual_service_admission_receipts_owner_lock_and_selected_generation_survive_restart",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/read_model.rs",
+      "name": "inventory_filters_before_counts_and_pins_pages_across_writes",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/read_model.rs",
+      "name": "snapshot_cursor_cannot_change_identity_query_policy_or_lease",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/read_model.rs",
+      "name": "page_byte_ceiling_wins_over_row_count_without_truncating_items",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-service/src/runtime/uploads.rs",
+      "name": "streamed_intake_is_principal_scoped_and_only_exact_bytes_become_ready",
+      "kind": "async",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/adoption.rs",
+      "name": "replay_denials_bootstrap_credentials_and_reopen_do_not_invent_adoption",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/adoption.rs",
+      "name": "accepted_business_facts_and_adoption_commit_atomically_and_missing_history_is_unknown",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/copies.rs",
+      "name": "immutable_copy_preserves_exact_records_receipts_and_restarts_from_complete_proof",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/copies.rs",
+      "name": "live_source_and_unproven_existing_destination_are_preserved",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/generations.rs",
+      "name": "activation_is_append_only_and_unsupported_capabilities_cannot_fall_back",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/generations.rs",
+      "name": "a_generation_switch_preserves_the_same_store_identity_key_and_receipt_kernel",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/generations.rs",
+      "name": "a_copy_with_the_same_root_uuid_but_another_replay_key_cannot_activate",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "scope_issuance_samples_time_after_waiting_for_the_writer",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "full_bounded_batch_and_receipt_commit_together_and_replay_ignores_new_targets",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "late_child_failure_rolls_back_every_job_group_and_receipt_before_a_safe_retry",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "batch_cancellation_journals_requests_without_claiming_a_running_writer_stopped",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "receipt_and_queued_job_survive_restart_and_replay_precedes_target_validation",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "scope_is_bound_to_principal_root_expiry_and_monotonic_clock",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "single_owner_and_terminal_state_guards_are_enforced",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "version_one_roots_are_preserved_for_an_explicit_generation_migration",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "unsupported_store_schema_is_never_reinitialized",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "additive_policy_revisions_preserve_accepted_work_but_revocation_blocks_the_atomic_fence",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "oversized_reply_is_rejected_before_any_mutation_or_receipt_commits",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/lib.rs",
+      "name": "profile_quota_rejects_only_new_records_and_keeps_existing_policy_writable",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/live.rs",
+      "name": "switch_refuses_live_read_or_write_and_preserves_the_original_commits",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/migrations.rs",
+      "name": "actual_receipts_and_exact_records_survive_fence_copy_activation_interruptions_and_restart",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/migrations.rs",
+      "name": "stale_review_never_fences_or_creates_an_accepted_migration",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/profiles.rs",
+      "name": "migration_preserves_principal_explicit_commands_and_old_policy_bytes",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/profiles.rs",
+      "name": "one_nonrepresentable_legacy_grant_rolls_back_the_entire_profile_migration",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/versions.rs",
+      "name": "inspection_is_read_only_and_retains_raw_receipt_identity_and_numeric_strings",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/versions.rs",
+      "name": "newer_versions_are_visible_without_writes_and_empty_unknown_files_are_not_initialized",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-store/src/versions.rs",
+      "name": "future_binary_records_are_not_decoded_with_the_old_json_codec_or_opened_writable",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-ui/src/cleanup.rs",
+      "name": "malformed_index_csv_never_executes_a_valid_subset",
+      "kind": "unit",
+      "ignored": false
+    },
+    {
+      "path": "crates/nw-ui/src/lib.rs",
+      "name": "delayed_suggestion_preserves_the_current_selection_and_manual_output",
+      "kind": "unit",
+      "ignored": false
+    }
+  ]
+}

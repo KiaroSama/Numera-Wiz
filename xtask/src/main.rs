@@ -1,5 +1,7 @@
 //! Repository automation. Ordinary validation is executed by hosted CI.
 use anyhow::{Context, Result, bail};
+mod hygiene;
+mod package;
 mod web;
 use sha2::{Digest, Sha256};
 use std::{
@@ -32,14 +34,17 @@ fn run() -> Result<()> {
         "release-gate" => release_gate(root),
         "build-fixture-profile" => build_fixture_profile(root),
         "build-web" => web::build(root),
+        "package-development" => package::development(root),
+        "record-ci-evidence" => package::evidence(root),
         "help" => {
-            println!("xtask verify-research | schemas | release-gate");
+            println!("xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | record-ci-evidence");
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),
     }
 }
 fn verify_research(root: &Path) -> Result<()> {
+    hygiene::verify(root)?;
     let pack = root.join("docs/research-pack");
     let manifest: serde_json::Value =
         serde_json::from_slice(&fs::read(pack.join("research-pack-manifest.json"))?)?;
@@ -65,7 +70,8 @@ fn verify_research(root: &Path) -> Result<()> {
     }
     tracing::info!(
         files = rows.len(),
-        "All preserved research members match their original hashes"
+        external = manifest["external_files"].as_array().map_or(0, Vec::len),
+        "Retained research members match original hashes; external source bytes are not repository contents or runtime evidence"
     );
     Ok(())
 }

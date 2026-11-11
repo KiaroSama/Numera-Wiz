@@ -1,8 +1,6 @@
 //! Bounded leaf execution; arguments are never executed as shell text.
 #[cfg(windows)]
 mod windows_stdio;
-#[cfg(windows)]
-pub use windows_stdio::prevent_stdio_inheritance;
 use nw_domain::{DomainError, Result};
 #[cfg(windows)]
 use process_wrap::tokio::JobObject;
@@ -15,6 +13,8 @@ use tokio::{
     process::Command,
 };
 use tokio_util::sync::CancellationToken;
+#[cfg(windows)]
+pub use windows_stdio::prevent_stdio_inheritance;
 
 #[derive(Debug)]
 pub struct RunOutput {

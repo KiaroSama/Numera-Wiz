@@ -648,7 +648,7 @@ async fn journey() {
     )
     .unwrap();
     assert_eq!(record["build"], identity.sha256);
-    std::fs::write(evidence.join("native.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":std::env::var("GITHUB_SHA").ok(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"executable":identity,"registry":record["registry"],"renderer":"Glow; LIBGL_ALWAYS_SOFTWARE=1","viewport":[1440,861],"observed":"Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output","not_qualified":["Windows or macOS native input","preview/playback","full five-surface qualification"]})).unwrap()).unwrap();
+    std::fs::write(evidence.join("native.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"executable":identity,"registry":record["registry"],"renderer":"Glow; LIBGL_ALWAYS_SOFTWARE=1","viewport":[1440,861],"observed":"Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output","not_qualified":["Windows or macOS native input","preview/playback","full five-surface qualification"]})).unwrap()).unwrap();
     input(&["windowactivate", "--sync", &window]).await;
     input(&["key", "--clearmodifiers", "alt+F4"]).await;
     assert!(

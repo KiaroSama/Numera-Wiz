@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "numera-wiz": {
+      "type": "stdio",
+      "command": "numera-wiz",
+      "args": ["--access-profile", "agent", "bridge", "--transport", "stdio"]
+    }
+  }
+}

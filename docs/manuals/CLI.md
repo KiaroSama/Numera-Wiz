@@ -452,3 +452,41 @@ schema2 readers and activates a separate complete target. Its development tests
 are pending fresh hosted CI. A safe rollback command and full old/new packaged
 application journey remain required. See [generation migration](../development/generation-migration.md)
 for the actual admitted behavior, finite limits and remaining qualification.
+
+
+## Folder intake
+
+`assets register-folder <absolute-engine-folder>` creates an immutable intake
+snapshot and registers successful media candidates. It requires the same explicit
+`--replay-scope` and `--idempotency-key` as other durable mutations. Reuse the
+exact command and identity after a lost response. `assets folder-inspect <id>`
+reads the retained snapshot under current creator/object and root grants.
+
+Options: `--recursive`, repeatable `--exclude-relative <normalized/relative/path>`,
+`--companion-policy inventory|exclude`, and the existing explicit probe policy
+flags. The default inventories companion identities; it does not copy companions
+or create a media job. Exclusion paths use forward slashes, without dot segments.
+Symlinks/reparse points are retained as denied outcomes and never followed.
+
+The snapshot includes successful asset IDs, every observed failure/exclusion,
+its hash, exact bounds and `complete`. A `complete: false` snapshot is incomplete
+even when the command itself was durably accepted. Current bounds are 32 retained
+entries, 4096 visited entries, 128 directories, depth 16, aggregate source size
+4 GiB and 512 KiB directory-name storage. The scan checks 300 seconds before the
+next entry; an active probe keeps its explicit policy. Existing HTTP/client request
+deadlines can cancel a longer unaccepted scan; retry the original identity and
+inspect any retained receipt before changing parameters. Large paged discovery
+and companion/output-tree execution remain separate unfinished work.
+
+Use returned registered asset IDs with `streams report`, `streams clean` and the
+existing explicit batch document. No failed candidate is silently turned into a
+verified job. The native/browser Folder intake section uses these same commands.
+
+## Waiting for one job
+
+`jobs wait <id> --timeout-seconds 1800` observes the existing accepted job through
+`jobs.inspect`. The deadline accepts 1 through 86400 seconds. It prints one
+canonical JSON terminal response and preserves the job failure category. Failed,
+interrupted, cancelled and skipped jobs are not reported as verified success.
+Ctrl+C or an observation deadline stops this frontend; the owner retains the
+accepted job. To cancel that job, issue the separate durable `jobs cancel` command.

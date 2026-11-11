@@ -1,6 +1,7 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod batches;
 mod cleanup;
+mod folders;
 pub mod client;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
@@ -38,6 +39,9 @@ enum Action {
     BatchInspect,
     BatchCancel,
     BatchHistory,
+    FolderRegister,
+    FolderInspect,
+    FolderBatchAsset,
 }
 struct Pending {
     request: Request,
@@ -96,6 +100,7 @@ pub struct WizApp {
     report_by_index: bool,
     report_page: usize,
     batch: batches::BatchUi,
+    folder: folders::FolderUi,
 }
 impl WizApp {
     fn save_artifact(
@@ -239,6 +244,7 @@ impl WizApp {
             report_by_index: false,
             report_page: 0,
             batch: batches::BatchUi::default(),
+            folder: folders::FolderUi::default(),
         };
         app.query("assets.list", json!({}), Action::Assets, ctx);
         app
@@ -499,6 +505,9 @@ impl WizApp {
                 | Action::BatchHistory => {
                     self.receive_batch(received.action, result)?;
                 }
+                Action::FolderRegister | Action::FolderInspect | Action::FolderBatchAsset => {
+                    self.receive_folder(received.action, result)?;
+                }
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
@@ -513,6 +522,8 @@ impl WizApp {
             && let Some((id, params, action)) = self.deferred.take()
         {
             self.mutate(&id, params, action, ctx);
+        } else if matches!(received.action, Action::FolderRegister) {
+            self.refresh_assets(ctx);
         } else if matches!(
             received.action,
             Action::Submit | Action::Cancel | Action::Assets
@@ -926,6 +937,7 @@ impl eframe::App for WizApp {
                 if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Inspect available operations")).clicked() { self.query("commands.list",json!({}),Action::Inspect,ui.ctx()); }
                 egui::ScrollArea::vertical().max_height(180.0).show(ui,|ui| { ui.add(egui::TextEdit::multiline(&mut self.inspect).code_editor().interactive(false).desired_width(f32::INFINITY)); });
             });
+            self.folder_controls(ui);
         });
         self.batch_window(ui.ctx());
     }

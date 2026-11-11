@@ -21,7 +21,9 @@ pub fn build(root: &Path) -> Result<()> {
     if std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true") {
         bail!("Web compilation belongs in GitHub CI");
     }
-    let source = std::env::var("GITHUB_SHA").context("CI source identity")?;
+    let source = std::env::var("NW_SOURCE_SHA")
+        .or_else(|_| std::env::var("GITHUB_SHA"))
+        .context("CI source identity")?;
     let tools: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("components/build-tools.json"))?)?;
     let tool = &tools["wasm_bindgen"];
@@ -134,8 +136,15 @@ try {{
     )?;
     boot["immutable"] = serde_json::json!(false);
     let css=asset(&output,b"html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:#ddd;font:15px system-ui}canvas{display:block;width:100%;height:100%}#boot-status{position:fixed;inset:40% 12%;text-align:center;pointer-events:none}","css","text/css")?;
+    let logo = asset(
+        &output,
+        &fs::read(root.join("assets/branding/numera-wiz.png"))?,
+        "png",
+        "image/png",
+    )?;
     let index = format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Numera Wiz</title><link rel="stylesheet" href="/{}"></head><body><canvas id="canvas"></canvas><div id="boot-status">Connecting to the local workspace…</div><script type="module" src="/{}"></script></body></html>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Numera Wiz</title><link rel="icon" type="image/png" href="/{}"><link rel="stylesheet" href="/{}"></head><body><canvas id="canvas"></canvas><div id="boot-status">Connecting to the local workspace…</div><script type="module" src="/{}"></script></body></html>"#,
+        logo["path"].as_str().context("logo path")?,
         css["path"].as_str().context("css path")?,
         boot["path"].as_str().context("bootstrap path")?
     );
@@ -144,7 +153,7 @@ try {{
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(
-            &serde_json::json!({"schema_version":1,"source":source,"registry":nw_domain::commands::registry_fingerprint(),"tool":tool,"assets":[index_entry,wasm,js,boot,css]}),
+            &serde_json::json!({"schema_version":1,"source":source,"registry":nw_domain::commands::registry_fingerprint(),"tool":tool,"assets":[index_entry,wasm,js,boot,css,logo]}),
         )?,
     )?;
     tracing::info!(output=%output.display(),"Built same-source WASM assets and executable namespace manifest");
