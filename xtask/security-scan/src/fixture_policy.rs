@@ -6,9 +6,45 @@ use std::io::Cursor;
 
 pub fn qualify(root: &Path, deadline: Instant) -> Result<()> {
     reports(root)?;
+    unknown_unicode()?;
     archives(deadline)?;
     proofs(root)?;
+    failure_stage_controls(root, deadline)?;
     diagnostic("INFO", "SECURITY_MOCK_POLICY_ARCHIVE_REPORT_PROOF_PASS"); Ok(())
+}
+fn unknown_unicode() -> Result<()> {
+    // These unknown values used to take IgnoredAny's weaker string path.
+    let malformed: &[&[u8]] = &[
+        b"{\"Secret\":\"\xff\"}",
+        b"{\"Extra\":{\"\xff\":\"private\"}}",
+        b"{\"Extra\":[{\"key\":\"\xff\"}]}",
+        br#"{"Secret":"\uD800"}"#,
+        br#"{"Match":"\uDC00"}"#,
+        br#"{"Extra":{"\uD800":"private"}}"#,
+        br#"{"Extra":[{"key":"\uDC00"}]}"#,
+        br#"{"Secret":"\uD800\u0041"}"#,
+    ];
+    for row in malformed {
+        for preceding in [0, 200] {
+            let mut bytes = b"[".to_vec();
+            for _ in 0..preceding { bytes.extend_from_slice(b"{},"); }
+            bytes.extend_from_slice(row); bytes.push(b']');
+            require(matches!(report::parse(&bytes), Err(ScanFailure("SECURITY_REPORT_INVALID"))),
+                "SECURITY_MOCK_UNKNOWN_UNICODE_ACCEPTED")?;
+        }
+    }
+    let valid = br#"{"Secret":"\uD83D\uDE00","Extra":{"\uD83D\uDE00":[null,true,false,-1,18446744073709551616,1e400,{"private":"\u0061"}]}}"#;
+    for preceding in [0, 200] {
+        let mut bytes = b"[".to_vec();
+        for _ in 0..preceding { bytes.extend_from_slice(b"{},"); }
+        bytes.extend_from_slice(valid); bytes.push(b']');
+        let parsed = report::parse(&bytes)?;
+        require(parsed.count == preceding + 1 && parsed.rows.len() == (preceding + 1).min(200),
+            "SECURITY_MOCK_VALID_UNKNOWN_UNICODE_REJECTED")?;
+        let summary = report::summary(&parsed, false);
+        require(!summary.contains('😀') && !summary.contains("private"), "SECURITY_MOCK_UNKNOWN_UNICODE_PUBLISHED")?;
+    }
+    diagnostic("INFO", "SECURITY_MOCK_FULL_UNICODE_VALIDATION_PASS"); Ok(())
 }
 fn reports(root: &Path) -> Result<()> {
     let empty = report::parse(b"[]")?;
@@ -17,11 +53,15 @@ fn reports(root: &Path) -> Result<()> {
     for malformed in ["", "null", "{}", "[", "[{}", "[[]]", "[1]", "[null]", "[]false",
         "[{\"RuleID\":null}]", "[{\"File\":false}]", "[{\"Commit\":1}]", "[{\"StartLine\":\"1\"}]",
         "[{\"StartLine\":-1}]", "[{\"StartLine\":1.5}]", "[{\"StartLine\":1e0}]",
+        "[{\"StartLine\":18446744073709551616}]", "[{\"StartLine\":1e400}]",
+        "[{\"StartLine\":{\"$serde_json::private::Number\":\"1\"}}]",
         "[{\"RuleID\":\"a\",\"RuleID\":\"b\"}]"] {
         require(report::parse(malformed.as_bytes()).is_err(), "SECURITY_MOCK_REPORT_ACCEPTED")?;
     }
     let missing = report::parse(b"[{}]")?;
     require(missing.count == 1 && missing.rows[0].line.is_empty(), "SECURITY_MOCK_MISSING_FIELDS")?;
+    require(report::parse(b"[{\"StartLine\":18446744073709551615}]")?.rows[0].line == "18446744073709551615",
+        "SECURITY_MOCK_INTEGER_PRECISION_LOST")?;
     require(report::parse(b"[{\"RuleID\":\"\xff\"}]").is_err()
         && private::read(&root.join("absent-report.json"), private::REPORT_LIMIT).is_err(), "SECURITY_MOCK_REPORT_INVALID")?;
     require(matches!(report::parse(&vec![b' '; private::REPORT_LIMIT as usize + 1]),
@@ -158,6 +198,9 @@ fn proofs(root: &Path) -> Result<()> {
     let args = protocol::history_args("/fixed-synthetic/.git", "--all");
     let id = record(&context, &args, "history", 0, false)?;
     require(protocol::verify_proofs(&context, 123)?.history == 1, "SECURITY_MOCK_PROOF_VALID")?;
+    invocation_identity(&context, &args, &id)?;
+    proof_integer_bounds(&context, &id)?;
+    history_failure_proof(&context, &args, &id)?;
     for wrong in [vec!["ls-remote", "--quiet", "--get-url", "https://example.invalid"],
         vec!["ls-remote", "--quiet"], vec!["fetch"], vec!["-C", "/other", "log"]] {
         require(protocol::classify(&wrong.into_iter().map(str::to_owned).collect::<Vec<_>>(),
@@ -223,13 +266,150 @@ fn replace(path: &Path, value: &Value) -> Result<()> {
 }
 fn record(context: &protocol::Context, args: &[String], kind: &str, status: i32, no_remote: bool) -> Result<String> {
     let id = private::nonce()?;
-    let attempt = json!({"run":context.value["run"],"context":private::hash(&private::read(&context.root.join("context.json"), private::RECORD_LIMIT)?),
+    let attempt = json!({"invocation":id,"run":context.value["run"],"context":private::hash(&private::read(&context.root.join("context.json"), private::RECORD_LIMIT)?),
         "group":123,"kind":"rejected","argv":[]});
     let mut start = attempt.clone(); start["kind"] = json!(kind); start["argv"] = json!(args);
     let proof = context.root.join("proof");
     protocol::write_json(&proof.join(format!("{id}.attempt")), &attempt)?;
     protocol::write_json(&proof.join(format!("{id}.start")), &start)?;
-    protocol::write_json(&proof.join(format!("{id}.done")), &json!({"accepted":true,"status":status,"no_remote":no_remote,
+    protocol::write_json(&proof.join(format!("{id}.done")), &json!({"invocation":id,"accepted":true,"completed":true,"stderr_quiet":!no_remote,"status":status,"no_remote":no_remote,
         "start":private::hash(&private::read(&proof.join(format!("{id}.start")), private::RECORD_LIMIT)?)}))?;
     Ok(id)
+}
+fn invocation_identity(context: &protocol::Context, args: &[String], first: &str) -> Result<()> {
+    let proof = context.root.join("proof");
+    let renamed = private::nonce()?;
+    for suffix in ["attempt", "start", "done"] {
+        fs::rename(proof.join(format!("{first}.{suffix}")), proof.join(format!("{renamed}.{suffix}")))
+            .private("SECURITY_FIXTURE_IO")?;
+    }
+    require(protocol::verify_proofs(context, 123).is_err(), "SECURITY_MOCK_RENAMED_INVOCATION_ACCEPTED")?;
+    for suffix in ["attempt", "start", "done"] {
+        fs::rename(proof.join(format!("{renamed}.{suffix}")), proof.join(format!("{first}.{suffix}")))
+            .private("SECURITY_FIXTURE_IO")?;
+    }
+    for suffix in ["attempt", "start", "done"] {
+        private::write(&proof.join(format!("{renamed}.{suffix}")),
+            &private::read(&proof.join(format!("{first}.{suffix}")), private::RECORD_LIMIT)?)?;
+    }
+    require(protocol::verify_proofs(context, 123).is_err(), "SECURITY_MOCK_COPIED_INVOCATION_ACCEPTED")?;
+    for suffix in ["attempt", "start", "done"] {
+        fs::remove_file(proof.join(format!("{renamed}.{suffix}"))).private("SECURITY_FIXTURE_IO")?;
+    }
+    let second = record(context, args, "history", 0, false)?;
+    require(protocol::verify_proofs(context, 123)?.history == 2, "SECURITY_MOCK_IDENTICAL_ARGV_INVOCATIONS_REJECTED")?;
+    for suffix in ["attempt", "start", "done"] {
+        let target = proof.join(format!("{first}.{suffix}"));
+        let original = protocol::read_json(&target)?;
+        replace(&target, &protocol::read_json(&proof.join(format!("{second}.{suffix}")))?)?;
+        require(protocol::verify_proofs(context, 123).is_err(), "SECURITY_MOCK_MIXED_INVOCATIONS_ACCEPTED")?;
+        replace(&target, &original)?;
+    }
+    for suffix in ["attempt", "start", "done"] {
+        fs::remove_file(proof.join(format!("{second}.{suffix}"))).private("SECURITY_FIXTURE_IO")?;
+    }
+    require(protocol::verify_proofs(context, 123)?.history == 1, "SECURITY_MOCK_INVOCATION_RESTORE_FAILED")?;
+    diagnostic("INFO", "SECURITY_MOCK_INVOCATION_NONCE_CHAIN_PASS"); Ok(())
+}
+fn failure_stage_controls(root: &Path, deadline: Instant) -> Result<()> {
+    let empty = report::parse(b"[]")?;
+    let controls = [
+        (protocol::deadline_from(&json!({"deadline_ms":0})).map(|_| ()), "SECURITY_DEADLINE"),
+        (private::read(&root.join("absent-setup"), 16).map(|_| ()), "SECURITY_PRIVATE_IO_FAILED"),
+        (assets::verify_pinned(b"private invalid archive", deadline).map(|_| ()), "SECURITY_ARCHIVE_HASH_INVALID"),
+        (report::write_summary(Some(root), &empty, false), "SECURITY_SUMMARY_WRITE_FAILED"),
+    ];
+    for (result, expected) in controls {
+        require(failed_at(&result, expected) && !failed_at(&result, "SECURITY_HISTORY_GIT_FAILED")
+            && !failed_at(&result, "SECURITY_REVISION_COMMIT_CHECK_FAILED"), "SECURITY_MOCK_INFRA_MATCHED_GIT_ORACLE")?;
+    }
+    let mut outcome = process::Outcome { leader:123, status:Some(128), stdout:process::Capture::default(),
+        stderr:process::Capture::default(), failure:None, reaped:1, adopted:0,
+        barrier:process::barrier()?, cleanup_elapsed:Duration::ZERO };
+    require(outcome.completed_nonzero(), "SECURITY_MOCK_NONZERO_COMPLETION_REJECTED")?;
+    for status in [None, Some(0), Some(-1), Some(256)] {
+        outcome.status = status;
+        require(!outcome.completed_nonzero(), "SECURITY_MOCK_INCOMPLETE_MATCHED_GIT_ORACLE")?;
+    }
+    outcome.status = Some(128); outcome.failure = Some(ScanFailure("SECURITY_CHILD_TIMEOUT"));
+    require(!outcome.completed_nonzero(), "SECURITY_MOCK_TIMEOUT_MATCHED_GIT_ORACLE")?;
+    outcome.failure = None; outcome.stderr.overflow = true;
+    require(!outcome.completed_nonzero(), "SECURITY_MOCK_CAPTURE_MATCHED_GIT_ORACLE")?;
+    outcome.stderr.overflow = false; outcome.stdout.failed = true;
+    require(!outcome.completed_nonzero(), "SECURITY_MOCK_CAPTURE_MATCHED_GIT_ORACLE")?;
+    outcome.stdout.failed = false; outcome.adopted = 1;
+    require(!outcome.completed_nonzero(), "SECURITY_MOCK_ADOPTION_MATCHED_GIT_ORACLE")?;
+    outcome.adopted = 0; outcome.reaped = 0;
+    require(!outcome.completed_nonzero(), "SECURITY_MOCK_UNWAITED_MATCHED_GIT_ORACLE")?;
+    diagnostic("INFO", "SECURITY_MOCK_FAILURE_STAGE_CONTROLS_PASS"); Ok(())
+}
+fn proof_integer_bounds(context: &protocol::Context, id: &str) -> Result<()> {
+    let canonical_path = context.root.join("number-spelling.json");
+    for text in ["{\"extra\":1e0}", "{\"extra\":1.0}", "{\"extra\":-0}",
+        "{\"extra\":1e400}", "{\"extra\":18446744073709551616}"] {
+        private::write(&canonical_path, text.as_bytes())?;
+        require(protocol::read_json(&canonical_path).is_err(), "SECURITY_MOCK_NONCANONICAL_NUMBER_ACCEPTED")?;
+        fs::remove_file(&canonical_path).private("SECURITY_FIXTURE_IO")?;
+    }
+    protocol::write_json(&canonical_path, &json!({"extra":u64::MAX}))?;
+    require(protocol::read_json(&canonical_path)?["extra"].as_u64() == Some(u64::MAX),
+        "SECURITY_MOCK_CANONICAL_INTEGER_REJECTED")?;
+    let done_path = context.root.join("proof").join(format!("{id}.done"));
+    let done = protocol::read_json(&done_path)?;
+    for number in ["0.0", "0e0", "1e400", "-1", "256", "true", "\"0\""] {
+        let mut invalid = done.clone();
+        invalid["status"] = serde_json::from_str(number).private("SECURITY_FIXTURE_IO")?;
+        replace(&done_path, &invalid)?;
+        require(protocol::verify_proofs(context, 123).is_err(), "SECURITY_MOCK_UNBOUNDED_STATUS_ACCEPTED")?;
+    }
+    replace(&done_path, &done)?;
+    let group_path = context.root.join("group.json");
+    let group = protocol::read_json(&group_path)?;
+    for number in ["123.0", "123e0", "1e400", "-1", "\"123\""] {
+        let mut invalid = group.clone();
+        invalid["group"] = serde_json::from_str(number).private("SECURITY_FIXTURE_IO")?;
+        replace(&group_path, &invalid)?;
+        require(protocol::verify_proofs(context, 123).is_err(), "SECURITY_MOCK_UNBOUNDED_GROUP_ACCEPTED")?;
+    }
+    replace(&group_path, &group)?;
+    for number in ["1e400", "18446744073709551616", "-1", "true"] {
+        let value: Value = serde_json::from_str(number).private("SECURITY_FIXTURE_IO")?;
+        require(protocol::deadline_from(&json!({"deadline_ms":value})).is_err(), "SECURITY_MOCK_UNBOUNDED_DEADLINE_ACCEPTED")?;
+    }
+    require(protocol::verify_proofs(context, 123)?.history == 1, "SECURITY_MOCK_INTEGER_PROOF_RESTORE_FAILED")?;
+    diagnostic("INFO", "SECURITY_MOCK_PROOF_INTEGER_BOUNDS_PASS"); Ok(())
+}
+fn history_failure_proof(context: &protocol::Context, args: &[String], id: &str) -> Result<()> {
+    let proof = context.root.join("proof");
+    let path = proof.join(format!("{id}.done"));
+    let valid = protocol::read_json(&path)?;
+    let mut failed = valid.clone();
+    failed["accepted"] = json!(false); failed["status"] = json!(128); failed["stderr_quiet"] = json!(false);
+    replace(&path, &failed)?;
+    require(failed_at(&protocol::verify_proofs(context, 123), "SECURITY_HISTORY_GIT_FAILED"),
+        "SECURITY_MOCK_HISTORY_FAILURE_NOT_REACHED")?;
+    let successful = record(context, args, "history", 0, false)?;
+    require(failed_at(&protocol::verify_proofs(context, 123), "SECURITY_HISTORY_GIT_FAILED"),
+        "SECURITY_MOCK_LATER_SUCCESS_HID_FAILURE")?;
+    for (key, value) in [("completed", json!(false)), ("status", Value::Null), ("status", json!(0)),
+        ("status", json!(-1)), ("status", json!(256)), ("no_remote", json!(true))] {
+        let mut invalid = failed.clone(); invalid[key] = value;
+        replace(&path, &invalid)?;
+        let result = protocol::verify_proofs(context, 123);
+        require(result.is_err() && !failed_at(&result, "SECURITY_HISTORY_GIT_FAILED"),
+            "SECURITY_MOCK_INFRA_MISLABELLED_HISTORY")?;
+    }
+    replace(&path, &failed)?;
+    let orphan = proof.join(format!("{}.attempt", private::nonce()?));
+    protocol::write_json(&orphan, &json!({}))?;
+    let incomplete = protocol::verify_proofs(context, 123);
+    require(incomplete.is_err() && !failed_at(&incomplete, "SECURITY_HISTORY_GIT_FAILED"),
+        "SECURITY_MOCK_INCOMPLETE_MISLABELLED_HISTORY")?;
+    fs::remove_file(orphan).private("SECURITY_FIXTURE_IO")?;
+    replace(&path, &valid)?;
+    for suffix in ["attempt", "start", "done"] {
+        fs::remove_file(proof.join(format!("{successful}.{suffix}"))).private("SECURITY_FIXTURE_IO")?;
+    }
+    require(protocol::verify_proofs(context, 123)?.history == 1, "SECURITY_MOCK_HISTORY_PROOF_RESTORE_FAILED")?;
+    diagnostic("INFO", "SECURITY_MOCK_COMPLETED_HISTORY_FAILURE_PASS"); Ok(())
 }

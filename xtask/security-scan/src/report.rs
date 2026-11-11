@@ -1,11 +1,39 @@
 //! Complete JSON validation with bounded location retention; no raw findings log.
 use crate::{PrivateResult, Result, require};
-use serde::de::{self, Deserialize, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::{fmt, fs::OpenOptions, io::Write, path::Path};
 
 #[derive(Default)]
 pub struct Row { pub rule: String, pub file: String, pub line: String, pub commit: String }
 pub struct Report { pub count: usize, pub rows: Vec<Row> }
+/// Validate unknown JSON recursively without retaining its values. In particular,
+/// use Serde's normal string/key decoder, not IgnoredAny's weaker skip path.
+/// The bounded input and serde_json's maintained recursion limit bound this walk.
+struct ValidatedDiscard;
+impl<'de> Deserialize<'de> for ValidatedDiscard {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        struct DiscardVisitor;
+        impl<'de> Visitor<'de> for DiscardVisitor {
+            type Value = ValidatedDiscard;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str("valid JSON value") }
+            fn visit_bool<E: de::Error>(self, _: bool) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_i64<E: de::Error>(self, _: i64) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_u64<E: de::Error>(self, _: u64) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_f64<E: de::Error>(self, _: f64) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_unit<E: de::Error>(self) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_str<E: de::Error>(self, _: &str) -> std::result::Result<Self::Value, E> { Ok(ValidatedDiscard) }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error> {
+                while seq.next_element::<ValidatedDiscard>()?.is_some() {}
+                Ok(ValidatedDiscard)
+            }
+            fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> std::result::Result<Self::Value, M::Error> {
+                while map.next_key::<String>()?.is_some() { map.next_value::<ValidatedDiscard>()?; }
+                Ok(ValidatedDiscard)
+            }
+        }
+        deserializer.deserialize_any(DiscardVisitor)
+    }
+}
 impl<'de> Deserialize<'de> for Row {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         struct RowVisitor;
@@ -18,7 +46,7 @@ impl<'de> Deserialize<'de> for Row {
                 while let Some(key) = map.next_key::<String>()? {
                     let index = match key.as_str() {
                         "RuleID" => 0, "File" => 1, "StartLine" => 2, "Commit" => 3,
-                        _ => { map.next_value::<IgnoredAny>()?; continue; }
+                        _ => { map.next_value::<ValidatedDiscard>()?; continue; }
                     };
                     if seen[index] { return Err(de::Error::custom("duplicate location")); }
                     seen[index] = true;
@@ -26,8 +54,9 @@ impl<'de> Deserialize<'de> for Row {
                         0 => row.rule = map.next_value::<String>()?,
                         1 => row.file = map.next_value::<String>()?,
                         2 => {
-                            let number = map.next_value::<serde_json::Number>()?;
-                            row.line = number.as_u64().ok_or_else(|| de::Error::custom("invalid line"))?.to_string();
+                            // Typed integer decoding cannot accept arbitrary_precision's
+                            // internal Number-map representation as a JSON object.
+                            row.line = map.next_value::<u64>()?.to_string();
                         }
                         _ => row.commit = map.next_value::<String>()?,
                     }
@@ -40,6 +69,7 @@ impl<'de> Deserialize<'de> for Row {
 }
 pub fn parse(bytes: &[u8]) -> Result<Report> {
     require(bytes.len() as u64 <= crate::private::REPORT_LIMIT, "SECURITY_REPORT_OVERSIZE")?;
+    let text = std::str::from_utf8(bytes).private("SECURITY_REPORT_INVALID")?;
     struct ReportVisitor;
     impl<'de> Visitor<'de> for ReportVisitor {
         type Value = Report;
@@ -53,7 +83,7 @@ pub fn parse(bytes: &[u8]) -> Result<Report> {
             Ok(report)
         }
     }
-    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let mut deserializer = serde_json::Deserializer::from_str(text);
     let report = deserializer.deserialize_seq(ReportVisitor).private("SECURITY_REPORT_INVALID")?;
     deserializer.end().private("SECURITY_REPORT_INVALID")?;
     Ok(report)

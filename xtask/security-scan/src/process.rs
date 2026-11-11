@@ -110,6 +110,16 @@ pub struct Outcome {
     pub barrier: NoChildren, pub cleanup_elapsed: Duration,
 }
 impl Outcome {
+    /// Completed normal exit, verified wait ownership and complete bounded
+    /// captures. Nonwhite output alone is allowed here for private Git errors.
+    pub fn completed(&self) -> bool {
+        self.failure.is_none() && self.status.is_some_and(|status| (0..=255).contains(&status))
+            && self.reaped > 0 && self.adopted == 0
+            && !self.stdout.failed && !self.stdout.overflow && !self.stderr.failed && !self.stderr.overflow
+    }
+    pub fn completed_nonzero(&self) -> bool {
+        self.completed() && self.status.is_some_and(|status| status != 0)
+    }
     pub fn successful(&self) -> Result<()> {
         if let Some(error) = self.failure { return Err(error); }
         require(self.status == Some(0), "SECURITY_CHILD_FAILED")

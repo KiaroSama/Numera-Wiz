@@ -182,21 +182,40 @@ impl Fixture {
             "SECURITY_ALL_REFS_MISSED")?;
         require(self.scan(&repository, &Scope::PullRequest { base: base.clone(), head }, &self.root.join("pr-scope.md"))?.finding_count == 0,
             "SECURITY_PR_SCOPE_INVALID")?;
-        require(self.scan(&repository, &Scope::PullRequest { base, head: "0".repeat(40) }, &self.root.join("missing-head.md")).is_err(),
+        let missing = "0".repeat(40);
+        let independent = self.git_result(&repository, &["cat-file", "-e", &format!("{missing}^{{commit}}")])?;
+        require(independent.completed_nonzero(), "SECURITY_MISSING_REVISION_NOT_ESTABLISHED")?;
+        independent.barrier.recheck()?;
+        require(failed_at(&self.scan(&repository, &Scope::PullRequest { base, head: missing }, &self.root.join("missing-head.md")),
+            "SECURITY_REVISION_COMMIT_CHECK_FAILED"),
             "SECURITY_MISSING_REVISION_ACCEPTED")?;
+        diagnostic("INFO", "SECURITY_REAL_MISSING_REVISION_COMMIT_CHECK_PASS");
         diagnostic("INFO", "SECURITY_REAL_ALL_REFS_PR_SCOPE_PASS"); Ok(())
     }
     fn real_git_failure(&self) -> Result<()> {
         let repository = self.repository("broken")?;
         let blob = self.revision(&repository, "HEAD:README.txt")?;
-        fs::remove_file(repository.join(".git/objects").join(&blob[..2]).join(&blob[2..]))
+        let original = self.git_result(&repository, &["cat-file", "-t", &blob])?;
+        require(original.completed() && original.status == Some(0) && original.stdout.bytes == b"blob\n"
+            && original.stderr.quiet(), "SECURITY_REAL_GIT_OBJECT_SETUP_FAILED")?;
+        let object = repository.join(".git/objects").join(&blob[..2]).join(&blob[2..]);
+        require(fs::symlink_metadata(&object).is_ok_and(|m| m.is_file() && !m.file_type().is_symlink()),
+            "SECURITY_REAL_GIT_OBJECT_SETUP_FAILED")?;
+        fs::remove_file(&object)
             .private("SECURITY_FIXTURE_IO")?;
+        require(!object.try_exists().private("SECURITY_FIXTURE_IO")?, "SECURITY_REAL_GIT_OBJECT_STILL_PRESENT")?;
+        let absent = self.git_result(&repository, &["cat-file", "-e", &blob])?;
+        require(absent.completed_nonzero(), "SECURITY_REAL_GIT_MISSING_OBJECT_NOT_ESTABLISHED")?;
+        absent.barrier.recheck()?;
         let args = protocol::history_args(private::text(&repository.join(".git"))?, "--all");
         let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
         let fault = self.git_result(&repository, &refs)?;
-        require(fault.status != Some(0), "SECURITY_REAL_GIT_FAULT_NOT_ESTABLISHED")?;
-        require(self.scan(&repository, &Scope::All, &self.root.join("broken-summary.md")).is_err(),
+        require(fault.completed_nonzero(), "SECURITY_REAL_GIT_FAULT_NOT_ESTABLISHED")?;
+        fault.barrier.recheck()?;
+        require(failed_at(&self.scan(&repository, &Scope::All, &self.root.join("broken-summary.md")),
+            "SECURITY_HISTORY_GIT_FAILED"),
             "SECURITY_REAL_GIT_FAILURE_ACCEPTED")?;
+        diagnostic("INFO", "SECURITY_REAL_HISTORY_COMPLETED_NONZERO_PASS");
         diagnostic("INFO", "SECURITY_REAL_GIT_FAILURE_PASS"); Ok(())
     }
     fn untrusted_build(&self) -> Result<()> {
@@ -352,3 +371,6 @@ fn synthetic_secret() -> Result<String> {
     Ok(format!("{prefix}{}", &entropy[..36]))
 }
 fn contains(haystack: &[u8], needle: &[u8]) -> bool { haystack.windows(needle.len()).any(|w| w == needle) }
+fn failed_at<T>(result: &Result<T>, category: &'static str) -> bool {
+    matches!(result, Err(error) if error.0 == category)
+}

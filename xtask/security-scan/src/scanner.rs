@@ -46,8 +46,9 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
                 command.current_dir(&git_directory).arg("-C").arg(&git_directory)
                     .args(["cat-file", "-e"]).arg(format!("{revision}^{{commit}}"));
                 let checked = process::run(&mut command, process::Options::command(Duration::from_secs(15), request.deadline), || Ok(()))?;
+                if checked.completed_nonzero() { return Err(ScanFailure("SECURITY_REVISION_COMMIT_CHECK_FAILED")); }
                 checked.successful()?;
-                require(checked.stdout.quiet() && checked.stderr.quiet() && checked.adopted == 0, "SECURITY_REVISION_INVALID")?;
+                require(checked.completed() && checked.stdout.quiet() && checked.stderr.quiet(), "SECURITY_REVISION_INVALID")?;
             }
         }
         let context = Context::prepare(scratch.path(), &git_directory, &git, request.release, request.scope, request.deadline)?;

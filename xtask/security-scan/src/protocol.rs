@@ -43,11 +43,27 @@ pub fn write_json(path: &Path, value: &Value) -> Result<()> {
 pub fn read_json(path: &Path) -> Result<Value> {
     let bytes = private::read(path, private::RECORD_LIMIT)?;
     let value: Value = serde_json::from_slice(&bytes).private("SECURITY_CONTEXT_INVALID")?;
+    // Authored protocol numbers are bounded decimal integers. The report's
+    // arbitrary_precision feature must not make alternate numeric spellings
+    // canonical here (for example 1e0 or -0 in an otherwise ignored field).
+    require(canonical_integer_values(&value), "SECURITY_CONTEXT_INVALID")?;
     // Authored records are canonical JSON. Re-serialization rejects duplicate keys,
     // trailing values and alternate encodings rather than silently overwriting them.
     require(serde_json::to_vec(&value).private("SECURITY_CONTEXT_INVALID")? == bytes,
         "SECURITY_CONTEXT_INVALID")?;
     Ok(value)
+}
+fn canonical_integer_values(value: &Value) -> bool {
+    match value {
+        Value::Number(number) => {
+            let canonical = number.as_i64().map(|value| value.to_string())
+                .or_else(|| number.as_u64().map(|value| value.to_string()));
+            canonical.is_some_and(|text| number.to_string() == text)
+        }
+        Value::Array(values) => values.iter().all(canonical_integer_values),
+        Value::Object(values) => values.values().all(canonical_integer_values),
+        _ => true,
+    }
 }
 pub fn unix_millis() -> Result<u64> {
     SystemTime::now().duration_since(UNIX_EPOCH).private("SECURITY_CLOCK_INVALID")?
@@ -173,7 +189,7 @@ pub fn proxy_worker() -> Result<i32> {
     let proof = context.root.join("proof");
     // Every attempt leaves durable evidence before argv validation; rejected attempts
     // cannot disappear behind a later successful history child.
-    let mut started = json!({"run": v["run"], "context": private::hash(&private::read(&context.root.join("context.json"), private::RECORD_LIMIT)?),
+    let mut started = json!({"invocation":id, "run": v["run"], "context": private::hash(&private::read(&context.root.join("context.json"), private::RECORD_LIMIT)?),
         "group": group["group"], "kind": "rejected", "argv": []});
     write_json(&proof.join(format!("{id}.attempt")), &started)?;
     let mut args = Vec::new(); let mut bytes = 0_usize;
@@ -191,12 +207,13 @@ pub fn proxy_worker() -> Result<i32> {
     command.current_dir(string(v, "repository")?).args(&args);
     let result = process::run(&mut command, process::Options { budget: Duration::from_secs(if kind == "history" { 930 } else { 15 }),
         deadline: deadline_from(v)?, inherited_group: true, forward_stdout: true }, || context.monitor())?;
-    let no_remote = kind == "metadata" && result.failure.is_none() && result.status == Some(128)
-        && result.stderr.bytes == b"fatal: No remote configured to list refs from.\n" && !result.stderr.overflow;
-    let accepted = result.failure.is_none() && result.adopted == 0
+    let completed = result.completed();
+    let no_remote = kind == "metadata" && completed && result.status == Some(128)
+        && result.stderr.bytes == b"fatal: No remote configured to list refs from.\n";
+    let accepted = completed
         && ((result.status == Some(0) && result.stderr.quiet()) || no_remote);
-    write_json(&proof.join(format!("{id}.done")), &json!({"start": private::hash(&serde_json::to_vec(&started).private("SECURITY_CONTEXT_INVALID")?),
-        "accepted": accepted, "status": result.status, "no_remote": no_remote}))?;
+    write_json(&proof.join(format!("{id}.done")), &json!({"invocation":id, "start": private::hash(&serde_json::to_vec(&started).private("SECURITY_CONTEXT_INVALID")?),
+        "completed":completed, "stderr_quiet":result.stderr.quiet(), "accepted": accepted, "status": result.status, "no_remote": no_remote}))?;
     require(accepted, "SECURITY_GIT_CHILD_FAILED")?;
     if no_remote {
         // Fixed private protocol text preserves pinned Gitleaks's no-remote case.
@@ -229,6 +246,7 @@ pub fn verify_proofs(context: &Context, leader: i32) -> Result<ProofCounts> {
         "SECURITY_PROOF_INVALID")?;
     let digest = private::hash(&descriptor);
     let mut counts = ProofCounts { history: 0, metadata: 0, blobs: 0 };
+    let mut history_attempts = 0; let mut failed_history = false;
     require(!files.is_empty() && files.len().is_multiple_of(3), "SECURITY_PROOF_INCOMPLETE")?;
     for (name, path) in &files {
         let (id, suffix) = name.split_once('.').ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?;
@@ -241,19 +259,35 @@ pub fn verify_proofs(context: &Context, leader: i32) -> Result<ProofCounts> {
         let start_path = files.get(&format!("{id}.start")).ok_or(ScanFailure("SECURITY_PROOF_INCOMPLETE"))?;
         let done_path = files.get(&format!("{id}.done")).ok_or(ScanFailure("SECURITY_PROOF_INCOMPLETE"))?;
         let started = read_json(start_path)?; let done = read_json(done_path)?;
-        require(attempt["kind"] == "rejected" && attempt["argv"] == json!([]) && attempt["run"] == context.value["run"]
+        require(attempt["invocation"] == id && started["invocation"] == id && done["invocation"] == id
+            && attempt["kind"] == "rejected" && attempt["argv"] == json!([]) && attempt["run"] == context.value["run"]
             && attempt["context"] == digest && attempt["group"] == group["group"]
             && started["run"] == attempt["run"] && started["context"] == attempt["context"]
-            && started["group"] == attempt["group"] && done["accepted"] == true
+            && started["group"] == attempt["group"]
             && done["start"] == private::hash(&private::read(start_path, private::RECORD_LIMIT)?), "SECURITY_PROOF_INVALID")?;
         let args = started["argv"].as_array().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?.iter()
             .map(|v| v.as_str().map(str::to_owned).ok_or(ScanFailure("SECURITY_PROOF_INVALID")))
             .collect::<Result<Vec<_>>>()?;
         let kind = classify(&args, string(&context.value, "repository")?, string(&context.value, "scope")?)?;
-        require(started["kind"] == kind && ((done["status"] == 0 && done["no_remote"] == false)
-            || (kind == "metadata" && done["status"] == 128 && done["no_remote"] == true)), "SECURITY_PROOF_INVALID")?;
+        require(started["kind"] == kind, "SECURITY_PROOF_INVALID")?;
+        let status = done["status"].as_i64().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?;
+        let accepted = done["accepted"].as_bool().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?;
+        let no_remote = done["no_remote"].as_bool().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?;
+        let quiet = done["stderr_quiet"].as_bool().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?;
+        require(done["completed"] == true && (0..=255).contains(&status), "SECURITY_PROOF_INVALID")?;
+        if kind == "history" { history_attempts += 1; }
+        if kind == "history" && !accepted && status != 0 && !no_remote {
+            failed_history = true;
+            continue;
+        }
+        require(accepted && ((status == 0 && !no_remote && quiet)
+            || (kind == "metadata" && status == 128 && no_remote && !quiet)), "SECURITY_PROOF_INVALID")?;
         match kind { "history" => counts.history += 1, "metadata" => counts.metadata += 1, _ => counts.blobs += 1 }
     }
-    require(counts.history > 0 && counts.history <= 256, "SECURITY_PROOF_INCOMPLETE")?;
+    require(history_attempts > 0 && history_attempts <= 256, "SECURITY_PROOF_INCOMPLETE")?;
+    // Only a complete, identity-validated nonzero real history completion reaches
+    // this category; malformed/incomplete/other failed records return above.
+    require(!failed_history, "SECURITY_HISTORY_GIT_FAILED")?;
+    require(counts.history > 0, "SECURITY_PROOF_INCOMPLETE")?;
     Ok(counts)
 }
