@@ -1,0 +1,354 @@
+//! Private synthetic repositories and independently classified negative oracles.
+use nw_security_scan::{PrivateResult, Result, ScanFailure, diagnostic, require,
+    assets::{self, Release}, private::{self, Scratch}, process::{self, Options},
+    protocol::{self, Scope}, scanner::{self, ScanRequest, VerifiedScan}};
+use std::{env, fs, io::Write,
+    path::{Path, PathBuf}, process::Command, time::{Duration, Instant}};
+
+#[path = "fixture_policy.rs"] mod policy;
+#[path = "fixture_children.rs"] mod children;
+pub use children::dispatch as child_dispatch;
+const EXPECTED_SUMMARY: &str = concat!(
+    "## Gitleaks\n\nScanner: **8.30.1**\n\n",
+    "Scope: **All fetched branches and tags, including full history and merge diffs**\n\n",
+    "Rules: Pinned built-in Gitleaks rules with standard exclusions. ",
+    "Full history describes revision coverage, not universal byte or credential coverage.\n\n",
+    "No matching secrets were found in the scanned Git history.\n",
+);
+struct Fixture { root: PathBuf, git: PathBuf, deadline: Instant, release: Option<Release> }
+pub fn qualify() -> Result<()> {
+    scanner::guard()?; process::initialize()?; process::barrier()?; scanner::provenance()?;
+    let deadline = Instant::now() + Duration::from_secs(300);
+    let git = scanner::real_git()?;
+    let scratch = Scratch::create(&scanner::temporary()?)?;
+    let mut fixture = Fixture { root: scratch.path().to_owned(), git, deadline, release: None };
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fixture.all()))
+        .unwrap_or(Err(ScanFailure("SECURITY_QUALIFICATION_PANIC")));
+    match process::barrier() {
+        Ok(barrier) => { scratch.remove(&barrier)?; result }
+        Err(_) => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
+    }
+}
+impl Fixture {
+    fn all(&mut self) -> Result<()> {
+        self.real_clean()?;
+        policy::qualify(&self.root, self.deadline)?;
+        self.seed_suppression_attributes()?;
+        self.merge_scope()?;
+        self.all_refs_scope()?;
+        self.real_git_failure()?;
+        self.untrusted_build()?;
+        self.process_cases()?;
+        self.known_public_data_policy_red()
+    }
+    fn git_result(&self, repository: &Path, args: &[&str]) -> Result<process::Outcome> {
+        let mut command = Command::new(&self.git);
+        private::controlled(&mut command, &self.root);
+        command.current_dir(repository).env("GIT_TEMPLATE_DIR", self.root.join("empty-template"))
+            .env("GIT_AUTHOR_NAME", "Security qualification").env("GIT_AUTHOR_EMAIL", "qualification@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Security qualification").env("GIT_COMMITTER_EMAIL", "qualification@example.invalid")
+            .args(["--no-pager", "-c", "commit.gpgSign=false"]).args(args);
+        process::run(&mut command, Options::command(Duration::from_secs(15), self.deadline), || Ok(()))
+    }
+    fn git(&self, repository: &Path, args: &[&str]) -> Result<String> {
+        let output = self.git_result(repository, args)?;
+        output.successful()?;
+        String::from_utf8(output.stdout.bytes).private("SECURITY_FIXTURE_GIT_ENCODING")
+    }
+    fn revision(&self, repository: &Path, revision: &str) -> Result<String> {
+        let result = self.git(repository, &["rev-parse", "--verify", revision])?;
+        let result = result.trim().to_owned();
+        require(protocol::revision(&result), "SECURITY_FIXTURE_REVISION")?; Ok(result)
+    }
+    fn repository(&self, name: &str) -> Result<PathBuf> {
+        let path = self.root.join(name); private::directory(&path)?;
+        self.git(&path, &["init", "--quiet", "--initial-branch=main"])?;
+        fs::write(path.join("README.txt"), b"A clean synthetic repository for security qualification.\n")
+            .private("SECURITY_FIXTURE_IO")?;
+        self.git(&path, &["add", "--", "README.txt"])?;
+        self.git(&path, &["commit", "--quiet", "--no-gpg-sign", "-m", "Clean fixture"])?;
+        Ok(path)
+    }
+    fn scan(&self, repository: &Path, scope: &Scope, summary: &Path) -> Result<VerifiedScan> {
+        let result = scanner::scan(&ScanRequest { repository, summary: Some(summary), scope,
+            release: self.release.as_ref().ok_or(ScanFailure("SECURITY_FIXTURE_ASSETS"))?, deadline: self.deadline })?;
+        eprintln!("{} [INFO] SECURITY_SYNTHETIC_PROTOCOL history={} metadata={} blobs={}",
+            protocol::unix_millis()?, result.successful_history_invocations, result.metadata_invocations, result.blob_invocations);
+        Ok(result)
+    }
+    fn real_clean(&mut self) -> Result<()> {
+        private::directory(&self.root.join("empty-template"))?;
+        let repository = self.repository("repository")?;
+        self.git(&repository, &["cat-file", "-e", "HEAD^{commit}"])?;
+        self.git(&repository, &["diff", "--quiet", "--no-ext-diff", "--no-textconv", "--ignore-submodules=all", "HEAD", "--"])?;
+        diagnostic("INFO", "SECURITY_REAL_CLEAN_SETUP_PASS");
+        let version_output = self.git(&repository, &["--version"])?;
+        let version = version_output.trim().strip_prefix("git version ").ok_or(ScanFailure("SECURITY_GIT_VERSION_INVALID"))?;
+        require(!version.is_empty() && version.len() <= 64 && version.bytes().all(|b| b.is_ascii_digit() || b == b'.'),
+            "SECURITY_GIT_VERSION_INVALID")?;
+        eprintln!("{} [INFO] SECURITY_TRUSTED_GIT version={version} sha256={}",
+            protocol::unix_millis()?, private::executable_hash(&self.git)?);
+        let assets = self.root.join("assets"); private::directory(&assets)?;
+        self.release = Some(Release::prepare(&assets, self.deadline)?);
+        let summary = self.root.join("summary.md");
+        let result = self.scan(&repository, &Scope::All, &summary)?;
+        require(result.scanner_version == "8.30.1" && result.finding_count == 0
+            && result.successful_history_invocations > 0, "SECURITY_REAL_CLEAN_CONTRACT_FAILED")?;
+        require(private::read(&summary, private::MIB)? == EXPECTED_SUMMARY.as_bytes(), "SECURITY_REAL_CLEAN_SUMMARY_FAILED")?;
+        // Preserve the original no-remote clean fixture; no fake origin hides metadata behavior.
+        require(result.metadata_invocations > 0, "SECURITY_METADATA_NOT_OBSERVED")?;
+        diagnostic("INFO", "SECURITY_REAL_CLEAN_PASS"); Ok(())
+    }
+    fn seed_suppression_attributes(&self) -> Result<()> {
+        let repository = self.repository("seeded")?;
+        let secret = synthetic_secret()?; let canary = format!("private-message-{}", private::nonce()?);
+        let source = format!("token = \"{secret}\" # gitleaks:allow\n");
+        fs::write(repository.join("credential.txt"), &source).private("SECURITY_FIXTURE_IO")?;
+        fs::write(repository.join(".gitleaks.toml"), "[[allowlists]]\nregexes = ['.*']\n").private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?;
+        self.git(&repository, &["commit", "--quiet", "-m", &canary])?;
+        let seeded = self.revision(&repository, "HEAD")?;
+        fs::write(repository.join(".gitleaksignore"), format!("{seeded}:credential.txt:github-pat:1\n"))
+            .private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Suppression attempt"])?;
+        let summary = self.root.join("seeded-summary.md");
+        let result = self.scan(&repository, &Scope::All, &summary)?;
+        require(result.finding_count > 0, "SECURITY_SEEDED_SECRET_MISSED")?;
+        let public = private::read(&summary, private::MIB)?;
+        require(!contains(&public, secret.as_bytes()) && !contains(&public, canary.as_bytes())
+            && !contains(&public, source.as_bytes()), "SECURITY_PRIVATE_DATA_PUBLISHED")?;
+        diagnostic("INFO", "SECURITY_REAL_SEEDED_SUPPRESSION_PRIVACY_PASS");
+        let sentinel = self.root.join("fixture-sentinel");
+        private::copy_executable(&env::current_exe().private("SECURITY_FIXTURE_IO")?, &sentinel)?;
+        self.git(&repository, &["config", "diff.sentinel.command", private::text(&sentinel)?])?;
+        self.git(&repository, &["config", "diff.sentinel.textconv", private::text(&sentinel)?])?;
+        fs::write(repository.join(".gitattributes"), "*.txt diff=sentinel\n").private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["update-index", "--add", "--cacheinfo", &format!("160000,{seeded},submodule")])?;
+        self.git(&repository, &["add", ".gitattributes"])?;
+        self.git(&repository, &["commit", "--quiet", "-m", "Attributes and gitlink"])?;
+        let next = self.revision(&repository, "HEAD")?;
+        self.git(&repository, &["update-index", "--cacheinfo", &format!("160000,{next},submodule")])?;
+        // A benign runtime-generated binary archive triggers the source-predicted cat-file path.
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gzip.write_all(&[0_u8; 512]).private("SECURITY_FIXTURE_IO")?;
+        fs::write(repository.join("benign.gz"), gzip.finish().private("SECURITY_FIXTURE_IO")?).private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "benign.gz"])?;
+        self.git(&repository, &["commit", "--quiet", "-m", "Gitlink transition and archive"])?;
+        let result = self.scan(&repository, &Scope::All, &self.root.join("attributes-summary.md"))?;
+        require(result.finding_count > 0 && result.blob_invocations > 0
+            && !self.root.join("sentinel-hit").exists(), "SECURITY_ATTRIBUTE_BLOB_CONTRACT_FAILED")?;
+        diagnostic("INFO", "SECURITY_REAL_ATTRIBUTES_GITLINK_BLOB_PASS"); Ok(())
+    }
+    fn merge_scope(&self) -> Result<()> {
+        let repository = self.repository("merge")?;
+        let base = self.revision(&repository, "HEAD")?;
+        self.git(&repository, &["checkout", "--quiet", "-b", "left"])?;
+        fs::write(repository.join("merge.txt"), "left\n").private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Left"])?;
+        let left = self.revision(&repository, "HEAD")?;
+        self.git(&repository, &["checkout", "--quiet", "-b", "right", &base])?;
+        fs::write(repository.join("merge.txt"), "right\n").private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Right"])?;
+        let right = self.revision(&repository, "HEAD")?;
+        let conflict = self.git_result(&repository, &["merge", "--no-commit", "--no-ff", "left"])?;
+        require(conflict.status == Some(1) && conflict.failure.is_none(), "SECURITY_MERGE_SETUP_FAILED")?;
+        let secret = synthetic_secret()?;
+        fs::write(repository.join("merge.txt"), format!("token = \"{secret}\"\n")).private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "merge.txt"])?; self.git(&repository, &["commit", "--quiet", "-m", "Resolution"])?;
+        let head = self.revision(&repository, "HEAD")?;
+        require(self.git(&repository, &["rev-list", "--parents", "-n", "1", "HEAD"])?.split_whitespace().count() == 3,
+            "SECURITY_MERGE_SETUP_FAILED")?;
+        for parent in [&left, &right] {
+            let text = self.git(&repository, &["show", &format!("{parent}:merge.txt")])?;
+            require(!text.contains(&secret), "SECURITY_MERGE_ORACLE_FAILED")?;
+        }
+        let result = self.scan(&repository, &Scope::PullRequest { base: right, head }, &self.root.join("merge-summary.md"))?;
+        require(result.finding_count > 0, "SECURITY_MERGE_SECRET_MISSED")?;
+        diagnostic("INFO", "SECURITY_REAL_MERGE_ONLY_PR_PASS"); Ok(())
+    }
+    fn all_refs_scope(&self) -> Result<()> {
+        let repository = self.repository("scope")?;
+        let base = self.revision(&repository, "HEAD")?;
+        self.git(&repository, &["checkout", "--quiet", "-b", "hidden"])?;
+        fs::write(repository.join("hidden.txt"), format!("token = \"{}\"\n", synthetic_secret()?)).private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Hidden"])?;
+        self.git(&repository, &["tag", "retained-secret"])?;
+        self.git(&repository, &["checkout", "--quiet", "main"])?;
+        self.git(&repository, &["branch", "-D", "hidden"])?;
+        fs::write(repository.join("second.txt"), "clean second commit\n").private("SECURITY_FIXTURE_IO")?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Second clean"])?;
+        let head = self.revision(&repository, "HEAD")?;
+        require(self.scan(&repository, &Scope::All, &self.root.join("all-refs.md"))?.finding_count > 0,
+            "SECURITY_ALL_REFS_MISSED")?;
+        require(self.scan(&repository, &Scope::PullRequest { base: base.clone(), head }, &self.root.join("pr-scope.md"))?.finding_count == 0,
+            "SECURITY_PR_SCOPE_INVALID")?;
+        require(self.scan(&repository, &Scope::PullRequest { base, head: "0".repeat(40) }, &self.root.join("missing-head.md")).is_err(),
+            "SECURITY_MISSING_REVISION_ACCEPTED")?;
+        diagnostic("INFO", "SECURITY_REAL_ALL_REFS_PR_SCOPE_PASS"); Ok(())
+    }
+    fn real_git_failure(&self) -> Result<()> {
+        let repository = self.repository("broken")?;
+        let blob = self.revision(&repository, "HEAD:README.txt")?;
+        fs::remove_file(repository.join(".git/objects").join(&blob[..2]).join(&blob[2..]))
+            .private("SECURITY_FIXTURE_IO")?;
+        let args = protocol::history_args(private::text(&repository.join(".git"))?, "--all");
+        let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let fault = self.git_result(&repository, &refs)?;
+        require(fault.status != Some(0), "SECURITY_REAL_GIT_FAULT_NOT_ESTABLISHED")?;
+        require(self.scan(&repository, &Scope::All, &self.root.join("broken-summary.md")).is_err(),
+            "SECURITY_REAL_GIT_FAILURE_ACCEPTED")?;
+        diagnostic("INFO", "SECURITY_REAL_GIT_FAILURE_PASS"); Ok(())
+    }
+    fn untrusted_build(&self) -> Result<()> {
+        let repository = self.repository("untrusted-build")?;
+        private::directory(&repository.join(".cargo"))?;
+        fs::write(repository.join("Cargo.toml"), "[package]\nname='untrusted-sentinel'\nversion='0.0.0'\n").private("SECURITY_FIXTURE_IO")?;
+        fs::write(repository.join("build.rs"), "fn main() { std::fs::write(\"BUILD_EXECUTED\", b\"bad\").unwrap(); }\n").private("SECURITY_FIXTURE_IO")?;
+        fs::write(repository.join(".cargo/config.toml"), format!("[build]\nrustc-wrapper = {:?}\n", self.root.join("fixture-sentinel")))
+            .private("SECURITY_FIXTURE_IO")?;
+        private::copy_executable(&env::current_exe().private("SECURITY_FIXTURE_IO")?, &repository.join("git"))?;
+        self.git(&repository, &["add", "."])?; self.git(&repository, &["commit", "--quiet", "-m", "Untrusted build inputs"])?;
+        require(self.scan(&repository, &Scope::All, &self.root.join("untrusted-summary.md"))?.finding_count == 0
+            && !repository.join("BUILD_EXECUTED").exists() && !self.root.join("sentinel-hit").exists(),
+            "SECURITY_BUILD_BOUNDARY_FAILED")?;
+        diagnostic("INFO", "SECURITY_REAL_UNTRUSTED_BUILD_PASS"); Ok(())
+    }
+    fn child(&self, mode: &str) -> Result<Command> {
+        let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
+        private::controlled(&mut command, &self.root);
+        command.current_dir(&self.root).args(["--fixture-child", mode]).arg(&self.root);
+        Ok(command)
+    }
+    fn process_cases(&self) -> Result<()> {
+        for mode in ["tree-exit", "tree-detach", "nested", "race", "proxy-dies"] {
+            let root = self.root.join(mode); private::directory(&root)?;
+            let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
+            private::controlled(&mut command, &root);
+            command.args(["--fixture-child", mode]).arg(&root);
+            let result = process::run(&mut command, Options::command(Duration::from_secs(3), self.deadline), || {
+                if mode != "tree-exit" && root.join("tree-ready").try_exists().private("SECURITY_FIXTURE_IO")? {
+                    Err(ScanFailure("SECURITY_FIXTURE_TERMINATE_READY_TREE"))
+                } else { Ok(()) }
+            })?;
+            require(result.adopted > 0 && result.reaped >= 2 && result.failure.is_some()
+                && result.cleanup_elapsed <= process::GRACE, "SECURITY_ADOPTION_NOT_PROVEN")?;
+            result.barrier.recheck()?;
+            if mode == "proxy-dies" {
+                require(result.status.is_none() && root.join("proxy-started").is_file()
+                    && !root.join("proxy-completed").exists(), "SECURITY_SYNTHETIC_PROXY_DEATH_NOT_PROVEN")?;
+            }
+        }
+        diagnostic("INFO", "SECURITY_ACTUAL_DESCENDANT_ADOPTION_PASS");
+        diagnostic("INFO", "SECURITY_SYNTHETIC_PROXY_DEATH_INCOMPLETE_PASS");
+        let pressure = process::run(&mut self.child("pressure")?, Options::command(Duration::from_secs(3), self.deadline), || Ok(()))?;
+        require(pressure.failure.is_some() && (pressure.stdout.overflow || pressure.stderr.overflow)
+            && pressure.stdout.bytes.len() <= private::CAPTURE_LIMIT && pressure.stderr.bytes.len() <= private::CAPTURE_LIMIT,
+            "SECURITY_CAPTURE_PRESSURE_NOT_PROVEN")?;
+        let panic_payload = synthetic_secret()?;
+        let panic = process::run(&mut self.child("sleep")?, Options::command(Duration::from_secs(2), self.deadline), || {
+            std::panic::panic_any(panic_payload.clone());
+        })?;
+        require(panic.failure == Some(ScanFailure("SECURITY_CHILD_PANIC")) && panic.reaped > 0, "SECURITY_PANIC_CLEANUP_NOT_PROVEN")?;
+        for mode in ["cancel", "cancel-int", "unrelated"] {
+            let result = process::run(&mut self.child(mode)?, Options::command(Duration::from_secs(8), self.deadline), || Ok(()))?;
+            result.successful()?;
+            require(result.stdout.bytes == b"FIXTURE_CONTROL_PASS\n", "SECURITY_PROCESS_ORACLE_FAILED")?;
+        }
+        diagnostic("INFO", "SECURITY_ACTUAL_CANCEL_PANIC_PRESSURE_UNRELATED_PASS");
+        self.fault_cases()?;
+        let utility = fs::canonicalize("/usr/bin/env").private("SECURITY_FIXTURE_UTILITY_INVALID")?;
+        let mut version = Command::new(&utility); private::controlled(&mut version, &self.root); version.arg("--version");
+        let result = process::run(&mut version, Options::command(Duration::from_secs(15), self.deadline), || Ok(()))?;
+        result.successful()?;
+        let output = std::str::from_utf8(&result.stdout.bytes).private("SECURITY_FIXTURE_UTILITY_INVALID")?;
+        let version = output.lines().next().and_then(|line| line.strip_prefix("env (GNU coreutils) "))
+            .ok_or(ScanFailure("SECURITY_FIXTURE_UTILITY_INVALID"))?;
+        require(!version.is_empty() && version.len() <= 64 && version.bytes().all(|b| b.is_ascii_digit() || b == b'.'),
+            "SECURITY_FIXTURE_UTILITY_INVALID")?;
+        eprintln!("{} [INFO] SECURITY_FIXTURE_GNU_ENV version={version} sha256={}", protocol::unix_millis()?, private::executable_hash(&utility)?);
+        for (option, mode) in [("--block-signal=TERM", "blocked"), ("--ignore-signal=CHLD", "ignored")] {
+            let mut command = Command::new(&utility); private::controlled(&mut command, &self.root);
+            command.arg(option).arg(env::current_exe().private("SECURITY_FIXTURE_IO")?).args(["--fixture-child", mode]).arg(&self.root);
+            let result = process::run(&mut command, Options::command(Duration::from_secs(2), self.deadline), || Ok(()))?;
+            result.successful()?;
+            require(result.stdout.bytes == b"FIXTURE_STATE_OBSERVED_REJECTED\n", "SECURITY_SIGNAL_NEGATIVE_NOT_PROVEN")?;
+        }
+        let mut debug = self.child("debug")?; debug.env("GITHUB_ACTIONS", "true").env("RUNNER_DEBUG", "1");
+        process::run(&mut debug, Options::command(Duration::from_secs(2), self.deadline), || Ok(()))?.successful()?;
+        diagnostic("INFO", "SECURITY_ACTUAL_SIGNAL_STATE_DEBUG_PASS"); Ok(())
+    }
+    fn fault_cases(&self) -> Result<()> {
+        let mut absent = Command::new(self.root.join("absent-program"));
+        require(process::run(&mut absent, Options::command(Duration::from_secs(1), self.deadline), || Ok(())).is_err(),
+            "SECURITY_SPAWN_FAILURE_ACCEPTED")?;
+        process::barrier()?;
+        for mode in ["fault-subreaper", "fault-registration", "fault-discovery", "fault-probe", "fault-cleanup"] {
+            let root = self.root.join(mode); private::directory(&root)?;
+            let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
+            private::controlled(&mut command, &root);
+            command.args(["--fixture-child", mode]).arg(&root);
+            let result = process::run(&mut command, Options::command(Duration::from_secs(8), self.deadline), || Ok(()))?;
+            require(result.status == Some(0) && result.stdout.bytes == b"FIXTURE_INJECTED_FAILURE_RETAINED\n",
+                "SECURITY_INJECTED_FAULT_ORACLE_FAILED")?;
+            let retained = private::read(&root.join("retained-path"), 4096)?;
+            let retained = Path::new(std::str::from_utf8(&retained).private("SECURITY_FIXTURE_IO")?);
+            require(retained.starts_with(&root) && retained.is_dir(), "SECURITY_PREMATURE_SCRATCH_REMOVAL")?;
+            result.barrier.recheck()?;
+            fs::remove_dir_all(&root).private("SECURITY_FIXTURE_IO")?;
+        }
+        diagnostic("INFO", "SECURITY_MOCK_OWNERSHIP_FAULT_RETENTION_PASS");
+        let root = self.root.join("report-growth"); private::directory(&root)?; private::directory(&root.join("proof"))?;
+        let context = protocol::Context { root: root.clone(), value: serde_json::json!({}) };
+        let mut writer = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
+        private::controlled(&mut writer, &root);
+        writer.args(["--fixture-child", "report-growth"]).arg(&root);
+        let outcome = process::run(&mut writer, Options::command(Duration::from_secs(3), self.deadline), || context.monitor())?;
+        require(outcome.failure == Some(ScanFailure("SECURITY_REPORT_OVERSIZE")) && outcome.reaped == 1
+            && fs::metadata(root.join("findings.json")).private("SECURITY_FIXTURE_IO")?.len() > private::REPORT_LIMIT,
+            "SECURITY_ACTUAL_REPORT_LIMIT_NOT_PROVEN")?;
+        diagnostic("INFO", "SECURITY_ACTUAL_REPORT_GROWTH_REAP_PASS"); Ok(())
+    }
+    fn known_public_data_policy_red(&self) -> Result<()> {
+        // TEST ONLY: immutable byte identities approved by the separate preflight.
+        // These constants do not approve any production report outcome.
+        const DOCUMENTS: [(&str, u64, &str); 4] = [
+            ("docs/research-pack/handoff/02-2-functional-scope-and-migration.md", 27483,
+                "02a9a4eb5a09d04d089dfbf25728af963772af8016a6cc62495c5358ec1d4bed"),
+            ("docs/research-pack/handoff/05-5-domain-model-and-interface-contracts.md", 96791,
+                "01c780f92cebe1e2f50c2b880a76cfd658c6bc1613804533f0884adf912b00f4"),
+            ("docs/research-pack/Numera-Wiz-Implementation-Mandate-EN.md", 772543,
+                "126c8aa8aa7f874802a09600040a1986cff650ad70b70f58f30a441d87fbef06"),
+            ("docs/research-pack/research_v7/filmcraft-source-commands.json", 344827,
+                "dc79337d44c786b037dabe5c18ecfac9cfeb3ea6912f761d3dc0d189590f1ed5"),
+        ];
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut verified = Vec::with_capacity(4);
+        for (path, length, digest) in DOCUMENTS {
+            let bytes = private::read(&source.join(path), private::MIB)?;
+            require(bytes.len() as u64 == length && private::hash(&bytes) == digest, "SECURITY_PUBLIC_DOCUMENT_IDENTITY_FAILED")?;
+            verified.push((path, bytes));
+        }
+        let repository = self.repository("known-public-data")?;
+        for (path, bytes) in verified {
+            let target = repository.join(path);
+            fs::create_dir_all(target.parent().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?).private("SECURITY_FIXTURE_IO")?;
+            private::write(&target, &bytes)?;
+        }
+        self.git(&repository, &["add", "."])?;
+        self.git(&repository, &["commit", "--quiet", "-m", "Verified public documentation fixture"])?;
+        let result = self.scan(&repository, &Scope::All, &self.root.join("public-documents-summary.md"))?;
+        require(result.finding_count == 5 && result.scanner_status == 2 && result.successful_history_invocations > 0,
+            "SECURITY_PUBLIC_DOCUMENT_SCANNER_CONTRACT_FAILED")?;
+        eprintln!("{} [INFO] SECURITY_PUBLIC_DOCUMENT_SCANNER_OBSERVED total=5 status=2 history={}",
+            protocol::unix_millis()?, result.successful_history_invocations);
+        // Strict baseline still fails findings. No reviewed policy or synthetic
+        // approval exists until root observes this precise hosted failure.
+        Err(ScanFailure("SECURITY_REVIEWED_PUBLIC_DATA_POLICY_ABSENT"))
+    }
+}
+fn synthetic_secret() -> Result<String> {
+    let prefix = String::from_utf8(vec![103, 104, 112, 95]).private("SECURITY_FIXTURE_IO")?;
+    let entropy = format!("{}{}", private::nonce()?, private::nonce()?);
+    Ok(format!("{prefix}{}", &entropy[..36]))
+}
+fn contains(haystack: &[u8], needle: &[u8]) -> bool { haystack.windows(needle.len()).any(|w| w == needle) }
