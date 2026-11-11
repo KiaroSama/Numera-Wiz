@@ -1161,7 +1161,7 @@ async fn semantic_project(
     ensure!(
         entities[&project.source]["source_kind"] == "solid_color"
             && entities[&project.source]["duration"] == json!({"num":"4","den":"1"})
-            && entities[&project.track]["grid"] == json!({"num":"1","den":"4"}),
+            && entities[&project.track]["grid"] == json!({"num":"4","den":"1"}),
         "Finite generator or explicit track grid differs"
     );
     let bins = project_projection(
