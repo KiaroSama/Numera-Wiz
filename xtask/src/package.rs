@@ -15,7 +15,8 @@ fn output(command: &mut Command) -> Result<Vec<u8>> {
     if !result.status.success() {
         bail!(
             "Packaging tool failed: {}",
-            String::from_utf8_lossy(&result.stderr)
+            std::str::from_utf8(&result.stderr)
+                .unwrap_or("<binary or non-UTF-8 packaging diagnostic>")
         );
     }
     Ok(result.stdout)
@@ -93,7 +94,8 @@ fn inventory(directory: &Path, root: &Path, rows: &mut Vec<Value>) -> Result<()>
                 entry
                     .path()
                     .strip_prefix(root)?
-                    .to_string_lossy()
+                    .to_str()
+                    .context("Package paths must be UTF-8")?
                     .replace('\\', "/")
             );
             rows.push(row);
@@ -278,7 +280,10 @@ pub fn development(root: &Path) -> Result<()> {
         checksums.push_str(&format!(
             "{}  {}\n",
             identity["sha256"].as_str().context("archive digest")?,
-            path.file_name().context("archive name")?.to_string_lossy()
+            path.file_name()
+                .context("archive name")?
+                .to_str()
+                .context("Archive names must be UTF-8")?
         ));
     }
     fs::write(delivery.join(format!("{name}-SHA256SUMS")), checksums)?;

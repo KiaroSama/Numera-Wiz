@@ -17,7 +17,7 @@ struct FolderScan<'a> {
     snapshot: FolderSnapshot,
     assets: Vec<Asset>,
     sources: Vec<(String, files::SourceStamp)>,
-    directories: Vec<files::DirectoryStamp>,
+    directories: Vec<Arc<files::DirectoryStamp>>,
     source_bytes: u64,
     started: std::time::Instant,
 }
@@ -202,12 +202,15 @@ impl Service {
         let input: RegisterFolderInput = commands::parse(request.params.clone())?;
         input.validate()?;
         self.folder_intake_allowed(context)?;
+        let _preflight = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+            DomainError::new("RESOURCE_LIMIT", "Folder intake and batch preflight capacity is full")
+        })?;
         let deadline = input
             .probe_timeout
             .unwrap_or(nw_domain::execution::CleanupLimits::default().probe);
         self.admit_probe_timeout(context, deadline)?;
         let root = self.folder_root(context, Path::new(&input.path))?;
-        let root_stamp = files::DirectoryStamp::capture_resolved(&root)?;
+        let root_stamp = Arc::new(files::DirectoryStamp::capture_resolved(&root)?);
         let root_object = root_stamp.object_identity()?;
         let now = self.clock.now()?;
         let mut scan = FolderScan {
@@ -234,14 +237,14 @@ impl Service {
             },
             assets: Vec::new(),
             sources: Vec::new(),
-            directories: vec![root_stamp],
+            directories: vec![root_stamp.clone()],
             source_bytes: 0,
             started: std::time::Instant::now(),
         };
         #[cfg(test)]
         self.preflight_started();
         // Enumeration and probes deliberately hold no mutation lock. Revocation can proceed.
-        let prepared = scan.visit(&root, 0, deadline);
+        let prepared = scan.visit(root_stamp, 0, deadline);
         let guard = self.mutation.lock().map_err(|_| lock_error())?;
         if let Some(replayed) = self.refresh_acceptance(context, request, cancellation, &guard)? {
             return Ok(replayed);
@@ -305,13 +308,21 @@ impl Service {
             .map(|asset| Ok((named("asset", &asset.id)?, value(asset)?)))
             .collect::<Result<Vec<_>>>()?;
         records.push((named("folder", &scan.snapshot.id)?, value(&scan.snapshot)?));
-        self.store.commit_with_clock(
+        let response = self.store.commit_with_clock(
             &context.principal,
             request,
             || self.clock.now(),
             result,
             &records,
-        )
+        )?;
+        if response.result.as_ref().and_then(|result| result["id"].as_str()) == Some(scan.snapshot.id.as_str()) {
+            let media_failure_count = scan.snapshot.entries.iter().filter(|entry| entry.kind == FolderEntryKind::Media && entry.error.is_some()).count();
+            tracing::info!(request_id=%request.request_id, snapshot_id=%scan.snapshot.id,
+                snapshot_hash=%scan.snapshot.hash, registered_count=scan.assets.len(),
+                media_failure_count, entry_count=scan.snapshot.entries.len(),
+                complete=scan.snapshot.complete, "folder.snapshot.accepted");
+        }
+        Ok(response)
     }
 }
 impl FolderScan<'_> {
@@ -354,16 +365,16 @@ impl FolderScan<'_> {
     }
     fn visit(
         &mut self,
-        directory: &Path,
+        stamp: Arc<files::DirectoryStamp>,
         depth: usize,
         deadline: nw_domain::execution::DeadlinePolicy,
     ) -> Result<()> {
         if self.stopped()? {
             return Ok(());
         }
+        let directory = stamp.path();
         self.service
             .root_authority(self.context, directory, false)?;
-        let stamp = files::DirectoryStamp::capture_resolved(directory)?;
         if self.snapshot.visited_directories as usize >= MAX_FOLDER_DIRECTORIES {
             self.limit("Folder intake reached its directory bound");
             return Ok(());
@@ -413,7 +424,7 @@ impl FolderScan<'_> {
             }
             return Ok(());
         }
-        self.directories.push(stamp);
+        self.directories.push(stamp.clone());
         entries.sort();
         for path in entries {
             if self.stopped()? {
@@ -477,7 +488,19 @@ impl FolderScan<'_> {
                         )),
                     );
                 } else {
-                    self.visit(&path, depth + 1, deadline)?;
+                    let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "Discovered directory needs an ordinary name"))?;
+                    match stamp.child_directory(name) {
+                        Ok(child) => self.visit(Arc::new(child), depth + 1, deadline)?,
+                        Err(error) => {
+                            if self.cancel.is_cancelled() {
+                                return Err(DomainError::new("CANCELLED", "Folder directory admission cancelled"));
+                            }
+                            self.service.folder_intake_allowed(self.context)?;
+                            self.service.root_authority(self.context, &self.root, false)?;
+                            self.snapshot.complete = false;
+                            self.row(relative, FolderEntryKind::Directory, FolderEntryOutcome::Rejected, Some(error));
+                        }
+                    }
                 }
                 continue;
             }
@@ -504,25 +527,13 @@ impl FolderScan<'_> {
                 self.row(relative, kind, FolderEntryOutcome::CompanionExcluded, None);
                 continue;
             }
-            self.source_bytes = self.source_bytes.saturating_add(metadata.len());
-            if self.source_bytes > MAX_FOLDER_SOURCE_BYTES {
-                self.row(
-                    relative,
-                    kind,
-                    FolderEntryOutcome::Rejected,
-                    Some(DomainError::new(
-                        "RESOURCE_LIMIT",
-                        "Folder intake exceeds its 4 GiB aggregate source-size budget",
-                    )),
-                );
-                continue;
-            }
-            self.register_file(path, relative, kind, deadline)?;
+            self.register_file(&stamp, path, relative, kind, deadline)?;
         }
         Ok(())
     }
     fn register_file(
         &mut self,
+        parent: &files::DirectoryStamp,
         path: PathBuf,
         relative: String,
         kind: FolderEntryKind,
@@ -539,14 +550,22 @@ impl FolderScan<'_> {
                     "Discovered source resolved outside its recorded relative path",
                 ));
             }
-            let stamp = files::SourceStamp::capture_resolved(&path)?;
+            let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "Discovered source needs an ordinary name"))?;
+            let stamp = parent.open_child_source(name)?;
             let object = stamp.object_identity()?;
-            let (identity, asset) = if kind == FolderEntryKind::Media {
-                let mut asset = tokio::runtime::Handle::current().block_on(
-                    self.service.engine()?.register_with_policy(
-                        path.clone(),
+            let source_bytes = stamp.byte_len()?;
+            let remaining = MAX_FOLDER_SOURCE_BYTES.saturating_sub(self.source_bytes);
+            if source_bytes > remaining {
+                return Err(DomainError::new("RESOURCE_LIMIT", "Folder intake exceeds its 4 GiB aggregate source-size budget"));
+            }
+            self.source_bytes += source_bytes;
+            let (identity, asset, stamp) = if kind == FolderEntryKind::Media {
+                let (mut asset, stamp) = tokio::runtime::Handle::current().block_on(
+                    self.service.engine()?.register_held_with_policy(
+                        stamp,
                         self.context.principal.clone(),
                         deadline,
+                        source_bytes,
                         self.cancel.clone(),
                     ),
                 )?;
@@ -562,11 +581,14 @@ impl FolderScan<'_> {
                     ));
                 }
                 asset.display_name = relative.clone();
-                (asset.identity.clone(), Some(asset))
+                (asset.identity.clone(), Some(asset), stamp)
             } else {
-                (files::identity(&path, self.cancel)?, None)
+                (stamp.identity_with_limit(self.cancel, source_bytes)?, None, stamp)
             };
             stamp.revalidate()?;
+            if identity.bytes != source_bytes.to_string() {
+                return Err(DomainError::new("SOURCE_CHANGED", "Source size differs from its held intake reservation"));
+            }
             Ok((identity, object, asset, stamp))
         })();
         if self.cancel.is_cancelled() {

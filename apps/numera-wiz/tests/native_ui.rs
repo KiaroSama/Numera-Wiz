@@ -88,6 +88,31 @@ async fn query_params(root: &Path, id: &str, params: Value) -> Option<Value> {
         None
     }
 }
+async fn ui_event(root: &Path, message: &str, command: Option<&str>, after: usize) -> Value {
+    let started = Instant::now();
+    loop {
+        let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
+        if let Some(event) = log
+            .lines()
+            .skip(after)
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == message
+                    && event["fields"]["request_id"] != "local"
+                    && command.is_none_or(|id| {
+                        event["fields"]["command"] == id && event["fields"]["ok"] == true
+                    })
+            })
+        {
+            return event;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Actual folder controls did not complete the expected UI event: {message}"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
 #[tokio::test]
 #[ignore = "Actual desktop input runs only with the hosted matching executable and Xvfb"]
 async fn native_window_imports_real_media_through_the_human_controls() {
@@ -642,6 +667,173 @@ async fn journey() {
         "review_event":batch_review_event,"result":batch_result,"producer_job_count":3,
         "oracle":"Actual second-file registration, two media checkboxes, batch Review and Run mouse input; independent full bytes for each source/output",
         "not_qualified":["GUI cancellation", "folder expansion", "companions", "replacement", "other native platforms"]
+    })).unwrap()).unwrap();
+
+    // Preserve every original producer/save/batch oracle before adding folder input.
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    let folder = media.directory.path().join("native-folder-input");
+    std::fs::create_dir(&folder).unwrap();
+    let folder_source = folder.join("a-registered.mkv");
+    std::fs::copy(&media.source, &folder_source).unwrap();
+    std::fs::write(folder.join("b-probe-failure.mkv"), b"Invalid media fixture").unwrap();
+    std::fs::write(folder.join("c-companion.txt"), b"Inventory is not copying\n").unwrap();
+    let source_identity =
+        nw_platform::files::identity(&folder_source, &CancellationToken::new()).unwrap();
+    let after = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    // The same-source 509c26e Chrome batch screenshot places this header at 276,659.
+    // Keyboard focus scrolls the bounded section to the actual controls.
+    click(&window, "276", "659").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-folder-expanded.png")).await;
+    input(&["key", "--clearmodifiers", "Tab"]).await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        folder.to_str().unwrap(),
+    ])
+    .await;
+    screenshot(&window, &evidence.join("native-folder-path.png")).await;
+    for _ in 0..4 {
+        input(&["key", "--clearmodifiers", "Tab"]).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let folder_event = ui_event(&root, "folder.snapshot.accepted", None, after).await;
+    let folder_id = folder_event["fields"]["snapshot_id"].as_str().unwrap();
+    let snapshot: nw_domain::ingest::FolderReview = serde_json::from_value(
+        query_params(&root, "assets.folder_inspect", json!({"id":folder_id}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    use nw_domain::ingest::FolderEntryOutcome;
+    assert!(snapshot.complete);
+    assert!(snapshot.scan_error.is_none());
+    assert_eq!(snapshot.entries.len(), 3);
+    assert_eq!(snapshot.limits.manifest_entries, 32);
+    assert_eq!(
+        snapshot.hash,
+        folder_event["fields"]["snapshot_hash"].as_str().unwrap()
+    );
+    assert_eq!(folder_event["fields"]["complete"], true);
+    assert_eq!(folder_event["fields"]["entry_count"], 3);
+    assert_eq!(folder_event["fields"]["registered_count"], 1);
+    assert_eq!(folder_event["fields"]["media_failure_count"], 1);
+    assert!(!snapshot.input.recursive);
+    assert_eq!(snapshot.input.path, folder.to_str().unwrap());
+    let registered = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "a-registered.mkv")
+        .unwrap();
+    assert_eq!(registered.outcome, FolderEntryOutcome::Registered);
+    let asset_id = registered.asset_id.as_ref().unwrap();
+    assert_eq!(registered.identity.as_ref().unwrap(), &source_identity);
+    let failed = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "b-probe-failure.mkv")
+        .unwrap();
+    assert_eq!(failed.outcome, FolderEntryOutcome::ProbeFailed);
+    assert!(failed.error.is_some());
+    assert!(failed.asset_id.is_none());
+    let companion = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "c-companion.txt")
+        .unwrap();
+    assert_eq!(companion.outcome, FolderEntryOutcome::CompanionInventoried);
+    assert!(companion.asset_id.is_none());
+    assert_eq!(
+        companion.identity.as_ref().unwrap(),
+        &nw_platform::files::identity(&folder.join("c-companion.txt"), &CancellationToken::new())
+            .unwrap()
+    );
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    let after_inspect = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    // Scan button -> retained ID -> Inspect button; the ID came from the UI reply.
+    for _ in 0..2 {
+        input(&["key", "--clearmodifiers", "Tab"]).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let inspect_event = ui_event(
+        &root,
+        "command.completed",
+        Some("assets.folder_inspect"),
+        after_inspect,
+    )
+    .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    input(&["key", "--clearmodifiers", "Tab"]).await;
+    screenshot(&window, &evidence.join("native-folder-snapshot.png")).await;
+    input(&["key", "--clearmodifiers", "Tab"]).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    screenshot(&window, &evidence.join("native-folder-registered-entry.png")).await;
+    input(&["mousemove", "--window", &window, "700", "740"]).await;
+    input(&["click", "--repeat", "6", "--delay", "100", "5"]).await;
+    screenshot(&window, &evidence.join("native-folder-failures-companion.png")).await;
+    input(&["key", "--clearmodifiers", "shift+Tab"]).await;
+    input(&["key", "--clearmodifiers", "Tab"]).await;
+    let after_open = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let open_event = ui_event(
+        &root,
+        "command.completed",
+        Some("assets.inspect"),
+        after_open,
+    )
+    .await;
+    let opened = query_params(&root, "assets.inspect", json!({"id":asset_id}))
+        .await
+        .unwrap();
+    assert_eq!(opened["identity"], json!(source_identity));
+    assert_eq!(opened["display_name"], "a-registered.mkv");
+    assert_eq!(
+        query_params(&root, "assets.folder_inspect", json!({"id":folder_id}))
+            .await
+            .unwrap()["hash"]
+            .as_str()
+            .unwrap(),
+        snapshot.hash.as_str()
+    );
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3,
+        "Folder intake, inspection and Open must not create media jobs"
+    );
+    assert_eq!(
+        query(&root, "assets.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3,
+        "Retained inspection and Open must not rescan or duplicate registration"
+    );
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-folder-opened-media.png")).await;
+    std::fs::write(evidence.join("native-folder-intake.json"),serde_json::to_vec_pretty(&json!({
+        "source":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),
+        "registration_event":folder_event,"inspect_event":inspect_event,"open_event":open_event,
+        "snapshot":snapshot,"independent_source_identity":source_identity,"opened_asset":opened,
+        "producer_job_count":3,
+        "oracle":"Actual folder-header pointer input, keyboard path/Scan/Inspect/Open input; committed audit identity before independent authorized snapshot/source checks; no duplicate registration or media producer",
+        "not_qualified":["companion copying","replacement","full F08","other native platforms"]
     })).unwrap()).unwrap();
     let record: Value = serde_json::from_slice(
         &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),

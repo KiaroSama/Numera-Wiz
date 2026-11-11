@@ -1,7 +1,7 @@
 name: Rust CI
 on:
   push:
-    branches: [main, implementation/numera-wiz-v1, rewrite/rust-completion]
+    branches: [main, rewrite/rust-completion]
   pull_request:
   workflow_dispatch:
 permissions:

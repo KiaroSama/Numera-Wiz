@@ -5,7 +5,7 @@ use nw_domain::{
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 use tokio_util::sync::CancellationToken;
@@ -34,14 +34,20 @@ pub fn source_path(path: &Path) -> Result<PathBuf> {
 /// Open the checked native input without following a final link or waiting on a FIFO.
 pub fn open_regular_read(path: &Path) -> Result<File> {
     let canonical = source_path(path)?;
+    if path.is_absolute() && canonical != path {
+        return Err(DomainError::new("SOURCE_CHANGED", "Admitted source pathname now resolves to another object location"));
+    }
     open_regular_handle(&canonical)
 }
 fn open_regular_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
     let file = {
         use rustix::fs::{Mode, OFlags};
-        let descriptor = rustix::fs::open(
-            path,
+        let parent = path.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "A source parent is required"))?;
+        let directory = open_directory_handle(parent)?;
+        let name = path.file_name().ok_or_else(|| DomainError::new("PATH_DENIED", "A source filename is required"))?;
+        let descriptor = rustix::fs::openat(
+            &directory, name,
             OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
             Mode::empty(),
         )
@@ -181,12 +187,25 @@ fn identity_observed(
     on_bytes(0)?;
     let canonical = source_path(path)?;
     let mut file = open_regular_handle(&canonical)?;
+    identity_opened_observed(canonical, &mut file, cancel, 256 * 1024 * 1024 * 1024, on_bytes)
+}
+fn identity_opened_observed(
+    canonical: PathBuf,
+    file: &mut File,
+    cancel: &CancellationToken,
+    maximum_bytes: u64,
+    mut on_bytes: impl FnMut(u64) -> Result<()>,
+) -> Result<FileIdentity> {
+    file.seek(SeekFrom::Start(0)).map_err(io_error)?;
     let before = file.metadata().map_err(io_error)?;
     if before.len() > 256 * 1024 * 1024 * 1024 {
         return Err(DomainError::new(
             "RESOURCE_LIMIT",
             "Source exceeds the development adapter's 256 GiB bound",
         ));
+    }
+    if before.len() > maximum_bytes {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Opened source exceeds its admitted identity byte budget"));
     }
     let mut hash = Sha256::new();
     let mut buffer = vec![0; 1024 * 1024];
@@ -195,7 +214,11 @@ fn identity_observed(
         if cancel.is_cancelled() {
             return Err(DomainError::new("CANCELLED", "Identity read cancelled"));
         }
-        let n = file.read(&mut buffer).map_err(io_error)?;
+        if count == before.len() {
+            break;
+        }
+        let read_bytes = (before.len() - count).min(buffer.len() as u64) as usize;
+        let n = file.read(&mut buffer[..read_bytes]).map_err(io_error)?;
         if n == 0 {
             break;
         }
@@ -226,7 +249,16 @@ fn identity_observed(
     })
 }
 pub fn revalidate(expected: &FileIdentity, cancel: &CancellationToken) -> Result<()> {
-    if &identity(Path::new(&expected.path), cancel)? != expected {
+    let bytes = expected.bytes.parse::<u64>().map_err(|_| {
+        DomainError::new("INVALID_IDENTITY", "Expected source length must be a decimal string")
+    })?;
+    if bytes.to_string() != expected.bytes {
+        return Err(DomainError::new("INVALID_IDENTITY", "Expected source length must be canonical"));
+    }
+    // A frozen path is already canonical. Do not normalize a new alias and read
+    // another location before discovering that its identity differs.
+    let stamp = SourceStamp::capture_resolved(Path::new(&expected.path))?;
+    if stamp.byte_len()? != bytes || &stamp.identity_with_limit(cancel, bytes)? != expected {
         return Err(DomainError::new(
             "SOURCE_CHANGED",
             "Reviewed bytes no longer match their identity",
@@ -258,7 +290,7 @@ impl DirectoryStamp {
         stamp.revalidate()?;
         Ok(stamp)
     }
-    pub(crate) fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.path
     }
     #[cfg(unix)]
@@ -326,6 +358,50 @@ impl DirectoryStamp {
         }
         self.revalidate()
     }
+    /// Open exactly one child through this held parent, without following a final link.
+    pub fn open_child_source(&self, name: &std::ffi::OsStr) -> Result<SourceStamp> {
+        child_name(name)?;
+        self.revalidate()?;
+        #[cfg(unix)]
+        let file = {
+            use rustix::fs::{Mode, OFlags};
+            File::from(rustix::fs::openat(&self.file, name,
+                OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC | OFlags::NOCTTY,
+                Mode::empty()).map_err(io_error)?)
+        };
+        #[cfg(not(unix))]
+        let file = open_regular_handle(&self.path.join(name))?;
+        let source = SourceStamp::capture_open_resolved(&self.path.join(name), file)?;
+        self.revalidate()?;
+        Ok(source)
+    }
+    /// Descend through the held parent; every descendant receives its own retained directory lease.
+    pub fn child_directory(&self, name: &std::ffi::OsStr) -> Result<Self> {
+        child_name(name)?;
+        self.revalidate()?;
+        #[cfg(unix)]
+        let file = {
+            use rustix::fs::{Mode, OFlags};
+            File::from(rustix::fs::openat(&self.file, name,
+                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::empty()).map_err(io_error)?)
+        };
+        #[cfg(not(unix))]
+        let file = open_directory_handle(&self.path.join(name))?;
+        let child = Self { path: self.path.join(name), object: native_object(&file)?, file };
+        child.revalidate()?;
+        self.revalidate()?;
+        Ok(child)
+    }
+}
+fn child_name(name: &std::ffi::OsStr) -> Result<()> {
+    let mut parts = Path::new(name).components();
+    if !matches!(parts.next(), Some(std::path::Component::Normal(part)) if part == name) || parts.next().is_some() {
+        return Err(DomainError::new("PATH_DENIED", "A held parent accepts exactly one ordinary child name"));
+    }
+    #[cfg(windows)]
+    windows_output_name(name.to_str().ok_or_else(|| DomainError::new("NATIVE_PATH_UNAVAILABLE", "A child name must be representable"))?)?;
+    Ok(())
 }
 fn directory_changed(error: impl std::fmt::Display) -> DomainError {
     DomainError::new(
@@ -337,14 +413,19 @@ fn open_directory_handle(path: &Path) -> Result<File> {
     #[cfg(unix)]
     let file = {
         use rustix::fs::{Mode, OFlags};
-        File::from(
-            rustix::fs::open(
-                path,
-                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-                Mode::empty(),
-            )
-            .map_err(io_error)?,
-        )
+        if !path.is_absolute() { return Err(DomainError::new("PATH_DENIED", "An absolute directory is required")); }
+        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        let mut descriptor = rustix::fs::open(Path::new("/"), flags, Mode::empty()).map_err(io_error)?;
+        for part in path.components() {
+            match part {
+                std::path::Component::RootDir => {},
+                std::path::Component::Normal(name) => {
+                    descriptor = rustix::fs::openat(&descriptor, name, flags, Mode::empty()).map_err(io_error)?;
+                }
+                _ => return Err(DomainError::new("PATH_DENIED", "Directory ancestry must contain ordinary components only")),
+            }
+        }
+        File::from(descriptor)
     };
     #[cfg(windows)]
     let file = {
@@ -438,6 +519,23 @@ impl SourceStamp {
     pub fn object_identity(&self) -> Result<NativeObjectIdentity> {
         self.revalidate()?;
         Ok(self.object.clone())
+    }
+    /// Size of the held, still-current source; metadata is not a content identity.
+    pub fn byte_len(&self) -> Result<u64> {
+        self.revalidate()?;
+        Ok(self.bytes)
+    }
+    /// Clone the held content handle for a sequential consumer, which must rewind before reading.
+    pub fn try_clone_file(&self) -> Result<File> {
+        self.revalidate()?;
+        self.handle.as_file().try_clone().map_err(io_error)
+    }
+    /// Hash only the retained source handle. Path checks never select the content reader.
+    pub fn identity_with_limit(&self, cancel: &CancellationToken, maximum_bytes: u64) -> Result<FileIdentity> {
+        let mut file = self.try_clone_file()?;
+        let identity = identity_opened_observed(self.path.clone(), &mut file, cancel, maximum_bytes, |_| Ok(()))?;
+        self.revalidate()?;
+        Ok(identity)
     }
     pub fn require_object(&self, expected: &NativeObjectIdentity) -> Result<()> {
         if &self.object_identity()? != expected {
@@ -986,6 +1084,9 @@ mod tests {
         fs::create_dir(&parent).unwrap();
         let parent = fs::canonicalize(parent).unwrap();
         let stamp = DirectoryStamp::capture_resolved(&parent).unwrap();
+        fs::write(parent.join("source.bin"), b"reviewed source bytes").unwrap();
+        let source = stamp.open_child_source(std::ffi::OsStr::new("source.bin")).unwrap();
+        let mut held_reader = source.try_clone_file().unwrap();
         fs::rename(&parent, parent.with_file_name("retained-exports")).unwrap();
         fs::create_dir(&parent).unwrap();
         assert_eq!(stamp.revalidate().unwrap_err().code, "TARGET_CHANGED");
@@ -1002,6 +1103,19 @@ mod tests {
             "TARGET_CHANGED"
         );
         assert_eq!(visited, 0);
+        let outside = root.path().join("outside");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("source.bin"), b"private outside bytes").unwrap();
+        fs::remove_file(parent.join("unreviewed.mkv")).unwrap();
+        fs::remove_dir(&parent).unwrap();
+        std::os::unix::fs::symlink(&outside, &parent).unwrap();
+        assert_eq!(stamp.open_child_source(std::ffi::OsStr::new("source.bin")).err().unwrap().code, "TARGET_CHANGED");
+        assert_eq!(source.identity_with_limit(&CancellationToken::new(), 1024).unwrap_err().code, "SOURCE_CHANGED");
+        assert!(open_regular_read(&parent.join("source.bin")).is_err());
+        held_reader.seek(SeekFrom::Start(0)).unwrap();
+        let mut bytes = Vec::new();
+        held_reader.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, b"reviewed source bytes");
     }
     #[cfg(windows)]
     #[test]
@@ -1050,6 +1164,12 @@ mod tests {
                 panic!("Removed children must not reappear through a shared stream position")
             })
             .unwrap();
+        fs::create_dir(parent.join("nested")).unwrap();
+        let nested = stamp.child_directory(std::ffi::OsStr::new("nested")).unwrap();
+        fs::write(parent.join("nested/source.bin"), b"held child").unwrap();
+        let child = nested.open_child_source(std::ffi::OsStr::new("source.bin")).unwrap();
+        assert_eq!(child.identity_with_limit(&CancellationToken::new(), 10).unwrap().sha256, hex::encode(Sha256::digest(b"held child")));
+        assert!(nested.open_child_source(std::ffi::OsStr::new("../source.bin")).is_err());
     }
     #[test]
     fn original_object_survives_handle_drop_but_rejects_identical_replacement() {
@@ -1089,7 +1209,7 @@ mod tests {
     #[tokio::test]
     async fn opened_input_rejects_fifo_without_waiting_for_a_writer() {
         let root = tempfile::tempdir().unwrap();
-        let source = root.path().join("input");
+        let source = fs::canonicalize(root.path()).unwrap().join("input");
         let fixture_tool = [Path::new("/usr/bin/mkfifo"), Path::new("/bin/mkfifo")]
             .into_iter()
             .find(|path| path.is_file())
@@ -1134,6 +1254,13 @@ mod tests {
         let canonical = source_path(&source).unwrap();
         let stamp = SourceStamp::capture_resolved(&canonical).unwrap();
         stamp.revalidate().unwrap();
+        let cancel = CancellationToken::new();
+        let expected = identity(&canonical, &cancel).unwrap();
+        let bytes = expected.bytes.parse::<u64>().unwrap();
+        assert_eq!(stamp.byte_len().unwrap(), bytes);
+        assert_eq!(stamp.identity_with_limit(&cancel, bytes).unwrap(), expected);
+        assert_eq!(stamp.identity_with_limit(&cancel, bytes - 1).unwrap_err().code, "RESOURCE_LIMIT");
+        revalidate(&expected, &cancel).unwrap();
         fs::rename(&source, root.path().join("retained-original.bin")).unwrap();
         fs::write(
             &source,
@@ -1144,6 +1271,10 @@ mod tests {
         let stamp = SourceStamp::capture_resolved(&canonical).unwrap();
         fs::write(&source, b"changed length").unwrap();
         assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(stamp.byte_len().unwrap_err().code, "SOURCE_CHANGED");
+        // The bound applies again to a later identity pass, before it hashes replacement bytes.
+        fs::write(&source, vec![0; bytes as usize + 1]).unwrap();
+        assert_eq!(revalidate(&expected, &cancel).unwrap_err().code, "SOURCE_CHANGED");
     }
     #[test]
     fn a_preopened_original_cannot_be_bound_to_a_replacement_at_its_old_path() {

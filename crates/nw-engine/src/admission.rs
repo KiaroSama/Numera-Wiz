@@ -14,13 +14,18 @@ pub struct Input {
 
 pub fn open(path: &Path, cancel: &tokio_util::sync::CancellationToken) -> Result<Input> {
     check_cancel(cancel)?;
-    let mut file = nw_platform::files::open_regular_read(path)?;
+    from_file(nw_platform::files::open_regular_read(path)?, cancel)
+}
+/// Admit the already authorized source handle without reopening its native pathname.
+pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -> Result<Input> {
+    check_cancel(cancel)?;
     if !file.metadata().map_err(io_error)?.is_file() {
         return Err(DomainError::new(
             "INPUT_DENIED",
             "A regular source file is required",
         ));
     }
+    file.seek(SeekFrom::Start(0)).map_err(io_error)?;
     let mut prefix = [0u8; 16];
     let mut length = 0;
     while length < prefix.len() {
