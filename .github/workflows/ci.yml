@@ -32,6 +32,19 @@ jobs:
           path: Cargo.lock
       - name: Enforce the committed lockfile
         run: git diff --exit-code -- Cargo.lock
+      - name: Resolve the isolated security candidate without upgrading unrelated packages
+        run: cargo update --manifest-path xtask/security-scan/Cargo.toml --workspace
+      - name: Save the exact isolated security dependency closure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-scan-resolved-dependencies
+          path: xtask/security-scan/Cargo.lock
+          if-no-files-found: error
+      - name: Enforce the tracked isolated security lockfile and exact resolution
+        run: |
+          git ls-files --error-unmatch -- xtask/security-scan/Cargo.lock
+          git diff --exit-code -- xtask/security-scan/Cargo.lock
   formatting:
     runs-on: ubuntu-24.04
     steps:
@@ -43,11 +56,15 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt
       - name: Enforce source formatting
         run: cargo fmt --all -- --check
+      - name: Enforce isolated security candidate formatting
+        if: ${{ !cancelled() }}
+        run: cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all -- --check
       - name: Prepare exact formatter changes
         if: always()
         shell: bash
         run: |
           cargo fmt --all
+          cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
           git diff --binary -- crates apps xtask test-support > formatting.patch
       - name: Save formatter evidence
         if: always()
@@ -283,6 +300,7 @@ jobs:
         if: always()
         run: |
           cargo fmt --all
+          cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
           git diff --binary -- crates apps xtask test-support > formatting.patch
       - name: Save dependency and generated evidence
         if: always()
@@ -356,6 +374,18 @@ jobs:
             target/fixture-ffmpeg-src/ffbuild/config.log
             target/fixture-ffmpeg-src/config.h
           if-no-files-found: warn
+
+      - name: Build, lint and qualify the isolated security candidate on synthetic repositories
+        if: ${{ !cancelled() }}
+        working-directory: xtask/security-scan
+        env:
+          CARGO_HOME: ${{ runner.temp }}/security-candidate-cargo-${{ github.run_id }}-${{ github.run_attempt }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/security-candidate-target-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          rustup component add clippy --toolchain 1.99.1
+          cargo +1.99.1 build --locked --manifest-path Cargo.toml --bins
+          cargo +1.99.1 clippy --locked --manifest-path Cargo.toml --all-targets -- -D warnings
+          "${CARGO_TARGET_DIR}/debug/nw-security-qualify"
 
   owner-batch:
     needs: [media]

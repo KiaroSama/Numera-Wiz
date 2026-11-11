@@ -1,0 +1,40 @@
+[workspace]
+members = ["."]
+resolver = "3"
+
+[package]
+name = "nw-security-scan"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+license = "GPL-3.0-or-later"
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[lib]
+name = "nw_security_scan"
+path = "src/lib.rs"
+test = false
+bench = false
+doctest = false
+
+[[bin]]
+name = "nw-security-scan"
+path = "src/main.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "nw-security-qualify"
+path = "src/qualify.rs"
+test = false
+bench = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+await_holding_lock = "deny"
