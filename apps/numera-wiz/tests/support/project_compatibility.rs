@@ -543,7 +543,9 @@ impl Owner {
         ensure!(
             self.child
                 .try_wait()
-                .map_err(|_| anyhow::anyhow!("Controlled owner stop-release child status unavailable"))?
+                .map_err(|_| anyhow::anyhow!(
+                    "Controlled owner stop-release child status unavailable"
+                ))?
                 .is_none(),
             "Controlled owner exited before stop-release"
         );

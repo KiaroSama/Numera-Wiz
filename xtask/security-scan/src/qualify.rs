@@ -205,12 +205,18 @@ mod linux {
                 .env("GIT_COMMITTER_EMAIL", "qualification@example.invalid")
                 .arg("--no-pager")
                 .args([
-                    "-c", "core.hooksPath=/dev/null",
-                    "-c", "core.fsmonitor=false",
-                    "-c", "core.attributesFile=/dev/null",
-                    "-c", "commit.gpgSign=false",
-                    "-c", "gc.auto=0",
-                    "-c", "maintenance.auto=false",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "-c",
+                    "core.attributesFile=/dev/null",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "-c",
+                    "gc.auto=0",
+                    "-c",
+                    "maintenance.auto=false",
                 ])
                 .args(arguments)
                 .stdin(Stdio::null())

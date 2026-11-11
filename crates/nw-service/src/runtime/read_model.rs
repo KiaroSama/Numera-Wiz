@@ -530,7 +530,12 @@ mod tests {
             .expect("Catalog pages must identify their captured projection");
         assert!(!snapshot.is_empty());
         assert!(
-            !service.snapshots.lock().unwrap().entries.contains_key(snapshot),
+            !service
+                .snapshots
+                .lock()
+                .unwrap()
+                .entries
+                .contains_key(snapshot),
             "The limit64 catalog must not retain a single-page inventory ticket"
         );
     }
