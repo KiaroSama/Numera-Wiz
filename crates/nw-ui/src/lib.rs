@@ -509,7 +509,10 @@ impl WizApp {
                 | Action::BatchHistory => {
                     self.receive_batch(received.action, result)?;
                 }
-                Action::FolderRegister | Action::FolderInspect | Action::FolderOpenAsset | Action::FolderBatchAsset => {
+                Action::FolderRegister
+                | Action::FolderInspect
+                | Action::FolderOpenAsset
+                | Action::FolderBatchAsset => {
                     self.receive_folder(received.action, result, ctx)?;
                 }
                 Action::Inspect => {
@@ -741,7 +744,9 @@ impl WizApp {
         }
         let mut open = self.artifact_manifest.is_some();
         let mut save = None;
-        if !self.folder.open && let Some(manifest) = self.artifact_manifest.clone() {
+        if !self.folder.open
+            && let Some(manifest) = self.artifact_manifest.clone()
+        {
             egui::Window::new("Output details").default_pos(egui::pos2(24.0, 260.0))
                 .default_width(720.0).open(&mut open).show(ui.ctx(), |ui| {
                 ui.label(format!("Verified bytes: {}", manifest.encoded_byte_count));
@@ -776,7 +781,9 @@ impl WizApp {
             self.artifact_manifest = None;
         }
         self.save_controls(ui);
-        if !self.folder.open { self.selection_report_window(ui.ctx()); }
+        if !self.folder.open {
+            self.selection_report_window(ui.ctx());
+        }
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }
@@ -876,19 +883,25 @@ impl eframe::App for WizApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
-        if !self.folder.open && ui.ctx().input_mut(|input| {
-            input.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND,
-                egui::Key::Enter,
-            ))
-        }) {
+        if !self.folder.open
+            && ui.ctx().input_mut(|input| {
+                input.consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::COMMAND,
+                    egui::Key::Enter,
+                ))
+            })
+        {
             if self.batch.open {
                 self.run_reviewed_batch(ui.ctx());
             } else {
                 self.run_reviewed(ui.ctx());
             }
         }
-        if self.folder.open && ui.ctx().input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        if self.folder.open
+            && ui
+                .ctx()
+                .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+        {
             self.close_folder();
         } else if (self.batch.open || self.artifact_manifest.is_some())
             && ui
@@ -901,7 +914,9 @@ impl eframe::App for WizApp {
                 self.artifact_manifest = None;
             }
         }
-        if self.folder.open { ui.disable(); }
+        if self.folder.open {
+            ui.disable();
+        }
         egui::Panel::top("navigation").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Numera Wiz");
@@ -946,7 +961,9 @@ impl eframe::App for WizApp {
             });
             self.folder_controls(ui);
         });
-        if !self.folder.open { self.batch_window(ui.ctx()); }
+        if !self.folder.open {
+            self.batch_window(ui.ctx());
+        }
         self.folder_window(ui.ctx());
     }
 }

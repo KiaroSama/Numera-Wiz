@@ -6,6 +6,7 @@ use nw_domain::ingest::{
     MAX_FOLDER_DIRECTORY_NAME_BYTES, MAX_FOLDER_ENTRIES, MAX_FOLDER_SECONDS,
     MAX_FOLDER_SOURCE_BYTES, MAX_FOLDER_VISITS, RegisterFolderInput,
 };
+use nw_domain::mux::StreamKind;
 
 const SNAPSHOT_LIMIT: usize = 128;
 
@@ -609,7 +610,7 @@ impl FolderScan<'_> {
                     .probe
                     .streams
                     .iter()
-                    .any(|stream| stream.kind == nw_domain::mux::StreamKind::Video)
+                    .any(|stream| stream.kind == StreamKind::Video && !stream.attached_picture())
                 {
                     return Err(DomainError::new(
                         "VIDEO_REQUIRED",

@@ -1773,8 +1773,21 @@ mod tests {
             for _ in 0..4 {
                 browser_key(&client, &base, &route, "\u{E004}").await;
             }
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-scan-ready.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-scan-ready.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             browser_key(&client, &base, &route, " ").await;
             let registration_response = observed_folder_command(
                 &fixture,
@@ -1837,8 +1850,21 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(700)).await;
             // Registration restores Inspect only after pending disables clear.
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-snapshot.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-snapshot.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             browser_key(&client, &base, &route, " ").await;
             let inspect_response = observed_folder_command(
                 &fixture,
@@ -1929,13 +1955,49 @@ mod tests {
             // retains its snapshot; wheel input affects this window only.
             browser_click(&client, &base, &route, 276, 680).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-retained-after-reopen.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-retained-after-reopen.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"wheel","id":"folder-scroll","actions":[{"type":"scroll","x":700,"y":500,"deltaX":0,"deltaY":800,"duration":400,"origin":"viewport"}]}]})).await;
-            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
-            std::fs::write(directory.join("folder-failures-companion.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            let png = driver(
+                &client,
+                &base,
+                reqwest::Method::GET,
+                &format!("{route}/screenshot"),
+                Value::Null,
+            )
+            .await;
+            std::fs::write(
+                directory.join("folder-failures-companion.png"),
+                base64::engine::general_purpose::STANDARD
+                    .decode(png.as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
             browser_key(&client, &base, &route, "\u{E00C}").await;
-            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(),3,"Dialog focus and scrolling must not execute a background plan");
+            assert_eq!(
+                fixture
+                    .owner
+                    .service
+                    .store
+                    .list::<nw_domain::records::Job>("job/", 128)
+                    .unwrap()
+                    .len(),
+                3,
+                "Dialog focus and scrolling must not execute a background plan"
+            );
             std::fs::write(directory.join("folder-intake.json"),serde_json::to_vec_pretty(&json!({
                 "source":crate::web_assets::UI_SOURCE,"registration_response":registration_response,
                 "inspect_response":inspect_response,"opened_response":opened_response,

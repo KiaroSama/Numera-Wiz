@@ -137,7 +137,12 @@ impl WizApp {
         );
     }
 
-    pub(super) fn receive_folder(&mut self, action: Action, result: Value, ctx: &egui::Context) -> Result<(), String> {
+    pub(super) fn receive_folder(
+        &mut self,
+        action: Action,
+        result: Value,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
         match action {
             Action::FolderRegister | Action::FolderInspect => {
                 let review: FolderReview =
@@ -159,8 +164,12 @@ impl WizApp {
                 self.folder.snapshot_id = review.id.clone();
                 self.folder.tab = FolderTab::Snapshot;
                 self.folder.focus = Some(if matches!(action, Action::FolderInspect) {
-                    review.entries.iter().find_map(|entry| entry.asset_id.clone())
-                        .map(FolderFocus::Open).unwrap_or(FolderFocus::Inspect)
+                    review
+                        .entries
+                        .iter()
+                        .find_map(|entry| entry.asset_id.clone())
+                        .map(FolderFocus::Open)
+                        .unwrap_or(FolderFocus::Inspect)
                 } else {
                     FolderFocus::Inspect
                 });
@@ -170,7 +179,10 @@ impl WizApp {
                 let asset: Asset =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
                 self.select_asset(&asset, ctx);
-                self.status = format!("Registered media {} opened without a new scan or cleanup job.", asset.display_name);
+                self.status = format!(
+                    "Registered media {} opened without a new scan or cleanup job.",
+                    asset.display_name
+                );
                 self.close_folder();
             }
             Action::FolderBatchAsset => {
@@ -193,10 +205,21 @@ impl WizApp {
     }
 
     pub(super) fn folder_controls(&mut self, ui: &mut egui::Ui) {
-        if ui.button("Folder intake (authorized engine path)").clicked() {
+        if ui
+            .button("Folder intake (authorized engine path)")
+            .clicked()
+        {
             self.folder.open = true;
-            self.folder.tab = if self.folder.review.is_some() { FolderTab::Snapshot } else { FolderTab::Source };
-            self.folder.focus = Some(if self.folder.review.is_some() { FolderFocus::Inspect } else { FolderFocus::Path });
+            self.folder.tab = if self.folder.review.is_some() {
+                FolderTab::Snapshot
+            } else {
+                FolderTab::Source
+            };
+            self.folder.focus = Some(if self.folder.review.is_some() {
+                FolderFocus::Inspect
+            } else {
+                FolderFocus::Path
+            });
         }
     }
 
@@ -206,17 +229,37 @@ impl WizApp {
     }
 
     pub(super) fn folder_request_failed(&mut self, action: Action) {
-        if matches!(action, Action::FolderRegister | Action::FolderInspect | Action::FolderOpenAsset | Action::FolderBatchAsset) {
-            self.folder.focus = Some(if self.pending.is_some() { FolderFocus::Retry } else if self.folder.review.is_some() { FolderFocus::Inspect } else { FolderFocus::Path });
+        if matches!(
+            action,
+            Action::FolderRegister
+                | Action::FolderInspect
+                | Action::FolderOpenAsset
+                | Action::FolderBatchAsset
+        ) {
+            self.folder.focus = Some(if self.pending.is_some() {
+                FolderFocus::Retry
+            } else if self.folder.review.is_some() {
+                FolderFocus::Inspect
+            } else {
+                FolderFocus::Path
+            });
         }
     }
 
-    fn folder_focus(&mut self, ui: &egui::Ui, response: &egui::Response, target: FolderFocus, enabled: bool) {
+    fn folder_focus(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        target: FolderFocus,
+        enabled: bool,
+    ) {
         if enabled && self.folder.focus.as_ref() == Some(&target) {
             response.scroll_to_me(Some(egui::Align::Center));
             if ui.is_rect_visible(response.rect) {
                 response.request_focus();
-                if response.has_focus() { self.folder.focus = None; }
+                if response.has_focus() {
+                    self.folder.focus = None;
+                }
             }
             response.ctx.request_repaint();
         } else {
@@ -225,17 +268,26 @@ impl WizApp {
     }
 
     pub(super) fn folder_window(&mut self, ctx: &egui::Context) {
-        if !self.folder.open { return; }
+        if !self.folder.open {
+            return;
+        }
         let mut open = true;
         egui::Window::new("Folder intake")
             .id(egui::Id::new("folder-intake-window"))
             .order(egui::Order::Foreground)
             .default_pos(egui::pos2(280.0, 70.0))
-            .default_width(860.0).default_height(640.0)
-            .min_width(560.0).min_height(360.0)
-            .resizable(true).collapsible(false).vscroll(true)
-            .open(&mut open).show(ctx, |ui| self.folder_body(ui));
-        if !open { self.close_folder(); }
+            .default_width(860.0)
+            .default_height(640.0)
+            .min_width(560.0)
+            .min_height(360.0)
+            .resizable(true)
+            .collapsible(false)
+            .vscroll(true)
+            .open(&mut open)
+            .show(ctx, |ui| self.folder_body(ui));
+        if !open {
+            self.close_folder();
+        }
     }
 
     fn folder_body(&mut self, ui: &mut egui::Ui) {
@@ -244,21 +296,47 @@ impl WizApp {
         ui.label("Browser file selection uploads bytes. It does not grant a host folder or reveal its path.");
         ui.label("Intake records media failures and inventories companions. It does not start cleanup or copy companions.");
         ui.horizontal(|ui| {
-            if ui.add_enabled_ui(idle, |ui| ui.selectable_value(&mut self.folder.tab, FolderTab::Source, "Folder source")).inner.clicked() {
+            if ui
+                .add_enabled_ui(idle, |ui| {
+                    ui.selectable_value(&mut self.folder.tab, FolderTab::Source, "Folder source")
+                })
+                .inner
+                .clicked()
+            {
                 self.folder.focus = Some(FolderFocus::Path);
             }
-            if ui.add_enabled_ui(idle, |ui| ui.selectable_value(&mut self.folder.tab, FolderTab::Snapshot, "Retained snapshot")).inner.clicked() {
+            if ui
+                .add_enabled_ui(idle, |ui| {
+                    ui.selectable_value(
+                        &mut self.folder.tab,
+                        FolderTab::Snapshot,
+                        "Retained snapshot",
+                    )
+                })
+                .inner
+                .clicked()
+            {
                 self.folder.focus = Some(FolderFocus::Inspect);
             }
         });
-        ui.label(if self.waiting { "Working with the local engine..." } else { &self.status });
-        if let Some(error) = &self.error { ui.colored_label(egui::Color32::YELLOW, error); }
-        if !self.waiting && let Some(pending) = &self.pending {
+        ui.label(if self.waiting {
+            "Working with the local engine..."
+        } else {
+            &self.status
+        });
+        if let Some(error) = &self.error {
+            ui.colored_label(egui::Color32::YELLOW, error);
+        }
+        if !self.waiting
+            && let Some(pending) = &self.pending
+        {
             let request = pending.request.clone();
             let action = pending.action;
             let retry = ui.button("Reconnect and retry the same request");
             self.folder_focus(ui, &retry, FolderFocus::Retry, true);
-            if retry.clicked() { self.dispatch(request, action, ui.ctx()); }
+            if retry.clicked() {
+                self.dispatch(request, action, ui.ctx());
+            }
         }
         ui.separator();
         match self.folder.tab {
@@ -296,11 +374,10 @@ impl WizApp {
                     .hint_text("Output\nSubfolder/Already processed"),
             ));
         });
-        let scan = ui
-            .add_enabled(
-                idle && !self.folder.path.trim().is_empty(),
-                egui::Button::new("Scan and register folder"),
-            );
+        let scan = ui.add_enabled(
+            idle && !self.folder.path.trim().is_empty(),
+            egui::Button::new("Scan and register folder"),
+        );
         self.folder_focus(ui, &scan, FolderFocus::Scan, idle);
         if scan.clicked() {
             self.register_folder(ui.ctx());
@@ -319,11 +396,10 @@ impl WizApp {
                 .hint_text("Retained folder snapshot ID"),
         );
         reveal_focus(&snapshot_id);
-        let inspect = ui
-            .add_enabled(
-                idle && !self.folder.snapshot_id.trim().is_empty(),
-                egui::Button::new("Inspect retained snapshot"),
-            );
+        let inspect = ui.add_enabled(
+            idle && !self.folder.snapshot_id.trim().is_empty(),
+            egui::Button::new("Inspect retained snapshot"),
+        );
         self.folder_focus(ui, &inspect, FolderFocus::Inspect, idle);
         if inspect.clicked() {
             self.query(
