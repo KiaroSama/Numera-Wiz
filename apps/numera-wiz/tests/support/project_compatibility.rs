@@ -26,13 +26,12 @@ use tokio::{
 
 const RECORDS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("versioned_records");
 const MAX_BODY: usize = 2 * 1024 * 1024;
-const PROJECT_NAMESPACES: &[&str] = &[
+const POPULATED_PROJECT_NAMESPACES: &[&str] = &[
     "project",
     "project-entity",
     "project-bin",
     "project-track",
     "project-clip",
-    "project-dependency",
     "project-op",
     "project-patch",
     "project-history",
@@ -955,8 +954,9 @@ async fn project_write(
 ) -> Result<Value> {
     retain_request(directory, &request)?;
     let response = owner.command(&request, evidence).await?;
+    let expected_revision = expected.to_string();
     ensure!(
-        response["result"]["revision"] == expected.to_string()
+        response["result"]["revision"].as_str() == Some(expected_revision.as_str())
             && response["receipt_id"].is_string(),
         "Actual project mutation revision/receipt differs"
     );
@@ -967,8 +967,9 @@ async fn project_write(
         "Fresh project mutation reused an earlier receipt ID"
     );
     if expected > 0 {
+        let expected_base_revision = (expected - 1).to_string();
         ensure!(
-            response["result"]["base_revision"] == (expected - 1).to_string(),
+            response["result"]["base_revision"].as_str() == Some(expected_base_revision.as_str()),
             "Project mutation base revision differs"
         );
     }
@@ -1072,8 +1073,9 @@ async fn project_projection(
     request["project"] = json!({"id":project.id}); // expected_revision is deliberately absent, never null.
     let response = owner.command(&request, evidence).await?;
     let result = response["result"].clone();
+    let expected_revision = revision.to_string();
     ensure!(
-        result["project_revision"] == revision.to_string(),
+        result["project_revision"].as_str() == Some(expected_revision.as_str()),
         "Reopened project projection has wrong revision"
     );
     *replacement = Some(text(&result, "snapshot_id")?);
@@ -1110,7 +1112,7 @@ async fn semantic_project(
     for (id, kind) in [
         (&project.bin, "bin"),
         (&project.sequence, "sequence"),
-        (&project.track, "track"),
+        (&project.track, "video"),
         (&project.source, "source_binding"),
         (&project.left, "clip"),
         (&project.right, "clip"),
@@ -1131,6 +1133,10 @@ async fn semantic_project(
         );
         entities.insert(id.clone(), result["entity"].clone());
     }
+    ensure!(
+        entities[&project.track]["sequence_id"] == project.sequence,
+        "Reopened track belongs to a different sequence"
+    );
     let offset = if revision == 6 { 1 } else { 0 };
     ensure!(
         entities[&project.left]["sequence_start"] == json!({"num":offset.to_string(),"den":"1"})
@@ -1377,7 +1383,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         "Current startup silently changed legacy schema"
     );
     preserved(&original_raw, &a, legacy_key)?;
-    for namespace in PROJECT_NAMESPACES {
+    for namespace in POPULATED_PROJECT_NAMESPACES {
         ensure!(
             a.facts
                 .namespaces
@@ -1386,6 +1392,17 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
             "Actual project fixture did not populate {namespace}"
         );
     }
+    let dependency_rows = a
+        .facts
+        .namespaces
+        .get("project-dependency")
+        .copied()
+        .unwrap_or(0);
+    ensure!(
+        dependency_rows == 0,
+        "Unlinked project fixture unexpectedly populated dependency rows"
+    );
+    evidence.record(json!({"phase":"project-namespace-coverage","checkpoint":"A","project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_dependency_rows":dependency_rows,"nonempty_dependency_preservation":"unqualified","required_before_full_v1":"Extend actual prior/current preservation through a real public link/import producer"}))?;
     ensure!(
         a.rows
             .keys()
@@ -1601,6 +1618,15 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     let semantic_d = semantic_project(&mut owner, &project, 6, evidence).await?;
     owner.stop(evidence).await?;
     let d = closed(&root, "D-current-business-adoption", evidence)?;
+    ensure!(
+        d.facts
+            .namespaces
+            .get("project-dependency")
+            .copied()
+            .unwrap_or(0)
+            == 0,
+        "Unlinked project move unexpectedly populated dependency rows"
+    );
     preserved(&original_raw, &d, legacy_key)?;
     preserved(&c, &d, |key| key.starts_with("receipt/"))?;
     let guard_d = guard(&d, &migration_id, "1")?;
@@ -1686,7 +1712,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         epochs.len() == 7,
         "Every controlled owner must establish a new epoch"
     );
-    evidence.record(json!({"phase":"complete","status":"passed","mode":"additive-preservation","owner_epochs":epochs.len(),"root_id":root_id,"project_id":project.id,"final_revision":"6","migration_id":migration_id,"project_namespaces_required":PROJECT_NAMESPACES,"legacy_v1":"shape/echo plus independently frozen digest and exact raw preservation","legacy_v2":"actual decoder acceptance plus independently frozen semantic digest and exact raw preservation","registered_media":false}))?;
+    evidence.record(json!({"phase":"complete","status":"passed","mode":"additive-preservation","owner_epochs":epochs.len(),"root_id":root_id,"project_id":project.id,"final_revision":"6","migration_id":migration_id,"project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_dependency_rows":final_raw.facts.namespaces.get("project-dependency").copied().unwrap_or(0),"nonempty_dependency_preservation":"unqualified","required_before_full_v1":"Extend actual prior/current preservation through a real public link/import producer","legacy_v1":"shape/echo plus independently frozen digest and exact raw preservation","legacy_v2":"actual decoder acceptance plus independently frozen semantic digest and exact raw preservation","registered_media":false}))?;
     Ok(())
 }
 pub async fn run() {
