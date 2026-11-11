@@ -11,7 +11,7 @@ use std::{
 /// Prefix of owned Windows ACL evidence files created inside protected directories.
 /// This name participates in directory-reader protocols, so producer and reader
 /// regression fixtures share it.
-pub const ACL_EVIDENCE_PREFIX: &str = "acl-check-";
+pub const ACL_EVIDENCE_PREFIX: &str = ".credential-acl-check-";
 
 fn denied(message: impl Into<String>) -> DomainError {
     DomainError::new("INSECURE_DATA_ROOT", message)
