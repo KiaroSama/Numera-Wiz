@@ -1,5 +1,6 @@
 //! Repository automation. Ordinary validation is executed by hosted CI.
 use anyhow::{Context, Result, bail};
+mod ci_host;
 mod hygiene;
 mod package;
 mod web;
@@ -36,9 +37,10 @@ fn run() -> Result<()> {
         "build-web" => web::build(root),
         "package-development" => package::development(root),
         "record-ci-evidence" => package::evidence(root),
+        "ci-linux-dependencies" => ci_host::linux_dependencies(),
         "help" => {
             println!(
-                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | record-ci-evidence"
+                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | record-ci-evidence | ci-linux-dependencies <desktop|browser|native>"
             );
             Ok(())
         }

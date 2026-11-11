@@ -112,7 +112,7 @@ jobs:
       - name: Install selected Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
       - name: Install actual browser display and OS picker input tools
-        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick dbus-x11 xdg-desktop-portal xdg-desktop-portal-gtk
+        run: cargo run --locked -p xtask -- ci-linux-dependencies browser
       - name: Record actual browser and driver candidates
         run: |
           google-chrome --version
@@ -152,8 +152,6 @@ jobs:
         with:
           name: ffmpeg-development-fixture-profile-linux
           path: target
-      - name: Install native input and display tools
-        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox imagemagick libxkbcommon0 libxkbcommon-x11-0 libegl1 libgl1-mesa-dri dbus-x11 xdg-desktop-portal xdg-desktop-portal-gtk
       - name: Prepare identified executable artifacts
         run: chmod +x target/native-app/numera-wiz target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
       - name: Restore the compiler cache for the matching harness
@@ -167,6 +165,8 @@ jobs:
           restore-keys: checks-1.99.1-Linux-X64-${{ hashFiles('Cargo.lock') }}-
       - name: Install the selected Rust harness toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Install native input and display tools
+        run: cargo run --locked -p xtask -- ci-linux-dependencies native
       - name: Exercise the real native workspace and file controls
         run: xvfb-run -a -s '-screen 0 1600x1000x24 -nolisten tcp' dbus-run-session -- cargo test --locked -p numera-wiz --test native_ui -- --ignored --nocapture
       - name: Retain native window and execution evidence
@@ -207,7 +207,7 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt,clippy
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev
+        run: cargo run --locked -p xtask -- ci-linux-dependencies desktop
       - name: Load matching immutable UI namespace
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
