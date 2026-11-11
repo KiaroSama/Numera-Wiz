@@ -6,6 +6,9 @@ use std::process::Command;
 // The dedicated same-root case below still starts three frontends concurrently.
 static OWNER_CASE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+#[path = "support/project_compatibility.rs"]
+mod project_compatibility;
+
 #[path = "support/evidence.rs"]
 mod evidence;
 fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLogs {
@@ -418,4 +421,5 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
     })
     .await
     .expect("Actual CLI migration/restart deadline");
+    project_compatibility::run().await;
 }

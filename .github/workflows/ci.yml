@@ -178,6 +178,15 @@ jobs:
           if-no-files-found: error
   checks:
     needs: web
+    permissions:
+      contents: read
+      actions: read
+    env:
+      NW_COMPAT_REQUIRED: '1'
+      NW_COMPAT_PREVIOUS_EXE: ${{ github.workspace }}/target/project-compatibility/previous/${{ matrix.os == 'windows-2025' && 'numera-wiz.exe' || 'numera-wiz' }}
+      NW_COMPAT_CURRENT_EXE: ${{ github.workspace }}/target/project-compatibility/current/${{ matrix.os == 'windows-2025' && 'numera-wiz.exe' || 'numera-wiz' }}
+      NW_COMPAT_BASELINE_MANIFEST: ${{ github.workspace }}/ci/project-compatibility-baseline.json
+      NW_COMPAT_EVIDENCE_DIR: ${{ github.workspace }}/target/project-compatibility/evidence
     strategy:
       fail-fast: false
       matrix:
@@ -242,6 +251,20 @@ jobs:
           path: target/development-packages/
           if-no-files-found: error
           compression-level: 0
+      - name: Fetch the immutable prior native executable
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: numera-wiz-development-${{ matrix.os }}
+          run-id: 43026539369
+          repository: KiaroSama/Numera-Wiz
+          github-token: ${{ github.token }}
+          path: target/project-compatibility/previous/
+      - name: Verify prior identity and retain the current package executable
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cargo run --locked -p xtask -- prepare-project-compatibility
       - name: Check platform boundaries before the application regressions
         if: ${{ !cancelled() }}
         run: cargo test --locked -p nw-platform --all-targets
@@ -271,6 +294,7 @@ jobs:
             formatting.patch
             docs/generated/
             target/interface-evidence/
+            target/project-compatibility/evidence/
             target/source-language-report.json
           if-no-files-found: error
 
