@@ -644,9 +644,18 @@ mod tests {
         // I5: opaque extensions must reject ambiguity before any known-field overlay.
         let mut duplicate_failures = Vec::new();
         for (case, payload) in [
-            ("duplicate_unknown", r#"{"member_count":0,"locked":false,"future":1,"future":2}"#),
-            ("nested_object", r#"{"member_count":0,"locked":false,"future":{"exact":900719925474099312345678901,"exact":2}}"#),
-            ("nested_array", r#"{"member_count":0,"locked":false,"future":[{"a":1,"a":2}]}"#),
+            (
+                "duplicate_unknown",
+                r#"{"member_count":0,"locked":false,"future":1,"future":2}"#,
+            ),
+            (
+                "nested_object",
+                r#"{"member_count":0,"locked":false,"future":{"exact":900719925474099312345678901,"exact":2}}"#,
+            ),
+            (
+                "nested_array",
+                r#"{"member_count":0,"locked":false,"future":[{"a":1,"a":2}]}"#,
+            ),
         ] {
             let mut ambiguous = entity.clone();
             ambiguous.payload_json = payload.into();
@@ -654,15 +663,22 @@ mod tests {
             let original_payload = ambiguous.payload_json.clone();
             let original_hash = ambiguous.payload_sha256.clone();
             let validation = ambiguous.validate();
-            let update = ambiguous.update(&Bin { member_count: 2, locked: false });
-            if validation.is_ok() || update.is_ok()
+            let update = ambiguous.update(&Bin {
+                member_count: 2,
+                locked: false,
+            });
+            if validation.is_ok()
+                || update.is_ok()
                 || ambiguous.payload_json != original_payload
                 || ambiguous.payload_sha256 != original_hash
             {
                 duplicate_failures.push(format!("{case}: validation_rejected={}, update_rejected={}, original_bytes_preserved={}", validation.is_err(), update.is_err(), ambiguous.payload_json == original_payload && ambiguous.payload_sha256 == original_hash));
             }
         }
-        assert!(duplicate_failures.is_empty(), "Opaque duplicate-key preservation failures: {duplicate_failures:#?}");
+        assert!(
+            duplicate_failures.is_empty(),
+            "Opaque duplicate-key preservation failures: {duplicate_failures:#?}"
+        );
     }
 }
 
