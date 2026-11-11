@@ -1716,8 +1716,8 @@ mod tests {
             assert!(updated.read_roots.contains(&granted_root));
             fixture.observed_reports.lock().await.clear();
             browser_key(&client, &base, &route, "\u{E00C}").await;
-            // Personally inspected 509c26e hosted batch screenshot: the closed
-            // batch leaves the folder header at viewport 276,659.
+            // Hosted captures place the launcher at 276,659. The dedicated
+            // dialog explicitly focuses its path; no hidden-widget Tab search.
             browser_click(&client, &base, &route, 276, 659).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
             let png = driver(
@@ -1735,7 +1735,6 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-            browser_key(&client, &base, &route, "\u{E004}").await;
             let mut keys = vec![
                 json!({"type":"keyDown","value":"\u{E009}"}),
                 json!({"type":"keyDown","value":"a"}),
@@ -1770,9 +1769,12 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
+            // From explicit path focus: two visible checkboxes, exclusions, Scan.
             for _ in 0..4 {
                 browser_key(&client, &base, &route, "\u{E004}").await;
             }
+            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+            std::fs::write(directory.join("folder-scan-ready.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
             browser_key(&client, &base, &route, " ").await;
             let registration_response = observed_folder_command(
                 &fixture,
@@ -1834,8 +1836,9 @@ mod tests {
                 .unwrap()
             );
             tokio::time::sleep(Duration::from_millis(700)).await;
-            browser_key(&client, &base, &route, "\u{E004}").await;
-            browser_key(&client, &base, &route, "\u{E004}").await;
+            // Registration restores Inspect only after pending disables clear.
+            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+            std::fs::write(directory.join("folder-snapshot.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
             browser_key(&client, &base, &route, " ").await;
             let inspect_response = observed_folder_command(
                 &fixture,
@@ -1848,23 +1851,8 @@ mod tests {
             .await;
             assert_eq!(inspect_response["result"]["id"], snapshot.id);
             assert_eq!(inspect_response["result"]["hash"], snapshot.hash);
-            browser_key(&client, &base, &route, "\u{E004}").await;
-            let png = driver(
-                &client,
-                &base,
-                reqwest::Method::GET,
-                &format!("{route}/screenshot"),
-                Value::Null,
-            )
-            .await;
-            std::fs::write(
-                directory.join("folder-snapshot.png"),
-                base64::engine::general_purpose::STANDARD
-                    .decode(png.as_str().unwrap())
-                    .unwrap(),
-            )
-            .unwrap();
-            browser_key(&client, &base, &route, "\u{E004}").await;
+            // Inspection deliberately focuses and scrolls the first Open control.
+            tokio::time::sleep(Duration::from_millis(700)).await;
             let png = driver(
                 &client,
                 &base,
@@ -1880,24 +1868,6 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"wheel","id":"folder-scroll","actions":[{"type":"scroll","x":700,"y":740,"deltaX":0,"deltaY":480,"duration":400,"origin":"viewport"}]}]})).await;
-            let png = driver(
-                &client,
-                &base,
-                reqwest::Method::GET,
-                &format!("{route}/screenshot"),
-                Value::Null,
-            )
-            .await;
-            std::fs::write(
-                directory.join("folder-failures-companion.png"),
-                base64::engine::general_purpose::STANDARD
-                    .decode(png.as_str().unwrap())
-                    .unwrap(),
-            )
-            .unwrap();
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E008}"},{"type":"keyDown","value":"\u{E004}"},{"type":"keyUp","value":"\u{E004}"},{"type":"keyUp","value":"\u{E008}"}]}]})).await;
-            browser_key(&client, &base, &route, "\u{E004}").await;
             browser_key(&client, &base, &route, " ").await;
             let opened_response = observed_folder_command(
                 &fixture,
@@ -1955,6 +1925,17 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
+            // Open closes the dialog after the actual response. Reopening
+            // retains its snapshot; wheel input affects this window only.
+            browser_click(&client, &base, &route, 276, 680).await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+            std::fs::write(directory.join("folder-retained-after-reopen.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"wheel","id":"folder-scroll","actions":[{"type":"scroll","x":700,"y":500,"deltaX":0,"deltaY":800,"duration":400,"origin":"viewport"}]}]})).await;
+            let png = driver(&client,&base,reqwest::Method::GET,&format!("{route}/screenshot"),Value::Null).await;
+            std::fs::write(directory.join("folder-failures-companion.png"),base64::engine::general_purpose::STANDARD.decode(png.as_str().unwrap()).unwrap()).unwrap();
+            browser_key(&client, &base, &route, "\u{E00C}").await;
+            assert_eq!(fixture.owner.service.store.list::<nw_domain::records::Job>("job/",128).unwrap().len(),3,"Dialog focus and scrolling must not execute a background plan");
             std::fs::write(directory.join("folder-intake.json"),serde_json::to_vec_pretty(&json!({
                 "source":crate::web_assets::UI_SOURCE,"registration_response":registration_response,
                 "inspect_response":inspect_response,"opened_response":opened_response,

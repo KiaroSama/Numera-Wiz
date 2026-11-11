@@ -289,7 +289,10 @@ mod tests {
             bytes
         }
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("renamed.mov");
+        // The composition root resolves native aliases before invoking canonical-only admission.
+        let path = std::fs::canonicalize(directory.path())
+            .unwrap()
+            .join("renamed.mov");
         for target in [
             b"../ungranted/sibling.mov".as_slice(),
             b"/private/absolute.mov",
@@ -304,9 +307,11 @@ mod tests {
             let mut content = atom(b"ftyp", b"isom\0\0\0\0isom");
             content.extend(atom(b"moov", &atom(b"dinf", &atom(b"dref", &dref))));
             std::fs::write(&path, content).unwrap();
-            assert!(
-                matches!(open(&path, &tokio_util::sync::CancellationToken::new()), Err(error) if error.code == "INPUT_ROUTE_REQUIRED")
-            );
+            assert_eq!(nw_platform::files::source_path(&path).unwrap(), path);
+            let error = open(&path, &tokio_util::sync::CancellationToken::new())
+                .err()
+                .expect("External MOV references must fail before probing");
+            assert_eq!(error.code, "INPUT_ROUTE_REQUIRED", "{error}");
         }
         let mut dref = vec![0; 4];
         dref.extend(1u32.to_be_bytes());

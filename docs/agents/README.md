@@ -20,6 +20,10 @@ or MuxCls source programs, download runtimes, or replace the Rust MCP adapter.
 | `integrations/.claude-plugin/marketplace.json` | Local Claude-compatible catalogue with the same package. |
 | `integrations/templates/` | Standalone MCP configurations for clients without the plugin format. |
 
+Development archives include the same `integrations/` tree and this guide under
+their resource root (on macOS, `Numera Wiz.app/Contents/Resources`). The source
+archive is available separately. Neither archive installs personal client config.
+
 Use an identified GitHub Actions executable for Windows, Linux or macOS. Set
 the executable's actual absolute path, or make `numera-wiz` available in the
 client's launch PATH (`numera-wiz.exe` on Windows). GUI clients can have a

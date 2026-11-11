@@ -146,9 +146,11 @@ bounds and the distinction between a stage and the whole job.
 
 ## Authorized folder intake
 
-Expand Folder intake below Command details. Enter an absolute path on the
-engine's computer, select recursion, exact relative exclusions and companion
-inventory/exclusion, then register with the existing durable retry mechanism.
+Open Folder intake below Command details. Its separate scrollable window keeps
+the form and retained results accessible without pushing the cleanup controls
+below the viewport. Enter an absolute path on the engine's computer, select
+recursion, exact relative exclusions and companion inventory/exclusion, then
+register with the existing durable retry mechanism.
 A browser picker uploads selected file bytes; it does not grant a native folder.
 Inspect a retained snapshot ID to review its hash, completeness, bounds and
 per-file outcomes. Open a successfully registered asset or include it in the

@@ -41,6 +41,7 @@ enum Action {
     BatchHistory,
     FolderRegister,
     FolderInspect,
+    FolderOpenAsset,
     FolderBatchAsset,
 }
 struct Pending {
@@ -154,7 +155,8 @@ impl WizApp {
         }
     }
     fn run_reviewed(&mut self, ctx: &egui::Context) {
-        if !self.waiting
+        if !self.folder.open
+            && !self.waiting
             && self.pending.is_none()
             && let Some(plan) = self.plan.clone()
         {
@@ -357,6 +359,7 @@ impl WizApp {
             Ok(response) => response,
             Err(error) => {
                 self.error = Some(error);
+                self.folder_request_failed(received.action);
                 self.status = if matches!(received.action, Action::Intake) {
                     "File intake did not finish. Select the file to try again.".into()
                 } else {
@@ -394,6 +397,7 @@ impl WizApp {
                 self.error = Some(format!("{}: {}", error.code, error.message));
             }
             self.deferred = None;
+            self.folder_request_failed(received.action);
             return;
         }
         let result = response.result.unwrap_or(Value::Null);
@@ -505,8 +509,8 @@ impl WizApp {
                 | Action::BatchHistory => {
                     self.receive_batch(received.action, result)?;
                 }
-                Action::FolderRegister | Action::FolderInspect | Action::FolderBatchAsset => {
-                    self.receive_folder(received.action, result)?;
+                Action::FolderRegister | Action::FolderInspect | Action::FolderOpenAsset | Action::FolderBatchAsset => {
+                    self.receive_folder(received.action, result, ctx)?;
                 }
                 Action::Inspect => {
                     self.inspect =
@@ -737,7 +741,7 @@ impl WizApp {
         }
         let mut open = self.artifact_manifest.is_some();
         let mut save = None;
-        if let Some(manifest) = self.artifact_manifest.clone() {
+        if !self.folder.open && let Some(manifest) = self.artifact_manifest.clone() {
             egui::Window::new("Output details").default_pos(egui::pos2(24.0, 260.0))
                 .default_width(720.0).open(&mut open).show(ui.ctx(), |ui| {
                 ui.label(format!("Verified bytes: {}", manifest.encoded_byte_count));
@@ -772,7 +776,7 @@ impl WizApp {
             self.artifact_manifest = None;
         }
         self.save_controls(ui);
-        self.selection_report_window(ui.ctx());
+        if !self.folder.open { self.selection_report_window(ui.ctx()); }
         if let Some(id) = cancel {
             self.mutate("jobs.cancel", json!({"id":id}), Action::Cancel, ui.ctx());
         }
@@ -872,7 +876,7 @@ impl eframe::App for WizApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
-        if ui.ctx().input_mut(|input| {
+        if !self.folder.open && ui.ctx().input_mut(|input| {
             input.consume_shortcut(&egui::KeyboardShortcut::new(
                 egui::Modifiers::COMMAND,
                 egui::Key::Enter,
@@ -884,7 +888,9 @@ impl eframe::App for WizApp {
                 self.run_reviewed(ui.ctx());
             }
         }
-        if (self.batch.open || self.artifact_manifest.is_some())
+        if self.folder.open && ui.ctx().input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            self.close_folder();
+        } else if (self.batch.open || self.artifact_manifest.is_some())
             && ui
                 .ctx()
                 .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
@@ -895,6 +901,7 @@ impl eframe::App for WizApp {
                 self.artifact_manifest = None;
             }
         }
+        if self.folder.open { ui.disable(); }
         egui::Panel::top("navigation").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Numera Wiz");
@@ -939,7 +946,8 @@ impl eframe::App for WizApp {
             });
             self.folder_controls(ui);
         });
-        self.batch_window(ui.ctx());
+        if !self.folder.open { self.batch_window(ui.ctx()); }
+        self.folder_window(ui.ctx());
     }
 }
 #[cfg(target_arch = "wasm32")]

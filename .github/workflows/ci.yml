@@ -258,7 +258,7 @@ jobs:
         run: cargo run --locked -p xtask -- verify-research
       - name: Prepare formatting evidence
         if: always()
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
         run: |
           cargo fmt --all
           git diff --binary -- crates apps xtask test-support > formatting.patch
@@ -272,6 +272,7 @@ jobs:
             formatting.patch
             docs/generated/
             target/interface-evidence/
+            target/source-language-report.json
           if-no-files-found: error
 
       - name: Save reusable compiler outputs even after a test failure

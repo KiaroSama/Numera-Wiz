@@ -176,14 +176,7 @@ pub fn development(root: &Path) -> Result<()> {
     ] {
         fs::copy(root.join(file), resources.join(file))?;
     }
-    for directory in [
-        "docs/manuals",
-        "docs/development",
-        "docs/generated",
-        "docs/vendor/ffmpeg",
-        "examples",
-        "components",
-    ] {
+    for directory in ["docs", "integrations", "examples", "components"] {
         copy_tree(&root.join(directory), &resources.join(directory))?;
     }
     let branding = root.join("assets/branding");

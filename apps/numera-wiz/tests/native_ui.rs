@@ -687,12 +687,11 @@ async fn journey() {
         .unwrap()
         .lines()
         .count();
-    // The same-source 509c26e Chrome batch screenshot places this header at 276,659.
-    // Keyboard focus scrolls the bounded section to the actual controls.
+    // Hosted captures place the bottom launcher at 276,659. The dedicated
+    // dialog explicitly focuses its visible path field; no hidden Tab search.
     click(&window, "276", "659").await;
     tokio::time::sleep(Duration::from_millis(300)).await;
     screenshot(&window, &evidence.join("native-folder-expanded.png")).await;
-    input(&["key", "--clearmodifiers", "Tab"]).await;
     input(&["key", "--clearmodifiers", "ctrl+a"]).await;
     input(&[
         "type",
@@ -703,10 +702,12 @@ async fn journey() {
     ])
     .await;
     screenshot(&window, &evidence.join("native-folder-path.png")).await;
+    // From explicit path focus: the two visible checkboxes, exclusions, then Scan.
     for _ in 0..4 {
         input(&["key", "--clearmodifiers", "Tab"]).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
+    screenshot(&window, &evidence.join("native-folder-scan-ready.png")).await;
     input(&["key", "--clearmodifiers", "space"]).await;
     let folder_event = ui_event(&root, "folder.snapshot.accepted", None, after).await;
     let folder_id = folder_event["fields"]["snapshot_id"].as_str().unwrap();
@@ -764,11 +765,8 @@ async fn journey() {
         .unwrap()
         .lines()
         .count();
-    // Scan button -> retained ID -> Inspect button; the ID came from the UI reply.
-    for _ in 0..2 {
-        input(&["key", "--clearmodifiers", "Tab"]).await;
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    // Completion deliberately restores focus to Inspect after controls re-enable.
+    screenshot(&window, &evidence.join("native-folder-snapshot.png")).await;
     input(&["key", "--clearmodifiers", "space"]).await;
     let inspect_event = ui_event(
         &root,
@@ -777,25 +775,12 @@ async fn journey() {
         after_inspect,
     )
     .await;
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    input(&["key", "--clearmodifiers", "Tab"]).await;
-    screenshot(&window, &evidence.join("native-folder-snapshot.png")).await;
-    input(&["key", "--clearmodifiers", "Tab"]).await;
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
     screenshot(
         &window,
         &evidence.join("native-folder-registered-entry.png"),
     )
     .await;
-    input(&["mousemove", "--window", &window, "700", "740"]).await;
-    input(&["click", "--repeat", "6", "--delay", "100", "5"]).await;
-    screenshot(
-        &window,
-        &evidence.join("native-folder-failures-companion.png"),
-    )
-    .await;
-    input(&["key", "--clearmodifiers", "shift+Tab"]).await;
-    input(&["key", "--clearmodifiers", "Tab"]).await;
     let after_open = std::fs::read_to_string(root.join("logs/owner.jsonl"))
         .unwrap()
         .lines()
@@ -839,6 +824,17 @@ async fn journey() {
     );
     tokio::time::sleep(Duration::from_millis(700)).await;
     screenshot(&window, &evidence.join("native-folder-opened-media.png")).await;
+    // Open closes the dialog after the real asset response. Reopening retains
+    // its immutable snapshot; scroll only that window to expose every outcome.
+    click(&window, "276", "680").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-folder-retained-after-reopen.png")).await;
+    input(&["mousemove", "--window", &window, "700", "500"]).await;
+    input(&["click", "--repeat", "8", "--delay", "100", "5"]).await;
+    screenshot(&window, &evidence.join("native-folder-failures-companion.png")).await;
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    assert_eq!(query(&root,"jobs.list").await.unwrap()["items"].as_array().unwrap().len(), 3,
+        "Dialog focus, reopen and scrolling must not execute a background plan");
     std::fs::write(evidence.join("native-folder-intake.json"),serde_json::to_vec_pretty(&json!({
         "source":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),
         "registration_event":folder_event,"inspect_event":inspect_event,"open_event":open_event,
