@@ -539,6 +539,7 @@ pub struct SourceStamp {
     object: NativeObjectIdentity,
     bytes: u64,
     modified: std::time::SystemTime,
+    change_time: (i64, i64),
 }
 impl SourceStamp {
     pub fn capture_resolved(path: &Path) -> Result<Self> {
@@ -571,12 +572,14 @@ impl SourceStamp {
             ));
         }
         let object = native_object(handle.as_file())?;
+        let change_time = native_change_time(handle.as_file())?;
         let stamp = Self {
             path,
             handle,
             object,
             bytes: metadata.len(),
             modified: metadata.modified().map_err(io_error)?,
+            change_time,
         };
         stamp.revalidate()?;
         Ok(stamp)
@@ -641,11 +644,63 @@ impl SourceStamp {
             || native_object(current.as_file()).map_err(|_| changed())? != self.object
             || metadata.len() != self.bytes
             || metadata.modified().map_err(|_| changed())? != self.modified
+            || native_change_time(current.as_file()).map_err(|_| changed())? != self.change_time
         {
             return Err(changed());
         }
         Ok(())
     }
+}
+// Detect ordinary in-place writes even when an application restores mtime.
+// Access time is intentionally excluded: our own content reads can update it.
+// This is a cheap guard, not an immutable snapshot or a substitute for content hashes.
+#[cfg(unix)]
+fn native_change_time(file: &File) -> Result<(i64, i64)> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file.metadata().map_err(io_error)?;
+    Ok((metadata.ctime(), metadata.ctime_nsec()))
+}
+#[cfg(windows)]
+#[expect(
+    unsafe_code,
+    reason = "One borrowed-handle FILE_BASIC_INFO query with a checked output buffer and lifetime"
+)]
+fn native_change_time(file: &File) -> Result<(i64, i64)> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_BASIC_INFO, FileBasicInfo, GetFileInformationByHandleEx,
+    };
+    let mut information = FILE_BASIC_INFO::default();
+    // SAFETY: File retains its valid handle for the call. The initialized repr(C)
+    // buffer is exclusively borrowed and exactly the requested size. No pointer
+    // escapes, and its contents are read only after a successful query.
+    let succeeded = unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle(),
+            FileBasicInfo,
+            std::ptr::from_mut(&mut information).cast(),
+            std::mem::size_of::<FILE_BASIC_INFO>() as u32,
+        )
+    };
+    if succeeded == 0 {
+        return Err(DomainError::new(
+            "NATIVE_IDENTITY_UNAVAILABLE",
+            format!(
+                "Windows source change time is unavailable: {}",
+                std::io::Error::last_os_error()
+            ),
+        ));
+    }
+    // Windows reports one 100-nanosecond tick count. It can be deliberately set
+    // or suppressed by a writer, so full hash verification remains mandatory.
+    Ok((information.ChangeTime, 0))
+}
+#[cfg(not(any(unix, windows)))]
+fn native_change_time(_file: &File) -> Result<(i64, i64)> {
+    Err(DomainError::new(
+        "NATIVE_IDENTITY_UNAVAILABLE",
+        "No admitted source change stamp on this target",
+    ))
 }
 pub(crate) fn native_object(file: &File) -> Result<NativeObjectIdentity> {
     let metadata = file.metadata().map_err(io_error)?;
@@ -1399,7 +1454,10 @@ mod tests {
             .set_times(std::fs::FileTimes::new().set_modified(modified))
             .unwrap();
         drop(writer);
-        assert_eq!(fs::metadata(&in_place).unwrap().modified().unwrap(), modified);
+        assert_eq!(
+            fs::metadata(&in_place).unwrap().modified().unwrap(),
+            modified
+        );
         assert_eq!(fs::read(&in_place).unwrap(), b"after!");
         assert_eq!(source_object(&in_place).unwrap(), object);
         assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
