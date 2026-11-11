@@ -57,8 +57,8 @@ fn limits(ui: &mut egui::Ui, limits: &FolderIntakeLimits) {
         limits.manifest_entries, limits.filesystem_entries, limits.directories, limits.depth,
     ));
     ui.small(format!(
-        "Source reads: {} bytes; directory names: {} bytes; {} s before the next entry. An active probe keeps its own deadline.",
-        limits.source_read_bytes, limits.directory_name_bytes, limits.seconds_before_next_entry,
+        "Aggregate source size: {} bytes; directory names: {} bytes; {} s before the next entry. An active probe keeps its own deadline.",
+        limits.aggregate_source_bytes, limits.directory_name_bytes, limits.seconds_before_next_entry,
     ));
 }
 fn error(ui: &mut egui::Ui, error: &ErrorView) {
