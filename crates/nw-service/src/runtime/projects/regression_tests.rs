@@ -534,14 +534,24 @@ pub(in crate::runtime) async fn linked_edits() {
     // move/lift must now expand the shared group index on its own.
     let unchanged_right = right_entities
         .iter()
-        .find(|entity| !entity.references.iter().any(|reference| reference.role == "link"))
+        .find(|entity| {
+            !entity
+                .references
+                .iter()
+                .any(|reference| reference.role == "link")
+        })
         .unwrap();
     let unchanged_id = unchanged_right.id.clone();
     let unchanged_bytes = fixture.raw(&unchanged_id);
     // Only the source of the one-way edge changes; its target is already group-only.
     let grouped_only = right_entities
         .into_iter()
-        .filter(|entity| entity.references.iter().any(|reference| reference.role == "link"))
+        .filter(|entity| {
+            entity
+                .references
+                .iter()
+                .any(|reference| reference.role == "link")
+        })
         .map(|mut entity| {
             entity
                 .references
@@ -549,13 +559,29 @@ pub(in crate::runtime) async fn linked_edits() {
             entity
         })
         .collect::<Vec<_>>();
-    assert_eq!(grouped_only.len(), 1, "Exactly the one-way explicit edge must be removed");
+    assert_eq!(
+        grouped_only.len(),
+        1,
+        "Exactly the one-way explicit edge must be removed"
+    );
     fixture.install_envelopes(grouped_only);
     assert_eq!(fixture.raw(&unchanged_id), unchanged_bytes);
     for id in &right_ids {
         let entity = fixture.entity(id);
-        assert!(!entity.references.iter().any(|reference| reference.role == "link"));
-        assert_eq!(entity.payload::<Clip>("clip").unwrap().link_group_id.as_ref(), Some(&right_group));
+        assert!(
+            !entity
+                .references
+                .iter()
+                .any(|reference| reference.role == "link")
+        );
+        assert_eq!(
+            entity
+                .payload::<Clip>("clip")
+                .unwrap()
+                .link_group_id
+                .as_ref(),
+            Some(&right_group)
+        );
     }
     let left_bytes = [
         fixture.raw(&fixture.clips[0]),
