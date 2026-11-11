@@ -13,6 +13,17 @@ use tokio_util::sync::CancellationToken;
 pub fn io_error(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("FILESYSTEM_ERROR", error.to_string())
 }
+// Operation names are fixed at call sites; paths and error text must stay out of diagnostics.
+pub(crate) fn diagnostic_io_error(operation: &'static str, error: std::io::Error) -> DomainError {
+    let os_error = error.raw_os_error();
+    tracing::error!(
+        operation,
+        os_error_present = os_error.is_some(),
+        os_error,
+        "Filesystem operation failed"
+    );
+    io_error(error)
+}
 pub fn path_text(path: &Path) -> Result<String> {
     path.to_str().map(String::from).ok_or_else(|| {
         DomainError::new(
@@ -22,14 +33,15 @@ pub fn path_text(path: &Path) -> Result<String> {
     })
 }
 pub fn source_path(path: &Path) -> Result<PathBuf> {
-    let meta = fs::symlink_metadata(path).map_err(io_error)?;
+    let meta = fs::symlink_metadata(path)
+        .map_err(|error| diagnostic_io_error("source_path.metadata", error))?;
     if meta.file_type().is_symlink() || !meta.is_file() {
         return Err(DomainError::new(
             "PATH_DENIED",
             "Source must be an admitted regular file; symbolic links are not followed",
         ));
     }
-    fs::canonicalize(path).map_err(io_error)
+    fs::canonicalize(path).map_err(|error| diagnostic_io_error("source_path.canonicalize", error))
 }
 /// Open the checked native input without following a final link or waiting on a FIFO.
 pub fn open_regular_read(path: &Path) -> Result<File> {
@@ -71,11 +83,13 @@ fn open_regular_handle(path: &Path) -> Result<File> {
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
             .security_qos_flags(0)
             .open(path)
-            .map_err(io_error)?
+            .map_err(|error| diagnostic_io_error("regular_file.open", error))?
     };
     #[cfg(not(any(unix, windows)))]
     let file = File::open(path).map_err(io_error)?;
-    let metadata = file.metadata().map_err(io_error)?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| diagnostic_io_error("regular_file.metadata", error))?;
     if !metadata.is_file() || metadata.file_type().is_symlink() {
         return Err(DomainError::new(
             "INPUT_DENIED",
@@ -210,8 +224,11 @@ fn identity_opened_observed(
     maximum_bytes: u64,
     mut on_bytes: impl FnMut(u64) -> Result<()>,
 ) -> Result<FileIdentity> {
-    file.seek(SeekFrom::Start(0)).map_err(io_error)?;
-    let before = file.metadata().map_err(io_error)?;
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| diagnostic_io_error("identity.seek", error))?;
+    let before = file
+        .metadata()
+        .map_err(|error| diagnostic_io_error("identity.metadata_before", error))?;
     if before.len() > 256 * 1024 * 1024 * 1024 {
         return Err(DomainError::new(
             "RESOURCE_LIMIT",
@@ -235,7 +252,9 @@ fn identity_opened_observed(
             break;
         }
         let read_bytes = (before.len() - count).min(buffer.len() as u64) as usize;
-        let n = file.read(&mut buffer[..read_bytes]).map_err(io_error)?;
+        let n = file
+            .read(&mut buffer[..read_bytes])
+            .map_err(|error| diagnostic_io_error("identity.read", error))?;
         if n == 0 {
             break;
         }
@@ -249,7 +268,9 @@ fn identity_opened_observed(
             ));
         }
     }
-    let after = file.metadata().map_err(io_error)?;
+    let after = file
+        .metadata()
+        .map_err(|error| diagnostic_io_error("identity.metadata_after", error))?;
     if before.len() != after.len()
         || count != before.len()
         || before.modified().ok() != after.modified().ok()

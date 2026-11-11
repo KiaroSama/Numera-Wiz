@@ -570,7 +570,9 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
     let port = listener.local_addr()?.port();
     let exe = std::env::current_exe()?;
     let build = tokio::task::spawn_blocking(move || {
-        nw_platform::files::identity(&exe, &CancellationToken::new())
+        nw_platform::files::identity(&exe, &CancellationToken::new()).inspect_err(|error| {
+            tracing::error!(stage = "executable_identity", code = %error.code, "Owner startup stage failed");
+        })
     })
     .await??
     .sha256;
@@ -587,12 +589,18 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
             uuid::Uuid::new_v4().simple()
         ),
     };
-    let runtime = nw_platform::security::private_directory(&root.join("runtime"))?;
+    let runtime = nw_platform::security::private_directory(&root.join("runtime"))
+        .inspect_err(|error| {
+            tracing::error!(stage = "runtime_directory", code = %error.code, "Owner startup stage failed");
+        })?;
     nw_platform::security::write_private(
         &runtime.join("owner.json"),
         &serde_json::to_vec(&record)?,
         true,
-    )?;
+    )
+    .inspect_err(|error| {
+        tracing::error!(stage = "owner_record_publish", code = %error.code, "Owner startup stage failed");
+    })?;
     let owner = Arc::new(Owner {
         service,
         record,

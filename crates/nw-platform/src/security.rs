@@ -1,5 +1,5 @@
 //! OS-enforced protection is established before credentials are written.
-use crate::files::io_error;
+use crate::files::{diagnostic_io_error, io_error};
 use nw_domain::{DomainError, Result};
 use std::{
     fs,
@@ -12,7 +12,9 @@ fn denied(message: impl Into<String>) -> DomainError {
     DomainError::new("INSECURE_DATA_ROOT", message)
 }
 pub fn private_directory(path: &Path) -> Result<PathBuf> {
-    let existed = path.try_exists().map_err(io_error)?;
+    let existed = path
+        .try_exists()
+        .map_err(|error| diagnostic_io_error("private_directory.exists", error))?;
     if !existed {
         let mut builder = fs::DirBuilder::new();
         builder.recursive(true);
@@ -21,15 +23,19 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
             use std::os::unix::fs::DirBuilderExt;
             builder.mode(0o700);
         }
-        builder.create(path).map_err(io_error)?;
+        builder
+            .create(path)
+            .map_err(|error| diagnostic_io_error("private_directory.create", error))?;
     }
-    let metadata = fs::symlink_metadata(path).map_err(io_error)?;
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| diagnostic_io_error("private_directory.metadata", error))?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(denied(
             "Credential/store directory must be a real owned directory",
         ));
     }
-    let canonical = fs::canonicalize(path).map_err(io_error)?;
+    let canonical = fs::canonicalize(path)
+        .map_err(|error| diagnostic_io_error("private_directory.canonicalize", error))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -62,15 +68,25 @@ fn system_tool(name: &str) -> Result<PathBuf> {
     Ok(PathBuf::from(root).join("System32").join(name))
 }
 #[cfg(windows)]
+fn diagnostic_decode_error(operation: &'static str, error: impl std::fmt::Display) -> DomainError {
+    tracing::error!(
+        operation,
+        os_error_present = false,
+        "Protected text decoding failed"
+    );
+    io_error(error)
+}
+#[cfg(windows)]
 fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
     let output = Command::new(system_tool("whoami.exe")?)
         .args(["/user", "/fo", "csv", "/nh"])
         .output()
-        .map_err(io_error)?;
+        .map_err(|error| diagnostic_io_error("acl.whoami_execute", error))?;
     if !output.status.success() {
         return Err(denied("Cannot establish the current Windows SID"));
     }
-    let text = String::from_utf8(output.stdout).map_err(io_error)?;
+    let text = String::from_utf8(output.stdout)
+        .map_err(|error| diagnostic_decode_error("acl.whoami_decode", error))?;
     let sid = text
         .split([',', '"', '\r', '\n'])
         .find(|part| part.starts_with("S-1-5-"))
@@ -82,7 +98,7 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
             .arg(format!("*{sid}:(OI)(CI)F"))
             .arg("/q")
             .output()
-            .map_err(io_error)?;
+            .map_err(|error| diagnostic_io_error("acl.grant_execute", error))?;
         if !status.status.success() {
             return Err(denied(
                 "User-only Windows ACL could not be established; use NTFS with ACL support",
@@ -98,22 +114,25 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
     let scratch = tempfile::Builder::new()
         .prefix("acl-check-")
         .tempfile_in(scratch_parent)
-        .map_err(io_error)?;
+        .map_err(|error| diagnostic_io_error("acl.scratch_create", error))?;
     let check = scratch.path().to_owned();
-    scratch.close().map_err(io_error)?;
+    scratch
+        .close()
+        .map_err(|error| diagnostic_io_error("acl.scratch_close", error))?;
     let output = Command::new(system_tool("icacls.exe")?)
         .arg(path)
         .arg("/save")
         .arg(&check)
         .arg("/q")
         .output()
-        .map_err(io_error)?;
-    let bytes = fs::read(&check).map_err(io_error);
+        .map_err(|error| diagnostic_io_error("acl.save_execute", error))?;
+    let bytes = fs::read(&check);
     let _ = fs::remove_file(&check);
     if !output.status.success() {
         return Err(denied("Cannot verify the Windows DACL"));
     }
-    let bytes = bytes?;
+    // Only report the read failure when it is the selected return error.
+    let bytes = bytes.map_err(|error| diagnostic_io_error("acl.evidence_read", error))?;
     let utf16 = bytes.starts_with(&[0xff, 0xfe]) || bytes.get(1) == Some(&0);
     let offset = if bytes.starts_with(&[0xff, 0xfe]) {
         2
@@ -131,9 +150,10 @@ fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
                 .map(|word| u16::from_le_bytes(*word))
                 .collect::<Vec<_>>(),
         )
-        .map_err(io_error)?
+        .map_err(|error| diagnostic_decode_error("acl.evidence_decode_utf16", error))?
     } else {
-        String::from_utf8(bytes).map_err(io_error)?
+        String::from_utf8(bytes)
+            .map_err(|error| diagnostic_decode_error("acl.evidence_decode_utf8", error))?
     };
     check_dacl(&text, sid)
 }
@@ -222,11 +242,15 @@ pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<(
     let mut file = tempfile::Builder::new()
         .prefix(".credential-")
         .tempfile_in(&parent)
-        .map_err(io_error)?;
-    file.write_all(bytes).map_err(io_error)?;
-    file.as_file().sync_all().map_err(io_error)?;
+        .map_err(|error| diagnostic_io_error("private_write.create", error))?;
+    file.write_all(bytes)
+        .map_err(|error| diagnostic_io_error("private_write.write", error))?;
+    file.as_file()
+        .sync_all()
+        .map_err(|error| diagnostic_io_error("private_write.sync", error))?;
     if replace_owned {
-        file.persist(path).map_err(|error| io_error(error.error))?;
+        file.persist(path)
+            .map_err(|error| diagnostic_io_error("private_write.persist", error.error))?;
     } else {
         file.persist_noclobber(path)
             .map_err(|error| io_error(error.error))?;
