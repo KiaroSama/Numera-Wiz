@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::Mutex,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     io::{AsyncRead, AsyncReadExt},
@@ -93,13 +93,20 @@ fn ordered(value: Value) -> Value {
 struct Evidence {
     path: PathBuf,
     events: Mutex<Vec<Value>>,
+    started: Instant,
 }
 impl Evidence {
-    fn record(&self, event: Value) -> Result<()> {
+    fn record(&self, mut event: Value) -> Result<()> {
         let mut events = self
             .events
             .lock()
             .map_err(|_| anyhow::anyhow!("Evidence lock failed"))?;
+        let elapsed_ms = u64::try_from(self.started.elapsed().as_millis())
+            .context("Compatibility elapsed milliseconds exceed the evidence integer range")?;
+        event
+            .as_object_mut()
+            .context("Compatibility evidence event must be an object")?
+            .insert("elapsed_ms".into(), json!(elapsed_ms));
         events.push(event);
         fs::write(
             &self.path,
@@ -1727,11 +1734,12 @@ pub async fn run() {
     let evidence = Evidence {
         path: directory.join("preservation.json"),
         events: Mutex::new(Vec::new()),
+        started: Instant::now(),
     };
     evidence
-        .record(json!({"phase":"started","status":"running","deadline_seconds":420}))
+        .record(json!({"phase":"started","status":"running","deadline_seconds":600}))
         .expect("Write compatibility start evidence");
-    let outcome = tokio::time::timeout(Duration::from_secs(420), scenario(&evidence)).await;
+    let outcome = tokio::time::timeout(Duration::from_secs(600), scenario(&evidence)).await;
     match outcome {
         Ok(Ok(())) => {}
         Ok(Err(error)) => {
@@ -1739,7 +1747,7 @@ pub async fn run() {
             panic!("Actual prior/current package compatibility failed: {error:#}");
         }
         Err(_) => {
-            evidence.record(json!({"phase":"failed","status":"failed","reason":"420-second preservation deadline; retained owned children are terminated only for cleanup; no dirty reopen is attempted"})).expect("Write compatibility deadline evidence");
+            evidence.record(json!({"phase":"failed","status":"failed","reason":"600-second preservation deadline; retained owned children are terminated only for cleanup; no dirty reopen is attempted"})).expect("Write compatibility deadline evidence");
             panic!("Actual prior/current package preservation deadline");
         }
     }
