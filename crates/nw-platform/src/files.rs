@@ -1385,6 +1385,24 @@ mod tests {
             revalidate(&expected, &cancel).unwrap_err().code,
             "SOURCE_CHANGED"
         );
+
+        let in_place = canonical.with_file_name("timestamp-preserved.bin");
+        fs::write(&in_place, b"before").unwrap();
+        let modified = fs::metadata(&in_place).unwrap().modified().unwrap();
+        let stamp = SourceStamp::capture_resolved(&in_place).unwrap();
+        let object = stamp.object_identity().unwrap();
+        // Cross a full second so even a coarse change-time clock observes this write.
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        let mut writer = OpenOptions::new().write(true).open(&in_place).unwrap();
+        writer.write_all(b"after!").unwrap();
+        writer
+            .set_times(std::fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+        drop(writer);
+        assert_eq!(fs::metadata(&in_place).unwrap().modified().unwrap(), modified);
+        assert_eq!(fs::read(&in_place).unwrap(), b"after!");
+        assert_eq!(source_object(&in_place).unwrap(), object);
+        assert_eq!(stamp.revalidate().unwrap_err().code, "SOURCE_CHANGED");
     }
     #[test]
     fn a_preopened_original_cannot_be_bound_to_a_replacement_at_its_old_path() {
