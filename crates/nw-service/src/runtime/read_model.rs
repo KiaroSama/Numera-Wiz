@@ -467,6 +467,72 @@ mod tests {
                 .code,
             "SNAPSHOT_EXPIRED"
         );
+
+        project_catalog_lists_committed_public_headers(&service).await;
+    }
+    async fn project_catalog_lists_committed_public_headers(service: &Arc<Service>) {
+        let owner = service.owner();
+        let mut bootstrap = Request::query("access.replay_scope.create", json!({}));
+        bootstrap.request_id = "workbench-catalog-scope".into();
+        let bootstrapped = service.dispatch(owner.clone(), bootstrap).await;
+        assert!(bootstrapped.ok, "Catalog fixture scope: {bootstrapped:?}");
+        assert!(bootstrapped.receipt_id.is_none());
+        let scope = bootstrapped.result.unwrap()["replay_scope"]
+            .as_str()
+            .expect("The actual owner must issue a replay scope")
+            .to_owned();
+        let name = "Stage A catalog discovery";
+        let mut create = Request::query("projects.create", json!({"name":name}));
+        create.request_id = "workbench-catalog-create".into();
+        create.replay_scope = Some(scope);
+        create.idempotency_key = Some("workbench-catalog-create".into());
+        let created = service.dispatch(owner.clone(), create).await;
+        assert!(created.ok, "Catalog fixture project: {created:?}");
+        assert!(created.receipt_id.is_some());
+        let created = created.result.unwrap();
+        let project_id = created["project_id"]
+            .as_str()
+            .expect("The accepted project must have an identity");
+        assert_eq!(created["revision"], "0");
+
+        let mut request = Request::query("projects.list", json!({"limit":64}));
+        request.request_id = "workbench-catalog-list".into();
+        let response = service.dispatch(owner, request).await;
+        assert!(
+            response.ok,
+            "projects.list must discover a committed project through the shared service: {response:?}"
+        );
+        assert!(response.receipt_id.is_none());
+        assert_eq!(response.request_id, "workbench-catalog-list");
+        let catalog = response.result.unwrap();
+        assert_eq!(catalog["schema_version"], 1);
+        assert_eq!(catalog["project_revision"], Value::Null);
+        assert_eq!(catalog["projection"], "projects.summary.v1");
+        assert_eq!(catalog["total_count"], 1);
+        assert_eq!(catalog["count_accuracy"], "exact");
+        assert_eq!(catalog["next_cursor"], Value::Null);
+        assert_eq!(catalog["event_cursor"], Value::Null);
+        assert!(catalog["snapshot_expires_at"].is_string());
+        assert_eq!(
+            catalog["items"],
+            json!([{
+                "id":project_id,
+                "name":name,
+                "revision":"0",
+                "schema_major":1,
+                "envelope_version":1,
+                "compatibility":"supported"
+            }]),
+            "Catalog rows must contain only the bounded public header summary"
+        );
+        let snapshot = catalog["snapshot_id"]
+            .as_str()
+            .expect("Catalog pages must identify their captured projection");
+        assert!(!snapshot.is_empty());
+        assert!(
+            !service.snapshots.lock().unwrap().entries.contains_key(snapshot),
+            "The limit64 catalog must not retain a single-page inventory ticket"
+        );
     }
     #[tokio::test]
     async fn snapshot_cursor_cannot_change_identity_query_policy_or_lease() {

@@ -285,9 +285,12 @@ jobs:
       - name: Check platform boundaries before the application regressions
         if: ${{ !cancelled() }}
         run: cargo test --locked -p nw-platform --all-targets
+      - name: Check shared service regressions before the application journeys
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p nw-service --all-targets --no-fail-fast
       - name: Compile and run ordinary regressions
         if: ${{ !cancelled() }}
-        run: cargo test --locked --workspace --exclude nw-platform --all-targets --no-fail-fast
+        run: cargo test --locked --workspace --exclude nw-platform --exclude nw-service --all-targets --no-fail-fast
       - name: Lint implementation
         if: ${{ !cancelled() }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
