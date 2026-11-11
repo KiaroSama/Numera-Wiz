@@ -488,3 +488,7 @@ fn validate_declared_source_extent(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "projects/regression_tests.rs"]
+pub(super) mod regression_tests;

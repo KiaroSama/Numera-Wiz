@@ -397,11 +397,14 @@ pub(in crate::runtime) async fn held_source_current_grants() {
         .unwrap();
     let actor = service.profile_context("browser").unwrap();
     let mut profile: AccessProfile = service.store.get("profile/browser").unwrap().unwrap();
-    profile.read_roots = vec![files::path_text(temporary.path()).unwrap()];
+    // Stored grants use canonical roots, as the profile command does in production.
+    let grant_root = std::fs::canonicalize(temporary.path()).unwrap();
+    profile.read_roots = vec![files::path_text(&grant_root).unwrap()];
     profile.revision += 1;
     service.store.put("profile/browser", &profile).unwrap();
     let cancel = CancellationToken::new();
     let identity = files::identity(&file, &cancel).unwrap();
+    assert!(Path::new(&identity.path).starts_with(&grant_root));
     let asset = Asset {
         id: Uuid::new_v4().to_string(),
         creator: actor.principal.clone(),
@@ -449,12 +452,15 @@ pub(in crate::runtime) async fn held_source_current_grants() {
     let sequence=good(write(&service,&actor,&scope,Some((project,"0")),"sequences.create","held-sequence",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]})).await);
     let params = json!({"sequence_id":sequence["created"]["sequence_id"],"track_id":sequence["created"]["tracks"][0]["id"],"source":{"kind":"registered","asset_id":asset.id,"stream_index":7},"source_range":{"start":{"num":"-1","den":"1"},"end":{"num":"0","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"});
     let weak = Arc::downgrade(&service);
+    let preflight_observed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let hook_observed = preflight_observed.clone();
     let mut revoked = profile.clone();
     revoked.read_roots.clear();
     revoked.revision += 1;
     *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
         let service = weak.upgrade().unwrap();
         service.store.put("profile/browser", &revoked).unwrap();
+        hook_observed.store(true, std::sync::atomic::Ordering::SeqCst);
     }));
     failed(
         write(
@@ -470,6 +476,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
         "PATH_DENIED",
     );
     *service.preflight_hook.lock().unwrap() = None;
+    assert!(preflight_observed.load(std::sync::atomic::Ordering::SeqCst));
     profile.revision += 2;
     service.store.put("profile/browser", &profile).unwrap();
     assert_eq!(

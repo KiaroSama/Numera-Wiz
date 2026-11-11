@@ -557,6 +557,7 @@ mod tests {
         );
         crate::runtime::projects::tests::indexed_snapshot_and_edit_cases().await;
         crate::runtime::projects::tests::held_source_current_grants().await;
+        crate::runtime::projects::regression_tests::compatibility_and_zero_delta().await;
     }
     #[test]
     fn page_byte_ceiling_wins_over_row_count_without_truncating_items() {

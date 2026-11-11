@@ -375,7 +375,7 @@ impl Store {
             if self.project_fail_after_rows.swap(false, std::sync::atomic::Ordering::SeqCst) {
                 return Err(DomainError::new("INJECTED_PROJECT_FAILURE", "Injected after project rows and before receipt/clock commit"));
             }
-            if creating { Ok(json!({"project_id":project,"root_bin_id":header.root_bin_id,"revision":header.revision,"history":history.summary()})) }
+            if creating { Ok(json!({"project_id":project,"root_bin_id":header.root_bin_id,"revision":header.revision,"history":{"can_undo":false,"can_redo":false}})) }
             else { Ok(json!({"project_id":project,"base_revision":base,"revision":header.revision,"operation_id":prepared.operation_id,"created":prepared.created,"changed_ids":prepared.patch.changes.iter().map(|c|&c.id).collect::<Vec<_>>(),"history":history.summary()})) }
         })
     }
@@ -1098,4 +1098,8 @@ pub(super) fn exercise_atomic_projects() {
     assert!(nw_platform::project_lease::ProjectWriterLease::acquire(&project).is_err());
     drop(lease);
     let _reacquired = nw_platform::project_lease::ProjectWriterLease::acquire(&project).unwrap();
+    regressions::run();
 }
+
+#[cfg(test)]
+mod regressions;
