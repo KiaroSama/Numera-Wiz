@@ -996,6 +996,27 @@
           "observed_outcome": "197983-byte saved/source full equality; one producer job; successful PNG personally inspected; other browsers/platforms/packages remain unqualified"
         }
       ]
+    },
+    {
+      "subject_id": "cleanup.folder_intake_development",
+      "subject_kind": "internal",
+      "status": "implemented_unqualified",
+      "modules": [
+        "crates/nw-domain/src/ingest.rs",
+        "crates/nw-service/src/runtime/folders.rs",
+        "crates/nw-ui/src/folders.rs",
+        "apps/numera-wiz/src/human.rs"
+      ],
+      "evidence": [
+        {
+          "commit": "9a171e9fea96eb756d346972d9a8b392f6977294",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/43026539369",
+          "artifact_sha256": "ca8d48ec42162e91c337a913d8663cb2782dc3cd7e37e7f05bb767fb945d320a",
+          "asserted_domain": "bounded native/Linux Chrome folder registration, retained failures and inventory-only companions; CLI/official SDK service parity",
+          "report": "docs/development/evidence/rust-completion-43026539369.json",
+          "observed_outcome": "All 13 expanded jobs passed. Actual native/Chrome Scan, Inspect, Open and reopened/failure/companion PNGs personally inspected; independent source identity and exactly 3 producer jobs. Full F08, companion copying/replacement, other GUI platforms and timestamp-preserving in-place mutation regression remain open."
+        }
+      ]
     }
   ]
 }

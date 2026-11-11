@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "source_sha": "9a171e9fea96eb756d346972d9a8b392f6977294",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/43026539369",
+  "run_attempt": 1,
+  "conclusion": "success",
+  "required_expanded_jobs": 13,
+  "jobs": [
+    {
+      "id": 130542715355,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 130542715714,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 130542716061,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 130542716132,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543737138,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543737258,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543737264,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543737491,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543877236,
+      "name": "owner-transports",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543877789,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 130543889417,
+      "name": "owner-batch",
+      "conclusion": "success"
+    },
+    {
+      "id": 130551433192,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 130552544519,
+      "name": "artifact-http",
+      "conclusion": "success"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13860741565,
+      "name": "native-ui-evidence-linux",
+      "bytes": 3080613,
+      "sha256": "ca8d48ec42162e91c337a913d8663cb2782dc3cd7e37e7f05bb767fb945d320a"
+    },
+    {
+      "id": 13860573031,
+      "name": "artifact-http-evidence-linux",
+      "bytes": 4532,
+      "sha256": "2f15b2ef250dc7517f769779b4c460e3a1795ffc54a67d86a9cb43cb160ff9eb"
+    },
+    {
+      "id": 13860065901,
+      "name": "development-evidence-macos-15-intel",
+      "bytes": 52824,
+      "sha256": "e9fc3253a989ec1b668b9227656c0cc13bd5be28bd75d17ac1e8aedb91aefc94"
+    },
+    {
+      "id": 13860002517,
+      "name": "exact-head-workflow-evidence",
+      "bytes": 674,
+      "sha256": "5ab84428a20446e05074cdf55d5ad93dcc2769a4c7226947020cf6e03053ca9e"
+    },
+    {
+      "id": 13859750434,
+      "name": "development-evidence-windows-2025",
+      "bytes": 52832,
+      "sha256": "58504c573c1b35d7b6c8dd702147a1fc41ee4c214660f7d923286e84f3cb2a37"
+    },
+    {
+      "id": 13859505770,
+      "name": "development-evidence-ubuntu-24.04",
+      "bytes": 52820,
+      "sha256": "7fb76e2e80314355d9a7ddf79787c0b27c09c656135741b792dcb61726b2449e"
+    },
+    {
+      "id": 13859285483,
+      "name": "owner-batch-evidence-linux",
+      "bytes": 3113,
+      "sha256": "d55fd3a3cc49bc99156aa78b7660f816d30bdaff94c538145123f6a3311c496f"
+    },
+    {
+      "id": 13859260410,
+      "name": "numera-wiz-development-package-windows-2025",
+      "bytes": 39641693,
+      "sha256": "7c0bd1a731cefd891260b5fdf44a24727a078ca45b00988146130b0441ed7f68"
+    },
+    {
+      "id": 13859085981,
+      "name": "numera-wiz-development-macos-15-intel",
+      "bytes": 35817517,
+      "sha256": "f236e0b08f205b253e82a68050392e258c814d6ef61c86698382a540810bd55d"
+    },
+    {
+      "id": 13858965774,
+      "name": "browser-boot-evidence-linux-chrome",
+      "bytes": 2259590,
+      "sha256": "5434657bd5432ed1ec4b94bcdec603feb55f0737d4c48f2817e619b67fa6e33b"
+    },
+    {
+      "id": 13858885624,
+      "name": "numera-wiz-development-windows-2025",
+      "bytes": 29352592,
+      "sha256": "d7944d2a7db85fed9371cb69fee9383d6a1d78c2f11ead7e62b8ec2219d11430"
+    },
+    {
+      "id": 13858751358,
+      "name": "numera-wiz-development-package-macos-15-intel",
+      "bytes": 46372324,
+      "sha256": "47d5e840102ab4b31c5bcc1ec98b70d429f73d3d6ecda74a770b71a7f11c4100"
+    },
+    {
+      "id": 13858370915,
+      "name": "owner-media-evidence-linux",
+      "bytes": 2197,
+      "sha256": "958ddee2956e02bd5b3008311a232a0e5c59b2a26d3bdb68ca90b35efb73fa17"
+    },
+    {
+      "id": 13857980656,
+      "name": "numera-wiz-development-package-macos-15",
+      "bytes": 43625087,
+      "sha256": "e98be68dba931414b29bc6b4ce04a17b85f83ab3fb09884abbf7f448e73b62d0"
+    },
+    {
+      "id": 13857796230,
+      "name": "numera-wiz-development-macos-15",
+      "bytes": 33726453,
+      "sha256": "b2818954b947881ea34b3a2742769af5552811eda9685df0607d6fc537c153a0"
+    },
+    {
+      "id": 13857522689,
+      "name": "development-evidence-macos-15",
+      "bytes": 52814,
+      "sha256": "4aef4b2464729907d7cd5546fb2e1739343a78f6b58eb22435b83a12d926332d"
+    },
+    {
+      "id": 13857482248,
+      "name": "embedded-web",
+      "bytes": 3673004,
+      "sha256": "12e43a1042c897530a78edcd50be37b8b6458714530f0137d40a9e636f0d3297"
+    },
+    {
+      "id": 13857312987,
+      "name": "ffmpeg-development-fixture-profile-linux",
+      "bytes": 7390727,
+      "sha256": "5266cc3f2278927fec8950d6f08df7013ccd03c91e3c2f858b98f4a4e2588058"
+    },
+    {
+      "id": 13857247788,
+      "name": "numera-wiz-development-ubuntu-24.04",
+      "bytes": 37472139,
+      "sha256": "306ee6f6b169bc56a9fd8c91f796c51cb7d6471caf4fd1f71704f9294d36e669"
+    },
+    {
+      "id": 13856999452,
+      "name": "numera-wiz-development-package-ubuntu-24.04",
+      "bytes": 47660792,
+      "sha256": "3dd4f5382baa987d115f6f1459d10352ad42b171337cfeff3497b0105d57067c"
+    },
+    {
+      "id": 13856519354,
+      "name": "source-formatting",
+      "bytes": 148,
+      "sha256": "c1ed7d787465af5fa0581bed0b85449778f06e05fc43e45d80bfffd3eac28539"
+    },
+    {
+      "id": 13856279756,
+      "name": "resolved-dependencies",
+      "bytes": 29191,
+      "sha256": "0b6f717b4c3144e4cced9b86de207c9b2f53c5acd0063c1096c3e1c28dfba9ae"
+    }
+  ],
+  "review": {
+    "native_and_chrome": "Actual Scan/Inspect/Open plus reopened snapshot, failed media and inventory-only companion screenshots personally inspected; three producer jobs retained; source and snapshot facts independently asserted by hosted journeys.",
+    "packages": "Downloaded all four package artifacts; verified artifact digests, SHA256SUMS, each inner manifest member, original official PNG hash, 39 generated commands and bundled plugin metadata without executing packages locally.",
+    "source_and_tests": "Each platform verify-research passed; original 179 unit/async test entrypoints/categories retained; tracked runtime/tooling sources are Rust.",
+    "boundary": "Development cleanup/folder/CLI/SDK/artifact/UI/package scope only. Timestamp-preserving in-place source writes were identified by subsequent source review and have a pending existing-test regression."
+  },
+  "not_qualified": [
+    "full version 1",
+    "standard FFmpeg offline profiles",
+    "full F08 companions/replacement",
+    "project/editor/preview/effects/remaining utility families",
+    "Windows/macOS native GUI interaction",
+    "other browsers",
+    "named agent client installation/runtime",
+    "complete license/corresponding-source closure",
+    "owner GPU/resource qualification"
+  ],
+  "release_ready": false
+}

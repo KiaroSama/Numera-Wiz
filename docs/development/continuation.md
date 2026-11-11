@@ -14,7 +14,11 @@ changes add bounded folder registration/inspection and shared controls, CLI job
 waiting, client plugin packages, rmcp 3.9.0 listener cancellation, current CI action
 pins, exact source-HEAD builds/provenance, Pure Rust/test-inventory enforcement,
 four native development package targets and the exact owner-supplied logo. Hosted
-validation of this candidate remains pending until current-head results are linked.
+[run 43026539369](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43026539369)
+passed all 13 jobs on exact source `9a171e9fea96eb756d346972d9a8b392f6977294`.
+The [scoped evidence](evidence/rust-completion-43026539369.json) records inspected native/Chrome
+folder input and all four package manifests. Later source changes require their own
+current-head checks; the baseline does not qualify a new candidate or full v1.
 
 The full first version remains unfinished: authoritative projects/edit history,
 timeline/DAG/render compiler, preview/audio transport, the remaining utility/effect
