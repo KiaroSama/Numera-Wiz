@@ -3,6 +3,7 @@
 use super::owner::Cli;
 #[path = "../../../../ci/schema_validation.rs"]
 mod schema_validation;
+#[path = "project_topology/output_contracts.rs"]
 mod output_contracts;
 use nw_domain::commands::{MAX_RESULT_BYTES, ProjectRef, Request};
 use rmcp::{
