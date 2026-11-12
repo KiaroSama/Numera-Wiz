@@ -323,6 +323,15 @@ fn link_selection<R: ProjectRead>(
     }
     Ok(selected.into_values().collect())
 }
+fn validate_link_group_candidate<R: ProjectRead>(read: &R, candidate: &EntityId) -> Result<()> {
+    if read.raw_entity(candidate)?.is_some() || read.has_dependency_target(candidate)? {
+        return Err(DomainError::new(
+            "OBJECT_CONFLICT",
+            "Allocated link group ID is already present",
+        ));
+    }
+    Ok(())
+}
 pub fn resolve_edit<R: ProjectRead>(
     read: &R,
     intent: ProjectEditIntent,
@@ -460,12 +469,7 @@ pub fn resolve_edit<R: ProjectRead>(
                 }
             }
             let group = ids.next()?;
-            if read.raw_entity(&group)?.is_some() || read.has_dependency_target(&group)? {
-                return Err(DomainError::new(
-                    "OBJECT_CONFLICT",
-                    "Allocated link group ID is already present",
-                ));
-            }
+            validate_link_group_candidate(read, &group)?;
             for mut entity in selected {
                 let mut clip: Clip = entity.payload("clip")?;
                 clip.link_group_id = Some(group.clone());
@@ -556,6 +560,7 @@ pub fn resolve_edit<R: ProjectRead>(
                         Some(id) => id.clone(),
                         None => {
                             let id = ids.next()?;
+                            validate_link_group_candidate(read, &id)?;
                             right_groups.insert(group.clone(), id.clone());
                             id
                         }
