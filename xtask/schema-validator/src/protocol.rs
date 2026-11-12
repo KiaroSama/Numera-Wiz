@@ -195,7 +195,7 @@ pub fn preflight(bytes: &[u8]) -> Result<(), ()> {
                 Some(_) => {
                     let start = self.offset;
                     while self.bytes.get(self.offset).is_some_and(|b| {
-                        !b.is_ascii_whitespace() && ![b',', b']', b'}'].contains(b)
+                        !b.is_ascii_whitespace() && !b",]}".contains(b)
                     }) {
                         self.offset += 1;
                     }

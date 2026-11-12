@@ -1320,8 +1320,9 @@ fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, li
         auth["schema_version"] == 1,
         "R2_AUTHORIZATION_SCHEMA_CHANGED"
     );
+    let expected_policy_revision = profile.revision.to_string();
     assert!(
-        auth["policy_revision"] == profile.revision.to_string(),
+        auth["policy_revision"].as_str() == Some(expected_policy_revision.as_str()),
         "R2_POLICY_REVISION_CHANGED"
     );
     assert!(
