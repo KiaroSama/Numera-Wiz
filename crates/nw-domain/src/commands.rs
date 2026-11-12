@@ -764,7 +764,10 @@ mod tests {
             });
         let mut expected = expected.to_vec();
         expected.sort_unstable();
-        assert!(actual.as_deref() == Some(expected.as_slice()), "{diagnostic}");
+        assert!(
+            actual.as_deref() == Some(expected.as_slice()),
+            "{diagnostic}"
+        );
     }
     #[test]
     fn duplicate_context_is_rejected() {
