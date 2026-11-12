@@ -974,7 +974,12 @@ impl project_workbench::Driver for NativeProjects<'_> {
     }
     async fn replace(&mut self, text: &str) {
         input(&["key", "--clearmodifiers", "ctrl+a"]).await;
-        input(&["type", "--clearmodifiers", "--delay", "2", text]).await;
+        for (index, segment) in text.split('\n').enumerate() {
+            if index != 0 {
+                input(&["key", "--clearmodifiers", "Return"]).await;
+            }
+            input(&["type", "--clearmodifiers", "--delay", "2", segment]).await;
+        }
     }
     async fn screenshot(&mut self, name: &str) {
         screenshot(
