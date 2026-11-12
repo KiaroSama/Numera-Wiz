@@ -167,7 +167,8 @@ stdio and HTTP. Call it with `{"params":{"limit":64}}`; omit `context.project`,
 `cursor` and `replace_snapshot` belong in `params` and cannot be used together;
 the limit defaults to 128 and accepts 1 through 512.
 
-The [catalog contract](PROJECTS.md#project-catalog) defines its six public fields,
+The [catalog contract](PROJECTS.md#project-catalog) defines its six common-header
+fields and additive authorization observations,
 ascending canonical UUID order, current Read filtering, compatibility labels,
 absolute 30-second continuation binding and shared quotas. Catalog replacement
 can retire the exact principal/profile's own catalog or project read ticket
@@ -177,6 +178,14 @@ handles, and paged retries have no durable exact-replay guarantee. Existing
 operator profiles must deliberately grant `projects.list` using the inspected,
 owner-reviewed revision-checked policy update described above, preserving their
 principal/profile, roots and unrelated rights.
+
+Read [current authorization observations](PROJECTS.md#current-authorization-observations)
+as advisory captured predicates. Static descriptor requirements and the runtime
+`commands.list` overlay have different scopes; neither replaces fresh request
+validation. All 13 project-family commands publish result schemas. MCP schemas for
+the complete structured Response and their full wire-size qualification are still
+in progress; result-schema presence alone does not establish that MCP output
+contract.
 
 A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside

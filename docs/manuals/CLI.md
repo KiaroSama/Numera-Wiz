@@ -62,7 +62,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
 | `logs status` | Inspect owner log health under current owner authority. |
 | `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
-| `clips place/move/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
+| `clips place/move/link/unlink/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
 
 See the [project command guide](PROJECTS.md) for exact fractions, expected
 revisions, typed examples, source rights and bounded snapshot/history behavior.
@@ -71,7 +71,8 @@ List commands accept `--limit`, `--cursor` and `--replace-snapshot`.
 `numera-wiz projects list --limit 64` discovers the complete authorized catalog
 under the current 64-project store bound. It uses `projects.list`, with no project
 context, replay scope, idempotency key or durable receipt. Pages default to 128
-items (range 1 through 512). The six common-header fields, ascending UUID order,
+items (range 1 through 512). The six common-header fields and additive current
+authorization observations, ascending UUID order,
 current Read filtering, continuation binding, shared quotas and catalog-only
 cross-project ticket retirement are documented in the
 [project catalog contract](PROJECTS.md#project-catalog). Stored operating profiles
