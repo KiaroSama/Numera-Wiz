@@ -1185,6 +1185,7 @@ pub(in crate::runtime) async fn public_link_producer() {
     assert_eq!(unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group)), after_unlink);
     assert_eq!(service.store.project_read(project.as_str()).unwrap().header().entity_count, 8);
     public_unlink_edges().await;
+    linked_split_right_group_collision().await;
 }
 
 // Public validation and real-store deterministic allocation models, after A's literal oracles.
@@ -1779,4 +1780,229 @@ async fn public_unlink_relations() {
         fixture.accept(fixture.request("history.redo", "unlink-edge-redo", json!({}))).await;
         assert_eq!(unlink_images(&fixture.service, &fixture.project, &selected, &groups), after);
     }
+}
+
+// Pure resolver collision model, reached only after every public Link/Unlink oracle above.
+async fn linked_split_right_group_collision() {
+    let fixture = Fixture::new().await;
+    let linked = fixture
+        .accept(fixture.request(
+            "clips.link",
+            "split-collision-source-group",
+            json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand"}),
+        ))
+        .await;
+    let source_group = EntityId::parse(linked["created"]["link_group_id"].as_str().unwrap()).unwrap();
+    let occupied_clip: Clip = fixture.entity(&fixture.clips[1]).payload("clip").unwrap();
+    let placed = fixture
+        .accept(fixture.request(
+            "clips.place",
+            "split-collision-extra",
+            json!({
+                "sequence_id":occupied_clip.sequence_id,"track_id":occupied_clip.track_id,
+                "source":{"kind":"solid_color","rgba":[0,0,0,1],"duration":{"num":"4","den":"1"}},
+                "source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},
+                "sequence_start":{"num":"6","den":"1"},"collision":"reject"
+            }),
+        ))
+        .await;
+    let extra = EntityId::parse(placed["created"]["clip_ids"][0].as_str().unwrap()).unwrap();
+    let extra_source = EntityId::parse(placed["created"]["source_id"].as_str().unwrap()).unwrap();
+    let occupied = fixture
+        .accept(fixture.request(
+            "clips.link",
+            "split-collision-occupied-group",
+            json!({"clip_ids":[fixture.clips[1],extra],"link_policy":"expand"}),
+        ))
+        .await;
+    let occupied_group = EntityId::parse(occupied["created"]["link_group_id"].as_str().unwrap()).unwrap();
+
+    // No setup read survives a public write. This final snapshot is never changed/applied.
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    let mut source_members = vec![fixture.clips[0].clone(), fixture.clips[2].clone()];
+    source_members.sort();
+    let mut occupied_members = vec![fixture.clips[1].clone(), extra.clone()];
+    occupied_members.sort();
+    assert_ne!(source_group, occupied_group);
+    assert_eq!(linked["changed_ids"], json!(source_members));
+    assert_eq!(occupied["changed_ids"], json!(occupied_members));
+    for (group, members) in [(&source_group, &source_members), (&occupied_group, &occupied_members)] {
+        assert!(read.raw_entity(group).unwrap().is_none());
+        assert_eq!(read.dependents(group, 128).unwrap(), *members);
+        assert!(read.has_dependency_target(group).unwrap());
+        assert_eq!(read.dependents(group, 1).unwrap_err().code, "RESOURCE_LIMIT");
+    }
+
+    let zero = Rational::ZERO;
+    let one = Rational::new(1, 1).unwrap();
+    let half = Rational::new(1, 2).unwrap();
+    let four = Rational::new(4, 1).unwrap();
+    let primary: Clip = read.entity(&fixture.clips[0]).unwrap().payload("clip").unwrap();
+    let partner: Clip = read.entity(&fixture.clips[2]).unwrap().payload("clip").unwrap();
+    assert_eq!(primary.sequence_id, partner.sequence_id);
+    assert_ne!(primary.track_id, partner.track_id);
+    let mut clips = fixture.clips.clone();
+    clips.push(extra.clone());
+    let root_bin = read.header().root_bin_id.clone();
+    assert!(!read.entity(&root_bin).unwrap().payload::<Bin>("bin").unwrap().locked);
+    let mut entity_ids = std::collections::BTreeSet::from([root_bin.clone()]);
+    let mut identities = std::collections::BTreeSet::from([source_group.clone(), occupied_group.clone()]);
+    let mut sequences = std::collections::BTreeSet::new();
+    for (id, start) in [
+        (&fixture.clips[0], 0), (&fixture.clips[1], 4), (&fixture.clips[2], 0),
+        (&fixture.clips[3], 0), (&extra, 6),
+    ] {
+        let entity = read.entity(id).unwrap();
+        entity.semantics().unwrap();
+        let clip: Clip = entity.payload("clip").unwrap();
+        let track: Track = read.entity(&clip.track_id).unwrap().payload("track").unwrap();
+        let sequence: Sequence = read.entity(&clip.sequence_id).unwrap().payload("sequence").unwrap();
+        assert!(!clip.locked && !track.locked && !sequence.locked);
+        assert_eq!(track.sequence_id, clip.sequence_id);
+        assert_eq!(track.grid, four);
+        assert_eq!(clip.rate, one);
+        assert_eq!(clip.sequence_start, Rational::new(start, 1).unwrap());
+        assert_eq!(clip.end().unwrap(), Rational::new(start + 1, 1).unwrap());
+        assert_eq!(clip.duration, one);
+        assert_eq!(clip.source_range.start, zero);
+        assert_eq!(clip.source_range.end, one);
+        let source = read.entity(&clip.source_id).unwrap();
+        source.semantics().unwrap();
+        match source.payload::<SourceBinding>("source_binding").unwrap() {
+            SourceBinding::SolidColor { duration, .. } => assert_eq!(duration, four),
+            other => panic!("Split collision setup requires a solid source: {other:?}"),
+        }
+        if id == &fixture.clips[0] || id == &fixture.clips[2] {
+            assert_eq!(clip.link_group_id.as_ref(), Some(&source_group));
+            assert!(clip.sequence_start < half && half < clip.end().unwrap());
+            assert_eq!(grid_tick(half, track.grid).unwrap(), 2);
+        } else if id == &fixture.clips[1] || id == &extra {
+            assert_eq!(clip.sequence_id, primary.sequence_id);
+            assert_eq!(clip.track_id, primary.track_id);
+            assert_eq!(clip.link_group_id.as_ref(), Some(&occupied_group));
+            assert!(clip.sequence_start > one);
+        }
+        assert!(!entity.references.iter().any(|reference| reference.role == "link"));
+        entity_ids.extend([id.clone(), clip.source_id, clip.track_id, clip.sequence_id.clone()]);
+        identities.insert(clip.occurrence_id);
+        if let Some(group) = clip.link_group_id {
+            identities.insert(group);
+        }
+        sequences.insert(clip.sequence_id);
+    }
+    // Include even unused tracks, then prove the finite fixture list covers every entity.
+    for sequence in sequences {
+        let page = read.track_page(&sequence, None, 128, 128 * 1024).unwrap();
+        assert!(page.next_key.is_none());
+        assert_eq!(page.items.len(), 2);
+        for track in page.items {
+            entity_ids.insert(EntityId::parse(track["id"].as_str().unwrap()).unwrap());
+        }
+    }
+    assert_eq!(entity_ids.len(), read.header().entity_count);
+    identities.extend(entity_ids.iter().cloned());
+    let fixed = [
+        "00000000-0000-4000-8000-000000000101",
+        "00000000-0000-4000-8000-000000000102",
+        "00000000-0000-4000-8000-000000000103",
+        "00000000-0000-4000-8000-000000000104",
+        "00000000-0000-4000-8000-000000000105",
+    ].map(|id| EntityId::parse(id).unwrap());
+    assert_eq!(fixed.iter().collect::<std::collections::BTreeSet<_>>().len(), 5);
+    for id in &fixed {
+        assert!(!identities.contains(id), "Fixed Split allocation identity is already in use: {id}");
+        assert!(read.raw_entity(id).unwrap().is_none());
+        assert!(!read.has_dependency_target(id).unwrap());
+    }
+    let [occ_a, right_a, occ_b, right_b, free_group] = fixed;
+    let groups = [source_group.clone(), occupied_group.clone()];
+    let snapshot = || {
+        let raw = entity_ids.iter().map(|id| (id.clone(), read.raw_entity(id).unwrap().unwrap())).collect::<BTreeMap<_, _>>();
+        json!({
+            "header":read.header_raw(),"raw":raw,
+            "retained":unlink_unchanged_facts(&fixture, &groups),
+            "images":unlink_images(&fixture.service, &fixture.project, &clips, &groups),
+            "extra_source_reference":fixture.service.store.project_fact_hash(&format!("project-reference/{}/{extra_source}", fixture.project)).unwrap()
+        })
+    };
+    let before = snapshot();
+    let intent = |at: Rational| ProjectEditIntent::Split(commands::parse(json!({
+        "clip_id":fixture.clips[0],"at_sequence":at,"link_policy":"expand"
+    })).unwrap());
+    for boundary in [zero, one] {
+        let unchanged = resolve_edit(&read, intent(boundary), AllocatedIds(VecDeque::new()))
+            .expect("Primary boundary must finish without allocating or probing a right group");
+        assert!(unchanged.forward.changes.is_empty());
+        assert!(unchanged.inverse.changes.is_empty());
+        assert!(unchanged.changed_ids.is_empty());
+        assert_eq!(unchanged.created, json!({"clip_ids":[],"no_change":true}));
+        assert_eq!(snapshot(), before);
+    }
+
+    // A is the explicit primary. Exact queue: A occurrence, right group, A right,
+    // B occurrence, B right. No exhaustion, injected dependency rows, or retries.
+    let allocations = |group: EntityId| AllocatedIds(VecDeque::from([
+        occ_a.clone(), group, right_a.clone(), occ_b.clone(), right_b.clone(),
+    ]));
+    let error = resolve_edit(&read, intent(half), allocations(occupied_group.clone()))
+        .expect_err("Occupied right group must reject");
+    assert_eq!(error.code, "OBJECT_CONFLICT", "Dependency-occupied right-group model: {error:?}");
+    assert_eq!(snapshot(), before);
+
+    // Independent entity occupancy and free-candidate controls remain after the intended RED.
+    assert!(read.raw_entity(&root_bin).unwrap().is_some());
+    let error = resolve_edit(&read, intent(half), allocations(root_bin))
+        .expect_err("Entity-occupied right group must reject");
+    assert_eq!(error.code, "OBJECT_CONFLICT", "Entity-occupied right-group model: {error:?}");
+    assert_eq!(snapshot(), before);
+    let resolved = resolve_edit(&read, intent(half), allocations(free_group.clone()))
+        .expect("A free right group must resolve on valid linked geometry");
+    let mut changed = vec![
+        fixture.clips[0].clone(), fixture.clips[2].clone(), right_a.clone(), right_b.clone(),
+        primary.track_id.clone(), partner.track_id.clone(),
+    ];
+    changed.sort();
+    assert_eq!(resolved.changed_ids, changed);
+    assert_eq!(resolved.forward.changes.len(), 6);
+    assert_eq!(resolved.created, json!({"clip_ids":[right_a,right_b],"no_change":false}));
+    assert_eq!(serde_json::to_value(&resolved.inverse).unwrap(), serde_json::to_value(resolved.forward.inverse()).unwrap());
+    for (left_id, right_id, occurrence) in [
+        (&fixture.clips[0], &right_a, &occ_a), (&fixture.clips[2], &right_b, &occ_b),
+    ] {
+        let original = read.entity(left_id).unwrap();
+        let original_clip: Clip = original.payload("clip").unwrap();
+        for right in [false, true] {
+            let mut expected = original.clone();
+            let mut clip = original_clip.clone();
+            clip.duration = half;
+            if right {
+                expected.id = right_id.clone();
+                clip.occurrence_id = occurrence.clone();
+                clip.sequence_start = half;
+                clip.source_range.start = half;
+                clip.link_group_id = Some(free_group.clone());
+            } else {
+                clip.source_range.end = half;
+            }
+            expected.update(&clip).unwrap();
+            let change = resolved.forward.changes.iter().find(|change| change.id == expected.id).unwrap();
+            assert_eq!(change.before, read.raw_entity(&expected.id).unwrap());
+            assert_eq!(change.after.as_deref(), Some(expected.bytes().unwrap().as_str()));
+            assert_eq!(clip.duration, half);
+            assert_eq!(clip.source_range.duration().unwrap(), half);
+            assert_eq!(clip.link_group_id.as_ref(), Some(if right { &free_group } else { &source_group }));
+        }
+        let mut expected = read.entity(&original_clip.track_id).unwrap();
+        let mut track: Track = expected.payload("track").unwrap();
+        track.clip_count += 1;
+        expected.update(&track).unwrap();
+        let change = resolved.forward.changes.iter().find(|change| change.id == expected.id).unwrap();
+        assert_eq!(change.before, read.raw_entity(&expected.id).unwrap());
+        assert_eq!(change.after.as_deref(), Some(expected.bytes().unwrap().as_str()));
+    }
+    assert!(!resolved.forward.changes.iter().any(|change| change.id == free_group));
+    assert!(read.raw_entity(&free_group).unwrap().is_none());
+    assert!(!read.has_dependency_target(&free_group).unwrap());
+    assert_eq!(snapshot(), before);
+    // Pure resolution only: no patch application or public Split rejection/rollback claim.
 }
