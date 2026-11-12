@@ -513,7 +513,7 @@ impl Service {
             self.catalog_publication(context, revision, snapshot.created, cancellation)?;
         }
         if !projects {
-            check_cancel(cancellation)?;
+            check_cancel()?;
         }
         // Empty and single-page inventories need no retained lease or database snapshot.
         if page["next_cursor"].is_string() {
