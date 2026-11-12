@@ -37,6 +37,46 @@ struct Fixture {
     deadline: Instant,
     release: Option<Release>,
 }
+#[derive(Debug)]
+enum FixtureGitOperation {
+    Init,
+    Add,
+    Commit,
+    Revision,
+    Config,
+    UpdateRef,
+    PackRefs,
+    ForEachRef,
+    Other,
+}
+impl FixtureGitOperation {
+    fn from_args(args: &[&str]) -> Self {
+        let operation = if args.first() == Some(&"--no-replace-objects") {
+            args.get(1)
+        } else {
+            args.first()
+        };
+        match operation.copied() {
+            Some("init") => Self::Init,
+            Some("add") => Self::Add,
+            Some("commit") => Self::Commit,
+            Some("rev-parse") => Self::Revision,
+            Some("config") => Self::Config,
+            Some("update-ref") => Self::UpdateRef,
+            Some("pack-refs") => Self::PackRefs,
+            Some("for-each-ref") => Self::ForEachRef,
+            _ => Self::Other,
+        }
+    }
+}
+#[derive(Debug)]
+enum FixtureGitFailure {
+    Deadline,
+    Timeout,
+    Cancelled,
+    ChildStatus,
+    Other,
+}
 pub fn qualify() -> Result<()> {
     scanner::guard()?;
     process::initialize()?;
@@ -85,15 +125,51 @@ impl Fixture {
             .env("GIT_COMMITTER_EMAIL", "qualification@example.invalid")
             .args(["--no-pager", "-c", "commit.gpgSign=false"])
             .args(args);
-        process::run(
+        let result = process::run(
             &mut command,
             Options::command(Duration::from_secs(15), self.deadline),
             || Ok(()),
-        )
+        );
+        if let Err(error) = &result {
+            self.git_failure(args, None, *error);
+        }
+        result
+    }
+    fn git_failure(&self, args: &[&str], outcome: Option<&process::Outcome>, error: ScanFailure) {
+        let class = match error.0 {
+            "SECURITY_DEADLINE" => FixtureGitFailure::Deadline,
+            "SECURITY_CHILD_TIMEOUT" => FixtureGitFailure::Timeout,
+            "SECURITY_CANCELLED" => FixtureGitFailure::Cancelled,
+            "SECURITY_CHILD_FAILED" => FixtureGitFailure::ChildStatus,
+            _ => FixtureGitFailure::Other,
+        };
+        // Only finite trusted enums and booleans. Diagnostic I/O cannot replace
+        // the original failure; captures and actual arguments stay private.
+        let _ = writeln!(
+            std::io::stderr(),
+            "{} [ERROR] SECURITY_FIXTURE_GIT_FAILURE op={:?} class={class:?} outcome_available={} completed={} completed_nonzero={} failure_present={} deadline_elapsed={} cancellation={} capture_failed={} capture_overflow={}",
+            protocol::unix_millis().unwrap_or(0),
+            FixtureGitOperation::from_args(args),
+            outcome.is_some(),
+            outcome.is_some_and(process::Outcome::completed),
+            outcome.is_some_and(process::Outcome::completed_nonzero),
+            outcome.is_some_and(|value| value.failure.is_some()),
+            Instant::now() >= self.deadline,
+            process::cancelled(),
+            outcome.is_some_and(|value| value.stdout.failed || value.stderr.failed),
+            outcome.is_some_and(|value| value.stdout.overflow || value.stderr.overflow),
+        );
+    }
+    fn git_success(&self, repository: &Path, args: &[&str]) -> Result<process::Outcome> {
+        let output = self.git_result(repository, args)?;
+        if let Err(error) = output.successful() {
+            self.git_failure(args, Some(&output), error);
+            return Err(error);
+        }
+        Ok(output)
     }
     fn git(&self, repository: &Path, args: &[&str]) -> Result<String> {
-        let output = self.git_result(repository, args)?;
-        output.successful()?;
+        let output = self.git_success(repository, args)?;
         String::from_utf8(output.stdout.bytes).private("SECURITY_FIXTURE_GIT_ENCODING")
     }
     fn revision(&self, repository: &Path, revision: &str) -> Result<String> {

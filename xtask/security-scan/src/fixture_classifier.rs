@@ -604,18 +604,38 @@ fn real_evaluator(fixture: &Fixture, repository: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+enum AdmissionCase {
+    Shallow,
+    Grafts,
+    Alternates,
+    HttpAlternates,
+    CommonDirectory,
+    LooseReplacement,
+    Promisor,
+    IncludedConfig,
+    PackedReplacement,
+    SymlinkDirectory,
+    SharedLimits,
+}
+impl AdmissionCase {
+    fn enter(&self) {
+        let _ = writeln!(std::io::stderr(), "{} [INFO] SECURITY_MOCK_ADMISSION_CASE case={self:?}", protocol::unix_millis().unwrap_or(0));
+    }
+}
 fn admission(fixture: &Fixture) -> Result<()> {
-    for (index, forbidden) in [
-        "shallow",
-        "info/grafts",
-        "objects/info/alternates",
-        "objects/info/http-alternates",
-        "commondir",
-        "refs/replace",
+    for (index, (case, forbidden)) in [
+        (AdmissionCase::Shallow, "shallow"),
+        (AdmissionCase::Grafts, "info/grafts"),
+        (AdmissionCase::Alternates, "objects/info/alternates"),
+        (AdmissionCase::HttpAlternates, "objects/info/http-alternates"),
+        (AdmissionCase::CommonDirectory, "commondir"),
+        (AdmissionCase::LooseReplacement, "refs/replace"),
     ]
     .iter()
     .enumerate()
     {
+        case.enter();
         let repo = fixture.repository(&format!("admission-forbidden-{index}"))?;
         let target = repo.join(".git").join(forbidden);
         fs::create_dir_all(target.parent().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?)
@@ -636,6 +656,7 @@ fn admission(fixture: &Fixture) -> Result<()> {
             "SECURITY_MOCK_ADMISSION_FORBIDDEN_FAILED",
         )?;
     }
+    AdmissionCase::Promisor.enter();
     let repo = fixture.repository("admission-promisor")?;
     private::write(&repo.join(".git/objects/pack/marker.promisor"), b"")?;
     require(
@@ -645,6 +666,7 @@ fn admission(fixture: &Fixture) -> Result<()> {
         ),
         "SECURITY_MOCK_PROMISOR_FAILED",
     )?;
+    AdmissionCase::IncludedConfig.enter();
     let repo = fixture.repository("admission-include")?;
     private::write(
         &repo.join(".git/included-config"),
@@ -658,17 +680,47 @@ fn admission(fixture: &Fixture) -> Result<()> {
         ),
         "SECURITY_MOCK_INCLUDE_FAILED",
     )?;
+    AdmissionCase::PackedReplacement.enter();
     let repo = fixture.repository("admission-replace")?;
     let revision = fixture.revision(&repo, "HEAD")?;
     fixture.git(
         &repo,
         &["update-ref", &format!("refs/replace/{revision}"), &revision],
     )?;
-    fixture.git(&repo, &["pack-refs", "--all", "--prune"])?;
+    let packed = fixture.git_success(
+        &repo,
+        &["--no-replace-objects", "pack-refs", "--all", "--prune"],
+    )?;
+    require(
+        packed.completed() && packed.stdout.bytes.is_empty() && packed.stderr.bytes.is_empty(),
+        "SECURITY_MOCK_PACKED_REPLACE_SETUP_FAILED",
+    )?;
     let loose = repo.join(".git/refs/replace");
     if loose.exists() {
         fs::remove_dir(&loose).private("SECURITY_FIXTURE_IO")?;
     }
+    require(
+        matches!(fs::symlink_metadata(&loose), Err(error) if error.kind() == std::io::ErrorKind::NotFound),
+        "SECURITY_MOCK_PACKED_REPLACE_SETUP_FAILED",
+    )?;
+    // One additional owned fixture child proves the real packed ref and value;
+    // its private output is never published or substituted for admission proof.
+    let present = fixture.git_success(
+        &repo,
+        &[
+            "--no-replace-objects",
+            "for-each-ref",
+            "--format=%(objectname) %(refname)",
+            "refs/replace/",
+        ],
+    )?;
+    require(
+        present.completed()
+            && present.stderr.bytes.is_empty()
+            && present.stdout.bytes == format!("{revision} refs/replace/{revision}\n").as_bytes(),
+        "SECURITY_MOCK_PACKED_REPLACE_SETUP_FAILED",
+    )?;
+    diagnostic("INFO", "SECURITY_MOCK_PACKED_REPLACE_SETUP_PASS");
     require(
         failed_at(
             &evaluator(fixture, &repo, "admission-replace-proof", |_| Ok(())),
@@ -676,6 +728,7 @@ fn admission(fixture: &Fixture) -> Result<()> {
         ),
         "SECURITY_MOCK_PACKED_REPLACE_FAILED",
     )?;
+    AdmissionCase::SymlinkDirectory.enter();
     let repo = fixture.repository("admission-symlink")?;
     fs::rename(
         repo.join(".git/objects/info"),
@@ -692,6 +745,7 @@ fn admission(fixture: &Fixture) -> Result<()> {
         "SECURITY_MOCK_ADMISSION_SYMLINK_FAILED",
     )?;
     // Shared aggregate boundary is exercised without running any child.
+    AdmissionCase::SharedLimits.enter();
     let root = fixture.root.join("classifier-shared-cap");
     private::directory(&root)?;
     private::directory(&root.join("proof"))?;
