@@ -253,7 +253,7 @@ async fn refresh<D: Driver>(driver: &mut D, reads: usize) {
 async fn select_clip<D: Driver>(driver: &mut D, row: usize) {
     // Source-derived shared panel rows; hosted screenshots qualify these input targets.
     driver.mark().await;
-    driver.click(410, 184 + row as u32 * 94).await;
+    driver.click(300, 184 + row as u32 * 94).await;
     driver.observed("projects.list").await;
     driver.loaded(8).await;
 }
