@@ -1,6 +1,8 @@
 //! Finite public topology qualification inside the existing hosted transport test.
 //! Only supported solid clips are used: no source registration, jobs or raw store reads.
 use super::owner::Cli;
+#[path = "../../../../ci/schema_validation.rs"]
+mod schema_validation;
 use nw_domain::commands::{MAX_RESULT_BYTES, ProjectRef, Request};
 use rmcp::{
     ClientLifecycleMode, ClientServiceExt, RoleClient, ServiceExt,
@@ -151,6 +153,18 @@ impl Adapter<'_> {
         }
         response
     }
+    async fn schema_documents(&self) -> Vec<Value> {
+        let listing = self.invoke(&Invocation::new("commands.list",json!({}),json!({}),args(&["--access-profile","topology","commands","list"]))).await;
+        let rows = listing["result"]["commands"].as_array().expect("SCHEMA_TRANSPORT_DISCOVERY_ROWS");
+        let mut schemas = Vec::new();
+        for id in schema_validation::COMMANDS {
+            let response = self.invoke(&Invocation::new("commands.schema",json!({"id":id}),json!({}),args(&["--access-profile","topology","commands","schema",id]))).await;
+            let row = rows.iter().find(|row|row["id"]==id).expect("SCHEMA_TRANSPORT_DISCOVERY_ID");
+            assert!(&response["result"]==row,"SCHEMA_TRANSPORT_DISCOVERY_EQUAL");
+            schemas.push(response["result"].get("result_schema").expect("SCHEMA_TRANSPORT_DOCUMENT").clone());
+        }
+        schemas
+    }
     async fn scope(&self, tag: &str) -> String {
         let cli_args = args(&[
             "--access-profile",
@@ -178,7 +192,10 @@ impl Adapter<'_> {
     }
 }
 
-struct Journey<'a> {
+struct Journey<'a, 'b> {
+    conformance: &'b mut schema_validation::Batch,
+    case_base: u16,
+    initial_projections: u16,
     adapter: Adapter<'a>,
     tag: &'static str,
     scope: String,
@@ -187,7 +204,7 @@ struct Journey<'a> {
     request_ids: BTreeSet<String>,
     snapshot: Option<String>,
 }
-impl Journey<'_> {
+impl Journey<'_, '_> {
     async fn write(
         &mut self,
         step: &str,
@@ -214,7 +231,7 @@ impl Journey<'_> {
         flag(&mut selected, "--idempotency-key", &identity);
         flag(&mut selected, "--request-id", &identity);
         let saved = Invocation::new(command, params, context, selected);
-        let response = self.adapter.invoke(&saved).await;
+        let response = self.conformance.capture(self.case_base + self.accepted.len() as u16 + 1, command, self.adapter.invoke(&saved).await);
         assert!(
             self.receipts.insert(text(&response, "receipt_id")),
             "Fresh topology receipt reused"
@@ -274,6 +291,12 @@ impl Journey<'_> {
             .adapter
             .invoke(&Invocation::new(command, params, context, selected))
             .await;
+        // Select the complete first checkpoint explicitly; later checkpoints retain their
+        // original equality oracles without creating unbounded repeated observations.
+        if revision == 3 {
+            self.conformance.observe(self.case_base + 20 + self.initial_projections,command,&response);
+            self.initial_projections += 1;
+        }
         assert!(response.get("receipt_id").is_none_or(Value::is_null));
         let result = response["result"].clone();
         assert_eq!(result["project_revision"], revision.to_string());
@@ -316,6 +339,7 @@ impl Journey<'_> {
                 cli_args,
             ))
             .await;
+        self.conformance.observe(self.case_base + 40,"projects.list",&response);
         assert!(response.get("receipt_id").is_none_or(Value::is_null));
         assert_eq!(response["result"]["projection"], "projects.summary.v1");
         assert!(
@@ -360,7 +384,7 @@ fn clip_facts(mut entity: Value) -> Value {
     entity
 }
 async fn checkpoint(
-    journey: &mut Journey<'_>,
+    journey: &mut Journey<'_, '_>,
     project: &Project,
     revision: u64,
     group: Option<&str>,
@@ -538,9 +562,12 @@ async fn checkpoint(
     }
 }
 
-async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
+async fn journey(adapter: Adapter<'_>, tag: &'static str, conformance: &mut schema_validation::Batch, case_base: u16, extra_receipts: &mut BTreeSet<String>) -> BTreeSet<String> {
     let scope = adapter.scope(tag).await;
     let mut journey = Journey {
+        conformance,
+        case_base,
+        initial_projections: 0,
         adapter,
         tag,
         scope,
@@ -688,6 +715,30 @@ async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
     journey.replay().await;
     checkpoint(&mut journey, &project, 8, None, Some(&baseline)).await;
     journey.retire().await;
+    assert_eq!(journey.initial_projections,11,"SCHEMA_TRANSPORT_PROJECTION_SET");
+    // These two additive writes follow all original nine-receipt/replay/checkpoint oracles.
+    let split_key = format!("topology-{tag}-schema-split");
+    let context = json!({"request_id":split_key,"replay_scope":journey.scope,"idempotency_key":split_key,"project":{"id":project.id,"expected_revision":"8"}});
+    let selected = args(&["--access-profile","topology","clips","split","--project",&project.id,"--expected-revision","8","--clip",&project.clips[0],"--at","3/1","--replay-scope",&journey.scope,"--idempotency-key",&split_key,"--request-id",&split_key]);
+    let split = journey.adapter.invoke(&Invocation::new("clips.split",json!({"clip_id":project.clips[0],"at_sequence":rational(3),"link_policy":"expand"}),context,selected)).await;
+    journey.conformance.observe(case_base+41,"clips.split",&split);
+    assert!(split["result"]["base_revision"]=="8","SCHEMA_EXTRA_REVISION");
+    assert!(split["result"]["revision"]=="9","SCHEMA_EXTRA_REVISION");
+    assert_eq!(split["result"]["created"]["clip_ids"].as_array().unwrap().len(),1);
+    let right = split["result"]["created"]["clip_ids"][0].as_str().unwrap();
+    let remove_key = format!("topology-{tag}-schema-remove");
+    let context = json!({"request_id":remove_key,"replay_scope":journey.scope,"idempotency_key":remove_key,"project":{"id":project.id,"expected_revision":"9"}});
+    let selected = args(&["--access-profile","topology","clips","remove","--project",&project.id,"--expected-revision","9","--clip",right,"--replay-scope",&journey.scope,"--idempotency-key",&remove_key,"--request-id",&remove_key]);
+    let removed = journey.adapter.invoke(&Invocation::new("clips.remove",json!({"clip_ids":[right],"mode":"lift","link_policy":"expand"}),context,selected)).await;
+    journey.conformance.observe(case_base+42,"clips.remove",&removed);
+    assert!(removed["result"]["base_revision"]=="9","SCHEMA_EXTRA_REVISION");
+    assert!(removed["result"]["revision"]=="10","SCHEMA_EXTRA_REVISION");
+    for response in [&split,&removed] {
+        let receipt = text(response,"receipt_id");
+        assert!(!journey.receipts.contains(&receipt),"SCHEMA_EXTRA_RECEIPT_DISJOINT");
+        assert!(extra_receipts.insert(receipt),"SCHEMA_EXTRA_RECEIPT_UNIQUE");
+    }
+    journey.conformance.reject_copy(case_base+50,case_base+1,|v| {v["extra"]=json!(true);});
     journey.receipts
 }
 fn retain_receipts(all: &mut BTreeSet<String>, fresh: BTreeSet<String>) {
@@ -703,7 +754,7 @@ fn retain_receipts(all: &mut BTreeSet<String>, fresh: BTreeSet<String>) {
 /// The caller bounds this entire phase to 120s inside its existing 20-minute job.
 /// Return the new private bearer solely for the caller's protected-log secret checks.
 pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> String {
-    let profile = json!({"name":"topology","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["access.replay_scope.create","projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.link","clips.move","clips.unlink","history.undo","history.redo"],"object_grants":[],"read_roots":[],"write_roots":[]});
+    let profile = json!({"name":"topology","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["access.replay_scope.create","projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.link","clips.move","clips.unlink","clips.split","clips.remove","history.undo","history.redo"],"object_grants":[],"read_roots":[],"write_roots":[]});
     let mut profile_request = Request::query("access.profiles.put", profile);
     profile_request.request_id = "topology-profile-put".to_owned();
     profile_request.replay_scope = Some(owner_scope.to_owned());
@@ -724,14 +775,28 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
         "Topology profile retained response differs; response withheld"
     );
     let mut receipts = BTreeSet::new();
-    retain_receipts(&mut receipts, journey(Adapter::Cli(cli), "cli").await);
+    let mut extra_receipts = BTreeSet::new();
+    let case_ids = |bases: &[u16]| {
+        let mut ids = vec![1000,1001,1002,1003,1004,1005,1006];
+        for base in bases { ids.extend((1..=9).chain(20..=30).chain([40,41,42,50]).map(|id| base+id)); }
+        ids
+    };
+    let cli_adapter = Adapter::Cli(cli);
+    let mut cli_batch = schema_validation::Batch::new(11,&case_ids(&[0]),cli_adapter.schema_documents().await);
+    cli_batch.engine_controls();
+    retain_receipts(&mut receipts, journey(cli_adapter, "cli",&mut cli_batch,0,&mut extra_receipts).await);
+    cli_batch.finish().await;
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "topology"]);
     let stdio = ()
         .serve(TokioChildProcess::new(command).unwrap())
         .await
         .unwrap_or_else(|_| panic!("Topology official stdio startup failed"));
-    retain_receipts(&mut receipts, journey(Adapter::Sdk(&stdio), "stdio").await);
+    let stdio_adapter = Adapter::Sdk(&stdio);
+    let mut stdio_batch = schema_validation::Batch::new(12,&case_ids(&[0]),stdio_adapter.schema_documents().await);
+    stdio_batch.engine_controls();
+    retain_receipts(&mut receipts, journey(stdio_adapter, "stdio",&mut stdio_batch,0,&mut extra_receipts).await);
+    stdio_batch.finish().await;
     stdio.cancel().await.unwrap();
     let port_string = port.to_string();
     let issue_args = [
@@ -760,6 +825,8 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
         !issued.to_string().contains(&token),
         "Topology token issuance disclosed bearer"
     );
+    let mut http_batch = None;
+    let mut http_schemas = None;
     for (tag, lifecycle) in [
         ("http-initialize", ClientLifecycleMode::Initialize),
         (
@@ -782,13 +849,29 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
             .serve_with_lifecycle(transport, lifecycle)
             .await
             .unwrap_or_else(|_| panic!("Topology official HTTP startup failed"));
-        retain_receipts(&mut receipts, journey(Adapter::Sdk(&http), tag).await);
+        let adapter = Adapter::Sdk(&http);
+        let schemas = adapter.schema_documents().await;
+        let base = if tag == "http-initialize" {0} else {100};
+        if let Some(expected) = &http_schemas {
+            assert!(&schemas==expected,"SCHEMA_HTTP_DISCOVERY_EQUAL");
+        } else {
+            http_schemas = Some(schemas.clone());
+            let mut batch = schema_validation::Batch::new(13,&case_ids(&[0,100]),schemas);
+            batch.engine_controls();
+            http_batch = Some(batch);
+        }
+        retain_receipts(&mut receipts, journey(adapter,tag,http_batch.as_mut().expect("SCHEMA_HTTP_BATCH"),base,&mut extra_receipts).await);
         http.cancel().await.unwrap();
     }
+    http_batch.expect("SCHEMA_HTTP_BATCH").finish().await;
     assert_eq!(receipts.len(), 36);
     assert!(
         !receipts.contains(&profile_receipt),
         "Topology project receipt reused profile setup receipt"
     );
+    assert_eq!(extra_receipts.len(),8,"SCHEMA_EXTRA_EIGHT_RECEIPTS");
+    assert!(extra_receipts.is_disjoint(&receipts) && !extra_receipts.contains(&profile_receipt),"SCHEMA_EXTRA_RECEIPT_GLOBAL_DISJOINT");
+    // 36 original plus eight additive project writes; profile setup is separate.
+    assert_eq!(receipts.len()+extra_receipts.len(),44);
     token
 }

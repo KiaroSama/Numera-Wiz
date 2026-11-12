@@ -160,6 +160,14 @@ impl Fixture {
         assert!(response.receipt_id.is_some());
         response.result.unwrap()
     }
+    async fn accept_observed(&self, conformance: &mut crate::schema_validation::Batch, id: u16, request: Request) -> Value {
+        let command = request.command.id.clone();
+        let response = self.service.dispatch(self.context.clone(),request).await;
+        conformance.observe(id,&command,&response);
+        assert!(response.ok, "{:?}", response.error);
+        assert!(response.receipt_id.is_some());
+        response.result.unwrap()
+    }
     async fn reject_unchanged(&self, request: Request, code: &str) {
         let before = self
             .service
@@ -256,6 +264,7 @@ impl Fixture {
 }
 
 pub(in crate::runtime) async fn compatibility_and_zero_delta() {
+    let mut conformance = crate::project_schema_batch(4,&[1,2,3,4,5,6,10,11,12,13,14,15,16,17,18,30,31,40,41]);
     let mut failures = Vec::new();
     for (case, affected, independent, global_block) in [
         ("known_source_unknown_role", 0, 3, true),
@@ -346,6 +355,19 @@ pub(in crate::runtime) async fn compatibility_and_zero_delta() {
                 ));
             }
         }
+        let case_id = match case {
+            "known_source_unknown_role"=>10,"known_source_unknown_scope"=>11,"known_source_unknown_envelope"=>12,
+            "missing_semantic_input"=>13,"missing_source_reference"=>14,"missing_ownership_reference"=>15,
+            "unknown_track_scope"=>16,"unknown_sequence_scope"=>17,"unknown_entity_scope"=>18,
+            _=>unreachable!("SCHEMA_FIXED_COMPATIBILITY_CASE"),
+        };
+        let mut request = Request::query("projects.inspect",json!({"projection":"entity","entity_id":unknown_id}));
+        request.project = Some(ProjectRef{id:fixture.project.to_string(),expected_revision:None});
+        let projected = fixture.service.dispatch(fixture.context.clone(),request).await;
+        conformance.observe(case_id,"projects.inspect",&projected);
+        if case == "known_source_unknown_role" || case == "known_source_unknown_scope" {
+            assert!(projected.result.as_ref().unwrap()["entity"].get("payload_json").is_none(),"SCHEMA_KNOWN_CODEC_STAYS_TYPED");
+        }
     }
     // A fresh and an undo-restored clip are separate fixtures so one regression cannot mask the other.
     for restored in [false, true] {
@@ -359,12 +381,14 @@ pub(in crate::runtime) async fn compatibility_and_zero_delta() {
                     fixture.move_request(0, 1, "nonzero-before-undo"),
                 )
                 .await;
+            conformance.observe(5,"clips.move",&moved);
             assert!(moved.ok, "{:?}", moved.error);
             let undo = fixture.request("history.undo", "restore-original-bytes", json!({}));
             let undone = fixture
                 .service
                 .dispatch(fixture.context.clone(), undo)
                 .await;
+            conformance.observe(6,"history.undo",&undone);
             assert!(undone.ok, "{:?}", undone.error);
             assert_eq!(fixture.raw(&fixture.clips[0]), original);
             assert!(
@@ -405,6 +429,8 @@ pub(in crate::runtime) async fn compatibility_and_zero_delta() {
             .service
             .dispatch(fixture.context.clone(), request)
             .await;
+        conformance.observe(if restored {3} else {1},"clips.move",&response);
+        conformance.observe(if restored {4} else {2},"clips.move",&retry);
         let unchanged = fixture
             .service
             .store
@@ -429,9 +455,34 @@ pub(in crate::runtime) async fn compatibility_and_zero_delta() {
         failures.is_empty(),
         "I2/I4 project regression failures: {failures:#?}"
     );
+    // Unsupported sequence codec remains a real opaque public sequence projection.
+    let fixture = Fixture::new().await;
+    let clip:Clip = fixture.entity(&fixture.clips[0]).payload("clip").unwrap();
+    let mut sequence = fixture.entity(&clip.sequence_id);
+    sequence.kind_version = 2;
+    fixture.install_future_envelope(sequence);
+    let mut ticket = Value::Null;
+    for (case,command,params) in [(30,"projects.inspect",json!({"projection":"entity","entity_id":clip.sequence_id})),(31,"sequences.inspect",json!({"projection":"entity","sequence_id":clip.sequence_id}))] {
+        let mut params = params;
+        if !ticket.is_null() { params["replace_snapshot"] = ticket; }
+        let mut request = Request::query(command,params);
+        request.project = Some(ProjectRef{id:fixture.project.to_string(),expected_revision:None});
+        let response = fixture.service.dispatch(fixture.context.clone(),request).await;
+        conformance.observe(case,command,&response);
+        ticket = response.result.unwrap()["snapshot_id"].clone();
+    }
+    conformance.reject_copy(40,12,|v|{v["entity"]["payload_json"]=json!({});});
+    conformance.reject_copy(41,11,|v|{
+        let entity=v["entity"].as_object_mut().unwrap();
+        for field in ["source_kind","rgba","duration"] {entity.remove(field);}
+        entity.insert("payload_json".into(),json!("{}"));
+    });
+    conformance.finish().await;
+
 }
 
 pub(in crate::runtime) async fn linked_edits() {
+    let mut conformance = crate::project_schema_batch(5,&[1,2,3,4,5,6,7,20,21,22,23,24]);
     let fixture = Fixture::new().await;
     let group = EntityId::parse(Uuid::new_v4().to_string()).unwrap();
     let mut first = fixture.entity(&fixture.clips[0]);
@@ -465,10 +516,10 @@ pub(in crate::runtime) async fn linked_edits() {
     locked.update(&clip).unwrap();
     fixture.install_future_envelope(locked);
     fixture.reject_unchanged(fixture.request("clips.split","linked-off-grid",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"1","den":"3"},"link_policy":"expand"})),"OFF_GRID").await;
-    let boundary=fixture.accept(fixture.request("clips.split","linked-boundary",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"0","den":"1"},"link_policy":"expand"}))).await;
+    let boundary=fixture.accept_observed(&mut conformance,1,fixture.request("clips.split","linked-boundary",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"0","den":"1"},"link_policy":"expand"}))).await;
     assert_eq!(boundary["no_change"], true);
     let moved = fixture
-        .accept(fixture.move_request(2, 1, "linked-incoming-move"))
+        .accept_observed(&mut conformance,2,fixture.move_request(2, 1, "linked-incoming-move"))
         .await;
     assert_eq!(moved["changed_ids"].as_array().unwrap().len(), 2);
     for id in [&fixture.clips[0], &fixture.clips[2]] {
@@ -481,7 +532,7 @@ pub(in crate::runtime) async fn linked_edits() {
             nw_domain::time::Rational::new(1, 4).unwrap()
         );
     }
-    let split=fixture.accept(fixture.request("clips.split","linked-split",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"3","den":"4"},"link_policy":"expand"}))).await;
+    let split=fixture.accept_observed(&mut conformance,3,fixture.request("clips.split","linked-split",json!({"clip_id":fixture.clips[2],"at_sequence":{"num":"3","den":"4"},"link_policy":"expand"}))).await;
     let right_ids = split["created"]["clip_ids"]
         .as_array()
         .unwrap()
@@ -587,7 +638,7 @@ pub(in crate::runtime) async fn linked_edits() {
         fixture.raw(&fixture.clips[0]),
         fixture.raw(&fixture.clips[2]),
     ];
-    let moved=fixture.accept(fixture.request("clips.move","right-group-move",json!({"clip_ids":[right_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"}))).await;
+    let moved=fixture.accept_observed(&mut conformance,4,fixture.request("clips.move","right-group-move",json!({"clip_ids":[right_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"}))).await;
     assert_eq!(moved["changed_ids"].as_array().unwrap().len(), 2);
     assert_eq!(
         [
@@ -601,7 +652,7 @@ pub(in crate::runtime) async fn linked_edits() {
         .map(|id| fixture.raw(id))
         .collect::<Vec<_>>();
     fixture
-        .accept(fixture.request(
+        .accept_observed(&mut conformance,5,fixture.request(
             "clips.remove",
             "right-group-lift",
             json!({"clip_ids":[right_ids[0]],"mode":"lift","link_policy":"expand"}),
@@ -620,7 +671,7 @@ pub(in crate::runtime) async fn linked_edits() {
     }
     drop(read);
     fixture
-        .accept(fixture.request("history.undo", "right-group-restore", json!({})))
+        .accept_observed(&mut conformance,6,fixture.request("history.undo", "right-group-restore", json!({})))
         .await;
     for (id, before) in right_ids.iter().zip(right_before) {
         assert_eq!(fixture.raw(id), before);
@@ -639,10 +690,17 @@ pub(in crate::runtime) async fn linked_edits() {
     second.update(&shorter).unwrap();
     different.install_envelopes(vec![first, second]);
     let incoming = different
-        .accept(different.move_request(2, 1, "incoming-edge-without-group"))
+        .accept_observed(&mut conformance,7,different.move_request(2, 1, "incoming-edge-without-group"))
         .await;
     assert_eq!(incoming["changed_ids"].as_array().unwrap().len(), 2);
     different.reject_unchanged(different.request("clips.split","linked-non-interior",json!({"clip_id":different.clips[0],"at_sequence":{"num":"1","den":"1"},"link_policy":"expand"})),"VALIDATION_ERROR").await;
+    conformance.reject_copy(20,1,|v|{v["no_change"]=json!(false);});
+    conformance.reject_copy(21,1,|v|{v["no_change"]=Value::Null;});
+    conformance.reject_copy(22,1,|v|{v.as_object_mut().unwrap().remove("no_change");});
+    conformance.reject_copy(23,1,|v|{v["changed_ids"]=json!([v["project_id"].clone()]);});
+    conformance.reject_copy(24,3,|v|{v["created"]["no_change"]=json!(true);});
+    conformance.finish().await;
+
 }
 
 /// Public topology must persist a real group and expand a move from one seed.
@@ -685,6 +743,7 @@ pub(in crate::runtime) async fn public_link_producer() {
         value
     }
 
+    let mut conformance = crate::project_schema_batch(6,&[1,2,3,4,5,6,7,8,9,20,21,22,23,30,31,32,33,40,41,42,43,50,51,52,53,54,55]);
     let root = tempfile::tempdir().unwrap();
     let service = Service::open(root.path().join("data"), None).await.unwrap();
     let context = service.owner();
@@ -700,7 +759,7 @@ pub(in crate::runtime) async fn public_link_producer() {
         .as_str()
         .unwrap()
         .to_owned();
-    let created = accepted(
+    let created = accepted(conformance.capture(1,"projects.create",
         write(
             &service,
             &context,
@@ -710,12 +769,11 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-link-red-create",
             json!({"name":"Public two-solid link producer"}),
         )
-        .await,
-    );
+        .await));
     let project = ProjectId::parse(created["project_id"].as_str().unwrap()).unwrap();
     let bin = EntityId::parse(created["root_bin_id"].as_str().unwrap()).unwrap();
     assert_eq!(created["revision"], "0");
-    let sequence = accepted(
+    let sequence = accepted(conformance.capture(2,"sequences.create",
         write(
             &service,
             &context,
@@ -729,8 +787,7 @@ pub(in crate::runtime) async fn public_link_producer() {
                 "tracks":[{"kind":"video","name":"First solid"},{"kind":"video","name":"Second solid"}]
             }),
         )
-        .await,
-    );
+        .await));
     assert_eq!(sequence["base_revision"], "0");
     assert_eq!(sequence["revision"], "1");
     let sequence_id =
@@ -762,7 +819,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             json!({"num":"1","den":"4"}),
         ),
     ] {
-        let placed = accepted(
+        let placed = accepted(conformance.capture(3 + index as u16,"clips.place",
             write(
                 &service,
                 &context,
@@ -776,8 +833,7 @@ pub(in crate::runtime) async fn public_link_producer() {
                     "source_range":source_range,"sequence_start":sequence_start,"collision":"reject"
                 }),
             )
-            .await,
-        );
+            .await));
         assert_eq!(placed["base_revision"], revision);
         assert_eq!(placed["revision"], next_revision);
         assert_eq!(placed["created"]["clip_ids"].as_array().unwrap().len(), 1);
@@ -1056,7 +1112,7 @@ pub(in crate::runtime) async fn public_link_producer() {
     }
 
     // The prior hosted A failure was this real Link request's UNKNOWN_COMMAND.
-    let linked = accepted(
+    let linked = accepted(conformance.capture(5,"clips.link",
         write(
             &service,
             &context,
@@ -1066,8 +1122,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-link-red-link",
             json!({"clip_ids":clip_ids,"link_policy":"expand"}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(linked["project_id"], project.as_str());
     assert_eq!(linked["base_revision"], "3");
     assert_eq!(linked["revision"], "4");
@@ -1102,7 +1157,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
         }
     }
-    let moved = accepted(
+    let moved = accepted(conformance.capture(6,"clips.move",
         write(
             &service,
             &context,
@@ -1112,8 +1167,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-link-red-single-seed-move",
             json!({"clip_ids":[clip_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(moved["project_id"], project.as_str());
     assert_eq!(moved["base_revision"], "4");
     assert_eq!(moved["revision"], "5");
@@ -1170,11 +1224,11 @@ pub(in crate::runtime) async fn public_link_producer() {
         .map(|id| read.entity(id).unwrap())
         .collect::<Vec<_>>();
     drop(read);
-    public_link_edges().await;
+    public_link_edges(&mut conformance).await;
 
     let before_unlink = unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group));
     // Actual hosted missing-handler RED reached this public request after every Link oracle.
-    let unlinked = accepted(
+    let unlinked = accepted(conformance.capture(7,"clips.unlink",
         write(
             &service,
             &context,
@@ -1184,8 +1238,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-link-red-unlink",
             json!({"clip_ids":[clip_ids[1]],"link_policy":"expand"}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(unlinked["project_id"], project.as_str());
     assert_eq!(unlinked["base_revision"], "5");
     assert_eq!(unlinked["revision"], "6");
@@ -1214,7 +1267,7 @@ pub(in crate::runtime) async fn public_link_producer() {
     }
     drop(read);
     let after_unlink = unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group));
-    let undone = accepted(
+    let undone = accepted(conformance.capture(8,"history.undo",
         write(
             &service,
             &context,
@@ -1224,8 +1277,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-unlink-undo",
             json!({}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(undone["base_revision"], "6");
     assert_eq!(undone["revision"], "7");
     assert_eq!(
@@ -1248,7 +1300,7 @@ pub(in crate::runtime) async fn public_link_producer() {
         );
     }
     drop(restored);
-    let redone = accepted(
+    let redone = accepted(conformance.capture(9,"history.redo",
         write(
             &service,
             &context,
@@ -1258,8 +1310,7 @@ pub(in crate::runtime) async fn public_link_producer() {
             "public-unlink-redo",
             json!({}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(redone["base_revision"], "7");
     assert_eq!(redone["revision"], "8");
     assert_eq!(
@@ -1275,12 +1326,20 @@ pub(in crate::runtime) async fn public_link_producer() {
             .entity_count,
         8
     );
-    public_unlink_edges().await;
+    public_unlink_edges(&mut conformance).await;
     linked_split_right_group_collision().await;
+    conformance.reject_copy(50,5,|v| {let item=v["created"]["clip_ids"][0].clone();v["created"]["clip_ids"]=json!([item.clone(),item]);});
+    conformance.reject_copy(51,7,|v| {let item=v["created"]["clip_ids"][0].clone();v["created"]["clip_ids"]=json!([item.clone(),item]);});
+    conformance.reject_copy(52,21,|v| {v["no_change"]=json!(false);});
+    conformance.reject_copy(53,40,|v| {v["no_change"]=Value::Null;});
+    conformance.reject_copy(54,40,|v| {v.as_object_mut().unwrap().remove("no_change");});
+    conformance.reject_copy(55,40,|v| {v["changed_ids"]=json!([v["project_id"].clone()]);});
+    conformance.finish().await;
+
 }
 
 // Public validation and real-store deterministic allocation models, after A's literal oracles.
-async fn public_link_edges() {
+async fn public_link_edges(conformance: &mut crate::schema_validation::Batch) {
     let fixture = Fixture::new().await;
     for (key, seeds) in [
         ("empty", vec![]),
@@ -1333,7 +1392,7 @@ async fn public_link_edges() {
             .await;
     }
     let linked = fixture
-        .accept(fixture.request(
+        .accept_observed(conformance,20,fixture.request(
             "clips.link",
             "link-model-group",
             json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand"}),
@@ -1363,6 +1422,7 @@ async fn public_link_edges() {
         .service
         .dispatch(fixture.context.clone(), request.clone())
         .await;
+    conformance.observe(21,"clips.link",&response);
     assert!(response.ok && response.receipt_id.is_some(), "{response:?}");
     let result = response.result.as_ref().unwrap();
     assert_eq!(result["no_change"], true);
@@ -1391,13 +1451,14 @@ async fn public_link_edges() {
         .service
         .dispatch(fixture.context.clone(), request)
         .await;
+    conformance.observe(22,"clips.link",&replay);
     assert_eq!(replay.receipt_id, response.receipt_id);
     assert_eq!(replay.result, response.result);
 
     // Add an unlinked partner to clip 1 by public placement; A's project is untouched.
     let clip: Clip = fixture.entity(&fixture.clips[1]).payload("clip").unwrap();
     let placed = fixture
-        .accept(fixture.request(
+        .accept_observed(conformance,23,fixture.request(
             "clips.place",
             "link-model-extra",
             json!({
@@ -1664,7 +1725,7 @@ fn install_unlink_raw_clip(fixture: &Fixture, index: usize) {
     fixture.install_future_envelope(entity);
 }
 
-async fn public_unlink_edges() {
+async fn public_unlink_edges(conformance: &mut crate::schema_validation::Batch) {
     let fixture = Fixture::new().await;
     for (key, params, code) in [
         (
@@ -1712,19 +1773,19 @@ async fn public_unlink_edges() {
             .await;
         assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);
     }
-    public_unlink_mixed().await;
-    public_unlink_noop().await;
+    public_unlink_mixed(conformance).await;
+    public_unlink_noop(conformance).await;
     public_unlink_relations().await;
 }
 
-async fn public_unlink_mixed() {
+async fn public_unlink_mixed(conformance: &mut crate::schema_validation::Batch) {
     let fixture = Fixture::new().await;
     // A/B are grouped by the public producer; C's deliberately noncanonical bytes are admitted.
     install_unlink_raw_clip(&fixture, 0);
     install_unlink_raw_clip(&fixture, 1);
     let c_raw = fixture.raw(&fixture.clips[1]);
     let linked = fixture
-        .accept(fixture.request(
+        .accept_observed(conformance,30,fixture.request(
             "clips.link",
             "unlink-mixed-link",
             json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand"}),
@@ -1817,7 +1878,7 @@ async fn public_unlink_mixed() {
     );
     drop(read);
     let result = fixture
-        .accept(fixture.request("clips.unlink", "unlink-mixed", params))
+        .accept_observed(conformance,31,fixture.request("clips.unlink", "unlink-mixed", params))
         .await;
     assert_eq!(result["created"], json!({"clip_ids":members}));
     assert_eq!(result["changed_ids"], json!(changing));
@@ -1893,7 +1954,7 @@ async fn public_unlink_mixed() {
         serde_json::to_value(resolved.forward).unwrap()
     );
     fixture
-        .accept(fixture.request("history.undo", "unlink-mixed-undo", json!({})))
+        .accept_observed(conformance,32,fixture.request("history.undo", "unlink-mixed-undo", json!({})))
         .await;
     assert_eq!(
         unlink_images(
@@ -1905,7 +1966,7 @@ async fn public_unlink_mixed() {
         before
     );
     fixture
-        .accept(fixture.request("history.redo", "unlink-mixed-redo", json!({})))
+        .accept_observed(conformance,33,fixture.request("history.redo", "unlink-mixed-redo", json!({})))
         .await;
     assert_eq!(
         unlink_images(
@@ -1933,7 +1994,7 @@ async fn public_unlink_mixed() {
     );
 }
 
-async fn public_unlink_noop() {
+async fn public_unlink_noop(conformance: &mut crate::schema_validation::Batch) {
     for several in [false, true] {
         let fixture = Fixture::new().await;
         install_unlink_raw_clip(&fixture, 1);
@@ -1975,6 +2036,7 @@ async fn public_unlink_noop() {
             .service
             .dispatch(fixture.context.clone(), request.clone())
             .await;
+        conformance.observe(if several {42} else {40},"clips.unlink",&response);
         assert!(response.ok && response.receipt_id.is_some(), "{response:?}");
         let result = response.result.as_ref().unwrap();
         assert_eq!(result["no_change"], true);
@@ -1988,6 +2050,7 @@ async fn public_unlink_noop() {
             .service
             .dispatch(fixture.context.clone(), request)
             .await;
+        conformance.observe(if several {43} else {41},"clips.unlink",&replay);
         assert_eq!(replay.receipt_id, response.receipt_id);
         assert_eq!(replay.result, response.result);
         assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);

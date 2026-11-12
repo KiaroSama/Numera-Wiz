@@ -45,6 +45,19 @@ jobs:
         run: |
           git ls-files --error-unmatch -- xtask/security-scan/Cargo.lock
           git diff --exit-code -- xtask/security-scan/Cargo.lock
+      - name: Resolve the isolated schema validator without upgrading unrelated packages
+        run: cargo update --manifest-path xtask/schema-validator/Cargo.toml --workspace
+      - name: Save the exact isolated schema validator dependency closure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: schema-validator-resolved-dependencies
+          path: xtask/schema-validator/Cargo.lock
+          if-no-files-found: error
+      - name: Enforce the tracked isolated schema validator lockfile and exact resolution
+        run: |
+          git ls-files --error-unmatch -- xtask/schema-validator/Cargo.lock
+          git diff --exit-code -- xtask/schema-validator/Cargo.lock
   formatting:
     runs-on: ubuntu-24.04
     steps:
@@ -59,13 +72,21 @@ jobs:
       - name: Enforce isolated security candidate formatting
         if: ${{ !cancelled() }}
         run: cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all -- --check
+      - name: Enforce isolated schema validator formatting
+        if: ${{ !cancelled() }}
+        run: |
+          cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all -- --check
+          rustfmt --edition 2024 --check ci/schema_validation.rs
       - name: Prepare exact formatter changes
         if: always()
         shell: bash
         run: |
           cargo fmt --all
           cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
+          cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all
+          rustfmt --edition 2024 ci/schema_validation.rs
           git diff --binary -- crates apps xtask test-support > formatting.patch
+          git diff --binary -- ci/schema_validation.rs >> formatting.patch
       - name: Save formatter evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -199,6 +220,11 @@ jobs:
       contents: read
       actions: read
     env:
+      NW_SCHEMA_VALIDATOR_REQUIRED: '1'
+      NW_SCHEMA_VALIDATOR_EXE: ${{ github.workspace }}/target/schema-validator/debug/${{ matrix.os == 'windows-2025' && 'nw-schema-validator.exe' || 'nw-schema-validator' }}
+      NW_SCHEMA_VALIDATOR_EVIDENCE_DIR: ${{ github.workspace }}/target/interface-evidence/schema-validator
+      NW_SCHEMA_VALIDATOR_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+      NW_SCHEMA_VALIDATOR_TARGET: ${{ matrix.os == 'ubuntu-24.04' && 'x86_64-unknown-linux-gnu' || matrix.os == 'windows-2025' && 'x86_64-pc-windows-msvc' || matrix.os == 'macos-15' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
       NW_COMPAT_REQUIRED: '1'
       NW_COMPAT_PREVIOUS_EXE: ${{ github.workspace }}/target/project-compatibility/previous/${{ matrix.os == 'windows-2025' && 'numera-wiz.exe' || 'numera-wiz' }}
       NW_COMPAT_CURRENT_EXE: ${{ github.workspace }}/target/project-compatibility/current/${{ matrix.os == 'windows-2025' && 'numera-wiz.exe' || 'numera-wiz' }}
@@ -223,11 +249,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/debug
+            target/schema-validator
             target/release
             target/wasm32-unknown-unknown
-          key: checks-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
+          key: checks-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'xtask/schema-validator/Cargo.toml', 'xtask/schema-validator/Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
           restore-keys: |
-            checks-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-
+            checks-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'xtask/schema-validator/Cargo.toml', 'xtask/schema-validator/Cargo.lock') }}-
             checks-1.99.1-${{ runner.os }}-${{ runner.arch }}-
       - name: Install the selected toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt,clippy
@@ -285,6 +312,16 @@ jobs:
       - name: Check platform boundaries before the application regressions
         if: ${{ !cancelled() }}
         run: cargo test --locked -p nw-platform --all-targets
+      - name: Build the locked independent schema validator and retain provenance
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          export NW_SCHEMA_VALIDATOR_LOCK_SHA256="$(openssl dgst -sha256 -r xtask/schema-validator/Cargo.lock | cut -d ' ' -f 1)"
+          test "${#NW_SCHEMA_VALIDATOR_LOCK_SHA256}" -eq 64
+          printf 'NW_SCHEMA_VALIDATOR_LOCK_SHA256=%s\n' "$NW_SCHEMA_VALIDATOR_LOCK_SHA256" >> "$GITHUB_ENV"
+          cargo build --locked --manifest-path xtask/schema-validator/Cargo.toml --target-dir target/schema-validator
+          mkdir -p "$NW_SCHEMA_VALIDATOR_EVIDENCE_DIR"
+          cargo tree --locked --manifest-path xtask/schema-validator/Cargo.toml --format '{p} {l}' --prefix none > "$NW_SCHEMA_VALIDATOR_EVIDENCE_DIR/dependency-licenses.txt"
       - name: Check shared service regressions before the application journeys
         if: ${{ !cancelled() }}
         run: cargo test --locked -p nw-service --all-targets --no-fail-fast
@@ -294,6 +331,9 @@ jobs:
       - name: Lint implementation
         if: ${{ !cancelled() }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Lint independent schema validator
+        if: ${{ !cancelled() }}
+        run: cargo clippy --locked --manifest-path xtask/schema-validator/Cargo.toml --target-dir target/schema-validator --all-targets -- -D warnings
       - name: Check shared browser UI dependency closure
         if: runner.os == 'Linux'
         run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown
@@ -304,7 +344,10 @@ jobs:
         run: |
           cargo fmt --all
           cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
+          cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all
+          rustfmt --edition 2024 ci/schema_validation.rs
           git diff --binary -- crates apps xtask test-support > formatting.patch
+          git diff --binary -- ci/schema_validation.rs >> formatting.patch
       - name: Save dependency and generated evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -312,6 +355,8 @@ jobs:
           name: development-evidence-${{ matrix.os }}
           path: |
             Cargo.lock
+            xtask/schema-validator/Cargo.toml
+            xtask/schema-validator/Cargo.lock
             formatting.patch
             docs/generated/
             target/interface-evidence/
@@ -327,6 +372,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/debug
+            target/schema-validator
             target/release
             target/wasm32-unknown-unknown
           key: ${{ steps.rust-cache.outputs.cache-primary-key }}
@@ -450,6 +496,11 @@ jobs:
     timeout-minutes: 20
     env:
       NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+      NW_SCHEMA_VALIDATOR_REQUIRED: '1'
+      NW_SCHEMA_VALIDATOR_EXE: ${{ github.workspace }}/target/schema-validator/debug/nw-schema-validator
+      NW_SCHEMA_VALIDATOR_EVIDENCE_DIR: ${{ github.workspace }}/target/owner-evidence/schema-validator
+      NW_SCHEMA_VALIDATOR_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+      NW_SCHEMA_VALIDATOR_TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -468,11 +519,22 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/debug
-          key: media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}
+            target/schema-validator
+          key: media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/**/*.rs', 'apps/**/*.rs', 'xtask/**/*.rs', 'test-support/**/*.rs') }}-schema-${{ hashFiles('xtask/schema-validator/Cargo.toml', 'xtask/schema-validator/Cargo.lock') }}
           restore-keys: |
             media-1.99.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}-
       - name: Install matching hosted toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Build the locked independent schema validator and retain provenance
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          export NW_SCHEMA_VALIDATOR_LOCK_SHA256="$(openssl dgst -sha256 -r xtask/schema-validator/Cargo.lock | cut -d ' ' -f 1)"
+          test "${#NW_SCHEMA_VALIDATOR_LOCK_SHA256}" -eq 64
+          printf 'NW_SCHEMA_VALIDATOR_LOCK_SHA256=%s\n' "$NW_SCHEMA_VALIDATOR_LOCK_SHA256" >> "$GITHUB_ENV"
+          cargo build --locked --manifest-path xtask/schema-validator/Cargo.toml --target-dir target/schema-validator
+          mkdir -p "$NW_SCHEMA_VALIDATOR_EVIDENCE_DIR"
+          cargo tree --locked --manifest-path xtask/schema-validator/Cargo.toml --format '{p} {l}' --prefix none > "$NW_SCHEMA_VALIDATOR_EVIDENCE_DIR/dependency-licenses.txt"
       - name: Exercise actual typed CLI and official SDK transport media parity
         run: cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture
       - name: Retain actual owner diagnostics
@@ -480,7 +542,10 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: owner-media-evidence-linux
-          path: target/owner-evidence/
+          path: |
+            target/owner-evidence/
+            xtask/schema-validator/Cargo.toml
+            xtask/schema-validator/Cargo.lock
           if-no-files-found: error
 
   artifact-http:

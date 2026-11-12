@@ -50,6 +50,7 @@ fn failed(response: Response, code: &str) {
     assert_eq!(response.error.unwrap().code, code);
 }
 pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
+    let mut conformance = crate::project_schema_batch(2, &[1,2,3,4,5,6,7,8,9,10,20,21,22,23,24,25,26,27,28,29,30,31,32,33,50,51,52,53,54,55,56,57,58,59,60,61]);
     let root = tempfile::tempdir().unwrap();
     let service = Service::open(root.path().join("data"), None).await.unwrap();
     let actor = service.profile_context("browser").unwrap();
@@ -57,7 +58,7 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
         .store
         .issue_scope_with_clock(&actor.principal, || service.clock.now())
         .unwrap();
-    let created = good(
+    let created = good(conformance.capture(1, "projects.create", 
         write(
             &service,
             &actor,
@@ -67,11 +68,10 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             "create-indexed",
             json!({"name":"Indexed fixture"}),
         )
-        .await,
-    );
+        .await));
     let project = created["project_id"].as_str().unwrap();
     let bin = created["root_bin_id"].as_str().unwrap();
-    let sequence = good(write(&service,&actor,&scope,Some((project,"0")),"sequences.create","sequence-indexed",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]})).await);
+    let sequence = good(conformance.capture(2, "sequences.create", write(&service,&actor,&scope,Some((project,"0")),"sequences.create","sequence-indexed",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]})).await));
     let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap();
     let track = sequence["created"]["tracks"][0]["id"].as_str().unwrap();
     let mut revision = "1".to_owned();
@@ -86,7 +86,7 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
                 .to_owned(),
         );
     }
-    let first = view(
+    let first = view(conformance.capture(3, "projects.inspect", 
         query(
             &service,
             &actor,
@@ -94,8 +94,7 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             "projects.inspect",
             json!({"projection":"bin_page","bin_id":bin,"limit":128}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(first["items"].as_array().unwrap().len(), 128);
     assert_eq!(first["total_count"], 131);
     assert!(serde_json::to_vec(&first).unwrap().len() < 240 * 1024);
@@ -126,9 +125,9 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
         );
     }
     let old_revision = revision.clone();
-    let moved = good(write(&service,&actor,&scope,Some((project,&revision)),"clips.move","remote-move",json!({"clip_ids":[clip_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"})).await);
+    let moved = good(conformance.capture(4, "clips.move", write(&service,&actor,&scope,Some((project,&revision)),"clips.move","remote-move",json!({"clip_ids":[clip_ids[0]],"delta":{"num":"1","den":"4"},"collision":"reject","link_policy":"expand"})).await));
     revision = moved["revision"].as_str().unwrap().to_owned();
-    let next = view(
+    let next = view(conformance.capture(5, "projects.inspect", 
         query(
             &service,
             &actor,
@@ -136,8 +135,8 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             "projects.inspect",
             json!({"projection":"bin_page","bin_id":bin,"limit":128,"cursor":cursor}),
         )
-        .await,
-    );
+        .await));
+    assert!(next["next_cursor"].is_null(),"SCHEMA_BIN_END_CURSOR");
     assert_eq!(next["project_revision"], old_revision);
     assert_eq!(next["snapshot_id"], first["snapshot_id"]);
     assert_eq!(next["items"].as_array().unwrap().len(), 3);
@@ -172,18 +171,20 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
         "SNAPSHOT_EXPIRED",
     );
     let range = json!({"start":{"num":"0","den":"1"},"end":{"num":"260","den":"1"}});
-    let viewport = view(query(&service,&actor,project,"sequences.inspect",json!({"projection":"viewport","sequence_id":sequence_id,"track_ids":[track],"range":range,"limit":128,"revision":old_revision})).await);
+    let viewport = view(conformance.capture(6, "sequences.inspect", query(&service,&actor,project,"sequences.inspect",json!({"projection":"viewport","sequence_id":sequence_id,"track_ids":[track],"range":range,"limit":128,"revision":old_revision})).await));
     assert_eq!(viewport["snapshot_id"], first["snapshot_id"]);
     assert_eq!(
         viewport["items"][0]["sequence_start"],
         json!({"num":"0","den":"1"})
     );
     assert_eq!(viewport["count_accuracy"], "lower_bound");
-    let rest = view(query(&service,&actor,project,"sequences.inspect",json!({"projection":"viewport","sequence_id":sequence_id,"track_ids":[track],"range":range,"limit":128,"cursor":viewport["next_cursor"]})).await);
+    let rest = view(conformance.capture(7, "sequences.inspect", query(&service,&actor,project,"sequences.inspect",json!({"projection":"viewport","sequence_id":sequence_id,"track_ids":[track],"range":range,"limit":128,"cursor":viewport["next_cursor"]})).await));
+    assert!(viewport["next_cursor"].is_string(),"SCHEMA_VIEWPORT_CONTINUATION");
+    assert!(rest["next_cursor"].is_null(),"SCHEMA_VIEWPORT_END_CURSOR");
     assert_eq!(rest["total_count"], 130);
     assert_eq!(rest["count_accuracy"], "exact");
     failed(query(&service,&actor,project,"sequences.inspect",json!({"projection":"viewport","sequence_id":sequence_id,"track_ids":[track],"range":{"start":{"num":"1","den":"1"},"end":{"num":"260","den":"1"}},"limit":128,"cursor":viewport["next_cursor"]})).await,"SNAPSHOT_EXPIRED");
-    let boundary = good(write(&service,&actor,&scope,Some((project,&revision)),"clips.split","boundary-no-change",json!({"clip_id":clip_ids[0],"at_sequence":{"num":"1","den":"4"},"link_policy":"expand"})).await);
+    let boundary = good(conformance.capture(8, "clips.split", write(&service,&actor,&scope,Some((project,&revision)),"clips.split","boundary-no-change",json!({"clip_id":clip_ids[0],"at_sequence":{"num":"1","den":"4"},"link_policy":"expand"})).await));
     assert_eq!(boundary["revision"], revision);
     assert_eq!(boundary["no_change"], true);
     assert!(
@@ -355,7 +356,7 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
         .store
         .issue_scope_with_clock(&owner.principal, || service.clock.now())
         .unwrap();
-    let summary = view(
+    let summary = view(conformance.capture(10,"projects.inspect",
         query(
             &service,
             &owner,
@@ -363,8 +364,7 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             "projects.inspect",
             json!({"projection":"summary"}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(summary["compatibility"], "read_only_unsupported");
     failed(
         write(
@@ -386,9 +386,52 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             .project_fact_hash(&format!("project/{project}"))
             .unwrap()
     );
+    // Independent finite fixture follows every original indexed/raw/rights oracle.
+    let owner = service.owner();
+    let extra_scope = service.store.issue_scope_with_clock(&owner.principal, || service.clock.now()).unwrap();
+    let extra = good(conformance.capture(20,"projects.create",write(&service,&owner,&extra_scope,None,"projects.create","schema-small-create",json!({"name":"Schema projections"})).await));
+    let extra_id = extra["project_id"].as_str().unwrap();
+    let extra_bin = extra["root_bin_id"].as_str().unwrap();
+    let small = good(conformance.capture(21,"sequences.create",write(&service,&owner,&extra_scope,Some((extra_id,"0")),"sequences.create","schema-small-sequence",json!({"name":"Both track codecs","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"},{"kind":"audio","name":"Audio"}]})).await));
+    let seq = small["created"]["sequence_id"].as_str().unwrap();
+    let video = small["created"]["tracks"][0]["id"].as_str().unwrap();
+    let audio = small["created"]["tracks"][1]["id"].as_str().unwrap();
+    let placed = good(conformance.capture(22,"clips.place",write(&service,&owner,&extra_scope,Some((extra_id,"1")),"clips.place","schema-small-place",json!({"sequence_id":seq,"track_id":video,"source":{"kind":"solid_color","rgba":[0,0,0,1],"duration":{"num":"1","den":"1"}},"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"})).await));
+    let summary = query(&service,&owner,extra_id,"projects.inspect",json!({"projection":"summary"})).await;
+    conformance.observe(9,"projects.inspect",&summary);
+    let mut ticket = view(summary)["snapshot_id"].clone();
+    for (case,entity) in [(23,extra_bin),(24,seq),(25,video),(26,audio),(27,placed["created"]["clip_ids"][0].as_str().unwrap()),(28,placed["created"]["source_id"].as_str().unwrap())] {
+        let response = query(&service,&owner,extra_id,"projects.inspect",json!({"projection":"entity","entity_id":entity,"replace_snapshot":ticket})).await;
+        conformance.observe(case,"projects.inspect",&response);
+        ticket = view(response)["snapshot_id"].clone();
+    }
+    let sequence_entity = view(conformance.capture(29,"sequences.inspect",query(&service,&owner,extra_id,"sequences.inspect",json!({"projection":"entity","sequence_id":seq,"replace_snapshot":ticket})).await));
+    let tracks_first = view(conformance.capture(30,"sequences.inspect",query(&service,&owner,extra_id,"sequences.inspect",json!({"projection":"track_page","sequence_id":seq,"limit":1,"replace_snapshot":sequence_entity["snapshot_id"]})).await));
+    assert!(tracks_first["next_cursor"].is_string());
+    let tracks_end = view(conformance.capture(31,"sequences.inspect",query(&service,&owner,extra_id,"sequences.inspect",json!({"projection":"track_page","sequence_id":seq,"limit":1,"cursor":tracks_first["next_cursor"]})).await));
+    assert!(tracks_end["next_cursor"].is_null());
+    let catalog = view(conformance.capture(32,"projects.list",service.dispatch(owner.clone(),Request::query("projects.list",json!({"limit":1,"replace_snapshot":tracks_end["snapshot_id"]}))).await));
+    assert!(catalog["next_cursor"].is_string());
+    let catalog_end = view(conformance.capture(33,"projects.list",service.dispatch(owner,Request::query("projects.list",json!({"limit":1,"cursor":catalog["next_cursor"]}))).await));
+    assert!(catalog_end["next_cursor"].is_null());
+    conformance.reject_copy(50,20,|v| {v.as_object_mut().unwrap().remove("project_id");});
+    conformance.reject_copy(51,20,|v| {v["extra"]=json!(true);});
+    conformance.reject_copy(52,20,|v| {v["project_id"]=json!("bad-uuid");});
+    conformance.reject_copy(53,20,|v| {v["revision"]=json!("01");});
+    conformance.reject_copy(54,9,|v| {v["entity_count"]=json!("1");});
+    conformance.reject_copy(55,9,|v| {v["read_only"]=json!(0);});
+    conformance.reject_copy(56,3,|v| {v["projection"]=json!("not-a-projection");});
+    conformance.reject_copy(57,3,|v| {let item=v["items"][0].clone(); v["items"]=json!(vec![item;513]);});
+    conformance.reject_copy(58,7,|v| {v.as_object_mut().unwrap().remove("next_cursor");});
+    conformance.reject_copy(59,28,|v| {v["entity"]["payload_sha256"]=json!("not-a-hash");});
+    conformance.reject_copy(60,27,|v| {v["entity"]["duration"]["den"]=json!("0");});
+    conformance.reject_copy(61,9,|v| {v["writer_status"]=json!("unknown");});
+    conformance.finish().await;
+
 }
 
 pub(in crate::runtime) async fn held_source_current_grants() {
+    let mut conformance = crate::project_schema_batch(3,&[1,2,3,4,5,6]);
     let temporary = tempfile::tempdir().unwrap();
     let file = temporary.path().join("registered-model-source.bin");
     std::fs::write(&file, b"bounded held-source test content").unwrap();
@@ -488,7 +531,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             .revision,
         Revision(1)
     );
-    let accepted = good(
+    let accepted = good(conformance.capture(1, "clips.place", 
         write(
             &service,
             &actor,
@@ -498,11 +541,10 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             "held-placement",
             params,
         )
-        .await,
-    );
+        .await));
     let source = accepted["created"]["source_id"].as_str().unwrap();
     let clip = accepted["created"]["clip_ids"][0].as_str().unwrap();
-    let binding = view(
+    let binding = view(conformance.capture(2, "projects.inspect", 
         query(
             &service,
             &actor,
@@ -510,8 +552,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             "projects.inspect",
             json!({"projection":"entity","entity_id":source}),
         )
-        .await,
-    );
+        .await));
     assert_eq!(binding["entity"]["stream_index"], 7);
     assert_eq!(binding["entity"]["content_sha256"], asset.identity.sha256);
     assert!(!binding.to_string().contains(file.to_str().unwrap()));
@@ -526,7 +567,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
         service.dispatch(actor.clone(), different).await,
         "IDEMPOTENCY_CONFLICT",
     );
-    good(
+    good(conformance.capture(4,"clips.remove",
         write(
             &service,
             &actor,
@@ -536,14 +577,13 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             "held-remove",
             json!({"clip_ids":[clip],"mode":"lift","link_policy":"expand"}),
         )
-        .await,
-    );
+        .await));
     std::fs::remove_file(&file).unwrap();
     profile.read_roots.clear();
     profile.revision += 1;
     service.store.put("profile/browser", &profile).unwrap();
     // Undo restores the relationship and ID even when the source file is absent and path rights were withdrawn.
-    good(
+    good(conformance.capture(5,"history.undo",
         write(
             &service,
             &actor,
@@ -553,12 +593,14 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             "held-undo",
             json!({}),
         )
-        .await,
-    );
-    let restored=view(query(&service,&actor,project,"projects.inspect",json!({"projection":"entity","entity_id":clip,"replace_snapshot":binding["snapshot_id"]})).await);
+        .await));
+    let restored=view(conformance.capture(3, "projects.inspect", query(&service,&actor,project,"projects.inspect",json!({"projection":"entity","entity_id":clip,"replace_snapshot":binding["snapshot_id"]})).await));
     assert_eq!(restored["entity"]["source_id"], source);
     assert_eq!(
         restored["entity"]["source_range"]["start"],
         json!({"num":"-1","den":"1"})
     );
+    conformance.reject_copy(6,2,|v| {v["entity"]["stream_index"]=json!(4294967296u64);});
+    conformance.finish().await;
+
 }
