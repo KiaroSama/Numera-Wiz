@@ -158,28 +158,43 @@ pub fn agreement(status: Option<i32>, report: &Report, history: usize, quiet: bo
 /// Second maintained-Serde pass over the same immutable, already agreed report.
 /// A callback failure keeps its fixed category; malformed JSON never yields totals.
 pub fn visit_rows(bytes: &[u8], mut callback: impl FnMut(Row) -> Result<()>) -> Result<usize> {
-    require(bytes.len() as u64 <= crate::private::REPORT_LIMIT,"SECURITY_REPORT_OVERSIZE")?;
+    require(
+        bytes.len() as u64 <= crate::private::REPORT_LIMIT,
+        "SECURITY_REPORT_OVERSIZE",
+    )?;
     let text = std::str::from_utf8(bytes).private("SECURITY_REPORT_INVALID")?;
-    struct Rows<'a,F> { callback: &'a mut F, failure: &'a mut Option<ScanFailure> }
-    impl<'de,F: FnMut(Row) -> Result<()>> Visitor<'de> for Rows<'_,F> {
+    struct Rows<'a, F> {
+        callback: &'a mut F,
+        failure: &'a mut Option<ScanFailure>,
+    }
+    impl<'de, F: FnMut(Row) -> Result<()>> Visitor<'de> for Rows<'_, F> {
         type Value = usize;
-        fn expecting(&self,f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str("finding array") }
-        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> std::result::Result<usize,A::Error> {
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("finding array")
+        }
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> std::result::Result<usize, A::Error> {
             let mut count = 0usize;
             while let Some(row) = seq.next_element::<Row>()? {
                 if let Err(error) = (self.callback)(row) {
                     *self.failure = Some(error);
                     return Err(de::Error::custom("classification interrupted"));
                 }
-                count = count.checked_add(1).ok_or_else(|| de::Error::custom("count overflow"))?;
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| de::Error::custom("count overflow"))?;
             }
             Ok(count)
         }
     }
     let mut failure = None;
     let mut deserializer = serde_json::Deserializer::from_str(text);
-    let result = deserializer.deserialize_seq(Rows { callback: &mut callback, failure: &mut failure });
-    if let Some(error) = failure { return Err(error); }
+    let result = deserializer.deserialize_seq(Rows {
+        callback: &mut callback,
+        failure: &mut failure,
+    });
+    if let Some(error) = failure {
+        return Err(error);
+    }
     let count = result.private("SECURITY_REPORT_INVALID")?;
     deserializer.end().private("SECURITY_REPORT_INVALID")?;
     Ok(count)
@@ -229,18 +244,34 @@ pub fn summary(report: &Report, pull_request: bool) -> String {
     output
 }
 pub fn write_summary(path: Option<&Path>, report: &Report, pull_request: bool) -> Result<()> {
-    publish(path,&summary(report,pull_request))
+    publish(path, &summary(report, pull_request))
 }
 pub fn classified_summary(report: &Report, pull_request: bool, counts: &Counts) -> Result<String> {
-    require(report.count == counts.total && counts.reviewed.checked_add(counts.unreviewed) == Some(counts.total),
-        "SECURITY_CLASSIFIER_COUNT_DISAGREEMENT")?;
-    let mut text = summary(report,pull_request);
+    require(
+        report.count == counts.total
+            && counts.reviewed.checked_add(counts.unreviewed) == Some(counts.total),
+        "SECURITY_CLASSIFIER_COUNT_DISAGREEMENT",
+    )?;
+    let mut text = summary(report, pull_request);
     if counts.total > 0 {
         // Keep the original four-column table and every retained row intact.
-        let position = text.find("| Rule | File | Line | Commit |").ok_or(ScanFailure("SECURITY_SUMMARY_WRITE_FAILED"))?;
-        text.insert_str(position,&format!("Total: **{}**. Reviewed public data: **{}**. Unreviewed: **{}**.\n\n{}\n\n",
-            counts.total,counts.reviewed,counts.unreviewed,
-            if counts.unreviewed == 0 { "All detected findings match reviewed public data." } else { "Unreviewed findings require review." }));
+        let position = text
+            .find("| Rule | File | Line | Commit |")
+            .ok_or(ScanFailure("SECURITY_SUMMARY_WRITE_FAILED"))?;
+        text.insert_str(
+            position,
+            &format!(
+                "Total: **{}**. Reviewed public data: **{}**. Unreviewed: **{}**.\n\n{}\n\n",
+                counts.total,
+                counts.reviewed,
+                counts.unreviewed,
+                if counts.unreviewed == 0 {
+                    "All detected findings match reviewed public data."
+                } else {
+                    "Unreviewed findings require review."
+                }
+            ),
+        );
     }
     Ok(text)
 }

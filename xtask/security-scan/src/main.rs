@@ -1,8 +1,8 @@
 //! The active workflow must pin an already reviewed, hosted-qualified tool source.
-use nw_security_scan::{diagnostic, install_private_panic_hook};
-use std::process::ExitCode;
 #[cfg(target_os = "linux")]
 use nw_security_scan::classifier::Disposition;
+use nw_security_scan::{diagnostic, install_private_panic_hook};
+use std::process::ExitCode;
 fn main() -> ExitCode {
     #[cfg(target_os = "linux")]
     if let Some(status) = nw_security_scan::scanner::internal_dispatch() {
@@ -35,7 +35,9 @@ fn main() -> ExitCode {
     }
     #[cfg(not(target_os = "linux"))]
     {
-        if let Err(error) = result { diagnostic("ERROR",error.0); }
+        if let Err(error) = result {
+            diagnostic("ERROR", error.0);
+        }
         ExitCode::FAILURE
     }
 }
@@ -86,8 +88,11 @@ fn run() -> nw_security_scan::Result<Disposition> {
         Ok(barrier) => {
             scratch.remove(&barrier)?;
             let verified = result?;
-            require(std::time::Instant::now() < deadline && !process::cancelled(),"SECURITY_DEADLINE")?;
-            nw_security_scan::report::publish(summary.as_deref(),&verified.summary)?;
+            require(
+                std::time::Instant::now() < deadline && !process::cancelled(),
+                "SECURITY_DEADLINE",
+            )?;
+            nw_security_scan::report::publish(summary.as_deref(), &verified.summary)?;
             Ok(verified.disposition)
         }
         Err(_) => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),

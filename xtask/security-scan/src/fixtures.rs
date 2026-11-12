@@ -19,10 +19,10 @@ use std::{
 
 #[path = "fixture_children.rs"]
 mod children;
-#[path = "fixture_policy.rs"]
-mod policy;
 #[path = "fixture_classifier.rs"]
 mod classifier_cases;
+#[path = "fixture_policy.rs"]
+mod policy;
 pub use children::dispatch as child_dispatch;
 const EXPECTED_SUMMARY: &str = concat!(
     "## Gitleaks\n\nScanner: **8.30.1**\n\n",
@@ -224,10 +224,13 @@ impl Fixture {
         let summary = self.root.join("seeded-summary.md");
         let result = self.scan(&repository, &Scope::All, &summary)?;
         require(result.finding_count > 0, "SECURITY_SEEDED_SECRET_MISSED")?;
-        require(result.unreviewed_count == result.finding_count
-            && result.reviewed_public_data_count == 0
-            && result.disposition == nw_security_scan::classifier::Disposition::UnreviewedFindings,
-            "SECURITY_SEEDED_POLICY_FAILED")?;
+        require(
+            result.unreviewed_count == result.finding_count
+                && result.reviewed_public_data_count == 0
+                && result.disposition
+                    == nw_security_scan::classifier::Disposition::UnreviewedFindings,
+            "SECURITY_SEEDED_POLICY_FAILED",
+        )?;
         let public = private::read(&summary, private::MIB)?;
         require(
             !contains(&public, secret.as_bytes())
@@ -787,19 +790,12 @@ impl Fixture {
             private::write(&target, &bytes)?;
         }
         self.git(&repository, &["add", "."])?;
-        self.git(
-            &repository,
-            &[
-                "commit",
-                "--quiet",
-                "-m",
-                message,
-            ],
-        )?;
+        self.git(&repository, &["commit", "--quiet", "-m", message])?;
         Ok(repository)
     }
     fn known_public_data_policy(&self) -> Result<()> {
-        let repository = self.public_repository("known-public-data", "Verified public documentation fixture")?;
+        let repository =
+            self.public_repository("known-public-data", "Verified public documentation fixture")?;
         let result = self.scan(
             &repository,
             &Scope::All,
