@@ -232,8 +232,23 @@ async fn field<D: Driver>(driver: &mut D, text: &str) {
     driver.key(Key::Tab).await;
     driver.replace(text).await;
 }
+async fn move_selected<D: Driver>(driver: &mut D, capture_first: bool) -> Observation {
+    if capture_first {
+        driver.screenshot("selected-solid-before-move").await;
+    }
+    driver.mark().await;
+    driver.click(1248, 240).await;
+    driver.replace("2").await;
+    field(driver, "1").await;
+    if capture_first {
+        driver.screenshot("move-fields-before-submit").await;
+    }
+    driver.key(Key::Tab).await;
+    driver.key(Key::Space).await;
+    driver.observed("clips.move").await
+}
 async fn refresh<D: Driver>(driver: &mut D, reads: usize) {
-    activate(driver, 175, 80, "projects.list", reads).await;
+    activate(driver, 142, 74, "projects.list", reads).await;
 }
 async fn select_clip<D: Driver>(driver: &mut D, row: usize) {
     // Source-derived shared panel rows; hosted screenshots qualify these input targets.
@@ -243,8 +258,10 @@ async fn select_clip<D: Driver>(driver: &mut D, row: usize) {
     driver.loaded(8).await;
 }
 async fn select_source_track<D: Driver>(driver: &mut D) {
+    // Sequence and solid binding: two bin rows in this fixture phase.
+    driver.screenshot("tracks-before-source-selection").await;
     driver.mark().await;
-    driver.click(85, 288).await;
+    driver.click(55, 319).await;
     driver.observed("projects.list").await;
     driver.loaded(6).await;
 }
@@ -471,24 +488,21 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
         entity(driver, &graph, &source_id).await["source_kind"],
         "solid_color"
     );
-    driver.screenshot("selected-solid-before-move").await;
-    driver.mark().await;
-    driver.click(1240, 307).await;
-    driver.replace("2").await;
-    field(driver, "1").await;
-    driver.screenshot("move-fields-before-submit").await;
-    // Keep the whole first edit attempt inside the same observer window.
-    driver.click(1170, 329).await;
-    let moved = driver.observed("clips.move").await;
+    let moved = move_selected(driver, true).await;
     assert_eq!(moved.code, "OK", "clips.move");
     driver.loaded(8).await;
     graph.accept(&moved);
     evidence.push(moved.evidence("clips.move"));
     clip_at(&entity(driver, &graph, &graph.left).await, 2, 6, 0, 4);
-    driver.click(1270, 350).await;
+    driver.mark().await;
+    driver.click(1298, 283).await;
     driver.replace("4").await;
     field(driver, "1").await;
-    let split = activate(driver, 1170, 372, "clips.split", 8).await;
+    driver.key(Key::Tab).await;
+    driver.key(Key::Space).await;
+    let split = driver.observed("clips.split").await;
+    assert_eq!(split.code, "OK", "clips.split");
+    driver.loaded(8).await;
     graph.accept(&split);
     evidence.push(split.evidence("clips.split"));
     let split_page = viewport(driver, &graph, &graph.solid_track).await;
@@ -506,7 +520,7 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     select_clip(driver, 0).await;
     clip_at(&entity(driver, &graph, &graph.left).await, 2, 4, 0, 2);
     select_clip(driver, 1).await;
-    let lifted = activate(driver, 1170, 393, "clips.remove", 8).await;
+    let lifted = activate(driver, 1150, 325, "clips.remove", 8).await;
     graph.accept(&lifted);
     evidence.push(lifted.evidence("clips.remove"));
     assert_eq!(
@@ -553,9 +567,7 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
         assert_eq!(readable["compatibility"], "supported");
         assert_eq!(readable["writer_status"], "this_owner");
         assert_eq!(readable["read_only"], false);
-        driver.mark().await;
-        driver.click(1170, 329).await;
-        let denied = driver.observed("clips.move").await;
+        let denied = move_selected(driver, false).await;
         assert_eq!(denied.code, "OBJECT_NOT_FOUND");
         evidence.push(denied.evidence("clips.move"));
         evidence.push(
@@ -564,7 +576,9 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
                 .await,
         );
         refresh(driver, 8).await;
-        let admitted = activate(driver, 1170, 329, "clips.move", 8).await;
+        let admitted = move_selected(driver, false).await;
+        assert_eq!(admitted.code, "OK", "clips.move");
+        driver.loaded(8).await;
         graph.accept(&admitted);
         evidence.push(admitted.evidence("clips.move"));
         left_start = 4;
@@ -600,18 +614,17 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     assert_eq!(binding["asset_id"], asset);
     assert_eq!(binding["stream_index"], physical);
     evidence.push(json!({"registered_clip":registered_clip,"source_binding":binding}));
-    // Select the original solid track through its real row before observing/editing it.
+    // Three bin rows after registered placement; capture this layout candidate.
+    driver.screenshot("tracks-before-solid-selection").await;
     driver.mark().await;
-    driver.click(85, 256).await;
+    driver.click(55, 319).await;
     driver.observed("projects.list").await;
     driver.loaded(8).await;
     select_clip(driver, 0).await;
     let captured_revision = graph.revision.clone();
     let competing = external_move(driver, &graph).await;
     let competing_revision = id(&competing.result.as_ref().unwrap()["revision"]);
-    driver.mark().await;
-    driver.click(1170, 329).await;
-    let stale = driver.observed("clips.move").await;
+    let stale = move_selected(driver, false).await;
     assert_eq!(stale.code, "STALE_REVISION");
     assert!(stale.receipt.is_none());
     driver.screenshot("stale").await;
@@ -625,10 +638,9 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
         0,
         2,
     );
-    driver.click(1240, 307).await;
-    driver.replace("2").await;
-    field(driver, "1").await;
-    let deliberate = activate(driver, 1170, 329, "clips.move", 8).await;
+    let deliberate = move_selected(driver, false).await;
+    assert_eq!(deliberate.code, "OK", "clips.move");
+    driver.loaded(8).await;
     graph.accept(&deliberate);
     evidence.push(deliberate.evidence("clips.move"));
     clip_at(
@@ -686,8 +698,10 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     driver.write("journey",&json!({"schema_version":1,"identity":driver.metadata(),"elapsed_ms":started.elapsed().as_millis().to_string(),"project_id":graph.project,"revision":graph.revision,"sequence_id":graph.sequence,"solid_track":graph.solid_track,"source_track":graph.source_track,"left_clip":graph.left,"right_clip":graph.right,"registered_clip":registered_id,"asset_id":asset,"physical_stream":physical,"assets":assets,"jobs":jobs,"producer_job_count":3,"observations":evidence,"oracle":"Actual pointer/keyboard controls; independent canonical queries reuse the selected UI bindings; external editor and owner policy updates are explicitly labeled fixture setup","not_qualified":["transport-loss replay","OS IME","Windows/macOS human input","GPU","decoded preview/export","full v1"]}));
 }
 async fn select_source_track_after_reopen<D: Driver>(driver: &mut D) {
+    // Same three-bin-row fixture; ROOT must verify this later capture.
+    driver.screenshot("tracks-before-reopened-source-selection").await;
     driver.mark().await;
-    driver.click(85, 288).await;
+    driver.click(55, 353).await;
     driver.observed("projects.list").await;
     driver.loaded(8).await;
 }
