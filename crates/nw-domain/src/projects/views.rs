@@ -5,8 +5,11 @@ use crate::time::TimeRange;
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectCreateResult {
+    #[schemars(extend("pattern" = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))]
     pub project_id: ProjectId,
+    #[schemars(extend("pattern" = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))]
     pub root_bin_id: EntityId,
+    #[schemars(extend("pattern" = "^(0|[1-9][0-9]*)$"))]
     pub revision: Revision,
     pub history: ProjectCreateHistory,
 }
