@@ -20,7 +20,7 @@ fn reviewed(result: &VerifiedScan, total: usize) -> Result<()> {
 }
 fn row(commit: &str, path: usize) -> serde_json::Value {
     json!({"RuleID": if path == 3 { "sourcegraph-access-token" } else { "generic-api-key" },
-        "File": DOCUMENTS[path].path, "StartLine": [111,254,301,2][path], "Commit": commit})
+        "File": DOCUMENTS[path].path, "StartLine": ([111,254,301,2][path]), "Commit": commit})
 }
 fn mock_plan(bytes: &[u8], deadline: Instant) -> Result<Plan> {
     let parsed = report::parse(bytes)?;
