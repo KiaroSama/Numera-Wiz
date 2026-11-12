@@ -229,5 +229,30 @@ mod tests {
                 .unwrap(),
             "1"
         );
+        public_media_promotion_review(&restarted, &migration_id, &activation).await;
+    }
+
+    async fn public_media_promotion_review(
+        service: &Arc<Service>,
+        migration_id: &str,
+        activation: &str,
+    ) {
+        // The original public migration/replay/business journey supplies real P and r=1.
+        let request = Request::query("maintenance.promotion.plan", json!({}));
+        let request_id = request.request_id.clone();
+        let response = service.dispatch(service.owner(), request).await;
+        assert!(
+            response.ok,
+            "MEDIA_PROMOTION_PUBLIC_REVIEW_MISSING code={:?}",
+            response.error.as_ref().map(|error| error.code.as_str())
+        );
+        assert_eq!(response.request_id, request_id);
+        assert!(response.result.as_ref().is_some_and(serde_json::Value::is_object));
+        assert!(response.receipt_id.is_none());
+        assert_eq!(
+            service.store.adoption_revision(migration_id, activation).unwrap(),
+            "1",
+            "Review must not adopt media or reset the original source guard"
+        );
     }
 }
