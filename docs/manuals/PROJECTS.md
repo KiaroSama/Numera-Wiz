@@ -303,9 +303,20 @@ required fields, page/selection bounds and explicit sequence settings. They reta
 existing optional nulls and defaults. JSON Schema character lengths do not replace
 runtime UTF-8 byte bounds, and exact time/grid/closure/source validation remains
 runtime work. Noncanonical accepted input fraction strings are not normalized in
-the original request or its retry digest. MCP whole-Response output contracts,
-new authorization publication/size coverage and the latest complete input-schema
-qualification remain in progress; descriptor presence alone does not qualify them.
+the original request or its retry digest.
+
+[Run 43315700376](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43315700376)
+validated 94 independent literal input cases and 34 authorization-output cases
+against the 13 published schemas on each of the four native targets. Existing
+parser, public-profile and final-publication race assertions passed in the shared
+service tests. These are scoped observations; the whole run later failed at an
+unrelated MCP test-module path. Later source changes still require current checks.
+
+The MCP tools now publish whole-Response output schemas. Actual CLI, official
+stdio and both HTTP lifecycle responses passed their independent schema batches
+in [run 43319569511](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43319569511).
+Retained raw-frame byte-size evidence and latest-source full CI qualification
+remain pending. Schema presence alone does not establish that evidence or full v1.
 
 ## Bounded reads and history
 

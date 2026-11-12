@@ -42,9 +42,9 @@ Current work and required gaps are recorded in the
   solid-color/registered-source placement, move/split/lift, Undo/Redo, explicit
   stale-view Refresh and catalog reopen. GUI link/unlink controls, decoded preview
   and the complete editor remain unfinished.
-- Shared project result schemas and captured Read/Edit/command observations;
-  discovery keeps static requirements separate from live policy facts. Full input
-  and MCP output qualification is in progress, as recorded in the
+- Shared finite project input/result schemas and captured Read/Edit/command
+  observations; discovery keeps static requirements separate from live policy
+  facts. Validation and pending MCP wire evidence are recorded in the
   [project contract guide](docs/manuals/PROJECTS.md#command-contracts-and-qualification).
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.

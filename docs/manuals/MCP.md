@@ -182,10 +182,22 @@ principal/profile, roots and unrelated rights.
 Read [current authorization observations](PROJECTS.md#current-authorization-observations)
 as advisory captured predicates. Static descriptor requirements and the runtime
 `commands.list` overlay have different scopes; neither replaces fresh request
-validation. All 13 project-family commands publish result schemas. MCP schemas for
-the complete structured Response and their full wire-size qualification are still
-in progress; result-schema presence alone does not establish that MCP output
-contract.
+validation. All 13 project-family tools publish `outputSchema` for the complete
+canonical `structuredContent` Response. The closed envelope requires `request_id`
+and `ok`: success carries its command-specific `result` without `error`; failure
+carries a typed `error` without `result`. An optional `receipt_id` is a string,
+never null. The error's nullable `field` is always present. Static requirements
+appear under `_meta["numera-wiz/authorization_requirements"]` and contain no live
+caller policy or project rights.
+
+Discovery returns the complete standard unpaged tools list. Both its serialized
+result and full JSON-RPC envelope, including the stdio newline, must fit the
+262144-byte response budget. The implementation rejects an oversized or incomplete
+list. Whole-Response validation has passed the actual typed CLI, official stdio
+and both HTTP lifecycle journeys in
+[run 43319569511](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43319569511).
+Retained raw-wire evidence and latest-source full CI qualification remain in
+progress; see the [project contract guide](PROJECTS.md#command-contracts-and-qualification).
 
 A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside
