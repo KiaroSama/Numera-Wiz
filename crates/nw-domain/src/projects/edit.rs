@@ -485,12 +485,17 @@ pub fn resolve_edit<R: ProjectRead>(
             for mut entity in selected {
                 let mut clip: Clip = entity.payload("clip")?;
                 if clip.link_group_id.is_none()
-                    && !entity.references.iter().any(|reference| reference.role == "link")
+                    && !entity
+                        .references
+                        .iter()
+                        .any(|reference| reference.role == "link")
                 {
                     continue;
                 }
                 clip.link_group_id = None;
-                entity.references.retain(|reference| reference.role != "link");
+                entity
+                    .references
+                    .retain(|reference| reference.role != "link");
                 entity.update(&clip)?;
                 edit.set(entity)?;
             }
