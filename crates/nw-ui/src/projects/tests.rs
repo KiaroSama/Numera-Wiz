@@ -1027,7 +1027,7 @@ fn selected_failure(
     code: &str,
 ) -> Request {
     let (request, reply) = port.pop();
-    reply(Ok(Response::failure(
+    reply(Ok(Response::error(
         &request.request_id,
         nw_domain::DomainError::new(code, "Canonical selection fixture"),
     )));
@@ -1304,7 +1304,7 @@ fn selection_recovery_rejects_other_failures() {
     app.retry_pending(&ctx);
     let (retried, reply) = port.pop();
     assert_eq!(serde_json::to_value(&retried).unwrap(), captured);
-    reply(Ok(Response::failure(
+    reply(Ok(Response::error(
         &retried.request_id,
         nw_domain::DomainError::object_not_found(),
     )));
@@ -1527,7 +1527,7 @@ fn selected_track_and_clip_recovery() {
     let (mut app, port, ctx) = missing_sequence_stage();
     let (request, reply) = port.pop();
     let captured = serde_json::to_value(&request).unwrap();
-    reply(Ok(Response::failure(
+    reply(Ok(Response::error(
         "unrelated-response",
         nw_domain::DomainError::object_not_found(),
     )));
