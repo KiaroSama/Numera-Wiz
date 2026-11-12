@@ -21,6 +21,8 @@ use std::{
 mod children;
 #[path = "fixture_policy.rs"]
 mod policy;
+#[path = "fixture_classifier.rs"]
+mod classifier_cases;
 pub use children::dispatch as child_dispatch;
 const EXPECTED_SUMMARY: &str = concat!(
     "## Gitleaks\n\nScanner: **8.30.1**\n\n",
@@ -69,7 +71,7 @@ impl Fixture {
         self.real_git_failure()?;
         self.untrusted_build()?;
         self.process_cases()?;
-        self.known_public_data_policy_red()
+        self.known_public_data_policy()
     }
     fn git_result(&self, repository: &Path, args: &[&str]) -> Result<process::Outcome> {
         let mut command = Command::new(&self.git);
@@ -177,6 +179,9 @@ impl Fixture {
         require(
             result.scanner_version == "8.30.1"
                 && result.finding_count == 0
+                && result.reviewed_public_data_count == 0
+                && result.unreviewed_count == 0
+                && result.disposition == nw_security_scan::classifier::Disposition::Clean
                 && result.successful_history_invocations > 0,
             "SECURITY_REAL_CLEAN_CONTRACT_FAILED",
         )?;
@@ -219,6 +224,10 @@ impl Fixture {
         let summary = self.root.join("seeded-summary.md");
         let result = self.scan(&repository, &Scope::All, &summary)?;
         require(result.finding_count > 0, "SECURITY_SEEDED_SECRET_MISSED")?;
+        require(result.unreviewed_count == result.finding_count
+            && result.reviewed_public_data_count == 0
+            && result.disposition == nw_security_scan::classifier::Disposition::UnreviewedFindings,
+            "SECURITY_SEEDED_POLICY_FAILED")?;
         let public = private::read(&summary, private::MIB)?;
         require(
             !contains(&public, secret.as_bytes())
@@ -735,9 +744,9 @@ impl Fixture {
         diagnostic("INFO", "SECURITY_ACTUAL_REPORT_GROWTH_REAP_PASS");
         Ok(())
     }
-    fn known_public_data_policy_red(&self) -> Result<()> {
+    fn public_repository(&self, name: &str, message: &str) -> Result<PathBuf> {
         // TEST ONLY: immutable byte identities approved by the separate preflight.
-        // These constants do not approve any production report outcome.
+        // Independent frozen source identities precede copying into synthetic Git.
         const DOCUMENTS: [(&str, u64, &str); 4] = [
             (
                 "docs/research-pack/handoff/02-2-functional-scope-and-migration.md",
@@ -770,7 +779,7 @@ impl Fixture {
             )?;
             verified.push((path, bytes));
         }
-        let repository = self.repository("known-public-data")?;
+        let repository = self.repository(name)?;
         for (path, bytes) in verified {
             let target = repository.join(path);
             fs::create_dir_all(target.parent().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?)
@@ -784,9 +793,13 @@ impl Fixture {
                 "commit",
                 "--quiet",
                 "-m",
-                "Verified public documentation fixture",
+                message,
             ],
         )?;
+        Ok(repository)
+    }
+    fn known_public_data_policy(&self) -> Result<()> {
+        let repository = self.public_repository("known-public-data", "Verified public documentation fixture")?;
         let result = self.scan(
             &repository,
             &Scope::All,
@@ -803,9 +816,7 @@ impl Fixture {
             protocol::unix_millis()?,
             result.successful_history_invocations
         );
-        // Strict baseline still fails findings. No reviewed policy or synthetic
-        // approval exists until root observes this precise hosted failure.
-        Err(ScanFailure("SECURITY_REVIEWED_PUBLIC_DATA_POLICY_ABSENT"))
+        classifier_cases::qualify(self, &repository, &result)
     }
 }
 fn synthetic_secret() -> Result<String> {

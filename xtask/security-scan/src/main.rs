@@ -1,6 +1,8 @@
 //! The active workflow must pin an already reviewed, hosted-qualified tool source.
 use nw_security_scan::{diagnostic, install_private_panic_hook};
 use std::process::ExitCode;
+#[cfg(target_os = "linux")]
+use nw_security_scan::classifier::Disposition;
 fn main() -> ExitCode {
     #[cfg(target_os = "linux")]
     if let Some(status) = nw_security_scan::scanner::internal_dispatch() {
@@ -12,13 +14,18 @@ fn main() -> ExitCode {
     #[cfg(not(target_os = "linux"))]
     let result: nw_security_scan::Result<bool> =
         Err(nw_security_scan::ScanFailure("SECURITY_HOST_UNSUPPORTED"));
+    #[cfg(target_os = "linux")]
     match result {
-        Ok(true) => {
+        Ok(Disposition::Clean) => {
             diagnostic("INFO", "SECURITY_SCAN_CLEAN");
             ExitCode::SUCCESS
         }
-        Ok(false) => {
-            diagnostic("WARNING", "SECURITY_SCAN_FINDINGS");
+        Ok(Disposition::ReviewedPublicData) => {
+            diagnostic("INFO", "SECURITY_SCAN_REVIEWED_PUBLIC_DATA");
+            ExitCode::SUCCESS
+        }
+        Ok(Disposition::UnreviewedFindings) => {
+            diagnostic("WARNING", "SECURITY_SCAN_UNREVIEWED_FINDINGS");
             ExitCode::FAILURE
         }
         Err(error) => {
@@ -26,9 +33,14 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if let Err(error) = result { diagnostic("ERROR",error.0); }
+        ExitCode::FAILURE
+    }
 }
 #[cfg(target_os = "linux")]
-fn run() -> nw_security_scan::Result<bool> {
+fn run() -> nw_security_scan::Result<Disposition> {
     use nw_security_scan::{
         PrivateResult, ScanFailure,
         assets::Release,
@@ -63,18 +75,20 @@ fn run() -> nw_security_scan::Result<bool> {
         let release = Release::prepare(scratch.path(), deadline)?;
         scanner::scan(&ScanRequest {
             repository: &repository,
-            summary: summary.as_deref(),
+            summary: None,
             scope: &scope,
             release: &release,
             deadline,
         })
-        .map(|result| result.finding_count == 0)
     }))
     .unwrap_or(Err(ScanFailure("SECURITY_SCAN_PANIC")));
     match process::barrier() {
         Ok(barrier) => {
             scratch.remove(&barrier)?;
-            result
+            let verified = result?;
+            require(std::time::Instant::now() < deadline && !process::cancelled(),"SECURITY_DEADLINE")?;
+            nw_security_scan::report::publish(summary.as_deref(),&verified.summary)?;
+            Ok(verified.disposition)
         }
         Err(_) => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
     }

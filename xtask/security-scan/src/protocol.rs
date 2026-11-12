@@ -71,6 +71,9 @@ pub fn write_json(path: &Path, value: &Value) -> Result<()> {
         bytes.len() as u64 <= private::RECORD_LIMIT,
         "SECURITY_RECORD_OVERSIZE",
     )?;
+    if let Some(parent) = path.parent().filter(|parent| parent.file_name().is_some_and(|name| name == "proof")) {
+        check_proof_budget(parent.parent().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?,1,bytes.len() as u64)?;
+    }
     private::write(path, &bytes)
 }
 pub fn read_json(path: &Path) -> Result<Value> {
@@ -213,7 +216,7 @@ impl Context {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(ScanFailure("SECURITY_REPORT_INVALID")),
         }
-        proof_files(&self.root.join("proof")).map(|_| ())
+        check_proof_budget(&self.root,0,0)
     }
 }
 fn authenticated() -> Result<Context> {
@@ -412,7 +415,28 @@ pub struct ProofCounts {
     pub metadata: usize,
     pub blobs: usize,
 }
+/// Scanner and classifier share one file/byte budget, including prospective writes.
+pub fn check_proof_budget(root: &Path, additional_files: usize, additional_bytes: u64) -> Result<()> {
+    let mut files = additional_files;
+    let mut bytes = additional_bytes;
+    for directory in ["proof","review-proof"] {
+        let path = root.join(directory);
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound && directory == "review-proof" => continue,
+            Err(_) => return Err(ScanFailure("SECURITY_PROOF_INVALID")),
+            Ok(meta) => require(meta.is_dir() && !meta.file_type().is_symlink(),"SECURITY_PROOF_INVALID")?,
+        }
+        for path in proof_files(&path)?.values() {
+            files = files.checked_add(1).ok_or(ScanFailure("SECURITY_PROOF_OVERFLOW"))?;
+            bytes = bytes.checked_add(fs::symlink_metadata(path).private("SECURITY_PROOF_INVALID")?.len())
+                .ok_or(ScanFailure("SECURITY_PROOF_OVERFLOW"))?;
+            require(files <= private::MAX_RECORDS && bytes <= private::PROOF_LIMIT,"SECURITY_PROOF_OVERFLOW")?;
+        }
+    }
+    require(files <= private::MAX_RECORDS && bytes <= private::PROOF_LIMIT,"SECURITY_PROOF_OVERFLOW")
+}
 pub fn verify_proofs(context: &Context, leader: i32) -> Result<ProofCounts> {
+    check_proof_budget(&context.root,0,0)?;
     let files = proof_files(&context.root.join("proof"))?;
     let group = read_json(&context.root.join("group.json"))?;
     require(

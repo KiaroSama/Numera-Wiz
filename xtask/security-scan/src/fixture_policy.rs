@@ -40,6 +40,8 @@ fn unknown_unicode() -> Result<()> {
                 ),
                 "SECURITY_MOCK_UNKNOWN_UNICODE_ACCEPTED",
             )?;
+            require(matches!(report::visit_rows(&bytes, |_| Ok(())),Err(ScanFailure("SECURITY_REPORT_INVALID"))),
+                "SECURITY_MOCK_SECOND_PASS_UNICODE_ACCEPTED")?;
         }
     }
     let valid = br#"{"Secret":"\uD83D\uDE00","Extra":{"\uD83D\uDE00":[null,true,false,-1,18446744073709551616,1e400,{"private":"\u0061"}]}}"#;
@@ -51,6 +53,8 @@ fn unknown_unicode() -> Result<()> {
         bytes.extend_from_slice(valid);
         bytes.push(b']');
         let parsed = report::parse(&bytes)?;
+        require(report::visit_rows(&bytes, |_| Ok(()))? == parsed.count,
+            "SECURITY_MOCK_SECOND_PASS_COUNT_FAILED")?;
         require(
             parsed.count == preceding + 1 && parsed.rows.len() == (preceding + 1).min(200),
             "SECURITY_MOCK_VALID_UNKNOWN_UNICODE_REJECTED",

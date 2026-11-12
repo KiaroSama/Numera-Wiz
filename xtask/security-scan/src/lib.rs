@@ -5,6 +5,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(target_os = "linux")]
 pub mod assets;
 #[cfg(target_os = "linux")]
+pub mod classifier;
+#[cfg(target_os = "linux")]
+pub mod classifier_git;
+#[cfg(target_os = "linux")]
 pub mod private;
 #[cfg(target_os = "linux")]
 pub mod process;
