@@ -160,8 +160,25 @@ job cancellation. SDK request cancellation retains its independent lifetime.
 
 ## Project context
 
-The ten [project/edit/history commands](PROJECTS.md) use the same backend as CLI.
-A project read supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
+The [project/edit/history commands](PROJECTS.md) use the same backend as CLI.
+`projects.list` is a context-free query, exposed by the same registry through
+stdio and HTTP. Call it with `{"params":{"limit":64}}`; omit `context.project`,
+`replay_scope` and `idempotency_key`. It returns no durable receipt. Optional
+`cursor` and `replace_snapshot` belong in `params` and cannot be used together;
+the limit defaults to 128 and accepts 1 through 512.
+
+The [catalog contract](PROJECTS.md#project-catalog) defines its six public fields,
+ascending canonical UUID order, current Read filtering, compatibility labels,
+absolute 30-second continuation binding and shared quotas. Catalog replacement
+can retire the exact principal/profile's own catalog or project read ticket
+across projects and policy revisions; it requires current list permission and
+does not require current Read on the retired project. Same-profile tabs share
+handles, and paged retries have no durable exact-replay guarantee. Existing
+operator profiles must deliberately grant `projects.list` using the inspected,
+owner-reviewed revision-checked policy update described above, preserving their
+principal/profile, roots and unrelated rights.
+
+A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside
 its retained `request_id`, `replay_scope` and `idempotency_key` in context:
 

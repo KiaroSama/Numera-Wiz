@@ -36,8 +36,9 @@ Current work and required gaps are recorded in the
 - CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped
   operator profiles, bounded artifact transfer and verified client Save As.
 - [Project state editing](docs/manuals/PROJECTS.md) through shared CLI/MCP commands:
-  exact sequence grids, place/move/split/lift, atomic history/receipts and bounded
-  revision snapshots. Human project controls and decoded preview remain unfinished.
+  authorized project catalog discovery, exact sequence grids, place/move/split/lift,
+  atomic history/receipts and bounded revision snapshots. Human project controls
+  and decoded preview remain unfinished.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
 

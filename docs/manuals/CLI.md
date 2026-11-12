@@ -61,13 +61,23 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `artifacts list` / `artifacts manifest --artifact-id ID` | Page authorized outputs or inspect one exact object. |
 | `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
 | `logs status` | Inspect owner log health under current owner authority. |
-| `projects create/inspect`, `sequences create/inspect` | Create and inspect durable project/sequence state. |
+| `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
 | `clips place/move/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
 
 See the [project command guide](PROJECTS.md) for exact fractions, expected
 revisions, typed examples, source rights and bounded snapshot/history behavior.
 
 List commands accept `--limit`, `--cursor` and `--replace-snapshot`.
+`numera-wiz projects list --limit 64` discovers the complete authorized catalog
+under the current 64-project store bound. It uses `projects.list`, with no project
+context, replay scope, idempotency key or durable receipt. Pages default to 128
+items (range 1 through 512). The six common-header fields, ascending UUID order,
+current Read filtering, continuation binding, shared quotas and catalog-only
+cross-project ticket retirement are documented in the
+[project catalog contract](PROJECTS.md#project-catalog). Stored operating profiles
+need a deliberate `projects.list` grant through the existing owner-reviewed
+[revision-checked policy update](#authority-and-errors).
+
 Cleanup planning accepts `--file-times new|preserve_best_effort|require_reviewed`.
 Relative native paths resolve against the CLI process working directory before
 the same canonical authorization checks. Input JSON documents are individually

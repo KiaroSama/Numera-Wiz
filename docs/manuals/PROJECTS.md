@@ -9,6 +9,7 @@ work. Creating a solid-color binding here does not produce a video file.
 
 | Canonical command | Typed CLI | Behavior |
 | --- | --- | --- |
+| `projects.list` | `projects list` | Page authorized common project headers in ascending UUID order. |
 | `projects.create` | `projects create` | Create a project and root bin at revision `0`. |
 | `projects.inspect` | `projects inspect` | Read summary, one entity or a bin page. |
 | `sequences.create` | `sequences create` | Create explicit sequence settings and video/audio tracks. |
@@ -31,8 +32,9 @@ revision or source. Changing the expected revision on that retry changes the
 request and produces `IDEMPOTENCY_CONFLICT`. After `STALE_REVISION`, inspect the
 current state and deliberately submit a new operation identity.
 
-Queries carry `project.id` without `project.expected_revision`; omit the latter
-entirely rather than setting it to null. A captured read revision belongs in
+Project/sequence inspection queries carry `project.id` without
+`project.expected_revision`; omit the latter entirely rather than setting it to
+null. The catalog query has no project context. A captured read revision belongs in
 `params.revision`. For example, a canonical write has this shape:
 
 ```json
@@ -64,7 +66,8 @@ numera-wiz --data-dir DATA projects create --name "First project" --replay-scope
 ```
 
 Creation returns `project_id`, `root_bin_id` and revision `"0"`. Retain the project
-ID; a human project catalog is not implemented yet. Create a four-frame-per-second
+ID or rediscover it with `numera-wiz --data-dir DATA projects list --limit 64`.
+Shared GUI project controls remain unfinished. Create a four-frame-per-second
 sequence, retaining `created.sequence_id` and `created.tracks[0].id`:
 
 ```text
@@ -123,6 +126,63 @@ Unknown project majors remain readable within supported projections and reject
 writes; unsupported enabled semantics block their affected closure. Admitted
 opaque payload text is retained; duplicate members and unsafe overlays are rejected.
 
+## Project catalog
+
+`numera-wiz projects list` lowers to the canonical `projects.list` query used by
+MCP. It accepts `--limit` (default 128, range 1 through 512), `--cursor` and
+`--replace-snapshot`. It takes no ProjectRef, replay scope or idempotency key and
+returns no durable receipt. For example, a canonical request is:
+
+```json
+{
+  "api_version": 1,
+  "request_id": "catalog-1",
+  "command": {"id": "projects.list", "version": 1},
+  "params": {"limit": 64}
+}
+```
+
+Each item contains exactly `id`, `name`, decimal-string `revision`, `schema_major`,
+`envelope_version` and `compatibility`. Items are ordered by ascending canonical
+project UUID (`id`); there is no arbitrary sorting or recency order. Compatibility
+is `supported` or `read_only_unsupported`, describing common schema/envelope
+readability. Unsupported common headers can remain visible without promising
+editing support. Effective authority, enabled semantics and writer availability
+have their own checks. The catalog reads headers, not entities, history, source
+paths or writer leases. Its outer `project_revision` and `event_cursor` are null;
+row revisions are independent captured facts.
+
+Current Project Read rights filter rows before items and exact counts are
+computed. The current store limit is 64 projects, so `--limit 64` returns the
+complete authorized catalog in one unretained page. Smaller pages can retain a
+continuation bound to principal, profile, policy revision, projection and limit
+for an absolute 30 seconds. Pass the exact `next_cursor` with the same limit;
+expiry or a policy change requires a fresh query. Paged queries are ordinary
+queries without a durable exact-replay guarantee: a lost-response retry can
+allocate another retained snapshot, subject to quota and expiry.
+
+For this catalog command alone, `--replace-snapshot SNAPSHOT_ID` may retire an
+owned catalog snapshot or project read ticket, including one for another project
+or an older policy revision. Ownership requires the exact principal and profile;
+native owner has no bypass for another caller's ticket. Current `projects.list`
+permission is required, but current Read on the old project is not. The returned
+catalog is always filtered under current rights. Same-profile tabs share this
+ownership boundary and can expire each other's handles. Cursor and replacement
+cannot be supplied together. Unknown, foreign and expired replacement tokens
+return no existence information; removing a real owned ticket can legitimately
+free quota. Other inventories and inspect replacement behavior are unchanged.
+
+Catalog and project tickets share four retained snapshots per principal, 32
+globally and a 16 MiB metadata/serialization reserve. Results remain bounded to
+240 KiB inside the 256 KiB response envelope. An unretained catalog does not need
+a count slot, even at capacity; it still undergoes byte-budget checks.
+
+Stored operating profiles must deliberately add `projects.list` to their command
+allowlist. Use the existing [owner-reviewed grant update](CLI.md#authority-and-errors):
+inspect with `--grants-out`, preserve principal/profile, roots and unrelated rights,
+then update with the captured `--expected-revision`. Discovery and adapters never
+silently widen grants. Command permission and Project Read remain separate.
+
 ## Bounded reads and history
 
 Project inspection offers `summary`, `entity` and `bin_page`. Sequence inspection
@@ -132,7 +192,8 @@ query fields and limit. A live ticket captures one revision for 30 seconds and
 supports eight query bindings. Project and inventory tickets share 32 global/four
 per-principal limits and a 16 MiB metadata/serialization reserve.
 
-Use the same captured `--revision` for coherent projections. `--replace-snapshot`
+Use the same captured `--revision` for coherent projections. For project/sequence
+inspection, `--replace-snapshot`
 can retire an owned same-project ticket before a fresh capture. Expired cursors
 require an explicit refresh; a revision without a live ticket is not reconstructed
 from the latest head. Observed file growth and conservative write estimates can
