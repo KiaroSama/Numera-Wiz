@@ -59,6 +59,8 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     let _logs = retain_owner_logs(data.path(), "discovery");
     command.arg("--data-dir").arg(data.path()).arg("bridge");
     let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
+    // Capture the complete standard page from a fresh SDK session before list_all_tools flattens it.
+    let first_page = client.list_tools(None).await.unwrap();
     let tools = client.list_all_tools().await.unwrap();
     assert!(tools.iter().any(|tool| tool.name == "jobs.submit"));
     assert!(!tools.iter().any(|tool| tool.name == "shell.execute"));
@@ -89,7 +91,55 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         value["structuredContent"]["error"]["code"],
         "PERMISSION_DENIED"
     );
+    project_mcp_output_contract(&first_page);
     client.cancel().await.unwrap();
+}
+
+fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
+    use serde_json::Value;
+    use std::collections::BTreeSet;
+    assert!(page.next_cursor.is_none(), "MCP_UNEXPECTED_TOOL_PAGINATION");
+    let encoded = serde_json::to_vec(page).unwrap();
+    assert!(encoded.len() <= nw_domain::commands::MAX_RESULT_BYTES, "MCP_COMPLETE_TOOL_PAGE_BYTE_BOUND");
+    let actual: BTreeSet<_> = page.tools.iter().map(|tool| tool.name.as_ref()).collect();
+    let expected: BTreeSet<_> = nw_service::ACTIVE_COMMANDS.iter().copied().collect();
+    assert!(page.tools.len() == actual.len() && actual == expected, "MCP_COMPLETE_ACTIVE_ID_SET");
+    let family = ["projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect",
+        "clips.place","clips.move","clips.link","clips.unlink","clips.split","clips.remove","history.undo","history.redo"];
+    for id in family {
+        let tool = page.tools.iter().find(|tool| tool.name == id).unwrap();
+        let schema = tool.output_schema.as_ref().expect("MCP_CANONICAL_OUTPUT_SCHEMA_MISSING");
+        let root = Value::Object(schema.as_ref().clone());
+        assert_eq!(root["type"], "object");
+        assert_eq!(root["additionalProperties"], false);
+        assert_eq!(root["required"], serde_json::json!(["request_id","ok"]));
+        assert_eq!(root["properties"]["result"]["$ref"], "#/$defs/Result");
+        assert_eq!(root["properties"]["error"]["$ref"], "#/$defs/Error");
+        assert_eq!(root["oneOf"].as_array().unwrap().len(), 2);
+        assert!(root["$defs"]["Result"].is_object() && root["$defs"]["Error"].is_object());
+        let mut pending = vec![&root];
+        while let Some(node) = pending.pop() {
+            match node {
+                Value::Object(object) => {
+                    for key in ["$ref","$dynamicRef"] {
+                        if let Some(reference) = object.get(key) {
+                            let pointer = reference.as_str().unwrap().strip_prefix('#').expect("MCP_NONLOCAL_OUTPUT_REF");
+                            assert!(pointer.is_empty() || root.pointer(pointer).is_some(), "MCP_DANGLING_OUTPUT_REF");
+                        }
+                    }
+                    pending.extend(object.values());
+                }
+                Value::Array(array) => pending.extend(array),
+                _ => {},
+            }
+        }
+        let serialized = serde_json::to_value(tool).unwrap();
+        let requirement = &serialized["_meta"]["numera-wiz/authorization_requirements"];
+        assert_eq!(requirement["schema_version"], 1);
+        assert_eq!(requirement["command_id"], id);
+        assert!(requirement.get("policy_revision").is_none() && serialized["_meta"].get("authorization").is_none());
+    }
+    eprintln!("MCP_SCHEMA_SIZE kind=standard_list_tools_result bytes={} project_outputs={}", encoded.len(), family.len());
 }
 
 async fn wait_for_idle_owner_unlock(root: &std::path::Path) {
