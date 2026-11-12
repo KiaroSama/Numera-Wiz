@@ -64,6 +64,8 @@ macro_rules! project_sdk {
 }
 #[path = "support/lost_ack.rs"]
 mod lost_ack;
+#[path = "support/project_topology.rs"]
+mod project_topology;
 
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
@@ -1370,6 +1372,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         "Identical replacement bytes are not the published physical object"
     );
     browser.cancel().await.unwrap();
+    let topology_bearer = tokio::time::timeout(
+        Duration::from_secs(120),
+        project_topology::run(
+            &cli,
+            &scope,
+            port,
+            &media.directory.path().join("auth/topology-token"),
+        ),
+    )
+    .await
+    .expect("Whole public topology transport phase exceeded 120 seconds");
     let status = cli.query("logs.status", json!({})).await;
     assert_eq!(status["configured"], true);
     assert_eq!(status["writer_healthy"], true);
@@ -1384,7 +1397,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         {
             let bytes = nw_platform::security::read_private(&path, 2 * 1024 * 1024 + 1024).unwrap();
             let text = String::from_utf8(bytes.clone()).unwrap();
-            for value in [&token, &issued_bearer, &browser_bearer] {
+            for value in [&token, &issued_bearer, &browser_bearer, &topology_bearer] {
                 assert!(
                     !text.contains(value.as_str()),
                     "Protected logs must not contain a transport bearer"
