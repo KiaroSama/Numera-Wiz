@@ -162,6 +162,42 @@ impl shared::Driver for BrowserProjects<'_> {
         loop {
             {
                 let mut observed = self.fixture.observed_reports.lock().await;
+                let mutations: Vec<_> = observed
+                    .iter()
+                    .filter(|response| shared::project_mutation(&response.command_id))
+                    .take(9)
+                    .collect();
+                let overflow = mutations.len() > 8;
+                if overflow || mutations.iter().any(|response| response.command_id != command) {
+                    let completions: Vec<Value> = if overflow {
+                        Vec::new()
+                    } else {
+                        mutations
+                            .iter()
+                            .map(|response| {
+                                let ok = response.response["ok"].as_bool();
+                                json!({
+                                    "command":response.command_id,
+                                    "request_id":response.request_id,
+                                    "project":response.response["result"]["project_id"].as_str().or(response.project_id.as_deref()),
+                                    "expected_revision":response.expected_revision,
+                                    "code":if ok==Some(true) { Some("OK") } else { response.response["error"]["code"].as_str() },
+                                    "outcome":match ok { Some(true)=>"accepted",Some(false)=>"rejected",None=>"unknown" },
+                                    "accepted_revision":if ok==Some(true) { response.response["result"]["revision"].as_str() } else { None },
+                                    "receipt":response.response["receipt_id"].as_str(),
+                                })
+                            })
+                            .collect()
+                    };
+                    drop(mutations);
+                    drop(observed);
+                    self.write("unexpected-project-mutation", &json!({
+                        "expected_command":command,"completion_limit":8,
+                        "overflow":overflow,"completions":completions,
+                    }));
+                    self.capture("unexpected-project-mutation").await;
+                    panic!("Chrome input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG");
+                }
                 if let Some(index) = observed
                     .iter()
                     .position(|response| response.command_id == command)

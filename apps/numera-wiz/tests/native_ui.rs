@@ -987,6 +987,57 @@ impl project_workbench::Driver for NativeProjects<'_> {
         let started = Instant::now();
         loop {
             let events = self.events();
+            let mutations: Vec<_> = events
+                .iter()
+                .filter(|event| {
+                    event["fields"]["message"] == "command.completed"
+                        && event["fields"]["command"]
+                            .as_str()
+                            .is_some_and(project_workbench::project_mutation)
+                })
+                .take(9)
+                .collect();
+            let overflow = mutations.len() > 8;
+            if overflow
+                || mutations
+                    .iter()
+                    .any(|event| event["fields"]["command"] != command)
+            {
+                let completions: Vec<Value> = if overflow {
+                    Vec::new()
+                } else {
+                    mutations
+                        .iter()
+                        .map(|event| {
+                            let fields = &event["fields"];
+                            let audit = events.iter().find(|audit| {
+                                audit["fields"]["request_id"] == fields["request_id"]
+                                    && matches!(
+                                        audit["fields"]["event"].as_str(),
+                                        Some("project.created" | "project.edit.accepted")
+                                    )
+                            });
+                            let code = fields["code"].as_str();
+                            json!({
+                                "command":fields["command"].as_str(),
+                                "request_id":fields["request_id"].as_str(),
+                                "project":audit.and_then(|audit|audit["fields"]["project_id"].as_str()),
+                                "expected_revision":audit.and_then(|audit|audit["fields"]["base_revision"].as_str()),
+                                "code":code,
+                                "outcome":match code { Some("OK")=>"accepted",Some(_)=>"rejected",None=>"unknown" },
+                                "accepted_revision":if code==Some("OK") { audit.and_then(|audit|audit["fields"]["revision"].as_str()) } else { None },
+                                "receipt":fields["receipt_id"].as_str().filter(|id|!id.is_empty()),
+                            })
+                        })
+                        .collect()
+                };
+                self.write("unexpected-project-mutation", &json!({
+                    "expected_command":command,"completion_limit":8,
+                    "overflow":overflow,"completions":completions,
+                }));
+                self.screenshot("unexpected-project-mutation").await;
+                panic!("Native input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG");
+            }
             if let Some(completed) = events.iter().find(|event| {
                 event["fields"]["message"] == "command.completed"
                     && event["fields"]["command"] == command

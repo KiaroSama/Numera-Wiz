@@ -21,6 +21,19 @@ const PROJECT_COMMANDS: [&str; 11] = [
 pub fn project_commands() -> &'static [&'static str] {
     &PROJECT_COMMANDS
 }
+pub fn project_mutation(command: &str) -> bool {
+    matches!(
+        command,
+        "projects.create"
+            | "sequences.create"
+            | "clips.place"
+            | "clips.move"
+            | "clips.split"
+            | "clips.remove"
+            | "history.undo"
+            | "history.redo"
+    )
+}
 #[derive(Clone, Copy)]
 pub enum Key {
     Tab,
@@ -458,10 +471,17 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
         entity(driver, &graph, &source_id).await["source_kind"],
         "solid_color"
     );
+    driver.screenshot("selected-solid-before-move").await;
+    driver.mark().await;
     driver.click(1240, 307).await;
     driver.replace("2").await;
     field(driver, "1").await;
-    let moved = activate(driver, 1170, 329, "clips.move", 8).await;
+    driver.screenshot("move-fields-before-submit").await;
+    // Keep the whole first edit attempt inside the same observer window.
+    driver.click(1170, 329).await;
+    let moved = driver.observed("clips.move").await;
+    assert_eq!(moved.code, "OK", "clips.move");
+    driver.loaded(8).await;
     graph.accept(&moved);
     evidence.push(moved.evidence("clips.move"));
     clip_at(&entity(driver, &graph, &graph.left).await, 2, 6, 0, 4);
