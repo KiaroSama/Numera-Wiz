@@ -202,74 +202,17 @@ async fn run() -> Result<()> {
         Some(Mode::Bridge { .. } | Mode::Serve { .. }) => None,
         _ => args.access_profile.clone(),
     };
-    let client = NativeClient::new(root, args.components_dir, profile).await?;
+    let one_shot = !matches!(
+        &args.command,
+        None | Some(Mode::Owner | Mode::Bridge { .. } | Mode::Serve { .. })
+    );
+    let client = if one_shot {
+        NativeClient::new_one_shot(root, args.components_dir, profile).await?
+    } else {
+        NativeClient::new(root, args.components_dir, profile).await?
+    };
     match args.command {
         Some(Mode::Owner) => unreachable!("owner was dispatched before frontend initialization"),
-        Some(Mode::Access { command, json }) => {
-            tracing::debug!(
-                json_output = json,
-                "Access command uses structured JSON output"
-            );
-            access::run(&client, command).await
-        }
-        Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
-        Some(Mode::Projects { command }) => {
-            human::run(&client, human::Command::Projects(command)).await
-        }
-        Some(Mode::Sequences { command }) => {
-            human::run(&client, human::Command::Sequences(command)).await
-        }
-        Some(Mode::Clips { command }) => human::run(&client, human::Command::Clips(command)).await,
-        Some(Mode::History { command }) => {
-            human::run(&client, human::Command::History(command)).await
-        }
-        Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
-        Some(Mode::Assets { command }) => {
-            human::run(&client, human::Command::Assets(command)).await
-        }
-        Some(Mode::Streams { command }) => {
-            human::run(&client, human::Command::Streams(command)).await
-        }
-        Some(Mode::Plans { command }) => human::run(&client, human::Command::Plans(command)).await,
-        Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
-        Some(Mode::Batches { command }) => {
-            human::run(&client, human::Command::Batches(command)).await
-        }
-        Some(Mode::Maintenance { command }) => {
-            human::run(&client, human::Command::Maintenance(command)).await
-        }
-        Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
-        Some(Mode::Commands { command }) => {
-            human::run(&client, human::Command::Discovery(command)).await
-        }
-        Some(Mode::Request { file }) => {
-            let input: Box<dyn Read> = match file {
-                Some(path) => Box::new(std::fs::File::open(path)?),
-                None => Box::new(std::io::stdin()),
-            };
-            let mut bytes = Vec::new();
-            input
-                .take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64)
-                .read_to_end(&mut bytes)?;
-            if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
-                return Err(
-                    nw_domain::DomainError::new("RESOURCE_LIMIT", "Request exceeds 1 MiB").into(),
-                );
-            }
-            print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
-        }
-        Some(Mode::Doctor) => {
-            tracing::warn!(
-                "WARNING: Complete runtime, portable payload and GPU qualification remain pending"
-            );
-            println!(
-                "{}",
-                serde_json::to_string_pretty(
-                    &serde_json::json!({"product":"Numera Wiz","version":env!("CARGO_PKG_VERSION"),"scope":"development cleanup owner and shared workspace","media_gpu_initialized":false,"portable_release":"not_qualified","default_mcp_profile":"discovery_only","default_http_port":1578})
-                )?
-            );
-            Ok(())
-        }
         Some(Mode::Bridge {
             transport,
             port,
@@ -318,8 +261,99 @@ async fn run() -> Result<()> {
             .await
         }
         None => desktop(client).await,
+        command => finish_one_shot(&client, async {
+            match command {
+                Some(Mode::Access { command, json }) => {
+                    tracing::debug!(
+                        json_output = json,
+                        "Access command uses structured JSON output"
+                    );
+                    access::run(&client, command).await
+                }
+                Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
+                Some(Mode::Projects { command }) => {
+                    human::run(&client, human::Command::Projects(command)).await
+                }
+                Some(Mode::Sequences { command }) => {
+                    human::run(&client, human::Command::Sequences(command)).await
+                }
+                Some(Mode::Clips { command }) => human::run(&client, human::Command::Clips(command)).await,
+                Some(Mode::History { command }) => {
+                    human::run(&client, human::Command::History(command)).await
+                }
+                Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
+                Some(Mode::Assets { command }) => {
+                    human::run(&client, human::Command::Assets(command)).await
+                }
+                Some(Mode::Streams { command }) => {
+                    human::run(&client, human::Command::Streams(command)).await
+                }
+                Some(Mode::Plans { command }) => human::run(&client, human::Command::Plans(command)).await,
+                Some(Mode::Jobs { command }) => human::run(&client, human::Command::Jobs(command)).await,
+                Some(Mode::Batches { command }) => {
+                    human::run(&client, human::Command::Batches(command)).await
+                }
+                Some(Mode::Maintenance { command }) => {
+                    human::run(&client, human::Command::Maintenance(command)).await
+                }
+                Some(Mode::Logs { command }) => human::run(&client, human::Command::Logs(command)).await,
+                Some(Mode::Commands { command }) => {
+                    human::run(&client, human::Command::Discovery(command)).await
+                }
+                Some(Mode::Request { file }) => {
+                    let input: Box<dyn Read> = match file {
+                        Some(path) => Box::new(std::fs::File::open(path)?),
+                        None => Box::new(std::io::stdin()),
+                    };
+                    let mut bytes = Vec::new();
+                    input
+                        .take((nw_domain::commands::MAX_COMMAND_BYTES + 1) as u64)
+                        .read_to_end(&mut bytes)?;
+                    if bytes.len() > nw_domain::commands::MAX_COMMAND_BYTES {
+                        return Err(
+                            nw_domain::DomainError::new("RESOURCE_LIMIT", "Request exceeds 1 MiB").into(),
+                        );
+                    }
+                    print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
+                }
+                Some(Mode::Doctor) => {
+                    tracing::warn!(
+                        "WARNING: Complete runtime, portable payload and GPU qualification remain pending"
+                    );
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(
+                            &serde_json::json!({"product":"Numera Wiz","version":env!("CARGO_PKG_VERSION"),"scope":"development cleanup owner and shared workspace","media_gpu_initialized":false,"portable_release":"not_qualified","default_mcp_profile":"discovery_only","default_http_port":1578})
+                        )?
+                    );
+                    Ok(())
+                }
+                None | Some(Mode::Owner | Mode::Bridge { .. } | Mode::Serve { .. }) => {
+                    unreachable!("long-lived modes were dispatched outside one-shot finish")
+                }
+            }
+        }).await,
     }
 }
+async fn finish_one_shot<T>(
+    client: &NativeClient,
+    operation: impl std::future::Future<Output = Result<T>>,
+) -> Result<T> {
+    let result = operation.await;
+    let cleanup = client.finish().await;
+    if cleanup.code != "complete" {
+        tracing::warn!(
+            code = cleanup.code,
+            attempted = cleanup.attempted,
+            released = cleanup.released,
+            remaining = cleanup.remaining,
+            elapsed_ms = cleanup.elapsed_ms,
+            "Native scoped credential cleanup was not confirmed"
+        );
+    }
+    result
+}
+
 async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
     if matches!(
         request.command.id.as_str(),

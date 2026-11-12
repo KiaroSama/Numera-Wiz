@@ -74,6 +74,8 @@ struct LeaseInput {
 struct PublicInput {
     port: u16,
 }
+#[derive(Clone)]
+struct ReleaseBearer(String);
 fn failure(status: StatusCode, code: &str, message: &str) -> Response {
     (
         status,
@@ -133,6 +135,9 @@ impl http_body::Body for ActiveBody {
     }
 }
 async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next) -> Response {
+    let private_release = auth.private
+        && request.method() == axum::http::Method::POST
+        && request.uri().path() == "/internal/credential/release";
     let permit = match auth.owner.slots.clone().try_acquire_owned() {
         Ok(permit) => permit,
         Err(_) => {
@@ -222,7 +227,10 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         public: (!auth.private).then(|| auth.owner.public_active.clone()),
         _permit: permit,
     };
-    if request.uri().path().starts_with("/internal/") && context.profile.is_some() {
+    if request.uri().path().starts_with("/internal/")
+        && context.profile.is_some()
+        && !private_release
+    {
         return failure(
             StatusCode::FORBIDDEN,
             "PERMISSION_DENIED",
@@ -253,16 +261,28 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
                 );
             }
         };
-        if commands::decode_json(&bytes).is_err() {
+        let value = match commands::decode_json(&bytes) {
+            Ok(value) => value,
+            Err(_) => {
+                return failure(
+                    StatusCode::BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    "Invalid or ambiguous JSON request",
+                );
+            }
+        };
+        if private_release && value != json!({}) {
             return failure(
                 StatusCode::BAD_REQUEST,
                 "VALIDATION_ERROR",
-                "Invalid or ambiguous JSON request",
+                "Scoped credential release requires an empty object",
             );
         }
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
-    if request.uri().path().starts_with("/api/v1/artifacts/") {
+    if private_release {
+        request.extensions_mut().insert(ReleaseBearer(download_token));
+    } else if request.uri().path().starts_with("/api/v1/artifacts/") {
         request
             .extensions_mut()
             .insert(artifacts::DownloadAuthority {
@@ -415,6 +435,40 @@ async fn credential(
         ),
     }
 }
+async fn release_credential(
+    State(owner): State<Arc<Owner>>,
+    axum::Extension(context): axum::Extension<Context>,
+    axum::Extension(ReleaseBearer(bearer)): axum::Extension<ReleaseBearer>,
+    Json(_input): Json<commands::Empty>,
+) -> Response {
+    if context.profile.is_none() {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Only a scoped credential can release itself",
+        );
+    }
+    let service = owner.service.clone();
+    match tokio::task::spawn_blocking(move || {
+        service.release_private_credential(&bearer, &context)
+    }).await {
+        Ok(Ok(())) => Json(json!({"released":true})).into_response(),
+        Ok(Err(error)) => {
+            let (status, code) = match error.code.as_str() {
+                "AUTHENTICATION_REQUIRED" => (StatusCode::UNAUTHORIZED, "AUTHENTICATION_REQUIRED"),
+                "PERMISSION_DENIED" => (StatusCode::FORBIDDEN, "PERMISSION_DENIED"),
+                "OWNER_BUSY" | "RESOURCE_LIMIT" => (StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_LIMIT"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "CREDENTIAL_RELEASE_FAILED"),
+            };
+            failure(status, code, "Scoped credential release was not confirmed")
+        }
+        Err(_) => failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "WORKER_FAILED",
+            "Scoped credential release was not confirmed",
+        ),
+    }
+}
 fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: CancellationToken) -> Router {
     let host = format!("127.0.0.1:{port}");
     let origin = format!("http://{host}");
@@ -459,6 +513,7 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
     if private {
         router = router
             .route("/internal/credential", post(credential))
+            .route("/internal/credential/release", post(release_credential))
             .route("/internal/lease", post(lease))
             .route("/internal/public", post(public))
             .route("/internal/pair", post(browser::create_pairing));
@@ -977,6 +1032,225 @@ mod tests {
         );
         task.abort();
         private_credential_self_release_preserves_admission_and_survivors().await;
+        native_one_shot_lifecycle_uses_real_private_routes().await;
+    }
+
+    #[derive(Default)]
+    struct LifecycleProbe {
+        bootstraps: AtomicUsize,
+        releases: AtomicUsize,
+        reject_commands: AtomicUsize,
+        acknowledgement: AtomicUsize,
+        stop: CancellationToken,
+    }
+
+    async fn observe_lifecycle(
+        State(probe): State<Arc<LifecycleProbe>>,
+        request: Request,
+        next: Next,
+    ) -> Response {
+        let path = request.uri().path();
+        let release = path == "/internal/credential/release";
+        let command = path == "/api/v1/commands";
+        if path == "/internal/credential" {
+            probe.bootstraps.fetch_add(1, Ordering::AcqRel);
+        }
+        if release {
+            probe.releases.fetch_add(1, Ordering::AcqRel);
+        }
+        let response = next.run(request).await;
+        if command && probe.reject_commands.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |count| count.checked_sub(1),
+        ).is_ok() {
+            return failure(StatusCode::UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "Fixture reconnect");
+        }
+        if release {
+            match probe.acknowledgement.load(Ordering::Acquire) {
+                1 => return Json(json!({"not_released":true})).into_response(),
+                2 => {
+                    // The real handler has completed. Keep the lost acknowledgement
+                    // bounded by fixture teardown, without sleeping or retrying.
+                    drop(response);
+                    probe.stop.cancelled().await;
+                    return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                }
+                _ => {}
+            }
+        }
+        response
+    }
+
+    fn lifecycle_error<T>(result: Result<T>) -> anyhow::Error {
+        match result {
+            Err(error) => error,
+            Ok(_) => panic!("The lifecycle operation must retain its original error"),
+        }
+    }
+
+    async fn native_one_shot_lifecycle_uses_real_private_routes() {
+        use crate::client::NativeClient;
+        let data = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(data.path()).unwrap();
+        let service = Service::open(root.clone(), None).await.unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let record = OwnerRecord {
+            canonical_root: nw_platform::files::path_text(&root).unwrap(),
+            root_id: service.store.root_id().into(),
+            epoch: service.epoch.clone(),
+            build: "lifecycle-fixture".into(),
+            registry: registry_fingerprint(),
+            port,
+            bearer: "lifecycle-fixture-owner".into(),
+        };
+        // Real reconnect reads the protected fixture record and verifies /health;
+        // it never hashes a test executable or launches an owner process.
+        let runtime = nw_platform::security::private_directory(&root.join("runtime")).unwrap();
+        nw_platform::security::write_private(
+            &runtime.join("owner.json"),
+            &serde_json::to_vec(&record).unwrap(),
+            false,
+        ).unwrap();
+        let owner = Arc::new(Owner {
+            service,
+            record: record.clone(),
+            leases: Mutex::new(HashMap::new()),
+            public: Mutex::new(None),
+            public_active: Arc::new(AtomicUsize::new(0)),
+            stop: CancellationToken::new(),
+            active: Arc::new(AtomicUsize::new(0)),
+            slots: Arc::new(Semaphore::new(32)),
+            pairing: Mutex::new(HashMap::new()),
+        });
+        let probe = Arc::new(LifecycleProbe::default());
+        let listener_stop = CancellationToken::new();
+        let routes = router(owner.clone(), port, true, listener_stop.clone())
+            .layer(middleware::from_fn_with_state(probe.clone(), observe_lifecycle));
+        let task = tokio::spawn(async move {
+            axum::serve(listener, routes).await.unwrap();
+        });
+        let new_client = |one_shot| NativeClient::for_test_owner(
+            record.clone(), Some("agent".into()), one_shot,
+        ).unwrap();
+        let query = commands::Request::query("commands.list", json!({}));
+        let body_token = owner.service.credential("agent").unwrap();
+        let body_client = reqwest::Client::builder()
+            .no_proxy().timeout(Duration::from_secs(10)).build().unwrap();
+        let release_url = format!("http://127.0.0.1:{port}/internal/credential/release");
+        assert_eq!(body_client.post(&release_url).bearer_auth(&body_token)
+            .json(&json!([])).send().await.unwrap().status(), StatusCode::BAD_REQUEST);
+        assert!(owner.service.authenticate(&body_token).is_ok());
+        assert_eq!(body_client.post(&release_url).bearer_auth(&body_token)
+            .json(&json!({})).send().await.unwrap().status(), StatusCode::OK);
+        assert!(owner.service.authenticate(&body_token).is_err());
+        probe.releases.store(0, Ordering::Release);
+        let survivor = new_client(false);
+        assert!(survivor.request(&query).await.unwrap().ok);
+        assert_eq!(survivor.finish().await.attempted, 0);
+        assert!(survivor.request(&query).await.unwrap().ok);
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), 1);
+        assert_eq!(probe.releases.load(Ordering::Acquire), 0);
+
+        let one_shot = new_client(true);
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query)).await.unwrap();
+        assert!(response.ok);
+        assert_eq!(response.request_id, query.request_id);
+        assert_eq!(probe.releases.load(Ordering::Acquire), 1);
+        assert_eq!(one_shot.finish().await.attempted, 0);
+        assert!(!one_shot.has_cached_credential().await);
+        let before = probe.bootstraps.load(Ordering::Acquire);
+        let error = lifecycle_error(one_shot.request(&query).await);
+        assert_eq!(error.downcast_ref::<nw_domain::DomainError>().unwrap().code, "CLIENT_CLOSED");
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), before);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        let denied = commands::Request::query("unknown.lifecycle.command", json!({}));
+        let one_shot = new_client(true);
+        let before = probe.releases.load(Ordering::Acquire);
+        let result: Result<()> = crate::finish_one_shot(&one_shot, async {
+            let response = one_shot.request(&denied).await?;
+            assert!(!response.ok);
+            assert_eq!(response.request_id, denied.request_id);
+            Err(response.error.expect("Canonical error must remain present").into())
+        }).await;
+        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "UNKNOWN_COMMAND");
+        assert_eq!(probe.releases.load(Ordering::Acquire), before + 1);
+
+        for rejections in [1, 2] {
+            let one_shot = new_client(true);
+            let bootstraps = probe.bootstraps.load(Ordering::Acquire);
+            let releases = probe.releases.load(Ordering::Acquire);
+            probe.reject_commands.store(rejections, Ordering::Release);
+            let result = crate::finish_one_shot(&one_shot, async {
+                let result = one_shot.request(&query).await;
+                if rejections == 2 {
+                    assert!(!one_shot.has_cached_credential().await);
+                }
+                result
+            }).await;
+            if rejections == 1 {
+                assert!(result.unwrap().ok);
+            } else {
+                let error = lifecycle_error(result);
+                assert_eq!(error.downcast_ref::<nw_domain::DomainError>().unwrap().code, "AUTHENTICATION_REQUIRED");
+            }
+            assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps + 2);
+            assert_eq!(probe.releases.load(Ordering::Acquire), releases + 2);
+            assert_eq!(one_shot.finish().await.attempted, 0);
+            assert!(one_shot.request(&query).await.is_err());
+            assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps + 2);
+            assert!(survivor.request(&query).await.unwrap().ok);
+        }
+
+        // Malformed acknowledgement preserves the original successful response.
+        let one_shot = new_client(true);
+        probe.acknowledgement.store(1, Ordering::Release);
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query)).await.unwrap();
+        assert!(response.ok);
+        assert_eq!(response.request_id, query.request_id);
+        probe.acknowledgement.store(0, Ordering::Release);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        // Two known owned credentials, one total deadline, and no second release
+        // attempt after the first acknowledgement consumes that entire deadline.
+        let one_shot = new_client(true);
+        probe.reject_commands.store(1, Ordering::Release);
+        assert!(one_shot.request(&query).await.unwrap().ok);
+        let bootstraps = probe.bootstraps.load(Ordering::Acquire);
+        let releases = probe.releases.load(Ordering::Acquire);
+        probe.acknowledgement.store(2, Ordering::Release);
+        let result: Result<()> = tokio::time::timeout(Duration::from_secs(10),
+            crate::finish_one_shot(&one_shot, async {
+                let response = one_shot.request(&denied).await?;
+                assert!(!response.ok);
+                Err(response.error.expect("Canonical error must remain present").into())
+            }),
+        ).await.expect("Total one-second finish must remain bounded");
+        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "UNKNOWN_COMMAND");
+        assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert_eq!(one_shot.finish().await.attempted, 0);
+        assert!(one_shot.request(&query).await.is_err());
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        // Pre-attachment input errors and owner-only finite operations mint nothing.
+        let unused = new_client(true);
+        let result: Result<()> = crate::finish_one_shot(&unused, async {
+            Err(nw_domain::DomainError::new("VALIDATION_ERROR", "Fixture input error").into())
+        }).await;
+        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "VALIDATION_ERROR");
+        let unscoped = NativeClient::for_test_owner(record, None, true).unwrap();
+        assert!(crate::finish_one_shot(&unscoped, unscoped.request(&query)).await.unwrap().ok);
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
+        probe.stop.cancel();
+        owner.stop.cancel();
+        listener_stop.cancel();
+        task.abort();
+        let _ = task.await;
     }
 
     async fn private_credential_self_release_preserves_admission_and_survivors() {

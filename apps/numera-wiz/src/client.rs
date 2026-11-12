@@ -3,7 +3,12 @@ mod download;
 use anyhow::{Context as _, Result};
 use nw_domain::commands::{Request, Response};
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
+use std::{
+    path::PathBuf,
+    process::Stdio,
+    sync::{Arc, atomic::{AtomicBool, Ordering}},
+    time::Duration,
+};
 use tokio::{io::AsyncReadExt, sync::Mutex};
 
 const OWNER_STARTUP_FRAME_LIMIT: usize = 512;
@@ -173,9 +178,127 @@ pub struct NativeClient {
     pub profile: Option<String>,
     http: reqwest::Client,
     cached: Arc<Mutex<Option<OwnerRecord>>>,
-    credential: Arc<Mutex<Option<(String, String)>>>,
+    credential: Arc<CredentialSession>,
     binding: Arc<Mutex<SessionBinding>>,
     build: String,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ClientLifetime {
+    LongLived,
+    OneShot,
+}
+struct CredentialSession {
+    lifetime: ClientLifetime,
+    closed: AtomicBool,
+    state: Mutex<CredentialState>,
+}
+impl CredentialSession {
+    fn new(lifetime: ClientLifetime) -> Self {
+        Self {
+            lifetime,
+            closed: AtomicBool::new(false),
+            state: Mutex::new(CredentialState::default()),
+        }
+    }
+    fn ensure_open(&self) -> Result<()> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(nw_domain::DomainError::new(
+                "CLIENT_CLOSED",
+                "The one-shot native operation has finished",
+            ).into());
+        }
+        Ok(())
+    }
+    fn close(&self) -> bool {
+        self.lifetime == ClientLifetime::OneShot
+            && !self.closed.swap(true, Ordering::AcqRel)
+    }
+}
+#[derive(Clone, PartialEq, Eq)]
+struct CredentialIssuer {
+    root_id: String,
+    port: u16,
+    epoch: String,
+}
+impl CredentialIssuer {
+    fn from_owner(record: &OwnerRecord) -> Self {
+        Self {
+            root_id: record.root_id.clone(),
+            port: record.port,
+            epoch: record.epoch.clone(),
+        }
+    }
+}
+// Never retain the bootstrap owner's bearer in a scoped cleanup candidate.
+#[derive(Clone, PartialEq, Eq)]
+struct ScopedCredential {
+    issuer: CredentialIssuer,
+    profile: String,
+    principal: String,
+    token: String,
+}
+#[derive(Default)]
+struct CredentialState {
+    cached: Option<ScopedCredential>,
+    owned: Vec<ScopedCredential>,
+}
+impl CredentialState {
+    fn prepare_issuance(
+        &mut self,
+        issuer: &CredentialIssuer,
+        profile: &str,
+        principal: Option<&str>,
+    ) -> Result<()> {
+        // Reject identity changes before pruning entries from a verified old epoch.
+        for candidate in &self.owned {
+            if candidate.issuer.root_id != issuer.root_id || candidate.profile != profile {
+                return Err(nw_domain::DomainError::new(
+                    "OWNER_IDENTITY_CONFLICT",
+                    "Scoped issuance changed its original root or profile",
+                ).into());
+            }
+            if principal != Some(candidate.principal.as_str()) {
+                return Err(nw_domain::DomainError::new(
+                    "PRINCIPAL_CHANGED",
+                    "Scoped issuance changed its original principal",
+                ).into());
+            }
+        }
+        self.owned.retain(|candidate| candidate.issuer.epoch == issuer.epoch);
+        if self.owned.len() >= 32 {
+            return Err(nw_domain::DomainError::new(
+                "RESOURCE_LIMIT",
+                "One-shot credential ownership budget reached",
+            ).into());
+        }
+        Ok(())
+    }
+    fn record_issued(&mut self, candidate: ScopedCredential, lifetime: ClientLifetime) {
+        if lifetime == ClientLifetime::OneShot && !self.owned.contains(&candidate) {
+            self.owned.push(candidate.clone());
+        }
+        self.cached = Some(candidate);
+    }
+    fn evict_cached(&mut self) {
+        self.cached = None;
+    }
+    fn take_owned_current_first(&mut self) -> Vec<ScopedCredential> {
+        let mut candidates = std::mem::take(&mut self.owned);
+        candidates.reverse();
+        if let Some(current) = self.cached.take()
+            && let Some(index) = candidates.iter().position(|candidate| candidate == &current)
+        {
+            candidates.swap(0, index);
+        }
+        candidates
+    }
+}
+pub(crate) struct FinishSummary {
+    pub code: &'static str,
+    pub attempted: usize,
+    pub released: usize,
+    pub remaining: Option<usize>,
+    pub elapsed_ms: u128,
 }
 #[derive(Default)]
 struct SessionBinding {
@@ -230,6 +353,21 @@ impl NativeClient {
         components: Option<PathBuf>,
         profile: Option<String>,
     ) -> Result<Self> {
+        Self::new_with_lifetime(root, components, profile, ClientLifetime::LongLived).await
+    }
+    pub async fn new_one_shot(
+        root: PathBuf,
+        components: Option<PathBuf>,
+        profile: Option<String>,
+    ) -> Result<Self> {
+        Self::new_with_lifetime(root, components, profile, ClientLifetime::OneShot).await
+    }
+    async fn new_with_lifetime(
+        root: PathBuf,
+        components: Option<PathBuf>,
+        profile: Option<String>,
+        lifetime: ClientLifetime,
+    ) -> Result<Self> {
         std::fs::create_dir_all(&root)?;
         let root = std::fs::canonicalize(root)?;
         let exe = std::env::current_exe()?;
@@ -239,7 +377,15 @@ impl NativeClient {
         })
         .await??;
         tracing::info!(elapsed_ms=identity_started.elapsed().as_millis(), executable_bytes=%identity.bytes, "Executable identity read completed");
-        let build = identity.sha256;
+        Self::from_identity(root, components, profile, identity.sha256, lifetime)
+    }
+    fn from_identity(
+        root: PathBuf,
+        components: Option<PathBuf>,
+        profile: Option<String>,
+        build: String,
+        lifetime: ClientLifetime,
+    ) -> Result<Self> {
         Ok(Self {
             root,
             components,
@@ -250,25 +396,53 @@ impl NativeClient {
                 .timeout(Duration::from_secs(130))
                 .build()?,
             cached: Arc::new(Mutex::new(None)),
-            credential: Arc::new(Mutex::new(None)),
+            credential: Arc::new(CredentialSession::new(lifetime)),
             binding: Arc::new(Mutex::new(SessionBinding::default())),
             build,
         })
     }
+    #[cfg(test)]
+    pub(crate) fn for_test_owner(
+        record: OwnerRecord,
+        profile: Option<String>,
+        one_shot: bool,
+    ) -> Result<Self> {
+        let mut client = Self::from_identity(
+            PathBuf::from(&record.canonical_root),
+            None,
+            profile,
+            record.build.clone(),
+            if one_shot { ClientLifetime::OneShot } else { ClientLifetime::LongLived },
+        )?;
+        let mut binding = SessionBinding::default();
+        binding.bind_root(&record.root_id)?;
+        client.binding = Arc::new(Mutex::new(binding));
+        client.cached = Arc::new(Mutex::new(Some(record)));
+        Ok(client)
+    }
+    #[cfg(test)]
+    pub(crate) async fn has_cached_credential(&self) -> bool {
+        self.credential.state.lock().await.cached.is_some()
+    }
     pub async fn attach(&self) -> Result<OwnerRecord> {
+        self.credential.ensure_open()?;
         if let Some(record) = self.cached.lock().await.clone() {
+            self.credential.ensure_open()?;
             return Ok(record);
         }
+        self.credential.ensure_open()?;
         let started = std::time::Instant::now();
         let runtime_root = self.root.join("runtime");
         let runtime_root = tokio::task::spawn_blocking(move || {
             nw_platform::security::private_directory(&runtime_root)
         })
         .await??;
+        self.credential.ensure_open()?;
         let runtime = runtime_root.join("owner.json");
         let mut bootstrap_gate = None;
         let mut spawned = false;
         loop {
+            self.credential.ensure_open()?;
             if runtime.try_exists()? {
                 let path = runtime.clone();
                 let bytes = tokio::task::spawn_blocking(move || {
@@ -310,6 +484,7 @@ impl NativeClient {
                         return Err(nw_domain::DomainError::new("OWNER_VERSION_CONFLICT", "Another build owns this root; let its jobs/clients drain before updating").into());
                     }
                     self.binding.lock().await.bind_root(&record.root_id)?;
+                    self.credential.ensure_open()?;
                     *self.cached.lock().await = Some(record.clone());
                     tracing::info!(
                         elapsed_ms = started.elapsed().as_millis(),
@@ -333,6 +508,7 @@ impl NativeClient {
                 && (!lock_root.try_exists()?
                     || nw_platform::files::RootLock::acquire(&lock_root).is_ok());
             if may_spawn && !spawned {
+                self.credential.ensure_open()?;
                 #[cfg(windows)]
                 nw_platform::process::prevent_stdio_inheritance()?;
                 let mut command = tokio::process::Command::new(std::env::current_exe()?);
@@ -397,16 +573,23 @@ impl NativeClient {
         }
     }
     async fn scoped_token(&self, record: &OwnerRecord) -> Result<String> {
+        self.credential.ensure_open()?;
         let Some(profile) = &self.profile else {
             return Ok(record.bearer.clone());
         };
-        let mut cached = self.credential.lock().await;
-        if let Some((epoch, token)) = &*cached
-            && epoch == &record.epoch
-        {
-            return Ok(token.clone());
-        }
+        let mut state = self.credential.state.lock().await;
+        self.credential.ensure_open()?;
+        let issuer = CredentialIssuer::from_owner(record);
         let expected_principal = self.binding.lock().await.principal.clone();
+        if let Some(cached) = &state.cached
+            && cached.issuer == issuer
+            && cached.profile == *profile
+            && Some(cached.principal.as_str()) == expected_principal.as_deref()
+        {
+            return Ok(cached.token.clone());
+        }
+        state.prepare_issuance(&issuer, profile, expected_principal.as_deref())?;
+        self.credential.ensure_open()?;
         let response = self
             .http
             .post(format!(
@@ -420,6 +603,7 @@ impl NativeClient {
         let value = bounded_json(response).await?;
         let token = value["bearer"]
             .as_str()
+            .filter(|token| !token.is_empty() && token.len() <= 256)
             .context("Scoped credential was not issued")?
             .to_owned();
         if value["profile"].as_str() != Some(profile.as_str()) {
@@ -429,12 +613,23 @@ impl NativeClient {
             )
             .into());
         }
+        let principal = value["principal"].as_str().unwrap_or("");
         self.binding
             .lock()
             .await
-            .bind_principal(value["principal"].as_str().unwrap_or(""))?;
-        *cached = Some((record.epoch.clone(), token.clone()));
+            .bind_principal(principal)?;
+        state.record_issued(ScopedCredential {
+            issuer,
+            profile: profile.clone(),
+            principal: principal.to_owned(),
+            token: token.clone(),
+        }, self.credential.lifetime);
+        self.credential.ensure_open()?;
         Ok(token)
+    }
+    async fn evict_cached(&self) {
+        *self.cached.lock().await = None;
+        self.credential.state.lock().await.evict_cached();
     }
     pub async fn request(&self, request: &Request) -> Result<Response> {
         Ok(serde_json::from_value(
@@ -467,11 +662,17 @@ impl NativeClient {
                                 .downcast_ref::<nw_domain::DomainError>()
                                 .is_some_and(|error| error.code == "AUTHENTICATION_REQUIRED")) =>
                 {
-                    *self.cached.lock().await = None;
-                    *self.credential.lock().await = None;
+                    self.evict_cached().await;
                     continue;
                 }
-                Err(error) => return Err(error),
+                Err(error) => {
+                    if error.downcast_ref::<nw_domain::DomainError>()
+                        .is_some_and(|error| error.code == "AUTHENTICATION_REQUIRED")
+                    {
+                        self.evict_cached().await;
+                    }
+                    return Err(error);
+                }
             };
             let result = self
                 .http
@@ -489,6 +690,9 @@ impl NativeClient {
                         || response.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE)
                         && attempt == 0 => {}
                 Ok(response) => {
+                    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                        self.evict_cached().await;
+                    }
                     bounded_json(response).await?;
                     return Err(nw_domain::DomainError::new(
                         "TRANSPORT_ERROR",
@@ -499,14 +703,88 @@ impl NativeClient {
                 Err(error) if attempt != 0 => return Err(error.into()),
                 Err(_) => {}
             }
-            *self.cached.lock().await = None;
-            *self.credential.lock().await = None;
+            self.evict_cached().await;
         }
         Err(nw_domain::DomainError::new(
             "TRANSPORT_ERROR",
             "Owner reconnect failed; original durable request identity was retained",
         )
         .into())
+    }
+    pub(crate) async fn finish(&self) -> FinishSummary {
+        let started = tokio::time::Instant::now();
+        let deadline = started + Duration::from_secs(1);
+        let mut summary = FinishSummary {
+            code: "complete",
+            attempted: 0,
+            released: 0,
+            remaining: Some(0),
+            elapsed_ms: 0,
+        };
+        if !self.credential.close() {
+            return summary;
+        }
+        summary.remaining = None;
+        let result = tokio::time::timeout_at(deadline, async {
+            let candidates = self.credential.state.lock().await.take_owned_current_first();
+            summary.remaining = Some(candidates.len());
+            for candidate in candidates {
+                summary.attempted += 1;
+                match self.release_candidate(candidate, deadline).await {
+                    Ok(()) => {
+                        summary.released += 1;
+                        summary.remaining = summary.remaining.map(|count| count - 1);
+                    }
+                    Err("deadline") => {
+                        summary.code = "deadline";
+                        break;
+                    }
+                    Err(code) if summary.code == "complete" => summary.code = code,
+                    Err(_) => {}
+                }
+            }
+        }).await;
+        if result.is_err() {
+            summary.code = "deadline";
+        }
+        summary.elapsed_ms = started.elapsed().as_millis();
+        summary
+    }
+    async fn release_candidate(
+        &self,
+        candidate: ScopedCredential,
+        deadline: tokio::time::Instant,
+    ) -> std::result::Result<(), &'static str> {
+        let remaining = deadline.checked_duration_since(tokio::time::Instant::now())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or("deadline")?;
+        let mut response = self.http
+            .post(format!("http://127.0.0.1:{}/internal/credential/release", candidate.issuer.port))
+            .bearer_auth(&candidate.token)
+            .timeout(remaining)
+            .json(&serde_json::json!({}))
+            .send().await.map_err(|error| if error.is_timeout() { "deadline" } else { "transport" })?;
+        if !response.status().is_success() {
+            return Err(if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                "authentication"
+            } else {
+                "denied"
+            });
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await
+            .map_err(|error| if error.is_timeout() { "deadline" } else { "transport" })?
+        {
+            if bytes.len().saturating_add(chunk.len()) > 64 {
+                return Err("acknowledgement");
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let value = nw_domain::commands::decode_json(&bytes).map_err(|_| "acknowledgement")?;
+        if value != serde_json::json!({"released":true}) {
+            return Err("acknowledgement");
+        }
+        Ok(())
     }
     pub async fn internal(
         &self,
@@ -561,6 +839,7 @@ mod binding_tests {
         assert!(binding.bind_principal("principal-replacement").is_err());
         assert_eq!(binding.root_id.as_deref(), Some("root-original"));
         assert_eq!(binding.principal.as_deref(), Some("principal-original"));
+        credential_lifecycle_bookkeeping();
 
         // The private startup channel accepts only finite canonical frames, even
         // when an error's code, context or message contains arbitrary content.
@@ -738,10 +1017,83 @@ mod binding_tests {
                         collect_owner_startup_failure(None, std::time::Instant::now()).await,
                         OwnerStartupObservation::Missing
                     ));
+                    let client = NativeClient::from_identity(
+                        PathBuf::from("unused-lifecycle-lock-fixture"),
+                        None,
+                        Some("agent".into()),
+                        "fixture-build".into(),
+                        ClientLifetime::OneShot,
+                    ).unwrap();
+                    let held = client.credential.state.lock().await;
+                    let cleanup = client.finish().await;
+                    assert_eq!(cleanup.code, "deadline");
+                    assert_eq!(cleanup.attempted, 0);
+                    assert_eq!(cleanup.remaining, None);
+                    assert!(client.credential.ensure_open().is_err());
+                    drop(held);
+                    assert_eq!(client.finish().await.attempted, 0);
+                    assert!(client.attach().await.is_err());
                 })
                 .await
                 .expect("MOCK bounded startup reader exceeded its outer watchdog");
             });
+    }
+
+    fn credential_lifecycle_bookkeeping() {
+        let issuer = CredentialIssuer {
+            root_id: "root-original".into(),
+            port: 1578,
+            epoch: "epoch-original".into(),
+        };
+        let candidate = |ordinal| ScopedCredential {
+            issuer: issuer.clone(),
+            profile: "agent".into(),
+            principal: "principal-original".into(),
+            token: format!("local-bookkeeping-{ordinal}"),
+        };
+        let mut state = CredentialState::default();
+        for ordinal in 0..32 {
+            state.prepare_issuance(&issuer, "agent", Some("principal-original")).unwrap();
+            state.record_issued(candidate(ordinal), ClientLifetime::OneShot);
+        }
+        assert_eq!(state.owned.len(), 32);
+        state.record_issued(candidate(31), ClientLifetime::OneShot);
+        assert_eq!(state.owned.len(), 32);
+        assert!(state.prepare_issuance(&issuer, "agent", Some("principal-original")).is_err());
+        state.evict_cached();
+        assert!(state.cached.is_none());
+        assert_eq!(state.owned.len(), 32);
+        let mut next = issuer.clone();
+        next.epoch = "epoch-next".into();
+        next.root_id = "root-replacement".into();
+        assert!(state.prepare_issuance(&next, "agent", Some("principal-original")).is_err());
+        assert_eq!(state.owned.len(), 32);
+        next.root_id = issuer.root_id.clone();
+        assert!(state.prepare_issuance(&next, "agent", Some("principal-replacement")).is_err());
+        assert!(state.prepare_issuance(&next, "another-profile", Some("principal-original")).is_err());
+        assert_eq!(state.owned.len(), 32);
+        state.prepare_issuance(&next, "agent", Some("principal-original")).unwrap();
+        assert!(state.owned.is_empty());
+        for ordinal in 0..3 {
+            state.record_issued(candidate(ordinal), ClientLifetime::OneShot);
+        }
+        state.record_issued(candidate(0), ClientLifetime::OneShot);
+        let drained = state.take_owned_current_first();
+        assert_eq!(drained.len(), 3);
+        assert!(drained[0] == candidate(0));
+        assert!(state.owned.is_empty() && state.cached.is_none());
+        assert!(state.take_owned_current_first().is_empty());
+        state.record_issued(candidate(0), ClientLifetime::LongLived);
+        assert!(state.owned.is_empty());
+        assert!(state.cached.is_some());
+        let session = CredentialSession::new(ClientLifetime::OneShot);
+        assert!(session.ensure_open().is_ok());
+        assert!(session.close());
+        assert!(!session.close());
+        assert!(session.ensure_open().is_err());
+        let retained = CredentialSession::new(ClientLifetime::LongLived);
+        assert!(!retained.close());
+        assert!(retained.ensure_open().is_ok());
     }
 
     async fn mock_owner_startup_io(

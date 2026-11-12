@@ -695,6 +695,20 @@ impl Service {
         let _admission = self.ordinary_admission()?;
         let _guard = self.credentials.lock().map_err(|_| lock_error())?;
         let now = self.clock.now()?;
+        let (key, mut credential) = self.validated_credential_locked(token, origin, now)?;
+        if active && now > credential.last_active {
+            credential.last_active = now;
+            self.store.put(&key, &credential)?;
+        }
+        Ok(credential.context)
+    }
+    // Caller holds ordinary admission and the credential mutex, in that order.
+    fn validated_credential_locked(
+        &self,
+        token: &str,
+        origin: Option<&str>,
+        now: u64,
+    ) -> Result<(String, Credential)> {
         if token.len() > 256 {
             return Err(DomainError::new(
                 "AUTHENTICATION_REQUIRED",
@@ -705,7 +719,7 @@ impl Service {
             "credential/{}",
             hex::encode(Sha256::digest(token.as_bytes()))
         );
-        let mut credential: Credential = self.store.get(&key)?.ok_or_else(|| {
+        let credential: Credential = self.store.get(&key)?.ok_or_else(|| {
             DomainError::new(
                 "AUTHENTICATION_REQUIRED",
                 "Credential is missing or revoked",
@@ -724,11 +738,27 @@ impl Service {
             ));
         }
         self.policy(&credential.context)?;
-        if active && now > credential.last_active {
-            credential.last_active = now;
-            self.store.put(&key, &credential)?;
+        Ok((key, credential))
+    }
+    pub fn release_private_credential(&self, token: &str, context: &Context) -> Result<()> {
+        if context.profile.is_none() {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Only a scoped credential can release itself",
+            ));
         }
-        Ok(credential.context)
+        let _admission = self.ordinary_admission()?;
+        let _guard = self.credentials.lock().map_err(|_| lock_error())?;
+        let (key, credential) = self.validated_credential_locked(token, None, self.clock.now()?)?;
+        if credential.context.principal != context.principal
+            || credential.context.profile != context.profile
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "The authenticated context does not own this credential",
+            ));
+        }
+        self.store.remove(&key)
     }
     fn origin_generation(&self, origin: Option<&str>) -> Result<u64> {
         let generations = self.origins.lock().map_err(|_| lock_error())?;
@@ -3141,10 +3171,12 @@ mod tests {
         let accepted = service.dispatch(owner.clone(), create.clone()).await;
         assert!(accepted.ok, "{:?}", accepted.error);
         let token = service.credential("operator").unwrap();
+        let release_context = service.profile_context("operator").unwrap();
         let principal = service.authenticate(&token).unwrap().principal;
         let changed = mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"operator","expected_revision":1,"enabled":false,"mode":"operate","owned_object_access":true,"allowed_command_ids":[],"object_grants":[],"read_roots":[],"write_roots":[]})).await;
         assert!(changed.ok);
         assert!(service.authenticate(&token).is_err());
+        assert!(service.release_private_credential(&token, &release_context).is_err());
         let replay = service.dispatch(owner.clone(), create.clone()).await;
         assert_eq!(accepted.receipt_id, replay.receipt_id);
         assert_eq!(replay.result.unwrap()["revision"], 1);
@@ -3887,6 +3919,23 @@ mod tests {
                 .authenticate_at(&token, Some("http://127.0.0.1:1579"), true)
                 .is_err()
         );
+        let context = first.profile_context("agent").unwrap();
+        assert!(first.release_private_credential(&token, &context).is_err());
+        let private = first.credential("agent").unwrap();
+        let survivor = first.credential("agent").unwrap();
+        assert!(first.release_private_credential(&private, &first.owner()).is_err());
+        assert!(first.release_private_credential(
+            &private, &first.profile_context("browser").unwrap(),
+        ).is_err());
+        assert!(first.authenticate(&private).is_ok());
+        let mut mismatched_profile = context.clone();
+        mismatched_profile.profile = Some("browser".into());
+        assert!(first.release_private_credential(&private, &mismatched_profile).is_err());
+        assert!(first.authenticate(&private).is_ok());
+        first.release_private_credential(&private, &context).unwrap();
+        assert!(first.authenticate(&private).is_err());
+        assert!(first.release_private_credential(&private, &context).is_err());
+        assert!(first.authenticate(&survivor).is_ok());
         drop(first);
         let second = Service::open(root.path().to_owned(), None).await.unwrap();
         assert_eq!(
@@ -3898,6 +3947,10 @@ mod tests {
                 .authenticate_at(&token, Some("http://127.0.0.1:1578"), true)
                 .is_err()
         );
+        assert!(second.release_private_credential(&survivor, &context).is_err());
+        let current = second.credential("agent").unwrap();
+        second.release_private_credential(&current, &context).unwrap();
+        assert!(second.authenticate(&current).is_err());
     }
     #[tokio::test]
     async fn broad_owner_authority_cannot_publish_media_into_component_namespaces() {
