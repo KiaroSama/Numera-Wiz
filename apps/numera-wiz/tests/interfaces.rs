@@ -209,7 +209,8 @@ async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::L
         assert!(value.get("error").is_none());
         assert!(value["result"] == serde_json::to_value(expected).unwrap(), "MCP_ACTUAL_WIRE_STATIC_PAGE_DIFFERS");
         eprintln!("MCP_SCHEMA_SIZE kind=actual_stdio_jsonrpc_line bytes={}", frame.len());
-        let evidence = std::path::Path::new("target/interface-evidence/mcp-list-tools-wire.json");
+        let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/interface-evidence/mcp-list-tools-wire.json");
         std::fs::create_dir_all(evidence.parent().unwrap()).unwrap();
         std::fs::write(evidence, &frame).unwrap();
         drop(input);

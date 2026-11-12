@@ -76,7 +76,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all -- --check
-          rustfmt --edition 2024 --check ci/schema_validation.rs
+          rustfmt --edition 2024 --check test-support/schema_validation.rs
       - name: Prepare exact formatter changes
         if: always()
         shell: bash
@@ -84,9 +84,8 @@ jobs:
           cargo fmt --all
           cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
           cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all
-          rustfmt --edition 2024 ci/schema_validation.rs
+          rustfmt --edition 2024 test-support/schema_validation.rs
           git diff --binary -- crates apps xtask test-support > formatting.patch
-          git diff --binary -- ci/schema_validation.rs >> formatting.patch
       - name: Save formatter evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -345,9 +344,8 @@ jobs:
           cargo fmt --all
           cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
           cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all
-          rustfmt --edition 2024 ci/schema_validation.rs
+          rustfmt --edition 2024 test-support/schema_validation.rs
           git diff --binary -- crates apps xtask test-support > formatting.patch
-          git diff --binary -- ci/schema_validation.rs >> formatting.patch
       - name: Save dependency and generated evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
