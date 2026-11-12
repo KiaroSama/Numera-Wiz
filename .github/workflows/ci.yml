@@ -337,6 +337,7 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown
       - name: Verify preserved research hashes
+        if: ${{ !cancelled() }}
         run: cargo run --locked -p xtask -- verify-research
       - name: Prepare formatting evidence
         if: always()
