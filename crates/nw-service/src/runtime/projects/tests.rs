@@ -49,13 +49,14 @@ fn view(response: Response) -> Value {
         result_bytes <= 240 * 1024 && response_bytes <= nw_domain::commands::MAX_RESULT_BYTES,
         "R2_DETAIL_COMPLETE_BYTE_BOUND"
     );
-    assert!(
-        nw_domain::projects::authorization::ProjectAuthorization::from_observation(
-            result.get("authorization")
-        )
-        .is_some(),
-        "R2_DETAIL_METADATA_UNKNOWN"
-    );
+    if result["projection"] == "projects.summary.v1" {
+        for row in result["items"].as_array().unwrap() {
+            let summary: nw_domain::projects::views::ProjectSummary = serde_json::from_value(row.clone()).unwrap();
+            assert!(summary.known_authorization().is_some(), "R2_CATALOG_METADATA_UNKNOWN");
+        }
+    } else {
+        assert!(nw_domain::projects::authorization::ProjectAuthorization::from_observation(result.get("authorization")).is_some(), "R2_DETAIL_METADATA_UNKNOWN");
+    }
     eprintln!("R2_SIZE kind=detail result_bytes={result_bytes} response_bytes={response_bytes}");
     response.result.unwrap()
 }

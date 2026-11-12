@@ -1593,32 +1593,29 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
         metadata_size(&response, 0, limit, 0);
         conformance.observe(10 + index as u16, "projects.list", &response);
     }
-    // Storage boundary data measures maximum valid widths; it is not a public edit fixture.
-    let ids: Vec<_> = (0..64)
-        .map(|index| format!("00000000-0000-4000-8000-{index:012}"))
-        .collect();
-    let reader = f.profile("r2-size-boundary", &ids).await;
-    let key = format!("profile/{}", reader.profile.as_deref().unwrap());
-    let mut maximal: AccessProfile = f.service.store.get(&key).unwrap().unwrap();
-    maximal.revision = u64::MAX;
-    f.service.store.put(&key, &maximal).unwrap();
     let name = "é".repeat(64);
     assert_eq!(name.len(), 128);
-    let mut replacement = Value::Null;
-    for (stage, count) in [(0u16, 1usize), (1, 64)] {
-        for id in ids.iter().take(count) {
-            f.service
-                .store
-                .put(
-                    &format!("project/{id}"),
-                    &header(id, &owner.principal, &name),
-                )
-                .unwrap();
-        }
+    // Public profile grants must refer to real existing projects.
+    let mut ids = Vec::new();
+    for _ in 0..64 { ids.push(f.project(&owner, &name).await); }
+    let single = f.profile("r2-size-single", &ids[..1]).await;
+    let all = f.profile("r2-size-all", &ids).await;
+    // Only maximal revision/unknown-header widths use storage-boundary fixtures.
+    for reader in [&single, &all] {
+        let key = format!("profile/{}", reader.profile.as_deref().unwrap());
+        let mut maximal: AccessProfile = f.service.store.get(&key).unwrap().unwrap();
+        maximal.revision = u64::MAX;
+        f.service.store.put(&key, &maximal).unwrap();
+    }
+    for id in &ids {
+        f.service.store.put(&format!("project/{id}"), &header(id, &owner.principal, &name)).unwrap();
+    }
+    for (stage, count, reader) in [(0u16, 1usize, &single), (1, 64, &all)] {
+        let mut replacement = Value::Null;
         for (index, limit) in limits.into_iter().enumerate() {
             let response = f
                 .list(
-                    &reader,
+                    reader,
                     json!({"limit":limit,"replace_snapshot":replacement}),
                 )
                 .await;
@@ -1666,7 +1663,7 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
             &header(extra, &owner.principal, &name),
         )
         .unwrap();
-    let overflow = f.list(&reader, json!({"limit":512})).await;
+    let overflow = f.list(&all, json!({"limit":512})).await;
     assert!(overflow.result.is_none());
     assert!(serde_json::to_vec(&overflow).unwrap().len() <= commands::MAX_RESULT_BYTES);
     failed(overflow, "RESOURCE_LIMIT");
