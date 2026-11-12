@@ -1,4 +1,5 @@
 //! Exact, bounded project records. Payload JSON remains opaque until a known codec is needed.
+pub mod contracts;
 pub mod edit;
 mod json;
 pub mod views;

@@ -610,5 +610,244 @@ mod tests {
             }
         }
         eprintln!("Project family discovery: largest result_schema bytes={largest_schema_bytes}");
+
+        // Independent finite shape observations. This is not a JSON Schema validator
+        // or evidence that every real response conforms to its descriptor.
+        use serde_json::Value;
+
+        fn resolve<'a>(root: &'a Value, mut node: &'a Value) -> &'a Value {
+            for _ in 0..64 {
+                let Some(reference) = node.get("$ref").and_then(Value::as_str) else {
+                    return node;
+                };
+                node = root.pointer(&reference[1..]).expect("local schema reference");
+            }
+            panic!("Result schema reference cycle");
+        }
+        fn fields(root: &Value, node: &Value, expected: &[&str]) {
+            let node = resolve(root, node);
+            assert_eq!(node["type"], "object");
+            assert_eq!(node["additionalProperties"], false);
+            let properties = node["properties"].as_object().expect("finite properties");
+            let actual: std::collections::BTreeSet<_> =
+                properties.keys().map(String::as_str).collect();
+            let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
+            assert_eq!(actual, expected);
+            let required: std::collections::BTreeSet<_> = node["required"]
+                .as_array()
+                .expect("required fields")
+                .iter()
+                .map(|value| value.as_str().expect("required field name"))
+                .collect();
+            assert_eq!(required, expected);
+        }
+        // Observe only object-key admission, with no claim about scalar validation.
+        fn permits_keys(root: &Value, node: &Value, keys: &[&str]) -> bool {
+            let node = resolve(root, node);
+            let properties = node["properties"].as_object().expect("object properties");
+            keys.iter().all(|key| properties.contains_key(*key))
+                && node["required"].as_array().expect("required keys").iter().all(|key| {
+                    keys.contains(&key.as_str().expect("required key"))
+                })
+        }
+        let schema = |id: &str| -> &Value {
+            &rows.iter().find(|row| row["id"] == id).expect("listed command")["result_schema"]
+        };
+        let catalog = schema("projects.list");
+        fields(catalog, catalog, &[
+            "schema_version", "project_revision", "snapshot_id", "snapshot_expires_at",
+            "projection", "items", "next_cursor", "event_cursor", "total_count", "count_accuracy",
+        ]);
+        assert_eq!(catalog["properties"]["schema_version"], serde_json::json!({"const":1}));
+        assert_eq!(catalog["properties"]["projection"], serde_json::json!({"const":"projects.summary.v1"}));
+        assert_eq!(catalog["properties"]["count_accuracy"], serde_json::json!({"const":"exact"}));
+        for key in ["project_revision", "event_cursor"] {
+            assert_eq!(catalog["properties"][key], serde_json::json!({"type":"null"}));
+        }
+        assert_eq!(catalog["properties"]["items"]["maxItems"], 64);
+        let row = resolve(catalog, &catalog["properties"]["items"]["items"]);
+        fields(catalog, row, &[
+            "id", "name", "revision", "schema_major", "envelope_version", "compatibility",
+        ]);
+        assert_eq!(row["properties"]["compatibility"]["enum"], serde_json::json!(["supported","read_only_unsupported"]));
+
+        let detail_common = [
+            "schema_version", "project_revision", "snapshot_id", "snapshot_expires_at",
+            "projection", "event_cursor",
+        ];
+        for (id, projections) in [
+            ("projects.inspect", ["summary", "entity", "bin_page"]),
+            ("sequences.inspect", ["entity", "track_page", "viewport"]),
+        ] {
+            let root = schema(id);
+            let branches = root["oneOf"].as_array().expect("projection alternatives");
+            assert_eq!(branches.len(), 3);
+            for projection in projections {
+                let branch = branches.iter().find(|branch| branch["properties"]["projection"]["const"] == projection).expect("literal projection");
+                let mut keys = detail_common.to_vec();
+                match projection {
+                    "summary" => keys.extend([
+                        "project_id", "root_bin_id", "name", "entity_count", "sequence_count",
+                        "schema_major", "envelope_version", "compatibility", "history",
+                        "writer_status", "read_only",
+                    ]),
+                    "entity" => keys.push("entity"),
+                    _ => keys.extend(["items", "next_cursor", "total_count", "count_accuracy"]),
+                }
+                fields(root, branch, &keys);
+                assert_eq!(branch["properties"]["schema_version"], serde_json::json!({"const":1}));
+                assert_eq!(branch["properties"]["event_cursor"], serde_json::json!({"type":"null"}));
+                assert!(resolve(root, &branch["properties"]["project_revision"])["pattern"].is_string());
+                if projection == "summary" {
+                    assert_eq!(branch["properties"]["writer_status"]["enum"], serde_json::json!([
+                        "this_owner", "available", "other_owner_read_only", "writer_lease_unavailable_read_only",
+                    ]));
+                    assert_eq!(branch["properties"]["read_only"]["type"], "boolean");
+                } else if projection != "entity" {
+                    let next = branch["properties"]["next_cursor"]["anyOf"].as_array().unwrap();
+                    assert_eq!(next, &vec![serde_json::json!({"type":"string"}), serde_json::json!({"type":"null"})]);
+                    assert_eq!(branch["properties"]["items"]["maxItems"], 512);
+                    let item = &branch["properties"]["items"]["items"];
+                    match projection {
+                        "bin_page" => fields(root, item, &["id", "kind", "name"]),
+                        "track_page" => {
+                            fields(root, item, &["id", "kind", "name", "order", "clip_count"]);
+                            assert_eq!(resolve(root, item)["properties"]["kind"]["enum"], serde_json::json!(["video","audio"]));
+                        }
+                        "viewport" => fields(root, item, &["id", "track_id", "source_id", "sequence_start", "duration"]),
+                        _ => unreachable!(),
+                    }
+                    if projection == "viewport" {
+                        assert_eq!(branch["properties"]["count_accuracy"]["enum"], serde_json::json!(["exact","lower_bound"]));
+                    } else {
+                        assert_eq!(branch["properties"]["count_accuracy"], serde_json::json!({"const":"exact"}));
+                    }
+                }
+            }
+        }
+        let inspect = schema("projects.inspect");
+        let defs = &inspect["$defs"];
+        let entity_common = [
+            "id", "kind", "kind_version", "envelope_version", "owner_id", "enabled",
+            "references", "semantic_scope", "name", "payload_sha256", "compatibility",
+        ];
+        for (name, extra) in [
+            ("BinEntity", vec!["member_count", "locked"]),
+            ("SequenceEntity", vec!["settings", "track_count", "locked"]),
+            ("TrackEntity", vec!["sequence_id", "order", "grid", "clip_count", "locked"]),
+            ("ClipEntity", vec!["sequence_id", "track_id", "source_id", "occurrence_id", "source_range", "sequence_start", "duration", "rate", "link_group_id", "locked"]),
+            ("SolidSourceEntity", vec!["source_kind", "rgba", "duration"]),
+            ("RegisteredSourceEntity", vec!["source_kind", "asset_id", "content_sha256", "probe_sha256", "stream_index", "media_kind", "extent_verification"]),
+            ("OpaqueEntity", vec!["payload_json"]),
+        ] {
+            let node = &defs[name];
+            let mut keys = entity_common.to_vec();
+            keys.extend(extra);
+            fields(inspect, node, &keys);
+            assert_eq!(node["properties"]["compatibility"]["enum"], serde_json::json!(["supported_or_optional_annotation","read_only_affected_scope"]));
+            assert_eq!(node["properties"]["owner_id"]["anyOf"][1], serde_json::json!({"type":"null"}));
+            if name != "OpaqueEntity" {
+                assert_eq!(node["properties"]["kind_version"], serde_json::json!({"const":1}));
+                assert_eq!(node["properties"]["envelope_version"], serde_json::json!({"const":1}));
+                assert!(node["properties"].get("payload_json").is_none());
+            }
+        }
+        fields(inspect, &defs["EntityReference"], &["role", "target"]);
+        fields(inspect, &defs["SequenceSettings"], &["width", "height", "frame_rate", "sample_rate", "audio_layout"]);
+        fields(inspect, &defs["SourceSpan"], &["start", "end"]);
+        assert_eq!(defs["EntityReference"]["properties"]["role"]["type"], "string");
+        assert_eq!(defs["TrackEntity"]["properties"]["kind"]["enum"], serde_json::json!(["video","audio"]));
+        assert_eq!(defs["SolidSourceEntity"]["properties"]["kind"]["const"], "source_binding");
+        assert_eq!(defs["SolidSourceEntity"]["properties"]["source_kind"]["const"], "solid_color");
+        assert_eq!(defs["RegisteredSourceEntity"]["properties"]["source_kind"]["const"], "registered");
+        assert_eq!(defs["RegisteredSourceEntity"]["properties"]["extent_verification"]["type"], "string");
+        assert_eq!(defs["RegisteredSourceEntity"]["properties"]["media_kind"]["enum"], serde_json::json!(["video","audio"]));
+        let rgba = &defs["SolidSourceEntity"]["properties"]["rgba"];
+        assert_eq!(rgba["minItems"], 4);
+        assert_eq!(rgba["maxItems"], 4);
+        assert_eq!(rgba["items"]["type"], "number");
+        assert_eq!(defs["OpaqueEntity"]["properties"]["payload_json"], serde_json::json!({"type":"string"}));
+        assert_ne!(defs["OpaqueEntity"]["properties"]["payload_json"]["type"], "object");
+        assert_eq!(defs["OpaqueEntity"]["not"]["properties"]["kind"]["enum"], serde_json::json!(["bin","sequence","track","clip","source_binding"]));
+        assert_eq!(defs["Entity"]["anyOf"].as_array().unwrap().len(), 7);
+        assert!(defs["Entity"].get("oneOf").is_none());
+        let mut opaque_keys = entity_common.to_vec();
+        assert!(!permits_keys(inspect, &defs["OpaqueEntity"], &opaque_keys));
+        opaque_keys.push("payload_json");
+        assert!(permits_keys(inspect, &defs["OpaqueEntity"], &opaque_keys));
+        opaque_keys.push("project_id");
+        assert!(!permits_keys(inspect, &defs["OpaqueEntity"], &opaque_keys));
+        let sequence = schema("sequences.inspect");
+        let sequence_entities = &sequence["$defs"]["SequenceProjectionEntity"]["anyOf"];
+        assert_eq!(sequence_entities, &serde_json::json!([
+            {"$ref":"#/$defs/SequenceEntity"},{"$ref":"#/$defs/OpaqueSequenceEntity"},
+        ]));
+        assert_eq!(sequence["$defs"]["OpaqueSequenceEntity"]["properties"]["kind"]["const"], "sequence");
+        fields(inspect, &defs["Rational"], &["num", "den"]);
+        assert_eq!(defs["Rational"]["properties"]["num"]["pattern"], "^(0|-?[1-9][0-9]*)$");
+        assert_eq!(defs["Rational"]["properties"]["den"]["pattern"], "^[1-9][0-9]*$");
+
+        let edit_keys = ["project_id", "base_revision", "revision", "operation_id", "created", "changed_ids", "history"];
+        for (id, created_keys, noop) in [
+            ("sequences.create", vec!["sequence_id", "tracks"], false),
+            ("clips.place", vec!["source_id", "clip_ids"], false),
+            ("clips.move", vec![], true),
+            ("clips.link", vec!["link_group_id", "clip_ids"], true),
+            ("clips.unlink", vec!["clip_ids"], true),
+            ("clips.split", vec!["clip_ids", "no_change"], true),
+            ("clips.remove", vec![], false),
+            ("history.undo", vec![], false),
+            ("history.redo", vec![], false),
+        ] {
+            let root = schema(id);
+            let changed = if noop { &root["oneOf"][0] } else { root };
+            fields(root, changed, &edit_keys);
+            assert!(permits_keys(root, changed, &edit_keys));
+            let mut marked_keys = edit_keys.to_vec();
+            marked_keys.push("no_change");
+            assert!(!permits_keys(root, changed, &marked_keys));
+            assert!(changed["properties"].get("no_change").is_none());
+            assert_eq!(changed["properties"]["changed_ids"]["minItems"], 1);
+            fields(root, &changed["properties"]["created"], &created_keys);
+            fields(root, &changed["properties"]["history"], &[
+                "can_undo", "can_redo", "retained_operations", "retained_bytes", "history_floor", "journal_floor",
+            ]);
+            for floor in ["history_floor", "journal_floor"] {
+                assert_eq!(resolve(root, &root["$defs"]["History"]["properties"][floor])["type"], "string");
+            }
+            if noop {
+                assert_eq!(root["oneOf"].as_array().unwrap().len(), 2);
+                let unchanged = &root["oneOf"][1];
+                let mut keys = edit_keys.to_vec();
+                keys.push("no_change");
+                fields(root, unchanged, &keys);
+                assert!(permits_keys(root, unchanged, &keys));
+                assert!(!permits_keys(root, unchanged, &edit_keys));
+                assert_eq!(unchanged["properties"]["no_change"], serde_json::json!({"const":true}));
+                assert_ne!(unchanged["properties"]["no_change"], serde_json::json!({"const":false}));
+                assert_eq!(unchanged["properties"]["changed_ids"]["maxItems"], 0);
+                fields(root, &unchanged["properties"]["created"], &created_keys);
+            } else {
+                assert!(root.get("oneOf").is_none());
+            }
+            if id == "clips.split" {
+                assert_eq!(changed["properties"]["created"]["properties"]["no_change"], serde_json::json!({"const":false}));
+                assert_eq!(root["oneOf"][1]["properties"]["created"]["properties"]["no_change"], serde_json::json!({"const":true}));
+                assert_eq!(root["oneOf"][1]["properties"]["created"]["properties"]["clip_ids"]["maxItems"], 0);
+            }
+        }
+        let sequence_create = schema("sequences.create");
+        let tracks = &sequence_create["$defs"]["Created"]["properties"]["tracks"];
+        fields(sequence_create, &tracks["items"], &["id", "kind"]);
+        assert_eq!(tracks["items"]["properties"]["kind"]["enum"], serde_json::json!(["video","audio"]));
+        let link = schema("clips.link");
+        assert_eq!(link["$defs"]["Created"]["properties"]["link_group_id"]["$ref"], "#/$defs/OpaqueGroup");
+        assert_eq!(link["$defs"]["OpaqueGroup"]["type"], "string");
+        for (id, minimum) in [("clips.link", 2), ("clips.unlink", 1)] {
+            let clips = &schema(id)["$defs"]["Created"]["properties"]["clip_ids"];
+            assert_eq!(clips["minItems"], minimum);
+            assert_eq!(clips["maxItems"], 128);
+            assert_eq!(clips["uniqueItems"], true);
+        }
     }
 }

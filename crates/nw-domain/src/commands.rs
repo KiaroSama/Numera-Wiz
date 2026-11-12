@@ -212,11 +212,23 @@ fn descriptor_schema_version_default() -> u32 {
     1
 }
 fn result_schema(id: &str) -> Option<Value> {
+    use crate::projects::contracts::{self, EditResult};
     match id {
         "projects.create" => Some(
             serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
                 .expect("schema"),
         ),
+        "projects.list" => Some(contracts::catalog()),
+        "projects.inspect" => Some(contracts::inspect(false)),
+        "sequences.inspect" => Some(contracts::inspect(true)),
+        "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
+        "clips.place" => Some(contracts::edit(EditResult::Place)),
+        "clips.move" => Some(contracts::edit(EditResult::Move)),
+        "clips.link" => Some(contracts::edit(EditResult::Link)),
+        "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
+        "clips.split" => Some(contracts::edit(EditResult::Split)),
+        "clips.remove" => Some(contracts::edit(EditResult::Remove)),
+        "history.undo" | "history.redo" => Some(contracts::edit(EditResult::History)),
         _ => None,
     }
 }
