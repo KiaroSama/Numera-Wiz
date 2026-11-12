@@ -20,7 +20,9 @@ impl AvailabilityState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockReason {
     CommandNotAllowed,
@@ -30,7 +32,9 @@ pub enum BlockReason {
     WriterObservedUnavailable,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RequestGate {
     CurrentPolicy,
@@ -110,7 +114,10 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         request_gates.push(RequestGate::HistoryState);
     }
     if command == "clips.place" {
-        request_gates.extend([RequestGate::SourceObjectRights, RequestGate::SourcePathAndIdentity]);
+        request_gates.extend([
+            RequestGate::SourceObjectRights,
+            RequestGate::SourcePathAndIdentity,
+        ]);
     }
     Some(AuthorizationRequirements {
         schema_version: 1,
@@ -130,7 +137,10 @@ pub struct CurrentRight {
 impl CurrentRight {
     pub fn observed(granted: bool, reason: BlockReason) -> Self {
         let reasons = if granted { Vec::new() } else { vec![reason] };
-        Self { state: AvailabilityState::for_reasons(&reasons), reasons }
+        Self {
+            state: AvailabilityState::for_reasons(&reasons),
+            reasons,
+        }
     }
 }
 
@@ -180,9 +190,17 @@ impl ProjectAuthorization {
         }
         for key in ["current_read", "current_edit"] {
             let right = value.get(key)?;
-            if right.as_object()?.len() != 2 || right.get("reasons")?.as_array()?.len() > 1
-                || !matches!(right.get("state")?.as_str()?, "unavailable" | "requires_request_validation")
-                || right.get("reasons")?.as_array()?.iter().any(|reason| reason.as_str().is_none_or(|text| text.len() > 32))
+            if right.as_object()?.len() != 2
+                || right.get("reasons")?.as_array()?.len() > 1
+                || !matches!(
+                    right.get("state")?.as_str()?,
+                    "unavailable" | "requires_request_validation"
+                )
+                || right
+                    .get("reasons")?
+                    .as_array()?
+                    .iter()
+                    .any(|reason| reason.as_str().is_none_or(|text| text.len() > 32))
             {
                 return None;
             }
@@ -192,8 +210,15 @@ impl ProjectAuthorization {
                 || action.get("command_id")?.as_str()?.len() > 32
                 || action.get("reasons")?.as_array()?.len() > 5
                 || action.get("unchecked_gates")?.as_array()?.len() > 10
-                || !matches!(action.get("state")?.as_str()?, "unavailable" | "requires_request_validation")
-                || action.get("reasons")?.as_array()?.iter().chain(action.get("unchecked_gates")?.as_array()?)
+                || !matches!(
+                    action.get("state")?.as_str()?,
+                    "unavailable" | "requires_request_validation"
+                )
+                || action
+                    .get("reasons")?
+                    .as_array()?
+                    .iter()
+                    .chain(action.get("unchecked_gates")?.as_array()?)
                     .any(|label| label.as_str().is_none_or(|text| text.len() > 32))
             {
                 return None;
@@ -212,8 +237,11 @@ impl ProjectAuthorization {
         }
         for (action, command) in decoded.actions.iter().zip(PROJECT_TARGET_COMMANDS) {
             let requirement = requirements(command)?;
-            let gates: Vec<_> = requirement.request_gates.into_iter()
-                .filter(|gate| *gate != RequestGate::ProjectRights).collect();
+            let gates: Vec<_> = requirement
+                .request_gates
+                .into_iter()
+                .filter(|gate| *gate != RequestGate::ProjectRights)
+                .collect();
             if action.command_id != command
                 || action.state != AvailabilityState::for_reasons(&action.reasons)
                 || !ordered(&action.reasons)
@@ -223,12 +251,31 @@ impl ProjectAuthorization {
                 return None;
             }
             let read = requirement.project_action == Some(ProjectAction::Read);
-            let denied = if read { &decoded.current_read } else { &decoded.current_edit };
-            let reason = if read { BlockReason::ProjectReadNotGranted } else { BlockReason::ProjectEditNotGranted };
+            let denied = if read {
+                &decoded.current_read
+            } else {
+                &decoded.current_edit
+            };
+            let reason = if read {
+                BlockReason::ProjectReadNotGranted
+            } else {
+                BlockReason::ProjectEditNotGranted
+            };
             let missing_right = !denied.reasons.is_empty();
             if action.reasons.contains(&reason) != missing_right
-                || action.reasons.contains(&if read { BlockReason::ProjectEditNotGranted } else { BlockReason::ProjectReadNotGranted })
-                || (read && action.reasons.iter().any(|reason| matches!(reason, BlockReason::UnsupportedProjectSchema | BlockReason::WriterObservedUnavailable)))
+                || action.reasons.contains(&if read {
+                    BlockReason::ProjectEditNotGranted
+                } else {
+                    BlockReason::ProjectReadNotGranted
+                })
+                || (read
+                    && action.reasons.iter().any(|reason| {
+                        matches!(
+                            reason,
+                            BlockReason::UnsupportedProjectSchema
+                                | BlockReason::WriterObservedUnavailable
+                        )
+                    }))
             {
                 return None;
             }

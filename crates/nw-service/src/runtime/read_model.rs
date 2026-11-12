@@ -433,9 +433,15 @@ impl Service {
                 },
                 |mut summary, creator| {
                     summary.authorization = Some(value(&super::project_authorization::project(
-                        policy.as_ref(), super::project_authorization::ProjectObservation {
-                            id: summary.id.as_str(), creator, revision: summary.revision,
-                            supported: matches!(summary.compatibility, nw_domain::projects::views::ProjectCompatibility::Supported),
+                        policy.as_ref(),
+                        super::project_authorization::ProjectObservation {
+                            id: summary.id.as_str(),
+                            creator,
+                            revision: summary.revision,
+                            supported: matches!(
+                                summary.compatibility,
+                                nw_domain::projects::views::ProjectCompatibility::Supported
+                            ),
                             writer_unavailable: false,
                         },
                     ))?);
@@ -719,8 +725,12 @@ mod tests {
         assert_eq!(catalog["next_cursor"], Value::Null);
         assert_eq!(catalog["event_cursor"], Value::Null);
         assert!(catalog["snapshot_expires_at"].is_string());
-        let legacy_rows: Vec<_> = catalog["items"].as_array().unwrap().iter()
-            .map(catalog_tests::legacy_header).collect();
+        let legacy_rows: Vec<_> = catalog["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(catalog_tests::legacy_header)
+            .collect();
         assert_eq!(
             Value::Array(legacy_rows),
             json!([{

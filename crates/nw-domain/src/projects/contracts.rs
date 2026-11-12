@@ -84,11 +84,15 @@ fn availability_states() -> Value {
 }
 
 fn ordered_reasons(allowed: &[super::authorization::BlockReason]) -> Value {
-    let choices: Vec<Vec<_>> = (0..(1usize << allowed.len())).map(|mask| {
-        allowed.iter().enumerate().filter_map(|(index, reason)| {
-            (mask & (1 << index) != 0).then_some(*reason)
-        }).collect()
-    }).collect();
+    let choices: Vec<Vec<_>> = (0..(1usize << allowed.len()))
+        .map(|mask| {
+            allowed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, reason)| (mask & (1 << index) != 0).then_some(*reason))
+                .collect()
+        })
+        .collect();
     json!({"type":"array","maxItems":allowed.len(),"enum":choices})
 }
 
@@ -101,19 +105,35 @@ fn availability_relation(mut schema: Value) -> Value {
 }
 
 fn query_definitions() -> Map<String, Value> {
-    use super::authorization::{BlockReason as Reason, ProjectAction, RequestGate, PROJECT_TARGET_COMMANDS, requirements};
+    use super::authorization::{
+        BlockReason as Reason, PROJECT_TARGET_COMMANDS, ProjectAction, RequestGate, requirements,
+    };
     let mut defs = definitions();
     defs.insert("ProjectAvailabilityState".into(), availability_states());
-    defs.insert("ProjectReadReasons".into(), ordered_reasons(&[Reason::CommandNotAllowed, Reason::ProjectReadNotGranted]));
-    defs.insert("ProjectEditReasons".into(), ordered_reasons(&[Reason::CommandNotAllowed, Reason::ProjectEditNotGranted, Reason::UnsupportedProjectSchema, Reason::WriterObservedUnavailable]));
+    defs.insert(
+        "ProjectReadReasons".into(),
+        ordered_reasons(&[Reason::CommandNotAllowed, Reason::ProjectReadNotGranted]),
+    );
+    defs.insert(
+        "ProjectEditReasons".into(),
+        ordered_reasons(&[
+            Reason::CommandNotAllowed,
+            Reason::ProjectEditNotGranted,
+            Reason::UnsupportedProjectSchema,
+            Reason::WriterObservedUnavailable,
+        ]),
+    );
     for (name, reason) in [
         ("ProjectCurrentRead", Reason::ProjectReadNotGranted),
         ("ProjectCurrentEdit", Reason::ProjectEditNotGranted),
     ] {
-        defs.insert(name.into(), availability_relation(object([
-            ("state", reference("ProjectAvailabilityState")),
-            ("reasons", ordered_reasons(&[reason])),
-        ])));
+        defs.insert(
+            name.into(),
+            availability_relation(object([
+                ("state", reference("ProjectAvailabilityState")),
+                ("reasons", ordered_reasons(&[reason])),
+            ])),
+        );
     }
     for (name, command) in [
         ("ProjectReadAction", "projects.inspect"),
@@ -122,28 +142,42 @@ fn query_definitions() -> Map<String, Value> {
         ("ProjectHistoryAction", "history.undo"),
     ] {
         let requirement = requirements(command).expect("Static project requirements");
-        let gates: Vec<_> = requirement.request_gates.into_iter()
-            .filter(|gate| *gate != RequestGate::ProjectRights).collect();
-        defs.insert(name.into(), availability_relation(object([
-            ("command_id", string()),
-            ("state", reference("ProjectAvailabilityState")),
-            ("reasons", reference(if requirement.project_action == Some(ProjectAction::Read) {
-                "ProjectReadReasons"
-            } else { "ProjectEditReasons" })),
-            ("unchecked_gates", json!({"type":"array","const":gates})),
-        ])));
+        let gates: Vec<_> = requirement
+            .request_gates
+            .into_iter()
+            .filter(|gate| *gate != RequestGate::ProjectRights)
+            .collect();
+        defs.insert(
+            name.into(),
+            availability_relation(object([
+                ("command_id", string()),
+                ("state", reference("ProjectAvailabilityState")),
+                (
+                    "reasons",
+                    reference(if requirement.project_action == Some(ProjectAction::Read) {
+                        "ProjectReadReasons"
+                    } else {
+                        "ProjectEditReasons"
+                    }),
+                ),
+                ("unchecked_gates", json!({"type":"array","const":gates})),
+            ])),
+        );
     }
-    let actions: Vec<_> = PROJECT_TARGET_COMMANDS.into_iter().map(|command| {
-        let class = match command {
-            "projects.inspect" | "sequences.inspect" => "ProjectReadAction",
-            "clips.place" => "ProjectPlaceAction",
-            "history.undo" | "history.redo" => "ProjectHistoryAction",
-            "sequences.create" | "clips.move" | "clips.link" | "clips.unlink"
-            | "clips.split" | "clips.remove" => "ProjectEditAction",
-            _ => unreachable!("Unknown project target schema"),
-        };
-        json!({"allOf":[reference(class),{"properties":{"command_id":{"const":command}}}]})
-    }).collect();
+    let actions: Vec<_> = PROJECT_TARGET_COMMANDS
+        .into_iter()
+        .map(|command| {
+            let class = match command {
+                "projects.inspect" | "sequences.inspect" => "ProjectReadAction",
+                "clips.place" => "ProjectPlaceAction",
+                "history.undo" | "history.redo" => "ProjectHistoryAction",
+                "sequences.create" | "clips.move" | "clips.link" | "clips.unlink"
+                | "clips.split" | "clips.remove" => "ProjectEditAction",
+                _ => unreachable!("Unknown project target schema"),
+            };
+            json!({"allOf":[reference(class),{"properties":{"command_id":{"const":command}}}]})
+        })
+        .collect();
     defs.insert("ProjectAuthorization".into(), object([
         ("schema_version", json!({"const":1})),
         ("policy_revision", reference("Revision")),

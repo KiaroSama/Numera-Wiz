@@ -426,7 +426,10 @@ mod tests {
             .unwrap_or_else(|error| panic!("historical descriptor must deserialize: {error}"));
         assert_eq!(legacy.descriptor_schema_version, 1, "{legacy:?}");
         assert!(legacy.result_schema.is_none(), "{legacy:?}");
-        assert!(legacy.authorization_requirements.is_none(), "R2_LEGACY_STATIC_REQUIREMENTS_CHANGED");
+        assert!(
+            legacy.authorization_requirements.is_none(),
+            "R2_LEGACY_STATIC_REQUIREMENTS_CHANGED"
+        );
         assert_eq!(
             legacy.project_context,
             commands::ProjectContextRule::Forbidden,
@@ -489,21 +492,40 @@ mod tests {
     }
 
     fn project_authorization_requirements_are_static() {
-        let listed = CommandService.dispatch(Principal::DiscoveryAgent,
-            Request::query("commands.list", serde_json::json!({})));
+        let listed = CommandService.dispatch(
+            Principal::DiscoveryAgent,
+            Request::query("commands.list", serde_json::json!({})),
+        );
         assert!(listed.ok && listed.error.is_none() && listed.receipt_id.is_none());
         let result = listed.result.as_ref().unwrap();
-        assert!(result.get("authorization").is_none(), "R2_PURE_DISCOVERY_HAS_CALLER");
-        let family: std::collections::BTreeSet<_> = crate::schema_validation::COMMANDS.into_iter().collect();
-        let vocabulary = ["current_policy","project_context","project_rights","request_parameters",
-            "expected_revision","writer_lease","affected_scope","history_state","source_object_rights","source_path_and_identity"];
+        assert!(
+            result.get("authorization").is_none(),
+            "R2_PURE_DISCOVERY_HAS_CALLER"
+        );
+        let family: std::collections::BTreeSet<_> =
+            crate::schema_validation::COMMANDS.into_iter().collect();
+        let vocabulary = [
+            "current_policy",
+            "project_context",
+            "project_rights",
+            "request_parameters",
+            "expected_revision",
+            "writer_lease",
+            "affected_scope",
+            "history_state",
+            "source_object_rights",
+            "source_path_and_identity",
+        ];
         let mut count = 0;
         for row in result["commands"].as_array().unwrap() {
             let id = row["id"].as_str().unwrap();
             assert!(row.get("authorization").is_none() && row.get("policy_revision").is_none());
             assert!(row.get("current_read").is_none() && row.get("current_edit").is_none());
             if !family.contains(id) {
-                assert!(row.get("authorization_requirements").is_none(), "R2_UNRELATED_REQUIREMENTS");
+                assert!(
+                    row.get("authorization_requirements").is_none(),
+                    "R2_UNRELATED_REQUIREMENTS"
+                );
                 continue;
             }
             count += 1;
@@ -519,25 +541,60 @@ mod tests {
             assert!(requirement["project_action"] == expected_action);
             let gates = requirement["request_gates"].as_array().unwrap();
             assert!(gates.len() <= 10);
-            let positions: Vec<_> = gates.iter().map(|gate| vocabulary.iter()
-                .position(|known| gate.as_str() == Some(*known)).expect("R2_STATIC_UNKNOWN_GATE")).collect();
+            let positions: Vec<_> = gates
+                .iter()
+                .map(|gate| {
+                    vocabulary
+                        .iter()
+                        .position(|known| gate.as_str() == Some(*known))
+                        .expect("R2_STATIC_UNKNOWN_GATE")
+                })
+                .collect();
             assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
-            assert!(gates.contains(&serde_json::json!("current_policy")) && gates.contains(&serde_json::json!("request_parameters")));
+            assert!(
+                gates.contains(&serde_json::json!("current_policy"))
+                    && gates.contains(&serde_json::json!("request_parameters"))
+            );
             let exact = match id {
-                "projects.create" => Some(serde_json::json!(["current_policy","request_parameters","writer_lease"])),
-                "projects.list" => Some(serde_json::json!(["current_policy","project_rights","request_parameters"])),
-                "clips.link" | "clips.unlink" => Some(serde_json::json!(["current_policy","project_context","project_rights","request_parameters","expected_revision","writer_lease","affected_scope"])),
+                "projects.create" => Some(serde_json::json!([
+                    "current_policy",
+                    "request_parameters",
+                    "writer_lease"
+                ])),
+                "projects.list" => Some(serde_json::json!([
+                    "current_policy",
+                    "project_rights",
+                    "request_parameters"
+                ])),
+                "clips.link" | "clips.unlink" => Some(serde_json::json!([
+                    "current_policy",
+                    "project_context",
+                    "project_rights",
+                    "request_parameters",
+                    "expected_revision",
+                    "writer_lease",
+                    "affected_scope"
+                ])),
                 _ => None,
             };
-            if let Some(exact) = exact { assert!(requirement["request_gates"] == exact); }
-            let schema = CommandService.dispatch(Principal::DiscoveryAgent,
-                Request::query("commands.schema", serde_json::json!({"id":id})));
+            if let Some(exact) = exact {
+                assert!(requirement["request_gates"] == exact);
+            }
+            let schema = CommandService.dispatch(
+                Principal::DiscoveryAgent,
+                Request::query("commands.schema", serde_json::json!({"id":id})),
+            );
             assert!(schema.ok && schema.result.as_ref() == Some(row));
         }
         assert_eq!(count, 13);
-        let local = CommandService.dispatch(Principal::LocalUser,
-            Request::query("commands.list", serde_json::json!({})));
-        assert!(local.ok && local.result.as_ref() == listed.result.as_ref(), "R2_PURE_PRINCIPAL_CHANGES_STATIC_DISCOVERY");
+        let local = CommandService.dispatch(
+            Principal::LocalUser,
+            Request::query("commands.list", serde_json::json!({})),
+        );
+        assert!(
+            local.ok && local.result.as_ref() == listed.result.as_ref(),
+            "R2_PURE_PRINCIPAL_CHANGES_STATIC_DISCOVERY"
+        );
     }
 
     fn project_family_result_schemas_are_published_and_self_contained() {

@@ -245,7 +245,8 @@ pub struct Descriptor {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_schema: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authorization_requirements: Option<crate::projects::authorization::AuthorizationRequirements>,
+    pub authorization_requirements:
+        Option<crate::projects::authorization::AuthorizationRequirements>,
     #[serde(default, skip_serializing_if = "ProjectContextRule::forbidden")]
     pub project_context: ProjectContextRule,
 }

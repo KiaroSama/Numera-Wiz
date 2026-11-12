@@ -154,9 +154,18 @@ fn header(id: &str, creator: &str, name: &str) -> Value {
 pub(super) fn legacy_header(row: &Value) -> Value {
     let current: nw_domain::projects::views::ProjectSummary =
         serde_json::from_value(row.clone()).expect("R2_PUBLIC_HEADER_DECODE");
-    assert!(current.known_authorization().is_some(), "R2_PUBLIC_AUTHORIZATION_UNKNOWN");
+    assert!(
+        current.known_authorization().is_some(),
+        "R2_PUBLIC_AUTHORIZATION_UNKNOWN"
+    );
     let mut legacy = row.clone();
-    assert!(legacy.as_object_mut().unwrap().remove("authorization").is_some());
+    assert!(
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("authorization")
+            .is_some()
+    );
     legacy
 }
 
@@ -190,7 +199,10 @@ pub(super) async fn headers_and_rights() {
     assert_eq!(page["items"][0]["id"], own);
     assert!(!page.to_string().contains(&foreign));
     assert!(!page.to_string().contains(&owner.principal));
-    assert_eq!(legacy_header(&page["items"][0]).as_object().unwrap().len(), 6);
+    assert_eq!(
+        legacy_header(&page["items"][0]).as_object().unwrap().len(),
+        6
+    );
     let reader = f
         .profile("catalog-reader", std::slice::from_ref(&foreign))
         .await;
@@ -1087,10 +1099,16 @@ async fn publication_races(f: &Fixture, projects: &[String]) {
                 .await;
             if action == "edit" {
                 f.update(&reader, |input| {
-                    input["object_grants"] = json!(projects.iter().map(|id| {
-                        json!({"kind":"project","id":id,"actions":["read","edit"]})
-                    }).collect::<Vec<_>>());
-                }).await;
+                    input["object_grants"] = json!(
+                        projects
+                            .iter()
+                            .map(|id| {
+                                json!({"kind":"project","id":id,"actions":["read","edit"]})
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                })
+                .await;
             }
             let first = if continuation {
                 Some(view(f.list(&reader, json!({"limit":1})).await))
@@ -1138,11 +1156,16 @@ async fn publication_races(f: &Fixture, projects: &[String]) {
                 "edit" => tokio::time::timeout(
                     Duration::from_secs(5),
                     f.update(&reader, |input| {
-                        input["object_grants"] = json!(projects.iter().map(|id| {
-                            json!({"kind":"project","id":id,"actions":["read"]})
-                        }).collect::<Vec<_>>());
+                        input["object_grants"] = json!(
+                            projects
+                                .iter()
+                                .map(|id| { json!({"kind":"project","id":id,"actions":["read"]}) })
+                                .collect::<Vec<_>>()
+                        );
                     }),
-                ).await.expect("Edit revocation blocked by cache mutex"),
+                )
+                .await
+                .expect("Edit revocation blocked by cache mutex"),
                 "expire" => {}
                 _ => unreachable!(),
             }
@@ -1173,10 +1196,13 @@ async fn publication_races(f: &Fixture, projects: &[String]) {
 }
 
 pub(super) async fn rights_and_command_metadata() {
-    let mut conformance = crate::project_schema_batch(7, &[
-        1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-        50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-    ]);
+    let mut conformance = crate::project_schema_batch(
+        7,
+        &[
+            1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 50, 51, 52, 53,
+            54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+        ],
+    );
     let f = Fixture::new().await;
     let owner = f.service.owner();
     let name = "R2 command metadata";
@@ -1207,7 +1233,11 @@ pub(super) async fn rights_and_command_metadata() {
         root,
     ];
     let first = metadata_catalog(
-        conformance.capture(1, "projects.list", f.list(&reader, json!({"limit":64})).await),
+        conformance.capture(
+            1,
+            "projects.list",
+            f.list(&reader, json!({"limit":64})).await,
+        ),
         &project,
         name,
         &private,
@@ -1221,8 +1251,17 @@ pub(super) async fn rights_and_command_metadata() {
 
     // UNEXECUTED until the marker boundary above passes in hosted execution.
     assert_command_metadata(&first["authorization"], &read_only, false, false);
-    let first_detail = conformance.capture(4, "projects.inspect", metadata_detail(&f, &reader, &project).await);
-    assert_command_metadata(&view(first_detail)["authorization"], &read_only, false, false);
+    let first_detail = conformance.capture(
+        4,
+        "projects.inspect",
+        metadata_detail(&f, &reader, &project).await,
+    );
+    assert_command_metadata(
+        &view(first_detail)["authorization"],
+        &read_only,
+        false,
+        false,
+    );
     f.update(&reader, |input| {
         input["object_grants"] = json!([{"kind":"project","id":project,"actions":["read","edit"]}]);
     })
@@ -1231,14 +1270,27 @@ pub(super) async fn rights_and_command_metadata() {
     assert!(editable.allowed_command_ids == read_only.allowed_command_ids);
     assert!(editable.revision > read_only.revision);
     let second = metadata_catalog(
-        conformance.capture(2, "projects.list", f.list(&reader, json!({"limit":64})).await),
+        conformance.capture(
+            2,
+            "projects.list",
+            f.list(&reader, json!({"limit":64})).await,
+        ),
         &project,
         name,
         &private,
     );
     assert_command_metadata(&second["authorization"], &editable, true, false);
-    let second_detail = conformance.capture(5, "projects.inspect", metadata_detail(&f, &reader, &project).await);
-    assert_command_metadata(&view(second_detail)["authorization"], &editable, true, false);
+    let second_detail = conformance.capture(
+        5,
+        "projects.inspect",
+        metadata_detail(&f, &reader, &project).await,
+    );
+    assert_command_metadata(
+        &view(second_detail)["authorization"],
+        &editable,
+        true,
+        false,
+    );
 
     // UNEXECUTED until both preceding metadata stages pass.
     f.update(&reader, |input| {
@@ -1253,15 +1305,32 @@ pub(super) async fn rights_and_command_metadata() {
     assert!(unlink_only.allowed_command_ids == allowed);
     assert!(unlink_only.revision > editable.revision);
     let third = metadata_catalog(
-        conformance.capture(3, "projects.list", f.list(&reader, json!({"limit":64})).await),
+        conformance.capture(
+            3,
+            "projects.list",
+            f.list(&reader, json!({"limit":64})).await,
+        ),
         &project,
         name,
         &private,
     );
     assert_command_metadata(&third["authorization"], &unlink_only, true, true);
-    let third_detail = conformance.capture(6, "projects.inspect", metadata_detail(&f, &reader, &project).await);
-    assert_command_metadata(&view(third_detail)["authorization"], &unlink_only, true, true);
-    let owner_detail = conformance.capture(7, "projects.inspect", metadata_detail(&f, &owner, &project).await);
+    let third_detail = conformance.capture(
+        6,
+        "projects.inspect",
+        metadata_detail(&f, &reader, &project).await,
+    );
+    assert_command_metadata(
+        &view(third_detail)["authorization"],
+        &unlink_only,
+        true,
+        true,
+    );
+    let owner_detail = conformance.capture(
+        7,
+        "projects.inspect",
+        metadata_detail(&f, &owner, &project).await,
+    );
     assert_eq!(view(owner_detail)["authorization"]["policy_revision"], "0");
 
     use nw_domain::projects::views::ProjectSummary;
@@ -1269,47 +1338,101 @@ pub(super) async fn rights_and_command_metadata() {
     assert!(known.known_authorization().is_some());
     for newer in [false, true] {
         let mut copy = first.clone();
-        if newer { copy["authorization"]["schema_version"] = json!(2); }
-        else { copy.as_object_mut().unwrap().remove("authorization"); }
+        if newer {
+            copy["authorization"]["schema_version"] = json!(2);
+        } else {
+            copy.as_object_mut().unwrap().remove("authorization");
+        }
         copy["read_only"] = json!(false);
-        let historical: ProjectSummary = serde_json::from_value(copy).expect("R2_HISTORICAL_READER");
-        assert!(historical.known_authorization().is_none(), "R2_UNKNOWN_MARKER_GRANTED_RIGHTS");
+        let historical: ProjectSummary =
+            serde_json::from_value(copy).expect("R2_HISTORICAL_READER");
+        assert!(
+            historical.known_authorization().is_none(),
+            "R2_UNKNOWN_MARKER_GRANTED_RIGHTS"
+        );
     }
-    conformance.reject_copy(50, 1, |v| { v["items"][0].as_object_mut().unwrap().remove("authorization"); });
-    conformance.reject_copy(51, 1, |v| { v["items"][0]["authorization"]["schema_version"] = json!(2); });
+    conformance.reject_copy(50, 1, |v| {
+        v["items"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("authorization");
+    });
+    conformance.reject_copy(51, 1, |v| {
+        v["items"][0]["authorization"]["schema_version"] = json!(2);
+    });
     conformance.reject_copy(52, 1, |v| {
         let action = &mut v["items"][0]["authorization"]["actions"][0];
-        action["state"] = json!("unavailable"); action["reasons"] = json!(["unknown_reason"]);
+        action["state"] = json!("unavailable");
+        action["reasons"] = json!(["unknown_reason"]);
     });
-    conformance.reject_copy(53, 1, |v| { v["items"][0]["authorization"]["actions"].as_array_mut().unwrap().swap(0, 2); });
-    conformance.reject_copy(54, 1, |v| { v["items"][0]["authorization"]["actions"][0]["unchecked_gates"] = json!([]); });
-    conformance.reject_copy(55, 1, |v| { v["items"][0]["authorization"]["actions"][0]["state"] = json!("ready"); });
-    conformance.reject_copy(56, 2, |v| { v["items"][0]["authorization"]["current_edit"]["state"] = json!("unavailable"); });
-    conformance.reject_copy(57, 1, |v| { v["items"][0]["authorization"]["extra_field"] = json!(true); });
-    conformance.reject_copy(58, 1, |v| { v["items"][0]["authorization"]["policy_revision"] = json!(1); });
-    conformance.reject_copy(59, 1, |v| { v["items"][0]["authorization"]["observed_project_revision"] = json!("01"); });
-    conformance.reject_copy(60, 1, |v| { v["items"][0]["authorization"]["current_edit"]["reasons"] = json!(["project_read_not_granted"]); });
-    conformance.reject_copy(61, 1, |v| { v["items"][0]["authorization"]["actions"].as_array_mut().unwrap().remove(0); });
+    conformance.reject_copy(53, 1, |v| {
+        v["items"][0]["authorization"]["actions"]
+            .as_array_mut()
+            .unwrap()
+            .swap(0, 2);
+    });
+    conformance.reject_copy(54, 1, |v| {
+        v["items"][0]["authorization"]["actions"][0]["unchecked_gates"] = json!([]);
+    });
+    conformance.reject_copy(55, 1, |v| {
+        v["items"][0]["authorization"]["actions"][0]["state"] = json!("ready");
+    });
+    conformance.reject_copy(56, 2, |v| {
+        v["items"][0]["authorization"]["current_edit"]["state"] = json!("unavailable");
+    });
+    conformance.reject_copy(57, 1, |v| {
+        v["items"][0]["authorization"]["extra_field"] = json!(true);
+    });
+    conformance.reject_copy(58, 1, |v| {
+        v["items"][0]["authorization"]["policy_revision"] = json!(1);
+    });
+    conformance.reject_copy(59, 1, |v| {
+        v["items"][0]["authorization"]["observed_project_revision"] = json!("01");
+    });
+    conformance.reject_copy(60, 1, |v| {
+        v["items"][0]["authorization"]["current_edit"]["reasons"] =
+            json!(["project_read_not_granted"]);
+    });
+    conformance.reject_copy(61, 1, |v| {
+        v["items"][0]["authorization"]["actions"]
+            .as_array_mut()
+            .unwrap()
+            .remove(0);
+    });
     conformance.reject_copy(62, 1, |v| {
         let action = &mut v["items"][0]["authorization"]["actions"][0];
-        action["state"] = json!("unavailable"); action["reasons"] = json!(["command_not_allowed", "command_not_allowed"]);
+        action["state"] = json!("unavailable");
+        action["reasons"] = json!(["command_not_allowed", "command_not_allowed"]);
     });
-    conformance.reject_copy(63, 1, |v| { v["items"][0]["authorization"]["current_read"] = json!(true); });
-    conformance.reject_copy(64, 7, |v| { v.as_object_mut().unwrap().remove("authorization"); });
+    conformance.reject_copy(63, 1, |v| {
+        v["items"][0]["authorization"]["current_read"] = json!(true);
+    });
+    conformance.reject_copy(64, 7, |v| {
+        v.as_object_mut().unwrap().remove("authorization");
+    });
     metadata_runtime_discovery(&f, &reader, &project).await;
     metadata_size_bounds(&mut conformance).await;
     metadata_writer_observation().await;
     conformance.finish().await;
     // The existing reaper can wait on the snapshot mutex while a publication is paused.
     tokio::task::spawn_blocking(|| {
-        tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()
-            .unwrap().block_on(metadata_publication_races());
-    }).await.unwrap();
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(metadata_publication_races());
+    })
+    .await
+    .unwrap();
 }
 
 async fn metadata_detail(f: &Fixture, context: &Context, project: &str) -> Response {
     let mut request = Request::query("projects.inspect", json!({"projection":"summary"}));
-    request.project = Some(ProjectRef { id: project.into(), expected_revision: None });
+    request.project = Some(ProjectRef {
+        id: project.into(),
+        expected_revision: None,
+    });
     f.service.dispatch(context.clone(), request).await
 }
 
@@ -1319,39 +1442,76 @@ async fn metadata_runtime_discovery(f: &Fixture, reader: &Context, project: &str
     f.update(reader, |input| {
         let allowed = input["allowed_command_ids"].as_array_mut().unwrap();
         for command in ["commands.list", "commands.schema"] {
-            if !allowed.iter().any(|value| value == command) { allowed.push(json!(command)); }
+            if !allowed.iter().any(|value| value == command) {
+                allowed.push(json!(command));
+            }
         }
-    }).await;
+    })
+    .await;
     let profile = metadata_profile(f, reader, project, json!(["read", "edit"]));
     let expected_revision = profile.revision.to_string();
-    let pure = crate::CommandService.dispatch(crate::Principal::DiscoveryAgent,
-        Request::query("commands.list", json!({}))).result.unwrap();
-    assert!(pure.get("authorization").is_none(), "R2_PURE_DISCOVERY_HAS_LIVE_FACTS");
+    let pure = crate::CommandService
+        .dispatch(
+            crate::Principal::DiscoveryAgent,
+            Request::query("commands.list", json!({})),
+        )
+        .result
+        .unwrap();
+    assert!(
+        pure.get("authorization").is_none(),
+        "R2_PURE_DISCOVERY_HAS_LIVE_FACTS"
+    );
     let mut results = Vec::new();
     for (kind, context) in [("owner", owner.clone()), ("delegated", reader.clone())] {
-        let response = f.service.dispatch(context, Request::query("commands.list", json!({}))).await;
+        let response = f
+            .service
+            .dispatch(context, Request::query("commands.list", json!({})))
+            .await;
         let bytes = serde_json::to_vec(&response).unwrap().len();
-        assert!(response.ok && bytes <= commands::MAX_RESULT_BYTES, "R2_DISCOVERY_RESPONSE_BOUND");
+        assert!(
+            response.ok && bytes <= commands::MAX_RESULT_BYTES,
+            "R2_DISCOVERY_RESPONSE_BOUND"
+        );
         eprintln!("R2_SIZE kind=discovery actor={kind} response_bytes={bytes}");
         let listing = view(response);
-        assert!(listing["commands"] == pure["commands"], "R2_DISCOVERY_STATIC_ROWS_CHANGED");
+        assert!(
+            listing["commands"] == pure["commands"],
+            "R2_DISCOVERY_STATIC_ROWS_CHANGED"
+        );
         assert_eq!(listing["authorization"].as_object().unwrap().len(), 3);
         assert_eq!(listing["authorization"]["schema_version"], 1);
         assert!(listing["authorization"].get("current_read").is_none());
         assert!(listing["authorization"].get("current_edit").is_none());
         let visible = listing.to_string();
-        for private in [reader.principal.as_str(), reader.profile.as_deref().unwrap(), owner.principal.as_str(), f.root.path().to_str().unwrap()] {
+        for private in [
+            reader.principal.as_str(),
+            reader.profile.as_deref().unwrap(),
+            owner.principal.as_str(),
+            f.root.path().to_str().unwrap(),
+        ] {
             assert!(!visible.contains(private), "R2_DISCOVERY_PRIVATE_FACT");
         }
         results.push(listing);
     }
     assert_eq!(results[0]["authorization"]["policy_revision"], "0");
-    assert!(results[1]["authorization"]["policy_revision"].as_str() == Some(expected_revision.as_str()));
+    assert!(
+        results[1]["authorization"]["policy_revision"].as_str() == Some(expected_revision.as_str())
+    );
     let rows = results[0]["commands"].as_array().unwrap();
-    let family: Vec<_> = rows.iter().filter(|row| row.get("authorization_requirements").is_some()).collect();
+    let family: Vec<_> = rows
+        .iter()
+        .filter(|row| row.get("authorization_requirements").is_some())
+        .collect();
     assert_eq!(family.len(), 13);
-    let expected: std::collections::BTreeSet<_> = crate::schema_validation::COMMANDS.into_iter().collect();
-    assert_eq!(family.iter().map(|row| row["id"].as_str().unwrap()).collect::<std::collections::BTreeSet<_>>(), expected);
+    let expected: std::collections::BTreeSet<_> =
+        crate::schema_validation::COMMANDS.into_iter().collect();
+    assert_eq!(
+        family
+            .iter()
+            .map(|row| row["id"].as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>(),
+        expected
+    );
     for (index, row) in family.iter().enumerate() {
         let command = row["id"].as_str().unwrap();
         let owner_action = &results[0]["authorization"]["actions"][index];
@@ -1370,24 +1530,58 @@ async fn metadata_runtime_discovery(f: &Fixture, reader: &Context, project: &str
         }
         if row["authorization_requirements"]["project_action"].is_string() {
             let gates = action["unchecked_gates"].as_array().unwrap();
-            assert!(gates.contains(&json!("project_context")) && gates.contains(&json!("project_rights")));
+            assert!(
+                gates.contains(&json!("project_context"))
+                    && gates.contains(&json!("project_rights"))
+            );
         }
     }
     for id in ["projects.create", "projects.list", "clips.link"] {
         let request = Request::query("commands.schema", json!({"id":id}));
-        let static_result = crate::CommandService.dispatch(crate::Principal::DiscoveryAgent, request.clone()).result.unwrap();
+        let static_result = crate::CommandService
+            .dispatch(crate::Principal::DiscoveryAgent, request.clone())
+            .result
+            .unwrap();
         let response = f.service.dispatch(reader.clone(), request).await;
-        assert!(response.ok && serde_json::to_vec(&response).unwrap().len() <= commands::MAX_RESULT_BYTES);
-        assert!(response.result.as_ref() == Some(&static_result), "R2_SCHEMA_CARRIES_LIVE_AUTHORITY");
+        assert!(
+            response.ok
+                && serde_json::to_vec(&response).unwrap().len() <= commands::MAX_RESULT_BYTES
+        );
+        assert!(
+            response.result.as_ref() == Some(&static_result),
+            "R2_SCHEMA_CARRIES_LIVE_AUTHORITY"
+        );
         assert!(static_result.get("authorization").is_none());
     }
-    f.update(reader, |input| input["allowed_command_ids"].as_array_mut().unwrap().retain(|id| id != "commands.list")).await;
-    let denied = f.service.dispatch(reader.clone(), Request::query("commands.list", json!({}))).await;
+    f.update(reader, |input| {
+        input["allowed_command_ids"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|id| id != "commands.list")
+    })
+    .await;
+    let denied = f
+        .service
+        .dispatch(reader.clone(), Request::query("commands.list", json!({})))
+        .await;
     assert!(denied.result.is_none());
     failed(denied, "PERMISSION_DENIED");
-    f.update(reader, |input| input["enabled"] = json!(false)).await;
-    failed(f.service.dispatch(reader.clone(), Request::query("commands.schema", json!({"id":"clips.link"}))).await, "PERMISSION_DENIED");
-    assert_eq!(commands::registry_fingerprint(), fingerprint, "R2_LIVE_POLICY_CHANGED_STATIC_FINGERPRINT");
+    f.update(reader, |input| input["enabled"] = json!(false))
+        .await;
+    failed(
+        f.service
+            .dispatch(
+                reader.clone(),
+                Request::query("commands.schema", json!({"id":"clips.link"})),
+            )
+            .await,
+        "PERMISSION_DENIED",
+    );
+    assert_eq!(
+        commands::registry_fingerprint(),
+        fingerprint,
+        "R2_LIVE_POLICY_CHANGED_STATIC_FINGERPRINT"
+    );
 }
 
 async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch) {
@@ -1400,7 +1594,9 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
         conformance.observe(10 + index as u16, "projects.list", &response);
     }
     // Storage boundary data measures maximum valid widths; it is not a public edit fixture.
-    let ids: Vec<_> = (0..64).map(|index| format!("00000000-0000-4000-8000-{index:012}")).collect();
+    let ids: Vec<_> = (0..64)
+        .map(|index| format!("00000000-0000-4000-8000-{index:012}"))
+        .collect();
     let reader = f.profile("r2-size-boundary", &ids).await;
     let key = format!("profile/{}", reader.profile.as_deref().unwrap());
     let mut maximal: AccessProfile = f.service.store.get(&key).unwrap().unwrap();
@@ -1411,26 +1607,50 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
     let mut replacement = Value::Null;
     for (stage, count) in [(0u16, 1usize), (1, 64)] {
         for id in ids.iter().take(count) {
-            f.service.store.put(&format!("project/{id}"), &header(id, &owner.principal, &name)).unwrap();
+            f.service
+                .store
+                .put(
+                    &format!("project/{id}"),
+                    &header(id, &owner.principal, &name),
+                )
+                .unwrap();
         }
         for (index, limit) in limits.into_iter().enumerate() {
-            let response = f.list(&reader, json!({"limit":limit,"replace_snapshot":replacement})).await;
+            let response = f
+                .list(
+                    &reader,
+                    json!({"limit":limit,"replace_snapshot":replacement}),
+                )
+                .await;
             metadata_size(&response, count, limit, limit.min(count));
             let page = response.result.as_ref().unwrap();
             assert_eq!(page["total_count"], count);
             for row in page["items"].as_array().unwrap() {
                 assert_eq!(row["name"], name);
                 let encoded = serde_json::to_vec(row).unwrap();
-                let decoded: nw_domain::projects::views::ProjectSummary = serde_json::from_slice(&encoded).unwrap();
+                let decoded: nw_domain::projects::views::ProjectSummary =
+                    serde_json::from_slice(&encoded).unwrap();
                 assert_eq!(decoded.name, name);
-                let auth = decoded.known_authorization().expect("R2_BOUNDARY_METADATA_UNKNOWN");
+                let auth = decoded
+                    .known_authorization()
+                    .expect("R2_BOUNDARY_METADATA_UNKNOWN");
                 let maximum = u64::MAX.to_string();
                 assert!(auth.policy_revision.as_str() == maximum.as_str());
                 assert!(auth.observed_project_revision.as_str() == maximum.as_str());
                 assert_eq!(auth.current_read.state, nw_domain::projects::authorization::AvailabilityState::RequiresRequestValidation);
-                assert_eq!(auth.current_edit.reasons, [nw_domain::projects::authorization::BlockReason::ProjectEditNotGranted]);
+                assert_eq!(
+                    auth.current_edit.reasons,
+                    [nw_domain::projects::authorization::BlockReason::ProjectEditNotGranted]
+                );
                 let place = metadata_action(&row["authorization"], "clips.place");
-                assert_eq!(place["reasons"], json!(["command_not_allowed","project_edit_not_granted","unsupported_project_schema"]));
+                assert_eq!(
+                    place["reasons"],
+                    json!([
+                        "command_not_allowed",
+                        "project_edit_not_granted",
+                        "unsupported_project_schema"
+                    ])
+                );
                 assert_eq!(place["unchecked_gates"].as_array().unwrap().len(), 8);
             }
             replacement = page["snapshot_id"].clone();
@@ -1439,7 +1659,13 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
         assert_eq!(f.count(), 0, "R2_BOUNDARY_SINGLE_PAGE_RETAINED");
     }
     let extra = "00000000-0000-4000-8000-000000000064";
-    f.service.store.put(&format!("project/{extra}"), &header(extra, &owner.principal, &name)).unwrap();
+    f.service
+        .store
+        .put(
+            &format!("project/{extra}"),
+            &header(extra, &owner.principal, &name),
+        )
+        .unwrap();
     let overflow = f.list(&reader, json!({"limit":512})).await;
     assert!(overflow.result.is_none());
     assert!(serde_json::to_vec(&overflow).unwrap().len() <= commands::MAX_RESULT_BYTES);
@@ -1448,19 +1674,36 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
 }
 
 fn metadata_size(response: &Response, total: usize, limit: usize, delivered: usize) {
-    assert!(response.ok && response.error.is_none() && response.receipt_id.is_none(), "R2_SIZE_QUERY_FAILED");
+    assert!(
+        response.ok && response.error.is_none() && response.receipt_id.is_none(),
+        "R2_SIZE_QUERY_FAILED"
+    );
     let page = response.result.as_ref().expect("R2_SIZE_RESULT_MISSING");
     assert_eq!(page["items"].as_array().unwrap().len(), delivered);
     let result_bytes = serde_json::to_vec(page).unwrap().len();
     let response_bytes = serde_json::to_vec(response).unwrap().len();
-    assert!(result_bytes <= MAX_PAGE_BYTES && response_bytes <= commands::MAX_RESULT_BYTES, "R2_SIZE_EXCEEDED");
-    if total <= limit { assert!(page.get("next_cursor") == Some(&Value::Null), "R2_SIZE_SILENT_PAGINATION"); }
-    eprintln!("R2_SIZE kind=catalog total={total} limit={limit} delivered={delivered} result_bytes={result_bytes} response_bytes={response_bytes}");
+    assert!(
+        result_bytes <= MAX_PAGE_BYTES && response_bytes <= commands::MAX_RESULT_BYTES,
+        "R2_SIZE_EXCEEDED"
+    );
+    if total <= limit {
+        assert!(
+            page.get("next_cursor") == Some(&Value::Null),
+            "R2_SIZE_SILENT_PAGINATION"
+        );
+    }
+    eprintln!(
+        "R2_SIZE kind=catalog total={total} limit={limit} delivered={delivered} result_bytes={result_bytes} response_bytes={response_bytes}"
+    );
 }
 
 fn metadata_action<'a>(authorization: &'a Value, command: &str) -> &'a Value {
-    authorization["actions"].as_array().expect("R2_ACTIONS_MISSING").iter()
-        .find(|action| action["command_id"] == command).expect("R2_ACTION_MISSING")
+    authorization["actions"]
+        .as_array()
+        .expect("R2_ACTIONS_MISSING")
+        .iter()
+        .find(|action| action["command_id"] == command)
+        .expect("R2_ACTION_MISSING")
 }
 
 async fn metadata_writer_observation() {
@@ -1471,40 +1714,94 @@ async fn metadata_writer_observation() {
     let bin = summary["root_bin_id"].as_str().unwrap().to_owned();
     let reader = f.profile("r2-writer", std::slice::from_ref(&project)).await;
     f.update(&reader, |input| {
-        input["allowed_command_ids"].as_array_mut().unwrap().extend([json!("clips.link"), json!("clips.unlink")]);
-    }).await;
+        input["allowed_command_ids"]
+            .as_array_mut()
+            .unwrap()
+            .extend([json!("clips.link"), json!("clips.unlink")]);
+    })
+    .await;
     f.service.project_writers.lock().unwrap().clear();
-    let held = nw_platform::project_lease::ProjectWriterLease::acquire(&nw_domain::projects::ProjectId::parse(&project).unwrap()).unwrap();
+    let held = nw_platform::project_lease::ProjectWriterLease::acquire(
+        &nw_domain::projects::ProjectId::parse(&project).unwrap(),
+    )
+    .unwrap();
     let read_only = view(metadata_detail(&f, &reader, &project).await);
     assert_eq!(read_only["writer_status"], "other_owner_read_only");
-    assert_eq!(read_only["authorization"]["current_edit"], json!({"state":"unavailable","reasons":["project_edit_not_granted"]}));
-    assert_eq!(metadata_action(&read_only["authorization"], "clips.link")["reasons"], json!(["project_edit_not_granted","writer_observed_unavailable"]));
-    f.update(&reader, |input| input["object_grants"] = json!([{"kind":"project","id":project,"actions":["read","edit"]}])).await;
+    assert_eq!(
+        read_only["authorization"]["current_edit"],
+        json!({"state":"unavailable","reasons":["project_edit_not_granted"]})
+    );
+    assert_eq!(
+        metadata_action(&read_only["authorization"], "clips.link")["reasons"],
+        json!(["project_edit_not_granted", "writer_observed_unavailable"])
+    );
+    f.update(
+        &reader,
+        |input| {
+            input["object_grants"] =
+                json!([{"kind":"project","id":project,"actions":["read","edit"]}])
+        },
+    )
+    .await;
     let editable = view(metadata_detail(&f, &reader, &project).await);
-    assert_eq!(editable["authorization"]["current_edit"], json!({"state":"requires_request_validation","reasons":[]}));
-    assert_eq!(metadata_action(&editable["authorization"], "clips.link")["reasons"], json!(["writer_observed_unavailable"]));
-    let mut request = Request::query("projects.inspect", json!({"projection":"entity","entity_id":bin}));
-    request.project = Some(ProjectRef { id:project.clone(), expected_revision:None });
+    assert_eq!(
+        editable["authorization"]["current_edit"],
+        json!({"state":"requires_request_validation","reasons":[]})
+    );
+    assert_eq!(
+        metadata_action(&editable["authorization"], "clips.link")["reasons"],
+        json!(["writer_observed_unavailable"])
+    );
+    let mut request = Request::query(
+        "projects.inspect",
+        json!({"projection":"entity","entity_id":bin}),
+    );
+    request.project = Some(ProjectRef {
+        id: project.clone(),
+        expected_revision: None,
+    });
     let entity = view(f.service.dispatch(reader.clone(), request).await);
     assert!(entity.get("writer_status").is_none());
     let unobserved = metadata_action(&entity["authorization"], "clips.link");
     assert_eq!(unobserved["state"], "requires_request_validation");
     assert_eq!(unobserved["reasons"], json!([]));
-    assert!(unobserved["unchecked_gates"].as_array().unwrap().contains(&json!("writer_lease")));
+    assert!(
+        unobserved["unchecked_gates"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("writer_lease"))
+    );
     drop(held);
     let available = view(metadata_detail(&f, &reader, &project).await);
     assert_eq!(available["writer_status"], "available");
-    assert_eq!(metadata_action(&available["authorization"], "clips.link")["state"], "requires_request_validation");
-    assert!(metadata_action(&available["authorization"], "clips.link")["unchecked_gates"].as_array().unwrap().contains(&json!("writer_lease")));
+    assert_eq!(
+        metadata_action(&available["authorization"], "clips.link")["state"],
+        "requires_request_validation"
+    );
+    assert!(
+        metadata_action(&available["authorization"], "clips.link")["unchecked_gates"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("writer_lease"))
+    );
 }
 
 fn metadata_query(project: &str, params: Value) -> Request {
     let mut request = Request::query("projects.inspect", params);
-    request.project = Some(ProjectRef { id:project.into(), expected_revision:None });
+    request.project = Some(ProjectRef {
+        id: project.into(),
+        expected_revision: None,
+    });
     request
 }
 
-async fn metadata_sequence(f: &Fixture, owner: &Context, project: &str, revision: &str, name: &str) {
+async fn metadata_sequence(
+    f: &Fixture,
+    owner: &Context,
+    project: &str,
+    revision: &str,
+    name: &str,
+) {
     let result = f.write_project(owner, "sequences.create", json!({"name":name,
         "settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},
         "tracks":[{"kind":"video","name":"Video"}]}),
@@ -1513,7 +1810,11 @@ async fn metadata_sequence(f: &Fixture, owner: &Context, project: &str, revision
 }
 
 async fn metadata_publication_races() {
-    for phase in [CatalogPhase::ProjectFresh, CatalogPhase::ProjectReused, CatalogPhase::ProjectCursor] {
+    for phase in [
+        CatalogPhase::ProjectFresh,
+        CatalogPhase::ProjectReused,
+        CatalogPhase::ProjectCursor,
+    ] {
         for change in ["cancel", "expire", "read", "edit", "command", "disable"] {
             let f = Fixture::new().await;
             let owner = f.service.owner();
@@ -1521,57 +1822,139 @@ async fn metadata_publication_races() {
             metadata_sequence(&f, &owner, &project, "0", "A").await;
             metadata_sequence(&f, &owner, &project, "1", "B").await;
             let bin = view(metadata_detail(&f, &owner, &project).await)["root_bin_id"].clone();
-            let reader = f.profile("r2-publication", std::slice::from_ref(&project)).await;
-            f.update(&reader, |input| input["object_grants"] = json!([{"kind":"project","id":project,"actions":["read","edit"]}])).await;
+            let reader = f
+                .profile("r2-publication", std::slice::from_ref(&project))
+                .await;
+            f.update(
+                &reader,
+                |input| {
+                    input["object_grants"] =
+                        json!([{"kind":"project","id":project,"actions":["read","edit"]}])
+                },
+            )
+            .await;
             let (ticket, params) = if phase == CatalogPhase::ProjectFresh {
                 (None, json!({"projection":"summary"}))
             } else if phase == CatalogPhase::ProjectReused {
                 let ticket = f.ticket(&reader, &project, None).await;
                 metadata_sequence(&f, &owner, &project, "2", "C").await;
-                let pinned = view(f.service.dispatch(reader.clone(), metadata_query(&project,
-                    json!({"projection":"entity","entity_id":bin,"revision":"2"}))).await);
+                let pinned = view(
+                    f.service
+                        .dispatch(
+                            reader.clone(),
+                            metadata_query(
+                                &project,
+                                json!({"projection":"entity","entity_id":bin,"revision":"2"}),
+                            ),
+                        )
+                        .await,
+                );
                 assert_eq!(pinned["project_revision"], "2");
                 assert_eq!(pinned["authorization"]["observed_project_revision"], "3");
                 assert_eq!(pinned["entity"]["member_count"], 2);
-                (Some(ticket), json!({"projection":"bin_page","bin_id":bin,"revision":"2","limit":64}))
+                (
+                    Some(ticket),
+                    json!({"projection":"bin_page","bin_id":bin,"revision":"2","limit":64}),
+                )
             } else {
-                let first = view(f.service.dispatch(reader.clone(), metadata_query(&project,
-                    json!({"projection":"bin_page","bin_id":bin,"limit":1}))).await);
+                let first = view(
+                    f.service
+                        .dispatch(
+                            reader.clone(),
+                            metadata_query(
+                                &project,
+                                json!({"projection":"bin_page","bin_id":bin,"limit":1}),
+                            ),
+                        )
+                        .await,
+                );
                 assert!(first["next_cursor"].is_string());
                 metadata_sequence(&f, &owner, &project, "2", "C").await;
                 let params = json!({"projection":"bin_page","bin_id":bin,"limit":1,"cursor":first["next_cursor"]});
-                let pinned = view(f.service.dispatch(reader.clone(), metadata_query(&project, params.clone())).await);
+                let pinned = view(
+                    f.service
+                        .dispatch(reader.clone(), metadata_query(&project, params.clone()))
+                        .await,
+                );
                 assert_eq!(pinned["project_revision"], "2");
                 assert_eq!(pinned["authorization"]["observed_project_revision"], "3");
                 assert_eq!(pinned["total_count"], 2);
-                (Some(first["snapshot_id"].as_str().unwrap().to_owned()), params)
+                (
+                    Some(first["snapshot_id"].as_str().unwrap().to_owned()),
+                    params,
+                )
             };
             let before = f.count();
-            let bindings = ticket.as_ref().map(|id| f.service.snapshots.lock().unwrap().projects[id].binding_count());
+            let bindings = ticket
+                .as_ref()
+                .map(|id| f.service.snapshots.lock().unwrap().projects[id].binding_count());
             let cancellation = CancellationToken::new();
             let token = cancellation.clone();
             let (ready, resume) = pause(&f.service, phase);
             let service = f.service.clone();
             let context = reader.clone();
             let request = metadata_query(&project, params);
-            let task = tokio::spawn(async move { service.dispatch_cancel(context, request, token).await });
+            let task =
+                tokio::spawn(async move { service.dispatch_cancel(context, request, token).await });
             reached(ready).await;
             match change {
                 "cancel" => cancellation.cancel(),
-                "read" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["object_grants"] = json!([{"kind":"project","id":project,"actions":["edit"]}]))).await.expect("R2_READ_REVOCATION_BLOCKED"),
-                "edit" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["object_grants"] = json!([{"kind":"project","id":project,"actions":["read"]}]))).await.expect("R2_EDIT_REVOCATION_BLOCKED"),
-                "command" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["allowed_command_ids"].as_array_mut().unwrap().retain(|id| id != "projects.inspect"))).await.expect("R2_COMMAND_REVOCATION_BLOCKED"),
-                "disable" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["enabled"] = json!(false))).await.expect("R2_POLICY_DISABLE_BLOCKED"),
-                "expire" => {},
+                "read" => tokio::time::timeout(
+                    Duration::from_secs(5),
+                    f.update(&reader, |input| {
+                        input["object_grants"] =
+                            json!([{"kind":"project","id":project,"actions":["edit"]}])
+                    }),
+                )
+                .await
+                .expect("R2_READ_REVOCATION_BLOCKED"),
+                "edit" => tokio::time::timeout(
+                    Duration::from_secs(5),
+                    f.update(&reader, |input| {
+                        input["object_grants"] =
+                            json!([{"kind":"project","id":project,"actions":["read"]}])
+                    }),
+                )
+                .await
+                .expect("R2_EDIT_REVOCATION_BLOCKED"),
+                "command" => tokio::time::timeout(
+                    Duration::from_secs(5),
+                    f.update(&reader, |input| {
+                        input["allowed_command_ids"]
+                            .as_array_mut()
+                            .unwrap()
+                            .retain(|id| id != "projects.inspect")
+                    }),
+                )
+                .await
+                .expect("R2_COMMAND_REVOCATION_BLOCKED"),
+                "disable" => tokio::time::timeout(
+                    Duration::from_secs(5),
+                    f.update(&reader, |input| input["enabled"] = json!(false)),
+                )
+                .await
+                .expect("R2_POLICY_DISABLE_BLOCKED"),
+                "expire" => {}
                 _ => unreachable!(),
             }
             resume.send(change == "expire").unwrap();
             let response = finish(task).await;
             assert!(response.result.is_none() && response.receipt_id.is_none());
-            failed(response, match change { "cancel" => "CANCELLED", "disable" => "PERMISSION_DENIED", _ => "SNAPSHOT_EXPIRED" });
+            failed(
+                response,
+                match change {
+                    "cancel" => "CANCELLED",
+                    "disable" => "PERMISSION_DENIED",
+                    _ => "SNAPSHOT_EXPIRED",
+                },
+            );
             assert_eq!(f.count(), before, "R2_REJECTED_PUBLICATION_RETAINED_TICKET");
             if let Some(id) = ticket {
-                assert_eq!(Some(f.service.snapshots.lock().unwrap().projects[&id].binding_count()), bindings, "R2_REJECTED_PUBLICATION_ADDED_BINDING");
+                assert_eq!(
+                    Some(f.service.snapshots.lock().unwrap().projects[&id].binding_count()),
+                    bindings,
+                    "R2_REJECTED_PUBLICATION_ADDED_BINDING"
+                );
             }
         }
     }
@@ -1579,26 +1962,65 @@ async fn metadata_publication_races() {
         let f = Fixture::new().await;
         let owner = f.service.owner();
         let project = f.project(&owner, "Discovery publication").await;
-        let reader = f.profile("r2-discovery-publication", std::slice::from_ref(&project)).await;
-        f.update(&reader, |input| input["allowed_command_ids"].as_array_mut().unwrap().push(json!("commands.list"))).await;
+        let reader = f
+            .profile("r2-discovery-publication", std::slice::from_ref(&project))
+            .await;
+        f.update(&reader, |input| {
+            input["allowed_command_ids"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("commands.list"))
+        })
+        .await;
         let (ready, resume) = pause(&f.service, CatalogPhase::DiscoveryPublication);
         let token = CancellationToken::new();
         let cancellation = token.clone();
         let service = f.service.clone();
         let context = reader.clone();
-        let task = tokio::spawn(async move { service.dispatch_cancel(context, Request::query("commands.list", json!({})), token).await });
+        let task = tokio::spawn(async move {
+            service
+                .dispatch_cancel(context, Request::query("commands.list", json!({})), token)
+                .await
+        });
         reached(ready).await;
         match change {
             "cancel" => cancellation.cancel(),
-            "command" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["allowed_command_ids"].as_array_mut().unwrap().retain(|id| id != "commands.list"))).await.expect("R2_DISCOVERY_REVOKE_BLOCKED"),
-            "disable" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["enabled"] = json!(false))).await.expect("R2_DISCOVERY_DISABLE_BLOCKED"),
-            "revision" => tokio::time::timeout(Duration::from_secs(5), f.update(&reader, |input| input["owned_object_access"] = json!(true))).await.expect("R2_DISCOVERY_REVISION_BLOCKED"),
+            "command" => tokio::time::timeout(
+                Duration::from_secs(5),
+                f.update(&reader, |input| {
+                    input["allowed_command_ids"]
+                        .as_array_mut()
+                        .unwrap()
+                        .retain(|id| id != "commands.list")
+                }),
+            )
+            .await
+            .expect("R2_DISCOVERY_REVOKE_BLOCKED"),
+            "disable" => tokio::time::timeout(
+                Duration::from_secs(5),
+                f.update(&reader, |input| input["enabled"] = json!(false)),
+            )
+            .await
+            .expect("R2_DISCOVERY_DISABLE_BLOCKED"),
+            "revision" => tokio::time::timeout(
+                Duration::from_secs(5),
+                f.update(&reader, |input| input["owned_object_access"] = json!(true)),
+            )
+            .await
+            .expect("R2_DISCOVERY_REVISION_BLOCKED"),
             _ => unreachable!(),
         }
         resume.send(false).unwrap();
         let response = finish(task).await;
         assert!(response.result.is_none());
-        failed(response, if change == "cancel" { "CANCELLED" } else { "PERMISSION_DENIED" });
+        failed(
+            response,
+            if change == "cancel" {
+                "CANCELLED"
+            } else {
+                "PERMISSION_DENIED"
+            },
+        );
     }
 }
 

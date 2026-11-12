@@ -51,15 +51,18 @@ impl Store {
             } else {
                 ProjectCompatibility::ReadOnlyUnsupported
             };
-            visit(ProjectSummary {
-                id: identity.id,
-                name: common.name,
-                revision: common.revision,
-                schema_major: common.schema_major,
-                envelope_version: common.envelope_version,
-                compatibility,
-                authorization: None,
-            }, &identity.creator)?;
+            visit(
+                ProjectSummary {
+                    id: identity.id,
+                    name: common.name,
+                    revision: common.revision,
+                    schema_major: common.schema_major,
+                    envelope_version: common.envelope_version,
+                    compatibility,
+                    authorization: None,
+                },
+                &identity.creator,
+            )?;
         }
         Ok(())
     }

@@ -296,13 +296,23 @@ impl Service {
         let query = Query::parse(request)?;
         let current = self.read_project(context, &reference.id, ObjectAction::Read)?;
         let policy = self.policy(context)?;
-        if policy.as_ref().is_some_and(|profile| !profile.allows_command(&request.command.id)) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Project query is outside the current profile allowlist"));
+        if policy
+            .as_ref()
+            .is_some_and(|profile| !profile.allows_command(&request.command.id))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Project query is outside the current profile allowlist",
+            ));
         }
-        if policy.as_ref().is_some_and(|profile| !profile.allows_object(
-            ObjectKind::Project, current.header().id.as_str(), &current.header().creator,
-            ObjectAction::Read,
-        )) {
+        if policy.as_ref().is_some_and(|profile| {
+            !profile.allows_object(
+                ObjectKind::Project,
+                current.header().id.as_str(),
+                &current.header().creator,
+                ObjectAction::Read,
+            )
+        }) {
             return Err(DomainError::object_not_found());
         }
         let policy_revision = policy.as_ref().map_or(0, |profile| profile.revision);
@@ -340,13 +350,19 @@ impl Service {
             let mut result = query.render(ticket, id, &binding, Some(&key), count)?;
             self.project_writer_projection(&reference.id, &query.projection, &mut result);
             let response = super::super::project_authorization::query_result(
-                policy.as_ref(), current.header(), result, &request.request_id, MAX_PAGE_BYTES,
+                policy.as_ref(),
+                current.header(),
+                result,
+                &request.request_id,
+                MAX_PAGE_BYTES,
             )?;
             let created = ticket.created;
             #[cfg(test)]
             let created = if self.catalog_test_phase(CatalogPhase::ProjectCursor) {
                 Instant::now() - LEASE
-            } else { created };
+            } else {
+                created
+            };
             if ticket.expired() {
                 return Err(expired());
             }
@@ -394,13 +410,19 @@ impl Service {
             let mut result = query.render(ticket, &id, &binding, None, 0)?;
             self.project_writer_projection(&reference.id, &query.projection, &mut result);
             let response = super::super::project_authorization::query_result(
-                policy.as_ref(), current.header(), result, &request.request_id, MAX_PAGE_BYTES,
+                policy.as_ref(),
+                current.header(),
+                result,
+                &request.request_id,
+                MAX_PAGE_BYTES,
             )?;
             let created = ticket.created;
             #[cfg(test)]
             let created = if self.catalog_test_phase(CatalogPhase::ProjectReused) {
                 Instant::now() - LEASE
-            } else { created };
+            } else {
+                created
+            };
             if ticket.expired() {
                 return Err(expired());
             }
@@ -455,13 +477,19 @@ impl Service {
         let mut result = query.render(&ticket, &id, &binding, None, 0)?;
         self.project_writer_projection(&reference.id, &query.projection, &mut result);
         let response = super::super::project_authorization::query_result(
-            policy.as_ref(), ticket.read.header(), result, &request.request_id, MAX_PAGE_BYTES,
+            policy.as_ref(),
+            ticket.read.header(),
+            result,
+            &request.request_id,
+            MAX_PAGE_BYTES,
         )?;
         let created = ticket.created;
         #[cfg(test)]
         let created = if self.catalog_test_phase(CatalogPhase::ProjectFresh) {
             Instant::now() - LEASE
-        } else { created };
+        } else {
+            created
+        };
         if ticket.expired() {
             return Err(expired());
         }
@@ -522,9 +550,14 @@ impl Service {
         {
             return Err(expired());
         }
-        if policy.as_ref().is_some_and(|profile| !profile.allows_object(
-            ObjectKind::Project, header.id.as_str(), &header.creator, ObjectAction::Read,
-        )) {
+        if policy.as_ref().is_some_and(|profile| {
+            !profile.allows_object(
+                ObjectKind::Project,
+                header.id.as_str(),
+                &header.creator,
+                ObjectAction::Read,
+            )
+        }) {
             return Err(DomainError::object_not_found());
         }
         if cancel.is_cancelled() {

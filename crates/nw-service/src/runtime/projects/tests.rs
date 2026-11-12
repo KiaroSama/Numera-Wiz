@@ -45,8 +45,17 @@ fn view(response: Response) -> Value {
     let response_bytes = serde_json::to_vec(&response).unwrap().len();
     let result = response.result.as_ref().unwrap();
     let result_bytes = serde_json::to_vec(result).unwrap().len();
-    assert!(result_bytes <= 240 * 1024 && response_bytes <= nw_domain::commands::MAX_RESULT_BYTES, "R2_DETAIL_COMPLETE_BYTE_BOUND");
-    assert!(nw_domain::projects::authorization::ProjectAuthorization::from_observation(result.get("authorization")).is_some(), "R2_DETAIL_METADATA_UNKNOWN");
+    assert!(
+        result_bytes <= 240 * 1024 && response_bytes <= nw_domain::commands::MAX_RESULT_BYTES,
+        "R2_DETAIL_COMPLETE_BYTE_BOUND"
+    );
+    assert!(
+        nw_domain::projects::authorization::ProjectAuthorization::from_observation(
+            result.get("authorization")
+        )
+        .is_some(),
+        "R2_DETAIL_METADATA_UNKNOWN"
+    );
     eprintln!("R2_SIZE kind=detail result_bytes={result_bytes} response_bytes={response_bytes}");
     response.result.unwrap()
 }
