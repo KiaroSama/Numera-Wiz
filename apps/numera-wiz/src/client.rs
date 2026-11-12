@@ -130,6 +130,13 @@ async fn collect_owner_startup_failure(
     stdout: Option<tokio::process::ChildStdout>,
     attach_started: std::time::Instant,
 ) -> OwnerStartupObservation {
+    read_owner_startup_failure(stdout, attach_started).await
+}
+
+async fn read_owner_startup_failure<R: tokio::io::AsyncRead + Unpin>(
+    stdout: Option<R>,
+    attach_started: std::time::Instant,
+) -> OwnerStartupObservation {
     let read_started = tokio::time::Instant::now();
     let deadline = tokio::time::Instant::from_std(attach_started + Duration::from_secs(20))
         .min(read_started + Duration::from_millis(50));
@@ -634,5 +641,83 @@ mod binding_tests {
         assert_eq!(at_limit.len(), 513);
         assert!(matches!(OwnerStartupObservation::from_frame(&at_limit), OwnerStartupObservation::Overflow));
         assert!(matches!(OwnerStartupObservation::from_frame(&[]), OwnerStartupObservation::Missing));
+
+        // MOCK in-process I/O coverage of the production reader; this does not
+        // prove actual child reaping or platform standard-handle inheritance.
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap()
+            .block_on(async {
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    let expected = OwnerStartupDiagnostic {
+                        schema_version: 1,
+                        stage: OwnerStartupStage::OwnerLogActivation,
+                        code: OwnerStartupCode::OwnerBusy,
+                    };
+                    let closed_valid = mock_owner_startup_io(
+                        canonical,
+                        true,
+                        std::time::Instant::now(),
+                    )
+                    .await;
+                    assert_eq!(closed_valid.record(), Some(&expected));
+
+                    // A valid prefix cannot make a 513-byte stream a record,
+                    // even when its writer is still open when the limit is hit.
+                    assert!(matches!(
+                        mock_owner_startup_io(&at_limit, false, std::time::Instant::now()).await,
+                        OwnerStartupObservation::Overflow
+                    ));
+                    // The writer remains alive across collection. Only the
+                    // production 50-ms read deadline can complete this case.
+                    assert!(matches!(
+                        mock_owner_startup_io(canonical, false, std::time::Instant::now()).await,
+                        OwnerStartupObservation::Missing
+                    ));
+                    assert!(matches!(
+                        mock_owner_startup_io(&[], true, std::time::Instant::now()).await,
+                        OwnerStartupObservation::Missing
+                    ));
+                    assert!(matches!(
+                        mock_owner_startup_io(b"not JSON\n", true, std::time::Instant::now()).await,
+                        OwnerStartupObservation::Malformed
+                    ));
+                    let expired_attach = std::time::Instant::now()
+                        .checked_sub(Duration::from_secs(21))
+                        .expect("mock attach start must precede the original horizon");
+                    assert!(matches!(
+                        mock_owner_startup_io(canonical, true, expired_attach).await,
+                        OwnerStartupObservation::Missing
+                    ));
+                    assert!(matches!(
+                        collect_owner_startup_failure(None, std::time::Instant::now()).await,
+                        OwnerStartupObservation::Missing
+                    ));
+                })
+                .await
+                .expect("MOCK bounded startup reader exceeded its outer watchdog");
+            });
+    }
+
+    async fn mock_owner_startup_io(
+        bytes: &[u8],
+        close_writer: bool,
+        attach_started: std::time::Instant,
+    ) -> OwnerStartupObservation {
+        use tokio::io::AsyncWriteExt;
+
+        let (mut writer, reader) = tokio::io::duplex(OWNER_STARTUP_FRAME_LIMIT + 1);
+        writer.write_all(bytes).await.unwrap();
+        let held_writer = if close_writer {
+            drop(writer);
+            None
+        } else {
+            Some(writer)
+        };
+        let observation = read_owner_startup_failure(Some(reader), attach_started).await;
+        // Keep a live writer explicitly owned until after the collector returns.
+        drop(held_writer);
+        observation
     }
 }
