@@ -24,6 +24,15 @@ pub(super) enum InventoryKind {
     Projects,
 }
 impl InventoryKind {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Assets => "assets.list",
+            Self::Jobs => "jobs.list",
+            Self::Artifacts => "artifacts.list",
+            Self::Batches => "batches.list",
+            Self::Projects => "projects.list",
+        }
+    }
     fn projection(self) -> &'static str {
         match self {
             Self::Assets => "assets.summary.v1",
@@ -250,6 +259,16 @@ impl Service {
         } else {
             self.policy(context)?
         };
+        if !projects
+            && policy
+                .as_ref()
+                .is_some_and(|profile| !profile.allows_command(kind.command()))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Inventory is outside the current profile allowlist",
+            ));
+        }
         let revision = policy.as_ref().map_or(0, |profile| profile.revision);
         if projects && cancellation.is_cancelled() {
             return Err(DomainError::new("CANCELLED", "Snapshot query cancelled"));
