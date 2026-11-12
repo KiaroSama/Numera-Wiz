@@ -292,8 +292,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{catalog}");
     assert!(catalog["receipt_id"].is_null());
     assert_eq!(catalog["result"]["projection"], "projects.summary.v1");
-    let row = catalog["result"]["items"].as_array().unwrap().iter().find(|row| row["id"] == cli_project).unwrap();
-    assert_eq!(row, &json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
+    let row = catalog["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == cli_project)
+        .unwrap();
+    assert_eq!(
+        row,
+        &json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"})
+    );
     let (project_sequence, exit) = cli
         .human(&[
             "sequences",

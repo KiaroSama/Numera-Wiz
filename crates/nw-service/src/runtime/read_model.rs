@@ -1,10 +1,10 @@
 //! Short-lived, authorization-bound inventory snapshots containing summaries only.
 use super::*;
-#[path = "projects/queries.rs"]
-mod project_queries;
 #[cfg(test)]
 #[path = "read_model/catalog_tests.rs"]
 mod catalog_tests;
+#[path = "projects/queries.rs"]
+mod project_queries;
 use nw_domain::views::{AssetSummary, JobSummary, PageInput, SnapshotPage};
 use std::time::{Duration, Instant};
 
@@ -305,7 +305,10 @@ impl Service {
             // Catalog navigation alone may retire any principal/profile-owned project read.
             // Drop the removed ticket immediately, including its real MVCC lease.
             if projects
-                && cache.projects.get(&id).is_some_and(|ticket| ticket.owned_by(context))
+                && cache
+                    .projects
+                    .get(&id)
+                    .is_some_and(|ticket| ticket.owned_by(context))
             {
                 cache.projects.remove(&id);
             }

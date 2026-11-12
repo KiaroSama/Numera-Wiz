@@ -932,14 +932,12 @@ impl Service {
             "maintenance.plan" | "maintenance.migrate" | "maintenance.inspect" => {
                 return self.maintenance_command(&context, &request, &cancellation);
             }
-            "artifacts.list" => {
-                self.inventory_page(
-                    &context,
-                    commands::parse(params)?,
-                    read_model::InventoryKind::Artifacts,
-                    &cancellation,
-                )?
-            }
+            "artifacts.list" => self.inventory_page(
+                &context,
+                commands::parse(params)?,
+                read_model::InventoryKind::Artifacts,
+                &cancellation,
+            )?,
             "artifacts.manifest" => {
                 let input: nw_domain::artifacts::ManifestInput = commands::parse(params)?;
                 value(&self.artifact_manifest(&context, &input.artifact_id, &cancellation)?)?
@@ -1303,14 +1301,12 @@ impl Service {
                     ],
                 );
             }
-            "assets.list" => {
-                self.inventory_page(
-                    &context,
-                    commands::parse(params)?,
-                    read_model::InventoryKind::Assets,
-                    &cancellation,
-                )?
-            }
+            "assets.list" => self.inventory_page(
+                &context,
+                commands::parse(params)?,
+                read_model::InventoryKind::Assets,
+                &cancellation,
+            )?,
             "assets.inspect" => {
                 let input: IdInput = commands::parse(params)?;
                 let asset: Asset = self
@@ -1445,14 +1441,12 @@ impl Service {
                 let plan = self.read_batch_plan(&context, &input.id, ObjectAction::Read)?;
                 value(&self.batch_review(&context, &plan)?)?
             }
-            "batches.list" => {
-                self.inventory_page(
-                    &context,
-                    commands::parse(params)?,
-                    read_model::InventoryKind::Batches,
-                    &cancellation,
-                )?
-            }
+            "batches.list" => self.inventory_page(
+                &context,
+                commands::parse(params)?,
+                read_model::InventoryKind::Batches,
+                &cancellation,
+            )?,
             "batches.inspect" => {
                 let input: IdInput = commands::parse(params)?;
                 value(&self.inspect_batch(&context, &input.id)?)?
@@ -1774,14 +1768,12 @@ impl Service {
                 )?;
                 value(&self.job_view(&context, &job)?)?
             }
-            "jobs.list" => {
-                self.inventory_page(
-                    &context,
-                    commands::parse(params)?,
-                    read_model::InventoryKind::Jobs,
-                    &cancellation,
-                )?
-            }
+            "jobs.list" => self.inventory_page(
+                &context,
+                commands::parse(params)?,
+                read_model::InventoryKind::Jobs,
+                &cancellation,
+            )?,
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
                 let mut job = self.store.inspect_job(&input.id)?;
