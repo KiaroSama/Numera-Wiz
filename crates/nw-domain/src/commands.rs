@@ -634,6 +634,137 @@ mod tests {
         assert_eq!(a.structural_digest(), b.structural_digest());
         b.params["path"] = Value::String("b".into());
         assert_ne!(a.structural_digest(), b.structural_digest());
+        finite_input_descriptor_vocabularies();
+    }
+
+    fn finite_input_descriptor_vocabularies() {
+        for id in ["clips.link", "clips.unlink"] {
+            let command = finite_input_descriptor(id);
+            finite_input_enum(
+                finite_input_property(&command.params_schema, "link_policy"),
+                &["expand"],
+                "R1_FINITE_TYPED_LINK_POLICY_MISSING",
+            );
+        }
+
+        let project = finite_input_descriptor("projects.inspect");
+        finite_input_enum(
+            finite_input_property(&project.params_schema, "projection"),
+            &["summary", "entity", "bin_page"],
+            "R1_FINITE_INSPECT_PROJECTION_MISSING",
+        );
+
+        // Later authored cases remain UNEXECUTED until the boundary above passes.
+        finite_input_enum(
+            finite_input_property(&project.params_schema, "sort"),
+            &["label"],
+            "R1_FINITE_INSPECT_SORT_MISSING",
+        );
+        let sequence = finite_input_descriptor("sequences.inspect");
+        finite_input_enum(
+            finite_input_property(&sequence.params_schema, "projection"),
+            &["entity", "track_page", "viewport"],
+            "R1_FINITE_SEQUENCE_PROJECTION_MISSING",
+        );
+        for (id, field, values) in [
+            ("clips.place", "collision", &["reject"][..]),
+            ("clips.move", "collision", &["reject"][..]),
+            ("clips.move", "link_policy", &["expand"][..]),
+            ("clips.split", "link_policy", &["expand"][..]),
+            ("clips.remove", "mode", &["lift"][..]),
+            ("clips.remove", "link_policy", &["expand"][..]),
+        ] {
+            let command = finite_input_descriptor(id);
+            finite_input_enum(
+                finite_input_property(&command.params_schema, field),
+                values,
+                "R1_FINITE_EDIT_VOCABULARY_MISSING",
+            );
+        }
+        // Both projection fields are required Strings without generated defaults.
+        assert!(
+            finite_input_property(&project.params_schema, "projection")
+                .get("default")
+                .is_none(),
+            "R1_FINITE_INSPECT_PROJECTION_DEFAULT_ADDED"
+        );
+        assert!(
+            finite_input_property(&sequence.params_schema, "projection")
+                .get("default")
+                .is_none(),
+            "R1_FINITE_SEQUENCE_PROJECTION_DEFAULT_ADDED"
+        );
+        assert!(
+            finite_input_property(&project.params_schema, "sort")
+                .get("default")
+                .and_then(Value::as_str)
+                == Some("label"),
+            "R1_FINITE_INSPECT_SORT_DEFAULT_CHANGED"
+        );
+    }
+
+    fn finite_input_descriptor(id: &str) -> Descriptor {
+        let command = descriptor(id).expect("R1_FINITE_DESCRIPTOR_MISSING");
+        assert!(
+            !command.id.is_empty() && command.id == id && command.version == 1,
+            "R1_FINITE_CANONICAL_COMMAND_CHANGED"
+        );
+        assert!(
+            ACTIVE_COMMANDS.contains(&command.id.as_str()),
+            "R1_FINITE_ACTIVE_HANDLER_MISSING"
+        );
+        command
+    }
+
+    fn finite_input_property<'a>(root: &'a Value, field: &str) -> &'a Value {
+        let property = finite_input_node(root, root)
+            .get("properties")
+            .and_then(|properties| properties.get(field))
+            .expect("R1_FINITE_PROPERTY_MISSING");
+        finite_input_node(root, property)
+    }
+
+    fn finite_input_node<'a>(root: &'a Value, mut node: &'a Value) -> &'a Value {
+        let mut seen = Vec::new();
+        for hop in 0..=16 {
+            let Some(reference) = node.get("$ref") else {
+                return node;
+            };
+            let reference = reference.as_str().expect("R1_FINITE_REF_NOT_STRING");
+            assert!(
+                node.as_object().is_some_and(|object| object.len() == 1),
+                "R1_FINITE_REF_NOT_WHOLE_NODE"
+            );
+            assert!(
+                reference.starts_with("#/$defs/"),
+                "R1_FINITE_REF_NOT_LOCAL_DEFS"
+            );
+            assert!(
+                hop < 16 && !seen.contains(&reference),
+                "R1_FINITE_REF_CYCLIC_OR_DEEP"
+            );
+            seen.push(reference);
+            node = root
+                .pointer(&reference[1..])
+                .expect("R1_FINITE_REF_TARGET_MISSING");
+        }
+        unreachable!("R1_FINITE_REF_CYCLIC_OR_DEEP")
+    }
+
+    fn finite_input_enum(node: &Value, expected: &[&str], diagnostic: &str) {
+        let actual = node
+            .get("enum")
+            .and_then(Value::as_array)
+            .and_then(|values| values.iter().map(Value::as_str).collect::<Option<Vec<_>>>())
+            .and_then(|mut values| {
+                let count = values.len();
+                values.sort_unstable();
+                values.dedup();
+                (values.len() == count).then_some(values)
+            });
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        assert!(actual.as_deref() == Some(expected.as_slice()), "{diagnostic}");
     }
     #[test]
     fn duplicate_context_is_rejected() {
