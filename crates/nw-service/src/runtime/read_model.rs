@@ -227,6 +227,35 @@ impl Service {
         }
         Ok(())
     }
+    fn legacy_publication(
+        &self,
+        context: &Context,
+        revision: u64,
+        created: Instant,
+        kind: InventoryKind,
+        cancellation: &CancellationToken,
+    ) -> Result<()> {
+        let policy = self.policy(context)?;
+        if policy.as_ref().map_or(0, |profile| profile.revision) != revision {
+            return Err(expired());
+        }
+        if policy
+            .as_ref()
+            .is_some_and(|profile| !profile.allows_command(kind.command()))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Inventory is outside the current profile allowlist",
+            ));
+        }
+        if cancellation.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Snapshot query cancelled"));
+        }
+        if created.elapsed() >= LEASE {
+            return Err(expired());
+        }
+        Ok(())
+    }
     pub(super) fn inventory_page(
         &self,
         context: &Context,
@@ -321,14 +350,8 @@ impl Service {
                     // same retained ticket after cursor validation/rendering.
                     cache.entries.get_mut(id).unwrap().created = Instant::now() - LEASE;
                 }
-                if self
-                    .policy(context)?
-                    .as_ref()
-                    .map_or(0, |profile| profile.revision)
-                    != revision
-                {
-                    return Err(expired());
-                }
+                let created = cache.entries.get(id).ok_or_else(expired)?.created;
+                self.legacy_publication(context, revision, created, kind, cancellation)?;
             }
             return Ok(page);
         }
@@ -530,7 +553,7 @@ impl Service {
             self.catalog_publication(context, revision, snapshot.created, cancellation)?;
         }
         if !projects {
-            check_cancel()?;
+            self.legacy_publication(context, revision, snapshot.created, kind, cancellation)?;
         }
         // Empty and single-page inventories need no retained lease or database snapshot.
         if page["next_cursor"].is_string() {
