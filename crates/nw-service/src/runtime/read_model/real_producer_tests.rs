@@ -15,8 +15,12 @@ pub(super) fn run_if_admitted() {
         eprintln!("real-producers: not-admitted (NW_FIXTURE_COMPONENTS absent)");
         return;
     };
-    assert!(!bin.is_empty(), "Explicit fixture component directory is empty");
-    let bin = std::fs::canonicalize(PathBuf::from(bin)).expect("Explicit fixture component directory");
+    assert!(
+        !bin.is_empty(),
+        "Explicit fixture component directory is empty"
+    );
+    let bin =
+        std::fs::canonicalize(PathBuf::from(bin)).expect("Explicit fixture component directory");
     assert!(bin.is_dir());
     for name in ["ffmpeg", "ffprobe"] {
         let path = bin.join(name);
@@ -28,7 +32,9 @@ pub(super) fn run_if_admitted() {
             assert_ne!(metadata.permissions().mode() & 0o111, 0, "{path:?}");
         }
     }
-    eprintln!("real-producers: started source=existing-media-FFV1-two-PCM-1s-64x48-at4 components={bin:?}");
+    eprintln!(
+        "real-producers: started source=existing-media-FFV1-two-PCM-1s-64x48-at4 components={bin:?}"
+    );
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -49,14 +55,25 @@ fn view(response: Response, durable: bool) -> Value {
     response.result.unwrap()
 }
 async fn query(service: &Arc<Service>, context: &Context, command: &str, params: Value) -> Value {
-    view(service.dispatch(context.clone(), request(command, params)).await, false)
+    view(
+        service
+            .dispatch(context.clone(), request(command, params))
+            .await,
+        false,
+    )
 }
 async fn scope(service: &Arc<Service>, context: &Context) -> String {
     query(service, context, "access.replay_scope.create", json!({})).await["replay_scope"]
-        .as_str().unwrap().to_owned()
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 async fn write(
-    service: &Arc<Service>, context: &Context, scope: &str, command: &str, params: Value,
+    service: &Arc<Service>,
+    context: &Context,
+    scope: &str,
+    command: &str,
+    params: Value,
 ) -> Value {
     let mut request = request(command, params);
     request.replay_scope = Some(scope.to_owned());
@@ -64,10 +81,23 @@ async fn write(
     view(service.dispatch(context.clone(), request).await, true)
 }
 async fn put_profile(service: &Arc<Service>, owner_scope: &str, params: Value) -> AccessProfile {
-    serde_json::from_value(write(service, &service.owner(), owner_scope, "access.profiles.put", params).await).unwrap()
+    serde_json::from_value(
+        write(
+            service,
+            &service.owner(),
+            owner_scope,
+            "access.profiles.put",
+            params,
+        )
+        .await,
+    )
+    .unwrap()
 }
 async fn update_profile(
-    service: &Arc<Service>, owner_scope: &str, current: &AccessProfile, desired: &AccessProfile,
+    service: &Arc<Service>,
+    owner_scope: &str,
+    current: &AccessProfile,
+    desired: &AccessProfile,
 ) -> AccessProfile {
     let response = tokio::time::timeout(Duration::from_secs(5), write(
         service, &service.owner(), owner_scope, "access.profiles.update", json!({
@@ -89,16 +119,30 @@ fn identity(path: &Path) -> nw_domain::records::FileIdentity {
     files::identity(path, &CancellationToken::new()).unwrap()
 }
 fn ids(page: &Value, kind: InventoryKind) -> BTreeSet<String> {
-    page["items"].as_array().unwrap().iter().map(|row| {
-        row[if kind == InventoryKind::Artifacts { "artifact_id" } else { "id" }]
-            .as_str().unwrap().to_owned()
-    }).collect()
+    page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            row[if kind == InventoryKind::Artifacts {
+                "artifact_id"
+            } else {
+                "id"
+            }]
+            .as_str()
+            .unwrap()
+            .to_owned()
+        })
+        .collect()
 }
 fn page_control(page: &Value, kind: InventoryKind, expected: &BTreeSet<String>, limit: usize) {
     assert_eq!(page["projection"], kind.projection());
     assert_eq!(page["total_count"], expected.len());
     assert_eq!(page["count_accuracy"], "exact");
-    assert_eq!(page["items"].as_array().unwrap().len(), expected.len().min(limit));
+    assert_eq!(
+        page["items"].as_array().unwrap().len(),
+        expected.len().min(limit)
+    );
     assert!(ids(page, kind).is_subset(expected));
     assert_eq!(page["next_cursor"].is_string(), expected.len() > limit);
     if expected.len() <= limit {
@@ -108,10 +152,24 @@ fn page_control(page: &Value, kind: InventoryKind, expected: &BTreeSet<String>, 
 fn private_paths_absent(page: &Value, roots: &[&Path]) {
     let encoded = page.to_string();
     for root in roots {
-        assert!(!encoded.contains(root.to_str().unwrap()), "Summary exposed private path");
+        assert!(
+            !encoded.contains(root.to_str().unwrap()),
+            "Summary exposed private path"
+        );
     }
-    for field in ["source_path", "output_path", "read_roots", "write_roots", "principal", "creator", "prepared_argv"] {
-        assert!(!encoded.contains(&format!("\"{field}\"")), "Summary exposed {field}");
+    for field in [
+        "source_path",
+        "output_path",
+        "read_roots",
+        "write_roots",
+        "principal",
+        "creator",
+        "prepared_argv",
+    ] {
+        assert!(
+            !encoded.contains(&format!("\"{field}\"")),
+            "Summary exposed {field}"
+        );
     }
 }
 async fn completed_job(service: &Arc<Service>, context: &Context, id: &str) -> Value {
@@ -125,7 +183,9 @@ async fn completed_job(service: &Arc<Service>, context: &Context, id: &str) -> V
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-    }).await.expect("Real public job exceeded the existing thirty-second completion bound")
+    })
+    .await
+    .expect("Real public job exceeded the existing thirty-second completion bound")
 }
 async fn completed_batch(service: &Arc<Service>, context: &Context, id: &str) -> Value {
     tokio::time::timeout(Duration::from_secs(30), async {
@@ -149,14 +209,18 @@ async fn completed_batch(service: &Arc<Service>, context: &Context, id: &str) ->
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-    }).await.expect("Real public batch exceeded the existing thirty-second completion bound")
+    })
+    .await
+    .expect("Real public batch exceeded the existing thirty-second completion bound")
 }
 async fn drained(service: &Arc<Service>) {
     tokio::time::timeout(Duration::from_secs(30), async {
         while service.busy() {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-    }).await.expect("Actual accepted workers did not drain within thirty seconds");
+    })
+    .await
+    .expect("Actual accepted workers did not drain within thirty seconds");
     assert!(!service.busy());
 }
 
@@ -177,7 +241,10 @@ async fn exercise(bin: PathBuf) {
     }
     let original_bytes = std::fs::read(&media.source).unwrap();
     let source_identity = identity(&media.source);
-    assert_eq!(source_identity.sha256, hex::encode(Sha256::digest(&original_bytes)));
+    assert_eq!(
+        source_identity.sha256,
+        hex::encode(Sha256::digest(&original_bytes))
+    );
     let second_source = media.directory.path().join("source-second.mkv");
     std::fs::copy(&media.source, &second_source).unwrap();
     assert_eq!(std::fs::read(&second_source).unwrap(), original_bytes);
@@ -186,21 +253,41 @@ async fn exercise(bin: PathBuf) {
     std::fs::create_dir(&outputs).unwrap();
     assert!(!outputs.starts_with(&bin));
     assert!(!media.directory.path().starts_with(&bin));
-    let service = Service::open(root.path().join("data"), Some((bin.join("ffmpeg"), bin.join("ffprobe"))))
-        .await.unwrap();
+    let service = Service::open(
+        root.path().join("data"),
+        Some((bin.join("ffmpeg"), bin.join("ffprobe"))),
+    )
+    .await
+    .unwrap();
     let engine = service.engine().unwrap();
     for (name, component) in [("ffmpeg", &engine.ffmpeg), ("ffprobe", &engine.ffprobe)] {
         let observed = identity(&bin.join(name));
         assert_eq!(observed.sha256, component.sha256);
         assert_eq!(observed.bytes, component.bytes);
-        eprintln!("real-producers: component={name} bytes={} sha256={}", observed.bytes, observed.sha256);
+        eprintln!(
+            "real-producers: component={name} bytes={} sha256={}",
+            observed.bytes, observed.sha256
+        );
     }
-    eprintln!("real-producers: source bytes={} sha256={} streams=3", source_identity.bytes, source_identity.sha256);
+    eprintln!(
+        "real-producers: source bytes={} sha256={} streams=3",
+        source_identity.bytes, source_identity.sha256
+    );
     let owner_scope = scope(&service, &service.owner()).await;
     let producer_commands = [
-        "access.replay_scope.create", "assets.register", "assets.list", "streams.clean",
-        "jobs.submit", "jobs.inspect", "jobs.list", "artifacts.list", "artifacts.manifest",
-        "streams.clean.batch_plan", "batches.submit", "batches.inspect", "batches.list",
+        "access.replay_scope.create",
+        "assets.register",
+        "assets.list",
+        "streams.clean",
+        "jobs.submit",
+        "jobs.inspect",
+        "jobs.list",
+        "artifacts.list",
+        "artifacts.manifest",
+        "streams.clean.batch_plan",
+        "batches.submit",
+        "batches.inspect",
+        "batches.list",
     ];
     let mut producer_profile = put_profile(&service, &owner_scope, json!({
         "name":"inventory-producer","expected_revision":null,"enabled":true,"mode":"operate",
@@ -215,13 +302,23 @@ async fn exercise(bin: PathBuf) {
     let mut assets = BTreeSet::new();
     let mut asset_order = Vec::new();
     for path in [&media.source, &second_source] {
-        let asset = write(&service, &producer, &producer_scope, "assets.register", json!({"path":path})).await;
+        let asset = write(
+            &service,
+            &producer,
+            &producer_scope,
+            "assets.register",
+            json!({"path":path}),
+        )
+        .await;
         let id = asset["id"].as_str().unwrap().to_owned();
         assert_eq!(asset["creator"], producer.principal);
         assert_eq!(asset["identity"]["sha256"], source_identity.sha256);
         assert_eq!(asset["identity"]["bytes"], source_identity.bytes);
         assert_eq!(asset["probe"]["streams"].as_array().unwrap().len(), 3);
-        assert!(assets.insert(id.clone()), "Equal bytes must still have distinct actual asset IDs");
+        assert!(
+            assets.insert(id.clone()),
+            "Equal bytes must still have distinct actual asset IDs"
+        );
         asset_order.push(id);
     }
     let mut jobs = BTreeSet::new();
@@ -235,29 +332,58 @@ async fn exercise(bin: PathBuf) {
     })).await;
     assert_eq!(plan["resolution"]["action"], "copy_unchanged");
     assert_eq!(plan["source_sha256"], source_identity.sha256);
-    let standalone = write(&service, &producer, &producer_scope, "jobs.submit", json!({
-        "plan_id":plan["id"],"plan_hash":plan["hash"]
-    })).await["job_id"].as_str().unwrap().to_owned();
+    let standalone = write(
+        &service,
+        &producer,
+        &producer_scope,
+        "jobs.submit",
+        json!({
+            "plan_id":plan["id"],"plan_hash":plan["hash"]
+        }),
+    )
+    .await["job_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     assert!(jobs.insert(standalone.clone()));
     job_outputs.insert(standalone.clone(), standalone_output);
     completed_job(&service, &producer, &standalone).await;
     for batch_index in 0..2 {
-        let paths: Vec<_> = (0..2).map(|index| outputs.join(format!("batch-{batch_index}-{index}.mkv"))).collect();
-        let items: Vec<_> = asset_order.iter().zip(&paths).map(|(asset, output)| json!({"asset_id":asset,"output":output})).collect();
-        let plan = query(&service, &producer, "streams.clean.batch_plan", json!({
-            "items":items,"intent":fixture::rules(),"file_times":"new",
-            "execution_limits":nw_domain::execution::CleanupLimits::default(),
-            "failure_policy":"reject_all","unresolved_policy":"reject"
-        })).await;
+        let paths: Vec<_> = (0..2)
+            .map(|index| outputs.join(format!("batch-{batch_index}-{index}.mkv")))
+            .collect();
+        let items: Vec<_> = asset_order
+            .iter()
+            .zip(&paths)
+            .map(|(asset, output)| json!({"asset_id":asset,"output":output}))
+            .collect();
+        let plan = query(
+            &service,
+            &producer,
+            "streams.clean.batch_plan",
+            json!({
+                "items":items,"intent":fixture::rules(),"file_times":"new",
+                "execution_limits":nw_domain::execution::CleanupLimits::default(),
+                "failure_policy":"reject_all","unresolved_policy":"reject"
+            }),
+        )
+        .await;
         assert_eq!(plan["items"].as_array().unwrap().len(), 2);
         for item in plan["items"].as_array().unwrap() {
             assert_eq!(item["action"], "copy_unchanged");
             assert!(item["error"].is_null());
             assert_eq!(item["source_sha256"], source_identity.sha256);
         }
-        let accepted = write(&service, &producer, &producer_scope, "batches.submit", json!({
-            "plan_id":plan["id"],"plan_hash":plan["hash"]
-        })).await;
+        let accepted = write(
+            &service,
+            &producer,
+            &producer_scope,
+            "batches.submit",
+            json!({
+                "plan_id":plan["id"],"plan_hash":plan["hash"]
+            }),
+        )
+        .await;
         assert_eq!(accepted["accepted_jobs"], 2);
         assert_eq!(accepted["rejected_candidates"], 0);
         let batch = accepted["batch_id"].as_str().unwrap().to_owned();
@@ -294,14 +420,23 @@ async fn exercise(bin: PathBuf) {
         assert_eq!(output_identity.sha256, source_identity.sha256);
         assert_eq!(output_identity.bytes, source_identity.bytes);
         let artifact = format!("job-{id}");
-        let manifest = query(&service, &producer, "artifacts.manifest", json!({"artifact_id":artifact})).await;
+        let manifest = query(
+            &service,
+            &producer,
+            "artifacts.manifest",
+            json!({"artifact_id":artifact}),
+        )
+        .await;
         assert_eq!(manifest["artifact_id"], artifact);
         assert_eq!(manifest["job_id"], *id);
         assert_eq!(manifest["plan_id"], inspected["plan"]["id"]);
         assert_eq!(manifest["sha256"], source_identity.sha256);
         assert_eq!(manifest["encoded_byte_count"], source_identity.bytes);
         assert_eq!(manifest["availability"], "retained_published_object");
-        assert_eq!(manifest["manifest_uri"], format!("numera://artifact/{artifact}/manifest"));
+        assert_eq!(
+            manifest["manifest_uri"],
+            format!("numera://artifact/{artifact}/manifest")
+        );
         let actual = service.store.inspect_job(id).unwrap();
         assert_eq!(actual.creator, producer.principal);
         assert_eq!(actual.state, JobState::Succeeded);
@@ -310,10 +445,17 @@ async fn exercise(bin: PathBuf) {
         assert_eq!(inspected["artifact"]["sha256"], source_identity.sha256);
         assert_eq!(inspected["artifact"]["bytes"], source_identity.bytes);
         assert!(actual.owned_staging.is_some());
-        let publication: Publication = service.store.get(&named("publication", id).unwrap()).unwrap().unwrap();
+        let publication: Publication = service
+            .store
+            .get(&named("publication", id).unwrap())
+            .unwrap()
+            .unwrap();
         assert_eq!(publication.read_purpose_version, 1);
         assert!(publication.published);
-        assert_eq!(value(&publication.identity).unwrap(), value(actual.artifact.as_ref().unwrap()).unwrap());
+        assert_eq!(
+            value(&publication.identity).unwrap(),
+            value(actual.artifact.as_ref().unwrap()).unwrap()
+        );
         assert!(artifacts.insert(artifact));
     }
     drained(&service).await;
@@ -325,13 +467,20 @@ async fn exercise(bin: PathBuf) {
         if kind == InventoryKind::Artifacts {
             for item in page["items"].as_array().unwrap() {
                 assert!(expected[1].contains(item["job_id"].as_str().unwrap()));
-                assert_eq!(item["artifact_id"], format!("job-{}", item["job_id"].as_str().unwrap()));
+                assert_eq!(
+                    item["artifact_id"],
+                    format!("job-{}", item["job_id"].as_str().unwrap())
+                );
                 assert_eq!(item["sha256"], source_identity.sha256);
                 assert_eq!(item["encoded_byte_count"], source_identity.bytes);
             }
         }
     }
-    let grants: Vec<_> = expected[1].iter().chain(&expected[3]).map(|id| json!({"kind":"job","id":id,"actions":["read"]})).collect();
+    let grants: Vec<_> = expected[1]
+        .iter()
+        .chain(&expected[3])
+        .map(|id| json!({"kind":"job","id":id,"actions":["read"]}))
+        .collect();
     let mut delegated_profile = put_profile(&service, &owner_scope, json!({
         "name":"inventory-delegated","expected_revision":null,"enabled":true,"mode":"operate",
         "owned_object_access":false,"client_sessions":false,"allowed_command_ids":[
@@ -346,18 +495,36 @@ async fn exercise(bin: PathBuf) {
     assert_eq!(delegated_profile.mode, ProfileMode::Operate);
     assert_eq!(delegated_profile.object_grants.len(), 7);
     for id in expected[1].iter().chain(&expected[3]) {
-        assert!(delegated_profile.allows_object(ObjectKind::Job, id, &producer.principal, ObjectAction::Read));
+        assert!(delegated_profile.allows_object(
+            ObjectKind::Job,
+            id,
+            &producer.principal,
+            ObjectAction::Read
+        ));
     }
     assert!(delegated_profile.read_roots.is_empty() && delegated_profile.write_roots.is_empty());
     for (index, kind) in KINDS.into_iter().enumerate() {
-        let wanted = if index == 0 { BTreeSet::new() } else { expected[index].clone() };
+        let wanted = if index == 0 {
+            BTreeSet::new()
+        } else {
+            expected[index].clone()
+        };
         let page = query(&service, &delegated, kind.command(), json!({"limit":64})).await;
         page_control(&page, kind, &wanted, 64);
         private_paths_absent(&page, &[media.directory.path(), root.path(), &bin]);
     }
     for id in &expected[1] {
-        assert_eq!(query(&service, &delegated, "jobs.inspect", json!({"id":id})).await["id"], *id);
-        let manifest = query(&service, &delegated, "artifacts.manifest", json!({"artifact_id":format!("job-{id}")})).await;
+        assert_eq!(
+            query(&service, &delegated, "jobs.inspect", json!({"id":id})).await["id"],
+            *id
+        );
+        let manifest = query(
+            &service,
+            &delegated,
+            "artifacts.manifest",
+            json!({"artifact_id":format!("job-{id}")}),
+        )
+        .await;
         assert_eq!(manifest["job_id"], *id);
         assert_eq!(manifest["sha256"], source_identity.sha256);
         assert_eq!(manifest["encoded_byte_count"], source_identity.bytes);
@@ -379,7 +546,10 @@ async fn exercise(bin: PathBuf) {
     page_control(&zero, InventoryKind::Assets, &BTreeSet::new(), 64);
     producer_profile = update_profile(&service, &owner_scope, &producer_profile, &original).await;
     assert_eq!(service.snapshots.lock().unwrap().count(), 0);
-    eprintln!("real-producers: baseline assets=2 jobs=5 artifacts=5 batches=2 drained=true setup_elapsed_ms={}", started.elapsed().as_millis());
+    eprintln!(
+        "real-producers: baseline assets=2 jobs=5 artifacts=5 batches=2 drained=true setup_elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
 
     let matrix_started = Instant::now();
     let mut completed = 0;
@@ -387,9 +557,15 @@ async fn exercise(bin: PathBuf) {
         for path in [PagePath::Fresh, PagePath::Cursor] {
             for action in [Action::Cancel, Action::Ttl, Action::Command] {
                 Matrix {
-                    service: &service, owner_scope: &owner_scope, context: &producer,
-                    profile: &mut producer_profile, expected: &expected[index], withdrawal: None,
-                }.case(kind, path, action).await;
+                    service: &service,
+                    owner_scope: &owner_scope,
+                    context: &producer,
+                    profile: &mut producer_profile,
+                    expected: &expected[index],
+                    withdrawal: None,
+                }
+                .case(kind, path, action)
+                .await;
                 completed += 1;
             }
         }
@@ -399,38 +575,81 @@ async fn exercise(bin: PathBuf) {
     for (index, kind) in KINDS.into_iter().enumerate().skip(1) {
         for path in [PagePath::Fresh, PagePath::Cursor] {
             Matrix {
-                service: &service, owner_scope: &owner_scope, context: &delegated,
-                profile: &mut delegated_profile, expected: &expected[index],
-                withdrawal: Some(Withdrawal { job: &withdrawn_job, batch: &withdrawn_batch, all: &expected }),
-            }.case(kind, path, Action::Grant).await;
+                service: &service,
+                owner_scope: &owner_scope,
+                context: &delegated,
+                profile: &mut delegated_profile,
+                expected: &expected[index],
+                withdrawal: Some(Withdrawal {
+                    job: &withdrawn_job,
+                    batch: &withdrawn_batch,
+                    all: &expected,
+                }),
+            }
+            .case(kind, path, Action::Grant)
+            .await;
             completed += 1;
         }
     }
     assert_eq!(completed, 30);
     drained(&service).await;
     assert_eq!(service.snapshots.lock().unwrap().count(), 0);
-    eprintln!("real-producers: completed cases=30 matrix_elapsed_ms={} total_elapsed_ms={}", matrix_started.elapsed().as_millis(), started.elapsed().as_millis());
+    eprintln!(
+        "real-producers: completed cases=30 matrix_elapsed_ms={} total_elapsed_ms={}",
+        matrix_started.elapsed().as_millis(),
+        started.elapsed().as_millis()
+    );
 }
 
 #[derive(Clone, Copy)]
-enum PagePath { Fresh, Cursor }
+enum PagePath {
+    Fresh,
+    Cursor,
+}
 impl PagePath {
-    fn label(self) -> &'static str { match self { Self::Fresh => "fresh", Self::Cursor => "cursor" } }
+    fn label(self) -> &'static str {
+        match self {
+            Self::Fresh => "fresh",
+            Self::Cursor => "cursor",
+        }
+    }
 }
 #[derive(Clone, Copy)]
-enum Action { Cancel, Ttl, Command, Grant }
+enum Action {
+    Cancel,
+    Ttl,
+    Command,
+    Grant,
+}
 impl Action {
     fn label(self) -> &'static str {
-        match self { Self::Cancel => "cancel", Self::Ttl => "ttl", Self::Command => "command", Self::Grant => "grant" }
+        match self {
+            Self::Cancel => "cancel",
+            Self::Ttl => "ttl",
+            Self::Command => "command",
+            Self::Grant => "grant",
+        }
     }
 }
 fn retained(service: &Service, context: &Context) -> BTreeSet<String> {
-    service.snapshots.lock().unwrap().entries.iter()
+    service
+        .snapshots
+        .lock()
+        .unwrap()
+        .entries
+        .iter()
         .filter(|(_, snapshot)| snapshot.principal == context.principal)
-        .map(|(id, _)| id.clone()).collect()
+        .map(|(id, _)| id.clone())
+        .collect()
 }
 async fn retire(service: &Arc<Service>, context: &Context, kind: InventoryKind, id: &str) {
-    let page = query(service, context, kind.command(), json!({"limit":64,"replace_snapshot":id})).await;
+    let page = query(
+        service,
+        context,
+        kind.command(),
+        json!({"limit":64,"replace_snapshot":id}),
+    )
+    .await;
     assert!(page["next_cursor"].is_null());
     assert!(retained(service, context).is_empty());
 }
@@ -466,7 +685,13 @@ impl Matrix<'_> {
         page_control(&first, kind, expected, 1);
         let ticket = first["snapshot_id"].as_str().unwrap().to_owned();
         let cursor = first["next_cursor"].as_str().unwrap().to_owned();
-        let continuation = query(service, context, kind.command(), json!({"limit":1,"cursor":cursor})).await;
+        let continuation = query(
+            service,
+            context,
+            kind.command(),
+            json!({"limit":1,"cursor":cursor}),
+        )
+        .await;
         assert_eq!(continuation["snapshot_id"], ticket);
         assert_eq!(continuation["projection"], kind.projection());
         assert_eq!(continuation["total_count"], expected.len());
@@ -474,8 +699,17 @@ impl Matrix<'_> {
         assert_eq!(continuation["items"].as_array().unwrap().len(), 1);
         assert!(ids(&continuation, kind).is_subset(expected));
         assert!(ids(&continuation, kind).is_disjoint(&ids(&first, kind)));
-        let same_cursor = query(service, context, kind.command(), json!({"limit":1,"cursor":cursor})).await;
-        assert_eq!(same_cursor, continuation, "{label}: stable cursor identity/content");
+        let same_cursor = query(
+            service,
+            context,
+            kind.command(),
+            json!({"limit":1,"cursor":cursor}),
+        )
+        .await;
+        assert_eq!(
+            same_cursor, continuation,
+            "{label}: stable cursor identity/content"
+        );
         assert_eq!(retained(service, context), BTreeSet::from([ticket.clone()]));
         let params = match path {
             PagePath::Fresh => {
@@ -489,7 +723,9 @@ impl Matrix<'_> {
         let original = profile.clone();
         let mut changed = original.clone();
         match action {
-            Action::Command => { assert!(changed.allowed_command_ids.remove(kind.command())); }
+            Action::Command => {
+                assert!(changed.allowed_command_ids.remove(kind.command()));
+            }
             Action::Grant => {
                 let job = withdrawal.unwrap().job;
                 let count = changed.object_grants.len();
@@ -506,21 +742,34 @@ impl Matrix<'_> {
             PagePath::Cursor => CatalogPhase::LegacyCursor(kind),
         };
         assert!(service.catalog_hook.lock().unwrap().is_none());
-        *service.catalog_hook.lock().unwrap() = Some(CatalogHook { phase, started, waiting });
+        *service.catalog_hook.lock().unwrap() = Some(CatalogHook {
+            phase,
+            started,
+            waiting,
+        });
         let task_service = service.clone();
         let task_context = context.clone();
         let task_cancellation = cancellation.clone();
         let dispatch = request(kind.command(), params);
         let task = tokio::spawn(async move {
-            task_service.dispatch_cancel(task_context, dispatch, task_cancellation).await
+            task_service
+                .dispatch_cancel(task_context, dispatch, task_cancellation)
+                .await
         });
         tokio::task::spawn_blocking(move || {
-            ready.recv_timeout(Duration::from_secs(5)).expect("Real producer final page barrier not reached")
-        }).await.unwrap();
+            ready
+                .recv_timeout(Duration::from_secs(5))
+                .expect("Real producer final page barrier not reached")
+        })
+        .await
+        .unwrap();
         // Do not inspect/replace/count the cache while the request owns its mutex.
         assert!(!cancellation.is_cancelled(), "{label}");
         let expire = match action {
-            Action::Cancel => { cancellation.cancel(); false }
+            Action::Cancel => {
+                cancellation.cancel();
+                false
+            }
             Action::Ttl => true,
             Action::Command | Action::Grant => {
                 *profile = update_profile(service, owner_scope, profile, &changed).await;
@@ -528,17 +777,33 @@ impl Matrix<'_> {
             }
         };
         resume.send(expire).unwrap();
-        let response = tokio::time::timeout(Duration::from_secs(5), task).await
-            .expect("Real producer final page dispatch did not resume").unwrap();
+        let response = tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("Real producer final page dispatch did not resume")
+            .unwrap();
         let after = retained(service, context);
-        assert!(!response.ok, "{label}: post-render publication must fail: {response:?}");
-        let code = if matches!(action, Action::Cancel) { "CANCELLED" } else { "SNAPSHOT_EXPIRED" };
-        assert_eq!(response.error.as_ref().map(|error| error.code.as_str()), Some(code), "{label}: {response:?}");
+        assert!(
+            !response.ok,
+            "{label}: post-render publication must fail: {response:?}"
+        );
+        let code = if matches!(action, Action::Cancel) {
+            "CANCELLED"
+        } else {
+            "SNAPSHOT_EXPIRED"
+        };
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some(code),
+            "{label}: {response:?}"
+        );
         assert!(response.result.is_none(), "{label}: {response:?}");
         assert!(response.receipt_id.is_none(), "{label}: {response:?}");
         if matches!(action, Action::Ttl) {
             // The reaper may have removed the actual expired cursor after unlock.
-            assert!(after.is_subset(&before), "{label}: no newly retained ticket");
+            assert!(
+                after.is_subset(&before),
+                "{label}: no newly retained ticket"
+            );
         } else {
             assert_eq!(after, before, "{label}: no newly retained ticket");
         }

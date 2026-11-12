@@ -3,11 +3,11 @@ use super::*;
 #[cfg(test)]
 #[path = "read_model/catalog_tests.rs"]
 mod catalog_tests;
+#[path = "projects/queries.rs"]
+mod project_queries;
 #[cfg(test)]
 #[path = "read_model/real_producer_tests.rs"]
 mod real_producer_tests;
-#[path = "projects/queries.rs"]
-mod project_queries;
 use nw_domain::views::{AssetSummary, JobSummary, PageInput, SnapshotPage};
 use std::time::{Duration, Instant};
 
