@@ -108,7 +108,11 @@ pub fn preflight(bytes: &[u8]) -> Result<(), ()> {
     }
     impl Scan<'_> {
         fn whitespace(&mut self) {
-            while self.bytes.get(self.offset).is_some_and(u8::is_ascii_whitespace) {
+            while self
+                .bytes
+                .get(self.offset)
+                .is_some_and(u8::is_ascii_whitespace)
+            {
                 self.offset += 1;
             }
         }
@@ -144,7 +148,8 @@ pub fn preflight(bytes: &[u8]) -> Result<(), ()> {
                     if self.bytes.get(self.offset) != Some(&b'}') {
                         loop {
                             self.whitespace();
-                            let key: String = serde_json::from_slice(self.string()?).map_err(|_| ())?;
+                            let key: String =
+                                serde_json::from_slice(self.string()?).map_err(|_| ())?;
                             if !keys.insert(key) {
                                 return Err(());
                             }

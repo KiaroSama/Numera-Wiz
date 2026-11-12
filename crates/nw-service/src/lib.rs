@@ -77,13 +77,32 @@ impl CommandService {
 mod schema_validation;
 #[cfg(test)]
 fn project_schema_batch(suite: u16, expected: &[u16]) -> schema_validation::Batch {
-    let schemas = schema_validation::COMMANDS.iter().map(|id| {
-        let response = CommandService.dispatch(Principal::DiscoveryAgent,
-            Request::query("commands.schema", serde_json::json!({"id":id})));
-        assert!(response.ok && response.error.is_none(), "SCHEMA_DISCOVERY_SUCCESS");
-        assert!(serde_json::to_vec(&response).expect("SCHEMA_DISCOVERY_SERIALIZE").len() <= commands::MAX_RESULT_BYTES, "SCHEMA_DISCOVERY_BOUND");
-        response.result.expect("SCHEMA_DISCOVERY_DESCRIPTOR").get("result_schema").expect("SCHEMA_DISCOVERY_DOCUMENT").clone()
-    }).collect();
+    let schemas = schema_validation::COMMANDS
+        .iter()
+        .map(|id| {
+            let response = CommandService.dispatch(
+                Principal::DiscoveryAgent,
+                Request::query("commands.schema", serde_json::json!({"id":id})),
+            );
+            assert!(
+                response.ok && response.error.is_none(),
+                "SCHEMA_DISCOVERY_SUCCESS"
+            );
+            assert!(
+                serde_json::to_vec(&response)
+                    .expect("SCHEMA_DISCOVERY_SERIALIZE")
+                    .len()
+                    <= commands::MAX_RESULT_BYTES,
+                "SCHEMA_DISCOVERY_BOUND"
+            );
+            response
+                .result
+                .expect("SCHEMA_DISCOVERY_DESCRIPTOR")
+                .get("result_schema")
+                .expect("SCHEMA_DISCOVERY_DOCUMENT")
+                .clone()
+        })
+        .collect();
     schema_validation::Batch::new(suite, expected, schemas)
 }
 #[cfg(test)]
@@ -454,10 +473,14 @@ mod tests {
         );
 
         project_family_result_schemas_are_published_and_self_contained();
-        let mut conformance = crate::project_schema_batch(1, &[1000,1001,1002,1003,1004,1005,1006]);
+        let mut conformance =
+            crate::project_schema_batch(1, &[1000, 1001, 1002, 1003, 1004, 1005, 1006]);
         conformance.engine_controls();
-        tokio::runtime::Builder::new_current_thread().enable_all().build()
-            .expect("SCHEMA_LOCAL_RUNTIME").block_on(conformance.finish());
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("SCHEMA_LOCAL_RUNTIME")
+            .block_on(conformance.finish());
     }
 
     fn project_family_result_schemas_are_published_and_self_contained() {
