@@ -146,29 +146,7 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         assert_eq!(root["properties"]["error"]["$ref"], "#/$defs/Error");
         assert_eq!(root["oneOf"].as_array().unwrap().len(), 2);
         assert!(root["$defs"]["Result"].is_object() && root["$defs"]["Error"].is_object());
-        let mut pending = vec![&root];
-        while let Some(node) = pending.pop() {
-            match node {
-                Value::Object(object) => {
-                    for key in ["$ref", "$dynamicRef"] {
-                        if let Some(reference) = object.get(key) {
-                            let pointer = reference
-                                .as_str()
-                                .unwrap()
-                                .strip_prefix('#')
-                                .expect("MCP_NONLOCAL_OUTPUT_REF");
-                            assert!(
-                                pointer.is_empty() || root.pointer(pointer).is_some(),
-                                "MCP_DANGLING_OUTPUT_REF"
-                            );
-                        }
-                    }
-                    pending.extend(object.values());
-                }
-                Value::Array(array) => pending.extend(array),
-                _ => {}
-            }
-        }
+        project_mcp_local_references(&root).expect("MCP_OUTPUT_REFERENCE_CONTRACT");
         let serialized = serde_json::to_value(tool).unwrap();
         let requirement = &serialized["_meta"]["numera-wiz/authorization_requirements"];
         assert_eq!(requirement["schema_version"], 1);
@@ -183,6 +161,56 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         encoded.len(),
         family.len()
     );
+    let literal_data = serde_json::json!({
+        "$defs":{"value":{"type":"string"}},
+        "properties":{"$ref":{"type":"string"},"real":{"$ref":"#/$defs/value"}},
+        "const":{"$ref":"literal text"},
+        "enum":[{"$dynamicRef":"literal text"}],
+        "default":{"$ref":"#/data-is-not-a-schema"},
+        "examples":[{"$ref":"literal text"}],
+        "anyOf":[true,{"not":false}]
+    });
+    assert!(project_mcp_local_references(&literal_data).is_ok());
+    for invalid in [
+        serde_json::json!({"properties":{"value":{"$ref":"https://example.invalid/schema"}}}),
+        serde_json::json!({"items":{"$ref":"#/$defs/missing"}}),
+        serde_json::json!({"allOf":[{"$dynamicRef":"#/$defs/missing"}]}),
+    ] {
+        assert!(project_mcp_local_references(&invalid).is_err());
+    }
+}
+
+fn project_mcp_local_references(root: &serde_json::Value) -> Result<(), &'static str> {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        if node.is_boolean() {
+            continue;
+        }
+        let object = node.as_object().ok_or("MCP_INVALID_OUTPUT_SCHEMA")?;
+        for (keyword, value) in object {
+            match keyword.as_str() {
+                "$ref" | "$dynamicRef" => {
+                    let pointer = value.as_str().and_then(|text| text.strip_prefix('#'))
+                        .ok_or("MCP_NONLOCAL_OUTPUT_REF")?;
+                    if !pointer.is_empty() && root.pointer(pointer).is_none() {
+                        return Err("MCP_DANGLING_OUTPUT_REF");
+                    }
+                }
+                "$defs" | "definitions" | "properties" | "patternProperties" | "dependentSchemas" => {
+                    pending.extend(value.as_object().ok_or("MCP_INVALID_OUTPUT_SCHEMA_MAP")?.values());
+                }
+                "allOf" | "anyOf" | "oneOf" | "prefixItems" => {
+                    pending.extend(value.as_array().ok_or("MCP_INVALID_OUTPUT_SCHEMA_ARRAY")?);
+                }
+                "items" | "additionalProperties" | "unevaluatedProperties" | "propertyNames"
+                | "contains" | "not" | "if" | "then" | "else" | "unevaluatedItems" | "contentSchema" => {
+                    pending.push(value);
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::ListToolsResult) {
