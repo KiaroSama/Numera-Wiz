@@ -92,6 +92,7 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         "PERMISSION_DENIED"
     );
     project_mcp_output_contract(&first_page);
+    project_mcp_wire_page(data.path(), &first_page).await;
     client.cancel().await.unwrap();
 }
 
@@ -140,6 +141,53 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         assert!(requirement.get("policy_revision").is_none() && serialized["_meta"].get("authorization").is_none());
     }
     eprintln!("MCP_SCHEMA_SIZE kind=standard_list_tools_result bytes={} project_outputs={}", encoded.len(), family.len());
+}
+
+async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::ListToolsResult) {
+    use tokio::io::AsyncWriteExt;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
+            .arg("--data-dir").arg(root).arg("bridge")
+            .stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null()).kill_on_drop(true).spawn().unwrap();
+        let mut input = child.stdin.take().unwrap();
+        let mut output = tokio::io::BufReader::new(child.stdout.take().unwrap());
+        input.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":\"r4-initialize\",\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2026-07-28\",\"capabilities\":{},\"clientInfo\":{\"name\":\"numera-wiz-wire-contract\",\"version\":\"1\"}}}\n").await.unwrap();
+        input.flush().await.unwrap();
+        let initialized = project_mcp_wire_line(&mut output).await;
+        let initialized: serde_json::Value = serde_json::from_slice(&initialized).unwrap();
+        assert_eq!(initialized["id"], "r4-initialize");
+        assert!(initialized.get("error").is_none() && initialized["result"].is_object());
+        input.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":\"r4-tools\",\"method\":\"tools/list\"}\n").await.unwrap();
+        input.flush().await.unwrap();
+        let frame = project_mcp_wire_line(&mut output).await;
+        let value: serde_json::Value = serde_json::from_slice(&frame).unwrap();
+        assert_eq!(value["jsonrpc"], "2.0");
+        assert_eq!(value["id"], "r4-tools");
+        assert!(value.get("error").is_none());
+        assert!(value["result"] == serde_json::to_value(expected).unwrap(), "MCP_ACTUAL_WIRE_STATIC_PAGE_DIFFERS");
+        eprintln!("MCP_SCHEMA_SIZE kind=actual_stdio_jsonrpc_line bytes={}", frame.len());
+        let evidence = std::path::Path::new("target/interface-evidence/mcp-list-tools-wire.json");
+        std::fs::create_dir_all(evidence.parent().unwrap()).unwrap();
+        std::fs::write(evidence, &frame).unwrap();
+        drop(input);
+        assert!(child.wait().await.unwrap().success(), "MCP_WIRE_BRIDGE_DID_NOT_EXIT");
+    }).await.expect("MCP_ACTUAL_WIRE_DEADLINE");
+}
+
+async fn project_mcp_wire_line<T: tokio::io::AsyncBufRead + Unpin>(reader: &mut T) -> Vec<u8> {
+    use tokio::io::AsyncBufReadExt;
+    let mut frame = Vec::new();
+    loop {
+        let available = reader.fill_buf().await.unwrap();
+        assert!(!available.is_empty(), "MCP_WIRE_UNEXPECTED_EOF");
+        let newline = available.iter().position(|byte| *byte == b'\n');
+        let take = newline.map_or(available.len(), |index| index + 1);
+        assert!(frame.len() + take <= nw_domain::commands::MAX_RESULT_BYTES, "MCP_ACTUAL_JSONRPC_BYTE_BOUND");
+        frame.extend_from_slice(&available[..take]);
+        reader.consume(take);
+        if newline.is_some() { return frame; }
+    }
 }
 
 async fn wait_for_idle_owner_unlock(root: &std::path::Path) {
