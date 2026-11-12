@@ -880,7 +880,7 @@ fn retain_receipts(all: &mut BTreeSet<String>, fresh: BTreeSet<String>) {
 /// The caller bounds this entire phase to 120s inside its existing 20-minute job.
 /// Return the new private bearer solely for the caller's protected-log secret checks.
 pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> String {
-    let profile = json!({"name":"topology","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["access.replay_scope.create","projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.link","clips.move","clips.unlink","clips.split","clips.remove","history.undo","history.redo"],"object_grants":[],"read_roots":[],"write_roots":[]});
+    let profile = json!({"name":"topology","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["commands.list","commands.schema","access.replay_scope.create","projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.link","clips.move","clips.unlink","clips.split","clips.remove","history.undo","history.redo"],"object_grants":[],"read_roots":[],"write_roots":[]});
     let mut profile_request = Request::query("access.profiles.put", profile);
     profile_request.request_id = "topology-profile-put".to_owned();
     profile_request.replay_scope = Some(owner_scope.to_owned());
