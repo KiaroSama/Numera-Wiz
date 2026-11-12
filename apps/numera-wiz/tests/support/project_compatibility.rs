@@ -24,6 +24,9 @@ use tokio::{
     process::{Child, Command},
 };
 
+#[path = "project_compatibility/linked.rs"]
+mod linked;
+
 const RECORDS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("versioned_records");
 const MAX_BODY: usize = 2 * 1024 * 1024;
 const POPULATED_PROJECT_NAMESPACES: &[&str] = &[
@@ -1050,7 +1053,9 @@ async fn project_write(
             "Project mutation base revision differs"
         );
     }
-    same_receipt(&response, &owner.command(&request, evidence).await?)?;
+    let replay = owner.command(&request, evidence).await?;
+    same_receipt(&response, &replay)?;
+    ensure!(response == replay, "Project replay changed the whole accepted Response");
     retain_response(directory, &response)?;
     accepted.push((request, response.clone()));
     Ok(response["result"].clone())
@@ -1455,6 +1460,10 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         "Project mutation reused prior profile receipt ID"
     );
     let semantic_a = semantic_project(&mut owner, &project, 5, evidence).await?;
+    let (linked_project, linked_semantic_a) =
+        linked::LinkedProject::create(&mut owner, &scope, &requests, evidence).await?;
+    linked_project.distinct(&project, &semantic_a)?;
+    linked_project.receipts(&project, &[&accepted])?;
     owner.stop(evidence).await?;
     let a = closed(&root, "A-current-project-schema2", evidence)?;
     ensure!(
@@ -1471,17 +1480,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
             "Actual project fixture did not populate {namespace}"
         );
     }
-    let dependency_rows = a
-        .facts
-        .namespaces
-        .get("project-dependency")
-        .copied()
-        .unwrap_or(0);
-    ensure!(
-        dependency_rows == 0,
-        "Unlinked project fixture unexpectedly populated dependency rows"
-    );
-    evidence.record(json!({"phase":"project-namespace-coverage","checkpoint":"A","project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_dependency_rows":dependency_rows,"nonempty_dependency_preservation":"unqualified","required_before_full_v1":"Extend actual prior/current preservation through a real public link/import producer"}))?;
+    linked_project.dependencies(&project, &a, "A", evidence)?;
     ensure!(
         a.rows
             .keys()
@@ -1534,6 +1533,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     let b = closed(&root, "B-prior-read-preservation", evidence)?;
     preserved(&original_raw, &b, legacy_key)?;
     projects_identical(&a, &b)?;
+    linked_project.dependencies(&project, &b, "B", evidence)?;
 
     evidence.record(json!({"phase":"actual-prior-migration"}))?;
     let mut owner = Owner::start(
@@ -1602,6 +1602,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         migration_accepted["result"]["state"] == "accepted",
         "Migration submit did not acknowledge acceptance"
     );
+    linked_project.receipts(&project, &[&accepted, &migration_accepted])?;
     let migration_id = text(&migration_accepted["result"], "migration_id")?;
     ensure!(
         plan["id"] == migration_id,
@@ -1643,6 +1644,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     );
     preserved(&original_raw, &c, legacy_key)?;
     projects_identical(&a, &c)?;
+    linked_project.dependencies(&project, &c, "C", evidence)?;
     guard(&c, &migration_id, "0")?;
     let rollback_c = rollback(&root, &plan, &original_raw, &a, "C-rollback", evidence)?;
 
@@ -1657,6 +1659,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     .await?;
     legacy_reads(&mut owner, &original, &accepted, evidence).await?;
     replay_project(&mut owner, &project, evidence).await?;
+    linked_project.replay(&mut owner, evidence).await?;
     same_receipt(
         &migration_accepted,
         &owner.command(&migration_request, evidence).await?,
@@ -1677,6 +1680,10 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     ensure!(
         reopened == semantic_a,
         "Current schema3 reopen changed project entities/history"
+    );
+    ensure!(
+        linked_project.semantic(&mut owner, evidence).await? == linked_semantic_a,
+        "Current schema3 reopen changed linked revision-7 entities/history/redo"
     );
     let edit = durable(
         &scope,
@@ -1700,18 +1707,12 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
             && moved["receipt_id"] != accepted["receipt_id"],
         "Fresh adoption edit reused an old receipt ID"
     );
+    linked_project.receipts(&project, &[&accepted, &migration_accepted])?;
     let semantic_d = semantic_project(&mut owner, &project, 6, evidence).await?;
     owner.stop(evidence).await?;
     let d = closed(&root, "D-current-business-adoption", evidence)?;
-    ensure!(
-        d.facts
-            .namespaces
-            .get("project-dependency")
-            .copied()
-            .unwrap_or(0)
-            == 0,
-        "Unlinked project move unexpectedly populated dependency rows"
-    );
+    linked_project.dependencies(&project, &d, "D", evidence)?;
+    linked_project.preserved(&a, &d)?;
     preserved(&original_raw, &d, legacy_key)?;
     preserved(&c, &d, |key| key.starts_with("receipt/"))?;
     let guard_d = guard(&d, &migration_id, "1")?;
@@ -1759,6 +1760,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     let e = closed(&root, "E-prior-schema3-preservation", evidence)?;
     preserved(&original_raw, &e, legacy_key)?;
     projects_identical(&d, &e)?;
+    linked_project.dependencies(&project, &e, "E", evidence)?;
     ensure!(
         guard(&e, &migration_id, "1")? == guard_d,
         "Prior reader/replay changed adoption bytes"
@@ -1777,6 +1779,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
     .await?;
     legacy_reads(&mut owner, &original, &accepted, evidence).await?;
     replay_project(&mut owner, &project, evidence).await?;
+    linked_project.replay(&mut owner, evidence).await?;
     same_receipt(
         &migration_accepted,
         &owner.command(&migration_request, evidence).await?,
@@ -1785,8 +1788,13 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         semantic_project(&mut owner, &project, 6, evidence).await? == semantic_d,
         "Final current semantic project differs after prior schema3 reader"
     );
+    ensure!(
+        linked_project.semantic(&mut owner, evidence).await? == linked_semantic_a,
+        "Final linked revision-7 semantics/history/redo differ after prior schema3 reader"
+    );
     owner.stop(evidence).await?;
     let final_raw = closed(&root, "final-current-replay-preservation", evidence)?;
+    linked_project.dependencies(&project, &final_raw, "final", evidence)?;
     preserved(&original_raw, &final_raw, legacy_key)?;
     projects_identical(&d, &final_raw)?;
     ensure!(
@@ -1799,7 +1807,7 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         epochs.len() == 7,
         "Every controlled owner must establish a new epoch"
     );
-    evidence.record(json!({"phase":"complete","status":"passed","mode":"additive-preservation","owner_epochs":epochs.len(),"root_id":root_id,"project_id":project.id,"final_revision":"6","migration_id":migration_id,"project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_dependency_rows":final_raw.facts.namespaces.get("project-dependency").copied().unwrap_or(0),"nonempty_dependency_preservation":"unqualified","required_before_full_v1":"Extend actual prior/current preservation through a real public link/import producer","legacy_v1":"shape/echo plus independently frozen digest and exact raw preservation","legacy_v2":"actual decoder acceptance plus independently frozen semantic digest and exact raw preservation","registered_media":false}))?;
+    evidence.record(json!({"phase":"complete","status":"passed","mode":"additive-preservation","owner_epochs":epochs.len(),"root_id":root_id,"project_id":project.id,"final_revision":"6","migration_id":migration_id,"fixture_version":2,"variant":"public-group-only","linked_fixture":linked_project.completion(),"base_project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_namespaces_required_nonempty":linked::combined_namespaces(),"project_dependency_rows":final_raw.facts.namespaces.get("project-dependency").copied().unwrap_or(0),"unlinked_project_dependency_rows":0,"linked_project_dependency_rows":2,"nonempty_group_dependency_preservation":"passed","mixed_av_preservation":"unqualified","semantic_input_dependency_preservation":"unqualified","legacy_v1":"shape/echo plus independently frozen digest and exact raw preservation","legacy_v2":"actual decoder acceptance plus independently frozen semantic digest and exact raw preservation","registered_media":false}))?;
     Ok(())
 }
 pub async fn run() {
