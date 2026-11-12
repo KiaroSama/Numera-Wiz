@@ -124,7 +124,10 @@ mod tests {
             assert_eq!(
                 listed_commands
                     .iter()
-                    .filter(|descriptor| descriptor.get("id").and_then(serde_json::Value::as_str) == Some(id))
+                    .filter(
+                        |descriptor| descriptor.get("id").and_then(serde_json::Value::as_str)
+                            == Some(id)
+                    )
                     .count(),
                 1,
                 "exactly one {id} descriptor is required: {list_response:?}"
@@ -143,16 +146,25 @@ mod tests {
         );
         assert!(!unknown_response.ok, "{unknown_response:?}");
         assert_eq!(
-            unknown_response.error.as_ref().map(|error| error.code.as_str()),
+            unknown_response
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("CAPABILITY_UNAVAILABLE"),
             "{unknown_response:?}"
         );
         assert!(unknown_response.result.is_none(), "{unknown_response:?}");
-        assert!(unknown_response.receipt_id.is_none(), "{unknown_response:?}");
+        assert!(
+            unknown_response.receipt_id.is_none(),
+            "{unknown_response:?}"
+        );
 
         let schema_response = CommandService.dispatch(
             Principal::DiscoveryAgent,
-            Request::query("commands.schema", serde_json::json!({"id": "projects.create"})),
+            Request::query(
+                "commands.schema",
+                serde_json::json!({"id": "projects.create"}),
+            ),
         );
         assert!(schema_response.ok, "{schema_response:?}");
         assert!(schema_response.error.is_none(), "{schema_response:?}");
@@ -161,31 +173,66 @@ mod tests {
             .result
             .as_ref()
             .filter(|descriptor| descriptor.is_object())
-            .unwrap_or_else(|| panic!("commands.schema must return a descriptor: {schema_response:?}"));
-        assert_eq!(descriptor.get("id"), Some(&serde_json::json!("projects.create")), "{schema_response:?}");
-        assert_eq!(descriptor.get("version"), Some(&serde_json::json!(1)), "{schema_response:?}");
-        assert_eq!(descriptor.get("state_class"), Some(&serde_json::json!("durable_mutation")), "{schema_response:?}");
-        assert!(descriptor.get("project_context").is_none(), "{schema_response:?}");
+            .unwrap_or_else(|| {
+                panic!("commands.schema must return a descriptor: {schema_response:?}")
+            });
+        assert_eq!(
+            descriptor.get("id"),
+            Some(&serde_json::json!("projects.create")),
+            "{schema_response:?}"
+        );
+        assert_eq!(
+            descriptor.get("version"),
+            Some(&serde_json::json!(1)),
+            "{schema_response:?}"
+        );
+        assert_eq!(
+            descriptor.get("state_class"),
+            Some(&serde_json::json!("durable_mutation")),
+            "{schema_response:?}"
+        );
+        assert!(
+            descriptor.get("project_context").is_none(),
+            "{schema_response:?}"
+        );
         let params_schema = descriptor
             .get("params_schema")
             .filter(|schema| schema.is_object())
             .unwrap_or_else(|| panic!("params_schema must be an object: {schema_response:?}"));
-        assert_eq!(params_schema.get("type"), Some(&serde_json::json!("object")), "{schema_response:?}");
-        assert_eq!(params_schema.pointer("/properties/name/type"), Some(&serde_json::json!("string")), "{schema_response:?}");
+        assert_eq!(
+            params_schema.get("type"),
+            Some(&serde_json::json!("object")),
+            "{schema_response:?}"
+        );
+        assert_eq!(
+            params_schema.pointer("/properties/name/type"),
+            Some(&serde_json::json!("string")),
+            "{schema_response:?}"
+        );
         assert!(
-            params_schema.get("required").and_then(serde_json::Value::as_array).is_some_and(|required| {
-                required.iter().any(|name| name.as_str() == Some("name"))
-            }),
+            params_schema
+                .get("required")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|required| {
+                    required.iter().any(|name| name.as_str() == Some("name"))
+                }),
             "params_schema must require name: {schema_response:?}"
         );
         let listed_descriptor = listed_commands
             .iter()
-            .find(|entry| entry.get("id").and_then(serde_json::Value::as_str) == Some("projects.create"))
+            .find(|entry| {
+                entry.get("id").and_then(serde_json::Value::as_str) == Some("projects.create")
+            })
             .unwrap_or_else(|| panic!("projects.create descriptor missing: {list_response:?}"));
-        assert_eq!(descriptor, listed_descriptor, "list={list_response:?}; schema={schema_response:?}");
+        assert_eq!(
+            descriptor, listed_descriptor,
+            "list={list_response:?}; schema={schema_response:?}"
+        );
 
         assert!(
-            descriptor.get("result_schema").is_some_and(serde_json::Value::is_object),
+            descriptor
+                .get("result_schema")
+                .is_some_and(serde_json::Value::is_object),
             "projects.create must publish its finite result_schema: {schema_response:?}"
         );
         let result_schema = descriptor
@@ -201,13 +248,22 @@ mod tests {
                     let reference = reference.as_str().unwrap_or_else(|| {
                         panic!("schema reference must be a string: {schema_response:?}")
                     });
-                    assert!(reference.starts_with("#/$defs/"), "schema reference must use its own $defs: {schema_response:?}");
+                    assert!(
+                        reference.starts_with("#/$defs/"),
+                        "schema reference must use its own $defs: {schema_response:?}"
+                    );
                     node = result_schema.pointer(&reference[1..]).unwrap_or_else(|| {
                         panic!("schema reference must resolve locally: {schema_response:?}")
                     });
                 }
-                assert!(node.get("$ref").is_none(), "schema reference exceeds 16 hops: {schema_response:?}");
-                assert!(node.is_object(), "schema node must be an object: {schema_response:?}");
+                assert!(
+                    node.get("$ref").is_none(),
+                    "schema reference exceeds 16 hops: {schema_response:?}"
+                );
+                assert!(
+                    node.is_object(),
+                    "schema node must be an object: {schema_response:?}"
+                );
                 if let Some(segment) = segments.get(step) {
                     node = node.get(*segment).unwrap_or_else(|| {
                         panic!("schema path {segments:?} must exist: {schema_response:?}")
@@ -217,27 +273,59 @@ mod tests {
             node
         };
         let result_root = resolve(&[]);
-        assert_eq!(result_root.get("type"), Some(&serde_json::json!("object")), "{schema_response:?}");
+        assert_eq!(
+            result_root.get("type"),
+            Some(&serde_json::json!("object")),
+            "{schema_response:?}"
+        );
         let result_properties = result_root
             .get("properties")
             .and_then(serde_json::Value::as_object)
-            .unwrap_or_else(|| panic!("result_schema must declare properties: {schema_response:?}"));
+            .unwrap_or_else(|| {
+                panic!("result_schema must declare properties: {schema_response:?}")
+            });
         let result_required = result_root
             .get("required")
             .and_then(serde_json::Value::as_array)
-            .unwrap_or_else(|| panic!("result_schema must declare required fields: {schema_response:?}"));
+            .unwrap_or_else(|| {
+                panic!("result_schema must declare required fields: {schema_response:?}")
+            });
         let result_fields = ["project_id", "root_bin_id", "revision", "history"];
-        assert_eq!(result_properties.len(), result_fields.len(), "{schema_response:?}");
-        assert_eq!(result_required.len(), result_fields.len(), "{schema_response:?}");
+        assert_eq!(
+            result_properties.len(),
+            result_fields.len(),
+            "{schema_response:?}"
+        );
+        assert_eq!(
+            result_required.len(),
+            result_fields.len(),
+            "{schema_response:?}"
+        );
         for field in result_fields {
-            assert!(result_properties.contains_key(field), "missing result property {field}: {schema_response:?}");
-            assert!(result_required.iter().any(|name| name.as_str() == Some(field)), "missing required result field {field}: {schema_response:?}");
+            assert!(
+                result_properties.contains_key(field),
+                "missing result property {field}: {schema_response:?}"
+            );
+            assert!(
+                result_required
+                    .iter()
+                    .any(|name| name.as_str() == Some(field)),
+                "missing required result field {field}: {schema_response:?}"
+            );
         }
         for field in ["project_id", "root_bin_id", "revision"] {
-            assert_eq!(resolve(&["properties", field]).get("type"), Some(&serde_json::json!("string")), "{field} must be a string: {schema_response:?}");
+            assert_eq!(
+                resolve(&["properties", field]).get("type"),
+                Some(&serde_json::json!("string")),
+                "{field} must be a string: {schema_response:?}"
+            );
         }
         let history = resolve(&["properties", "history"]);
-        assert_eq!(history.get("type"), Some(&serde_json::json!("object")), "{schema_response:?}");
+        assert_eq!(
+            history.get("type"),
+            Some(&serde_json::json!("object")),
+            "{schema_response:?}"
+        );
         let history_properties = history
             .get("properties")
             .and_then(serde_json::Value::as_object)
@@ -246,12 +334,32 @@ mod tests {
             .get("required")
             .and_then(serde_json::Value::as_array)
             .unwrap_or_else(|| panic!("history must declare required fields: {schema_response:?}"));
-        assert_eq!(history_properties.len(), 2, "history must have two fields: {schema_response:?}");
-        assert_eq!(history_required.len(), 2, "history must require two fields: {schema_response:?}");
+        assert_eq!(
+            history_properties.len(),
+            2,
+            "history must have two fields: {schema_response:?}"
+        );
+        assert_eq!(
+            history_required.len(),
+            2,
+            "history must require two fields: {schema_response:?}"
+        );
         for field in ["can_undo", "can_redo"] {
-            assert!(history_properties.contains_key(field), "missing history property {field}: {schema_response:?}");
-            assert!(history_required.iter().any(|name| name.as_str() == Some(field)), "missing required history field {field}: {schema_response:?}");
-            assert_eq!(resolve(&["properties", "history", "properties", field]).get("type"), Some(&serde_json::json!("boolean")), "{field} must be a boolean: {schema_response:?}");
+            assert!(
+                history_properties.contains_key(field),
+                "missing history property {field}: {schema_response:?}"
+            );
+            assert!(
+                history_required
+                    .iter()
+                    .any(|name| name.as_str() == Some(field)),
+                "missing required history field {field}: {schema_response:?}"
+            );
+            assert_eq!(
+                resolve(&["properties", "history", "properties", field]).get("type"),
+                Some(&serde_json::json!("boolean")),
+                "{field} must be a boolean: {schema_response:?}"
+            );
         }
     }
 }
