@@ -12,7 +12,10 @@ use rmcp::{
     },
 };
 use serde_json::{Value, json};
-use std::{collections::{BTreeMap, BTreeSet}, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 // A saved invocation owns every byte needed for its one retained-receipt retry.
 struct Invocation {
@@ -34,22 +37,35 @@ impl Invocation {
             ("replay_scope", &mut request.replay_scope),
             ("idempotency_key", &mut request.idempotency_key),
         ] {
-            *target = context.get(name).map(|value| value.as_str().unwrap().to_owned());
+            *target = context
+                .get(name)
+                .map(|value| value.as_str().unwrap().to_owned());
         }
         if let Some(id) = context.get("request_id") {
             request.request_id = id.as_str().unwrap().to_owned();
         }
         bounded(&request);
-        Self { command, params, context, cli_args: args }
+        Self {
+            command,
+            params,
+            context,
+            cli_args: args,
+        }
     }
 }
 fn bounded(value: &impl serde::Serialize) {
-    assert!(serde_json::to_vec(value).unwrap().len() <= MAX_RESULT_BYTES,
-        "Topology request/captured response exceeds MAX_RESULT_BYTES");
+    assert!(
+        serde_json::to_vec(value).unwrap().len() <= MAX_RESULT_BYTES,
+        "Topology request/captured response exceeds MAX_RESULT_BYTES"
+    );
 }
 fn text(value: &Value, key: &str) -> String {
-    value.get(key).and_then(Value::as_str).filter(|s| !s.is_empty())
-        .unwrap_or_else(|| panic!("Topology response lacks string field {key}")).to_owned()
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| panic!("Topology response lacks string field {key}"))
+        .to_owned()
 }
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
@@ -57,7 +73,9 @@ fn args(values: &[&str]) -> Vec<String> {
 fn flag(values: &mut Vec<String>, key: &str, value: &str) {
     values.extend([key.to_owned(), value.to_owned()]);
 }
-fn rational(num: u64) -> Value { json!({"num":num.to_string(),"den":"1"}) }
+fn rational(num: u64) -> Value {
+    json!({"num":num.to_string(),"den":"1"})
+}
 fn sorted(values: &[String]) -> Value {
     let mut values = values.to_vec();
     values.sort();
@@ -73,7 +91,11 @@ impl Adapter<'_> {
     async fn invoke(&self, saved: &Invocation) -> Value {
         let response = match self {
             Self::Cli(cli) => {
-                let refs = saved.cli_args.iter().map(String::as_str).collect::<Vec<_>>();
+                let refs = saved
+                    .cli_args
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
                 // Cli::human parses the whole stdout as exactly one JSON value.
                 let (response, exit) = cli.human(&refs).await;
                 assert_eq!(exit, 0, "Topology typed CLI exit for {}", saved.command);
@@ -81,24 +103,48 @@ impl Adapter<'_> {
             }
             Self::Sdk(client) => {
                 let wrapper = json!({"params":saved.params,"context":saved.context});
-                let result = client.call_tool(CallToolRequestParams::new(saved.command)
-                    .with_arguments(wrapper.as_object().unwrap().clone())).await
+                let result = client
+                    .call_tool(
+                        CallToolRequestParams::new(saved.command)
+                            .with_arguments(wrapper.as_object().unwrap().clone()),
+                    )
+                    .await
                     .unwrap_or_else(|_| panic!("Topology SDK call failed for {}", saved.command));
                 let result = serde_json::to_value(result).unwrap();
-                assert!(result.get("isError").is_none_or(|value| value == &json!(false)),
-                    "Topology SDK reported tool error for {}", saved.command);
-                result.get("structuredContent").expect("SDK canonical structuredContent").clone()
+                assert!(
+                    result
+                        .get("isError")
+                        .is_none_or(|value| value == &json!(false)),
+                    "Topology SDK reported tool error for {}",
+                    saved.command
+                );
+                result
+                    .get("structuredContent")
+                    .expect("SDK canonical structuredContent")
+                    .clone()
             }
         };
         // These are after-capture bounds, not a streaming-memory qualification.
         bounded(&response);
-        let error = response.get("error").and_then(|v| v.get("code"))
-            .and_then(Value::as_str).unwrap_or("absent");
-        assert_eq!(response.get("ok"), Some(&json!(true)),
-            "Topology command {} rejected (code {error}); context withheld", saved.command);
-        assert!(response.get("error").is_none_or(Value::is_null),
-            "Topology success must have no canonical error");
-        assert!(response.get("result").is_some(), "Topology canonical result missing");
+        let error = response
+            .get("error")
+            .and_then(|v| v.get("code"))
+            .and_then(Value::as_str)
+            .unwrap_or("absent");
+        assert_eq!(
+            response.get("ok"),
+            Some(&json!(true)),
+            "Topology command {} rejected (code {error}); context withheld",
+            saved.command
+        );
+        assert!(
+            response.get("error").is_none_or(Value::is_null),
+            "Topology success must have no canonical error"
+        );
+        assert!(
+            response.get("result").is_some(),
+            "Topology canonical result missing"
+        );
         assert!(!text(&response, "request_id").is_empty());
         if let Some(id) = saved.context.get("request_id") {
             assert_eq!(&response["request_id"], id);
@@ -106,14 +152,27 @@ impl Adapter<'_> {
         response
     }
     async fn scope(&self, tag: &str) -> String {
-        let cli_args = args(&["--access-profile", "topology", "access", "replay-scope", "create", "--json"]);
+        let cli_args = args(&[
+            "--access-profile",
+            "topology",
+            "access",
+            "replay-scope",
+            "create",
+            "--json",
+        ]);
         // The scope bootstrap is a public query under this selected profile.
-        let saved = Invocation::new("access.replay_scope.create", json!({}),
-            json!({"request_id":format!("topology-{tag}-scope")}), cli_args);
+        let saved = Invocation::new(
+            "access.replay_scope.create",
+            json!({}),
+            json!({"request_id":format!("topology-{tag}-scope")}),
+            cli_args,
+        );
         // This typed bootstrap has no request-id option; SDK context still supplies it.
         let saved = if matches!(self, Self::Cli(_)) {
             Invocation::new(saved.command, saved.params, json!({}), saved.cli_args)
-        } else { saved };
+        } else {
+            saved
+        };
         let response = self.invoke(&saved).await;
         text(&response["result"], "replay_scope")
     }
@@ -129,11 +188,21 @@ struct Journey<'a> {
     snapshot: Option<String>,
 }
 impl Journey<'_> {
-    async fn write(&mut self, step: &str, command: &'static str, params: Value,
-        mut cli_args: Vec<String>, project: Option<(&str, u64)>) -> Value {
+    async fn write(
+        &mut self,
+        step: &str,
+        command: &'static str,
+        params: Value,
+        mut cli_args: Vec<String>,
+        project: Option<(&str, u64)>,
+    ) -> Value {
         let identity = format!("topology-{}-{step}", self.tag);
-        assert!(self.request_ids.insert(identity.clone()), "Fresh topology request identity reused");
-        let mut context = json!({"request_id":identity,"replay_scope":self.scope,"idempotency_key":identity});
+        assert!(
+            self.request_ids.insert(identity.clone()),
+            "Fresh topology request identity reused"
+        );
+        let mut context =
+            json!({"request_id":identity,"replay_scope":self.scope,"idempotency_key":identity});
         let mut selected = args(&["--access-profile", "topology"]);
         selected.append(&mut cli_args);
         if let Some((id, base)) = project {
@@ -146,23 +215,38 @@ impl Journey<'_> {
         flag(&mut selected, "--request-id", &identity);
         let saved = Invocation::new(command, params, context, selected);
         let response = self.adapter.invoke(&saved).await;
-        assert!(self.receipts.insert(text(&response, "receipt_id")), "Fresh topology receipt reused");
+        assert!(
+            self.receipts.insert(text(&response, "receipt_id")),
+            "Fresh topology receipt reused"
+        );
         let result = response["result"].clone();
         if let Some((id, base)) = project {
             assert_eq!(result["project_id"], id);
             assert_eq!(result["base_revision"], base.to_string());
             assert_eq!(result["revision"], (base + 1).to_string());
-            assert!(result.get("no_change").is_none(), "Durable topology edit must advance");
+            assert!(
+                result.get("no_change").is_none(),
+                "Durable topology edit must advance"
+            );
             assert!(!text(&result, "operation_id").is_empty());
         } else {
             assert_eq!(result["revision"], "0");
-            assert_eq!(result["history"], json!({"can_undo":false,"can_redo":false}));
+            assert_eq!(
+                result["history"],
+                json!({"can_undo":false,"can_redo":false})
+            );
         }
         self.accepted.push((saved, response));
         result
     }
-    async fn projection(&mut self, project: &str, revision: u64, command: &'static str,
-        mut params: Value, mut cli_args: Vec<String>) -> Value {
+    async fn projection(
+        &mut self,
+        project: &str,
+        revision: u64,
+        command: &'static str,
+        mut params: Value,
+        mut cli_args: Vec<String>,
+    ) -> Value {
         // Match the real typed query lowering, including its optional defaults.
         let fields = params.as_object_mut().unwrap();
         fields.entry("limit").or_insert(json!(128));
@@ -186,7 +270,10 @@ impl Journey<'_> {
         // A query's expected_revision is absent (never JSON null).
         let context = json!({"project":{"id":project}});
         assert!(context["project"].get("expected_revision").is_none());
-        let response = self.adapter.invoke(&Invocation::new(command, params, context, selected)).await;
+        let response = self
+            .adapter
+            .invoke(&Invocation::new(command, params, context, selected))
+            .await;
         assert!(response.get("receipt_id").is_none_or(Value::is_null));
         let result = response["result"].clone();
         assert_eq!(result["project_revision"], revision.to_string());
@@ -199,21 +286,42 @@ impl Journey<'_> {
             // All original bases are stale now. No rebase, new scope, key or ID.
             let retry = self.adapter.invoke(saved).await;
             for field in ["ok", "request_id", "receipt_id", "result"] {
-                assert_eq!(retry.get(field), accepted.get(field),
-                    "Topology retained mutation field {field} differs for {}", saved.command);
+                assert_eq!(
+                    retry.get(field),
+                    accepted.get(field),
+                    "Topology retained mutation field {field} differs for {}",
+                    saved.command
+                );
             }
             assert_eq!(&retry, accepted, "Topology full canonical replay differs");
         }
     }
     async fn retire(&mut self) {
         let snapshot = self.snapshot.take().expect("Final topology project ticket");
-        let mut cli_args = args(&["--access-profile", "topology", "projects", "list", "--limit", "64"]);
+        let mut cli_args = args(&[
+            "--access-profile",
+            "topology",
+            "projects",
+            "list",
+            "--limit",
+            "64",
+        ]);
         flag(&mut cli_args, "--replace-snapshot", &snapshot);
-        let response = self.adapter.invoke(&Invocation::new("projects.list",
-            json!({"limit":64,"cursor":null,"replace_snapshot":snapshot}), json!({}), cli_args)).await;
+        let response = self
+            .adapter
+            .invoke(&Invocation::new(
+                "projects.list",
+                json!({"limit":64,"cursor":null,"replace_snapshot":snapshot}),
+                json!({}),
+                cli_args,
+            ))
+            .await;
         assert!(response.get("receipt_id").is_none_or(Value::is_null));
         assert_eq!(response["result"]["projection"], "projects.summary.v1");
-        assert!(response["result"]["next_cursor"].is_null(), "Finite topology catalog must fit one page");
+        assert!(
+            response["result"]["next_cursor"].is_null(),
+            "Finite topology catalog must fit one page"
+        );
     }
 }
 
@@ -227,8 +335,16 @@ struct Project {
 }
 impl Project {
     fn entities(&self) -> Vec<String> {
-        vec![self.bin.clone(), self.sequence.clone(), self.tracks[0].clone(), self.tracks[1].clone(),
-            self.sources[0].clone(), self.sources[1].clone(), self.clips[0].clone(), self.clips[1].clone()]
+        vec![
+            self.bin.clone(),
+            self.sequence.clone(),
+            self.tracks[0].clone(),
+            self.tracks[1].clone(),
+            self.sources[0].clone(),
+            self.sources[1].clone(),
+            self.clips[0].clone(),
+            self.clips[1].clone(),
+        ]
     }
 }
 struct Facts {
@@ -238,13 +354,27 @@ struct Facts {
 fn clip_facts(mut entity: Value) -> Value {
     let fields = entity.as_object_mut().expect("Projected clip object");
     // Hash changes with the two independently asserted mutable payload fields.
-    for field in ["payload_sha256", "link_group_id", "sequence_start"] { fields.remove(field); }
+    for field in ["payload_sha256", "link_group_id", "sequence_start"] {
+        fields.remove(field);
+    }
     entity
 }
-async fn checkpoint(journey: &mut Journey<'_>, project: &Project, revision: u64,
-    group: Option<&str>, baseline: Option<&Facts>) -> Facts {
-    let summary = journey.projection(&project.id, revision, "projects.inspect", json!({"projection":"summary"}),
-        args(&["projects", "inspect", "--projection", "summary"])).await;
+async fn checkpoint(
+    journey: &mut Journey<'_>,
+    project: &Project,
+    revision: u64,
+    group: Option<&str>,
+    baseline: Option<&Facts>,
+) -> Facts {
+    let summary = journey
+        .projection(
+            &project.id,
+            revision,
+            "projects.inspect",
+            json!({"projection":"summary"}),
+            args(&["projects", "inspect", "--projection", "summary"]),
+        )
+        .await;
     assert_eq!(summary["project_id"], project.id);
     assert_eq!(summary["root_bin_id"], project.bin);
     assert_eq!(summary["name"], format!("Topology {}", journey.tag));
@@ -258,20 +388,39 @@ async fn checkpoint(journey: &mut Journey<'_>, project: &Project, revision: u64,
     let mut entities = BTreeMap::new();
     assert_eq!(project.entities().iter().collect::<BTreeSet<_>>().len(), 8);
     for id in project.entities() {
-        let result = journey.projection(&project.id, revision, "projects.inspect",
-            json!({"projection":"entity","entity_id":id}),
-            args(&["projects", "inspect", "--projection", "entity", "--entity", &id])).await;
+        let result = journey
+            .projection(
+                &project.id,
+                revision,
+                "projects.inspect",
+                json!({"projection":"entity","entity_id":id}),
+                args(&[
+                    "projects",
+                    "inspect",
+                    "--projection",
+                    "entity",
+                    "--entity",
+                    &id,
+                ]),
+            )
+            .await;
         assert_eq!(result["entity"]["id"], id);
         entities.insert(id, result["entity"].clone());
     }
     if let Some(group) = group {
-        assert!(!entities.contains_key(group), "The opaque group is not a ninth entity");
+        assert!(
+            !entities.contains_key(group),
+            "The opaque group is not a ninth entity"
+        );
         assert!(!group.is_empty());
     }
     assert_eq!(entities[&project.bin]["kind"], "bin");
     let sequence = &entities[&project.sequence];
     assert_eq!(sequence["kind"], "sequence");
-    assert_eq!(sequence["settings"], json!({"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"}));
+    assert_eq!(
+        sequence["settings"],
+        json!({"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"})
+    );
     assert_eq!(sequence["track_count"], 2);
     let mut clips = [Value::Null, Value::Null];
     for (index, clip_slot) in clips.iter_mut().enumerate() {
@@ -284,7 +433,14 @@ async fn checkpoint(journey: &mut Journey<'_>, project: &Project, revision: u64,
         assert_eq!(source["kind"], "source_binding");
         assert_eq!(source["source_kind"], "solid_color");
         assert_eq!(source["duration"], rational(4));
-        assert_eq!(source["rgba"], if index == 0 { json!([0.0,0.0,0.0,1.0]) } else { json!([1.0,0.0,0.0,1.0]) });
+        assert_eq!(
+            source["rgba"],
+            if index == 0 {
+                json!([0.0, 0.0, 0.0, 1.0])
+            } else {
+                json!([1.0, 0.0, 0.0, 1.0])
+            }
+        );
         let clip = &entities[&project.clips[index]];
         assert_eq!(clip["kind"], "clip");
         assert_eq!(clip["sequence_id"], project.sequence);
@@ -292,25 +448,60 @@ async fn checkpoint(journey: &mut Journey<'_>, project: &Project, revision: u64,
         assert_eq!(clip["source_id"], project.sources[index]);
         assert!(!text(clip, "occurrence_id").is_empty());
         assert_eq!(clip["duration"], rational(if index == 0 { 4 } else { 2 }));
-        assert_eq!(clip["source_range"], json!({"start":rational(index as u64),"end":rational(if index == 0 {4} else {3})}));
-        assert_eq!(clip["sequence_start"], rational(index as u64 + if revision >= 5 {2} else {0}));
+        assert_eq!(
+            clip["source_range"],
+            json!({"start":rational(index as u64),"end":rational(if index == 0 {4} else {3})})
+        );
+        assert_eq!(
+            clip["sequence_start"],
+            rational(index as u64 + if revision >= 5 { 2 } else { 0 })
+        );
         // Missing key must fail; Value indexing alone would turn it into null.
-        assert_eq!(clip.get("link_group_id"), Some(&json!(group)),
-            "Supported clip must explicitly project its persisted group");
-        if let Some(group) = group { assert_ne!(text(clip, "occurrence_id"), group); }
+        assert_eq!(
+            clip.get("link_group_id"),
+            Some(&json!(group)),
+            "Supported clip must explicitly project its persisted group"
+        );
+        if let Some(group) = group {
+            assert_ne!(text(clip, "occurrence_id"), group);
+        }
         *clip_slot = clip.clone();
         if let Some(baseline) = baseline {
-            assert_eq!(clip_facts(clip.clone()), clip_facts(baseline.clips[index].clone()));
+            assert_eq!(
+                clip_facts(clip.clone()),
+                clip_facts(baseline.clips[index].clone())
+            );
         }
     }
-    assert_ne!(text(&entities[&project.clips[0]], "occurrence_id"), text(&entities[&project.clips[1]], "occurrence_id"));
-    let tracks = journey.projection(&project.id, revision, "sequences.inspect",
-        json!({"sequence_id":project.sequence,"projection":"track_page","limit":128}),
-        args(&["sequences", "inspect", "--sequence", &project.sequence, "--projection", "track_page", "--limit", "128"])).await;
+    assert_ne!(
+        text(&entities[&project.clips[0]], "occurrence_id"),
+        text(&entities[&project.clips[1]], "occurrence_id")
+    );
+    let tracks = journey
+        .projection(
+            &project.id,
+            revision,
+            "sequences.inspect",
+            json!({"sequence_id":project.sequence,"projection":"track_page","limit":128}),
+            args(&[
+                "sequences",
+                "inspect",
+                "--sequence",
+                &project.sequence,
+                "--projection",
+                "track_page",
+                "--limit",
+                "128",
+            ]),
+        )
+        .await;
     assert!(tracks["next_cursor"].is_null());
     let rows = tracks["items"].as_array().unwrap();
     assert_eq!(rows.len(), 2);
-    assert_eq!(sorted(&rows.iter().map(|row| text(row, "id")).collect::<Vec<_>>()), sorted(&project.tracks));
+    assert_eq!(
+        sorted(&rows.iter().map(|row| text(row, "id")).collect::<Vec<_>>()),
+        sorted(&project.tracks)
+    );
     assert!(rows.iter().all(|row| row["clip_count"] == 1));
     let viewport = journey.projection(&project.id, revision, "sequences.inspect",
         json!({"sequence_id":project.sequence,"projection":"viewport","track_ids":project.tracks,"range":{"start":rational(0),"end":rational(8)},"limit":128}),
@@ -318,26 +509,56 @@ async fn checkpoint(journey: &mut Journey<'_>, project: &Project, revision: u64,
     assert!(viewport["next_cursor"].is_null());
     let rows = viewport["items"].as_array().unwrap();
     assert_eq!(rows.len(), 2);
-    assert_eq!(sorted(&rows.iter().map(|row| text(row, "id")).collect::<Vec<_>>()), sorted(&project.clips));
+    assert_eq!(
+        sorted(&rows.iter().map(|row| text(row, "id")).collect::<Vec<_>>()),
+        sorted(&project.clips)
+    );
     for (index, clip_id) in project.clips.iter().enumerate() {
-        let row = rows.iter().find(|row| row["id"].as_str() == Some(clip_id.as_str())).unwrap();
+        let row = rows
+            .iter()
+            .find(|row| row["id"].as_str() == Some(clip_id.as_str()))
+            .unwrap();
         assert_eq!(row["track_id"], project.tracks[index]);
         assert_eq!(row["source_id"], project.sources[index]);
-        assert_eq!(row["sequence_start"], entities[&project.clips[index]]["sequence_start"]);
+        assert_eq!(
+            row["sequence_start"],
+            entities[&project.clips[index]]["sequence_start"]
+        );
         assert_eq!(row["duration"], entities[&project.clips[index]]["duration"]);
     }
-    for id in &project.clips { entities.remove(id); }
-    if let Some(baseline) = baseline { assert_eq!(entities, baseline.nonclips); }
-    Facts { clips, nonclips: entities }
+    for id in &project.clips {
+        entities.remove(id);
+    }
+    if let Some(baseline) = baseline {
+        assert_eq!(entities, baseline.nonclips);
+    }
+    Facts {
+        clips,
+        nonclips: entities,
+    }
 }
 
 async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
     let scope = adapter.scope(tag).await;
-    let mut journey = Journey { adapter, tag, scope, accepted: Vec::new(), receipts: BTreeSet::new(),
-        request_ids: BTreeSet::new(), snapshot: None };
+    let mut journey = Journey {
+        adapter,
+        tag,
+        scope,
+        accepted: Vec::new(),
+        receipts: BTreeSet::new(),
+        request_ids: BTreeSet::new(),
+        snapshot: None,
+    };
     let name = format!("Topology {tag}");
-    let created = journey.write("create", "projects.create", json!({"name":name}),
-        args(&["projects", "create", "--name", &name]), None).await;
+    let created = journey
+        .write(
+            "create",
+            "projects.create",
+            json!({"name":name}),
+            args(&["projects", "create", "--name", &name]),
+            None,
+        )
+        .await;
     let id = text(&created, "project_id");
     let bin = text(&created, "root_bin_id");
     let sequence = journey.write("sequence", "sequences.create",
@@ -347,12 +568,27 @@ async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
     let rows = sequence["created"]["tracks"].as_array().unwrap();
     assert_eq!(rows.len(), 2);
     let tracks = [text(&rows[0], "id"), text(&rows[1], "id")];
-    assert_eq!(sequence["created"], json!({"sequence_id":sequence_id,"tracks":[{"id":tracks[0],"kind":"video"},{"id":tracks[1],"kind":"video"}]}));
-    assert_eq!(sequence["changed_ids"], sorted(&[bin.clone(), sequence_id.clone(), tracks[0].clone(), tracks[1].clone()]));
+    assert_eq!(
+        sequence["created"],
+        json!({"sequence_id":sequence_id,"tracks":[{"id":tracks[0],"kind":"video"},{"id":tracks[1],"kind":"video"}]})
+    );
+    assert_eq!(
+        sequence["changed_ids"],
+        sorted(&[
+            bin.clone(),
+            sequence_id.clone(),
+            tracks[0].clone(),
+            tracks[1].clone()
+        ])
+    );
     let mut sources = [String::new(), String::new()];
     let mut clips = [String::new(), String::new()];
     for (index, track) in tracks.iter().enumerate() {
-        let rgba = if index == 0 { json!([0.0,0.0,0.0,1.0]) } else { json!([1.0,0.0,0.0,1.0]) };
+        let rgba = if index == 0 {
+            json!([0.0, 0.0, 0.0, 1.0])
+        } else {
+            json!([1.0, 0.0, 0.0, 1.0])
+        };
         let placed = journey.write(if index == 0 {"place-a"} else {"place-b"}, "clips.place",
             json!({"sequence_id":sequence_id,"track_id":track,"source":{"kind":"solid_color","rgba":rgba,"duration":rational(4)},"source_range":{"start":rational(index as u64),"end":rational(if index == 0 {4} else {3})},"sequence_start":rational(index as u64),"collision":"reject"}),
             args(&["clips", "place", "--sequence", &sequence_id, "--track", track, "--rgba", if index == 0 {"0,0,0,1"} else {"1,0,0,1"}, "--source-duration", "4/1", "--source-start", if index == 0 {"0/1"} else {"1/1"}, "--source-end", if index == 0 {"4/1"} else {"3/1"}, "--sequence-start", if index == 0 {"0/1"} else {"1/1"}]), Some((&id, index as u64 + 1))).await;
@@ -360,17 +596,52 @@ async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
         let placed_ids = placed["created"]["clip_ids"].as_array().unwrap();
         assert_eq!(placed_ids.len(), 1);
         clips[index] = placed_ids[0].as_str().unwrap().to_owned();
-        assert_eq!(placed["created"], json!({"source_id":sources[index],"clip_ids":[clips[index]]}));
-        assert_eq!(placed["changed_ids"], sorted(&[bin.clone(), track.clone(), sources[index].clone(), clips[index].clone()]));
+        assert_eq!(
+            placed["created"],
+            json!({"source_id":sources[index],"clip_ids":[clips[index]]})
+        );
+        assert_eq!(
+            placed["changed_ids"],
+            sorted(&[
+                bin.clone(),
+                track.clone(),
+                sources[index].clone(),
+                clips[index].clone()
+            ])
+        );
     }
-    let project = Project { id, bin, sequence: sequence_id, tracks, sources, clips };
+    let project = Project {
+        id,
+        bin,
+        sequence: sequence_id,
+        tracks,
+        sources,
+        clips,
+    };
     let baseline = checkpoint(&mut journey, &project, 3, None, None).await;
     let members = sorted(&project.clips);
-    let linked = journey.write("link", "clips.link", json!({"clip_ids":project.clips,"link_policy":"expand"}),
-        args(&["clips", "link", "--clip", &project.clips[0], "--clip", &project.clips[1]]), Some((&project.id, 3))).await;
+    let linked = journey
+        .write(
+            "link",
+            "clips.link",
+            json!({"clip_ids":project.clips,"link_policy":"expand"}),
+            args(&[
+                "clips",
+                "link",
+                "--clip",
+                &project.clips[0],
+                "--clip",
+                &project.clips[1],
+            ]),
+            Some((&project.id, 3)),
+        )
+        .await;
     let group = text(&linked["created"], "link_group_id");
     assert!(!project.entities().contains(&group));
-    assert_eq!(linked["created"], json!({"link_group_id":group,"clip_ids":members}));
+    assert_eq!(
+        linked["created"],
+        json!({"link_group_id":group,"clip_ids":members})
+    );
     assert_eq!(linked["changed_ids"], members);
     checkpoint(&mut journey, &project, 4, Some(&group), Some(&baseline)).await;
     let moved = journey.write("move", "clips.move",
@@ -379,16 +650,39 @@ async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
     assert_eq!(moved["created"], json!({}));
     assert_eq!(moved["changed_ids"], members);
     checkpoint(&mut journey, &project, 5, Some(&group), Some(&baseline)).await;
-    let unlinked = journey.write("unlink", "clips.unlink", json!({"clip_ids":[project.clips[0]],"link_policy":"expand"}),
-        args(&["clips", "unlink", "--clip", &project.clips[0]]), Some((&project.id, 5))).await;
+    let unlinked = journey
+        .write(
+            "unlink",
+            "clips.unlink",
+            json!({"clip_ids":[project.clips[0]],"link_policy":"expand"}),
+            args(&["clips", "unlink", "--clip", &project.clips[0]]),
+            Some((&project.id, 5)),
+        )
+        .await;
     assert_eq!(unlinked["created"], json!({"clip_ids":members}));
     assert_eq!(unlinked["changed_ids"], members);
     checkpoint(&mut journey, &project, 6, None, Some(&baseline)).await;
-    let undone = journey.write("undo", "history.undo", json!({}), args(&["history", "undo"]), Some((&project.id, 6))).await;
+    let undone = journey
+        .write(
+            "undo",
+            "history.undo",
+            json!({}),
+            args(&["history", "undo"]),
+            Some((&project.id, 6)),
+        )
+        .await;
     assert_eq!(undone["created"], json!({}));
     assert_eq!(undone["changed_ids"], members);
     checkpoint(&mut journey, &project, 7, Some(&group), Some(&baseline)).await;
-    let redone = journey.write("redo", "history.redo", json!({}), args(&["history", "redo"]), Some((&project.id, 7))).await;
+    let redone = journey
+        .write(
+            "redo",
+            "history.redo",
+            json!({}),
+            args(&["history", "redo"]),
+            Some((&project.id, 7)),
+        )
+        .await;
     assert_eq!(redone["created"], json!({}));
     assert_eq!(redone["changed_ids"], members);
     journey.replay().await;
@@ -399,7 +693,10 @@ async fn journey(adapter: Adapter<'_>, tag: &'static str) -> BTreeSet<String> {
 fn retain_receipts(all: &mut BTreeSet<String>, fresh: BTreeSet<String>) {
     assert_eq!(fresh.len(), 9);
     for receipt in fresh {
-        assert!(all.insert(receipt), "Fresh topology receipt reused across adapters");
+        assert!(
+            all.insert(receipt),
+            "Fresh topology receipt reused across adapters"
+        );
     }
 }
 
@@ -414,43 +711,84 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
     bounded(&profile_request);
     let response = cli.raw(&profile_request).await;
     bounded(&response);
-    assert_eq!(response["ok"], true, "Public topology profile setup failed; response withheld");
+    assert_eq!(
+        response["ok"], true,
+        "Public topology profile setup failed; response withheld"
+    );
     assert_eq!(response["request_id"], profile_request.request_id);
     let profile_receipt = text(&response, "receipt_id");
     let replay = cli.raw(&profile_request).await;
     bounded(&replay);
-    assert!(replay == response, "Topology profile retained response differs; response withheld");
+    assert!(
+        replay == response,
+        "Topology profile retained response differs; response withheld"
+    );
     let mut receipts = BTreeSet::new();
     retain_receipts(&mut receipts, journey(Adapter::Cli(cli), "cli").await);
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "topology"]);
-    let stdio = ().serve(TokioChildProcess::new(command).unwrap()).await
+    let stdio = ()
+        .serve(TokioChildProcess::new(command).unwrap())
+        .await
         .unwrap_or_else(|_| panic!("Topology official stdio startup failed"));
     retain_receipts(&mut receipts, journey(Adapter::Sdk(&stdio), "stdio").await);
     stdio.cancel().await.unwrap();
     let port_string = port.to_string();
-    let issue_args = ["access", "tokens", "issue", "--for-access-profile", "topology", "--port", &port_string,
-        "--out", token_file.to_str().unwrap(), "--json"];
+    let issue_args = [
+        "access",
+        "tokens",
+        "issue",
+        "--for-access-profile",
+        "topology",
+        "--port",
+        &port_string,
+        "--out",
+        token_file.to_str().unwrap(),
+        "--json",
+    ];
     bounded(&issue_args);
     let (issued, exit) = cli.human(&issue_args).await;
-    assert_eq!(exit, 0, "Topology private token issuance failed; response withheld");
+    assert_eq!(
+        exit, 0,
+        "Topology private token issuance failed; response withheld"
+    );
     bounded(&issued);
-    let token = String::from_utf8(nw_platform::security::read_private(token_file, 256).unwrap()).unwrap();
+    let token =
+        String::from_utf8(nw_platform::security::read_private(token_file, 256).unwrap()).unwrap();
     assert!(!token.is_empty());
-    assert!(!issued.to_string().contains(&token), "Topology token issuance disclosed bearer");
+    assert!(
+        !issued.to_string().contains(&token),
+        "Topology token issuance disclosed bearer"
+    );
     for (tag, lifecycle) in [
         ("http-initialize", ClientLifecycleMode::Initialize),
-        ("http-discover", ClientLifecycleMode::Discover { preferred_versions: vec![ProtocolVersion::V_2026_07_28] }),
+        (
+            "http-discover",
+            ClientLifecycleMode::Discover {
+                preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+            },
+        ),
     ] {
         let transport = StreamableHttpClientTransport::with_client(
-            reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).build().unwrap(),
-            StreamableHttpClientTransportConfig::with_uri(format!("http://127.0.0.1:{port}/mcp")).auth_header(&token));
-        let http = ().serve_with_lifecycle(transport, lifecycle).await
+            reqwest::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
+            StreamableHttpClientTransportConfig::with_uri(format!("http://127.0.0.1:{port}/mcp"))
+                .auth_header(&token),
+        );
+        let http = ()
+            .serve_with_lifecycle(transport, lifecycle)
+            .await
             .unwrap_or_else(|_| panic!("Topology official HTTP startup failed"));
         retain_receipts(&mut receipts, journey(Adapter::Sdk(&http), tag).await);
         http.cancel().await.unwrap();
     }
     assert_eq!(receipts.len(), 36);
-    assert!(!receipts.contains(&profile_receipt), "Topology project receipt reused profile setup receipt");
+    assert!(
+        !receipts.contains(&profile_receipt),
+        "Topology project receipt reused profile setup receipt"
+    );
     token
 }

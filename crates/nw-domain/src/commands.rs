@@ -747,7 +747,10 @@ mod tests {
         assert!(empty_decoded.extensions.is_empty());
         assert_eq!(empty_decoded.bytes().unwrap(), empty_envelope);
         let mut raw_entity = entity.clone();
-        raw_entity.extensions.insert("future_optional".into(), serde_json::from_str(opaque).unwrap());
+        raw_entity.extensions.insert(
+            "future_optional".into(),
+            serde_json::from_str(opaque).unwrap(),
+        );
         let encoded = raw_entity.bytes().unwrap();
         assert!(encoded.contains(opaque));
         let mut decoded: EntityEnvelope = serde_json::from_str(&encoded).unwrap();
@@ -756,55 +759,119 @@ mod tests {
         assert_eq!(decoded.id.as_str(), id);
         assert_eq!(decoded.project_id.as_str(), id);
         assert_eq!(decoded.owner_id, None);
-        decoded.update(&Bin { member_count: 3, locked: false }).unwrap();
+        decoded
+            .update(&Bin {
+                member_count: 3,
+                locked: false,
+            })
+            .unwrap();
         assert_eq!(decoded.extensions["future_optional"].get(), opaque);
         assert_eq!(decoded.payload::<Bin>("bin").unwrap().member_count, 3);
         let fields: BTreeMap<String, Box<RawValue>> = serde_json::from_str(&encoded).unwrap();
-        for required in ["envelope_version", "id", "project_id", "kind", "kind_version", "enabled", "references", "semantic_scope", "label", "payload_json", "payload_sha256"] {
+        for required in [
+            "envelope_version",
+            "id",
+            "project_id",
+            "kind",
+            "kind_version",
+            "enabled",
+            "references",
+            "semantic_scope",
+            "label",
+            "payload_json",
+            "payload_sha256",
+        ] {
             let mut missing = fields.clone();
             assert!(missing.remove(required).is_some());
             let raw = serde_json::to_string(&missing).unwrap();
-            assert!(serde_json::from_str::<EntityEnvelope>(&raw).is_err(), "Missing required envelope field {required}");
+            assert!(
+                serde_json::from_str::<EntityEnvelope>(&raw).is_err(),
+                "Missing required envelope field {required}"
+            );
         }
-        for (field, invalid) in [("envelope_version", "\"1\""), ("id", "1"), ("project_id", "false"), ("kind", "0"), ("kind_version", "null"), ("owner_id", "1"), ("enabled", "0"), ("references", "{}"), ("semantic_scope", "false"), ("label", "null"), ("payload_json", "0"), ("payload_sha256", "false")] {
+        for (field, invalid) in [
+            ("envelope_version", "\"1\""),
+            ("id", "1"),
+            ("project_id", "false"),
+            ("kind", "0"),
+            ("kind_version", "null"),
+            ("owner_id", "1"),
+            ("enabled", "0"),
+            ("references", "{}"),
+            ("semantic_scope", "false"),
+            ("label", "null"),
+            ("payload_json", "0"),
+            ("payload_sha256", "false"),
+        ] {
             let mut malformed = fields.clone();
             malformed.insert(field.into(), serde_json::from_str(invalid).unwrap());
             let raw = serde_json::to_string(&malformed).unwrap();
-            assert!(serde_json::from_str::<EntityEnvelope>(&raw).is_err(), "Malformed envelope field {field}");
+            assert!(
+                serde_json::from_str::<EntityEnvelope>(&raw).is_err(),
+                "Malformed envelope field {field}"
+            );
         }
         let mut missing_owner = fields.clone();
         missing_owner.remove("owner_id");
-        let missing_owner: EntityEnvelope = serde_json::from_str(&serde_json::to_string(&missing_owner).unwrap()).unwrap();
+        let missing_owner: EntityEnvelope =
+            serde_json::from_str(&serde_json::to_string(&missing_owner).unwrap()).unwrap();
         assert_eq!(missing_owner.owner_id, None);
         assert_eq!(missing_owner.extensions["future_optional"].get(), opaque);
         let mut explicit_owner = fields.clone();
-        explicit_owner.insert("owner_id".into(), serde_json::from_str(&format!("\"{id}\"")).unwrap());
-        let explicit_owner: EntityEnvelope = serde_json::from_str(&serde_json::to_string(&explicit_owner).unwrap()).unwrap();
-        assert_eq!(explicit_owner.owner_id.as_ref().map(EntityId::as_str), Some(id));
-        for duplicate in [format!("\"id\":\"{id}\""), "\"owner_id\":null".into(), format!("\"future_optional\":{opaque}")] {
+        explicit_owner.insert(
+            "owner_id".into(),
+            serde_json::from_str(&format!("\"{id}\"")).unwrap(),
+        );
+        let explicit_owner: EntityEnvelope =
+            serde_json::from_str(&serde_json::to_string(&explicit_owner).unwrap()).unwrap();
+        assert_eq!(
+            explicit_owner.owner_id.as_ref().map(EntityId::as_str),
+            Some(id)
+        );
+        for duplicate in [
+            format!("\"id\":\"{id}\""),
+            "\"owner_id\":null".into(),
+            format!("\"future_optional\":{opaque}"),
+        ] {
             let raw = format!("{{{duplicate},{}", &encoded[1..]);
             assert!(serde_json::from_str::<EntityEnvelope>(&raw).is_err());
         }
         let mut future_entity = raw_entity.clone();
         future_entity.envelope_version = 2;
-        let future_entity: EntityEnvelope = serde_json::from_str(&future_entity.bytes().unwrap()).unwrap();
+        let future_entity: EntityEnvelope =
+            serde_json::from_str(&future_entity.bytes().unwrap()).unwrap();
         assert_eq!(future_entity.envelope_version, 2);
         assert_eq!(future_entity.extensions["future_optional"].get(), opaque);
-        assert_eq!(future_entity.semantics().unwrap_err().code, "PROJECT_READ_ONLY");
+        assert_eq!(
+            future_entity.semantics().unwrap_err().code,
+            "PROJECT_READ_ONLY"
+        );
 
         let project = ProjectId::parse(id).unwrap();
         let mut header = ProjectHeader {
-            envelope_version: 1, schema_major: 1, id: project.clone(), creator: "codec-owner".into(),
-            name: "Raw header fields".into(), revision: Revision(0), root_bin_id: EntityId::parse(id).unwrap(),
-            entity_count: 1, sequence_count: 0, history_root: format!("project-history/{project}"),
-            materialized_revision: Revision(0), change_digest: String::new(), compatibility: "supported".into(),
+            envelope_version: 1,
+            schema_major: 1,
+            id: project.clone(),
+            creator: "codec-owner".into(),
+            name: "Raw header fields".into(),
+            revision: Revision(0),
+            root_bin_id: EntityId::parse(id).unwrap(),
+            entity_count: 1,
+            sequence_count: 0,
+            history_root: format!("project-history/{project}"),
+            materialized_revision: Revision(0),
+            change_digest: String::new(),
+            compatibility: "supported".into(),
             extensions: BTreeMap::new(),
         };
         let empty_header = serde_json::to_string(&header).unwrap();
         let empty_decoded: ProjectHeader = serde_json::from_str(&empty_header).unwrap();
         assert!(empty_decoded.extensions.is_empty());
         assert_eq!(serde_json::to_string(&empty_decoded).unwrap(), empty_header);
-        header.extensions.insert("future_optional".into(), serde_json::from_str(opaque).unwrap());
+        header.extensions.insert(
+            "future_optional".into(),
+            serde_json::from_str(opaque).unwrap(),
+        );
         let encoded = serde_json::to_string(&header).unwrap();
         assert!(encoded.contains(opaque));
         let decoded: ProjectHeader = serde_json::from_str(&encoded).unwrap();
@@ -819,19 +886,56 @@ mod tests {
         assert_eq!(decoded.sequence_count, 0);
         decoded.writable().unwrap();
         let fields: BTreeMap<String, Box<RawValue>> = serde_json::from_str(&encoded).unwrap();
-        for required in ["envelope_version", "schema_major", "id", "creator", "name", "revision", "root_bin_id", "entity_count", "sequence_count", "history_root", "materialized_revision", "change_digest", "compatibility"] {
+        for required in [
+            "envelope_version",
+            "schema_major",
+            "id",
+            "creator",
+            "name",
+            "revision",
+            "root_bin_id",
+            "entity_count",
+            "sequence_count",
+            "history_root",
+            "materialized_revision",
+            "change_digest",
+            "compatibility",
+        ] {
             let mut missing = fields.clone();
             assert!(missing.remove(required).is_some());
             let raw = serde_json::to_string(&missing).unwrap();
-            assert!(serde_json::from_str::<ProjectHeader>(&raw).is_err(), "Missing required header field {required}");
+            assert!(
+                serde_json::from_str::<ProjectHeader>(&raw).is_err(),
+                "Missing required header field {required}"
+            );
         }
-        for (field, invalid) in [("envelope_version", "null"), ("schema_major", "\"1\""), ("id", "1"), ("creator", "false"), ("name", "0"), ("revision", "0"), ("root_bin_id", "false"), ("entity_count", "-1"), ("sequence_count", "\"0\""), ("history_root", "null"), ("materialized_revision", "0"), ("change_digest", "false"), ("compatibility", "[]")] {
+        for (field, invalid) in [
+            ("envelope_version", "null"),
+            ("schema_major", "\"1\""),
+            ("id", "1"),
+            ("creator", "false"),
+            ("name", "0"),
+            ("revision", "0"),
+            ("root_bin_id", "false"),
+            ("entity_count", "-1"),
+            ("sequence_count", "\"0\""),
+            ("history_root", "null"),
+            ("materialized_revision", "0"),
+            ("change_digest", "false"),
+            ("compatibility", "[]"),
+        ] {
             let mut malformed = fields.clone();
             malformed.insert(field.into(), serde_json::from_str(invalid).unwrap());
             let raw = serde_json::to_string(&malformed).unwrap();
-            assert!(serde_json::from_str::<ProjectHeader>(&raw).is_err(), "Malformed header field {field}");
+            assert!(
+                serde_json::from_str::<ProjectHeader>(&raw).is_err(),
+                "Malformed header field {field}"
+            );
         }
-        for duplicate in [format!("\"id\":\"{id}\""), format!("\"future_optional\":{opaque}")] {
+        for duplicate in [
+            format!("\"id\":\"{id}\""),
+            format!("\"future_optional\":{opaque}"),
+        ] {
             let raw = format!("{{{duplicate},{}", &encoded[1..]);
             assert!(serde_json::from_str::<ProjectHeader>(&raw).is_err());
         }
@@ -853,9 +957,9 @@ mod tests {
         }
         let mut inconsistent = header.clone();
         inconsistent.materialized_revision = Revision(1);
-        let inconsistent: ProjectHeader = serde_json::from_str(&serde_json::to_string(&inconsistent).unwrap()).unwrap();
+        let inconsistent: ProjectHeader =
+            serde_json::from_str(&serde_json::to_string(&inconsistent).unwrap()).unwrap();
         assert_eq!(inconsistent.writable().unwrap_err().code, "PROJECT_CORRUPT");
-
     }
 }
 

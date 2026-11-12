@@ -250,41 +250,89 @@ impl<'de> Deserialize<'de> for ProjectHeader {
                 let mut extensions = BTreeMap::new();
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
-                        "envelope_version" => read_record_field(&mut map, &mut envelope_version, "envelope_version")?,
-                        "schema_major" => read_record_field(&mut map, &mut schema_major, "schema_major")?,
+                        "envelope_version" => {
+                            read_record_field(&mut map, &mut envelope_version, "envelope_version")?
+                        }
+                        "schema_major" => {
+                            read_record_field(&mut map, &mut schema_major, "schema_major")?
+                        }
                         "id" => read_record_field(&mut map, &mut id, "id")?,
                         "creator" => read_record_field(&mut map, &mut creator, "creator")?,
                         "name" => read_record_field(&mut map, &mut name, "name")?,
                         "revision" => read_record_field(&mut map, &mut revision, "revision")?,
-                        "root_bin_id" => read_record_field(&mut map, &mut root_bin_id, "root_bin_id")?,
-                        "entity_count" => read_record_field(&mut map, &mut entity_count, "entity_count")?,
-                        "sequence_count" => read_record_field(&mut map, &mut sequence_count, "sequence_count")?,
-                        "history_root" => read_record_field(&mut map, &mut history_root, "history_root")?,
-                        "materialized_revision" => read_record_field(&mut map, &mut materialized_revision, "materialized_revision")?,
-                        "change_digest" => read_record_field(&mut map, &mut change_digest, "change_digest")?,
-                        "compatibility" => read_record_field(&mut map, &mut compatibility, "compatibility")?,
+                        "root_bin_id" => {
+                            read_record_field(&mut map, &mut root_bin_id, "root_bin_id")?
+                        }
+                        "entity_count" => {
+                            read_record_field(&mut map, &mut entity_count, "entity_count")?
+                        }
+                        "sequence_count" => {
+                            read_record_field(&mut map, &mut sequence_count, "sequence_count")?
+                        }
+                        "history_root" => {
+                            read_record_field(&mut map, &mut history_root, "history_root")?
+                        }
+                        "materialized_revision" => read_record_field(
+                            &mut map,
+                            &mut materialized_revision,
+                            "materialized_revision",
+                        )?,
+                        "change_digest" => {
+                            read_record_field(&mut map, &mut change_digest, "change_digest")?
+                        }
+                        "compatibility" => {
+                            read_record_field(&mut map, &mut compatibility, "compatibility")?
+                        }
                         _ => {
-                            let std::collections::btree_map::Entry::Vacant(entry) = extensions.entry(key) else {
-                                return Err(serde::de::Error::custom("Duplicate project extension field"));
+                            let std::collections::btree_map::Entry::Vacant(entry) =
+                                extensions.entry(key)
+                            else {
+                                return Err(serde::de::Error::custom(
+                                    "Duplicate project extension field",
+                                ));
                             };
                             entry.insert(map.next_value::<Box<RawValue>>()?);
                         }
                     }
                 }
                 Ok(ProjectHeader {
-                    envelope_version: required_record_field::<_, M::Error>(envelope_version, "envelope_version")?,
-                    schema_major: required_record_field::<_, M::Error>(schema_major, "schema_major")?,
+                    envelope_version: required_record_field::<_, M::Error>(
+                        envelope_version,
+                        "envelope_version",
+                    )?,
+                    schema_major: required_record_field::<_, M::Error>(
+                        schema_major,
+                        "schema_major",
+                    )?,
                     id: required_record_field::<_, M::Error>(id, "id")?,
                     creator: required_record_field::<_, M::Error>(creator, "creator")?,
                     name: required_record_field::<_, M::Error>(name, "name")?,
                     revision: required_record_field::<_, M::Error>(revision, "revision")?,
                     root_bin_id: required_record_field::<_, M::Error>(root_bin_id, "root_bin_id")?,
-                    entity_count: required_record_field::<_, M::Error>(entity_count, "entity_count")?,
-                    sequence_count: required_record_field::<_, M::Error>(sequence_count, "sequence_count")?,
-                    history_root: required_record_field::<_, M::Error>(history_root, "history_root")?,
-                    materialized_revision: required_record_field::<_, M::Error>(materialized_revision, "materialized_revision")?,
-                    change_digest: required_record_field::<_, M::Error>(change_digest, "change_digest")?,
-                    compatibility: required_record_field::<_, M::Error>(compatibility, "compatibility")?,
+                    entity_count: required_record_field::<_, M::Error>(
+                        entity_count,
+                        "entity_count",
+                    )?,
+                    sequence_count: required_record_field::<_, M::Error>(
+                        sequence_count,
+                        "sequence_count",
+                    )?,
+                    history_root: required_record_field::<_, M::Error>(
+                        history_root,
+                        "history_root",
+                    )?,
+                    materialized_revision: required_record_field::<_, M::Error>(
+                        materialized_revision,
+                        "materialized_revision",
+                    )?,
+                    change_digest: required_record_field::<_, M::Error>(
+                        change_digest,
+                        "change_digest",
+                    )?,
+                    compatibility: required_record_field::<_, M::Error>(
+                        compatibility,
+                        "compatibility",
+                    )?,
                     extensions,
                 })
             }
@@ -360,39 +408,68 @@ impl<'de> Deserialize<'de> for EntityEnvelope {
                 let mut extensions = BTreeMap::new();
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
-                        "envelope_version" => read_record_field(&mut map, &mut envelope_version, "envelope_version")?,
+                        "envelope_version" => {
+                            read_record_field(&mut map, &mut envelope_version, "envelope_version")?
+                        }
                         "id" => read_record_field(&mut map, &mut id, "id")?,
                         "project_id" => read_record_field(&mut map, &mut project_id, "project_id")?,
                         "kind" => read_record_field(&mut map, &mut kind, "kind")?,
-                        "kind_version" => read_record_field(&mut map, &mut kind_version, "kind_version")?,
+                        "kind_version" => {
+                            read_record_field(&mut map, &mut kind_version, "kind_version")?
+                        }
                         "owner_id" => read_record_field(&mut map, &mut owner_id, "owner_id")?,
                         "enabled" => read_record_field(&mut map, &mut enabled, "enabled")?,
                         "references" => read_record_field(&mut map, &mut references, "references")?,
-                        "semantic_scope" => read_record_field(&mut map, &mut semantic_scope, "semantic_scope")?,
+                        "semantic_scope" => {
+                            read_record_field(&mut map, &mut semantic_scope, "semantic_scope")?
+                        }
                         "label" => read_record_field(&mut map, &mut label, "label")?,
-                        "payload_json" => read_record_field(&mut map, &mut payload_json, "payload_json")?,
-                        "payload_sha256" => read_record_field(&mut map, &mut payload_sha256, "payload_sha256")?,
+                        "payload_json" => {
+                            read_record_field(&mut map, &mut payload_json, "payload_json")?
+                        }
+                        "payload_sha256" => {
+                            read_record_field(&mut map, &mut payload_sha256, "payload_sha256")?
+                        }
                         _ => {
-                            let std::collections::btree_map::Entry::Vacant(entry) = extensions.entry(key) else {
-                                return Err(serde::de::Error::custom("Duplicate project extension field"));
+                            let std::collections::btree_map::Entry::Vacant(entry) =
+                                extensions.entry(key)
+                            else {
+                                return Err(serde::de::Error::custom(
+                                    "Duplicate project extension field",
+                                ));
                             };
                             entry.insert(map.next_value::<Box<RawValue>>()?);
                         }
                     }
                 }
                 Ok(EntityEnvelope {
-                    envelope_version: required_record_field::<_, M::Error>(envelope_version, "envelope_version")?,
+                    envelope_version: required_record_field::<_, M::Error>(
+                        envelope_version,
+                        "envelope_version",
+                    )?,
                     id: required_record_field::<_, M::Error>(id, "id")?,
                     project_id: required_record_field::<_, M::Error>(project_id, "project_id")?,
                     kind: required_record_field::<_, M::Error>(kind, "kind")?,
-                    kind_version: required_record_field::<_, M::Error>(kind_version, "kind_version")?,
+                    kind_version: required_record_field::<_, M::Error>(
+                        kind_version,
+                        "kind_version",
+                    )?,
                     owner_id: owner_id.flatten(),
                     enabled: required_record_field::<_, M::Error>(enabled, "enabled")?,
                     references: required_record_field::<_, M::Error>(references, "references")?,
-                    semantic_scope: required_record_field::<_, M::Error>(semantic_scope, "semantic_scope")?,
+                    semantic_scope: required_record_field::<_, M::Error>(
+                        semantic_scope,
+                        "semantic_scope",
+                    )?,
                     label: required_record_field::<_, M::Error>(label, "label")?,
-                    payload_json: required_record_field::<_, M::Error>(payload_json, "payload_json")?,
-                    payload_sha256: required_record_field::<_, M::Error>(payload_sha256, "payload_sha256")?,
+                    payload_json: required_record_field::<_, M::Error>(
+                        payload_json,
+                        "payload_json",
+                    )?,
+                    payload_sha256: required_record_field::<_, M::Error>(
+                        payload_sha256,
+                        "payload_sha256",
+                    )?,
                     extensions,
                 })
             }
