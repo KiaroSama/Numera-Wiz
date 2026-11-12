@@ -733,7 +733,8 @@ pub(in crate::runtime) async fn public_link_producer() {
     );
     assert_eq!(sequence["base_revision"], "0");
     assert_eq!(sequence["revision"], "1");
-    let sequence_id = EntityId::parse(sequence["created"]["sequence_id"].as_str().unwrap()).unwrap();
+    let sequence_id =
+        EntityId::parse(sequence["created"]["sequence_id"].as_str().unwrap()).unwrap();
     let tracks = sequence["created"]["tracks"].as_array().unwrap();
     assert_eq!(tracks.len(), 2);
     let track_ids = tracks
@@ -746,8 +747,20 @@ pub(in crate::runtime) async fn public_link_producer() {
     let mut clip_ids = Vec::new();
     let mut source_ids = Vec::new();
     for (index, revision, next_revision, source_range, sequence_start) in [
-        (0usize, "1", "2", json!({"start":{"num":"0","den":"1"},"end":{"num":"2","den":"1"}}), json!({"num":"0","den":"1"})),
-        (1usize, "2", "3", json!({"start":{"num":"1","den":"1"},"end":{"num":"5","den":"2"}}), json!({"num":"1","den":"4"})),
+        (
+            0usize,
+            "1",
+            "2",
+            json!({"start":{"num":"0","den":"1"},"end":{"num":"2","den":"1"}}),
+            json!({"num":"0","den":"1"}),
+        ),
+        (
+            1usize,
+            "2",
+            "3",
+            json!({"start":{"num":"1","den":"1"},"end":{"num":"5","den":"2"}}),
+            json!({"num":"1","den":"4"}),
+        ),
     ] {
         let placed = accepted(
             write(
@@ -773,15 +786,39 @@ pub(in crate::runtime) async fn public_link_producer() {
     }
     let mut expected_members = clip_ids.clone();
     expected_members.sort();
-    let mut identities = vec![project.to_string(), bin.to_string(), sequence_id.to_string()];
-    identities.extend(track_ids.iter().chain(&source_ids).chain(&clip_ids).map(ToString::to_string));
+    let mut identities = vec![
+        project.to_string(),
+        bin.to_string(),
+        sequence_id.to_string(),
+    ];
+    identities.extend(
+        track_ids
+            .iter()
+            .chain(&source_ids)
+            .chain(&clip_ids)
+            .map(ToString::to_string),
+    );
     let (before_clips, before_nonclips) = {
         let read = service.store.project_read(project.as_str()).unwrap();
         assert_eq!(read.header().revision, Revision(3));
         assert_eq!(read.header().entity_count, 8);
         assert_eq!(read.header().sequence_count, 1);
-        assert_eq!(read.entity(&bin).unwrap().payload::<Bin>("bin").unwrap().member_count, 3);
-        assert_eq!(read.entity(&sequence_id).unwrap().payload::<Sequence>("sequence").unwrap().track_count, 2);
+        assert_eq!(
+            read.entity(&bin)
+                .unwrap()
+                .payload::<Bin>("bin")
+                .unwrap()
+                .member_count,
+            3
+        );
+        assert_eq!(
+            read.entity(&sequence_id)
+                .unwrap()
+                .payload::<Sequence>("sequence")
+                .unwrap()
+                .track_count,
+            2
+        );
         for track_id in &track_ids {
             let track: Track = read.entity(track_id).unwrap().payload("track").unwrap();
             assert_eq!(track.kind, TrackKind::Video);
@@ -789,42 +826,92 @@ pub(in crate::runtime) async fn public_link_producer() {
             assert_eq!(track.clip_count, 1);
             assert_eq!(track.sequence_id, sequence_id);
         }
-        let clips = clip_ids.iter().map(|id| read.entity(id).unwrap()).collect::<Vec<_>>();
+        let clips = clip_ids
+            .iter()
+            .map(|id| read.entity(id).unwrap())
+            .collect::<Vec<_>>();
         for (index, entity) in clips.iter().enumerate() {
             let clip: Clip = entity.payload("clip").unwrap();
             identities.push(clip.occurrence_id.to_string());
             assert_eq!(clip.link_group_id, None);
-            assert!(!entity.references.iter().any(|reference| reference.role == "link"));
+            assert!(
+                !entity
+                    .references
+                    .iter()
+                    .any(|reference| reference.role == "link")
+            );
             assert_eq!(entity.owner_id.as_ref(), Some(&track_ids[index]));
             assert_eq!(clip.sequence_id, sequence_id);
             assert_eq!(clip.track_id, track_ids[index]);
             assert_eq!(clip.source_id, source_ids[index]);
             assert_eq!(entity.references.len(), 2);
-            assert!(entity.references.iter().any(|reference| reference.role == "source" && reference.target == source_ids[index]));
-            assert!(entity.references.iter().any(|reference| reference.role == "ownership" && reference.target == track_ids[index]));
+            assert!(entity.references.iter().any(
+                |reference| reference.role == "source" && reference.target == source_ids[index]
+            ));
+            assert!(
+                entity
+                    .references
+                    .iter()
+                    .any(|reference| reference.role == "ownership"
+                        && reference.target == track_ids[index])
+            );
             assert_eq!(clip.rate, nw_domain::time::Rational::new(1, 1).unwrap());
             assert!(!clip.locked);
         }
-        assert_eq!(serde_json::to_value(clips[0].payload::<Clip>("clip").unwrap()).unwrap()["source_range"], json!({"start":{"num":"0","den":"1"},"end":{"num":"2","den":"1"}}));
-        assert_eq!(serde_json::to_value(clips[1].payload::<Clip>("clip").unwrap()).unwrap()["source_range"], json!({"start":{"num":"1","den":"1"},"end":{"num":"5","den":"2"}}));
+        assert_eq!(
+            serde_json::to_value(clips[0].payload::<Clip>("clip").unwrap()).unwrap()["source_range"],
+            json!({"start":{"num":"0","den":"1"},"end":{"num":"2","den":"1"}})
+        );
+        assert_eq!(
+            serde_json::to_value(clips[1].payload::<Clip>("clip").unwrap()).unwrap()["source_range"],
+            json!({"start":{"num":"1","den":"1"},"end":{"num":"5","den":"2"}})
+        );
         let first: Clip = clips[0].payload("clip").unwrap();
         let second: Clip = clips[1].payload("clip").unwrap();
-        assert_eq!(first.sequence_start, nw_domain::time::Rational::new(0, 1).unwrap());
-        assert_eq!(first.duration, nw_domain::time::Rational::new(2, 1).unwrap());
-        assert_eq!(first.end().unwrap(), nw_domain::time::Rational::new(2, 1).unwrap());
-        assert_eq!(second.sequence_start, nw_domain::time::Rational::new(1, 4).unwrap());
-        assert_eq!(second.duration, nw_domain::time::Rational::new(3, 2).unwrap());
-        assert_eq!(second.end().unwrap(), nw_domain::time::Rational::new(7, 4).unwrap());
-        let nonclips = std::iter::once(&bin).chain(std::iter::once(&sequence_id)).chain(&track_ids).chain(&source_ids)
-            .map(|id| (id.clone(), read.raw_entity(id).unwrap().unwrap())).collect::<Vec<_>>();
+        assert_eq!(
+            first.sequence_start,
+            nw_domain::time::Rational::new(0, 1).unwrap()
+        );
+        assert_eq!(
+            first.duration,
+            nw_domain::time::Rational::new(2, 1).unwrap()
+        );
+        assert_eq!(
+            first.end().unwrap(),
+            nw_domain::time::Rational::new(2, 1).unwrap()
+        );
+        assert_eq!(
+            second.sequence_start,
+            nw_domain::time::Rational::new(1, 4).unwrap()
+        );
+        assert_eq!(
+            second.duration,
+            nw_domain::time::Rational::new(3, 2).unwrap()
+        );
+        assert_eq!(
+            second.end().unwrap(),
+            nw_domain::time::Rational::new(7, 4).unwrap()
+        );
+        let nonclips = std::iter::once(&bin)
+            .chain(std::iter::once(&sequence_id))
+            .chain(&track_ids)
+            .chain(&source_ids)
+            .map(|id| (id.clone(), read.raw_entity(id).unwrap().unwrap()))
+            .collect::<Vec<_>>();
         (clips, nonclips)
     };
     identities.sort();
     identities.dedup();
-    assert_eq!(identities.len(), 11, "Project, eight entities and two occurrences must be distinct");
+    assert_eq!(
+        identities.len(),
+        11,
+        "Project, eight entities and two occurrences must be distinct"
+    );
 
     // These pre-producer observations must run before the expected failing acceptance.
-    let listed = service.dispatch(context.clone(), Request::query("commands.list", json!({}))).await;
+    let listed = service
+        .dispatch(context.clone(), Request::query("commands.list", json!({})))
+        .await;
     assert!(listed.ok, "{listed:?}");
     assert!(listed.receipt_id.is_none(), "{listed:?}");
     let listing = listed.result.unwrap();
@@ -833,14 +920,31 @@ pub(in crate::runtime) async fn public_link_producer() {
     assert_eq!(listing["full_release"], "blocked");
     let descriptors = listing["commands"].as_array().unwrap();
     for command in ["clips.link", "clips.unlink"] {
-        assert!(!descriptors.iter().any(|descriptor| descriptor["id"] == command));
+        assert!(
+            !descriptors
+                .iter()
+                .any(|descriptor| descriptor["id"] == command)
+        );
         assert!(commands::descriptor(command).is_none());
-        assert!(!commands::registry().iter().any(|descriptor| descriptor.id == command));
-        let schema = service.dispatch(context.clone(), Request::query("commands.schema", json!({"id":command}))).await;
+        assert!(
+            !commands::registry()
+                .iter()
+                .any(|descriptor| descriptor.id == command)
+        );
+        let schema = service
+            .dispatch(
+                context.clone(),
+                Request::query("commands.schema", json!({"id":command})),
+            )
+            .await;
         assert!(!schema.ok, "{schema:?}");
         assert!(schema.result.is_none(), "{schema:?}");
         assert!(schema.receipt_id.is_none(), "{schema:?}");
-        assert_eq!(schema.error.as_ref().unwrap().code, "CAPABILITY_UNAVAILABLE", "{schema:?}");
+        assert_eq!(
+            schema.error.as_ref().unwrap().code,
+            "CAPABILITY_UNAVAILABLE",
+            "{schema:?}"
+        );
     }
 
     // Current source must fail here with UNKNOWN_COMMAND, not pass the missing handler.
@@ -863,7 +967,10 @@ pub(in crate::runtime) async fn public_link_producer() {
     assert!(linked.get("no_change").is_none());
     let group = EntityId::parse(linked["created"]["link_group_id"].as_str().unwrap()).unwrap();
     assert!(!identities.contains(&group.to_string()));
-    assert_eq!(linked["created"], json!({"link_group_id":group,"clip_ids":expected_members}));
+    assert_eq!(
+        linked["created"],
+        json!({"link_group_id":group,"clip_ids":expected_members})
+    );
     assert_eq!(linked["changed_ids"], json!(expected_members));
     {
         let read = service.store.project_read(project.as_str()).unwrap();
@@ -876,7 +983,12 @@ pub(in crate::runtime) async fn public_link_producer() {
             let clip: Clip = after.payload("clip").unwrap();
             assert_eq!(clip.link_group_id.as_ref(), Some(&group));
             assert_eq!(clip_facts(&after, false), clip_facts(before, false));
-            assert!(!after.references.iter().any(|reference| reference.role == "link"));
+            assert!(
+                !after
+                    .references
+                    .iter()
+                    .any(|reference| reference.role == "link")
+            );
         }
         for (id, raw) in &before_nonclips {
             assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
@@ -907,16 +1019,41 @@ pub(in crate::runtime) async fn public_link_producer() {
     assert_eq!(read.dependents(&group, 128).unwrap(), expected_members);
     for before in &before_clips {
         let after = read.entity(&before.id).unwrap();
-        assert_eq!(after.payload::<Clip>("clip").unwrap().link_group_id.as_ref(), Some(&group));
+        assert_eq!(
+            after
+                .payload::<Clip>("clip")
+                .unwrap()
+                .link_group_id
+                .as_ref(),
+            Some(&group)
+        );
         assert_eq!(clip_facts(&after, true), clip_facts(before, true));
     }
     let first: Clip = read.entity(&clip_ids[0]).unwrap().payload("clip").unwrap();
     let second: Clip = read.entity(&clip_ids[1]).unwrap().payload("clip").unwrap();
-    assert_eq!(first.sequence_start, nw_domain::time::Rational::new(1, 4).unwrap());
-    assert_eq!(first.end().unwrap(), nw_domain::time::Rational::new(9, 4).unwrap());
-    assert_eq!(second.sequence_start, nw_domain::time::Rational::new(1, 2).unwrap());
-    assert_eq!(second.end().unwrap(), nw_domain::time::Rational::new(2, 1).unwrap());
-    assert_eq!(second.sequence_start.checked_sub(first.sequence_start).unwrap(), nw_domain::time::Rational::new(1, 4).unwrap());
+    assert_eq!(
+        first.sequence_start,
+        nw_domain::time::Rational::new(1, 4).unwrap()
+    );
+    assert_eq!(
+        first.end().unwrap(),
+        nw_domain::time::Rational::new(9, 4).unwrap()
+    );
+    assert_eq!(
+        second.sequence_start,
+        nw_domain::time::Rational::new(1, 2).unwrap()
+    );
+    assert_eq!(
+        second.end().unwrap(),
+        nw_domain::time::Rational::new(2, 1).unwrap()
+    );
+    assert_eq!(
+        second
+            .sequence_start
+            .checked_sub(first.sequence_start)
+            .unwrap(),
+        nw_domain::time::Rational::new(1, 4).unwrap()
+    );
     for (id, raw) in &before_nonclips {
         assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
     }
