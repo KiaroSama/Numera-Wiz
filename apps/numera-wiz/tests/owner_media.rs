@@ -21,6 +21,14 @@ use std::{process::Stdio, time::Duration};
 mod owner;
 use owner::Cli;
 
+fn legacy_catalog_fields(row: &Value) -> Value {
+    let decoded: nw_domain::projects::views::ProjectSummary = serde_json::from_value(row.clone()).unwrap();
+    assert!(decoded.known_authorization().is_some(), "R2_TRANSPORT_AUTHORIZATION_UNKNOWN");
+    let mut legacy = row.clone();
+    assert!(legacy.as_object_mut().unwrap().remove("authorization").is_some());
+    legacy
+}
+
 macro_rules! call {
     ($client:expr, $id:expr, $params:expr, $context:expr) => {{
         let args = json!({"params":$params,"context":$context});
@@ -49,7 +57,7 @@ macro_rules! project_sdk {
         assert_eq!(catalog["projection"], "projects.summary.v1");
         assert!(catalog["next_cursor"].is_null());
         let row = catalog["items"].as_array().unwrap().iter().find(|row| row["id"] == id).expect("SDK-created project must be discoverable by its creator");
-        assert_eq!(row, &json!({"id":id,"name":format!("SDK project {}",$tag),"revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
+        assert_eq!(legacy_catalog_fields(row), json!({"id":id,"name":format!("SDK project {}",$tag),"revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
         let sequence = call!($client,"sequences.create",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),json!({"project":{"id":id,"expected_revision":"0"},"replay_scope":$scope,"idempotency_key":format!("project-sequence-{}",$tag)}));
         let placed = call!($client,"clips.place",json!({"sequence_id":sequence["created"]["sequence_id"],"track_id":sequence["created"]["tracks"][0]["id"],"source":{"kind":"registered","asset_id":$asset["id"],"stream_index":0},"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"}),json!({"project":{"id":id,"expected_revision":"1"},"replay_scope":$scope,"idempotency_key":format!("project-place-{}",$tag)}));
         let inspected = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["clip_ids"][0],"revision":"2"}),json!({"project":{"id":id}}));
@@ -301,8 +309,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .find(|row| row["id"] == cli_project)
         .unwrap();
     assert_eq!(
-        row,
-        &json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"})
+        legacy_catalog_fields(row),
+        json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"})
     );
     let (project_sequence, exit) = cli
         .human(&[
