@@ -4,7 +4,150 @@ use anyhow::{Context as _, Result};
 use nw_domain::commands::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::{io::AsyncReadExt, sync::Mutex};
+
+const OWNER_STARTUP_FRAME_LIMIT: usize = 512;
+
+// Only the owned __owner child's stdout carries this failure-only private frame.
+// These finite fields cannot carry error text or any owner/request identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum OwnerStartupStage {
+    OwnerLogActivation,
+    PostLogActivation,
+}
+impl OwnerStartupStage {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::OwnerLogActivation => "owner_log_activation",
+            Self::PostLogActivation => "post_log_activation",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum OwnerStartupCode {
+    OwnerBusy,
+    LogFileUnowned,
+    OwnerIdentityConflict,
+    FilesystemError,
+    LogStorageError,
+    InsecureDataRoot,
+    OtherDomain,
+    AdapterError,
+}
+impl OwnerStartupCode {
+    fn from_error(error: &anyhow::Error) -> Self {
+        match error.downcast_ref::<nw_domain::DomainError>() {
+            Some(error) => match error.code.as_str() {
+                "OWNER_BUSY" => Self::OwnerBusy,
+                "LOG_FILE_UNOWNED" => Self::LogFileUnowned,
+                "OWNER_IDENTITY_CONFLICT" => Self::OwnerIdentityConflict,
+                "FILESYSTEM_ERROR" => Self::FilesystemError,
+                "LOG_STORAGE_ERROR" => Self::LogStorageError,
+                "INSECURE_DATA_ROOT" => Self::InsecureDataRoot,
+                _ => Self::OtherDomain,
+            },
+            None => Self::AdapterError,
+        }
+    }
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::OwnerBusy => "OWNER_BUSY",
+            Self::LogFileUnowned => "LOG_FILE_UNOWNED",
+            Self::OwnerIdentityConflict => "OWNER_IDENTITY_CONFLICT",
+            Self::FilesystemError => "FILESYSTEM_ERROR",
+            Self::LogStorageError => "LOG_STORAGE_ERROR",
+            Self::InsecureDataRoot => "INSECURE_DATA_ROOT",
+            Self::OtherDomain => "OTHER_DOMAIN",
+            Self::AdapterError => "ADAPTER_ERROR",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OwnerStartupDiagnostic {
+    schema_version: u8,
+    stage: OwnerStartupStage,
+    code: OwnerStartupCode,
+}
+impl OwnerStartupDiagnostic {
+    fn frame(self) -> Option<Vec<u8>> {
+        if self.schema_version != 1 {
+            return None;
+        }
+        let mut bytes = serde_json::to_vec(&self).ok()?;
+        bytes.push(b'\n');
+        (bytes.len() <= OWNER_STARTUP_FRAME_LIMIT).then_some(bytes)
+    }
+}
+
+pub(crate) fn emit_owner_startup_failure(stage: OwnerStartupStage, error: &anyhow::Error) {
+    let diagnostic = OwnerStartupDiagnostic {
+        schema_version: 1,
+        stage,
+        code: OwnerStartupCode::from_error(error),
+    };
+    if let Some(bytes) = diagnostic.frame() {
+        use std::io::Write;
+        let _ = std::io::stdout().lock().write_all(&bytes);
+    }
+}
+
+enum OwnerStartupObservation {
+    Missing,
+    Overflow,
+    Malformed,
+    Record(OwnerStartupDiagnostic),
+}
+impl OwnerStartupObservation {
+    fn from_frame(bytes: &[u8]) -> Self {
+        if bytes.is_empty() {
+            return Self::Missing;
+        }
+        if bytes.len() > OWNER_STARTUP_FRAME_LIMIT {
+            return Self::Overflow;
+        }
+        let Ok(record) = serde_json::from_slice::<OwnerStartupDiagnostic>(bytes) else {
+            return Self::Malformed;
+        };
+        if record.frame().as_deref() != Some(bytes) {
+            return Self::Malformed;
+        }
+        Self::Record(record)
+    }
+    fn record(&self) -> Option<&OwnerStartupDiagnostic> {
+        match self {
+            Self::Record(record) => Some(record),
+            _ => None,
+        }
+    }
+}
+
+async fn collect_owner_startup_failure(
+    stdout: Option<tokio::process::ChildStdout>,
+    attach_started: std::time::Instant,
+) -> OwnerStartupObservation {
+    let read_started = tokio::time::Instant::now();
+    let deadline = tokio::time::Instant::from_std(attach_started + Duration::from_secs(20))
+        .min(read_started + Duration::from_millis(50));
+    let Some(stdout) = stdout else {
+        return OwnerStartupObservation::Missing;
+    };
+    if read_started >= deadline {
+        return OwnerStartupObservation::Missing;
+    }
+    // The wait has already reaped our child. A descendant retaining the writer
+    // cannot keep this read alive or turn a complete-looking prefix into a record.
+    let mut reader = stdout.take((OWNER_STARTUP_FRAME_LIMIT + 1) as u64);
+    let mut bytes = Vec::with_capacity(OWNER_STARTUP_FRAME_LIMIT + 1);
+    match tokio::time::timeout_at(deadline, reader.read_to_end(&mut bytes)).await {
+        Ok(Ok(_)) => OwnerStartupObservation::from_frame(&bytes),
+        _ => OwnerStartupObservation::Missing,
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OwnerRecord {
@@ -193,7 +336,7 @@ impl NativeClient {
                 command
                     .arg("__owner")
                     .stdin(Stdio::null())
-                    .stdout(Stdio::null())
+                    .stdout(Stdio::piped())
                     .stderr(Stdio::null())
                     .kill_on_drop(false);
                 #[cfg(unix)]
@@ -203,16 +346,25 @@ impl NativeClient {
                 let mut child = command
                     .spawn()
                     .context("Cannot start the protected owner")?;
+                let stdout = child.stdout.take();
                 tracing::info!(process_id = child.id(), "Protected owner child spawned");
                 tokio::spawn(async move {
                     match child.wait().await {
                         Ok(status) if status.success() => {
                             tracing::debug!("Protected owner child exited normally")
                         }
-                        Ok(status) => tracing::warn!(
-                            exit_code = status.code(),
-                            "Protected owner child exited with an error"
-                        ),
+                        Ok(status) => {
+                            let diagnostic = collect_owner_startup_failure(stdout, started).await;
+                            tracing::warn!(
+                                exit_code = status.code(),
+                                startup_stage = diagnostic.record().map(|record| record.stage.as_str()),
+                                startup_code = diagnostic.record().map(|record| record.code.as_str()),
+                                diagnostic_missing = matches!(diagnostic, OwnerStartupObservation::Missing),
+                                diagnostic_overflow = matches!(diagnostic, OwnerStartupObservation::Overflow),
+                                diagnostic_malformed = matches!(diagnostic, OwnerStartupObservation::Malformed),
+                                "Protected owner child exited with an error"
+                            );
+                        }
                         Err(_) => {
                             tracing::warn!("Protected owner child status could not be collected")
                         }
@@ -397,5 +549,90 @@ mod binding_tests {
         assert!(binding.bind_principal("principal-replacement").is_err());
         assert_eq!(binding.root_id.as_deref(), Some("root-original"));
         assert_eq!(binding.principal.as_deref(), Some("principal-original"));
+
+        // The private startup channel accepts only finite canonical frames, even
+        // when an error's code, context or message contains arbitrary content.
+        let known_codes = [
+            ("OWNER_BUSY", OwnerStartupCode::OwnerBusy),
+            ("LOG_FILE_UNOWNED", OwnerStartupCode::LogFileUnowned),
+            ("OWNER_IDENTITY_CONFLICT", OwnerStartupCode::OwnerIdentityConflict),
+            ("FILESYSTEM_ERROR", OwnerStartupCode::FilesystemError),
+            ("LOG_STORAGE_ERROR", OwnerStartupCode::LogStorageError),
+            ("INSECURE_DATA_ROOT", OwnerStartupCode::InsecureDataRoot),
+        ];
+        for (code, expected) in known_codes {
+            let error = anyhow::Error::from(nw_domain::DomainError::new(
+                code,
+                "private error message must never enter the frame",
+            ))
+            .context("private error context must never enter the frame");
+            assert_eq!(OwnerStartupCode::from_error(&error), expected);
+            assert_eq!(expected.as_str(), code);
+        }
+        for code in ["UNLISTED_PRIVATE_CODE", "ADAPTER_ERROR", "OTHER_DOMAIN", ""] {
+            let error = anyhow::Error::from(nw_domain::DomainError::new(code, "private message"));
+            assert_eq!(OwnerStartupCode::from_error(&error), OwnerStartupCode::OtherDomain);
+        }
+        assert_eq!(
+            OwnerStartupCode::from_error(&anyhow::anyhow!("private adapter message")),
+            OwnerStartupCode::AdapterError
+        );
+        for stage in [OwnerStartupStage::OwnerLogActivation, OwnerStartupStage::PostLogActivation] {
+            for code in [
+                OwnerStartupCode::OwnerBusy,
+                OwnerStartupCode::LogFileUnowned,
+                OwnerStartupCode::OwnerIdentityConflict,
+                OwnerStartupCode::FilesystemError,
+                OwnerStartupCode::LogStorageError,
+                OwnerStartupCode::InsecureDataRoot,
+                OwnerStartupCode::OtherDomain,
+                OwnerStartupCode::AdapterError,
+            ] {
+                let record = OwnerStartupDiagnostic { schema_version: 1, stage, code };
+                let bytes = record.frame().unwrap();
+                assert_eq!(bytes, format!(
+                    "{{\"schema_version\":1,\"stage\":\"{}\",\"code\":\"{}\"}}\n",
+                    stage.as_str(), code.as_str()
+                ).into_bytes());
+                assert!(bytes.len() <= OWNER_STARTUP_FRAME_LIMIT);
+                assert_eq!(OwnerStartupObservation::from_frame(&bytes).record(), Some(&record));
+            }
+        }
+        let canonical = b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n";
+        for invalid in [
+            "{\"schema_version\":0,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":2,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":256,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"unknown\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"UNLISTED_PRIVATE_CODE\"}\n",
+            "{\"schema_version\":1,\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"stage\":\"post_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\",\"message\":\"private\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\"}\n",
+            "{\"schema_version\":1,\"stage\":null,\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n{}\n",
+            "{\"code\":\"OWNER_BUSY\",\"stage\":\"owner_log_activation\",\"schema_version\":1}\n",
+            "{ \"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            "{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER\\u005fBUSY\"}\n",
+            "[]\n",
+            "not JSON\n",
+        ] {
+            assert!(matches!(OwnerStartupObservation::from_frame(invalid.as_bytes()), OwnerStartupObservation::Malformed));
+        }
+        assert!(matches!(OwnerStartupObservation::from_frame(&[0xff, b'\n']), OwnerStartupObservation::Malformed));
+        assert!(matches!(OwnerStartupObservation::from_frame(&canonical[..canonical.len() - 1]), OwnerStartupObservation::Malformed));
+        for suffix in [b"\n".as_slice(), b" ".as_slice(), b"{}\n".as_slice()] {
+            let mut noncanonical = canonical.to_vec();
+            noncanonical.extend_from_slice(suffix);
+            assert!(matches!(OwnerStartupObservation::from_frame(&noncanonical), OwnerStartupObservation::Malformed));
+        }
+        let mut at_limit = canonical.to_vec();
+        at_limit.resize(OWNER_STARTUP_FRAME_LIMIT, b' ');
+        assert!(matches!(OwnerStartupObservation::from_frame(&at_limit), OwnerStartupObservation::Malformed));
+        at_limit.push(b' ');
+        assert_eq!(at_limit.len(), 513);
+        assert!(matches!(OwnerStartupObservation::from_frame(&at_limit), OwnerStartupObservation::Overflow));
+        assert!(matches!(OwnerStartupObservation::from_frame(&[]), OwnerStartupObservation::Missing));
     }
 }

@@ -164,9 +164,17 @@ async fn run() -> Result<()> {
     std::fs::create_dir_all(&root)?;
     let root = std::fs::canonicalize(root)?;
     if matches!(&args.command, Some(Mode::Owner)) {
-        nw_platform::logging::activate(&root)?;
+        if let Err(error) = nw_platform::logging::activate(&root) {
+            let error = anyhow::Error::from(error);
+            client::emit_owner_startup_failure(client::OwnerStartupStage::OwnerLogActivation, &error);
+            return Err(error);
+        }
         tracing::info!("Protected structured owner logging activated");
-        return server::run_owner(root, args.components_dir).await;
+        let result = server::run_owner(root, args.components_dir).await;
+        if let Err(error) = &result {
+            client::emit_owner_startup_failure(client::OwnerStartupStage::PostLogActivation, error);
+        }
+        return result;
     }
     let profile = match &args.command {
         Some(Mode::Bridge { transport, .. }) if transport == "stdio" => Some(
