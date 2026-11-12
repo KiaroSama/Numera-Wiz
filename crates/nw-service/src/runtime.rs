@@ -3176,7 +3176,11 @@ mod tests {
         let changed = mutate(&service, &owner, &scope, "access.profiles.put", json!({"name":"operator","expected_revision":1,"enabled":false,"mode":"operate","owned_object_access":true,"allowed_command_ids":[],"object_grants":[],"read_roots":[],"write_roots":[]})).await;
         assert!(changed.ok);
         assert!(service.authenticate(&token).is_err());
-        assert!(service.release_private_credential(&token, &release_context).is_err());
+        assert!(
+            service
+                .release_private_credential(&token, &release_context)
+                .is_err()
+        );
         let replay = service.dispatch(owner.clone(), create.clone()).await;
         assert_eq!(accepted.receipt_id, replay.receipt_id);
         assert_eq!(replay.result.unwrap()["revision"], 1);
@@ -3923,18 +3927,34 @@ mod tests {
         assert!(first.release_private_credential(&token, &context).is_err());
         let private = first.credential("agent").unwrap();
         let survivor = first.credential("agent").unwrap();
-        assert!(first.release_private_credential(&private, &first.owner()).is_err());
-        assert!(first.release_private_credential(
-            &private, &first.profile_context("browser").unwrap(),
-        ).is_err());
+        assert!(
+            first
+                .release_private_credential(&private, &first.owner())
+                .is_err()
+        );
+        assert!(
+            first
+                .release_private_credential(&private, &first.profile_context("browser").unwrap(),)
+                .is_err()
+        );
         assert!(first.authenticate(&private).is_ok());
         let mut mismatched_profile = context.clone();
         mismatched_profile.profile = Some("browser".into());
-        assert!(first.release_private_credential(&private, &mismatched_profile).is_err());
+        assert!(
+            first
+                .release_private_credential(&private, &mismatched_profile)
+                .is_err()
+        );
         assert!(first.authenticate(&private).is_ok());
-        first.release_private_credential(&private, &context).unwrap();
+        first
+            .release_private_credential(&private, &context)
+            .unwrap();
         assert!(first.authenticate(&private).is_err());
-        assert!(first.release_private_credential(&private, &context).is_err());
+        assert!(
+            first
+                .release_private_credential(&private, &context)
+                .is_err()
+        );
         assert!(first.authenticate(&survivor).is_ok());
         drop(first);
         let second = Service::open(root.path().to_owned(), None).await.unwrap();
@@ -3947,9 +3967,15 @@ mod tests {
                 .authenticate_at(&token, Some("http://127.0.0.1:1578"), true)
                 .is_err()
         );
-        assert!(second.release_private_credential(&survivor, &context).is_err());
+        assert!(
+            second
+                .release_private_credential(&survivor, &context)
+                .is_err()
+        );
         let current = second.credential("agent").unwrap();
-        second.release_private_credential(&current, &context).unwrap();
+        second
+            .release_private_credential(&current, &context)
+            .unwrap();
         assert!(second.authenticate(&current).is_err());
     }
     #[tokio::test]

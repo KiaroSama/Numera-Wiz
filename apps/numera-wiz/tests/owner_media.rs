@@ -886,10 +886,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
 
         let mut scoped_cli_finish_command = cli.command();
         scoped_cli_finish_command.args(["bridge", "--access-profile", "operator"]);
-        let scoped_cli_finish_stdio = ()
-            .serve(TokioChildProcess::new(scoped_cli_finish_command).unwrap())
-            .await
-            .unwrap();
+        let scoped_cli_finish_stdio =
+            ().serve(TokioChildProcess::new(scoped_cli_finish_command).unwrap())
+                .await
+                .unwrap();
         let scoped_cli_finish_replay = scoped_cli_finish_stdio
             .call_tool(
                 CallToolRequestParams::new("jobs.submit").with_arguments(
@@ -907,8 +907,14 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             scoped_cli_finish_accepted
         );
         let scoped_cli_finish_job = cli.completed(scoped_cli_finish_job_id).await;
-        assert_eq!(scoped_cli_finish_job["state"], "succeeded", "{scoped_cli_finish_job}");
-        assert_eq!(scoped_cli_finish_job["file_times"]["policy"], "require_reviewed");
+        assert_eq!(
+            scoped_cli_finish_job["state"], "succeeded",
+            "{scoped_cli_finish_job}"
+        );
+        assert_eq!(
+            scoped_cli_finish_job["file_times"]["policy"],
+            "require_reviewed"
+        );
         assert_eq!(scoped_cli_finish_job["file_times"]["preserved"], true);
         assert_eq!(
             scoped_cli_finish_job["file_times"]["desired"],
@@ -943,8 +949,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
         let scoped_cli_finish_observed =
             fixture::probe(&media.bin, &scoped_cli_finish_output).await;
-        assert_eq!(scoped_cli_finish_observed["streams"].as_array().unwrap().len(), 3);
-        assert_eq!(scoped_cli_finish_observed["streams"][1]["tags"]["language"], "fas");
+        assert_eq!(
+            scoped_cli_finish_observed["streams"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+        assert_eq!(
+            scoped_cli_finish_observed["streams"][1]["tags"]["language"],
+            "fas"
+        );
         assert_eq!(
             scoped_cli_finish_observed["streams"][1]["tags"]["title"],
             "Scoped CLI finish"

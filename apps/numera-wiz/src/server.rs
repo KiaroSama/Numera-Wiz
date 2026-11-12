@@ -281,7 +281,9 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request = Request::from_parts(parts, axum::body::Body::from(bytes));
     }
     if private_release {
-        request.extensions_mut().insert(ReleaseBearer(download_token));
+        request
+            .extensions_mut()
+            .insert(ReleaseBearer(download_token));
     } else if request.uri().path().starts_with("/api/v1/artifacts/") {
         request
             .extensions_mut()
@@ -449,16 +451,21 @@ async fn release_credential(
         );
     }
     let service = owner.service.clone();
-    match tokio::task::spawn_blocking(move || {
-        service.release_private_credential(&bearer, &context)
-    }).await {
+    match tokio::task::spawn_blocking(move || service.release_private_credential(&bearer, &context))
+        .await
+    {
         Ok(Ok(())) => Json(json!({"released":true})).into_response(),
         Ok(Err(error)) => {
             let (status, code) = match error.code.as_str() {
                 "AUTHENTICATION_REQUIRED" => (StatusCode::UNAUTHORIZED, "AUTHENTICATION_REQUIRED"),
                 "PERMISSION_DENIED" => (StatusCode::FORBIDDEN, "PERMISSION_DENIED"),
-                "OWNER_BUSY" | "RESOURCE_LIMIT" => (StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_LIMIT"),
-                _ => (StatusCode::INTERNAL_SERVER_ERROR, "CREDENTIAL_RELEASE_FAILED"),
+                "OWNER_BUSY" | "RESOURCE_LIMIT" => {
+                    (StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_LIMIT")
+                }
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "CREDENTIAL_RELEASE_FAILED",
+                ),
             };
             failure(status, code, "Scoped credential release was not confirmed")
         }
@@ -1059,12 +1066,19 @@ mod tests {
             probe.releases.fetch_add(1, Ordering::AcqRel);
         }
         let response = next.run(request).await;
-        if command && probe.reject_commands.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |count| count.checked_sub(1),
-        ).is_ok() {
-            return failure(StatusCode::UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "Fixture reconnect");
+        if command
+            && probe
+                .reject_commands
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                    count.checked_sub(1)
+                })
+                .is_ok()
+        {
+            return failure(
+                StatusCode::UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Fixture reconnect",
+            );
         }
         if release {
             match probe.acknowledgement.load(Ordering::Acquire) {
@@ -1094,7 +1108,9 @@ mod tests {
         let data = tempfile::tempdir().unwrap();
         let root = std::fs::canonicalize(data.path()).unwrap();
         let service = Service::open(root.clone(), None).await.unwrap();
-        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
         let port = listener.local_addr().unwrap().port();
         let record = OwnerRecord {
             canonical_root: nw_platform::files::path_text(&root).unwrap(),
@@ -1112,7 +1128,8 @@ mod tests {
             &runtime.join("owner.json"),
             &serde_json::to_vec(&record).unwrap(),
             false,
-        ).unwrap();
+        )
+        .unwrap();
         let owner = Arc::new(Owner {
             service,
             record: record.clone(),
@@ -1126,24 +1143,46 @@ mod tests {
         });
         let probe = Arc::new(LifecycleProbe::default());
         let listener_stop = CancellationToken::new();
-        let routes = router(owner.clone(), port, true, listener_stop.clone())
-            .layer(middleware::from_fn_with_state(probe.clone(), observe_lifecycle));
+        let routes = router(owner.clone(), port, true, listener_stop.clone()).layer(
+            middleware::from_fn_with_state(probe.clone(), observe_lifecycle),
+        );
         let task = tokio::spawn(async move {
             axum::serve(listener, routes).await.unwrap();
         });
-        let new_client = |one_shot| NativeClient::for_test_owner(
-            record.clone(), Some("agent".into()), one_shot,
-        ).unwrap();
+        let new_client = |one_shot| {
+            NativeClient::for_test_owner(record.clone(), Some("agent".into()), one_shot).unwrap()
+        };
         let query = commands::Request::query("commands.list", json!({}));
         let body_token = owner.service.credential("agent").unwrap();
         let body_client = reqwest::Client::builder()
-            .no_proxy().timeout(Duration::from_secs(10)).build().unwrap();
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
         let release_url = format!("http://127.0.0.1:{port}/internal/credential/release");
-        assert_eq!(body_client.post(&release_url).bearer_auth(&body_token)
-            .json(&json!([])).send().await.unwrap().status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            body_client
+                .post(&release_url)
+                .bearer_auth(&body_token)
+                .json(&json!([]))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
         assert!(owner.service.authenticate(&body_token).is_ok());
-        assert_eq!(body_client.post(&release_url).bearer_auth(&body_token)
-            .json(&json!({})).send().await.unwrap().status(), StatusCode::OK);
+        assert_eq!(
+            body_client
+                .post(&release_url)
+                .bearer_auth(&body_token)
+                .json(&json!({}))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
         assert!(owner.service.authenticate(&body_token).is_err());
         probe.releases.store(0, Ordering::Release);
         let survivor = new_client(false);
@@ -1154,7 +1193,9 @@ mod tests {
         assert_eq!(probe.releases.load(Ordering::Acquire), 0);
 
         let one_shot = new_client(true);
-        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query)).await.unwrap();
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query))
+            .await
+            .unwrap();
         assert!(response.ok);
         assert_eq!(response.request_id, query.request_id);
         assert_eq!(probe.releases.load(Ordering::Acquire), 1);
@@ -1162,7 +1203,10 @@ mod tests {
         assert!(!one_shot.has_cached_credential().await);
         let before = probe.bootstraps.load(Ordering::Acquire);
         let error = lifecycle_error(one_shot.request(&query).await);
-        assert_eq!(error.downcast_ref::<nw_domain::DomainError>().unwrap().code, "CLIENT_CLOSED");
+        assert_eq!(
+            error.downcast_ref::<nw_domain::DomainError>().unwrap().code,
+            "CLIENT_CLOSED"
+        );
         assert_eq!(probe.bootstraps.load(Ordering::Acquire), before);
         assert!(survivor.request(&query).await.unwrap().ok);
 
@@ -1173,9 +1217,19 @@ mod tests {
             let response = one_shot.request(&denied).await?;
             assert!(!response.ok);
             assert_eq!(response.request_id, denied.request_id);
-            Err(response.error.expect("Canonical error must remain present").into())
-        }).await;
-        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "UNKNOWN_COMMAND");
+            Err(response
+                .error
+                .expect("Canonical error must remain present")
+                .into())
+        })
+        .await;
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "UNKNOWN_COMMAND"
+        );
         assert_eq!(probe.releases.load(Ordering::Acquire), before + 1);
 
         for rejections in [1, 2] {
@@ -1189,12 +1243,16 @@ mod tests {
                     assert!(!one_shot.has_cached_credential().await);
                 }
                 result
-            }).await;
+            })
+            .await;
             if rejections == 1 {
                 assert!(result.unwrap().ok);
             } else {
                 let error = lifecycle_error(result);
-                assert_eq!(error.downcast_ref::<nw_domain::DomainError>().unwrap().code, "AUTHENTICATION_REQUIRED");
+                assert_eq!(
+                    error.downcast_ref::<nw_domain::DomainError>().unwrap().code,
+                    "AUTHENTICATION_REQUIRED"
+                );
             }
             assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps + 2);
             assert_eq!(probe.releases.load(Ordering::Acquire), releases + 2);
@@ -1207,7 +1265,9 @@ mod tests {
         // Malformed acknowledgement preserves the original successful response.
         let one_shot = new_client(true);
         probe.acknowledgement.store(1, Ordering::Release);
-        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query)).await.unwrap();
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query))
+            .await
+            .unwrap();
         assert!(response.ok);
         assert_eq!(response.request_id, query.request_id);
         probe.acknowledgement.store(0, Ordering::Release);
@@ -1221,14 +1281,26 @@ mod tests {
         let bootstraps = probe.bootstraps.load(Ordering::Acquire);
         let releases = probe.releases.load(Ordering::Acquire);
         probe.acknowledgement.store(2, Ordering::Release);
-        let result: Result<()> = tokio::time::timeout(Duration::from_secs(10),
+        let result: Result<()> = tokio::time::timeout(
+            Duration::from_secs(10),
             crate::finish_one_shot(&one_shot, async {
                 let response = one_shot.request(&denied).await?;
                 assert!(!response.ok);
-                Err(response.error.expect("Canonical error must remain present").into())
+                Err(response
+                    .error
+                    .expect("Canonical error must remain present")
+                    .into())
             }),
-        ).await.expect("Total one-second finish must remain bounded");
-        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "UNKNOWN_COMMAND");
+        )
+        .await
+        .expect("Total one-second finish must remain bounded");
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "UNKNOWN_COMMAND"
+        );
         assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
         assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
         assert_eq!(one_shot.finish().await.attempted, 0);
@@ -1240,10 +1312,22 @@ mod tests {
         let unused = new_client(true);
         let result: Result<()> = crate::finish_one_shot(&unused, async {
             Err(nw_domain::DomainError::new("VALIDATION_ERROR", "Fixture input error").into())
-        }).await;
-        assert_eq!(lifecycle_error(result).downcast_ref::<nw_domain::DomainError>().unwrap().code, "VALIDATION_ERROR");
+        })
+        .await;
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "VALIDATION_ERROR"
+        );
         let unscoped = NativeClient::for_test_owner(record, None, true).unwrap();
-        assert!(crate::finish_one_shot(&unscoped, unscoped.request(&query)).await.unwrap().ok);
+        assert!(
+            crate::finish_one_shot(&unscoped, unscoped.request(&query))
+                .await
+                .unwrap()
+                .ok
+        );
         assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
         assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
         probe.stop.cancel();
