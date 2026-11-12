@@ -23,7 +23,7 @@ impl Service {
         Ok(Admission::Ordinary { _lease: lease })
     }
     pub(super) fn command_admission(&self, id: &str) -> Result<Admission<'_>> {
-        if ["maintenance.plan", "maintenance.migrate"].contains(&id) {
+        if ["maintenance.plan", "maintenance.migrate", "maintenance.promotion.plan"].contains(&id) {
             self.maintenance
                 .try_write()
                 .map(|lease| Admission::Maintenance { _lease: lease })
@@ -72,6 +72,15 @@ impl Service {
                 let plan =
                     self.store
                         .prepare_migration(&self.root_lease, &build, self.clock.now()?)?;
+                Ok(Response::success(&request.request_id, plan))
+            }
+            "maintenance.promotion.plan" => {
+                let _: Empty = commands::parse(request.params.clone())?;
+                self.snapshots.lock().map_err(|_| lock_error())?.clear_project_reads();
+                let plan = self.store.prepare_media_promotion(&self.root_lease, &build, || self.clock.now())?;
+                if cancel.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Promotion review cancelled before publication"));
+                }
                 Ok(Response::success(&request.request_id, plan))
             }
             "maintenance.migrate" => self.store.migrate_generation(
@@ -262,5 +271,128 @@ mod tests {
             "1",
             "Review must not adopt media or reset the original source guard"
         );
+        let raw = response.result.unwrap();
+        let encoded = serde_json::to_string(&raw).unwrap();
+        assert!(encoded.len() < 32768 && !encoded.contains("signing_key")
+            && !encoded.contains("replay_scope") && !encoded.contains("credential"));
+        assert!(!encoded.contains(service.root.to_string_lossy().as_ref()));
+        assert_eq!(raw["kind"], "generation_promotion_v1");
+        assert_eq!(raw["target_profile"], "media_v1");
+        assert_eq!(raw["rollback_condition"], "stopped_root_restoration_before_adoption");
+        assert_eq!(raw["source_generation"], 3);
+        assert_eq!(raw["rollback_generation"], 4);
+        assert_eq!(raw["target_generation"], 5);
+        assert_eq!(raw["source_activation_sequence"], 1);
+        assert_eq!(raw["root_id"], service.store.root_id());
+        assert_eq!(raw["source_activation_id"], activation);
+        assert_eq!(raw["source_guard"], json!({"migration_id":migration_id,"activation_id":activation,"revision":"1"}));
+        assert_eq!(raw["required_capabilities"], json!([
+            "access.v2","cleanup.v2","cleanup_batch.v1","receipts.v1",
+            "generation_activation.v1","migration.v1","adoption_guard.v1",
+            "generation_promotion.v1","media_execution.v1"
+        ]));
+        let plan: nw_domain::maintenance::promotion::GenerationPromotionPlan =
+            commands::parse(raw.clone()).unwrap();
+        plan.validate_hash().unwrap();
+        service.store.close_generation(&service.root_lease).unwrap();
+        let facts = service.root_lease.inspect_selected().unwrap();
+        service.store.reopen_current_generation(&service.root_lease).unwrap();
+        assert_eq!(plan.source_records_sha256, facts.records_sha256);
+        assert_eq!(plan.source_records, facts.record_count);
+        assert_eq!(plan.source_capabilities, facts.required_capabilities);
+        assert_eq!(raw["source_capabilities"], json!(["access.v2","cleanup.v2","cleanup_batch.v1",
+            "receipts.v1","generation_activation.v1","migration.v1","adoption_guard.v1"]));
+        let mut noise = plan.clone();
+        noise.id = uuid::Uuid::new_v4().to_string();
+        noise.created_at = (plan.created_at.parse::<u64>().unwrap() + 1).to_string();
+        noise.expires_at = (plan.expires_at.parse::<u64>().unwrap() + 1).to_string();
+        noise.required_capabilities.reverse();
+        noise.source_capabilities.reverse();
+        assert_eq!(noise.digest().unwrap(), plan.hash);
+        let mut tampered = plan.clone();
+        tampered.source_guard.revision = "2".into();
+        assert!(tampered.validate_hash().is_err());
+        tampered.source_guard.revision = "0".into();
+        assert!(tampered.digest().is_err());
+        let mut tampered = plan.clone();
+        tampered.required_capabilities.pop();
+        assert!(tampered.digest().is_err());
+        let mut overflow = plan.clone();
+        overflow.source_generation = u32::MAX;
+        overflow.rollback_generation = 0;
+        overflow.target_generation = 1;
+        assert!(overflow.digest().is_err());
+        let descriptor = commands::descriptor("maintenance.promotion.plan").unwrap();
+        assert!(!nw_domain::access::ordinary_commands().contains("maintenance.promotion.plan"));
+        let schema = descriptor.result_schema.unwrap();
+        let expected: Vec<u16> = (1..=18).collect();
+        let mut batch = crate::schema_validation::Batch::for_schemas(17, &expected, vec![schema]);
+        batch.whole(1, 0, encoded, true);
+        for id in 2..=18 {
+            let mut copy = raw.clone();
+            match id {
+                2 => copy["schema_version"] = json!(2),
+                3 => copy["extra"] = json!(true),
+                4 => copy["hash"] = json!("0".repeat(63)),
+                5 => copy["root_id"] = json!("../../not-a-root"),
+                6 => copy["source_guard"]["revision"] = json!("0"),
+                7 => copy["source_guard"] = serde_json::Value::Null,
+                8 => copy["source_store_version"] = json!(2),
+                9 => copy["target_profile"] = json!("cleanup"),
+                10 => { copy["required_capabilities"].as_array_mut().unwrap().pop(); },
+                11 => copy["required_capabilities"][8] = json!("access.v2"),
+                12 => copy["required_capabilities"][8] = json!("future.v99"),
+                13 => copy["source_generation"] = json!(0),
+                14 => copy["source_records"] = json!(49001),
+                15 => copy["source_prefix_sha256"] = json!("g".repeat(64)),
+                16 => { copy.as_object_mut().unwrap().remove("source_guard"); },
+                17 => copy["rollback_condition"] = json!("automatic"),
+                18 => copy["source_capabilities"].as_array_mut().unwrap().push(json!("media_execution.v1")),
+                _ => unreachable!(),
+            }
+            batch.whole(id, 0, serde_json::to_string(&copy).unwrap(), false);
+        }
+        batch.finish().await;
+        let browser = service.profile_context("browser").unwrap();
+        let denied = service.dispatch(browser,
+            Request::query("maintenance.promotion.plan", json!({}))).await;
+        assert_eq!(denied.error.unwrap().code, "PERMISSION_DENIED");
+        assert!(denied.receipt_id.is_none());
+        assert_eq!(service.store.adoption_revision(migration_id, activation).unwrap(), "1");
+        assert!(service.store.pending_migration().unwrap().is_none());
+        promotion_rejects_legacy_and_unadopted_sources().await;
+    }
+
+    async fn promotion_rejects_legacy_and_unadopted_sources() {
+        let temporary = tempfile::tempdir().unwrap();
+        let service = Service::open(temporary.path().to_owned(), None).await.unwrap();
+        let owner = service.owner();
+        let refused = service.dispatch(owner.clone(),
+            Request::query("maintenance.promotion.plan", json!({}))).await;
+        assert_eq!(refused.error.unwrap().code, "PROMOTION_UNQUALIFIED");
+        assert_eq!(service.store.store_version().unwrap(), 2);
+        assert!(refused.receipt_id.is_none());
+        let issued = service.dispatch(owner.clone(),
+            Request::query("access.replay_scope.create", json!({}))).await;
+        assert!(issued.ok);
+        let scope = issued.result.unwrap()["replay_scope"].as_str().unwrap().to_owned();
+        let reviewed = service.dispatch(owner.clone(),
+            Request::query("maintenance.plan", json!({}))).await;
+        assert!(reviewed.ok);
+        let mut migrate = Request::query("maintenance.migrate", json!({"plan":reviewed.result.unwrap()}));
+        migrate.replay_scope = Some(scope);
+        migrate.idempotency_key = Some("promotion-zero-source".into());
+        let accepted = service.dispatch(owner.clone(), migrate).await;
+        assert!(accepted.ok, "{:?}", accepted.error);
+        let migration = accepted.result.unwrap()["migration_id"].as_str().unwrap().to_owned();
+        let activation = service.root_lease.selection().unwrap().activation_id.unwrap();
+        assert_eq!(service.store.adoption_revision(&migration, &activation).unwrap(), "0");
+        let refused = service.dispatch(owner,
+            Request::query("maintenance.promotion.plan", json!({}))).await;
+        assert_eq!(refused.error.unwrap().code, "PROMOTION_UNQUALIFIED");
+        assert!(refused.receipt_id.is_none());
+        assert_eq!(service.store.adoption_revision(&migration, &activation).unwrap(), "0");
+        assert_eq!(service.store.store_version().unwrap(), 3);
+        assert!(service.store.pending_migration().unwrap().is_none());
     }
 }

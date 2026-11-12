@@ -23,6 +23,7 @@ pub mod generations;
 mod live;
 pub mod migrations;
 mod profiles;
+mod promotions;
 pub mod projects;
 mod records;
 pub mod versions;

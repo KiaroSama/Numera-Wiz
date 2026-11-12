@@ -249,6 +249,13 @@ pub enum Maintenance {
     Inspect {
         id: String,
     },
+    #[command(subcommand)]
+    Promotion(Promotion),
+}
+#[derive(Subcommand)]
+pub enum Promotion {
+    /// Review a compatible MediaV1 source; this does not accept or change its floor.
+    Plan,
 }
 #[derive(Subcommand)]
 pub enum Logs {
@@ -430,6 +437,9 @@ pub fn prepare(command: Command) -> Result<Request> {
             request
         }
         Command::Maintenance(Maintenance::Plan) => query("maintenance.plan", json!({})),
+        Command::Maintenance(Maintenance::Promotion(Promotion::Plan)) => {
+            query("maintenance.promotion.plan", json!({}))
+        }
         Command::Maintenance(Maintenance::Inspect { id }) => {
             query("maintenance.inspect", json!({"id":id}))
         }

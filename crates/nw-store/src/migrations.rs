@@ -144,7 +144,7 @@ impl Store {
             (_, Err(error)) => Err(error),
         }
     }
-    fn validate_migration_records(&self) -> Result<()> {
+    pub(super) fn validate_migration_records(&self) -> Result<()> {
         self.visit::<nw_domain::access::AccessProfile>("profile/", |profile| {
             if profile.schema_version != 2 || profile.principal.is_empty() || profile.revision == 0
             {

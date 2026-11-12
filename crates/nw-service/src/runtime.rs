@@ -959,7 +959,8 @@ impl Service {
                 drop(guard);
                 return self.folder_command(&context, &request, &cancellation);
             }
-            "maintenance.plan" | "maintenance.migrate" | "maintenance.inspect" => {
+            "maintenance.plan" | "maintenance.migrate" | "maintenance.inspect"
+            | "maintenance.promotion.plan" => {
                 return self.maintenance_command(&context, &request, &cancellation);
             }
             "artifacts.list" => self.inventory_page(

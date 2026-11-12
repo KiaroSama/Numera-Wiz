@@ -214,6 +214,7 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
+        "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
         "projects.create" => Some(
             serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
                 .expect("schema"),
@@ -405,6 +406,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Inspect an accepted owner migration",
             Query,
             IdInput
+        ),
+        row!(
+            "maintenance.promotion.plan",
+            "Review a compatible source for MediaV1; native owner only, acceptance remains in development",
+            Query,
+            Empty
         ),
         row!(
             "streams.clean.batch_plan",
@@ -1265,6 +1272,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "maintenance.plan",
     "maintenance.migrate",
     "maintenance.inspect",
+    "maintenance.promotion.plan",
     "streams.clean.batch_plan",
     "batches.plan_inspect",
     "batches.submit",
