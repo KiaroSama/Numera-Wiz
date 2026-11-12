@@ -50,6 +50,7 @@ pub(super) enum CatalogPhase {
     Fresh,
     Cursor,
     LegacyAssetsEntry,
+    LegacyAssetsFresh,
 }
 #[cfg(test)]
 pub(super) struct CatalogHook {
@@ -500,6 +501,10 @@ impl Service {
         }
         let id = Uuid::new_v4().to_string();
         let page = snapshot.page(&id, 0)?;
+        #[cfg(test)]
+        if kind == InventoryKind::Assets {
+            self.catalog_test_phase(CatalogPhase::LegacyAssetsFresh);
+        }
         if projects {
             #[cfg(test)]
             if self.catalog_test_phase(CatalogPhase::Fresh) {
@@ -812,6 +817,85 @@ mod tests {
                 .code,
             "RESOURCE_LIMIT"
         );
+        legacy_empty_assets_final_publication_rejects_cancellation();
+    }
+    fn legacy_empty_assets_final_publication_rejects_cancellation() {
+        // The original synchronous unit has no runtime. Keep a second worker
+        // available while the unchanged reaper waits for the held cache mutex.
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let root = tempfile::tempdir().unwrap();
+                let service = Service::open(root.path().join("data"), None).await.unwrap();
+                let reader = service.profile_context("browser").unwrap();
+                let mut control = Request::query("assets.list", json!({"limit":1}));
+                control.request_id = "legacy-assets-final-control".into();
+                let readable = service.dispatch(reader.clone(), control).await;
+                assert!(readable.ok, "Legacy empty Assets positive control: {readable:?}");
+                assert!(readable.error.is_none(), "{readable:?}");
+                assert!(readable.receipt_id.is_none(), "{readable:?}");
+                let readable_page = readable.result.as_ref().unwrap();
+                assert_eq!(readable_page["projection"], "assets.summary.v1");
+                assert_eq!(readable_page["items"], json!([]));
+                assert_eq!(readable_page["total_count"], 0);
+                assert_eq!(readable_page["count_accuracy"], "exact");
+                assert_eq!(readable_page["next_cursor"], Value::Null);
+                let retained_before = service.snapshots.lock().unwrap().count();
+                assert_eq!(retained_before, 0);
+
+                let cancellation = CancellationToken::new();
+                assert!(!cancellation.is_cancelled());
+                let mut request = Request::query("assets.list", json!({"limit":1}));
+                request.request_id = "legacy-assets-final-cancel".into();
+                let (started, ready) = std::sync::mpsc::channel();
+                let (resume, waiting) = std::sync::mpsc::channel();
+                *service.catalog_hook.lock().unwrap() = Some(CatalogHook {
+                    phase: CatalogPhase::LegacyAssetsFresh,
+                    started,
+                    waiting,
+                });
+                let task_service = service.clone();
+                let task_cancellation = cancellation.clone();
+                let task = tokio::spawn(async move {
+                    task_service
+                        .dispatch_cancel(reader, request, task_cancellation)
+                        .await
+                });
+                tokio::task::spawn_blocking(move || {
+                    ready
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("Legacy empty Assets final publication phase not reached")
+                })
+                .await
+                .unwrap();
+
+                // Page rendering has finished; do not acquire the held cache
+                // mutex until the public dispatch has resumed and joined.
+                assert!(!cancellation.is_cancelled());
+                cancellation.cancel();
+                assert!(cancellation.is_cancelled());
+                resume.send(false).unwrap();
+                let response = tokio::time::timeout(Duration::from_secs(5), task)
+                    .await
+                    .expect("Legacy empty Assets final publication did not resume")
+                    .unwrap();
+                let retained_after = service.snapshots.lock().unwrap().count();
+                assert!(
+                    !response.ok,
+                    "Legacy empty Assets final publication must reject cancellation: {response:?}"
+                );
+                assert_eq!(
+                    response.error.as_ref().map(|error| error.code.as_str()),
+                    Some("CANCELLED"),
+                    "{response:?}"
+                );
+                assert!(response.result.is_none(), "{response:?}");
+                assert!(response.receipt_id.is_none(), "{response:?}");
+                assert_eq!(retained_after, retained_before);
+            });
     }
     async fn legacy_assets_entry_rechecks_current_command_allowlist() {
         // Keep the catalog race fixtures' isolated runtime: the unchanged reaper
