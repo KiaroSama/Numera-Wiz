@@ -1191,8 +1191,7 @@ pub(super) async fn rights_and_command_metadata() {
     // UNEXECUTED until the marker boundary above passes in hosted execution.
     assert_command_metadata(&first["authorization"], &read_only, false, false);
     f.update(&reader, |input| {
-        input["object_grants"] =
-            json!([{"kind":"project","id":project,"actions":["read","edit"]}]);
+        input["object_grants"] = json!([{"kind":"project","id":project,"actions":["read","edit"]}]);
     })
     .await;
     let editable = metadata_profile(&f, &reader, &project, json!(["read", "edit"]));
@@ -1234,8 +1233,14 @@ fn metadata_profile(f: &Fixture, reader: &Context, project: &str, actions: Value
         .get(&format!("profile/{}", reader.profile.as_ref().unwrap()))
         .unwrap()
         .unwrap();
-    assert!(profile.principal == reader.principal, "R2_PRINCIPAL_CHANGED");
-    assert!(Some(&profile.id) == reader.profile.as_ref(), "R2_PROFILE_CHANGED");
+    assert!(
+        profile.principal == reader.principal,
+        "R2_PRINCIPAL_CHANGED"
+    );
+    assert!(
+        Some(&profile.id) == reader.profile.as_ref(),
+        "R2_PROFILE_CHANGED"
+    );
     assert!(!profile.owned_object_access);
     assert!(
         serde_json::to_value(&profile.object_grants).unwrap()
@@ -1251,11 +1256,23 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
     assert!(response.receipt_id.is_none(), "R2_CATALOG_RECEIPT");
     let page = response.result.expect("R2_CATALOG_RESULT_MISSING");
     assert!(page["schema_version"] == 1, "R2_CATALOG_SCHEMA_CHANGED");
-    assert!(page["projection"] == "projects.summary.v1", "R2_CATALOG_PROJECTION_CHANGED");
-    assert!(page["project_revision"] == Value::Null, "R2_CATALOG_REVISION_CHANGED");
+    assert!(
+        page["projection"] == "projects.summary.v1",
+        "R2_CATALOG_PROJECTION_CHANGED"
+    );
+    assert!(
+        page["project_revision"] == Value::Null,
+        "R2_CATALOG_REVISION_CHANGED"
+    );
     assert!(page["total_count"] == 1, "R2_CATALOG_COUNT_CHANGED");
-    assert!(page["count_accuracy"] == "exact", "R2_CATALOG_ACCURACY_CHANGED");
-    assert!(page["next_cursor"] == Value::Null, "R2_CATALOG_CURSOR_PRESENT");
+    assert!(
+        page["count_accuracy"] == "exact",
+        "R2_CATALOG_ACCURACY_CHANGED"
+    );
+    assert!(
+        page["next_cursor"] == Value::Null,
+        "R2_CATALOG_CURSOR_PRESENT"
+    );
     let rows = page["items"].as_array().expect("R2_CATALOG_ITEMS_MISSING");
     assert_eq!(rows.len(), 1);
     let row = &rows[0];
@@ -1265,7 +1282,8 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
         .expect("R2_CATALOG_ROW_NOT_OBJECT")
         .remove("authorization");
     assert!(
-        legacy == json!({"id":project,"name":name,"revision":"0","schema_major":1,
+        legacy
+            == json!({"id":project,"name":name,"revision":"0","schema_major":1,
             "envelope_version":1,"compatibility":"supported"}),
         "R2_LEGACY_HEADER_CHANGED"
     );
@@ -1288,8 +1306,7 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
     ]) {
         let encoded = serde_json::to_string(forbidden).unwrap();
         assert!(
-            !serialized.contains(forbidden)
-                && !serialized.contains(&encoded[1..encoded.len() - 1]),
+            !serialized.contains(forbidden) && !serialized.contains(&encoded[1..encoded.len() - 1]),
             "R2_CATALOG_PRIVACY_LEAK"
         );
     }
@@ -1299,19 +1316,29 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
 fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, link_removed: bool) {
     let fields = auth.as_object().expect("R2_AUTHORIZATION_NOT_OBJECT");
     assert_eq!(fields.len(), 6);
-    assert!(auth["schema_version"] == 1, "R2_AUTHORIZATION_SCHEMA_CHANGED");
-    assert!(auth["policy_revision"] == profile.revision.to_string(), "R2_POLICY_REVISION_CHANGED");
-    assert!(auth["observed_project_revision"] == "0", "R2_OBSERVED_REVISION_CHANGED");
+    assert!(
+        auth["schema_version"] == 1,
+        "R2_AUTHORIZATION_SCHEMA_CHANGED"
+    );
+    assert!(
+        auth["policy_revision"] == profile.revision.to_string(),
+        "R2_POLICY_REVISION_CHANGED"
+    );
+    assert!(
+        auth["observed_project_revision"] == "0",
+        "R2_OBSERVED_REVISION_CHANGED"
+    );
     assert!(
         auth["current_read"] == json!({"state":"requires_request_validation","reasons":[]}),
         "R2_CURRENT_READ_CHANGED"
     );
     assert!(
-        auth["current_edit"] == if edit {
-            json!({"state":"requires_request_validation","reasons":[]})
-        } else {
-            json!({"state":"unavailable","reasons":["project_edit_not_granted"]})
-        },
+        auth["current_edit"]
+            == if edit {
+                json!({"state":"requires_request_validation","reasons":[]})
+            } else {
+                json!({"state":"unavailable","reasons":["project_edit_not_granted"]})
+            },
         "R2_CURRENT_EDIT_CHANGED"
     );
     let commands = [
@@ -1355,7 +1382,12 @@ fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, li
         assert_finite_metadata_labels(&action["unchecked_gates"], &gates);
         let blocked = !action["reasons"].as_array().unwrap().is_empty();
         assert!(
-            action["state"] == if blocked { "unavailable" } else { "requires_request_validation" },
+            action["state"]
+                == if blocked {
+                    "unavailable"
+                } else {
+                    "requires_request_validation"
+                },
             "R2_ACTION_STATE_CHANGED"
         );
         let unchecked = action["unchecked_gates"].as_array().unwrap();
@@ -1369,10 +1401,20 @@ fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, li
             } else {
                 json!([])
             };
-            assert!(action["reasons"] == expected_reasons, "R2_LINK_UNLINK_REASONS_CHANGED");
             assert!(
-                action["unchecked_gates"] == json!(["current_policy","project_context","request_parameters",
-                    "expected_revision","writer_lease","affected_scope"]),
+                action["reasons"] == expected_reasons,
+                "R2_LINK_UNLINK_REASONS_CHANGED"
+            );
+            assert!(
+                action["unchecked_gates"]
+                    == json!([
+                        "current_policy",
+                        "project_context",
+                        "request_parameters",
+                        "expected_revision",
+                        "writer_lease",
+                        "affected_scope"
+                    ]),
                 "R2_LINK_UNLINK_GATES_CHANGED"
             );
         }

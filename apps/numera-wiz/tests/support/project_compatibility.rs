@@ -1055,7 +1055,10 @@ async fn project_write(
     }
     let replay = owner.command(&request, evidence).await?;
     same_receipt(&response, &replay)?;
-    ensure!(response == replay, "Project replay changed the whole accepted Response");
+    ensure!(
+        response == replay,
+        "Project replay changed the whole accepted Response"
+    );
     retain_response(directory, &response)?;
     accepted.push((request, response.clone()));
     Ok(response["result"].clone())
