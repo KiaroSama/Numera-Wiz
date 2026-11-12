@@ -808,5 +808,30 @@ mod tests {
             ])
             .is_err()
         );
+
+        let make_unlink = || {
+            ClipCli::try_parse_from([
+                "test", "unlink", "--project", id, "--expected-revision", "6",
+                "--clip", id, "--clip", partner, "--replay-scope", "retained-scope",
+                "--idempotency-key", "same-unlink", "--request-id", "supplied-unlink-request",
+            ]).unwrap().command
+        };
+        let unlinked = prepare(Command::Clips(make_unlink())).unwrap();
+        let retry = prepare(Command::Clips(make_unlink())).unwrap();
+        assert_eq!(unlinked.command.id, "clips.unlink");
+        assert_eq!(unlinked.command.version, 1);
+        assert_eq!(unlinked.project.as_ref().unwrap().id, id);
+        assert_eq!(unlinked.project.as_ref().unwrap().expected_revision.as_deref(), Some("6"));
+        assert_eq!(unlinked.params, json!({"clip_ids":[id,partner],"link_policy":"expand"}));
+        assert_eq!(unlinked.request_id, "supplied-unlink-request");
+        assert_eq!(unlinked.replay_scope.as_deref(), Some("retained-scope"));
+        assert_eq!(unlinked.idempotency_key.as_deref(), Some("same-unlink"));
+        assert_eq!(unlinked.request_id, retry.request_id);
+        assert_eq!(unlinked.structural_digest(), retry.structural_digest());
+        assert_ne!(unlinked.structural_digest(), linked.structural_digest());
+        assert!(ClipCli::try_parse_from([
+            "test", "unlink", "--project", id, "--expected-revision", "6",
+            "--replay-scope", "retained-scope", "--idempotency-key", "no-unlink-clip",
+        ]).is_err());
     }
 }

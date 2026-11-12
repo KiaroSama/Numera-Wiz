@@ -908,7 +908,7 @@ pub(in crate::runtime) async fn public_link_producer() {
         "Project, eight entities and two occurrences must be distinct"
     );
 
-    // Link discovery must describe the callable producer; Unlink is still unavailable.
+    // Link and Unlink discovery must describe the callable shared producers.
     let listed = service
         .dispatch(context.clone(), Request::query("commands.list", json!({})))
         .await;
@@ -982,33 +982,29 @@ pub(in crate::runtime) async fn public_link_producer() {
     assert_eq!(schema.result.as_ref(), Some(descriptor), "{schema:?}");
     {
         let command = "clips.unlink";
-        assert!(
-            !descriptors
-                .iter()
-                .any(|descriptor| descriptor["id"] == command),
-            "{listed:?}"
-        );
-        assert!(commands::descriptor(command).is_none(), "{listed:?}");
-        assert!(
-            !commands::registry()
-                .iter()
-                .any(|descriptor| descriptor.id == command),
-            "{listed:?}"
-        );
-        let schema = service
-            .dispatch(
-                context.clone(),
-                Request::query("commands.schema", json!({"id":command})),
-            )
-            .await;
-        assert!(!schema.ok, "{schema:?}");
-        assert!(schema.result.is_none(), "{schema:?}");
-        assert!(schema.receipt_id.is_none(), "{schema:?}");
-        assert_eq!(
-            schema.error.as_ref().unwrap().code,
-            "CAPABILITY_UNAVAILABLE",
-            "{schema:?}"
-        );
+        let descriptor = descriptors.iter().find(|row| row["id"] == command)
+            .unwrap_or_else(|| panic!("{listed:?}"));
+        assert_eq!(descriptor["version"], 1, "{listed:?}");
+        assert_eq!(descriptor["descriptor_schema_version"], 2, "{listed:?}");
+        assert!(descriptor.get("result_schema").is_none(), "{listed:?}");
+        assert_eq!(descriptor["state_class"], "durable_mutation", "{listed:?}");
+        assert_eq!(descriptor["project_context"], "required_write", "{listed:?}");
+        let params = &descriptor["params_schema"];
+        assert_eq!(params["additionalProperties"], false, "{listed:?}");
+        let required = params["required"].as_array().unwrap_or_else(|| panic!("{listed:?}"));
+        assert_eq!(required.len(), 2, "{listed:?}");
+        assert!(required.contains(&json!("clip_ids")) && required.contains(&json!("link_policy")), "{listed:?}");
+        assert_eq!(params["properties"]["clip_ids"]["minItems"], 1, "{listed:?}");
+        assert_eq!(params["properties"]["clip_ids"]["maxItems"], 128, "{listed:?}");
+        assert_eq!(params["properties"]["clip_ids"]["uniqueItems"], true, "{listed:?}");
+        assert_eq!(params["$defs"]["LinkPolicy"]["enum"], json!(["expand"]), "{listed:?}");
+        assert!(commands::ACTIVE_COMMANDS.contains(&command), "{listed:?}");
+        let registered = commands::descriptor(command).unwrap_or_else(|| panic!("{listed:?}"));
+        assert_eq!(serde_json::to_value(registered).unwrap(), *descriptor, "{listed:?}");
+        assert_eq!(commands::registry().iter().filter(|row| row.id == command).count(), 1, "{listed:?}");
+        let schema = service.dispatch(context.clone(), Request::query("commands.schema", json!({"id":command}))).await;
+        assert!(schema.ok && schema.error.is_none() && schema.receipt_id.is_none(), "{schema:?}");
+        assert_eq!(schema.result.as_ref(), Some(descriptor), "{schema:?}");
     }
 
     // The prior hosted A failure was this real Link request's UNKNOWN_COMMAND.
@@ -1128,7 +1124,8 @@ pub(in crate::runtime) async fn public_link_producer() {
     drop(read);
     public_link_edges().await;
 
-    // Next staged missing-handler RED: no Unlink production handler is active yet.
+    let before_unlink = unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group));
+    // Actual hosted missing-handler RED reached this public request after every Link oracle.
     let unlinked = accepted(
         write(
             &service,
@@ -1167,6 +1164,27 @@ pub(in crate::runtime) async fn public_link_producer() {
     for (id, raw) in &before_nonclips {
         assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
     }
+    drop(read);
+    let after_unlink = unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group));
+    let undone = accepted(write(&service, &context, &scope, Some((project.as_str(), "6")),
+        "history.undo", "public-unlink-undo", json!({})).await);
+    assert_eq!(undone["base_revision"], "6");
+    assert_eq!(undone["revision"], "7");
+    assert_eq!(unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group)), before_unlink);
+    let restored = service.store.project_read(project.as_str()).unwrap();
+    assert_eq!(restored.header().entity_count, 8);
+    assert_eq!(restored.dependents(&group, 128).unwrap(), expected_members);
+    for id in &clip_ids {
+        assert_eq!(restored.entity(id).unwrap().payload::<Clip>("clip").unwrap().link_group_id.as_ref(), Some(&group));
+    }
+    drop(restored);
+    let redone = accepted(write(&service, &context, &scope, Some((project.as_str(), "7")),
+        "history.redo", "public-unlink-redo", json!({})).await);
+    assert_eq!(redone["base_revision"], "7");
+    assert_eq!(redone["revision"], "8");
+    assert_eq!(unlink_images(&service, &project, &clip_ids, std::slice::from_ref(&group)), after_unlink);
+    assert_eq!(service.store.project_read(project.as_str()).unwrap().header().entity_count, 8);
+    public_unlink_edges().await;
 }
 
 // Public validation and real-store deterministic allocation models, after A's literal oracles.
@@ -1451,5 +1469,314 @@ async fn public_link_edges() {
                     .any(|r| r.role == role && &r.target == target)
             );
         }
+    }
+}
+
+// Metadata/model evidence only: compare exact entity bytes and real derived index values.
+fn unlink_images(service: &Arc<Service>, project: &ProjectId, clips: &[EntityId], groups: &[EntityId]) -> Value {
+    let read = service.store.project_read(project.as_str()).unwrap();
+    let mut entities = BTreeMap::new();
+    let mut targets = std::collections::BTreeSet::new();
+    targets.extend(groups.iter().cloned());
+    let mut keys = Vec::new();
+    for id in clips {
+        let entity = read.entity(id).unwrap();
+        let clip: Clip = entity.payload("clip").unwrap();
+        let track: Track = read.entity(&clip.track_id).unwrap().payload("track").unwrap();
+        let tick = grid_tick(clip.sequence_start, track.grid).unwrap();
+        keys.push(format!("project-clip/{project}/{}/{}/{tick:016x}/{id}", clip.sequence_id, clip.track_id));
+        targets.extend([id.clone(), clip.source_id.clone(), clip.track_id.clone(), clip.sequence_id.clone()]);
+    }
+    targets.insert(read.header().root_bin_id.clone());
+    for id in &targets {
+        if let Some(raw) = read.raw_entity(id).unwrap() {
+            entities.insert(id.to_string(), raw);
+        }
+    }
+    let mut dependencies = BTreeMap::new();
+    for target in &targets {
+        let members = read.dependents(target, 256).unwrap();
+        for member in &members {
+            keys.push(format!("project-dependency/{project}/{target}/{member}"));
+        }
+        dependencies.insert(target.to_string(), members);
+    }
+    let indexes = keys.into_iter().map(|key| {
+        let hash = service.store.project_fact_hash(&key).unwrap();
+        (key, hash)
+    }).collect::<BTreeMap<_, _>>();
+    json!({"entities":entities,"dependencies":dependencies,"indexes":indexes})
+}
+
+fn unlink_unchanged_facts(fixture: &Fixture, groups: &[EntityId]) -> Value {
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    let history = read.history().unwrap();
+    let mut keys = history.undo.iter().chain(&history.redo).map(|entry|
+        format!("project-patch/{}/{}", fixture.project, entry.id)).collect::<Vec<_>>();
+    keys.extend(fixture.sources.iter().map(|source| format!("project-reference/{}/{source}", fixture.project)));
+    let retained = keys.into_iter().map(|key| {
+        let hash = fixture.service.store.project_fact_hash(&key).unwrap();
+        (key, hash)
+    }).collect::<BTreeMap<_, _>>();
+    json!({"header":read.header_raw(),"history":fixture.history_hash(),"retained":retained,
+        "images":unlink_images(&fixture.service, &fixture.project, &fixture.clips, groups)})
+}
+
+fn install_unlink_raw_clip(fixture: &Fixture, index: usize) {
+    let mut entity = fixture.entity(&fixture.clips[index]);
+    entity.payload_json = format!(
+        "{{ \"future_number\": 9007199254740993, \"future_escape\":\"\\u0061\", {} }}",
+        &entity.payload_json[1..entity.payload_json.len()-1]);
+    entity.payload_sha256 = domain::hash(entity.payload_json.as_bytes());
+    entity.extensions.insert("future_optional".into(), serde_json::from_str("[9007199254740993,\"\\u0062\"]").unwrap());
+    fixture.install_future_envelope(entity);
+}
+
+async fn public_unlink_edges() {
+    let fixture = Fixture::new().await;
+    for (key, params, code) in [
+        ("empty", json!({"clip_ids":[],"link_policy":"expand"}), "VALIDATION_ERROR"),
+        ("duplicate", json!({"clip_ids":[fixture.clips[0],fixture.clips[0]],"link_policy":"expand"}), "VALIDATION_ERROR"),
+        ("oversized", json!({"clip_ids":vec![fixture.clips[0].clone();129],"link_policy":"expand"}), "RESOURCE_LIMIT"),
+        ("cross-sequence", json!({"clip_ids":[fixture.clips[0],fixture.clips[3]],"link_policy":"expand"}), "VALIDATION_ERROR"),
+        ("policy", json!({"clip_ids":[fixture.clips[0]],"link_policy":"ignore"}), "VALIDATION_ERROR"),
+        ("missing-policy", json!({"clip_ids":[fixture.clips[0]]}), "VALIDATION_ERROR"),
+        ("unknown-field", json!({"clip_ids":[fixture.clips[0]],"link_policy":"expand","group":"supplied"}), "VALIDATION_ERROR"),
+    ] {
+        let before = unlink_unchanged_facts(&fixture, &[]);
+        fixture.reject_unchanged(fixture.request("clips.unlink", &format!("unlink-{key}"), params), code).await;
+        assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);
+    }
+    public_unlink_mixed().await;
+    public_unlink_noop().await;
+    public_unlink_relations().await;
+}
+
+async fn public_unlink_mixed() {
+    let fixture = Fixture::new().await;
+    // A/B are grouped by the public producer; C's deliberately noncanonical bytes are admitted.
+    install_unlink_raw_clip(&fixture, 0);
+    install_unlink_raw_clip(&fixture, 1);
+    let c_raw = fixture.raw(&fixture.clips[1]);
+    let linked = fixture.accept(fixture.request("clips.link", "unlink-mixed-link",
+        json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand"}))).await;
+    let group = EntityId::parse(linked["created"]["link_group_id"].as_str().unwrap()).unwrap();
+    let mut members = vec![fixture.clips[0].clone(), fixture.clips[1].clone(), fixture.clips[2].clone()];
+    members.sort();
+    let mut changing = vec![fixture.clips[0].clone(), fixture.clips[2].clone()];
+    changing.sort();
+    let params = json!({"clip_ids":[fixture.clips[0],fixture.clips[1]],"link_policy":"expand"});
+    // The untouched member must still receive every compatibility/lock/reference check.
+    for (case, code) in [("locked", "ENTITY_LOCKED"), ("unsupported", "PROJECT_READ_ONLY"), ("required", "OBJECT_NOT_FOUND")] {
+        let mut c: EntityEnvelope = serde_json::from_str(&c_raw).unwrap();
+        match case {
+            "locked" => {
+                let mut clip: Clip = c.payload("clip").unwrap();
+                clip.locked = true;
+                c.update(&clip).unwrap();
+            }
+            "unsupported" => c.semantic_scope = "future_scope".into(),
+            _ => c.references.push(EntityReference { role:"semantic_input".into(), target:EntityId::parse(Uuid::new_v4().to_string()).unwrap() }),
+        }
+        fixture.install_future_envelope(c);
+        let before = unlink_unchanged_facts(&fixture, std::slice::from_ref(&group));
+        fixture.reject_unchanged(fixture.request("clips.unlink", &format!("unlink-mixed-{case}"), params.clone()), code).await;
+        assert_eq!(unlink_unchanged_facts(&fixture, std::slice::from_ref(&group)), before);
+        fixture.install_future_envelope(serde_json::from_str(&c_raw).unwrap());
+        assert_eq!(fixture.raw(&fixture.clips[1]), c_raw);
+    }
+    let before = unlink_images(&fixture.service, &fixture.project, &fixture.clips, std::slice::from_ref(&group));
+    let source_raw = fixture.sources.iter().map(|id| fixture.raw(id)).collect::<Vec<_>>();
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    let entity_count = read.header().entity_count;
+    let resolved = resolve_edit(&read, ProjectEditIntent::Unlink(commands::parse(params.clone()).unwrap()), AllocatedIds(VecDeque::new())).unwrap();
+    assert_eq!(resolved.created, json!({"clip_ids":members}));
+    assert_eq!(resolved.changed_ids, changing);
+    assert_eq!(resolved.forward.changes.len(), 2);
+    assert!(!resolved.forward.changes.iter().any(|change| change.id == fixture.clips[1]));
+    assert_eq!(serde_json::to_value(&resolved.inverse).unwrap(), serde_json::to_value(resolved.forward.inverse()).unwrap());
+    drop(read);
+    let result = fixture.accept(fixture.request("clips.unlink", "unlink-mixed", params)).await;
+    assert_eq!(result["created"], json!({"clip_ids":members}));
+    assert_eq!(result["changed_ids"], json!(changing));
+    assert_eq!(fixture.raw(&fixture.clips[1]), c_raw);
+    assert_eq!(fixture.sources.iter().map(|id| fixture.raw(id)).collect::<Vec<_>>(), source_raw);
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    assert_eq!(read.header().entity_count, entity_count);
+    assert!(read.raw_entity(&group).unwrap().is_none());
+    assert!(read.dependents(&group, 128).unwrap().is_empty());
+    for (id, raw) in before["entities"].as_object().unwrap() {
+        let id = EntityId::parse(id).unwrap();
+        if !changing.contains(&id) {
+            assert_eq!(read.raw_entity(&id).unwrap().as_deref(), raw.as_str());
+        }
+    }
+    for id in &changing {
+        let old: EntityEnvelope = serde_json::from_str(before["entities"][id.to_string()].as_str().unwrap()).unwrap();
+        let mut expected: Clip = old.payload("clip").unwrap();
+        expected.link_group_id = None;
+        let after = read.entity(id).unwrap();
+        assert_eq!(serde_json::to_value(after.payload::<Clip>("clip").unwrap()).unwrap(), serde_json::to_value(expected).unwrap());
+        assert_eq!(serde_json::to_value(&after.references).unwrap(), serde_json::to_value(&old.references).unwrap());
+        assert_eq!(after.owner_id, old.owner_id);
+        if id == &fixture.clips[0] {
+            let old_payload: BTreeMap<String, Box<serde_json::value::RawValue>> = serde_json::from_str(&old.payload_json).unwrap();
+            let new_payload: BTreeMap<String, Box<serde_json::value::RawValue>> = serde_json::from_str(&after.payload_json).unwrap();
+            for key in ["future_number", "future_escape"] {
+                assert_eq!(new_payload[key].get(), old_payload[key].get());
+            }
+            assert_eq!(after.extensions["future_optional"].get(), old.extensions["future_optional"].get());
+        }
+    }
+    drop(read);
+    let after = unlink_images(&fixture.service, &fixture.project, &fixture.clips, std::slice::from_ref(&group));
+    let operation = OperationId::parse(result["operation_id"].as_str().unwrap()).unwrap();
+    let stored = fixture.service.store.project_read(fixture.project.as_str()).unwrap().patch(&operation).unwrap();
+    assert_eq!(serde_json::to_value(&stored.forward).unwrap(), serde_json::to_value(resolved.forward).unwrap());
+    fixture.accept(fixture.request("history.undo", "unlink-mixed-undo", json!({}))).await;
+    assert_eq!(unlink_images(&fixture.service, &fixture.project, &fixture.clips, std::slice::from_ref(&group)), before);
+    fixture.accept(fixture.request("history.redo", "unlink-mixed-redo", json!({}))).await;
+    assert_eq!(unlink_images(&fixture.service, &fixture.project, &fixture.clips, std::slice::from_ref(&group)), after);
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    assert_eq!(read.history().unwrap().undo.last().unwrap().id, operation);
+    let redone = read.patch(&operation).unwrap();
+    assert_eq!(serde_json::to_value(redone.forward).unwrap(), serde_json::to_value(stored.forward).unwrap());
+    assert_eq!(serde_json::to_value(redone.inverse).unwrap(), serde_json::to_value(stored.inverse).unwrap());
+}
+
+async fn public_unlink_noop() {
+    for several in [false, true] {
+        let fixture = Fixture::new().await;
+        install_unlink_raw_clip(&fixture, 1);
+        let original = fixture.raw(&fixture.clips[1]);
+        fixture.accept(fixture.move_request(1, 1, "unlink-noop-move")).await;
+        fixture.accept(fixture.request("history.undo", "unlink-noop-restore", json!({}))).await;
+        assert_eq!(fixture.raw(&fixture.clips[1]), original);
+        let mut members = if several { fixture.clips[..3].to_vec() } else { vec![fixture.clips[1].clone()] };
+        members.sort();
+        let params = json!({"clip_ids":members,"link_policy":"expand"});
+        let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+        assert_eq!(read.history().unwrap().summary()["can_redo"], true);
+        let resolved = resolve_edit(&read, ProjectEditIntent::Unlink(commands::parse(params.clone()).unwrap()), AllocatedIds(VecDeque::new())).unwrap();
+        assert!(resolved.forward.changes.is_empty() && resolved.inverse.changes.is_empty());
+        assert!(resolved.changed_ids.is_empty());
+        assert_eq!(resolved.created, json!({"clip_ids":members}));
+        let revision = read.header().revision.to_string();
+        drop(read);
+        let before = unlink_unchanged_facts(&fixture, &[]);
+        let request = fixture.request("clips.unlink", "unlink-raw-noop", params);
+        let response = fixture.service.dispatch(fixture.context.clone(), request.clone()).await;
+        assert!(response.ok && response.receipt_id.is_some(), "{response:?}");
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["no_change"], true);
+        assert_eq!(result["base_revision"], revision);
+        assert_eq!(result["revision"], revision);
+        assert_eq!(result["changed_ids"], json!([]));
+        assert_eq!(result["created"], json!({"clip_ids":members}));
+        assert_eq!(result["history"]["can_redo"], true);
+        assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);
+        let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+        assert_eq!(replay.receipt_id, response.receipt_id);
+        assert_eq!(replay.result, response.result);
+        assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);
+        for (case, code) in [("locked", "ENTITY_LOCKED"), ("unsupported", "PROJECT_READ_ONLY"), ("required", "OBJECT_NOT_FOUND")] {
+            let mut c: EntityEnvelope = serde_json::from_str(&original).unwrap();
+            match case {
+                "locked" => {
+                    let mut clip: Clip = c.payload("clip").unwrap();
+                    clip.locked = true;
+                    c.update(&clip).unwrap();
+                }
+                "unsupported" => c.semantic_scope = "future_scope".into(),
+                _ => c.references.push(EntityReference { role:"semantic_input".into(), target:EntityId::parse(Uuid::new_v4().to_string()).unwrap() }),
+            }
+            fixture.install_future_envelope(c);
+            let before = unlink_unchanged_facts(&fixture, &[]);
+            fixture.reject_unchanged(fixture.request("clips.unlink", &format!("unlink-noop-{case}"), json!({"clip_ids":members,"link_policy":"expand"})), code).await;
+            assert_eq!(unlink_unchanged_facts(&fixture, &[]), before);
+            fixture.install_future_envelope(serde_json::from_str(&original).unwrap());
+        }
+    }
+}
+
+async fn public_unlink_relations() {
+    // MODEL setup: explicit directed edges use real envelopes and derived transaction indexes.
+    for relation in ["incoming", "outgoing", "incoming-nonclip", "outgoing-nonclip", "semantic-input", "multiple-groups"] {
+        let fixture = Fixture::new().await;
+        let mut groups = Vec::new();
+        if relation == "multiple-groups" {
+            let clip: Clip = fixture.entity(&fixture.clips[1]).payload("clip").unwrap();
+            let placed = fixture.accept(fixture.request("clips.place", "unlink-chain-extra", json!({
+                "sequence_id":clip.sequence_id,"track_id":clip.track_id,
+                "source":{"kind":"solid_color","rgba":[0,0,0,1],"duration":{"num":"4","den":"1"}},
+                "source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},
+                "sequence_start":{"num":"6","den":"1"},"collision":"reject"}))).await;
+            let extra = EntityId::parse(placed["created"]["clip_ids"][0].as_str().unwrap()).unwrap();
+            for (key, seeds) in [("first", vec![fixture.clips[0].clone(),fixture.clips[2].clone()]), ("second",vec![fixture.clips[1].clone(),extra])] {
+                let linked = fixture.accept(fixture.request("clips.link", &format!("unlink-chain-{key}"), json!({"clip_ids":seeds,"link_policy":"expand"}))).await;
+                groups.push(EntityId::parse(linked["created"]["link_group_id"].as_str().unwrap()).unwrap());
+            }
+        }
+        let (id, target, role) = match relation {
+            "incoming-nonclip" => (&fixture.sources[3], &fixture.clips[0], "link"),
+            "outgoing-nonclip" => (&fixture.clips[0], &fixture.sources[3], "link"),
+            "semantic-input" => (&fixture.sources[3], &fixture.clips[0], "semantic_input"),
+            "outgoing" => (&fixture.clips[0], &fixture.clips[2], "link"),
+            "multiple-groups" => (&fixture.clips[1], &fixture.clips[2], "link"),
+            _ => (&fixture.clips[2], &fixture.clips[0], "link"),
+        };
+        let mut entity = fixture.entity(id);
+        entity.references.push(EntityReference { role:role.into(), target:target.clone() });
+        entity.extensions.insert("future_optional".into(), serde_json::from_str("{\"number\":9007199254740993,\"escape\":\"\\u0061\"}").unwrap());
+        fixture.install_future_envelope(entity.clone());
+        let mut selected = fixture.clips.clone();
+        if relation == "multiple-groups" {
+            let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+            selected.extend(read.dependents(&groups[1], 128).unwrap());
+            selected.sort(); selected.dedup();
+        }
+        let before = unlink_images(&fixture.service, &fixture.project, &selected, &groups);
+        let request = fixture.request("clips.unlink", relation, json!({"clip_ids":[fixture.clips[0]],"link_policy":"expand"}));
+        if relation.ends_with("nonclip") {
+            fixture.reject_unchanged(request, "VALIDATION_ERROR").await;
+            assert_eq!(unlink_images(&fixture.service, &fixture.project, &selected, &groups), before);
+            continue;
+        }
+        let result = fixture.accept(request).await;
+        let mut expected = match relation {
+            "semantic-input" => vec![fixture.clips[0].clone()],
+            "multiple-groups" => selected.iter().filter(|id| *id != &fixture.clips[3]).cloned().collect(),
+            _ => vec![fixture.clips[0].clone(), fixture.clips[2].clone()],
+        };
+        expected.sort();
+        assert_eq!(result["created"], json!({"clip_ids":expected}));
+        if relation == "semantic-input" {
+            assert_eq!(result["no_change"], true);
+            assert_eq!(result["changed_ids"], json!([]));
+            assert_eq!(fixture.raw(id), entity.bytes().unwrap());
+            assert_eq!(unlink_images(&fixture.service, &fixture.project, &selected, &groups), before);
+            continue;
+        }
+        let changed = if relation == "multiple-groups" { expected.clone() } else { vec![id.clone()] };
+        assert_eq!(result["changed_ids"], json!(changed));
+        let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+        for member in &expected {
+            let after = read.entity(member).unwrap();
+            assert_eq!(after.payload::<Clip>("clip").unwrap().link_group_id, None);
+            assert!(!after.references.iter().any(|reference| reference.role == "link"));
+        }
+        for group in &groups {
+            assert!(read.raw_entity(group).unwrap().is_none());
+            assert!(read.dependents(group, 128).unwrap().is_empty());
+        }
+        let after_entity = read.entity(id).unwrap();
+        assert_eq!(after_entity.extensions["future_optional"].get(), entity.extensions["future_optional"].get());
+        assert_eq!(serde_json::to_value(&after_entity.references).unwrap(), serde_json::to_value(entity.references.iter().filter(|reference| reference.role != "link").collect::<Vec<_>>()).unwrap());
+        drop(read);
+        let after = unlink_images(&fixture.service, &fixture.project, &selected, &groups);
+        fixture.accept(fixture.request("history.undo", "unlink-edge-undo", json!({}))).await;
+        assert_eq!(unlink_images(&fixture.service, &fixture.project, &selected, &groups), before);
+        fixture.accept(fixture.request("history.redo", "unlink-edge-redo", json!({}))).await;
+        assert_eq!(unlink_images(&fixture.service, &fixture.project, &selected, &groups), after);
     }
 }

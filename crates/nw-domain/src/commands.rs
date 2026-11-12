@@ -201,7 +201,7 @@ impl ProjectContextRule {
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
         "projects.inspect" | "sequences.inspect" => ProjectContextRule::RequiredRead,
-        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.split"
+        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split"
         | "clips.remove" | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
@@ -336,6 +336,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Link complete same-sequence clip components without changing geometry",
             DurableMutation,
             crate::projects::LinkInput
+        ),
+        row!(
+            "clips.unlink",
+            "Unlink complete same-sequence clip components without changing geometry",
+            DurableMutation,
+            crate::projects::UnlinkInput
         ),
         row!(
             "clips.split",
@@ -873,6 +879,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.place",
     "clips.move",
     "clips.link",
+    "clips.unlink",
     "clips.split",
     "clips.remove",
     "history.undo",

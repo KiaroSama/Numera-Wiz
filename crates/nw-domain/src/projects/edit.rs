@@ -37,6 +37,7 @@ pub enum ProjectEditIntent {
     Place(Box<PlaceInput>, SourceBinding),
     Move(MoveInput),
     Link(LinkInput),
+    Unlink(UnlinkInput),
     Split(SplitInput),
     Remove(RemoveInput),
 }
@@ -237,7 +238,11 @@ fn expand_links<R: ProjectRead>(read: &R, ids: &[EntityId]) -> Result<Vec<Entity
     Ok(clips)
 }
 // New topology authoring is stricter than the frozen legacy edit expansion.
-fn link_selection<R: ProjectRead>(read: &R, ids: &[EntityId]) -> Result<Vec<EntityEnvelope>> {
+fn link_selection<R: ProjectRead>(
+    read: &R,
+    ids: &[EntityId],
+    minimum: usize,
+) -> Result<Vec<EntityEnvelope>> {
     if ids.is_empty() {
         return Err(invalid("Select at least one clip"));
     }
@@ -305,7 +310,7 @@ fn link_selection<R: ProjectRead>(read: &R, ids: &[EntityId]) -> Result<Vec<Enti
         }
         selected.insert(id, entity);
     }
-    if selected.len() < 2 {
+    if selected.len() < minimum {
         return Err(invalid("Link requires at least two resolved clips"));
     }
     let mut sequence = None;
@@ -437,7 +442,7 @@ pub fn resolve_edit<R: ProjectRead>(
             json!({"source_id":source_id,"clip_ids":[clip_id]})
         }
         ProjectEditIntent::Link(input) => {
-            let selected = link_selection(read, &input.clip_ids)?;
+            let selected = link_selection(read, &input.clip_ids, 2)?;
             validate_unchanged(read, &selected)?;
             let clip_ids = selected
                 .iter()
@@ -468,6 +473,28 @@ pub fn resolve_edit<R: ProjectRead>(
                 edit.set(entity)?;
             }
             json!({"link_group_id":group,"clip_ids":clip_ids})
+        }
+        ProjectEditIntent::Unlink(input) => {
+            let selected = link_selection(read, &input.clip_ids, 1)?;
+            // Validate even unchanged members before updating or serializing any member.
+            validate_unchanged(read, &selected)?;
+            let clip_ids = selected
+                .iter()
+                .map(|entity| entity.id.clone())
+                .collect::<Vec<_>>();
+            for mut entity in selected {
+                let mut clip: Clip = entity.payload("clip")?;
+                if clip.link_group_id.is_none()
+                    && !entity.references.iter().any(|reference| reference.role == "link")
+                {
+                    continue;
+                }
+                clip.link_group_id = None;
+                entity.references.retain(|reference| reference.role != "link");
+                entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({"clip_ids":clip_ids})
         }
         ProjectEditIntent::Move(input) => {
             if input.collision != "reject" || input.link_policy != "expand" {
