@@ -180,7 +180,29 @@ pub fn grid_tick(time: Rational, grid: Rational) -> Result<u64> {
         .try_into()
         .map_err(|_| invalid("Grid tick exceeds u64"))
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// Read fields from the original JSON map; flatten's generic buffering loses RawValue.
+fn read_record_field<'de, M, T>(
+    map: &mut M,
+    slot: &mut Option<T>,
+    name: &'static str,
+) -> std::result::Result<(), M::Error>
+where
+    M: serde::de::MapAccess<'de>,
+    T: Deserialize<'de>,
+{
+    if slot.is_some() {
+        return Err(serde::de::Error::duplicate_field(name));
+    }
+    *slot = Some(map.next_value()?);
+    Ok(())
+}
+fn required_record_field<T, E: serde::de::Error>(
+    slot: Option<T>,
+    name: &'static str,
+) -> std::result::Result<T, E> {
+    slot.ok_or_else(|| E::missing_field(name))
+}
+#[derive(Debug, Clone, Serialize)]
 pub struct ProjectHeader {
     pub envelope_version: u32,
     pub schema_major: u32,
@@ -197,6 +219,78 @@ pub struct ProjectHeader {
     pub compatibility: String,
     #[serde(flatten)]
     pub extensions: BTreeMap<String, Box<RawValue>>,
+}
+impl<'de> Deserialize<'de> for ProjectHeader {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct RecordVisitor;
+        impl<'input> serde::de::Visitor<'input> for RecordVisitor {
+            type Value = ProjectHeader;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a project header object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'input>>(
+                self,
+                mut map: M,
+            ) -> std::result::Result<Self::Value, M::Error> {
+                let mut envelope_version: Option<u32> = None;
+                let mut schema_major: Option<u32> = None;
+                let mut id: Option<ProjectId> = None;
+                let mut creator: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut revision: Option<Revision> = None;
+                let mut root_bin_id: Option<EntityId> = None;
+                let mut entity_count: Option<usize> = None;
+                let mut sequence_count: Option<usize> = None;
+                let mut history_root: Option<String> = None;
+                let mut materialized_revision: Option<Revision> = None;
+                let mut change_digest: Option<String> = None;
+                let mut compatibility: Option<String> = None;
+                let mut extensions = BTreeMap::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "envelope_version" => read_record_field(&mut map, &mut envelope_version, "envelope_version")?,
+                        "schema_major" => read_record_field(&mut map, &mut schema_major, "schema_major")?,
+                        "id" => read_record_field(&mut map, &mut id, "id")?,
+                        "creator" => read_record_field(&mut map, &mut creator, "creator")?,
+                        "name" => read_record_field(&mut map, &mut name, "name")?,
+                        "revision" => read_record_field(&mut map, &mut revision, "revision")?,
+                        "root_bin_id" => read_record_field(&mut map, &mut root_bin_id, "root_bin_id")?,
+                        "entity_count" => read_record_field(&mut map, &mut entity_count, "entity_count")?,
+                        "sequence_count" => read_record_field(&mut map, &mut sequence_count, "sequence_count")?,
+                        "history_root" => read_record_field(&mut map, &mut history_root, "history_root")?,
+                        "materialized_revision" => read_record_field(&mut map, &mut materialized_revision, "materialized_revision")?,
+                        "change_digest" => read_record_field(&mut map, &mut change_digest, "change_digest")?,
+                        "compatibility" => read_record_field(&mut map, &mut compatibility, "compatibility")?,
+                        _ => {
+                            let std::collections::btree_map::Entry::Vacant(entry) = extensions.entry(key) else {
+                                return Err(serde::de::Error::custom("Duplicate project extension field"));
+                            };
+                            entry.insert(map.next_value::<Box<RawValue>>()?);
+                        }
+                    }
+                }
+                Ok(ProjectHeader {
+                    envelope_version: required_record_field::<_, M::Error>(envelope_version, "envelope_version")?,
+                    schema_major: required_record_field::<_, M::Error>(schema_major, "schema_major")?,
+                    id: required_record_field::<_, M::Error>(id, "id")?,
+                    creator: required_record_field::<_, M::Error>(creator, "creator")?,
+                    name: required_record_field::<_, M::Error>(name, "name")?,
+                    revision: required_record_field::<_, M::Error>(revision, "revision")?,
+                    root_bin_id: required_record_field::<_, M::Error>(root_bin_id, "root_bin_id")?,
+                    entity_count: required_record_field::<_, M::Error>(entity_count, "entity_count")?,
+                    sequence_count: required_record_field::<_, M::Error>(sequence_count, "sequence_count")?,
+                    history_root: required_record_field::<_, M::Error>(history_root, "history_root")?,
+                    materialized_revision: required_record_field::<_, M::Error>(materialized_revision, "materialized_revision")?,
+                    change_digest: required_record_field::<_, M::Error>(change_digest, "change_digest")?,
+                    compatibility: required_record_field::<_, M::Error>(compatibility, "compatibility")?,
+                    extensions,
+                })
+            }
+        }
+        deserializer.deserialize_map(RecordVisitor)
+    }
 }
 impl ProjectHeader {
     pub fn writable(&self) -> Result<()> {
@@ -220,7 +314,7 @@ pub struct EntityReference {
     pub role: String,
     pub target: EntityId,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EntityEnvelope {
     pub envelope_version: u32,
     pub id: EntityId,
@@ -236,6 +330,75 @@ pub struct EntityEnvelope {
     pub payload_sha256: String,
     #[serde(flatten)]
     pub extensions: BTreeMap<String, Box<RawValue>>,
+}
+impl<'de> Deserialize<'de> for EntityEnvelope {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct RecordVisitor;
+        impl<'input> serde::de::Visitor<'input> for RecordVisitor {
+            type Value = EntityEnvelope;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a project entity envelope object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'input>>(
+                self,
+                mut map: M,
+            ) -> std::result::Result<Self::Value, M::Error> {
+                let mut envelope_version: Option<u32> = None;
+                let mut id: Option<EntityId> = None;
+                let mut project_id: Option<ProjectId> = None;
+                let mut kind: Option<String> = None;
+                let mut kind_version: Option<u32> = None;
+                let mut owner_id: Option<Option<EntityId>> = None;
+                let mut enabled: Option<bool> = None;
+                let mut references: Option<Vec<EntityReference>> = None;
+                let mut semantic_scope: Option<String> = None;
+                let mut label: Option<String> = None;
+                let mut payload_json: Option<String> = None;
+                let mut payload_sha256: Option<String> = None;
+                let mut extensions = BTreeMap::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "envelope_version" => read_record_field(&mut map, &mut envelope_version, "envelope_version")?,
+                        "id" => read_record_field(&mut map, &mut id, "id")?,
+                        "project_id" => read_record_field(&mut map, &mut project_id, "project_id")?,
+                        "kind" => read_record_field(&mut map, &mut kind, "kind")?,
+                        "kind_version" => read_record_field(&mut map, &mut kind_version, "kind_version")?,
+                        "owner_id" => read_record_field(&mut map, &mut owner_id, "owner_id")?,
+                        "enabled" => read_record_field(&mut map, &mut enabled, "enabled")?,
+                        "references" => read_record_field(&mut map, &mut references, "references")?,
+                        "semantic_scope" => read_record_field(&mut map, &mut semantic_scope, "semantic_scope")?,
+                        "label" => read_record_field(&mut map, &mut label, "label")?,
+                        "payload_json" => read_record_field(&mut map, &mut payload_json, "payload_json")?,
+                        "payload_sha256" => read_record_field(&mut map, &mut payload_sha256, "payload_sha256")?,
+                        _ => {
+                            let std::collections::btree_map::Entry::Vacant(entry) = extensions.entry(key) else {
+                                return Err(serde::de::Error::custom("Duplicate project extension field"));
+                            };
+                            entry.insert(map.next_value::<Box<RawValue>>()?);
+                        }
+                    }
+                }
+                Ok(EntityEnvelope {
+                    envelope_version: required_record_field::<_, M::Error>(envelope_version, "envelope_version")?,
+                    id: required_record_field::<_, M::Error>(id, "id")?,
+                    project_id: required_record_field::<_, M::Error>(project_id, "project_id")?,
+                    kind: required_record_field::<_, M::Error>(kind, "kind")?,
+                    kind_version: required_record_field::<_, M::Error>(kind_version, "kind_version")?,
+                    owner_id: owner_id.flatten(),
+                    enabled: required_record_field::<_, M::Error>(enabled, "enabled")?,
+                    references: required_record_field::<_, M::Error>(references, "references")?,
+                    semantic_scope: required_record_field::<_, M::Error>(semantic_scope, "semantic_scope")?,
+                    label: required_record_field::<_, M::Error>(label, "label")?,
+                    payload_json: required_record_field::<_, M::Error>(payload_json, "payload_json")?,
+                    payload_sha256: required_record_field::<_, M::Error>(payload_sha256, "payload_sha256")?,
+                    extensions,
+                })
+            }
+        }
+        deserializer.deserialize_map(RecordVisitor)
+    }
 }
 impl EntityEnvelope {
     pub fn new(
