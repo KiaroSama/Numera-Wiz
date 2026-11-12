@@ -32,8 +32,9 @@ impl LinkedProject {
         request["project"] = json!({"id":self.id});
         let response = owner.command(&request, evidence).await?;
         let result = response["result"].clone();
+        let expected_revision = revision.to_string();
         ensure!(
-            result["project_revision"] == revision.to_string(),
+            result["project_revision"].as_str() == Some(expected_revision.as_str()),
             "Linked projection revision differs"
         );
         *replacement = Some(text(&result, "snapshot_id")?);
