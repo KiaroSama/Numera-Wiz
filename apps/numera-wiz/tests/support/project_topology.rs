@@ -1,10 +1,10 @@
 //! Finite public topology qualification inside the existing hosted transport test.
 //! Only supported solid clips are used: no source registration, jobs or raw store reads.
 use super::owner::Cli;
-#[path = "../../../../ci/schema_validation.rs"]
-mod schema_validation;
 #[path = "project_topology/output_contracts.rs"]
 mod output_contracts;
+#[path = "../../../../ci/schema_validation.rs"]
+mod schema_validation;
 use nw_domain::commands::{MAX_RESULT_BYTES, ProjectRef, Request};
 use rmcp::{
     ClientLifecycleMode, ClientServiceExt, RoleClient, ServiceExt,
@@ -1040,6 +1040,14 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
     );
     // 36 original plus eight additive project writes; profile setup is separate.
     assert_eq!(receipts.len() + extra_receipts.len(), 44);
-    output_contracts::run(cli, port, &token, cli_responses, stdio_responses, http_responses).await;
+    output_contracts::run(
+        cli,
+        port,
+        &token,
+        cli_responses,
+        stdio_responses,
+        http_responses,
+    )
+    .await;
     token
 }

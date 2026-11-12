@@ -135,8 +135,12 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         let root = Value::Object(schema.as_ref().clone());
         assert_eq!(root["type"], "object");
         assert_eq!(root["additionalProperties"], false);
-        let required: BTreeSet<_> = root["required"].as_array().unwrap().iter()
-            .map(|field| field.as_str().unwrap()).collect();
+        let required: BTreeSet<_> = root["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|field| field.as_str().unwrap())
+            .collect();
         assert_eq!(required, BTreeSet::from(["request_id", "ok"]));
         assert_eq!(root["properties"]["result"]["$ref"], "#/$defs/Result");
         assert_eq!(root["properties"]["error"]["$ref"], "#/$defs/Error");
