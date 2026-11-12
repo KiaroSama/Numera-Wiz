@@ -2,6 +2,8 @@
 #![cfg(target_os = "linux")]
 #[path = "support/evidence.rs"]
 mod evidence;
+#[path = "support/project_workbench.rs"]
+mod project_workbench;
 #[allow(
     dead_code,
     reason = "This shared fixture also supports deeper output oracles"
@@ -10,6 +12,7 @@ mod evidence;
 mod fixture;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use evidence::RetainLogs;
+use project_workbench::Driver as _;
 use nw_domain::commands::Request;
 use serde_json::{Value, json};
 use std::{
@@ -122,6 +125,7 @@ async fn native_window_imports_real_media_through_the_human_controls() {
         .expect("Native UI journey deadline");
 }
 async fn journey() {
+    let journey_started = Instant::now();
     let executable = PathBuf::from(
         std::env::var_os("NW_DESKTOP_EXE").expect("Matching CI-built desktop executable"),
     );
@@ -160,7 +164,7 @@ async fn journey() {
         .spawn()
         .unwrap();
     let start = Instant::now();
-    let window = loop {
+    let mut window = loop {
         let output = xdo(&["search", "--onlyvisible", "--name", "^Numera Wiz$"]).await;
         let text = String::from_utf8(output.stdout).unwrap();
         if output.status.success()
@@ -857,6 +861,13 @@ async fn journey() {
         "oracle":"Actual folder-header pointer input, keyboard path/Scan/Inspect/Open input; committed audit identity before independent authorized snapshot/source checks; no duplicate registration or media producer",
         "not_qualified":["companion copying","replacement","full F08","other native platforms"]
     })).unwrap()).unwrap();
+    let projects_started = Instant::now();
+    let before_projects_ms = journey_started.elapsed().as_millis().to_string();
+    project_workbench::run(&mut NativeProjects {
+        root: &root, evidence: &evidence, window: &mut window, app: &mut app,
+        executable: &executable, components: &media.bin, identity: json!(identity), watermark: 0,
+    }, "Native C").await;
+    std::fs::write(evidence.join("native-project-phase-timing.json"),serde_json::to_vec_pretty(&json!({"before_projects_ms":before_projects_ms,"projects_ms":projects_started.elapsed().as_millis().to_string(),"combined_ms":journey_started.elapsed().as_millis().to_string(),"unchanged_combined_deadline_seconds":240})).unwrap()).unwrap();
     let record: Value = serde_json::from_slice(
         &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
     )
@@ -874,4 +885,130 @@ async fn journey() {
     );
     let _ = wm.kill().await;
     let _ = wm.wait().await;
+}
+
+
+struct NativeProjects<'a> {
+    root: &'a Path,
+    evidence: &'a Path,
+    window: &'a mut String,
+    app: &'a mut tokio::process::Child,
+    executable: &'a Path,
+    components: &'a Path,
+    identity: Value,
+    watermark: u64,
+}
+impl NativeProjects<'_> {
+    fn owner(&self) -> Value {
+        serde_json::from_slice(&nw_platform::security::read_private(&self.root.join("runtime/owner.json"),16384).unwrap()).unwrap()
+    }
+    fn events(&self) -> Vec<Value> {
+        use std::io::{Read as _, Seek as _};
+        let mut file=std::fs::File::open(self.root.join("logs/owner.jsonl")).unwrap();
+        assert!(file.metadata().unwrap().len() >= self.watermark,"Owner log changed during the input action");
+        file.seek(std::io::SeekFrom::Start(self.watermark)).unwrap();
+        let mut bytes=Vec::new(); file.take(256*1024+1).read_to_end(&mut bytes).unwrap();
+        assert!(bytes.len()<=256*1024,"One project input exceeded the bounded audit suffix");
+        String::from_utf8(bytes).unwrap().lines().filter_map(|line|serde_json::from_str::<Value>(line).ok()).filter(|event| {
+            event["fields"]["request_id"].as_str().is_some_and(|id| id!="local" && !id.starts_with(project_workbench::OBSERVER_PREFIX))
+        }).collect()
+    }
+    async fn timeout_image(&self) {
+        screenshot(self.window,&self.evidence.join("native-project-input-timeout.png")).await;
+    }
+}
+impl project_workbench::Driver for NativeProjects<'_> {
+    fn browser(&self) -> bool { false }
+    fn metadata(&self) -> Value {
+        let owner=self.owner();
+        json!({"source":std::env::var("NW_SOURCE_SHA").or_else(|_|std::env::var("GITHUB_SHA")).ok(),"executable":self.identity,"root_id":owner["root_id"],"registry":owner["registry"],"viewport":[1440,861],"combined_journey_deadline_seconds":240,"input_deadline_seconds":5,"command_deadline_seconds":10,"scenario_commands":project_workbench::project_commands()})
+    }
+    async fn mark(&mut self) { self.watermark=std::fs::metadata(self.root.join("logs/owner.jsonl")).unwrap().len(); }
+    async fn click(&mut self,x:u32,y:u32) { click(self.window,&x.to_string(),&y.to_string()).await; }
+    async fn key(&mut self,key:project_workbench::Key) {
+        let key=match key { project_workbench::Key::Tab=>"Tab",project_workbench::Key::Space=>"space",project_workbench::Key::Escape=>"Escape",project_workbench::Key::CtrlEnter=>"ctrl+Return" };
+        input(&["key","--clearmodifiers",key]).await;
+    }
+    async fn replace(&mut self,text:&str) {
+        input(&["key","--clearmodifiers","ctrl+a"]).await;
+        input(&["type","--clearmodifiers","--delay","2",text]).await;
+    }
+    async fn screenshot(&mut self,name:&str) { screenshot(self.window,&self.evidence.join(format!("native-project-{name}.png"))).await; }
+    async fn observed(&mut self,command:&str) -> project_workbench::Observation {
+        let started=Instant::now();
+        loop {
+            let events=self.events();
+            if let Some(completed)=events.iter().find(|event|event["fields"]["message"]=="command.completed" && event["fields"]["command"]==command) {
+                let fields=&completed["fields"];
+                let request_id=fields["request_id"].as_str().unwrap().to_owned();
+                let audit=events.iter().find(|event| event["fields"]["request_id"]==request_id && matches!(event["fields"]["event"].as_str(),Some("project.created"|"project.edit.accepted")));
+                let code=fields["code"].as_str().unwrap().to_owned();
+                if code=="OK" && matches!(command,"projects.create"|"sequences.create"|"clips.place"|"clips.move"|"clips.split"|"clips.remove"|"history.undo"|"history.redo") { assert!(audit.is_some(),"UI mutation has no correlated committed project audit event"); }
+                if code!="OK" { assert!(audit.is_none(),"Rejected UI request must not have an accepted edit"); }
+                return project_workbench::Observation {
+                    request_id,
+                    project:audit.and_then(|event|event["fields"]["project_id"].as_str()).map(str::to_owned),
+                    revision:audit.and_then(|event|event["fields"]["revision"].as_str()).map(str::to_owned),
+                    expected_revision:audit.and_then(|event|event["fields"]["base_revision"].as_str()).map(str::to_owned),
+                    code,
+                    receipt:fields["receipt_id"].as_str().filter(|id|!id.is_empty()).map(str::to_owned),
+                };
+            }
+            if started.elapsed()>=Duration::from_secs(10) { self.timeout_image().await; panic!("Native project input did not complete {command}"); }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+    async fn loaded(&mut self,reads:usize) {
+        let started=Instant::now();
+        loop {
+            let completed:std::collections::BTreeSet<_>=self.events().into_iter().filter(|event|event["fields"]["message"]=="command.completed" && matches!(event["fields"]["command"].as_str(),Some("projects.inspect"|"sequences.inspect"))).map(|event|event["fields"]["request_id"].as_str().unwrap().to_owned()).collect();
+            if completed.len()>=reads { assert_eq!(completed.len(),reads,"Unexpected extra UI projection request"); return; }
+            if started.elapsed()>=Duration::from_secs(10) { self.timeout_image().await; panic!("Native project load completed {} of {reads} canonical reads",completed.len()); }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+    async fn no_cleanup_submission(&mut self) {
+        assert!(!self.events().iter().any(|event| event["fields"]["message"]=="command.completed" && matches!(event["fields"]["command"].as_str(),Some("jobs.submit"|"batches.submit"))),"Projects input dispatched a hidden Cleanup submission");
+    }
+    async fn request(&mut self,request:Request,_external:bool) -> nw_domain::commands::Response {
+        let owner=self.owner();
+        let response=reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(10)).build().unwrap()
+            .post(format!("http://127.0.0.1:{}/api/v1/commands",owner["port"].as_u64().unwrap()))
+            .bearer_auth(owner["bearer"].as_str().unwrap()).json(&request).send().await.unwrap();
+        assert!(response.status().is_success());
+        let response:nw_domain::commands::Response=response.json().await.unwrap();
+        assert_eq!(response.request_id,request.request_id); response
+    }
+    async fn policy(&mut self,_phase:project_workbench::Policy,_project:Option<&str>) -> Value {
+        panic!("Native owner journey must not use browser policy fixtures")
+    }
+    async fn reopen(&mut self) -> Value {
+        let before=self.owner();
+        input(&["windowactivate","--sync",self.window]).await;
+        input(&["key","--clearmodifiers","alt+F4"]).await;
+        assert!(tokio::time::timeout(Duration::from_secs(10),self.app.wait()).await.expect("Project frontend close deadline").unwrap().success());
+        self.watermark=std::fs::metadata(self.root.join("logs/owner.jsonl")).unwrap().len();
+        *self.app=tokio::process::Command::new(self.executable).arg("--data-dir").arg(self.root).arg("--components-dir").arg(self.components)
+            .env("LIBGL_ALWAYS_SOFTWARE","1").env("WINIT_X11_SCALE_FACTOR","1").stdin(Stdio::null()).stdout(Stdio::null())
+            .stderr(std::fs::File::create(self.evidence.join("native-project-reopen-stderr.log")).unwrap()).kill_on_drop(true).spawn().unwrap();
+        let started=Instant::now();
+        loop {
+            let output=xdo(&["search","--onlyvisible","--name","^Numera Wiz$"]).await;
+            if output.status.success() && let Some(window)=String::from_utf8(output.stdout).unwrap().lines().find(|line|!line.is_empty() && line.bytes().all(|c|c.is_ascii_digit())) {
+                *self.window=window.into(); break;
+            }
+            assert!(self.app.try_wait().unwrap().is_none(),"Reopened frontend exited before its window");
+            assert!(started.elapsed()<Duration::from_secs(10),"Reopened native window deadline");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        input(&["windowsize",self.window,"1440","861"]).await;
+        input(&["windowactivate","--sync",self.window]).await;
+        self.observed("jobs.list").await;
+        let after=self.owner();
+        assert_eq!(after["root_id"],before["root_id"]); assert_eq!(after["canonical_root"],before["canonical_root"]); assert_eq!(after["build"],self.identity["sha256"]);
+        json!({"reopen":"actual native frontend process","root_id":after["root_id"],"build":after["build"],"elapsed_ms":started.elapsed().as_millis().to_string(),"owner_restart_claimed":false})
+    }
+    fn write(&self,name:&str,value:&Value) {
+        std::fs::write(self.evidence.join(format!("native-project-{name}.json")),serde_json::to_vec_pretty(value).unwrap()).unwrap();
+    }
 }

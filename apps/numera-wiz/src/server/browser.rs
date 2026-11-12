@@ -292,15 +292,34 @@ pub(super) async fn launch(url: &str) -> anyhow::Result<()> {
 mod media_fixture;
 
 #[cfg(all(test, feature = "embedded-web"))]
+#[path = "browser_project_journey.rs"]
+mod project_journey;
+
+#[cfg(all(test, feature = "embedded-web"))]
 mod tests {
     use super::*;
-    struct ObservedReport {
-        command_id: String,
-        request_id: String,
-        status: u16,
-        response: Value,
+    pub(super) struct ObservedReport {
+        pub(super) command_id: String,
+        pub(super) request_id: String,
+        pub(super) status: u16,
+        pub(super) response: Value,
+        pub(super) project_id: Option<String>,
+        pub(super) expected_revision: Option<String>,
     }
-    type ObservedReports = Arc<Mutex<std::collections::VecDeque<ObservedReport>>>;
+    #[derive(Default)]
+    pub(super) struct ObservedState {
+        responses: std::collections::VecDeque<ObservedReport>,
+        pub(super) projects: bool,
+        pub(super) project_reads: u64,
+    }
+    impl std::ops::Deref for ObservedState {
+        type Target = std::collections::VecDeque<ObservedReport>;
+        fn deref(&self) -> &Self::Target { &self.responses }
+    }
+    impl std::ops::DerefMut for ObservedState {
+        fn deref_mut(&mut self) -> &mut Self::Target { &mut self.responses }
+    }
+    pub(super) type ObservedReports = Arc<Mutex<ObservedState>>;
     async fn observe_reports(
         State(reports): State<ObservedReports>,
         request: Request,
@@ -315,6 +334,7 @@ mod tests {
         let bytes = axum::body::to_bytes(body, nw_domain::commands::MAX_COMMAND_BYTES)
             .await
             .expect("Observed command request exceeds the production bound");
+        let projects_enabled = reports.lock().await.projects;
         let report_id = nw_domain::commands::decode_json(&bytes)
             .ok()
             .and_then(|value| {
@@ -326,17 +346,21 @@ mod tests {
                     "assets.inspect",
                 ]
                 .contains(&command)
+                    || (projects_enabled && (project_journey::project_command(command)
+                        || matches!(command, "assets.list" | "jobs.list" | "streams.clean.plan" | "jobs.submit" | "batches.submit")))
                 {
                     value["request_id"]
                         .as_str()
-                        .map(|id| (command.to_owned(), id.to_owned()))
+                        .map(|id| (command.to_owned(), id.to_owned(),
+                            value["project"]["id"].as_str().map(str::to_owned),
+                            value["project"]["expected_revision"].as_str().map(str::to_owned)))
                 } else {
                     None
                 }
             });
         let request = Request::from_parts(parts, axum::body::Body::from(bytes));
         let response = next.run(request).await;
-        let Some((command_id, request_id)) = report_id else {
+        let Some((command_id, request_id, project_id, expected_revision)) = report_id else {
             return response;
         };
         // This test-only wire observer records the actual canonical response,
@@ -350,22 +374,36 @@ mod tests {
         let result = nw_domain::commands::decode_json(&bytes).expect("Observed report JSON");
         {
             let mut reports = reports.lock().await;
-            if reports.len() == 8 {
-                reports.pop_front();
+            let project_read = projects_enabled && matches!(command_id.as_str(), "projects.inspect" | "sequences.inspect");
+            if project_read {
+                reports.project_reads = reports.project_reads.checked_add(1).expect("Project observer ordinal exhausted");
             }
-            reports.push_back(ObservedReport {
-                command_id,
-                request_id,
-                status,
-                response: result,
-            });
+            let retain = !project_read || result["ok"] != true
+                || result["result"]["projection"] == "summary"
+                || result["result"]["entity"]["kind"] == "source_binding"
+                || (matches!(result["result"]["projection"].as_str(), Some("bin_page" | "viewport"))
+                    && result["result"]["items"].as_array().is_some_and(Vec::is_empty));
+            if retain {
+                if reports.len() == 8 {
+                    assert!(!projects_enabled, "Project observer responses were not drained within the original eight slots");
+                    reports.pop_front();
+                }
+                reports.push_back(ObservedReport {
+                    command_id,
+                    request_id,
+                    status,
+                    response: result,
+                    project_id,
+                    expected_revision,
+                });
+            }
         }
         Response::from_parts(parts, axum::body::Body::from(bytes))
     }
-    struct Fixture {
-        observed_reports: ObservedReports,
-        owner: Arc<Owner>,
-        endpoint: String,
+    pub(super) struct Fixture {
+        pub(super) observed_reports: ObservedReports,
+        pub(super) owner: Arc<Owner>,
+        pub(super) endpoint: String,
         _root: tempfile::TempDir,
         task: tokio::task::JoinHandle<()>,
     }
@@ -410,7 +448,7 @@ mod tests {
             slots: Arc::new(Semaphore::new(32)),
             pairing: Mutex::new(HashMap::new()),
         });
-        let observed_reports = Arc::new(Mutex::new(std::collections::VecDeque::new()));
+        let observed_reports = Arc::new(Mutex::new(ObservedState::default()));
         let routes = super::super::router(owner.clone(), port, false, owner.stop.clone()).layer(
             axum::middleware::from_fn_with_state(observed_reports.clone(), observe_reports),
         );
@@ -652,7 +690,7 @@ mod tests {
         // This isolated display contains only the test browser and OS dialog.
         println!("NW_BROWSER_VISIBLE_TITLES:{}", json!(titles));
     }
-    async fn driver(
+    pub(super) async fn driver(
         client: &reqwest::Client,
         base: &str,
         method: reqwest::Method,
@@ -675,13 +713,13 @@ mod tests {
         );
         result["value"].clone()
     }
-    async fn browser_click(client: &reqwest::Client, base: &str, route: &str, x: u32, y: u32) {
+    pub(super) async fn browser_click(client: &reqwest::Client, base: &str, route: &str, x: u32, y: u32) {
         driver(client,base,reqwest::Method::POST,&format!("{route}/actions"),
             json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[
                 {"type":"pointerMove","duration":150,"origin":"viewport","x":x,"y":y},
                 {"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
     }
-    async fn browser_key(client: &reqwest::Client, base: &str, route: &str, key: &str) {
+    pub(super) async fn browser_key(client: &reqwest::Client, base: &str, route: &str, key: &str) {
         driver(
             client,
             base,
@@ -2007,6 +2045,7 @@ mod tests {
                 "oracle":"Actual folder-header pointer input and keyboard path/Scan/Inspect/Open, observed canonical HTTP replies forwarded unchanged; independent native identities and retained digest; owner explicitly granted one host root",
                 "not_qualified":["companion copying","replacement","full F08","other browser families"]
             })).unwrap()).unwrap();
+            project_journey::run(&fixture, &client, &base, &route, &directory).await;
         }
         std::fs::write(directory.join("boot.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":crate::web_assets::UI_SOURCE,"registry":registry_fingerprint(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"capabilities":session["capabilities"],"observed":"Same-source WASM startup, one-use pairing, fragment removal, actual UI file intake, frozen plan review and byte-verified published output under real CSP/MIME","not_qualified":["media playback","other browser families","native desktop interaction","full B7-J01"]})).unwrap()).unwrap();
         driver(
