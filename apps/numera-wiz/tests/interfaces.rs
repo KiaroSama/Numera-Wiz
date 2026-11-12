@@ -101,19 +101,41 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
     use std::collections::BTreeSet;
     assert!(page.next_cursor.is_none(), "MCP_UNEXPECTED_TOOL_PAGINATION");
     let encoded = serde_json::to_vec(page).unwrap();
-    assert!(encoded.len() <= nw_domain::commands::MAX_RESULT_BYTES, "MCP_COMPLETE_TOOL_PAGE_BYTE_BOUND");
+    assert!(
+        encoded.len() <= nw_domain::commands::MAX_RESULT_BYTES,
+        "MCP_COMPLETE_TOOL_PAGE_BYTE_BOUND"
+    );
     let actual: BTreeSet<_> = page.tools.iter().map(|tool| tool.name.as_ref()).collect();
     let expected: BTreeSet<_> = nw_service::ACTIVE_COMMANDS.iter().copied().collect();
-    assert!(page.tools.len() == actual.len() && actual == expected, "MCP_COMPLETE_ACTIVE_ID_SET");
-    let family = ["projects.create","projects.list","projects.inspect","sequences.create","sequences.inspect",
-        "clips.place","clips.move","clips.link","clips.unlink","clips.split","clips.remove","history.undo","history.redo"];
+    assert!(
+        page.tools.len() == actual.len() && actual == expected,
+        "MCP_COMPLETE_ACTIVE_ID_SET"
+    );
+    let family = [
+        "projects.create",
+        "projects.list",
+        "projects.inspect",
+        "sequences.create",
+        "sequences.inspect",
+        "clips.place",
+        "clips.move",
+        "clips.link",
+        "clips.unlink",
+        "clips.split",
+        "clips.remove",
+        "history.undo",
+        "history.redo",
+    ];
     for id in family {
         let tool = page.tools.iter().find(|tool| tool.name == id).unwrap();
-        let schema = tool.output_schema.as_ref().expect("MCP_CANONICAL_OUTPUT_SCHEMA_MISSING");
+        let schema = tool
+            .output_schema
+            .as_ref()
+            .expect("MCP_CANONICAL_OUTPUT_SCHEMA_MISSING");
         let root = Value::Object(schema.as_ref().clone());
         assert_eq!(root["type"], "object");
         assert_eq!(root["additionalProperties"], false);
-        assert_eq!(root["required"], serde_json::json!(["request_id","ok"]));
+        assert_eq!(root["required"], serde_json::json!(["request_id", "ok"]));
         assert_eq!(root["properties"]["result"]["$ref"], "#/$defs/Result");
         assert_eq!(root["properties"]["error"]["$ref"], "#/$defs/Error");
         assert_eq!(root["oneOf"].as_array().unwrap().len(), 2);
@@ -122,25 +144,39 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         while let Some(node) = pending.pop() {
             match node {
                 Value::Object(object) => {
-                    for key in ["$ref","$dynamicRef"] {
+                    for key in ["$ref", "$dynamicRef"] {
                         if let Some(reference) = object.get(key) {
-                            let pointer = reference.as_str().unwrap().strip_prefix('#').expect("MCP_NONLOCAL_OUTPUT_REF");
-                            assert!(pointer.is_empty() || root.pointer(pointer).is_some(), "MCP_DANGLING_OUTPUT_REF");
+                            let pointer = reference
+                                .as_str()
+                                .unwrap()
+                                .strip_prefix('#')
+                                .expect("MCP_NONLOCAL_OUTPUT_REF");
+                            assert!(
+                                pointer.is_empty() || root.pointer(pointer).is_some(),
+                                "MCP_DANGLING_OUTPUT_REF"
+                            );
                         }
                     }
                     pending.extend(object.values());
                 }
                 Value::Array(array) => pending.extend(array),
-                _ => {},
+                _ => {}
             }
         }
         let serialized = serde_json::to_value(tool).unwrap();
         let requirement = &serialized["_meta"]["numera-wiz/authorization_requirements"];
         assert_eq!(requirement["schema_version"], 1);
         assert_eq!(requirement["command_id"], id);
-        assert!(requirement.get("policy_revision").is_none() && serialized["_meta"].get("authorization").is_none());
+        assert!(
+            requirement.get("policy_revision").is_none()
+                && serialized["_meta"].get("authorization").is_none()
+        );
     }
-    eprintln!("MCP_SCHEMA_SIZE kind=standard_list_tools_result bytes={} project_outputs={}", encoded.len(), family.len());
+    eprintln!(
+        "MCP_SCHEMA_SIZE kind=standard_list_tools_result bytes={} project_outputs={}",
+        encoded.len(),
+        family.len()
+    );
 }
 
 async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::ListToolsResult) {
@@ -183,10 +219,15 @@ async fn project_mcp_wire_line<T: tokio::io::AsyncBufRead + Unpin>(reader: &mut 
         assert!(!available.is_empty(), "MCP_WIRE_UNEXPECTED_EOF");
         let newline = available.iter().position(|byte| *byte == b'\n');
         let take = newline.map_or(available.len(), |index| index + 1);
-        assert!(frame.len() + take <= nw_domain::commands::MAX_RESULT_BYTES, "MCP_ACTUAL_JSONRPC_BYTE_BOUND");
+        assert!(
+            frame.len() + take <= nw_domain::commands::MAX_RESULT_BYTES,
+            "MCP_ACTUAL_JSONRPC_BYTE_BOUND"
+        );
         frame.extend_from_slice(&available[..take]);
         reader.consume(take);
-        if newline.is_some() { return frame; }
+        if newline.is_some() {
+            return frame;
+        }
     }
 }
 

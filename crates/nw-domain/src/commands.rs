@@ -300,7 +300,8 @@ pub fn registry() -> Vec<Descriptor> {
                 qualification: "development_only; five-surface/package qualification pending"
                     .into(),
                 params_schema: crate::projects::contracts::input_schema(
-                    $id, serde_json::to_value(schema_for!($params)).expect("schema"),
+                    $id,
+                    serde_json::to_value(schema_for!($params)).expect("schema"),
                 ),
                 result_schema: result_schema($id),
                 authorization_requirements: crate::projects::authorization::requirements($id),

@@ -625,7 +625,11 @@ pub(super) fn input_contract_parser_controls() {
             continue;
         }
         let request = Request::query(command, params);
-        assert_eq!(Query::parse(&request).is_ok(), valid, "R1_QUERY_PARSER_SCHEMA_DRIFT case={observed}");
+        assert_eq!(
+            Query::parse(&request).is_ok(),
+            valid,
+            "R1_QUERY_PARSER_SCHEMA_DRIFT case={observed}"
+        );
         observed += 1;
     }
     assert_eq!(observed, 34, "R1_QUERY_PARSER_CASE_SET_CHANGED");

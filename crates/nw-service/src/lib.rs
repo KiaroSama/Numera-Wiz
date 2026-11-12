@@ -73,10 +73,10 @@ impl CommandService {
     }
 }
 #[cfg(test)]
+mod input_conformance;
+#[cfg(test)]
 #[path = "../../../ci/schema_validation.rs"]
 mod schema_validation;
-#[cfg(test)]
-mod input_conformance;
 #[cfg(test)]
 fn project_schema_batch(suite: u16, expected: &[u16]) -> schema_validation::Batch {
     let schemas = schema_validation::COMMANDS

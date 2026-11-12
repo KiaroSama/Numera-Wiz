@@ -1597,7 +1597,9 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
     assert_eq!(name.len(), 128);
     // Public profile grants must refer to real existing projects.
     let mut ids = Vec::new();
-    for _ in 0..64 { ids.push(f.project(&owner, &name).await); }
+    for _ in 0..64 {
+        ids.push(f.project(&owner, &name).await);
+    }
     let single = f.profile("r2-size-single", &ids[..1]).await;
     let all = f.profile("r2-size-all", &ids).await;
     // Only maximal revision/unknown-header widths use storage-boundary fixtures.
@@ -1608,7 +1610,13 @@ async fn metadata_size_bounds(conformance: &mut crate::schema_validation::Batch)
         f.service.store.put(&key, &maximal).unwrap();
     }
     for id in &ids {
-        f.service.store.put(&format!("project/{id}"), &header(id, &owner.principal, &name)).unwrap();
+        f.service
+            .store
+            .put(
+                &format!("project/{id}"),
+                &header(id, &owner.principal, &name),
+            )
+            .unwrap();
     }
     for (stage, count, reader) in [(0u16, 1usize, &single), (1, 64, &all)] {
         let mut replacement = Value::Null;

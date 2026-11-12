@@ -22,10 +22,20 @@ mod owner;
 use owner::Cli;
 
 fn legacy_catalog_fields(row: &Value) -> Value {
-    let decoded: nw_domain::projects::views::ProjectSummary = serde_json::from_value(row.clone()).unwrap();
-    assert!(decoded.known_authorization().is_some(), "R2_TRANSPORT_AUTHORIZATION_UNKNOWN");
+    let decoded: nw_domain::projects::views::ProjectSummary =
+        serde_json::from_value(row.clone()).unwrap();
+    assert!(
+        decoded.known_authorization().is_some(),
+        "R2_TRANSPORT_AUTHORIZATION_UNKNOWN"
+    );
     let mut legacy = row.clone();
-    assert!(legacy.as_object_mut().unwrap().remove("authorization").is_some());
+    assert!(
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("authorization")
+            .is_some()
+    );
     legacy
 }
 

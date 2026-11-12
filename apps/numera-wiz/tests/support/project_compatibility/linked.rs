@@ -223,8 +223,19 @@ impl LinkedProject {
         linked.clips_match(&placed, false, None)?;
         for id in &linked.clips {
             let mut missing = placed.clone();
-            ensure!(missing.get_mut(id).and_then(Value::as_object_mut).context("Linked missing-field control")?.remove("link_group_id").is_some(), "Linked null field is absent before the control");
-            ensure!(linked.clips_match(&missing, false, None).is_err(), "Linked compatibility accepts an omitted nullable group field");
+            ensure!(
+                missing
+                    .get_mut(id)
+                    .and_then(Value::as_object_mut)
+                    .context("Linked missing-field control")?
+                    .remove("link_group_id")
+                    .is_some(),
+                "Linked null field is absent before the control"
+            );
+            ensure!(
+                linked.clips_match(&missing, false, None).is_err(),
+                "Linked compatibility accepts an omitted nullable group field"
+            );
         }
         let result = project_write(
             owner,
@@ -423,7 +434,8 @@ impl LinkedProject {
             .await?;
         let viewport = self.projection(owner, "sequences.inspect", json!({"sequence_id":self.sequence,"projection":"viewport","track_ids":self.tracks,"range":{"start":{"num":"0","den":"1"},"end":{"num":"3","den":"1"}},"limit":128}), replacement, 7, evidence).await?;
         ensure!(
-            tracks.get("next_cursor") == Some(&Value::Null) && viewport.get("next_cursor") == Some(&Value::Null),
+            tracks.get("next_cursor") == Some(&Value::Null)
+                && viewport.get("next_cursor") == Some(&Value::Null),
             "Linked finite projections require more pages"
         );
         let track_items = tracks["items"].as_array().context("Linked track page")?;
