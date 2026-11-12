@@ -549,7 +549,11 @@ async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>)
     });
     Json(json!({"endpoint":format!("http://127.0.0.1:{}",input.port)})).into_response()
 }
-pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()> {
+pub async fn run_owner(
+    root: PathBuf,
+    components: Option<PathBuf>,
+    logging_binding: nw_platform::logging::OwnerLoggingBinding,
+) -> Result<()> {
     let binaries = components.map(|path| {
         (
             path.join(if cfg!(windows) {
@@ -565,6 +569,13 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
         )
     });
     let service = Service::open(root.clone(), binaries).await?;
+    if !logging_binding.bind_keepalive(service.clone()) {
+        return Err(nw_domain::DomainError::new(
+            "LOG_STORAGE_ERROR",
+            "Protected owner log handoff could not be confirmed",
+        )
+        .into());
+    }
     nw_platform::logging::bind_owner(service.store.root_id(), &service.epoch)?;
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
     let port = listener.local_addr()?.port();
@@ -620,7 +631,8 @@ pub async fn run_owner(root: PathBuf, components: Option<PathBuf>) -> Result<()>
     )
     .with_graceful_shutdown(owner.stop.clone().cancelled_owned())
     .await?;
-    // The writer lock remains held until every route/worker reference has drained.
+    // The logging worker retains Service ownership until its Rotation is closed,
+    // even after these drained route/worker references and this local Arc drop.
     tracing::info!("Owner idle grace completed");
     Ok(())
 }

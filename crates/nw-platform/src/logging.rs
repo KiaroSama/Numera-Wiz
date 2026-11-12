@@ -1,7 +1,10 @@
 //! Primary severity names and UTC timestamps shared by native entry points.
 mod persisted;
 pub(crate) use persisted::JsonWriter;
-pub use persisted::{activate, bind_owner, flush, status};
+pub use persisted::{
+    OwnerLoggingBinding, OwnerLoggingClose, OwnerLoggingScope, activate, bind_owner, flush,
+    owner_scope, status,
+};
 use std::{collections::BTreeMap, fmt};
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::{

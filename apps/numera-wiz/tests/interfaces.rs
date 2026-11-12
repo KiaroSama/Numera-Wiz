@@ -135,6 +135,9 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
         let runtime_path = data.path().join("runtime/owner.json");
         let original: Value = serde_json::from_slice(&nw_platform::security::read_private(&runtime_path,16384).unwrap()).unwrap();
         wait_for_idle_owner_unlock(data.path()).await;
+        let log_lease = nw_platform::files::RootLock::acquire(&data.path().join("logs"))
+            .expect("Drained owner must release its log lease before its generation fence");
+        drop(log_lease);
         let next = scope!(client);
         let restarted: Value = serde_json::from_slice(&nw_platform::security::read_private(&runtime_path,16384).unwrap()).unwrap();
         assert_eq!(first["principal"], next["principal"]);

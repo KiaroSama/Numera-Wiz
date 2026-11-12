@@ -173,7 +173,21 @@ async fn run() -> Result<()> {
             return Err(error);
         }
         tracing::info!("Protected structured owner logging activated");
-        let result = server::run_owner(root, args.components_dir).await;
+        let result = async {
+            let (logging_scope, binding) = nw_platform::logging::owner_scope()?;
+            let result = server::run_owner(root, args.components_dir, binding).await;
+            let closed = logging_scope.finish();
+            match result {
+                Err(error) => Err(error),
+                Ok(()) if closed.is_clean() => Ok(()),
+                Ok(()) => Err(nw_domain::DomainError::new(
+                    "LOG_STORAGE_ERROR",
+                    "Protected owner log handoff could not be confirmed",
+                )
+                .into()),
+            }
+        }
+        .await;
         if let Err(error) = &result {
             client::emit_owner_startup_failure(client::OwnerStartupStage::PostLogActivation, error);
         }
