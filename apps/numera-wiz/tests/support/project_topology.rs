@@ -3,6 +3,7 @@
 use super::owner::Cli;
 #[path = "../../../../ci/schema_validation.rs"]
 mod schema_validation;
+mod output_contracts;
 use nw_domain::commands::{MAX_RESULT_BYTES, ProjectRef, Request};
 use rmcp::{
     ClientLifecycleMode, ClientServiceExt, RoleClient, ServiceExt,
@@ -922,6 +923,7 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
         &mut receipts,
         journey(cli_adapter, "cli", &mut cli_batch, 0, &mut extra_receipts).await,
     );
+    let cli_responses = output_contracts::capture(&cli_batch);
     cli_batch.finish().await;
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "topology"]);
@@ -944,6 +946,7 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
         )
         .await,
     );
+    let stdio_responses = output_contracts::capture(&stdio_batch);
     stdio_batch.finish().await;
     stdio.cancel().await.unwrap();
     let port_string = port.to_string();
@@ -1021,7 +1024,9 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
         );
         http.cancel().await.unwrap();
     }
-    http_batch.expect("SCHEMA_HTTP_BATCH").finish().await;
+    let http_batch = http_batch.expect("SCHEMA_HTTP_BATCH");
+    let http_responses = output_contracts::capture(&http_batch);
+    http_batch.finish().await;
     assert_eq!(receipts.len(), 36);
     assert!(
         !receipts.contains(&profile_receipt),
@@ -1034,5 +1039,6 @@ pub async fn run(cli: &Cli, owner_scope: &str, port: u16, token_file: &Path) -> 
     );
     // 36 original plus eight additive project writes; profile setup is separate.
     assert_eq!(receipts.len() + extra_receipts.len(), 44);
+    output_contracts::run(cli, port, &token, cli_responses, stdio_responses, http_responses).await;
     token
 }

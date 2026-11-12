@@ -61,6 +61,9 @@ impl Batch {
     pub fn whole(&mut self, id: u16, schema_id: usize, instance_json: String, valid: bool) {
         self.case(id, schema_id, instance_json, "whole", valid);
     }
+    pub fn observations(&self) -> impl Iterator<Item = &Value> {
+        self.cases.iter()
+    }
     pub fn observe(&mut self, id: u16, command: &str, response: &impl serde::Serialize) {
         let bytes = serde_json::to_vec(response).expect("SCHEMA_RESPONSE_SERIALIZE");
         assert!(bytes.len() <= 262_144, "SCHEMA_WHOLE_RESPONSE_BOUND");
@@ -227,8 +230,7 @@ impl Batch {
         let control_ids = numeric_ids(&self.controls);
         let expected_passed = self.schemas.len() + self.cases.len() + self.controls.len();
         let case_schemas: BTreeMap<u16, u16> = self
-            .cases
-            .iter()
+            .observations()
             .map(|case| {
                 (
                     case["id"].as_u64().expect("SCHEMA_CASE_ID") as u16,

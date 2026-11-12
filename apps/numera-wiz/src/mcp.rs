@@ -2,6 +2,7 @@ use nw_domain::commands::{self, Request};
 use nw_service::{ACTIVE_COMMANDS, Context, Service};
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use std::{borrow::Cow, sync::Arc};
+mod schema;
 #[derive(Clone)]
 pub struct Bridge {
     backend: Backend,
@@ -82,11 +83,21 @@ fn tool(name: &str) -> Option<Tool> {
     if let Some(definitions) = definitions {
         schema.as_object_mut()?.insert("$defs".into(), definitions);
     }
-    Some(Tool::new(
+    let mut tool = Tool::new(
         descriptor.id,
         descriptor.label,
         Arc::new(schema.as_object()?.clone()),
-    ))
+    );
+    if let Some(result) = descriptor.result_schema {
+        let output = schema::response(result)?;
+        tool = tool.with_raw_output_schema(Arc::new(output.as_object()?.clone()));
+    }
+    if let Some(requirements) = descriptor.authorization_requirements {
+        tool = tool.with_meta(serde_json::from_value(serde_json::json!({
+            "numera-wiz/authorization_requirements":requirements,
+        })).ok()?);
+    }
+    Some(tool)
 }
 impl ServerHandler for Bridge {
     fn get_info(&self) -> ServerConfig {
@@ -101,11 +112,23 @@ impl ServerHandler for Bridge {
     async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParams>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        Ok(ListToolsResult::with_all_items(
-            ACTIVE_COMMANDS.iter().filter_map(|id| tool(id)).collect(),
-        ))
+        let tools = ACTIVE_COMMANDS.iter().map(|id| tool(id).ok_or_else(|| {
+            ErrorData::internal_error("The complete tool registry could not be constructed", None)
+        })).collect::<Result<Vec<_>, _>>()?;
+        let result = ListToolsResult::with_all_items(tools);
+        let result_bytes = serde_json::to_vec(&result)
+            .map_err(|_| ErrorData::internal_error("Tool registry serialization failed", None))?.len();
+        let envelope = serde_json::json!({"jsonrpc":"2.0","id":&context.id,"result":&result});
+        let envelope_bytes = serde_json::to_vec(&envelope)
+            .map_err(|_| ErrorData::internal_error("Tool response serialization failed", None))?.len();
+        // Reserve the actual stdio newline in addition to the complete JSON-RPC envelope.
+        if result_bytes > commands::MAX_RESULT_BYTES || envelope_bytes >= commands::MAX_RESULT_BYTES {
+            return Err(ErrorData::internal_error("Tool discovery exceeds the complete response byte budget", None));
+        }
+        tracing::debug!(result_bytes,envelope_bytes,"Complete MCP tool discovery byte budget verified");
+        Ok(result)
     }
     fn get_tool(&self, name: &str) -> Option<Tool> {
         tool(name)
