@@ -620,7 +620,11 @@ enum AdmissionCase {
 }
 impl AdmissionCase {
     fn enter(&self) {
-        let _ = writeln!(std::io::stderr(), "{} [INFO] SECURITY_MOCK_ADMISSION_CASE case={self:?}", protocol::unix_millis().unwrap_or(0));
+        let _ = writeln!(
+            std::io::stderr(),
+            "{} [INFO] SECURITY_MOCK_ADMISSION_CASE case={self:?}",
+            protocol::unix_millis().unwrap_or(0)
+        );
     }
 }
 fn admission(fixture: &Fixture) -> Result<()> {
@@ -628,7 +632,10 @@ fn admission(fixture: &Fixture) -> Result<()> {
         (AdmissionCase::Shallow, "shallow"),
         (AdmissionCase::Grafts, "info/grafts"),
         (AdmissionCase::Alternates, "objects/info/alternates"),
-        (AdmissionCase::HttpAlternates, "objects/info/http-alternates"),
+        (
+            AdmissionCase::HttpAlternates,
+            "objects/info/http-alternates",
+        ),
         (AdmissionCase::CommonDirectory, "commondir"),
         (AdmissionCase::LooseReplacement, "refs/replace"),
     ]
