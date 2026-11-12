@@ -988,7 +988,13 @@ pub(in crate::runtime) async fn public_link_producer() {
             .unwrap_or_else(|| panic!("{listed:?}"));
         assert_eq!(descriptor["version"], 1, "{listed:?}");
         assert_eq!(descriptor["descriptor_schema_version"], 2, "{listed:?}");
-        assert!(descriptor.get("result_schema").is_none(), "{listed:?}");
+        assert!(
+            descriptor
+                .get("result_schema")
+                .and_then(serde_json::Value::as_object)
+                .is_some_and(|schema| !schema.is_empty()),
+            "{listed:?}"
+        );
         assert_eq!(descriptor["state_class"], "durable_mutation", "{listed:?}");
         assert_eq!(
             descriptor["project_context"], "required_write",
