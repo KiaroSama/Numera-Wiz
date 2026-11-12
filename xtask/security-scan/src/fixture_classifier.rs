@@ -75,7 +75,10 @@ fn pure(deadline: Deadline) -> Result<()> {
         "SECURITY_MOCK_CACHE_BOUND_FAILED",
     )?;
     require(
-        failed_at(&mock_plan(&bytes, deadline.cap_window(Duration::ZERO)?), "SECURITY_DEADLINE"),
+        failed_at(
+            &mock_plan(&bytes, deadline.cap_window(Duration::ZERO)?),
+            "SECURITY_DEADLINE",
+        ),
         "SECURITY_MOCK_CLASSIFIER_DEADLINE_FAILED",
     )?;
     require(
@@ -104,7 +107,8 @@ fn pure(deadline: Deadline) -> Result<()> {
             && Counts::checked(5, 5, 1).is_err(),
         "SECURITY_MOCK_CLASSIFIER_COUNTS_FAILED",
     )?;
-    let text = report::classified_summary(&parsed, false, &Counts::checked(201, 200, 1)?, deadline)?;
+    let text =
+        report::classified_summary(&parsed, false, &Counts::checked(201, 200, 1)?, deadline)?;
     require(
         text.contains("Total: **201**")
             && text.contains("Reviewed public data: **200**")
@@ -134,7 +138,15 @@ fn cli(fixture: &Fixture, repository: &Path, reviewed_only: bool) -> Result<()> 
     } else {
         "cli-unreviewed.md"
     });
-    let (cli_root, export) = bootstrap_cases::copy_export(fixture, &executable, if reviewed_only { "reviewed" } else { "unreviewed" })?;
+    let (cli_root, export) = bootstrap_cases::copy_export(
+        fixture,
+        &executable,
+        if reviewed_only {
+            "reviewed"
+        } else {
+            "unreviewed"
+        },
+    )?;
     let mut command = Command::new(&executable);
     private::controlled(&mut command, &fixture.root);
     command
@@ -212,7 +224,10 @@ fn evaluator(
         fixture.deadline,
     )?;
     let mut session = Session::admit(&context, fixture.deadline)?;
-    session.bind_report(&private::hash_bounded(b"explicitly fabricated evaluator input", fixture.deadline)?)?;
+    session.bind_report(&private::hash_bounded(
+        b"explicitly fabricated evaluator input",
+        fixture.deadline,
+    )?)?;
     action(&mut session)?;
     session.verify()
 }
@@ -229,14 +244,16 @@ fn variants(fixture: &Fixture) -> Result<()> {
         .ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?;
     bytes[position] = b'.';
     require(
-        bytes.len() as u64 == DOCUMENTS[0].length && private::hash_bounded(&bytes, fixture.deadline)? != original,
+        bytes.len() as u64 == DOCUMENTS[0].length
+            && private::hash_bounded(&bytes, fixture.deadline)? != original,
         "SECURITY_ACTUAL_CHANGED_SETUP_FAILED",
     )?;
     fs::write(&path, &bytes).private("SECURITY_FIXTURE_IO")?;
     private::write_bounded(
         &changed.join("runtime.txt"),
         format!("token={}\n", synthetic_secret()?).as_bytes(),
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     fixture.git(&changed, &["add", "."])?;
     fixture.git(
         &changed,
@@ -268,7 +285,11 @@ fn variants(fixture: &Fixture) -> Result<()> {
         .private("SECURITY_FIXTURE_IO")?;
     let path = moved.join(DOCUMENTS[1].path);
     let mut shifted = vec![b'\n'];
-    shifted.extend(private::read_bounded(&path, private::MIB, fixture.deadline)?);
+    shifted.extend(private::read_bounded(
+        &path,
+        private::MIB,
+        fixture.deadline,
+    )?);
     fs::write(path, shifted).private("SECURITY_FIXTURE_IO")?;
     fixture.git(&moved, &["add", "-A"])?;
     fixture.git(
@@ -288,9 +309,11 @@ fn variants(fixture: &Fixture) -> Result<()> {
     fixture.git(&repeated, &["checkout", "--quiet", "-b", "right", &base])?;
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for document in DOCUMENTS {
-        let bytes = private::read_bounded(&source.join(document.path), private::MIB, fixture.deadline)?;
+        let bytes =
+            private::read_bounded(&source.join(document.path), private::MIB, fixture.deadline)?;
         require(
-            bytes.len() as u64 == document.length && private::hash_bounded(&bytes, fixture.deadline)? == document.sha256,
+            bytes.len() as u64 == document.length
+                && private::hash_bounded(&bytes, fixture.deadline)? == document.sha256,
             "SECURITY_PUBLIC_DOCUMENT_IDENTITY_FAILED",
         )?;
         let target = repeated.join(document.path);
@@ -301,7 +324,8 @@ fn variants(fixture: &Fixture) -> Result<()> {
     private::write_bounded(
         &repeated.join("right.txt"),
         b"Right side of a real merge.\n",
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     fixture.git(&repeated, &["add", "."])?;
     fixture.git(
         &repeated,
@@ -656,7 +680,11 @@ fn admission(fixture: &Fixture) -> Result<()> {
     }
     AdmissionCase::Promisor.enter();
     let repo = fixture.repository("admission-promisor")?;
-    private::write_bounded(&repo.join(".git/objects/pack/marker.promisor"), b"", fixture.deadline)?;
+    private::write_bounded(
+        &repo.join(".git/objects/pack/marker.promisor"),
+        b"",
+        fixture.deadline,
+    )?;
     require(
         failed_at(
             &evaluator(fixture, &repo, "admission-promisor-proof", |_| Ok(())),
@@ -669,7 +697,8 @@ fn admission(fixture: &Fixture) -> Result<()> {
     private::write_bounded(
         &repo.join(".git/included-config"),
         b"[remote \"unused\"]\n promisor = false\n",
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     fixture.git(&repo, &["config", "include.path", "included-config"])?;
     require(
         failed_at(
@@ -759,7 +788,8 @@ fn admission(fixture: &Fixture) -> Result<()> {
                 })
                 .join(format!("{n}")),
             &payload,
-         fixture.deadline)?;
+            fixture.deadline,
+        )?;
     }
     protocol::check_proof_budget(&root, 0, 0)?;
     require(
@@ -780,7 +810,8 @@ fn admission(fixture: &Fixture) -> Result<()> {
     private::write_bounded(
         &root.join("review-proof/oversize"),
         &vec![b' '; private::RECORD_LIMIT as usize + 1],
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     require(
         failed_at(
             &protocol::check_proof_budget(&root, 0, 0),
@@ -804,7 +835,8 @@ pub(super) fn qualify(fixture: &Fixture, repository: &Path, initial: &VerifiedSc
     let summary = private::read_bounded(
         &fixture.root.join("public-documents-summary.md"),
         private::MIB,
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     require(
         contains(&summary, b"Total: **5**")
             && contains(&summary, b"Reviewed public data: **5**")
@@ -832,7 +864,8 @@ pub(super) fn qualify(fixture: &Fixture, repository: &Path, initial: &VerifiedSc
     private::write_bounded(
         &repository.join("runtime-secret.txt"),
         format!("token={secret}\n").as_bytes(),
-     fixture.deadline)?;
+        fixture.deadline,
+    )?;
     fixture.git(repository, &["add", "."])?;
     fixture.git(
         repository,
@@ -852,7 +885,11 @@ pub(super) fn qualify(fixture: &Fixture, repository: &Path, initial: &VerifiedSc
     )?;
     require(
         !contains(
-            &private::read_bounded(&fixture.root.join("mixed-summary.md"), private::MIB, fixture.deadline)?,
+            &private::read_bounded(
+                &fixture.root.join("mixed-summary.md"),
+                private::MIB,
+                fixture.deadline,
+            )?,
             secret.as_bytes(),
         ),
         "SECURITY_ACTUAL_MIXED_PRIVACY_FAILED",

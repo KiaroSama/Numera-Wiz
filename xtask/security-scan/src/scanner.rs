@@ -133,8 +133,11 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
             }
             require(outcome.adopted == 0, "SECURITY_UNEXPECTED_DESCENDANT")?;
             let proofs = protocol::verify_proofs(&context, outcome.leader)?;
-            let report_bytes =
-                private::read_bounded(&context.root.join("findings.json"), private::REPORT_LIMIT, request.deadline)?;
+            let report_bytes = private::read_bounded(
+                &context.root.join("findings.json"),
+                private::REPORT_LIMIT,
+                request.deadline,
+            )?;
             let parsed = report::parse(&report_bytes, request.deadline)?;
             request.deadline.check()?;
             require(!process::cancelled(), "SECURITY_DEADLINE")?;
@@ -152,7 +155,8 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
             let summary = report::classified_summary(
                 &parsed,
                 matches!(request.scope, Scope::PullRequest { .. }),
-                &counts, request.deadline,
+                &counts,
+                request.deadline,
             )?;
             request.deadline.check()?;
             require(!process::cancelled(), "SECURITY_DEADLINE")?;
@@ -208,8 +212,10 @@ pub fn internal_dispatch() -> Option<std::process::ExitCode> {
     })
 }
 pub fn provenance(deadline: Deadline) -> Result<()> {
-    let helper =
-        private::executable_hash_bounded(&env::current_exe().private("SECURITY_EXECUTABLE_INVALID")?, deadline)?;
+    let helper = private::executable_hash_bounded(
+        &env::current_exe().private("SECURITY_EXECUTABLE_INVALID")?,
+        deadline,
+    )?;
     let manifest = private::hash_bounded(include_bytes!("../Cargo.toml"), deadline)?;
     let lock = private::hash_bounded(include_bytes!("../Cargo.lock"), deadline)?;
     // Only fixed labels and SHA-256 digests; compiler/source commit are verified by

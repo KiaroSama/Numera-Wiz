@@ -44,7 +44,9 @@ pub fn dispatch() -> Option<ExitCode> {
 fn command(mode: &str, root: &Path) -> Result<Command> {
     let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
     private::controlled(&mut command, root);
-    if let Some(value) = env::var_os("NW_SECURITY_FIXTURE_DEADLINE") { command.env("NW_SECURITY_FIXTURE_DEADLINE", value); }
+    if let Some(value) = env::var_os("NW_SECURITY_FIXTURE_DEADLINE") {
+        command.env("NW_SECURITY_FIXTURE_DEADLINE", value);
+    }
     command
         .current_dir(root)
         .args(["--fixture-child", mode])
@@ -202,7 +204,10 @@ fn cancellation(root: &Path, signal: Signal) -> Result<()> {
     let mut delivered = false;
     let outcome = process::run(
         &mut command("sleep", root)?,
-        Options::command(Duration::from_secs(3), fixture_deadline()?.cap(Duration::from_secs(7))?),
+        Options::command(
+            Duration::from_secs(3),
+            fixture_deadline()?.cap(Duration::from_secs(7))?,
+        ),
         || {
             if !delivered && start.elapsed() >= Duration::from_millis(100) {
                 os::kill_process(os::getpid(), signal).private("SECURITY_FIXTURE_SIGNAL")?;
@@ -317,7 +322,11 @@ fn fault(root: &Path, mode: &str) -> Result<()> {
 
 fn fixture_deadline() -> Result<Deadline> {
     let bytes = env::var("NW_SECURITY_FIXTURE_DEADLINE").private("SECURITY_FIXTURE_ARGUMENTS")?;
-    require(bytes.len() as u64 <= private::RECORD_LIMIT, "SECURITY_FIXTURE_ARGUMENTS")?;
-    let value: serde_json::Value = serde_json::from_str(&bytes).private("SECURITY_FIXTURE_ARGUMENTS")?;
+    require(
+        bytes.len() as u64 <= private::RECORD_LIMIT,
+        "SECURITY_FIXTURE_ARGUMENTS",
+    )?;
+    let value: serde_json::Value =
+        serde_json::from_str(&bytes).private("SECURITY_FIXTURE_ARGUMENTS")?;
     Deadline::from_value(&value)
 }

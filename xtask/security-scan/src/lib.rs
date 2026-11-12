@@ -3,9 +3,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(target_os = "linux")]
-pub mod bootstrap;
-#[cfg(target_os = "linux")]
 pub mod assets;
+#[cfg(target_os = "linux")]
+pub mod bootstrap;
 #[cfg(target_os = "linux")]
 pub mod classifier;
 #[cfg(target_os = "linux")]

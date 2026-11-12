@@ -354,11 +354,16 @@ impl Running {
                         self.adopted += 1;
                     }
                     self.records.remove(&pid.as_raw_pid());
-                    if deadline.check().is_err() { return Ok(false); }
+                    if deadline.check().is_err() {
+                        return Ok(false);
+                    }
                 }
                 Ok(None) => return Ok(false),
                 Err(Errno::CHILD) => return Ok(true),
-                Err(Errno::INTR) => { deadline.check()?; continue; },
+                Err(Errno::INTR) => {
+                    deadline.check()?;
+                    continue;
+                }
                 Err(_) => return Err(ScanFailure("SECURITY_WAIT_FAILED")),
             }
         }
@@ -369,54 +374,113 @@ impl Running {
         // If clock admission fails, only already-owned handles and nonblocking
         // waits remain legal. No fresh grace or sleeping is granted.
         let immediate = |state: &mut Self| -> Result<NoChildren> {
-            if let Err(error) = state.direct_signal(Signal::KILL) { state.fail(error); }
+            if let Err(error) = state.direct_signal(Signal::KILL) {
+                state.fail(error);
+            }
             state.group = None;
-            if let Err(error) = state.signal_adopted(Signal::KILL) { state.fail(error); }
+            if let Err(error) = state.signal_adopted(Signal::KILL) {
+                state.fail(error);
+            }
             state.drain();
             match state.reap(deadline) {
-                Ok(true) if state.stdout_pipe.is_none() && state.stderr_pipe.is_none()
-                    && fault != Some(FixtureFault::CleanupBarrier) => barrier(),
+                Ok(true)
+                    if state.stdout_pipe.is_none()
+                        && state.stderr_pipe.is_none()
+                        && fault != Some(FixtureFault::CleanupBarrier) =>
+                {
+                    barrier()
+                }
                 _ => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
             }
         };
         let (window, start) = match window {
             Ok(window) => window,
-            Err(error) => { self.fail(error); return immediate(self); }
+            Err(error) => {
+                self.fail(error);
+                return immediate(self);
+            }
         };
-        if let Err(error) = window.check() { self.fail(error); return immediate(self); }
-        if let Err(e) = self.direct_signal(Signal::TERM) { self.fail(e); }
+        if let Err(error) = window.check() {
+            self.fail(error);
+            return immediate(self);
+        }
+        if let Err(e) = self.direct_signal(Signal::TERM) {
+            self.fail(e);
+        }
         let mut killed = false;
         loop {
-            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
+            if let Err(error) = window.check() {
+                self.fail(error);
+                return immediate(self);
+            }
             self.drain();
-            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
-            let now = match crate::bootstrap::boot_ns() { Ok(now) => now, Err(error) => { self.fail(error); return immediate(self); } };
-            let remaining = match window.remaining() { Ok(left) => left, Err(error) => { self.fail(error); return immediate(self); } };
+            if let Err(error) = window.check() {
+                self.fail(error);
+                return immediate(self);
+            }
+            let now = match crate::bootstrap::boot_ns() {
+                Ok(now) => now,
+                Err(error) => {
+                    self.fail(error);
+                    return immediate(self);
+                }
+            };
+            let remaining = match window.remaining() {
+                Ok(left) => left,
+                Err(error) => {
+                    self.fail(error);
+                    return immediate(self);
+                }
+            };
             // Retain the leader until the final numeric group signal is retired.
-            if !killed && (now.saturating_sub(start) >= 1_000_000_000
-                || (self.leader_exited && self.stdout_pipe.is_none() && self.stderr_pipe.is_none())
-                || remaining <= Duration::from_millis(100)) {
-                if let Err(e) = self.direct_signal(Signal::KILL) { self.fail(e); }
+            if !killed
+                && (now.saturating_sub(start) >= 1_000_000_000
+                    || (self.leader_exited
+                        && self.stdout_pipe.is_none()
+                        && self.stderr_pipe.is_none())
+                    || remaining <= Duration::from_millis(100))
+            {
+                if let Err(e) = self.direct_signal(Signal::KILL) {
+                    self.fail(e);
+                }
                 self.group = None;
                 killed = true;
             }
-            if let Err(e) = self.discover(fault, window) { self.fail(e); }
-            if let Err(e) = self.signal_adopted(if killed { Signal::KILL } else { Signal::TERM }) { self.fail(e); }
+            if let Err(e) = self.discover(fault, window) {
+                self.fail(e);
+            }
+            if let Err(e) = self.signal_adopted(if killed { Signal::KILL } else { Signal::TERM }) {
+                self.fail(e);
+            }
             if killed {
                 match self.reap(window) {
                     Ok(true) if self.stdout_pipe.is_none() && self.stderr_pipe.is_none() => {
-                        if fault == Some(FixtureFault::CleanupBarrier) { return Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")); }
+                        if fault == Some(FixtureFault::CleanupBarrier) {
+                            return Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED"));
+                        }
                         window.check()?;
                         return barrier();
                     }
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) => self.fail(e),
                 }
             }
-            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
-            let remaining = match window.remaining() { Ok(left) => left, Err(error) => { self.fail(error); return immediate(self); } };
+            if let Err(error) = window.check() {
+                self.fail(error);
+                return immediate(self);
+            }
+            let remaining = match window.remaining() {
+                Ok(left) => left,
+                Err(error) => {
+                    self.fail(error);
+                    return immediate(self);
+                }
+            };
             thread::sleep(TICK.min(remaining));
-            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
+            if let Err(error) = window.check() {
+                self.fail(error);
+                return immediate(self);
+            }
         }
     }
 }
@@ -540,7 +604,13 @@ fn run_inner(
             if state.leader_exited {
                 return Ok(());
             }
-            thread::sleep(TICK.min(end.remaining().map_err(|error| if error.0 == "SECURITY_DEADLINE" { ScanFailure("SECURITY_CHILD_TIMEOUT") } else { error })?));
+            thread::sleep(TICK.min(end.remaining().map_err(|error| {
+                if error.0 == "SECURITY_DEADLINE" {
+                    ScanFailure("SECURITY_CHILD_TIMEOUT")
+                } else {
+                    error
+                }
+            })?));
             end.check_as("SECURITY_CHILD_TIMEOUT")?;
         }
     }));
@@ -569,9 +639,14 @@ fn run_inner(
     let barrier = state.cleanup(options.deadline, fault)?;
     let cleanup_elapsed = match (cleanup_start, crate::bootstrap::boot_ns()) {
         (Ok(start), Ok(end)) if end >= start => Duration::from_nanos(end - start),
-        _ => { state.fail(ScanFailure("SECURITY_CLOCK_INVALID")); Duration::ZERO }
+        _ => {
+            state.fail(ScanFailure("SECURITY_CLOCK_INVALID"));
+            Duration::ZERO
+        }
     };
-    if let Err(error) = options.deadline.check() { state.fail(error); }
+    if let Err(error) = options.deadline.check() {
+        state.fail(error);
+    }
     if state.adopted > 0 {
         state.fail(ScanFailure("SECURITY_UNEXPECTED_DESCENDANT"));
     }

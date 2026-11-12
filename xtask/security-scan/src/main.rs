@@ -46,8 +46,8 @@ fn main() -> ExitCode {
 fn run() -> nw_security_scan::Result<Option<Disposition>> {
     use nw_security_scan::{
         ScanFailure,
-        bootstrap::{self, Stage},
         assets::Release,
+        bootstrap::{self, Stage},
         private::Scratch,
         process,
         protocol::Scope,

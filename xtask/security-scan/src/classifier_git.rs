@@ -201,8 +201,10 @@ impl<'a> Session<'a> {
         let repository = PathBuf::from(protocol::string(&context.value, "repository")?);
         let git = PathBuf::from(protocol::string(&context.value, "git")?);
         private::directory(&context.root.join("review-proof"))?;
-        let descriptor =
-            private::hash_bounded(&serde_json::to_vec(&context.value).private("SECURITY_CONTEXT_INVALID")?, deadline)?;
+        let descriptor = private::hash_bounded(
+            &serde_json::to_vec(&context.value).private("SECURITY_CONTEXT_INVALID")?,
+            deadline,
+        )?;
         let mut session = Self {
             context,
             deadline,
@@ -221,7 +223,8 @@ impl<'a> Session<'a> {
         session.identity()?;
         let transaction = session.begin("filesystem", json!({}))?;
         let manifest = filesystem(&session.repository, deadline)?;
-        session.filesystem = private::hash_bounded(&serde_json::to_vec(&manifest).private(UNSAFE)?, deadline)?;
+        session.filesystem =
+            private::hash_bounded(&serde_json::to_vec(&manifest).private(UNSAFE)?, deadline)?;
         session.finish(
             transaction,
             json!({"manifest":manifest,"sha256":session.filesystem}),
@@ -271,7 +274,8 @@ impl<'a> Session<'a> {
         let descriptor = private::read_bounded(
             &self.context.root.join("context.json"),
             private::RECORD_LIMIT,
-         self.deadline)?;
+            self.deadline,
+        )?;
         require(
             private::hash_bounded(&descriptor, self.deadline)? == self.descriptor,
             "SECURITY_CLASSIFIER_IDENTITY_INVALID",
@@ -293,10 +297,19 @@ impl<'a> Session<'a> {
             bytes.len() as u64 <= private::RECORD_LIMIT,
             "SECURITY_RECORD_OVERSIZE",
         )?;
-        protocol::check_proof_budget_bounded(&self.context.root, 1, bytes.len() as u64, self.deadline)?;
+        protocol::check_proof_budget_bounded(
+            &self.context.root,
+            1,
+            bytes.len() as u64,
+            self.deadline,
+        )?;
         let name = format!("{id}.{suffix}");
         require(!self.ledger.contains_key(&name), "SECURITY_PROOF_INVALID")?;
-        private::write_bounded(&self.context.root.join("review-proof").join(&name), &bytes, self.deadline)?;
+        private::write_bounded(
+            &self.context.root.join("review-proof").join(&name),
+            &bytes,
+            self.deadline,
+        )?;
         let hash = private::hash_bounded(&bytes, self.deadline)?;
         self.ledger.insert(name, hash.clone());
         Ok(hash)
@@ -387,7 +400,8 @@ impl<'a> Session<'a> {
                         == private::hash_bounded(
                             &serde_json::to_vec(&args)
                                 .private("SECURITY_CLASSIFIER_PROOF_INVALID")?,
-                         self.deadline)?
+                            self.deadline,
+                        )?
                     && (status == 0 || (kind == "config" && status == 1))
                     && child["completed"] == true
                     && child["barrier"] == true
@@ -415,7 +429,8 @@ impl<'a> Session<'a> {
     pub fn verify(&self) -> Result<()> {
         self.identity()?;
         protocol::check_proof_budget_bounded(&self.context.root, 0, 0, self.deadline)?;
-        let files = protocol::proof_files_bounded(&self.context.root.join("review-proof"), self.deadline)?;
+        let files =
+            protocol::proof_files_bounded(&self.context.root.join("review-proof"), self.deadline)?;
         require(
             files.len() == self.transactions * 3 && files.keys().eq(self.ledger.keys()),
             "SECURITY_CLASSIFIER_PROOF_INVALID",
@@ -430,8 +445,11 @@ impl<'a> Session<'a> {
             }
         }
         require(
-            private::hash_bounded(&serde_json::to_vec(&filesystem(&self.repository, self.deadline)?).private(UNSAFE)?, self.deadline)?
-                == self.filesystem,
+            private::hash_bounded(
+                &serde_json::to_vec(&filesystem(&self.repository, self.deadline)?)
+                    .private(UNSAFE)?,
+                self.deadline,
+            )? == self.filesystem,
             "SECURITY_CLASSIFIER_IDENTITY_INVALID",
         )
     }
@@ -511,7 +529,12 @@ impl<'a> Session<'a> {
             "SECURITY_CLASSIFIER_COMMAND_LIMIT",
         )?;
         // Reserve the maximum eventual completion record before starting work.
-        protocol::check_proof_budget_bounded(&self.context.root, 1, private::RECORD_LIMIT, self.deadline)?;
+        protocol::check_proof_budget_bounded(
+            &self.context.root,
+            1,
+            private::RECORD_LIMIT,
+            self.deadline,
+        )?;
         let args = self.arguments(kind, item, path)?;
         let mut command = Command::new(&self.git);
         private::controlled(&mut command, &self.context.root);
@@ -530,7 +553,8 @@ impl<'a> Session<'a> {
         )?;
         let argv_hash = private::hash_bounded(
             &serde_json::to_vec(&actual).private("SECURITY_CLASSIFIER_ARGV_INVALID")?,
-         self.deadline)?;
+            self.deadline,
+        )?;
         self.stats.commands += 1;
         let outcome = process::run(
             &mut command,
@@ -627,7 +651,8 @@ impl<'a> Session<'a> {
                                 self.child(&mut transaction, "payload", Some(&oid), None)?;
                             self.stats.blob_reads += 1;
                             let matched = output.1.len() as u64 == DOCUMENTS[path].length
-                                && private::hash_bounded(&output.1, self.deadline)? == DOCUMENTS[path].sha256;
+                                && private::hash_bounded(&output.1, self.deadline)?
+                                    == DOCUMENTS[path].sha256;
                             // This is the only payload; it is discarded before another child.
                             drop(output);
                             if matched {

@@ -44,9 +44,12 @@ impl Scope {
             "pull_request" => {
                 let path = env::var_os("GITHUB_EVENT_PATH")
                     .ok_or(ScanFailure("SECURITY_EVENT_INVALID"))?;
-                let event: Value =
-                    serde_json::from_slice(&private::read_bounded(Path::new(&path), private::MIB, deadline)?)
-                        .private("SECURITY_EVENT_INVALID")?;
+                let event: Value = serde_json::from_slice(&private::read_bounded(
+                    Path::new(&path),
+                    private::MIB,
+                    deadline,
+                )?)
+                .private("SECURITY_EVENT_INVALID")?;
                 let scope = Self::PullRequest {
                     base: string(&event["pull_request"]["base"], "sha")?.to_owned(),
                     head: string(&event["pull_request"]["head"], "sha")?.to_owned(),
@@ -89,11 +92,24 @@ pub fn write_json(path: &Path, value: &Value) -> Result<()> {
 pub fn write_json_bounded(path: &Path, value: &Value, deadline: Deadline) -> Result<()> {
     deadline.check()?;
     let bytes = serde_json::to_vec(value).private("SECURITY_CONTEXT_INVALID")?;
-    require(bytes.len() as u64 <= private::RECORD_LIMIT, "SECURITY_RECORD_OVERSIZE")?;
-    if let Some(parent) = path.parent().filter(|parent| parent.file_name().is_some_and(|name| name == "proof")) {
-        check_proof_budget_bounded(parent.parent().ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?,1,bytes.len() as u64,deadline)?;
+    require(
+        bytes.len() as u64 <= private::RECORD_LIMIT,
+        "SECURITY_RECORD_OVERSIZE",
+    )?;
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| parent.file_name().is_some_and(|name| name == "proof"))
+    {
+        check_proof_budget_bounded(
+            parent
+                .parent()
+                .ok_or(ScanFailure("SECURITY_PROOF_INVALID"))?,
+            1,
+            bytes.len() as u64,
+            deadline,
+        )?;
     }
-    private::write_bounded(path,&bytes,deadline)
+    private::write_bounded(path, &bytes, deadline)
 }
 pub fn read_json(path: &Path) -> Result<Value> {
     let bytes = private::read(path, private::RECORD_LIMIT)?;
@@ -198,7 +214,11 @@ impl Context {
         let helper_hash = private::copy_executable_bounded(&current, &root.join("git"), deadline)?;
         private::copy_executable_bounded(&current, &root.join("security-launch"), deadline)?;
         private::directory(&root.join("proof"))?;
-        private::write_bounded(&root.join("scanner.toml"), b"[extend]\nuseDefault = true\n", deadline)?;
+        private::write_bounded(
+            &root.join("scanner.toml"),
+            b"[extend]\nuseDefault = true\n",
+            deadline,
+        )?;
         let value = json!({"run": private::nonce()?, "token": private::nonce()?,
             "repository": private::text(repository)?, "repository_id": private::identity(repository)?,
             "git": private::text(git)?, "git_id": private::identity(git)?, "git_sha": private::executable_hash_bounded(git, deadline)?,
@@ -256,7 +276,8 @@ fn authenticated() -> Result<Context> {
         string(&value, "token")?
             == env::var("NW_SECURITY_TOKEN").private("SECURITY_CONTEXT_INVALID")?
             && string(&value, "scratch_id")? == private::identity(&root)?
-            && string(&value, "helper_sha")? == private::executable_hash_bounded(&executable, deadline)?,
+            && string(&value, "helper_sha")?
+                == private::executable_hash_bounded(&executable, deadline)?,
         "SECURITY_CONTEXT_INVALID",
     )?;
     let repository = Path::new(string(&value, "repository")?);
@@ -273,7 +294,11 @@ fn authenticated() -> Result<Context> {
         "SECURITY_CONTEXT_INVALID",
     )?;
     deadline.check()?;
-    Ok(Context { root, value, deadline })
+    Ok(Context {
+        root,
+        value,
+        deadline,
+    })
 }
 pub fn launch_worker() -> Result<()> {
     let context = authenticated()?;
@@ -288,10 +313,12 @@ pub fn launch_worker() -> Result<()> {
     write_json_bounded(
         &context.root.join("group.json"),
         &json!({"run": v["run"], "group": group}),
-     context.deadline)?;
+        context.deadline,
+    )?;
     let executable = Path::new(string(v, "scanner")?);
     require(
-        private::executable_hash_bounded(executable, context.deadline)? == string(v, "scanner_sha")?,
+        private::executable_hash_bounded(executable, context.deadline)?
+            == string(v, "scanner_sha")?,
         "SECURITY_EXECUTABLE_INVALID",
     )?;
     let mut command = Command::new(executable);
@@ -345,7 +372,11 @@ pub fn proxy_worker() -> Result<i32> {
     // cannot disappear behind a later successful history child.
     let mut started = json!({"invocation":id, "run": v["run"], "context": private::hash_bounded(&private::read_bounded(&context.root.join("context.json"), private::RECORD_LIMIT, context.deadline)?, context.deadline)?,
         "group": group["group"], "kind": "rejected", "argv": []});
-    write_json_bounded(&proof.join(format!("{id}.attempt")), &started, context.deadline)?;
+    write_json_bounded(
+        &proof.join(format!("{id}.attempt")),
+        &started,
+        context.deadline,
+    )?;
     let mut args = Vec::new();
     let mut bytes = 0_usize;
     for argument in env::args_os().skip(1) {
@@ -363,7 +394,11 @@ pub fn proxy_worker() -> Result<i32> {
     let kind = classify(&args, string(v, "repository")?, string(v, "scope")?)?;
     started["kind"] = json!(kind);
     started["argv"] = json!(args);
-    write_json_bounded(&proof.join(format!("{id}.start")), &started, context.deadline)?;
+    write_json_bounded(
+        &proof.join(format!("{id}.start")),
+        &started,
+        context.deadline,
+    )?;
     let mut command = Command::new(string(v, "git")?);
     private::controlled(&mut command, &context.root);
     command.current_dir(string(v, "repository")?).args(&args);
@@ -387,7 +422,8 @@ pub fn proxy_worker() -> Result<i32> {
         &proof.join(format!("{id}.done")),
         &json!({"invocation":id, "start": private::hash_bounded(&serde_json::to_vec(&started).private("SECURITY_CONTEXT_INVALID")?, context.deadline)?,
         "completed":completed, "stderr_quiet":result.stderr.quiet(), "accepted": accepted, "status": result.status, "no_remote": no_remote}),
-     context.deadline)?;
+        context.deadline,
+    )?;
     require(accepted, "SECURITY_GIT_CHILD_FAILED")?;
     if no_remote {
         // Fixed private protocol text preserves pinned Gitleaks's no-remote case.
@@ -403,13 +439,16 @@ pub fn proof_files(path: &Path) -> Result<BTreeMap<String, PathBuf>> {
     proof_files_inner(path, None)
 }
 pub fn proof_files_bounded(path: &Path, deadline: Deadline) -> Result<BTreeMap<String, PathBuf>> {
-    deadline.check()?; proof_files_inner(path, Some(deadline))
+    deadline.check()?;
+    proof_files_inner(path, Some(deadline))
 }
 fn proof_files_inner(path: &Path, deadline: Option<Deadline>) -> Result<BTreeMap<String, PathBuf>> {
     let mut result = BTreeMap::new();
     let mut total = 0_u64;
     for entry in fs::read_dir(path).private("SECURITY_PROOF_INVALID")? {
-        if let Some(deadline) = deadline { deadline.check()?; }
+        if let Some(deadline) = deadline {
+            deadline.check()?;
+        }
         require(
             result.len() < private::MAX_RECORDS,
             "SECURITY_PROOF_OVERFLOW",
@@ -450,10 +489,21 @@ pub fn check_proof_budget(
 ) -> Result<()> {
     check_proof_budget_inner(root, additional_files, additional_bytes, None)
 }
-pub fn check_proof_budget_bounded(root: &Path, additional_files: usize, additional_bytes: u64, deadline: Deadline) -> Result<()> {
-    deadline.check()?; check_proof_budget_inner(root, additional_files, additional_bytes, Some(deadline))
+pub fn check_proof_budget_bounded(
+    root: &Path,
+    additional_files: usize,
+    additional_bytes: u64,
+    deadline: Deadline,
+) -> Result<()> {
+    deadline.check()?;
+    check_proof_budget_inner(root, additional_files, additional_bytes, Some(deadline))
 }
-fn check_proof_budget_inner(root: &Path, additional_files: usize, additional_bytes: u64, deadline: Option<Deadline>) -> Result<()> {
+fn check_proof_budget_inner(
+    root: &Path,
+    additional_files: usize,
+    additional_bytes: u64,
+    deadline: Option<Deadline>,
+) -> Result<()> {
     let mut files = additional_files;
     let mut bytes = additional_bytes;
     for directory in ["proof", "review-proof"] {
@@ -471,7 +521,9 @@ fn check_proof_budget_inner(root: &Path, additional_files: usize, additional_byt
             )?,
         }
         for path in proof_files_inner(&path, deadline)?.values() {
-            if let Some(deadline) = deadline { deadline.check()?; }
+            if let Some(deadline) = deadline {
+                deadline.check()?;
+            }
             files = files
                 .checked_add(1)
                 .ok_or(ScanFailure("SECURITY_PROOF_OVERFLOW"))?;
@@ -501,7 +553,11 @@ pub fn verify_proofs(context: &Context, leader: i32) -> Result<ProofCounts> {
         group["run"] == context.value["run"] && group["group"].as_i64() == Some(i64::from(leader)),
         "SECURITY_PROOF_INVALID",
     )?;
-    let descriptor = private::read_bounded(&context.root.join("context.json"), private::RECORD_LIMIT, context.deadline)?;
+    let descriptor = private::read_bounded(
+        &context.root.join("context.json"),
+        private::RECORD_LIMIT,
+        context.deadline,
+    )?;
     require(
         descriptor == serde_json::to_vec(&context.value).private("SECURITY_CONTEXT_INVALID")?,
         "SECURITY_PROOF_INVALID",
@@ -560,7 +616,14 @@ pub fn verify_proofs(context: &Context, leader: i32) -> Result<ProofCounts> {
                 && started["context"] == attempt["context"]
                 && started["group"] == attempt["group"]
                 && done["start"]
-                    == private::hash_bounded(&private::read_bounded(start_path, private::RECORD_LIMIT, context.deadline)?, context.deadline)?,
+                    == private::hash_bounded(
+                        &private::read_bounded(
+                            start_path,
+                            private::RECORD_LIMIT,
+                            context.deadline,
+                        )?,
+                        context.deadline,
+                    )?,
             "SECURITY_PROOF_INVALID",
         )?;
         let args = started["argv"]

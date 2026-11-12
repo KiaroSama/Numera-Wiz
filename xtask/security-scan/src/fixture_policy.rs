@@ -120,7 +120,12 @@ fn reports(root: &Path, deadline: Deadline) -> Result<()> {
     )?;
     require(
         report::parse(b"[{\"RuleID\":\"\xff\"}]", deadline).is_err()
-            && private::read_bounded(&root.join("absent-report.json"), private::REPORT_LIMIT, deadline).is_err(),
+            && private::read_bounded(
+                &root.join("absent-report.json"),
+                private::REPORT_LIMIT,
+                deadline,
+            )
+            .is_err(),
         "SECURITY_MOCK_REPORT_INVALID",
     )?;
     require(
@@ -174,7 +179,11 @@ fn reports(root: &Path, deadline: Deadline) -> Result<()> {
     // Invalid row beyond the display limit must still be parsed and rejected.
     rows[200]["StartLine"] = json!(false);
     require(
-        report::parse(&serde_json::to_vec(&rows).private("SECURITY_FIXTURE_IO")?, deadline).is_err(),
+        report::parse(
+            &serde_json::to_vec(&rows).private("SECURITY_FIXTURE_IO")?,
+            deadline,
+        )
+        .is_err(),
         "SECURITY_MOCK_REPORT_TAIL_SKIPPED",
     )?;
     report::write_summary(None, &empty, false, deadline)?;
@@ -187,7 +196,8 @@ fn reports(root: &Path, deadline: Deadline) -> Result<()> {
     private::write_bounded(&path, b"prefix\n", deadline)?;
     report::write_summary(Some(&path), &empty, false, deadline)?;
     require(
-        private::read_bounded(&path, private::MIB, deadline)? == format!("prefix\n{EXPECTED_SUMMARY}").as_bytes(),
+        private::read_bounded(&path, private::MIB, deadline)?
+            == format!("prefix\n{EXPECTED_SUMMARY}").as_bytes(),
         "SECURITY_MOCK_SUMMARY_APPEND",
     )?;
     let mut capture = process::Capture::default();
@@ -242,7 +252,10 @@ fn gzip(bytes: &[u8], deadline: Deadline) -> Result<Vec<u8>> {
     Ok(result)
 }
 fn archives(deadline: Deadline) -> Result<()> {
-    let good = archive(&[("gitleaks", b'0', b"synthetic executable bytes")], deadline)?;
+    let good = archive(
+        &[("gitleaks", b'0', b"synthetic executable bytes")],
+        deadline,
+    )?;
     require(
         assets::inspect_archive(&good, deadline)? == b"synthetic executable bytes"
             && assets::verify_pinned(&good, deadline).is_err(),
@@ -529,7 +542,8 @@ fn proofs(root: &Path, deadline: Deadline) -> Result<()> {
     private::write_bounded(
         &root.join("proof").join("oversize"),
         &vec![0; private::RECORD_LIMIT as usize + 1],
-     deadline)?;
+        deadline,
+    )?;
     require(
         protocol::proof_files(&root.join("proof")).is_err(),
         "SECURITY_MOCK_RECORD_OVERFLOW_ACCEPTED",
@@ -540,7 +554,11 @@ fn proofs(root: &Path, deadline: Deadline) -> Result<()> {
     }
     let bytes = vec![b' '; private::RECORD_LIMIT as usize];
     for i in 0..257 {
-        private::write_bounded(&root.join("proof").join(format!("aggregate-{i}")), &bytes, deadline)?;
+        private::write_bounded(
+            &root.join("proof").join(format!("aggregate-{i}")),
+            &bytes,
+            deadline,
+        )?;
     }
     require(
         protocol::proof_files(&root.join("proof")).is_err(),
@@ -602,8 +620,10 @@ fn invocation_identity(context: &protocol::Context, args: &[String], first: &str
             &private::read_bounded(
                 &proof.join(format!("{first}.{suffix}")),
                 private::RECORD_LIMIT,
-             context.deadline)?,
-         context.deadline)?;
+                context.deadline,
+            )?,
+            context.deadline,
+        )?;
     }
     require(
         protocol::verify_proofs(context, 123).is_err(),

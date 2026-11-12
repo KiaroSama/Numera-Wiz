@@ -271,7 +271,8 @@ impl Fixture {
             "SECURITY_REAL_CLEAN_CONTRACT_FAILED",
         )?;
         require(
-            private::read_bounded(&summary, private::MIB, self.deadline)? == EXPECTED_SUMMARY.as_bytes(),
+            private::read_bounded(&summary, private::MIB, self.deadline)?
+                == EXPECTED_SUMMARY.as_bytes(),
             "SECURITY_REAL_CLEAN_SUMMARY_FAILED",
         )?;
         // Preserve the original no-remote clean fixture; no fake origin hides metadata behavior.
@@ -328,7 +329,8 @@ impl Fixture {
         private::copy_executable_bounded(
             &env::current_exe().private("SECURITY_FIXTURE_IO")?,
             &sentinel,
-         self.deadline)?;
+            self.deadline,
+        )?;
         self.git(
             &repository,
             &["config", "diff.sentinel.command", private::text(&sentinel)?],
@@ -585,7 +587,8 @@ impl Fixture {
         private::copy_executable_bounded(
             &env::current_exe().private("SECURITY_FIXTURE_IO")?,
             &repository.join("git"),
-         self.deadline)?;
+            self.deadline,
+        )?;
         self.git(&repository, &["add", "."])?;
         self.git(
             &repository,
@@ -609,7 +612,10 @@ impl Fixture {
     fn child(&self, mode: &str) -> Result<Command> {
         let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
         private::controlled(&mut command, &self.root);
-        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+        command.env(
+            "NW_SECURITY_FIXTURE_DEADLINE",
+            serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+        );
         command
             .current_dir(&self.root)
             .args(["--fixture-child", mode])
@@ -622,7 +628,10 @@ impl Fixture {
             private::directory(&root)?;
             let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
             private::controlled(&mut command, &root);
-        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+            command.env(
+                "NW_SECURITY_FIXTURE_DEADLINE",
+                serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+            );
             command.args(["--fixture-child", mode]).arg(&root);
             let result = process::run(
                 &mut command,
@@ -704,7 +713,10 @@ impl Fixture {
             fs::canonicalize("/usr/bin/env").private("SECURITY_FIXTURE_UTILITY_INVALID")?;
         let mut version = Command::new(&utility);
         private::controlled(&mut version, &self.root);
-        version.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+        version.env(
+            "NW_SECURITY_FIXTURE_DEADLINE",
+            serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+        );
         version.arg("--version");
         let result = process::run(
             &mut version,
@@ -736,7 +748,10 @@ impl Fixture {
         ] {
             let mut command = Command::new(&utility);
             private::controlled(&mut command, &self.root);
-        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+            command.env(
+                "NW_SECURITY_FIXTURE_DEADLINE",
+                serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+            );
             command
                 .arg(option)
                 .arg(env::current_exe().private("SECURITY_FIXTURE_IO")?)
@@ -787,7 +802,10 @@ impl Fixture {
             private::directory(&root)?;
             let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
             private::controlled(&mut command, &root);
-        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+            command.env(
+                "NW_SECURITY_FIXTURE_DEADLINE",
+                serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+            );
             command.args(["--fixture-child", mode]).arg(&root);
             let result = process::run(
                 &mut command,
@@ -820,7 +838,10 @@ impl Fixture {
         };
         let mut writer = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
         private::controlled(&mut writer, &root);
-        writer.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
+        writer.env(
+            "NW_SECURITY_FIXTURE_DEADLINE",
+            serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?,
+        );
         writer.args(["--fixture-child", "report-growth"]).arg(&root);
         let outcome = process::run(
             &mut writer,
@@ -869,7 +890,8 @@ impl Fixture {
         for (path, length, digest) in DOCUMENTS {
             let bytes = private::read_bounded(&source.join(path), private::MIB, self.deadline)?;
             require(
-                bytes.len() as u64 == length && private::hash_bounded(&bytes, self.deadline)? == digest,
+                bytes.len() as u64 == length
+                    && private::hash_bounded(&bytes, self.deadline)? == digest,
                 "SECURITY_PUBLIC_DOCUMENT_IDENTITY_FAILED",
             )?;
             verified.push((path, bytes));
