@@ -361,5 +361,82 @@ mod tests {
                 "{field} must be a boolean: {schema_response:?}"
             );
         }
+
+        assert_eq!(
+            descriptor.get("descriptor_schema_version"),
+            Some(&serde_json::json!(2)),
+            "{schema_response:?}"
+        );
+        let emitted: commands::Descriptor = serde_json::from_value(descriptor.clone())
+            .unwrap_or_else(|error| {
+                panic!("descriptor must deserialize: {error}; {schema_response:?}")
+            });
+        assert_eq!(emitted.descriptor_schema_version, 2, "{schema_response:?}");
+        assert!(emitted.result_schema.is_some(), "{schema_response:?}");
+
+        let historical = serde_json::json!({
+            "id": "projects.create",
+            "version": 1,
+            "label": "Create a durable project",
+            "state_class": "durable_mutation",
+            "qualification": "development_only; five-surface/package qualification pending",
+            "params_schema": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": false
+            }
+        });
+        let legacy: commands::Descriptor = serde_json::from_value(historical.clone())
+            .unwrap_or_else(|error| panic!("historical descriptor must deserialize: {error}"));
+        assert_eq!(legacy.descriptor_schema_version, 1, "{legacy:?}");
+        assert!(legacy.result_schema.is_none(), "{legacy:?}");
+        assert_eq!(
+            legacy.project_context,
+            commands::ProjectContextRule::Forbidden,
+            "{legacy:?}"
+        );
+        let serialized_legacy = serde_json::to_value(&legacy).expect("descriptor serializes");
+        assert!(
+            serialized_legacy.get("result_schema").is_none(),
+            "{serialized_legacy:?}"
+        );
+        assert!(
+            serialized_legacy.get("project_context").is_none(),
+            "{serialized_legacy:?}"
+        );
+        let mut expected_legacy = historical;
+        expected_legacy["descriptor_schema_version"] = serde_json::json!(1);
+        assert_eq!(serialized_legacy, expected_legacy, "{legacy:?}");
+
+        let other_response = CommandService.dispatch(
+            Principal::DiscoveryAgent,
+            Request::query(
+                "commands.schema",
+                serde_json::json!({"id": "commands.schema"}),
+            ),
+        );
+        assert!(other_response.ok, "{other_response:?}");
+        assert!(other_response.error.is_none(), "{other_response:?}");
+        assert!(other_response.receipt_id.is_none(), "{other_response:?}");
+        let other_descriptor = other_response
+            .result
+            .as_ref()
+            .filter(|descriptor| descriptor.is_object())
+            .unwrap_or_else(|| panic!("commands.schema descriptor missing: {other_response:?}"));
+        assert_eq!(
+            other_descriptor.get("id"),
+            Some(&serde_json::json!("commands.schema")),
+            "{other_response:?}"
+        );
+        assert_eq!(
+            other_descriptor.get("descriptor_schema_version"),
+            Some(&serde_json::json!(2)),
+            "{other_response:?}"
+        );
+        assert!(
+            other_descriptor.get("result_schema").is_none(),
+            "{other_response:?}"
+        );
     }
 }

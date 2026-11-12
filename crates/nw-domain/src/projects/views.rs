@@ -1,6 +1,22 @@
 //! Bounded query parameters; project identity and write revision stay in the envelope.
 use super::*;
 use crate::time::TimeRange;
+/// Schema-only mirror of the unchanged project creation result.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectCreateResult {
+    pub project_id: ProjectId,
+    pub root_bin_id: EntityId,
+    pub revision: Revision,
+    pub history: ProjectCreateHistory,
+}
+/// Project creation exposes only these two history flags.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectCreateHistory {
+    pub can_undo: bool,
+    pub can_redo: bool,
+}
 /// Public common-header fields only; catalog order is ascending canonical project ID.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectSummary {

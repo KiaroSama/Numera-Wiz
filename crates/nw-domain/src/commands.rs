@@ -206,14 +206,30 @@ fn project_context(id: &str) -> ProjectContextRule {
         _ => ProjectContextRule::Forbidden,
     }
 }
+fn descriptor_schema_version_default() -> u32 {
+    1
+}
+fn result_schema(id: &str) -> Option<Value> {
+    match id {
+        "projects.create" => Some(
+            serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
+                .expect("schema"),
+        ),
+        _ => None,
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Descriptor {
+    #[serde(default = "descriptor_schema_version_default")]
+    pub descriptor_schema_version: u32,
     pub id: String,
     pub version: u32,
     pub label: String,
     pub state_class: StateClass,
     pub qualification: String,
     pub params_schema: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_schema: Option<Value>,
     #[serde(default, skip_serializing_if = "ProjectContextRule::forbidden")]
     pub project_context: ProjectContextRule,
 }
@@ -259,6 +275,7 @@ pub fn registry() -> Vec<Descriptor> {
     macro_rules! row {
         ($id:literal,$label:literal,$class:ident,$params:ty) => {
             Descriptor {
+                descriptor_schema_version: 2,
                 id: $id.into(),
                 version: 1,
                 label: $label.into(),
@@ -266,6 +283,7 @@ pub fn registry() -> Vec<Descriptor> {
                 qualification: "development_only; five-surface/package qualification pending"
                     .into(),
                 params_schema: serde_json::to_value(schema_for!($params)).expect("schema"),
+                result_schema: result_schema($id),
                 project_context: project_context($id),
             }
         };
