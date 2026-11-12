@@ -6,6 +6,7 @@ use nw_security_scan::{
     report,
 };
 use serde_json::json;
+use std::cell::Cell;
 
 fn reviewed(result: &VerifiedScan, total: usize) -> Result<()> {
     require(
@@ -210,6 +211,112 @@ fn evaluator(
     name: &str,
     action: impl FnOnce(&mut Session<'_>) -> Result<()>,
 ) -> Result<()> {
+    evaluator_observed(fixture, repository, name, action, None)
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PackedPhase {
+    Entry,
+    ContextPreparation,
+    SessionAdmission,
+    Evaluation,
+}
+#[derive(Debug)]
+enum PackedResult {
+    ExpectedRefsUnsafe,
+    Deadline,
+    ChildTimeout,
+    Clock,
+    Cancelled,
+    OtherError,
+    UnexpectedOk,
+}
+impl PackedResult {
+    fn classify<T>(result: &Result<T>) -> Self {
+        match result {
+            Ok(_) => Self::UnexpectedOk,
+            Err(error) => match error.0 {
+                "SECURITY_CLASSIFIER_REFS_UNSAFE" => Self::ExpectedRefsUnsafe,
+                "SECURITY_DEADLINE" => Self::Deadline,
+                "SECURITY_CHILD_TIMEOUT" => Self::ChildTimeout,
+                "SECURITY_CLOCK_INVALID" => Self::Clock,
+                "SECURITY_CANCELLED" => Self::Cancelled,
+                _ => Self::OtherError,
+            },
+        }
+    }
+}
+struct PackedDiagnostic {
+    start: Option<u64>,
+    deadline: Deadline,
+    phase: Cell<PackedPhase>,
+}
+impl PackedDiagnostic {
+    fn new(deadline: Deadline) -> Self {
+        let diagnostic = Self {
+            start: nw_security_scan::bootstrap::boot_ns().ok(),
+            deadline,
+            phase: Cell::new(PackedPhase::Entry),
+        };
+        diagnostic.emit(None, false, false);
+        diagnostic
+    }
+    fn completed<T>(&self, result: &Result<T>) {
+        self.emit(
+            result.as_ref().err().map(|_| PackedResult::classify(result)),
+            result.is_ok(),
+            false,
+        );
+    }
+    fn finish<T>(&self, result: &Result<T>) {
+        self.emit(Some(PackedResult::classify(result)), result.is_ok(), true);
+    }
+    fn emit(&self, result: Option<PackedResult>, phase_ok: bool, final_result: bool) {
+        // These observations never replace the original Result or supply a work
+        // deadline. Invalid/out-of-range measurements have a false validity flag.
+        let elapsed = self
+            .start
+            .and_then(|start| nw_security_scan::bootstrap::boot_ns().ok()?.checked_sub(start))
+            .map(|nanos| nanos / 1_000_000)
+            .filter(|millis| *millis <= 300_000);
+        let remaining = self
+            .deadline
+            .remaining()
+            .ok()
+            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+            .filter(|millis| *millis <= 300_000);
+        let full = self.deadline.check();
+        let work = self.deadline.reserve(process::GRACE);
+        let full_valid = matches!(full, Ok(()) | Err(ScanFailure("SECURITY_DEADLINE")));
+        let work_valid = matches!(work, Ok(_) | Err(ScanFailure("SECURITY_DEADLINE")));
+        let timestamp = protocol::unix_millis();
+        let _ = writeln!(
+            std::io::stderr(),
+            "{} [INFO] SECURITY_MOCK_PACKED_REPLACE_DIAGNOSTIC phase={:?} phase_ok={phase_ok} final_result={final_result} result_available={} result={result:?} elapsed_ms={} elapsed_valid={} remaining_ms={} remaining_valid={} full_deadline_active={} full_check_valid={full_valid} work_reserve_active={} work_check_valid={work_valid} timestamp_valid={}",
+            timestamp.unwrap_or(0),
+            self.phase.get(),
+            result.is_some(),
+            elapsed.unwrap_or(0),
+            elapsed.is_some(),
+            remaining.unwrap_or(0),
+            remaining.is_some(),
+            full.is_ok(),
+            work.is_ok(),
+            timestamp.is_ok(),
+        );
+    }
+}
+
+fn evaluator_observed(
+    fixture: &Fixture,
+    repository: &Path,
+    name: &str,
+    action: impl FnOnce(&mut Session<'_>) -> Result<()>,
+    diagnostic: Option<&PackedDiagnostic>,
+) -> Result<()> {
+    if let Some(diagnostic) = diagnostic {
+        diagnostic.phase.set(PackedPhase::ContextPreparation);
+    }
     let root = fixture.root.join(name);
     private::directory(&root)?;
     let context = protocol::Context::prepare(
@@ -222,8 +329,22 @@ fn evaluator(
             .ok_or(ScanFailure("SECURITY_FIXTURE_ASSETS"))?,
         &Scope::All,
         fixture.deadline,
-    )?;
-    let mut session = Session::admit(&context, fixture.deadline)?;
+    );
+    if let Some(diagnostic) = diagnostic {
+        diagnostic.completed(&context);
+    }
+    let context = context?;
+    if let Some(diagnostic) = diagnostic {
+        diagnostic.phase.set(PackedPhase::SessionAdmission);
+    }
+    let session = Session::admit(&context, fixture.deadline);
+    if let Some(diagnostic) = diagnostic {
+        diagnostic.completed(&session);
+    }
+    let mut session = session?;
+    if let Some(diagnostic) = diagnostic {
+        diagnostic.phase.set(PackedPhase::Evaluation);
+    }
     session.bind_report(&private::hash_bounded(
         b"explicitly fabricated evaluator input",
         fixture.deadline,
@@ -748,9 +869,18 @@ fn admission(fixture: &Fixture) -> Result<()> {
         "SECURITY_MOCK_PACKED_REPLACE_SETUP_FAILED",
     )?;
     diagnostic("INFO", "SECURITY_MOCK_PACKED_REPLACE_SETUP_PASS");
+    let observation = PackedDiagnostic::new(fixture.deadline);
+    let evaluated = evaluator_observed(
+        fixture,
+        &repo,
+        "admission-replace-proof",
+        |_| Ok(()),
+        Some(&observation),
+    );
+    observation.finish(&evaluated);
     require(
         failed_at(
-            &evaluator(fixture, &repo, "admission-replace-proof", |_| Ok(())),
+            &evaluated,
             "SECURITY_CLASSIFIER_REFS_UNSAFE",
         ),
         "SECURITY_MOCK_PACKED_REPLACE_FAILED",
