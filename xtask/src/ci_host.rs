@@ -136,7 +136,9 @@ fn prepare_sources(started: Instant, archive: &str, security: &str) -> Result<()
                 .context("Write hosted Ubuntu package sources")
         });
     // Close stdin before waiting, and reap the supervised writer even if input fails.
-    let status = writer.wait().context("Wait for hosted package source setup")?;
+    let status = writer
+        .wait()
+        .context("Wait for hosted package source setup")?;
     input_result?;
     if !status.success() {
         bail!("Could not prepare the hosted Ubuntu package sources");

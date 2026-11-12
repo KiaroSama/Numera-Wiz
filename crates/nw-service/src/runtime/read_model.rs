@@ -834,7 +834,10 @@ mod tests {
                 let mut control = Request::query("assets.list", json!({"limit":1}));
                 control.request_id = "legacy-assets-final-control".into();
                 let readable = service.dispatch(reader.clone(), control).await;
-                assert!(readable.ok, "Legacy empty Assets positive control: {readable:?}");
+                assert!(
+                    readable.ok,
+                    "Legacy empty Assets positive control: {readable:?}"
+                );
                 assert!(readable.error.is_none(), "{readable:?}");
                 assert!(readable.receipt_id.is_none(), "{readable:?}");
                 let readable_page = readable.result.as_ref().unwrap();
