@@ -301,21 +301,20 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
     assert_eq!(streams[0]["kind"], "video");
     let physical = streams[0]["index"].as_u64().unwrap() as u32;
     // First real video stream follows the three inspected-source rows.
-    driver.click(390, 319).await;
+    driver.click(330, 312).await;
     driver.screenshot("registered-source-picker").await;
     (asset_id, physical)
 }
 async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
-    driver.click(390, 319).await;
-    tab(driver, 3).await;
+    driver.mark().await;
+    driver.click(330, 312).await;
+    driver.click(445, 376).await;
     driver.replace("0").await;
     for value in ["1", "1", "1", "0", "1"] {
         field(driver, value).await;
     }
     driver.screenshot("registered-source-form").await;
-    driver.mark().await;
-    driver.key(Key::Tab).await;
-    driver.key(Key::Space).await;
+    driver.click(347, 442).await;
     driver.observed("clips.place").await
 }
 async fn external_move<D: Driver>(driver: &mut D, graph: &Graph) -> Response {
