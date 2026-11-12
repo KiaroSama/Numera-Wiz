@@ -201,8 +201,8 @@ impl ProjectContextRule {
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
         "projects.inspect" | "sequences.inspect" => ProjectContextRule::RequiredRead,
-        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.split" | "clips.remove"
-        | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
+        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.split"
+        | "clips.remove" | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
 }
