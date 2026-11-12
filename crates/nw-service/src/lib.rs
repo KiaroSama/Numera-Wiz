@@ -76,6 +76,8 @@ impl CommandService {
 #[path = "../../../ci/schema_validation.rs"]
 mod schema_validation;
 #[cfg(test)]
+mod input_conformance;
+#[cfg(test)]
 fn project_schema_batch(suite: u16, expected: &[u16]) -> schema_validation::Batch {
     let schemas = schema_validation::COMMANDS
         .iter()
@@ -483,6 +485,7 @@ mod tests {
             .expect("SCHEMA_LOCAL_RUNTIME")
             .block_on(conformance.finish());
         project_authorization_requirements_are_static();
+        input_conformance::run();
     }
 
     fn project_authorization_requirements_are_static() {

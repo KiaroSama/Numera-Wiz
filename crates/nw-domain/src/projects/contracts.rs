@@ -1,9 +1,11 @@
-//! Result-only schema composition for the existing project producers.
+//! Public schema composition without changes to runtime request or payload codecs.
 //!
 //! These documents describe projections, never decode accepted results or stored payloads.
 //! In particular, a known payload is decoded by version/kind even when its semantics are
 //! read-only. Its typed projection may contain values that a new edit would reject.
 use serde_json::{Map, Value, json};
+mod inputs;
+pub use inputs::refine as input_schema;
 
 fn object(fields: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
     let properties: Map<String, Value> = fields

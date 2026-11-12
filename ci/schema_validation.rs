@@ -58,6 +58,9 @@ impl Batch {
         self.observe(id, command, &response);
         response
     }
+    pub fn whole(&mut self, id: u16, schema_id: usize, instance_json: String, valid: bool) {
+        self.case(id, schema_id, instance_json, "whole", valid);
+    }
     pub fn observe(&mut self, id: u16, command: &str, response: &impl serde::Serialize) {
         let bytes = serde_json::to_vec(response).expect("SCHEMA_RESPONSE_SERIALIZE");
         assert!(bytes.len() <= 262_144, "SCHEMA_WHOLE_RESPONSE_BOUND");
@@ -144,7 +147,7 @@ impl Batch {
             (1005, 102, r#""550e8400-e29b-41d4-a716-446655440000""#, true),
             (1006, 102, r#""invalid-uuid""#, false),
         ] {
-            self.case(id, schema, instance.into(), "whole", valid);
+            self.whole(id, schema, instance.into(), valid);
         }
         for (id, schema, outcome) in [
             (

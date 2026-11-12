@@ -585,6 +585,20 @@ impl Service {
 }
 
 #[cfg(test)]
+pub(super) fn input_contract_parser_controls() {
+    let mut observed = 0;
+    for (command, params, valid) in crate::input_conformance::literal_cases() {
+        if !matches!(command, "projects.inspect" | "sequences.inspect") {
+            continue;
+        }
+        let request = Request::query(command, params);
+        assert_eq!(Query::parse(&request).is_ok(), valid, "R1_QUERY_PARSER_SCHEMA_DRIFT case={observed}");
+        observed += 1;
+    }
+    assert_eq!(observed, 34, "R1_QUERY_PARSER_CASE_SET_CHANGED");
+}
+
+#[cfg(test)]
 pub(super) async fn exercise_real_snapshot_lifetime() {
     use nw_domain::commands::ProjectRef;
     let temporary = tempfile::tempdir().unwrap();

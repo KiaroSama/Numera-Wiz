@@ -298,7 +298,9 @@ pub fn registry() -> Vec<Descriptor> {
                 state_class: StateClass::$class,
                 qualification: "development_only; five-surface/package qualification pending"
                     .into(),
-                params_schema: serde_json::to_value(schema_for!($params)).expect("schema"),
+                params_schema: crate::projects::contracts::input_schema(
+                    $id, serde_json::to_value(schema_for!($params)).expect("schema"),
+                ),
                 result_schema: result_schema($id),
                 authorization_requirements: crate::projects::authorization::requirements($id),
                 project_context: project_context($id),
