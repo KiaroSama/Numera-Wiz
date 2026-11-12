@@ -502,7 +502,14 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     driver.mark().await;
     driver.click(1298, 283).await;
     driver.replace("4").await;
+    // Backend load observations precede UI publication; retain the actual form focus.
+    if driver.browser() {
+        driver.screenshot("split-numerator-after-input").await;
+    }
     field(driver, "1").await;
+    if driver.browser() {
+        driver.screenshot("split-fields-before-submit").await;
+    }
     driver.key(Key::Tab).await;
     driver.key(Key::Space).await;
     let split = driver.observed("clips.split").await;
