@@ -263,7 +263,10 @@ impl PackedDiagnostic {
     }
     fn completed<T>(&self, result: &Result<T>) {
         self.emit(
-            result.as_ref().err().map(|_| PackedResult::classify(result)),
+            result
+                .as_ref()
+                .err()
+                .map(|_| PackedResult::classify(result)),
             result.is_ok(),
             false,
         );
@@ -276,7 +279,11 @@ impl PackedDiagnostic {
         // deadline. Invalid/out-of-range measurements have a false validity flag.
         let elapsed = self
             .start
-            .and_then(|start| nw_security_scan::bootstrap::boot_ns().ok()?.checked_sub(start))
+            .and_then(|start| {
+                nw_security_scan::bootstrap::boot_ns()
+                    .ok()?
+                    .checked_sub(start)
+            })
             .map(|nanos| nanos / 1_000_000)
             .filter(|millis| *millis <= 300_000);
         let remaining = self
@@ -879,10 +886,7 @@ fn admission(fixture: &Fixture) -> Result<()> {
     );
     observation.finish(&evaluated);
     require(
-        failed_at(
-            &evaluated,
-            "SECURITY_CLASSIFIER_REFS_UNSAFE",
-        ),
+        failed_at(&evaluated, "SECURITY_CLASSIFIER_REFS_UNSAFE"),
         "SECURITY_MOCK_PACKED_REPLACE_FAILED",
     )?;
     AdmissionCase::SymlinkDirectory.enter();

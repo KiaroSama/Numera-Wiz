@@ -314,10 +314,14 @@ mod tests {
     }
     impl std::ops::Deref for ObservedState {
         type Target = std::collections::VecDeque<ObservedReport>;
-        fn deref(&self) -> &Self::Target { &self.responses }
+        fn deref(&self) -> &Self::Target {
+            &self.responses
+        }
     }
     impl std::ops::DerefMut for ObservedState {
-        fn deref_mut(&mut self) -> &mut Self::Target { &mut self.responses }
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.responses
+        }
     }
     pub(super) type ObservedReports = Arc<Mutex<ObservedState>>;
     async fn observe_reports(
@@ -346,14 +350,27 @@ mod tests {
                     "assets.inspect",
                 ]
                 .contains(&command)
-                    || (projects_enabled && (project_journey::project_command(command)
-                        || matches!(command, "assets.list" | "jobs.list" | "streams.clean.plan" | "jobs.submit" | "batches.submit")))
+                    || (projects_enabled
+                        && (project_journey::project_command(command)
+                            || matches!(
+                                command,
+                                "assets.list"
+                                    | "jobs.list"
+                                    | "streams.clean.plan"
+                                    | "jobs.submit"
+                                    | "batches.submit"
+                            )))
                 {
-                    value["request_id"]
-                        .as_str()
-                        .map(|id| (command.to_owned(), id.to_owned(),
+                    value["request_id"].as_str().map(|id| {
+                        (
+                            command.to_owned(),
+                            id.to_owned(),
                             value["project"]["id"].as_str().map(str::to_owned),
-                            value["project"]["expected_revision"].as_str().map(str::to_owned)))
+                            value["project"]["expected_revision"]
+                                .as_str()
+                                .map(str::to_owned),
+                        )
+                    })
                 } else {
                     None
                 }
@@ -374,18 +391,33 @@ mod tests {
         let result = nw_domain::commands::decode_json(&bytes).expect("Observed report JSON");
         {
             let mut reports = reports.lock().await;
-            let project_read = projects_enabled && matches!(command_id.as_str(), "projects.inspect" | "sequences.inspect");
+            let project_read = projects_enabled
+                && matches!(
+                    command_id.as_str(),
+                    "projects.inspect" | "sequences.inspect"
+                );
             if project_read {
-                reports.project_reads = reports.project_reads.checked_add(1).expect("Project observer ordinal exhausted");
+                reports.project_reads = reports
+                    .project_reads
+                    .checked_add(1)
+                    .expect("Project observer ordinal exhausted");
             }
-            let retain = !project_read || result["ok"] != true
+            let retain = !project_read
+                || result["ok"] != true
                 || result["result"]["projection"] == "summary"
                 || result["result"]["entity"]["kind"] == "source_binding"
-                || (matches!(result["result"]["projection"].as_str(), Some("bin_page" | "viewport"))
-                    && result["result"]["items"].as_array().is_some_and(Vec::is_empty));
+                || (matches!(
+                    result["result"]["projection"].as_str(),
+                    Some("bin_page" | "viewport")
+                ) && result["result"]["items"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty));
             if retain {
                 if reports.len() == 8 {
-                    assert!(!projects_enabled, "Project observer responses were not drained within the original eight slots");
+                    assert!(
+                        !projects_enabled,
+                        "Project observer responses were not drained within the original eight slots"
+                    );
                     reports.pop_front();
                 }
                 reports.push_back(ObservedReport {
@@ -713,7 +745,13 @@ mod tests {
         );
         result["value"].clone()
     }
-    pub(super) async fn browser_click(client: &reqwest::Client, base: &str, route: &str, x: u32, y: u32) {
+    pub(super) async fn browser_click(
+        client: &reqwest::Client,
+        base: &str,
+        route: &str,
+        x: u32,
+        y: u32,
+    ) {
         driver(client,base,reqwest::Method::POST,&format!("{route}/actions"),
             json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[
                 {"type":"pointerMove","duration":150,"origin":"viewport","x":x,"y":y},
