@@ -314,7 +314,7 @@ unrelated MCP test-module path. Later source changes still require current check
 
 The MCP tools now publish whole-Response output schemas. Actual CLI, official
 stdio and both HTTP lifecycle responses passed their independent schema batches
-in [run 43319569511](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43319569511).
+in [run 43324562802](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43324562802).
 The same run retained and independently checked actual stdio frames on all four
 native targets: a complete 52-tool standard list result of 144107 bytes and its
 144151-byte JSON-RPC line, including the newline. All 13 project output-schema
