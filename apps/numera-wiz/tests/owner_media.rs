@@ -35,6 +35,21 @@ macro_rules! project_sdk {
     ($client:expr, $scope:expr, $asset:expr, $tag:expr) => {{
         let project = call!($client,"projects.create",json!({"name":format!("SDK project {}",$tag)}),json!({"replay_scope":$scope,"idempotency_key":format!("project-create-{}",$tag)}));
         let id = project["project_id"].as_str().unwrap();
+        let tools = $client.list_all_tools().await.unwrap();
+        let tool = tools.iter().find(|tool| tool.name == "projects.list").expect("Catalog must be exposed by the official MCP registry");
+        let schema = serde_json::to_value(tool).unwrap();
+        assert_eq!(schema["inputSchema"]["properties"]["context"]["type"], "object");
+        assert!(schema["inputSchema"]["properties"]["context"]["properties"].get("project").is_none());
+        assert!(schema["inputSchema"]["properties"]["params"]["properties"].get("replace_snapshot").is_some());
+        let response = $client.call_tool(CallToolRequestParams::new("projects.list").with_arguments(rmcp::object!({"params":{"limit":64},"context":{}}))).await.unwrap();
+        let response = serde_json::to_value(response).unwrap();
+        assert_eq!(response["structuredContent"]["ok"], true, "{response}");
+        assert!(response["structuredContent"]["receipt_id"].is_null());
+        let catalog = &response["structuredContent"]["result"];
+        assert_eq!(catalog["projection"], "projects.summary.v1");
+        assert!(catalog["next_cursor"].is_null());
+        let row = catalog["items"].as_array().unwrap().iter().find(|row| row["id"] == id).expect("SDK-created project must be discoverable by its creator");
+        assert_eq!(row, &json!({"id":id,"name":format!("SDK project {}",$tag),"revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
         let sequence = call!($client,"sequences.create",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),json!({"project":{"id":id,"expected_revision":"0"},"replay_scope":$scope,"idempotency_key":format!("project-sequence-{}",$tag)}));
         let placed = call!($client,"clips.place",json!({"sequence_id":sequence["created"]["sequence_id"],"track_id":sequence["created"]["tracks"][0]["id"],"source":{"kind":"registered","asset_id":$asset["id"],"stream_index":0},"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"}),json!({"project":{"id":id,"expected_revision":"1"},"replay_scope":$scope,"idempotency_key":format!("project-place-{}",$tag)}));
         let inspected = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["clip_ids"][0],"revision":"2"}),json!({"project":{"id":id}}));
@@ -273,6 +288,12 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await;
     assert_eq!(exit, 0, "{project_created}");
     let cli_project = project_created["result"]["project_id"].as_str().unwrap();
+    let (catalog, exit) = cli.human(&["projects", "list", "--limit", "64"]).await;
+    assert_eq!(exit, 0, "{catalog}");
+    assert!(catalog["receipt_id"].is_null());
+    assert_eq!(catalog["result"]["projection"], "projects.summary.v1");
+    let row = catalog["result"]["items"].as_array().unwrap().iter().find(|row| row["id"] == cli_project).unwrap();
+    assert_eq!(row, &json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
     let (project_sequence, exit) = cli
         .human(&[
             "sequences",
@@ -632,7 +653,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,

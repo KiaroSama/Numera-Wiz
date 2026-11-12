@@ -714,5 +714,14 @@ mod tests {
             Some("4")
         );
         assert_eq!(moved.params["delta"], json!({"num":"-1","den":"4"}));
+        let listed = ProjectCli::try_parse_from(["test", "list", "--limit", "64", "--replace-snapshot", "old-ticket"]).unwrap();
+        let listed = prepare(Command::Projects(listed.command)).unwrap();
+        assert_eq!(listed.command.id, "projects.list");
+        assert_eq!(listed.params, json!({"limit":64,"cursor":null,"replace_snapshot":"old-ticket"}));
+        assert!(listed.project.is_none());
+        assert!(listed.replay_scope.is_none() && listed.idempotency_key.is_none());
+        let continued = ProjectCli::try_parse_from(["test", "list", "--limit", "1", "--cursor", "retained-cursor"]).unwrap();
+        assert_eq!(prepare(Command::Projects(continued.command)).unwrap().params, json!({"limit":1,"cursor":"retained-cursor","replace_snapshot":null}));
+        assert!(ProjectCli::try_parse_from(["test", "list", "--project", id]).is_err());
     }
 }

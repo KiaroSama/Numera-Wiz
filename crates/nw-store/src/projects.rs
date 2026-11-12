@@ -4,6 +4,7 @@ use nw_domain::projects::{self as domain, edit::ProjectRead, views::*, *};
 use redb::ReadableTableMetadata;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+mod catalog;
 
 const HISTORY_OPERATIONS: usize = 256;
 const HISTORY_BYTES: usize = 32 * 1024 * 1024;

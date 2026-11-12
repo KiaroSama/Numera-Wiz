@@ -272,6 +272,12 @@ pub fn registry() -> Vec<Descriptor> {
     }
     vec![
         row!(
+            "projects.list",
+            "List readable project headers in ascending ID order",
+            Query,
+            crate::views::PageInput
+        ),
+        row!(
             "projects.create",
             "Create a durable project",
             DurableMutation,
@@ -618,6 +624,15 @@ mod tests {
         read.validate().unwrap();
         read.command.id = "jobs.list".into();
         assert!(read.validate().is_err());
+        read.command.id = "projects.list".into();
+        assert!(read.validate().is_err());
+        let catalog = Request::query("projects.list", serde_json::json!({"limit":64}));
+        catalog.validate().unwrap();
+        let descriptor = descriptor("projects.list").unwrap();
+        assert_eq!(descriptor.project_context, ProjectContextRule::Forbidden);
+        assert!(matches!(descriptor.state_class, StateClass::Query));
+        assert!(ACTIVE_COMMANDS.contains(&"projects.list"));
+        assert!(parse::<crate::views::PageInput>(serde_json::json!({"project_id":id})).is_err());
         let mut entity = EntityEnvelope::new(
             &crate::projects::ProjectId::parse(id).unwrap(),
             EntityId::parse(id).unwrap(),
@@ -826,6 +841,7 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
+    "projects.list",
     "projects.create",
     "projects.inspect",
     "sequences.inspect",

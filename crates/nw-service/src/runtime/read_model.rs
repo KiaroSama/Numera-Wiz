@@ -2,6 +2,9 @@
 use super::*;
 #[path = "projects/queries.rs"]
 mod project_queries;
+#[cfg(test)]
+#[path = "read_model/catalog_tests.rs"]
+mod catalog_tests;
 use nw_domain::views::{AssetSummary, JobSummary, PageInput, SnapshotPage};
 use std::time::{Duration, Instant};
 
@@ -11,6 +14,39 @@ const MAX_PER_PRINCIPAL: usize = 4;
 const MAX_SNAPSHOT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_GLOBAL_BYTES: usize = 16 * 1024 * 1024;
 const MAX_PAGE_BYTES: usize = 240 * 1024;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum InventoryKind {
+    Assets,
+    Jobs,
+    Artifacts,
+    Batches,
+    Projects,
+}
+impl InventoryKind {
+    fn projection(self) -> &'static str {
+        match self {
+            Self::Assets => "assets.summary.v1",
+            Self::Jobs => "jobs.summary.v1",
+            Self::Artifacts => "artifacts.summary.v1",
+            Self::Batches => "batches.summary.v1",
+            Self::Projects => "projects.summary.v1",
+        }
+    }
+}
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum CatalogPhase {
+    Entry,
+    Fresh,
+    Cursor,
+}
+#[cfg(test)]
+pub(super) struct CatalogHook {
+    phase: CatalogPhase,
+    started: std::sync::mpsc::Sender<()>,
+    waiting: std::sync::mpsc::Receiver<bool>,
+}
 
 struct Snapshot {
     principal: String,
@@ -125,38 +161,61 @@ impl Snapshot {
     }
 }
 impl Service {
+    #[cfg(test)]
+    fn catalog_test_phase(&self, phase: CatalogPhase) -> bool {
+        let hook = {
+            let mut slot = self.catalog_hook.lock().unwrap();
+            if slot.as_ref().is_some_and(|hook| hook.phase == phase) {
+                slot.take()
+            } else {
+                None
+            }
+        };
+        if let Some(hook) = hook {
+            hook.started.send(()).unwrap();
+            hook.waiting
+                .recv_timeout(Duration::from_secs(10))
+                .expect("Catalog test phase was not resumed")
+        } else {
+            false
+        }
+    }
+    fn catalog_policy(&self, context: &Context) -> Result<Option<AccessProfile>> {
+        let policy = self.policy(context)?;
+        if policy
+            .as_ref()
+            .is_some_and(|profile| !profile.allows_command("projects.list"))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Project catalog is outside the current profile allowlist",
+            ));
+        }
+        Ok(policy)
+    }
+    fn catalog_publication(
+        &self,
+        context: &Context,
+        revision: u64,
+        created: Instant,
+        cancellation: &CancellationToken,
+    ) -> Result<()> {
+        if cancellation.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Snapshot query cancelled"));
+        }
+        let policy = self.catalog_policy(context)?;
+        if created.elapsed() >= LEASE
+            || policy.as_ref().map_or(0, |profile| profile.revision) != revision
+        {
+            return Err(expired());
+        }
+        Ok(())
+    }
     pub(super) fn inventory_page(
         &self,
         context: &Context,
         input: PageInput,
-        jobs: bool,
-        cancellation: &CancellationToken,
-    ) -> Result<Value> {
-        self.inventory_projection(context, input, jobs, false, false, cancellation)
-    }
-    pub(super) fn artifact_inventory(
-        &self,
-        context: &Context,
-        input: PageInput,
-        cancellation: &CancellationToken,
-    ) -> Result<Value> {
-        self.inventory_projection(context, input, true, true, false, cancellation)
-    }
-    pub(super) fn batch_inventory(
-        &self,
-        context: &Context,
-        input: PageInput,
-        cancellation: &CancellationToken,
-    ) -> Result<Value> {
-        self.inventory_projection(context, input, false, false, true, cancellation)
-    }
-    fn inventory_projection(
-        &self,
-        context: &Context,
-        input: PageInput,
-        jobs: bool,
-        artifacts: bool,
-        batches: bool,
+        kind: InventoryKind,
         cancellation: &CancellationToken,
     ) -> Result<Value> {
         if !(1..=512).contains(&input.limit)
@@ -175,17 +234,21 @@ impl Service {
                 "Page limit must be 1..512 and cursor must be bounded",
             ));
         }
-        let projection = if batches {
-            "batches.summary.v1"
-        } else if artifacts {
-            "artifacts.summary.v1"
-        } else if jobs {
-            "jobs.summary.v1"
+        let projects = kind == InventoryKind::Projects;
+        let projection = kind.projection();
+        #[cfg(test)]
+        if projects {
+            self.catalog_test_phase(CatalogPhase::Entry);
+        }
+        let policy = if projects {
+            self.catalog_policy(context)?
         } else {
-            "assets.summary.v1"
+            self.policy(context)?
         };
-        let policy = self.policy(context)?;
         let revision = policy.as_ref().map_or(0, |profile| profile.revision);
+        if projects && cancellation.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Snapshot query cancelled"));
+        }
         let mut cache = self.snapshots.try_lock().map_err(|_| {
             DomainError::new(
                 "RESOURCE_LIMIT",
@@ -212,7 +275,16 @@ impl Service {
                 return Err(expired());
             }
             let page = snapshot.page(id, offset)?;
-            if self
+            if projects {
+                let created = snapshot.created;
+                #[cfg(test)]
+                let created = if self.catalog_test_phase(CatalogPhase::Cursor) {
+                    Instant::now() - LEASE
+                } else {
+                    created
+                };
+                self.catalog_publication(context, revision, created, cancellation)?;
+            } else if self
                 .policy(context)?
                 .as_ref()
                 .map_or(0, |profile| profile.revision)
@@ -222,22 +294,34 @@ impl Service {
             }
             return Ok(page);
         }
-        if let Some(id) = input.replace_snapshot
-            && cache.entries.get(&id).is_some_and(|snapshot| {
+        if let Some(id) = input.replace_snapshot {
+            if cache.entries.get(&id).is_some_and(|snapshot| {
                 snapshot.principal == context.principal
                     && snapshot.profile == context.profile
                     && snapshot.projection == projection
-            })
-        {
-            cache.entries.remove(&id);
+            }) {
+                cache.entries.remove(&id);
+            }
+            // Catalog navigation alone may retire any principal/profile-owned project read.
+            // Drop the removed ticket immediately, including its real MVCC lease.
+            if projects
+                && cache.projects.get(&id).is_some_and(|ticket| ticket.owned_by(context))
+            {
+                cache.projects.remove(&id);
+            }
         }
-        if cache.count() >= MAX_SNAPSHOTS
-            || cache.principal_count(&context.principal) >= MAX_PER_PRINCIPAL
-        {
-            return Err(DomainError::new(
+        let at_capacity = |cache: &Snapshots| {
+            cache.count() >= MAX_SNAPSHOTS
+                || cache.principal_count(&context.principal) >= MAX_PER_PRINCIPAL
+        };
+        let quota_error = || {
+            DomainError::new(
                 "RESOURCE_LIMIT",
                 "Active snapshot lease quota reached; reuse a cursor or wait for expiry",
-            ));
+            )
+        };
+        if !projects && at_capacity(&cache) {
+            return Err(quota_error());
         }
         let mut snapshot = Snapshot {
             principal: context.principal.clone(),
@@ -263,7 +347,22 @@ impl Service {
                 Ok(())
             }
         };
-        if batches {
+        if projects {
+            self.store.visit_project_summaries(
+                |id, creator| {
+                    check_cancel()?;
+                    Ok(policy.as_ref().is_none_or(|profile| {
+                        profile.allows_object(
+                            ObjectKind::Project,
+                            id.as_str(),
+                            creator,
+                            ObjectAction::Read,
+                        )
+                    }))
+                },
+                |summary| snapshot.push(&summary),
+            )?;
+        } else if kind == InventoryKind::Batches {
             self.store
                 .visit("batch/", |batch: nw_domain::batches::Batch| {
                     check_cancel()?;
@@ -304,7 +403,7 @@ impl Service {
                     }
                     Ok(())
                 })?;
-        } else if jobs {
+        } else if matches!(kind, InventoryKind::Jobs | InventoryKind::Artifacts) {
             self.store.visit("job/", |job: Job| {
                 check_cancel()?;
                 if policy.as_ref().is_none_or(|profile| {
@@ -315,7 +414,7 @@ impl Service {
                         ObjectAction::Read,
                     )
                 }) {
-                    if artifacts {
+                    if kind == InventoryKind::Artifacts {
                         if job.state == JobState::Succeeded
                             && job.owned_staging.is_some()
                             && let Some(identity) = &job.artifact
@@ -356,12 +455,13 @@ impl Service {
                 Ok(())
             })?;
         }
-        if snapshot.created.elapsed() >= LEASE
-            || self
-                .policy(context)?
-                .as_ref()
-                .map_or(0, |profile| profile.revision)
-                != revision
+        if !projects
+            && (snapshot.created.elapsed() >= LEASE
+                || self
+                    .policy(context)?
+                    .as_ref()
+                    .map_or(0, |profile| profile.revision)
+                    != revision)
         {
             return Err(expired());
         }
@@ -373,8 +473,20 @@ impl Service {
         }
         let id = Uuid::new_v4().to_string();
         let page = snapshot.page(&id, 0)?;
+        if projects {
+            #[cfg(test)]
+            if self.catalog_test_phase(CatalogPhase::Fresh) {
+                snapshot.created = Instant::now() - LEASE;
+            }
+            self.catalog_publication(context, revision, snapshot.created, cancellation)?;
+        }
         // Empty and single-page inventories need no retained lease or database snapshot.
         if page["next_cursor"].is_string() {
+            // Projects alone defer count admission until a continuation really needs retention.
+            // The same cache mutex covers admission and insertion; byte checks still ran above.
+            if projects && at_capacity(&cache) {
+                return Err(quota_error());
+            }
             cache.entries.insert(id, snapshot);
         }
         Ok(page)
@@ -386,7 +498,7 @@ mod tests {
     use super::*;
     use nw_domain::records::{FileIdentity, MediaProbe};
 
-    fn asset(id: &str, creator: &str) -> Asset {
+    pub(super) fn asset(id: &str, creator: &str) -> Asset {
         Asset {
             source_object: None,
             id: id.into(),
@@ -469,6 +581,7 @@ mod tests {
         );
 
         project_catalog_lists_committed_public_headers(&service).await;
+        catalog_tests::headers_and_rights().await;
     }
     async fn project_catalog_lists_committed_public_headers(service: &Arc<Service>) {
         let owner = service.owner();
@@ -631,6 +744,8 @@ mod tests {
         crate::runtime::projects::regression_tests::compatibility_and_zero_delta().await;
         crate::runtime::projects::regression_tests::linked_edits().await;
         project_queries::exercise_real_snapshot_lifetime().await;
+        catalog_tests::retirement_and_quotas().await;
+        catalog_tests::cursor_and_publication().await;
     }
     #[test]
     fn page_byte_ceiling_wins_over_row_count_without_truncating_items() {

@@ -55,6 +55,10 @@ fn read_request(context: ReadContext, id: &str, mut params: Value) -> Result<Req
 }
 #[derive(Subcommand)]
 pub enum Projects {
+    List {
+        #[command(flatten)]
+        page: Page,
+    },
     Create {
         #[arg(long)]
         name: String,
@@ -79,6 +83,7 @@ pub enum Projects {
 impl Projects {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
+            Self::List { page } => Ok(query("projects.list", page.params())),
             Self::Create { name, identity } => {
                 model::label(&name)?;
                 let mut request = query("projects.create", json!({"name":name}));

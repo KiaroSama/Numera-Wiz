@@ -1,6 +1,22 @@
 //! Bounded query parameters; project identity and write revision stay in the envelope.
 use super::*;
 use crate::time::TimeRange;
+/// Public common-header fields only; catalog order is ascending canonical project ID.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectSummary {
+    pub id: ProjectId,
+    pub name: String,
+    pub revision: Revision,
+    pub schema_major: u32,
+    pub envelope_version: u32,
+    pub compatibility: ProjectCompatibility,
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectCompatibility {
+    Supported,
+    ReadOnlyUnsupported,
+}
 fn limit_default() -> usize {
     128
 }

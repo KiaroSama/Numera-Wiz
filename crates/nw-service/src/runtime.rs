@@ -81,6 +81,8 @@ pub struct Service {
     events: broadcast::Sender<String>,
     #[cfg(test)]
     preflight_hook: Mutex<Option<PreflightHook>>,
+    #[cfg(test)]
+    catalog_hook: Mutex<Option<read_model::CatalogHook>>,
 }
 fn lock_error() -> DomainError {
     DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned")
@@ -243,6 +245,8 @@ impl Service {
             events,
             #[cfg(test)]
             preflight_hook: Mutex::new(None),
+            #[cfg(test)]
+            catalog_hook: Mutex::new(None),
         });
         Self::start_snapshot_reaper(&service);
         if service.store.pending_migration()?.is_some() {
@@ -909,6 +913,12 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "projects.list" => self.inventory_page(
+                &context,
+                commands::parse(params)?,
+                read_model::InventoryKind::Projects,
+                &cancellation,
+            )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
             | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo"
             | "history.redo" => {
@@ -923,7 +933,12 @@ impl Service {
                 return self.maintenance_command(&context, &request, &cancellation);
             }
             "artifacts.list" => {
-                self.artifact_inventory(&context, commands::parse(params)?, &cancellation)?
+                self.inventory_page(
+                    &context,
+                    commands::parse(params)?,
+                    read_model::InventoryKind::Artifacts,
+                    &cancellation,
+                )?
             }
             "artifacts.manifest" => {
                 let input: nw_domain::artifacts::ManifestInput = commands::parse(params)?;
@@ -1289,7 +1304,12 @@ impl Service {
                 );
             }
             "assets.list" => {
-                self.inventory_page(&context, commands::parse(params)?, false, &cancellation)?
+                self.inventory_page(
+                    &context,
+                    commands::parse(params)?,
+                    read_model::InventoryKind::Assets,
+                    &cancellation,
+                )?
             }
             "assets.inspect" => {
                 let input: IdInput = commands::parse(params)?;
@@ -1426,7 +1446,12 @@ impl Service {
                 value(&self.batch_review(&context, &plan)?)?
             }
             "batches.list" => {
-                self.batch_inventory(&context, commands::parse(params)?, &cancellation)?
+                self.inventory_page(
+                    &context,
+                    commands::parse(params)?,
+                    read_model::InventoryKind::Batches,
+                    &cancellation,
+                )?
             }
             "batches.inspect" => {
                 let input: IdInput = commands::parse(params)?;
@@ -1750,7 +1775,12 @@ impl Service {
                 value(&self.job_view(&context, &job)?)?
             }
             "jobs.list" => {
-                self.inventory_page(&context, commands::parse(params)?, true, &cancellation)?
+                self.inventory_page(
+                    &context,
+                    commands::parse(params)?,
+                    read_model::InventoryKind::Jobs,
+                    &cancellation,
+                )?
             }
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;

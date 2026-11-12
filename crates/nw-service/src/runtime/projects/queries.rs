@@ -29,6 +29,9 @@ impl ProjectTicket {
     pub(super) fn principal(&self) -> &str {
         &self.principal
     }
+    pub(super) fn owned_by(&self, context: &Context) -> bool {
+        self.principal == context.principal && self.profile == context.profile
+    }
     pub(super) fn bytes(&self) -> usize {
         8192 + self.read.header_raw().len() * 2
             + self.query_bindings.values().map(String::len).sum::<usize>()
