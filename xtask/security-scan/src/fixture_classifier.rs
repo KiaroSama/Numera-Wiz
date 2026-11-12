@@ -482,7 +482,9 @@ fn real_evaluator(fixture: &Fixture, repository: &Path) -> Result<()> {
         // Unrelated missing-context I/O must keep its own category, never count
         // as a successful filename-set rejection. Restore before continuing.
         let context = fixture.root.join("evaluator-proof-faults/context.json");
-        let held_context = fixture.root.join("evaluator-proof-faults/held-context.json");
+        let held_context = fixture
+            .root
+            .join("evaluator-proof-faults/held-context.json");
         fs::rename(&context, &held_context).private("SECURITY_FIXTURE_IO")?;
         require(
             failed_at(&session.verify(), "SECURITY_PRIVATE_IO_FAILED"),
