@@ -1,4 +1,5 @@
 //! Complete JSON validation with bounded location retention; no raw findings log.
+use crate::bootstrap::Deadline;
 use crate::{PrivateResult, Result, ScanFailure, classifier::Counts, require};
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::{fmt, fs::OpenOptions, io::Write, path::Path};
@@ -110,12 +111,13 @@ impl<'de> Deserialize<'de> for Row {
         deserializer.deserialize_map(RowVisitor)
     }
 }
-pub fn parse(bytes: &[u8]) -> Result<Report> {
+pub fn parse(bytes: &[u8], deadline: Deadline) -> Result<Report> {
     require(
         bytes.len() as u64 <= crate::private::REPORT_LIMIT,
         "SECURITY_REPORT_OVERSIZE",
     )?;
-    let text = std::str::from_utf8(bytes).private("SECURITY_REPORT_INVALID")?;
+    deadline.check()?;
+    let clock_failure = std::cell::Cell::new(None);
     struct ReportVisitor;
     impl<'de> Visitor<'de> for ReportVisitor {
         type Value = Report;
@@ -139,11 +141,17 @@ pub fn parse(bytes: &[u8]) -> Result<Report> {
             Ok(report)
         }
     }
-    let mut deserializer = serde_json::Deserializer::from_str(text);
-    let report = deserializer
-        .deserialize_seq(ReportVisitor)
-        .private("SECURITY_REPORT_INVALID")?;
-    deserializer.end().private("SECURITY_REPORT_INVALID")?;
+    let reader = std::io::BufReader::with_capacity(64 * 1024, CheckedRead { bytes, deadline, failure: &clock_failure });
+    let mut deserializer = serde_json::Deserializer::from_reader(reader);
+    let parsed = deserializer.deserialize_seq(ReportVisitor);
+    deadline.check()?;
+    if let Some(error) = clock_failure.get() { return Err(error); }
+    let report = parsed.private("SECURITY_REPORT_INVALID")?;
+    let ended = deserializer.end();
+    deadline.check()?;
+    if let Some(error) = clock_failure.get() { return Err(error); }
+    ended.private("SECURITY_REPORT_INVALID")?;
+    deadline.check()?;
     Ok(report)
 }
 pub fn agreement(status: Option<i32>, report: &Report, history: usize, quiet: bool) -> Result<()> {
@@ -157,12 +165,13 @@ pub fn agreement(status: Option<i32>, report: &Report, history: usize, quiet: bo
 }
 /// Second maintained-Serde pass over the same immutable, already agreed report.
 /// A callback failure keeps its fixed category; malformed JSON never yields totals.
-pub fn visit_rows(bytes: &[u8], mut callback: impl FnMut(Row) -> Result<()>) -> Result<usize> {
+pub fn visit_rows(bytes: &[u8], deadline: Deadline, mut callback: impl FnMut(Row) -> Result<()>) -> Result<usize> {
     require(
         bytes.len() as u64 <= crate::private::REPORT_LIMIT,
         "SECURITY_REPORT_OVERSIZE",
     )?;
-    let text = std::str::from_utf8(bytes).private("SECURITY_REPORT_INVALID")?;
+    deadline.check()?;
+    let clock_failure = std::cell::Cell::new(None);
     struct Rows<'a, F> {
         callback: &'a mut F,
         failure: &'a mut Option<ScanFailure>,
@@ -187,21 +196,35 @@ pub fn visit_rows(bytes: &[u8], mut callback: impl FnMut(Row) -> Result<()>) -> 
         }
     }
     let mut failure = None;
-    let mut deserializer = serde_json::Deserializer::from_str(text);
+    let reader = std::io::BufReader::with_capacity(64 * 1024, CheckedRead { bytes, deadline, failure: &clock_failure });
+    let mut deserializer = serde_json::Deserializer::from_reader(reader);
     let result = deserializer.deserialize_seq(Rows {
         callback: &mut callback,
         failure: &mut failure,
     });
-    if let Some(error) = failure {
+    deadline.check()?;
+    if let Some(error) = clock_failure.get().or(failure) {
         return Err(error);
     }
     let count = result.private("SECURITY_REPORT_INVALID")?;
-    deserializer.end().private("SECURITY_REPORT_INVALID")?;
+    let ended = deserializer.end();
+    deadline.check()?;
+    if let Some(error) = clock_failure.get() { return Err(error); }
+    ended.private("SECURITY_REPORT_INVALID")?;
+    deadline.check()?;
     Ok(count)
 }
 pub fn escape(value: &str) -> String {
+    escape_inner(value, None).expect("no deadline in pure escape")
+}
+fn escape_inner(value: &str, deadline: Option<Deadline>) -> Result<String> {
     let mut output = String::new();
-    for c in value.chars() {
+    let mut next = 0;
+    for (index, c) in value.char_indices() {
+        if index >= next {
+            if let Some(deadline) = deadline { deadline.check()?; }
+            next = index + 64 * 1024;
+        }
         match c {
             '&' => output.push_str("&amp;"),
             '<' => output.push_str("&lt;"),
@@ -213,9 +236,15 @@ pub fn escape(value: &str) -> String {
             _ => output.push(c),
         }
     }
-    output
+    Ok(output)
 }
 pub fn summary(report: &Report, pull_request: bool) -> String {
+    summary_inner(report, pull_request, None).expect("no deadline in pure summary")
+}
+fn summary_bounded(report: &Report, pull_request: bool, deadline: Deadline) -> Result<String> {
+    deadline.check()?; summary_inner(report, pull_request, Some(deadline))
+}
+fn summary_inner(report: &Report, pull_request: bool, deadline: Option<Deadline>) -> Result<String> {
     let scope = if pull_request {
         "Commits introduced by this pull request, including merge diffs"
     } else {
@@ -231,28 +260,29 @@ pub fn summary(report: &Report, pull_request: bool) -> String {
         for row in &report.rows {
             output.push_str(&format!(
                 "| <code>{}</code> | <code>{}</code> | <code>{}</code> | <code>{}</code> |\n",
-                escape(&row.rule),
-                escape(&row.file),
-                escape(&row.line),
-                escape(&row.commit)
+                escape_inner(&row.rule, deadline)?,
+                escape_inner(&row.file, deadline)?,
+                escape_inner(&row.line, deadline)?,
+                escape_inner(&row.commit, deadline)?
             ));
         }
         if report.count > 200 {
             output.push_str(&format!("\nShowing 200 of {} findings. Repeat the same version locally for the complete report.\n", report.count));
         }
     }
-    output
+    if let Some(deadline) = deadline { deadline.check()?; }
+    Ok(output)
 }
-pub fn write_summary(path: Option<&Path>, report: &Report, pull_request: bool) -> Result<()> {
-    publish(path, &summary(report, pull_request))
+pub fn write_summary(path: Option<&Path>, report: &Report, pull_request: bool, deadline: Deadline) -> Result<()> {
+    publish(path, &summary_bounded(report, pull_request, deadline)?, deadline)
 }
-pub fn classified_summary(report: &Report, pull_request: bool, counts: &Counts) -> Result<String> {
+pub fn classified_summary(report: &Report, pull_request: bool, counts: &Counts, deadline: Deadline) -> Result<String> {
     require(
         report.count == counts.total
             && counts.reviewed.checked_add(counts.unreviewed) == Some(counts.total),
         "SECURITY_CLASSIFIER_COUNT_DISAGREEMENT",
     )?;
-    let mut text = summary(report, pull_request);
+    let mut text = summary_bounded(report, pull_request, deadline)?;
     if counts.total > 0 {
         // Keep the original four-column table and every retained row intact.
         let position = text
@@ -273,16 +303,33 @@ pub fn classified_summary(report: &Report, pull_request: bool, counts: &Counts) 
             ),
         );
     }
+    deadline.check()?;
     Ok(text)
 }
-pub fn publish(path: Option<&Path>, text: &str) -> Result<()> {
+pub fn publish(path: Option<&Path>, text: &str, deadline: Deadline) -> Result<()> {
+    deadline.check()?;
     if let Some(path) = path.filter(|p| !p.as_os_str().is_empty()) {
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut f| f.write_all(text.as_bytes()))
-            .private("SECURITY_SUMMARY_WRITE_FAILED")?;
+        let mut file = OpenOptions::new().create(true).append(true).open(path).private("SECURITY_SUMMARY_WRITE_FAILED")?;
+        for chunk in text.as_bytes().chunks(64 * 1024) {
+            deadline.check()?;
+            file.write_all(chunk).private("SECURITY_SUMMARY_WRITE_FAILED")?;
+            deadline.check()?;
+        }
     }
-    Ok(())
+    deadline.check()
+}
+
+struct CheckedRead<'a> {
+    bytes: &'a [u8], deadline: Deadline,
+    failure: &'a std::cell::Cell<Option<ScanFailure>>,
+}
+impl std::io::Read for CheckedRead<'_> {
+    fn read(&mut self, target: &mut [u8]) -> std::io::Result<usize> {
+        if let Err(error) = self.deadline.check() { self.failure.set(Some(error)); return Err(std::io::Error::other("bounded report interrupted")); }
+        let count = target.len().min(self.bytes.len()).min(64 * 1024);
+        target[..count].copy_from_slice(&self.bytes[..count]);
+        self.bytes = &self.bytes[count..];
+        if let Err(error) = self.deadline.check() { self.failure.set(Some(error)); return Err(std::io::Error::other("bounded report interrupted")); }
+        Ok(count)
+    }
 }

@@ -378,16 +378,27 @@ jobs:
             target/fixture-ffmpeg-src/config.h
           if-no-files-found: warn
 
-      - name: Build, lint and qualify the isolated security candidate on synthetic repositories
+      - name: Prepare the bounded isolated security candidate
+        id: security_candidate_prepare
         if: ${{ !cancelled() }}
         working-directory: xtask/security-scan
         env:
           CARGO_HOME: ${{ runner.temp }}/security-candidate-cargo-${{ github.run_id }}-${{ github.run_attempt }}
           CARGO_TARGET_DIR: ${{ runner.temp }}/security-candidate-target-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          /usr/bin/install --mode=0600 --no-target-directory -- /proc/uptime "${RUNNER_TEMP}/nw-security-bootstrap-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.stamp"
           rustup component add clippy --toolchain 1.99.1
           cargo +1.99.1 build --locked --manifest-path Cargo.toml --bins
           cargo +1.99.1 clippy --locked --manifest-path Cargo.toml --all-targets -- -D warnings
+          "${CARGO_TARGET_DIR}/debug/nw-security-scan" budget-from-marker
+
+      - name: Qualify the bounded security candidate on synthetic repositories
+        if: ${{ !cancelled() && steps.security_candidate_prepare.outcome == 'success' }}
+        working-directory: xtask/security-scan
+        env:
+          CARGO_HOME: ${{ runner.temp }}/security-candidate-cargo-${{ github.run_id }}-${{ github.run_attempt }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/security-candidate-target-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
           "${CARGO_TARGET_DIR}/debug/nw-security-qualify"
 
   owner-batch:

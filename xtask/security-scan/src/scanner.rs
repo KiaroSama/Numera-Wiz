@@ -1,4 +1,5 @@
 //! Scan orchestration. Repository data never selects Cargo, executables or rules.
+use crate::bootstrap::Deadline;
 use crate::{
     PrivateResult, Result, ScanFailure,
     assets::Release,
@@ -13,7 +14,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 pub struct ScanRequest<'a> {
@@ -21,7 +22,7 @@ pub struct ScanRequest<'a> {
     pub summary: Option<&'a Path>,
     pub scope: &'a Scope,
     pub release: &'a Release,
-    pub deadline: Instant,
+    pub deadline: Deadline,
 }
 pub struct VerifiedScan {
     pub scanner_version: String,
@@ -58,11 +59,12 @@ pub fn real_git() -> Result<PathBuf> {
     fs::canonicalize("/usr/bin/git").private("SECURITY_GIT_UNAVAILABLE")
 }
 pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
+    request.deadline.check()?;
     guard()?;
     process::initialize()?;
     process::barrier()?;
     request.scope.validate()?;
-    request.release.validate()?;
+    request.release.validate(request.deadline)?;
     let repository = fs::canonicalize(request.repository).private("SECURITY_REPOSITORY_INVALID")?;
     let git_directory = repository.join(".git");
     require(
@@ -132,12 +134,10 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
             require(outcome.adopted == 0, "SECURITY_UNEXPECTED_DESCENDANT")?;
             let proofs = protocol::verify_proofs(&context, outcome.leader)?;
             let report_bytes =
-                private::read(&context.root.join("findings.json"), private::REPORT_LIMIT)?;
-            let parsed = report::parse(&report_bytes)?;
-            require(
-                Instant::now() < request.deadline && !process::cancelled(),
-                "SECURITY_DEADLINE",
-            )?;
+                private::read_bounded(&context.root.join("findings.json"), private::REPORT_LIMIT, request.deadline)?;
+            let parsed = report::parse(&report_bytes, request.deadline)?;
+            request.deadline.check()?;
+            require(!process::cancelled(), "SECURITY_DEADLINE")?;
             report::agreement(
                 outcome.status,
                 &parsed,
@@ -152,12 +152,10 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
             let summary = report::classified_summary(
                 &parsed,
                 matches!(request.scope, Scope::PullRequest { .. }),
-                &counts,
+                &counts, request.deadline,
             )?;
-            require(
-                Instant::now() < request.deadline && !process::cancelled(),
-                "SECURITY_DEADLINE",
-            )?;
+            request.deadline.check()?;
+            require(!process::cancelled(), "SECURITY_DEADLINE")?;
             Ok(VerifiedScan {
                 scanner_version: crate::assets::VERSION.into(),
                 finding_count: parsed.count,
@@ -180,13 +178,11 @@ pub fn scan(request: &ScanRequest<'_>) -> Result<VerifiedScan> {
         .unwrap_or(Err(ScanFailure("SECURITY_SCAN_PANIC")));
     match process::barrier() {
         Ok(barrier) => {
-            scratch.remove(&barrier)?;
+            scratch.remove(&barrier, request.deadline)?;
             let verified = result?;
-            require(
-                Instant::now() < request.deadline && !process::cancelled(),
-                "SECURITY_DEADLINE",
-            )?;
-            report::publish(request.summary, &verified.summary)?;
+            request.deadline.check()?;
+            require(!process::cancelled(), "SECURITY_DEADLINE")?;
+            report::publish(request.summary, &verified.summary, request.deadline)?;
             Ok(verified)
         }
         Err(_) => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
@@ -211,11 +207,11 @@ pub fn internal_dispatch() -> Option<std::process::ExitCode> {
         }
     })
 }
-pub fn provenance() -> Result<()> {
+pub fn provenance(deadline: Deadline) -> Result<()> {
     let helper =
-        private::executable_hash(&env::current_exe().private("SECURITY_EXECUTABLE_INVALID")?)?;
-    let manifest = private::hash(include_bytes!("../Cargo.toml"));
-    let lock = private::hash(include_bytes!("../Cargo.lock"));
+        private::executable_hash_bounded(&env::current_exe().private("SECURITY_EXECUTABLE_INVALID")?, deadline)?;
+    let manifest = private::hash_bounded(include_bytes!("../Cargo.toml"), deadline)?;
+    let lock = private::hash_bounded(include_bytes!("../Cargo.lock"), deadline)?;
     // Only fixed labels and SHA-256 digests; compiler/source commit are verified by
     // the later trusted workflow bootstrap, not inferred from Cargo package metadata.
     eprintln!(

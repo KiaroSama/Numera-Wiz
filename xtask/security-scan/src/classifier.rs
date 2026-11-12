@@ -1,6 +1,7 @@
 //! Source-reviewed full historical file identities, never scanner suppression rules.
+use crate::bootstrap::Deadline;
 use crate::{Result, ScanFailure, classifier_git::Session, private, process, report, require};
-use std::{collections::BTreeMap, time::Instant};
+use std::collections::BTreeMap;
 
 pub struct Document {
     pub path: &'static str,
@@ -61,8 +62,9 @@ impl Counts {
         })
     }
 }
-pub fn active(deadline: Instant, cancelled: bool) -> Result<()> {
-    require(Instant::now() < deadline && !cancelled, "SECURITY_DEADLINE")
+pub fn active(deadline: Deadline, cancelled: bool) -> Result<()> {
+    deadline.check()?;
+    require(!cancelled, "SECURITY_DEADLINE")
 }
 pub fn positive_cache_room(current: usize) -> Result<()> {
     require(current < DOCUMENTS.len(), "SECURITY_CLASSIFIER_CACHE_LIMIT")
@@ -74,15 +76,15 @@ pub struct Plan {
     report_hash: String,
 }
 impl Plan {
-    pub fn from_report(bytes: &[u8], expected: usize, deadline: Instant) -> Result<Self> {
+    pub fn from_report(bytes: &[u8], expected: usize, deadline: Deadline) -> Result<Self> {
         active(deadline, process::cancelled())?;
         let mut plan = Self {
             total: 0,
             unknown: 0,
             candidates: BTreeMap::new(),
-            report_hash: private::hash(bytes),
+            report_hash: private::hash_bounded(bytes, deadline)?,
         };
-        let count = report::visit_rows(bytes, |row| {
+        let count = report::visit_rows(bytes, deadline, |row| {
             active(deadline, process::cancelled())?;
             plan.total = plan
                 .total

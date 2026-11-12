@@ -1,4 +1,5 @@
 //! Checksum-pinned release; the downloader runs as an owned bounded child.
+use crate::bootstrap::Deadline;
 use crate::{PrivateResult, Result, ScanFailure, private, process, require};
 use flate2::read::MultiGzDecoder;
 use serde_json::json;
@@ -9,7 +10,7 @@ use std::{
     os::unix::fs::{MetadataExt, PermissionsExt},
     path::{Path, PathBuf},
     process::Command,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 pub const VERSION: &str = "8.30.1";
@@ -21,20 +22,21 @@ pub struct Release {
     executable_sha: String,
 }
 impl Release {
-    pub fn prepare(root: &Path, deadline: Instant) -> Result<Self> {
+    pub fn prepare(root: &Path, deadline: Deadline) -> Result<Self> {
         require(!process::cancelled(), "SECURITY_CANCELLED")?;
         let helper = root.join("security-download");
         let current = std::env::current_exe().private("SECURITY_EXECUTABLE_INVALID")?;
-        let helper_sha = private::copy_executable(&current, &helper)?;
+        let helper_sha = private::copy_executable_bounded(&current, &helper, deadline)?;
         let token = private::nonce()?;
-        private::write(
+        let download_deadline = deadline.reserve(process::GRACE)?.cap(Duration::from_secs(60))?;
+        private::write_bounded(
             &root.join("download-context.json"),
             &serde_json::to_vec(&json!({
                 "token": token, "parent": rustix::process::getpid().as_raw_pid(),
-                "root": private::identity(root)?, "helper": helper_sha
+                "root": private::identity(root)?, "helper": helper_sha, "deadline": download_deadline.value()
             }))
             .private("SECURITY_CONTEXT_INVALID")?,
-        )?;
+         deadline)?;
         let mut command = Command::new(&helper);
         private::controlled(&mut command, root);
         command
@@ -58,16 +60,16 @@ impl Release {
             "SECURITY_DOWNLOAD_FAILED",
         )?;
         let archive = root.join("release.tar.gz");
-        let bytes = private::read(&archive, 64 * private::MIB)?;
+        let bytes = private::read_bounded(&archive, 64 * private::MIB, deadline)?;
         let executable = root.join("gitleaks");
         let payload = verify_pinned(&bytes, deadline)?;
-        private::write(&executable, &payload)?;
+        private::write_bounded(&executable, &payload, deadline)?;
         fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))
             .private("SECURITY_PRIVATE_IO_FAILED")?;
         let release = Self {
             archive,
             executable,
-            executable_sha: private::hash(&payload),
+            executable_sha: private::hash_bounded(&payload, deadline)?,
         };
         let mut version = Command::new(&release.executable);
         private::controlled(&mut version, root);
@@ -88,10 +90,10 @@ impl Release {
     pub fn executable(&self) -> &Path {
         &self.executable
     }
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self, deadline: Deadline) -> Result<()> {
         require(
-            private::hash(&private::read(&self.archive, 64 * private::MIB)?) == ARCHIVE_SHA
-                && private::executable_hash(&self.executable)? == self.executable_sha,
+            private::hash_bounded(&private::read_bounded(&self.archive, 64 * private::MIB, deadline)?, deadline)? == ARCHIVE_SHA
+                && private::executable_hash_bounded(&self.executable, deadline)? == self.executable_sha,
             "SECURITY_EXECUTABLE_INVALID",
         )
     }
@@ -104,15 +106,15 @@ pub fn verify_version(status: Option<i32>, stdout: &[u8], quiet_stderr: bool) ->
         "SECURITY_VERSION_INVALID",
     )
 }
-pub fn verify_pinned(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
+pub fn verify_pinned(bytes: &[u8], deadline: Deadline) -> Result<Vec<u8>> {
     require(
-        bytes.len() as u64 <= 64 * private::MIB && private::hash(bytes) == ARCHIVE_SHA,
+        bytes.len() as u64 <= 64 * private::MIB && private::hash_bounded(bytes, deadline)? == ARCHIVE_SHA,
         "SECURITY_ARCHIVE_HASH_INVALID",
     )?;
     inspect_archive(bytes, deadline)
 }
 /// Verifier boundary for malformed-archive fixtures, never a production pin override.
-pub fn inspect_archive(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
+pub fn inspect_archive(bytes: &[u8], deadline: Deadline) -> Result<Vec<u8>> {
     require(
         bytes.len() as u64 <= 64 * private::MIB,
         "SECURITY_ARCHIVE_OVERSIZE",
@@ -121,13 +123,12 @@ pub fn inspect_archive(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
     let mut decoded = Vec::new();
     let mut buffer = [0; 64 * 1024];
     loop {
-        require(
-            Instant::now() < deadline && !process::cancelled(),
-            "SECURITY_DEADLINE",
-        )?;
+        deadline.check()?;
+        require(!process::cancelled(), "SECURITY_DEADLINE")?;
         let size = decoder
             .read(&mut buffer)
             .private("SECURITY_ARCHIVE_INVALID")?;
+        deadline.check()?;
         if size == 0 {
             break;
         }
@@ -147,10 +148,8 @@ pub fn inspect_archive(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
         .private("SECURITY_ARCHIVE_INVALID")?
         .raw(true)
     {
-        require(
-            Instant::now() < deadline && !process::cancelled(),
-            "SECURITY_DEADLINE",
-        )?;
+        deadline.check()?;
+        require(!process::cancelled(), "SECURITY_DEADLINE")?;
         let mut entry = entry.private("SECURITY_ARCHIVE_INVALID")?;
         require(paths.len() < 128, "SECURITY_ARCHIVE_MEMBER_LIMIT")?;
         let path_bytes = entry.path_bytes();
@@ -183,15 +182,19 @@ pub fn inspect_archive(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
             )?;
             let expected = entry.size();
             let mut content = Vec::new();
-            entry
-                .by_ref()
-                .take(128 * private::MIB + 1)
-                .read_to_end(&mut content)
-                .private("SECURITY_ARCHIVE_INVALID")?;
+            loop {
+                deadline.check()?;
+                let count = entry.read(&mut buffer).private("SECURITY_ARCHIVE_INVALID")?;
+                deadline.check()?;
+                if count == 0 { break; }
+                require(content.len() as u64 + count as u64 <= 128 * private::MIB, "SECURITY_ARCHIVE_OVERSIZE")?;
+                content.extend_from_slice(&buffer[..count]);
+            }
             require(content.len() as u64 == expected, "SECURITY_ARCHIVE_INVALID")?;
             payload = Some(content);
         } else {
             loop {
+                deadline.check()?;
                 if entry
                     .read(&mut buffer)
                     .private("SECURITY_ARCHIVE_INVALID")?
@@ -202,6 +205,7 @@ pub fn inspect_archive(bytes: &[u8], deadline: Instant) -> Result<Vec<u8>> {
             }
         }
     }
+    deadline.check()?;
     payload.ok_or(ScanFailure("SECURITY_ARCHIVE_EXECUTABLE_INVALID"))
 }
 pub fn downloader_worker() -> Result<()> {
@@ -217,17 +221,14 @@ pub fn downloader_worker() -> Result<()> {
             && meta.uid() == rustix::process::getuid().as_raw(),
         "SECURITY_CONTEXT_INVALID",
     )?;
-    let value: serde_json::Value = serde_json::from_slice(&private::read(
-        &root.join("download-context.json"),
-        private::RECORD_LIMIT,
-    )?)
-    .private("SECURITY_CONTEXT_INVALID")?;
+    let value = crate::protocol::read_json(&root.join("download-context.json"))?;
+    let deadline = Deadline::from_value(&value["deadline"])?;
     let token = std::env::var("NW_SECURITY_DOWNLOAD_TOKEN").private("SECURITY_CONTEXT_INVALID")?;
     require(
         value["token"].as_str() == Some(&token)
             && token.len() == 32
             && value["root"].as_str() == Some(&private::identity(root)?)
-            && value["helper"].as_str() == Some(&private::executable_hash(&executable)?)
+            && value["helper"].as_str() == Some(&private::executable_hash_bounded(&executable, deadline)?)
             && value["parent"].as_i64()
                 == rustix::process::getppid().map(|p| i64::from(p.as_raw_pid())),
         "SECURITY_CONTEXT_INVALID",
@@ -240,15 +241,17 @@ pub fn downloader_worker() -> Result<()> {
         .no_deflate()
         .no_zstd()
         .redirect(reqwest::redirect::Policy::limited(10))
-        .timeout(Duration::from_secs(60))
-        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60).min(deadline.remaining()?))
+        .connect_timeout(Duration::from_secs(15).min(deadline.remaining()?))
         .build()
         .private("SECURITY_DOWNLOAD_FAILED")?;
+    deadline.check()?;
     let mut response = client
         .get(URL)
         .send()
         .and_then(|r| r.error_for_status())
         .private("SECURITY_DOWNLOAD_FAILED")?;
+    deadline.check()?;
     if let Some(length) = response.content_length() {
         require(length <= 64 * private::MIB, "SECURITY_DOWNLOAD_OVERSIZE")?;
     }
@@ -256,9 +259,11 @@ pub fn downloader_worker() -> Result<()> {
     let mut total = 0_u64;
     let mut buffer = [0; 64 * 1024];
     loop {
+        deadline.check()?;
         let size = response
             .read(&mut buffer)
             .private("SECURITY_DOWNLOAD_FAILED")?;
+        deadline.check()?;
         if size == 0 {
             break;
         }
@@ -267,5 +272,7 @@ pub fn downloader_worker() -> Result<()> {
         file.write_all(&buffer[..size])
             .private("SECURITY_DOWNLOAD_FAILED")?;
     }
-    file.sync_all().private("SECURITY_DOWNLOAD_FAILED")
+    deadline.check()?;
+    file.sync_all().private("SECURITY_DOWNLOAD_FAILED")?;
+    deadline.check()
 }

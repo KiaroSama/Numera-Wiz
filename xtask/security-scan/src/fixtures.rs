@@ -1,4 +1,5 @@
 //! Private synthetic repositories and independently classified negative oracles.
+use nw_security_scan::bootstrap::{Deadline, Stage};
 use nw_security_scan::{
     PrivateResult, Result, ScanFailure,
     assets::{self, Release},
@@ -14,9 +15,11 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
+#[path = "fixture_bootstrap.rs"]
+mod bootstrap_cases;
 #[path = "fixture_children.rs"]
 mod children;
 #[path = "fixture_classifier.rs"]
@@ -34,8 +37,9 @@ const EXPECTED_SUMMARY: &str = concat!(
 struct Fixture {
     root: PathBuf,
     git: PathBuf,
-    deadline: Instant,
+    deadline: Deadline,
     release: Option<Release>,
+    stage: Stage,
 }
 #[derive(Debug)]
 enum FixtureGitOperation {
@@ -81,8 +85,10 @@ pub fn qualify() -> Result<()> {
     scanner::guard()?;
     process::initialize()?;
     process::barrier()?;
-    scanner::provenance()?;
-    let deadline = Instant::now() + Duration::from_secs(300);
+    let stage = Stage::admit()?;
+    let deadline = stage.deadline.cap(Duration::from_secs(300))?;
+    diagnostic("INFO", "SECURITY_ACTUAL_BOOTSTRAP_ENV_CONSUMED_PASS");
+    scanner::provenance(deadline)?;
     let git = scanner::real_git()?;
     let scratch = Scratch::create(&scanner::temporary()?)?;
     let mut fixture = Fixture {
@@ -90,12 +96,13 @@ pub fn qualify() -> Result<()> {
         git,
         deadline,
         release: None,
+        stage,
     };
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fixture.all()))
         .unwrap_or(Err(ScanFailure("SECURITY_QUALIFICATION_PANIC")));
     match process::barrier() {
         Ok(barrier) => {
-            scratch.remove(&barrier)?;
+            scratch.remove(&barrier, deadline)?;
             result
         }
         Err(_) => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
@@ -111,7 +118,9 @@ impl Fixture {
         self.real_git_failure()?;
         self.untrusted_build()?;
         self.process_cases()?;
-        self.known_public_data_policy()
+        self.known_public_data_policy()?;
+        bootstrap_cases::cases(self)?;
+        bootstrap_cases::real_consumer(self)
     }
     fn git_result(&self, repository: &Path, args: &[&str]) -> Result<process::Outcome> {
         let mut command = Command::new(&self.git);
@@ -154,7 +163,7 @@ impl Fixture {
             outcome.is_some_and(process::Outcome::completed),
             outcome.is_some_and(process::Outcome::completed_nonzero),
             outcome.is_some_and(|value| value.failure.is_some()),
-            Instant::now() >= self.deadline,
+            self.deadline.check().is_err(),
             process::cancelled(),
             outcome.is_some_and(|value| value.stdout.failed || value.stderr.failed),
             outcome.is_some_and(|value| value.stdout.overflow || value.stderr.overflow),
@@ -245,7 +254,7 @@ impl Fixture {
         eprintln!(
             "{} [INFO] SECURITY_TRUSTED_GIT version={version} sha256={}",
             protocol::unix_millis()?,
-            private::executable_hash(&self.git)?
+            private::executable_hash_bounded(&self.git, self.deadline)?
         );
         let assets = self.root.join("assets");
         private::directory(&assets)?;
@@ -262,7 +271,7 @@ impl Fixture {
             "SECURITY_REAL_CLEAN_CONTRACT_FAILED",
         )?;
         require(
-            private::read(&summary, private::MIB)? == EXPECTED_SUMMARY.as_bytes(),
+            private::read_bounded(&summary, private::MIB, self.deadline)? == EXPECTED_SUMMARY.as_bytes(),
             "SECURITY_REAL_CLEAN_SUMMARY_FAILED",
         )?;
         // Preserve the original no-remote clean fixture; no fake origin hides metadata behavior.
@@ -307,7 +316,7 @@ impl Fixture {
                     == nw_security_scan::classifier::Disposition::UnreviewedFindings,
             "SECURITY_SEEDED_POLICY_FAILED",
         )?;
-        let public = private::read(&summary, private::MIB)?;
+        let public = private::read_bounded(&summary, private::MIB, self.deadline)?;
         require(
             !contains(&public, secret.as_bytes())
                 && !contains(&public, canary.as_bytes())
@@ -316,10 +325,10 @@ impl Fixture {
         )?;
         diagnostic("INFO", "SECURITY_REAL_SEEDED_SUPPRESSION_PRIVACY_PASS");
         let sentinel = self.root.join("fixture-sentinel");
-        private::copy_executable(
+        private::copy_executable_bounded(
             &env::current_exe().private("SECURITY_FIXTURE_IO")?,
             &sentinel,
-        )?;
+         self.deadline)?;
         self.git(
             &repository,
             &["config", "diff.sentinel.command", private::text(&sentinel)?],
@@ -573,10 +582,10 @@ impl Fixture {
             ),
         )
         .private("SECURITY_FIXTURE_IO")?;
-        private::copy_executable(
+        private::copy_executable_bounded(
             &env::current_exe().private("SECURITY_FIXTURE_IO")?,
             &repository.join("git"),
-        )?;
+         self.deadline)?;
         self.git(&repository, &["add", "."])?;
         self.git(
             &repository,
@@ -600,6 +609,7 @@ impl Fixture {
     fn child(&self, mode: &str) -> Result<Command> {
         let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
         private::controlled(&mut command, &self.root);
+        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
         command
             .current_dir(&self.root)
             .args(["--fixture-child", mode])
@@ -612,6 +622,7 @@ impl Fixture {
             private::directory(&root)?;
             let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
             private::controlled(&mut command, &root);
+        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
             command.args(["--fixture-child", mode]).arg(&root);
             let result = process::run(
                 &mut command,
@@ -693,6 +704,7 @@ impl Fixture {
             fs::canonicalize("/usr/bin/env").private("SECURITY_FIXTURE_UTILITY_INVALID")?;
         let mut version = Command::new(&utility);
         private::controlled(&mut version, &self.root);
+        version.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
         version.arg("--version");
         let result = process::run(
             &mut version,
@@ -716,7 +728,7 @@ impl Fixture {
         eprintln!(
             "{} [INFO] SECURITY_FIXTURE_GNU_ENV version={version} sha256={}",
             protocol::unix_millis()?,
-            private::executable_hash(&utility)?
+            private::executable_hash_bounded(&utility, self.deadline)?
         );
         for (option, mode) in [
             ("--block-signal=TERM", "blocked"),
@@ -724,6 +736,7 @@ impl Fixture {
         ] {
             let mut command = Command::new(&utility);
             private::controlled(&mut command, &self.root);
+        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
             command
                 .arg(option)
                 .arg(env::current_exe().private("SECURITY_FIXTURE_IO")?)
@@ -774,6 +787,7 @@ impl Fixture {
             private::directory(&root)?;
             let mut command = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
             private::controlled(&mut command, &root);
+        command.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
             command.args(["--fixture-child", mode]).arg(&root);
             let result = process::run(
                 &mut command,
@@ -785,7 +799,7 @@ impl Fixture {
                     && result.stdout.bytes == b"FIXTURE_INJECTED_FAILURE_RETAINED\n",
                 "SECURITY_INJECTED_FAULT_ORACLE_FAILED",
             )?;
-            let retained = private::read(&root.join("retained-path"), 4096)?;
+            let retained = private::read_bounded(&root.join("retained-path"), 4096, self.deadline)?;
             let retained =
                 Path::new(std::str::from_utf8(&retained).private("SECURITY_FIXTURE_IO")?);
             require(
@@ -801,10 +815,12 @@ impl Fixture {
         private::directory(&root.join("proof"))?;
         let context = protocol::Context {
             root: root.clone(),
+            deadline: self.deadline,
             value: serde_json::json!({}),
         };
         let mut writer = Command::new(env::current_exe().private("SECURITY_FIXTURE_IO")?);
         private::controlled(&mut writer, &root);
+        writer.env("NW_SECURITY_FIXTURE_DEADLINE", serde_json::to_string(&self.deadline.value()).private("SECURITY_FIXTURE_IO")?);
         writer.args(["--fixture-child", "report-growth"]).arg(&root);
         let outcome = process::run(
             &mut writer,
@@ -851,9 +867,9 @@ impl Fixture {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut verified = Vec::with_capacity(4);
         for (path, length, digest) in DOCUMENTS {
-            let bytes = private::read(&source.join(path), private::MIB)?;
+            let bytes = private::read_bounded(&source.join(path), private::MIB, self.deadline)?;
             require(
-                bytes.len() as u64 == length && private::hash(&bytes) == digest,
+                bytes.len() as u64 == length && private::hash_bounded(&bytes, self.deadline)? == digest,
                 "SECURITY_PUBLIC_DOCUMENT_IDENTITY_FAILED",
             )?;
             verified.push((path, bytes));
@@ -863,7 +879,7 @@ impl Fixture {
             let target = repository.join(path);
             fs::create_dir_all(target.parent().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?)
                 .private("SECURITY_FIXTURE_IO")?;
-            private::write(&target, &bytes)?;
+            private::write_bounded(&target, &bytes, self.deadline)?;
         }
         self.git(&repository, &["add", "."])?;
         self.git(&repository, &["commit", "--quiet", "-m", message])?;

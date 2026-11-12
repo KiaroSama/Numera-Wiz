@@ -4,16 +4,16 @@ use nw_security_scan::report;
 use serde_json::{Value, json};
 use std::io::Cursor;
 
-pub fn qualify(root: &Path, deadline: Instant) -> Result<()> {
-    reports(root)?;
-    unknown_unicode()?;
+pub fn qualify(root: &Path, deadline: Deadline) -> Result<()> {
+    reports(root, deadline)?;
+    unknown_unicode(deadline)?;
     archives(deadline)?;
-    proofs(root)?;
+    proofs(root, deadline)?;
     failure_stage_controls(root, deadline)?;
     diagnostic("INFO", "SECURITY_MOCK_POLICY_ARCHIVE_REPORT_PROOF_PASS");
     Ok(())
 }
-fn unknown_unicode() -> Result<()> {
+fn unknown_unicode(deadline: Deadline) -> Result<()> {
     // These unknown values used to take IgnoredAny's weaker string path.
     let malformed: &[&[u8]] = &[
         b"{\"Secret\":\"\xff\"}",
@@ -35,14 +35,14 @@ fn unknown_unicode() -> Result<()> {
             bytes.push(b']');
             require(
                 matches!(
-                    report::parse(&bytes),
+                    report::parse(&bytes, deadline),
                     Err(ScanFailure("SECURITY_REPORT_INVALID"))
                 ),
                 "SECURITY_MOCK_UNKNOWN_UNICODE_ACCEPTED",
             )?;
             require(
                 matches!(
-                    report::visit_rows(&bytes, |_| Ok(())),
+                    report::visit_rows(&bytes, deadline, |_| Ok(())),
                     Err(ScanFailure("SECURITY_REPORT_INVALID"))
                 ),
                 "SECURITY_MOCK_SECOND_PASS_UNICODE_ACCEPTED",
@@ -57,9 +57,9 @@ fn unknown_unicode() -> Result<()> {
         }
         bytes.extend_from_slice(valid);
         bytes.push(b']');
-        let parsed = report::parse(&bytes)?;
+        let parsed = report::parse(&bytes, deadline)?;
         require(
-            report::visit_rows(&bytes, |_| Ok(()))? == parsed.count,
+            report::visit_rows(&bytes, deadline, |_| Ok(()))? == parsed.count,
             "SECURITY_MOCK_SECOND_PASS_COUNT_FAILED",
         )?;
         require(
@@ -75,8 +75,8 @@ fn unknown_unicode() -> Result<()> {
     diagnostic("INFO", "SECURITY_MOCK_FULL_UNICODE_VALIDATION_PASS");
     Ok(())
 }
-fn reports(root: &Path) -> Result<()> {
-    let empty = report::parse(b"[]")?;
+fn reports(root: &Path, deadline: Deadline) -> Result<()> {
+    let empty = report::parse(b"[]", deadline)?;
     require(
         empty.count == 0 && report::summary(&empty, false) == EXPECTED_SUMMARY,
         "SECURITY_MOCK_EMPTY_SUMMARY",
@@ -104,28 +104,28 @@ fn reports(root: &Path) -> Result<()> {
         "[{\"RuleID\":\"a\",\"RuleID\":\"b\"}]",
     ] {
         require(
-            report::parse(malformed.as_bytes()).is_err(),
+            report::parse(malformed.as_bytes(), deadline).is_err(),
             "SECURITY_MOCK_REPORT_ACCEPTED",
         )?;
     }
-    let missing = report::parse(b"[{}]")?;
+    let missing = report::parse(b"[{}]", deadline)?;
     require(
         missing.count == 1 && missing.rows[0].line.is_empty(),
         "SECURITY_MOCK_MISSING_FIELDS",
     )?;
     require(
-        report::parse(b"[{\"StartLine\":18446744073709551615}]")?.rows[0].line
+        report::parse(b"[{\"StartLine\":18446744073709551615}]", deadline)?.rows[0].line
             == "18446744073709551615",
         "SECURITY_MOCK_INTEGER_PRECISION_LOST",
     )?;
     require(
-        report::parse(b"[{\"RuleID\":\"\xff\"}]").is_err()
-            && private::read(&root.join("absent-report.json"), private::REPORT_LIMIT).is_err(),
+        report::parse(b"[{\"RuleID\":\"\xff\"}]", deadline).is_err()
+            && private::read_bounded(&root.join("absent-report.json"), private::REPORT_LIMIT, deadline).is_err(),
         "SECURITY_MOCK_REPORT_INVALID",
     )?;
     require(
         matches!(
-            report::parse(&vec![b' '; private::REPORT_LIMIT as usize + 1]),
+            report::parse(&vec![b' '; private::REPORT_LIMIT as usize + 1], deadline),
             Err(ScanFailure("SECURITY_REPORT_OVERSIZE"))
         ),
         "SECURITY_MOCK_REPORT_SIZE_ACCEPTED",
@@ -158,7 +158,7 @@ fn reports(root: &Path) -> Result<()> {
         );
     }
     let encoded = serde_json::to_vec(&rows).private("SECURITY_FIXTURE_IO")?;
-    let parsed = report::parse(&encoded)?;
+    let parsed = report::parse(&encoded, deadline)?;
     let summary = report::summary(&parsed, true);
     require(
         parsed.count == 201
@@ -174,20 +174,20 @@ fn reports(root: &Path) -> Result<()> {
     // Invalid row beyond the display limit must still be parsed and rejected.
     rows[200]["StartLine"] = json!(false);
     require(
-        report::parse(&serde_json::to_vec(&rows).private("SECURITY_FIXTURE_IO")?).is_err(),
+        report::parse(&serde_json::to_vec(&rows).private("SECURITY_FIXTURE_IO")?, deadline).is_err(),
         "SECURITY_MOCK_REPORT_TAIL_SKIPPED",
     )?;
-    report::write_summary(None, &empty, false)?;
-    report::write_summary(Some(Path::new("")), &empty, false)?;
+    report::write_summary(None, &empty, false, deadline)?;
+    report::write_summary(Some(Path::new("")), &empty, false, deadline)?;
     require(
-        report::write_summary(Some(root), &empty, false).is_err(),
+        report::write_summary(Some(root), &empty, false, deadline).is_err(),
         "SECURITY_MOCK_SUMMARY_WRITE_ACCEPTED",
     )?;
     let path = root.join("mock-summary.md");
-    private::write(&path, b"prefix\n")?;
-    report::write_summary(Some(&path), &empty, false)?;
+    private::write_bounded(&path, b"prefix\n", deadline)?;
+    report::write_summary(Some(&path), &empty, false, deadline)?;
     require(
-        private::read(&path, private::MIB)? == format!("prefix\n{EXPECTED_SUMMARY}").as_bytes(),
+        private::read_bounded(&path, private::MIB, deadline)? == format!("prefix\n{EXPECTED_SUMMARY}").as_bytes(),
         "SECURITY_MOCK_SUMMARY_APPEND",
     )?;
     let mut capture = process::Capture::default();
@@ -214,9 +214,10 @@ fn reports(root: &Path) -> Result<()> {
     require(!failed.quiet(), "SECURITY_MOCK_CAPTURE_ERROR")?;
     Ok(())
 }
-fn archive(entries: &[(&str, u8, &[u8])]) -> Result<Vec<u8>> {
+fn archive(entries: &[(&str, u8, &[u8])], deadline: Deadline) -> Result<Vec<u8>> {
     let mut builder = tar::Builder::new(Vec::new());
     for (path, kind, bytes) in entries {
+        deadline.check()?;
         let mut header = tar::Header::new_ustar();
         header.set_path(path).private("SECURITY_FIXTURE_ARCHIVE")?;
         header.set_entry_type(tar::EntryType::new(*kind));
@@ -228,15 +229,20 @@ fn archive(entries: &[(&str, u8, &[u8])]) -> Result<Vec<u8>> {
             .private("SECURITY_FIXTURE_ARCHIVE")?;
     }
     let bytes = builder.into_inner().private("SECURITY_FIXTURE_ARCHIVE")?;
-    gzip(&bytes)
+    gzip(&bytes, deadline)
 }
-fn gzip(bytes: &[u8]) -> Result<Vec<u8>> {
+fn gzip(bytes: &[u8], deadline: Deadline) -> Result<Vec<u8>> {
     let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-    gzip.write_all(bytes).private("SECURITY_FIXTURE_ARCHIVE")?;
-    gzip.finish().private("SECURITY_FIXTURE_ARCHIVE")
+    for chunk in bytes.chunks(64 * 1024) {
+        deadline.check()?;
+        gzip.write_all(chunk).private("SECURITY_FIXTURE_ARCHIVE")?;
+    }
+    let result = gzip.finish().private("SECURITY_FIXTURE_ARCHIVE")?;
+    deadline.check()?;
+    Ok(result)
 }
-fn archives(deadline: Instant) -> Result<()> {
-    let good = archive(&[("gitleaks", b'0', b"synthetic executable bytes")])?;
+fn archives(deadline: Deadline) -> Result<()> {
+    let good = archive(&[("gitleaks", b'0', b"synthetic executable bytes")], deadline)?;
     require(
         assets::inspect_archive(&good, deadline)? == b"synthetic executable bytes"
             && assets::verify_pinned(&good, deadline).is_err(),
@@ -263,7 +269,7 @@ fn archives(deadline: Instant) -> Result<()> {
         ],
     ] {
         require(
-            assets::inspect_archive(&archive(&entries)?, deadline).is_err(),
+            assets::inspect_archive(&archive(&entries, deadline)?, deadline).is_err(),
             "SECURITY_MOCK_ARCHIVE_ACCEPTED",
         )?;
     }
@@ -284,7 +290,7 @@ fn archives(deadline: Instant) -> Result<()> {
         raw.push(b'x');
         raw.resize(2048, 0);
         require(
-            assets::inspect_archive(&gzip(&raw)?, deadline).is_err(),
+            assets::inspect_archive(&gzip(&raw, deadline)?, deadline).is_err(),
             "SECURITY_MOCK_ARCHIVE_PATH_ACCEPTED",
         )?;
     }
@@ -295,7 +301,7 @@ fn archives(deadline: Instant) -> Result<()> {
         .collect::<Vec<_>>();
     many[0].0 = "gitleaks";
     require(
-        assets::inspect_archive(&archive(&many)?, deadline)
+        assets::inspect_archive(&archive(&many, deadline)?, deadline)
             == Err(ScanFailure("SECURITY_ARCHIVE_MEMBER_LIMIT")),
         "SECURITY_MOCK_ARCHIVE_COUNT_ACCEPTED",
     )?;
@@ -323,14 +329,14 @@ fn archives(deadline: Instant) -> Result<()> {
         header.set_mode(0o700);
         header.set_cksum();
         require(
-            assets::inspect_archive(&gzip(header.as_bytes())?, deadline)
+            assets::inspect_archive(&gzip(header.as_bytes(), deadline)?, deadline)
                 == Err(ScanFailure(expected)),
             "SECURITY_MOCK_EXECUTABLE_SIZE_TYPE_ACCEPTED",
         )?;
     }
     let deep = "a/".repeat(16) + "gitleaks";
     require(
-        assets::inspect_archive(&archive(&[(&deep, b'0', b"x")])?, deadline)
+        assets::inspect_archive(&archive(&[(&deep, b'0', b"x")], deadline)?, deadline)
             == Err(ScanFailure("SECURITY_ARCHIVE_PATH_INVALID")),
         "SECURITY_MOCK_PATH_DEPTH_ACCEPTED",
     )?;
@@ -342,7 +348,7 @@ fn archives(deadline: Instant) -> Result<()> {
     let mut inflated = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
     let block = [0; 64 * 1024];
     for _ in 0..4097 {
-        require(Instant::now() < deadline, "SECURITY_DEADLINE")?;
+        deadline.check()?;
         inflated
             .write_all(&block)
             .private("SECURITY_FIXTURE_ARCHIVE")?;
@@ -368,12 +374,13 @@ fn archives(deadline: Instant) -> Result<()> {
     }
     Ok(())
 }
-fn proofs(root: &Path) -> Result<()> {
+fn proofs(root: &Path, deadline: Deadline) -> Result<()> {
     let root = root.join("mock-proof");
     private::directory(&root)?;
     private::directory(&root.join("proof"))?;
     let context = protocol::Context {
         root: root.clone(),
+        deadline,
         value: json!({"run":private::nonce()?,
         "repository":"/fixed-synthetic/.git", "scope":"--all"}),
     };
@@ -431,7 +438,7 @@ fn proofs(root: &Path) -> Result<()> {
         )?;
     }
     let duplicate = root.join("duplicate.json");
-    private::write(&duplicate, b"{\"run\":1,\"run\":2}")?;
+    private::write_bounded(&duplicate, b"{\"run\":1,\"run\":2}", deadline)?;
     require(
         protocol::read_json(&duplicate).is_err(),
         "SECURITY_MOCK_DUPLICATE_KEYS_ACCEPTED",
@@ -519,10 +526,10 @@ fn proofs(root: &Path) -> Result<()> {
         protocol::verify_proofs(&context, 123).is_err(),
         "SECURITY_MOCK_HISTORY_OVERFLOW_ACCEPTED",
     )?;
-    private::write(
+    private::write_bounded(
         &root.join("proof").join("oversize"),
         &vec![0; private::RECORD_LIMIT as usize + 1],
-    )?;
+     deadline)?;
     require(
         protocol::proof_files(&root.join("proof")).is_err(),
         "SECURITY_MOCK_RECORD_OVERFLOW_ACCEPTED",
@@ -533,7 +540,7 @@ fn proofs(root: &Path) -> Result<()> {
     }
     let bytes = vec![b' '; private::RECORD_LIMIT as usize];
     for i in 0..257 {
-        private::write(&root.join("proof").join(format!("aggregate-{i}")), &bytes)?;
+        private::write_bounded(&root.join("proof").join(format!("aggregate-{i}")), &bytes, deadline)?;
     }
     require(
         protocol::proof_files(&root.join("proof")).is_err(),
@@ -553,7 +560,7 @@ fn record(
     no_remote: bool,
 ) -> Result<String> {
     let id = private::nonce()?;
-    let attempt = json!({"invocation":id,"run":context.value["run"],"context":private::hash(&private::read(&context.root.join("context.json"), private::RECORD_LIMIT)?),
+    let attempt = json!({"invocation":id,"run":context.value["run"],"context":private::hash_bounded(&private::read_bounded(&context.root.join("context.json"), private::RECORD_LIMIT, context.deadline)?, context.deadline)?,
         "group":123,"kind":"rejected","argv":[]});
     let mut start = attempt.clone();
     start["kind"] = json!(kind);
@@ -564,7 +571,7 @@ fn record(
     protocol::write_json(
         &proof.join(format!("{id}.done")),
         &json!({"invocation":id,"accepted":true,"completed":true,"stderr_quiet":!no_remote,"status":status,"no_remote":no_remote,
-        "start":private::hash(&private::read(&proof.join(format!("{id}.start")), private::RECORD_LIMIT)?)}),
+        "start":private::hash_bounded(&private::read_bounded(&proof.join(format!("{id}.start")), private::RECORD_LIMIT, context.deadline)?, context.deadline)?}),
     )?;
     Ok(id)
 }
@@ -590,13 +597,13 @@ fn invocation_identity(context: &protocol::Context, args: &[String], first: &str
         .private("SECURITY_FIXTURE_IO")?;
     }
     for suffix in ["attempt", "start", "done"] {
-        private::write(
+        private::write_bounded(
             &proof.join(format!("{renamed}.{suffix}")),
-            &private::read(
+            &private::read_bounded(
                 &proof.join(format!("{first}.{suffix}")),
                 private::RECORD_LIMIT,
-            )?,
-        )?;
+             context.deadline)?,
+         context.deadline)?;
     }
     require(
         protocol::verify_proofs(context, 123).is_err(),
@@ -634,15 +641,15 @@ fn invocation_identity(context: &protocol::Context, args: &[String], first: &str
     diagnostic("INFO", "SECURITY_MOCK_INVOCATION_NONCE_CHAIN_PASS");
     Ok(())
 }
-fn failure_stage_controls(root: &Path, deadline: Instant) -> Result<()> {
-    let empty = report::parse(b"[]")?;
+fn failure_stage_controls(root: &Path, deadline: Deadline) -> Result<()> {
+    let empty = report::parse(b"[]", deadline)?;
     let controls = [
         (
             protocol::deadline_from(&json!({"deadline_ms":0})).map(|_| ()),
             "SECURITY_DEADLINE",
         ),
         (
-            private::read(&root.join("absent-setup"), 16).map(|_| ()),
+            private::read_bounded(&root.join("absent-setup"), 16, deadline).map(|_| ()),
             "SECURITY_PRIVATE_IO_FAILED",
         ),
         (
@@ -650,7 +657,7 @@ fn failure_stage_controls(root: &Path, deadline: Instant) -> Result<()> {
             "SECURITY_ARCHIVE_HASH_INVALID",
         ),
         (
-            report::write_summary(Some(root), &empty, false),
+            report::write_summary(Some(root), &empty, false, deadline),
             "SECURITY_SUMMARY_WRITE_FAILED",
         ),
     ];
@@ -726,7 +733,7 @@ fn proof_integer_bounds(context: &protocol::Context, id: &str) -> Result<()> {
         "{\"extra\":1e400}",
         "{\"extra\":18446744073709551616}",
     ] {
-        private::write(&canonical_path, text.as_bytes())?;
+        private::write_bounded(&canonical_path, text.as_bytes(), context.deadline)?;
         require(
             protocol::read_json(&canonical_path).is_err(),
             "SECURITY_MOCK_NONCANONICAL_NUMBER_ACCEPTED",
@@ -764,8 +771,10 @@ fn proof_integer_bounds(context: &protocol::Context, id: &str) -> Result<()> {
     replace(&group_path, &group)?;
     for number in ["1e400", "18446744073709551616", "-1", "true"] {
         let value: Value = serde_json::from_str(number).private("SECURITY_FIXTURE_IO")?;
+        let mut invalid = context.deadline.value();
+        invalid["end_ns"] = value;
         require(
-            protocol::deadline_from(&json!({"deadline_ms":value})).is_err(),
+            protocol::deadline_from(&json!({"deadline": invalid})).is_err(),
             "SECURITY_MOCK_UNBOUNDED_DEADLINE_ACCEPTED",
         )?;
     }

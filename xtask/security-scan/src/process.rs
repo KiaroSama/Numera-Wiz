@@ -1,5 +1,6 @@
 //! Dedicated Linux main-thread ownership: retained leaders, subreaping, pidfds,
 //! and actual wait-any ECHILD before scratch deletion. Never mixes std waits.
+use crate::bootstrap::Deadline;
 use crate::{PrivateResult, Result, ScanFailure, private, require};
 use rustix::{
     fd::{AsFd, OwnedFd},
@@ -19,7 +20,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 pub const GRACE: Duration = Duration::from_secs(5);
@@ -151,14 +152,14 @@ impl Capture {
 
 pub struct Options {
     pub budget: Duration,
-    pub deadline: Instant,
+    pub deadline: Deadline,
     /// Proxy Git must remain in the scanner's group; it owns only its direct pidfd.
     pub inherited_group: bool,
     /// Only the authenticated Git proxy may use unchanged binary stdout forwarding.
     pub forward_stdout: bool,
 }
 impl Options {
-    pub fn command(budget: Duration, deadline: Instant) -> Self {
+    pub fn command(budget: Duration, deadline: Deadline) -> Self {
         Self {
             budget,
             deadline,
@@ -263,7 +264,7 @@ impl Running {
         }
         Ok(())
     }
-    fn discover(&mut self, fault: Option<FixtureFault>) -> Result<()> {
+    fn discover(&mut self, fault: Option<FixtureFault>, deadline: Deadline) -> Result<()> {
         if fault == Some(FixtureFault::Discovery) {
             return Err(ScanFailure("SECURITY_INJECTED_DISCOVERY_FAILURE"));
         }
@@ -273,6 +274,7 @@ impl Running {
         ))?;
         let text = std::str::from_utf8(&bytes).private("SECURITY_PROC_INVALID")?;
         for token in text.split_ascii_whitespace() {
+            deadline.check()?;
             require(
                 token.len() <= 10 && token.bytes().all(|b| b.is_ascii_digit()),
                 "SECURITY_PROC_INVALID",
@@ -341,8 +343,8 @@ impl Running {
             Err(_) => Err(ScanFailure("SECURITY_SIGNAL_FAILED")),
         }
     }
-    fn reap(&mut self) -> Result<bool> {
-        loop {
+    fn reap(&mut self, deadline: Deadline) -> Result<bool> {
+        for _ in 0..=private::MAX_RECORDS {
             match os::wait(wait_options()) {
                 Ok(Some((pid, status))) => {
                     self.reaped += 1;
@@ -352,61 +354,69 @@ impl Running {
                         self.adopted += 1;
                     }
                     self.records.remove(&pid.as_raw_pid());
+                    if deadline.check().is_err() { return Ok(false); }
                 }
                 Ok(None) => return Ok(false),
                 Err(Errno::CHILD) => return Ok(true),
-                Err(Errno::INTR) => continue,
+                Err(Errno::INTR) => { deadline.check()?; continue; },
                 Err(_) => return Err(ScanFailure("SECURITY_WAIT_FAILED")),
             }
         }
+        Err(ScanFailure("SECURITY_PROCESS_RECORD_OVERFLOW"))
     }
-    fn cleanup(&mut self, deadline: Instant, fault: Option<FixtureFault>) -> Result<NoChildren> {
-        let start = Instant::now();
-        let end = (start + GRACE).min(deadline);
-        if let Err(e) = self.direct_signal(Signal::TERM) {
-            self.fail(e);
-        }
+    fn cleanup(&mut self, deadline: Deadline, fault: Option<FixtureFault>) -> Result<NoChildren> {
+        let window = deadline.cleanup();
+        // If clock admission fails, only already-owned handles and nonblocking
+        // waits remain legal. No fresh grace or sleeping is granted.
+        let immediate = |state: &mut Self| -> Result<NoChildren> {
+            if let Err(error) = state.direct_signal(Signal::KILL) { state.fail(error); }
+            state.group = None;
+            if let Err(error) = state.signal_adopted(Signal::KILL) { state.fail(error); }
+            state.drain();
+            match state.reap(deadline) {
+                Ok(true) if state.stdout_pipe.is_none() && state.stderr_pipe.is_none()
+                    && fault != Some(FixtureFault::CleanupBarrier) => barrier(),
+                _ => Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")),
+            }
+        };
+        let (window, start) = match window {
+            Ok(window) => window,
+            Err(error) => { self.fail(error); return immediate(self); }
+        };
+        if let Err(error) = window.check() { self.fail(error); return immediate(self); }
+        if let Err(e) = self.direct_signal(Signal::TERM) { self.fail(e); }
         let mut killed = false;
         loop {
+            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
             self.drain();
-            // No leader is reaped until the last numeric group signal is retired.
-            if !killed
-                && (start.elapsed() >= Duration::from_secs(1)
-                    || (self.leader_exited
-                        && self.stdout_pipe.is_none()
-                        && self.stderr_pipe.is_none())
-                    || Instant::now() + Duration::from_millis(100) >= end)
-            {
-                if let Err(e) = self.direct_signal(Signal::KILL) {
-                    self.fail(e);
-                }
+            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
+            let now = match crate::bootstrap::boot_ns() { Ok(now) => now, Err(error) => { self.fail(error); return immediate(self); } };
+            let remaining = match window.remaining() { Ok(left) => left, Err(error) => { self.fail(error); return immediate(self); } };
+            // Retain the leader until the final numeric group signal is retired.
+            if !killed && (now.saturating_sub(start) >= 1_000_000_000
+                || (self.leader_exited && self.stdout_pipe.is_none() && self.stderr_pipe.is_none())
+                || remaining <= Duration::from_millis(100)) {
+                if let Err(e) = self.direct_signal(Signal::KILL) { self.fail(e); }
                 self.group = None;
                 killed = true;
             }
-            let discovered = self.discover(fault);
-            if let Err(e) = discovered {
-                self.fail(e);
-            }
-            // Existing owned handles remain actionable even if discovery fails.
-            if let Err(e) = self.signal_adopted(if killed { Signal::KILL } else { Signal::TERM }) {
-                self.fail(e);
-            }
+            if let Err(e) = self.discover(fault, window) { self.fail(e); }
+            if let Err(e) = self.signal_adopted(if killed { Signal::KILL } else { Signal::TERM }) { self.fail(e); }
             if killed {
-                match self.reap() {
+                match self.reap(window) {
                     Ok(true) if self.stdout_pipe.is_none() && self.stderr_pipe.is_none() => {
-                        if fault == Some(FixtureFault::CleanupBarrier) {
-                            return Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED"));
-                        }
+                        if fault == Some(FixtureFault::CleanupBarrier) { return Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED")); }
+                        window.check()?;
                         return barrier();
                     }
-                    Ok(_) => {}
+                    Ok(_) => {},
                     Err(e) => self.fail(e),
                 }
             }
-            if Instant::now() >= end {
-                return Err(ScanFailure("SECURITY_CLEANUP_UNVERIFIED"));
-            }
-            thread::sleep(TICK);
+            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
+            let remaining = match window.remaining() { Ok(left) => left, Err(error) => { self.fail(error); return immediate(self); } };
+            thread::sleep(TICK.min(remaining));
+            if let Err(error) = window.check() { self.fail(error); return immediate(self); }
         }
     }
 }
@@ -447,12 +457,8 @@ fn run_inner(
     initialize()?;
     barrier()?;
     require(!cancelled(), "SECURITY_CANCELLED")?;
-    let usable = options
-        .deadline
-        .checked_sub(GRACE)
-        .ok_or(ScanFailure("SECURITY_DEADLINE"))?;
-    require(Instant::now() < usable, "SECURITY_DEADLINE")?;
-    let end = (Instant::now() + options.budget).min(usable);
+    options.deadline.check()?;
+    let end = options.deadline.reserve(GRACE)?.cap(options.budget)?;
     let mut state = Running {
         child: None,
         pid: None,
@@ -485,6 +491,7 @@ fn run_inner(
         command.process_group(0);
     }
     // Record immediately: no callback/allocation between receiving Child and ownership.
+    end.check()?;
     state.child = Some(command.spawn().private("SECURITY_SPAWN_FAILED")?);
     let execution = catch_unwind(AssertUnwindSafe(|| -> Result<()> {
         let child = state
@@ -518,18 +525,23 @@ fn run_inner(
             .private("SECURITY_CAPTURE_FAILED")?;
         }
         loop {
+            end.check_as("SECURITY_CHILD_TIMEOUT")?;
             state.drain();
+            end.check_as("SECURITY_CHILD_TIMEOUT")?;
             monitor()?;
+            end.check_as("SECURITY_CHILD_TIMEOUT")?;
             state.observe()?;
+            end.check_as("SECURITY_CHILD_TIMEOUT")?;
             if let Some(error) = state.failure {
                 return Err(error);
             }
             require(!cancelled(), "SECURITY_CANCELLED")?;
-            require(Instant::now() < end, "SECURITY_CHILD_TIMEOUT")?;
+
             if state.leader_exited {
                 return Ok(());
             }
-            thread::sleep(TICK);
+            thread::sleep(TICK.min(end.remaining().map_err(|error| if error.0 == "SECURITY_DEADLINE" { ScanFailure("SECURITY_CHILD_TIMEOUT") } else { error })?));
+            end.check_as("SECURITY_CHILD_TIMEOUT")?;
         }
     }));
     match execution {
@@ -553,9 +565,13 @@ fn run_inner(
             let _ = child.stderr.take();
         }
     }
-    let cleanup_start = Instant::now();
+    let cleanup_start = crate::bootstrap::boot_ns();
     let barrier = state.cleanup(options.deadline, fault)?;
-    let cleanup_elapsed = cleanup_start.elapsed();
+    let cleanup_elapsed = match (cleanup_start, crate::bootstrap::boot_ns()) {
+        (Ok(start), Ok(end)) if end >= start => Duration::from_nanos(end - start),
+        _ => { state.fail(ScanFailure("SECURITY_CLOCK_INVALID")); Duration::ZERO }
+    };
+    if let Err(error) = options.deadline.check() { state.fail(error); }
     if state.adopted > 0 {
         state.fail(ScanFailure("SECURITY_UNEXPECTED_DESCENDANT"));
     }

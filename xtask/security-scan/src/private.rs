@@ -1,5 +1,5 @@
 //! Owned private storage. No destructor deletes scratch while children may live.
-use crate::{PrivateResult, Result, require};
+use crate::{PrivateResult, Result, bootstrap::Deadline, require};
 use rustix::fs::{Mode, OFlags};
 use sha2::{Digest, Sha256};
 use std::{
@@ -43,9 +43,11 @@ impl Scratch {
     pub fn path(&self) -> &Path {
         &self.path
     }
-    pub fn remove(self, barrier: &crate::process::NoChildren) -> Result<()> {
+    pub fn remove(self, barrier: &crate::process::NoChildren, deadline: Deadline) -> Result<()> {
+        deadline.check()?;
         barrier.recheck()?;
-        fs::remove_dir_all(self.path).private("SECURITY_CLEANUP_FAILED")
+        fs::remove_dir_all(self.path).private("SECURITY_CLEANUP_FAILED")?;
+        deadline.check()
     }
 }
 pub fn create(path: &Path) -> Result<File> {
@@ -65,7 +67,7 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<()> {
 pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     let fd = rustix::fs::open(
         path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
         Mode::empty(),
     )
     .private("SECURITY_PRIVATE_IO_FAILED")?;
@@ -110,6 +112,57 @@ pub fn copy_executable(source: &Path, target: &Path) -> Result<String> {
         executable_hash(target)? == digest,
         "SECURITY_EXECUTABLE_INVALID",
     )?;
+    Ok(digest)
+}
+/// Bounded production I/O. Unguarded helpers above are restricted to short
+/// pre-admission descriptors and synthetic qualification data.
+pub fn read_bounded(path: &Path, limit: u64, deadline: Deadline) -> Result<Vec<u8>> {
+    deadline.check()?;
+    let fd = rustix::fs::open(path, OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK, Mode::empty()).private("SECURITY_PRIVATE_IO_FAILED")?;
+    let mut file = File::from(fd);
+    let meta = file.metadata().private("SECURITY_PRIVATE_IO_FAILED")?;
+    require(meta.is_file() && meta.len() <= limit, "SECURITY_SIZE_INVALID")?;
+    let mut bytes = Vec::new();
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        deadline.check()?;
+        let count = file.read(&mut buffer).private("SECURITY_PRIVATE_IO_FAILED")?;
+        deadline.check()?;
+        if count == 0 { break; }
+        require(bytes.len() as u64 + count as u64 <= limit, "SECURITY_SIZE_INVALID")?;
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    Ok(bytes)
+}
+pub fn write_bounded(path: &Path, bytes: &[u8], deadline: Deadline) -> Result<()> {
+    deadline.check()?;
+    let mut file = create(path)?;
+    for chunk in bytes.chunks(64 * 1024) {
+        deadline.check()?;
+        file.write_all(chunk).private("SECURITY_PRIVATE_IO_FAILED")?;
+        deadline.check()?;
+    }
+    file.sync_all().private("SECURITY_PRIVATE_IO_FAILED")?;
+    deadline.check()
+}
+pub fn hash_bounded(bytes: &[u8], deadline: Deadline) -> Result<String> {
+    let mut digest = Sha256::new();
+    for chunk in bytes.chunks(64 * 1024) { deadline.check()?; digest.update(chunk); }
+    deadline.check()?;
+    const HEX: &[u8;16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(64);
+    for &byte in digest.finalize().as_slice() { result.push(char::from(HEX[usize::from(byte >> 4)])); result.push(char::from(HEX[usize::from(byte & 15)])); }
+    Ok(result)
+}
+pub fn executable_hash_bounded(path: &Path, deadline: Deadline) -> Result<String> {
+    hash_bounded(&read_bounded(path,128 * MIB,deadline)?,deadline)
+}
+pub fn copy_executable_bounded(source: &Path, target: &Path, deadline: Deadline) -> Result<String> {
+    let bytes = read_bounded(source,128 * MIB,deadline)?;
+    write_bounded(target,&bytes,deadline)?;
+    fs::set_permissions(target,fs::Permissions::from_mode(0o700)).private("SECURITY_PRIVATE_IO_FAILED")?;
+    let digest = hash_bounded(&bytes,deadline)?;
+    require(executable_hash_bounded(target,deadline)? == digest,"SECURITY_EXECUTABLE_INVALID")?;
     Ok(digest)
 }
 pub fn text(path: &Path) -> Result<&str> {
