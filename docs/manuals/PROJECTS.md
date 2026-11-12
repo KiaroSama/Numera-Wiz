@@ -1,9 +1,13 @@
-# Projects and timeline state — development backend
+# Projects and timeline state — development
 
 The implemented project commands store acknowledged edits in the application
-database and share one service across CLI and MCP. Project controls in the shared
-human workspace, portable project files, decoded preview and export remain required
-work. Creating a solid-color binding here does not produce a video file.
+database and share one service across CLI, MCP and the shared native/browser
+workspace. Human controls provide authorized catalog discovery, project and
+sequence creation, solid-color and registered-source placement, move/split/lift,
+Undo/Redo, explicit stale-view Refresh and catalog reopen. Link/unlink currently
+have CLI/MCP commands; their GUI controls, portable project files, full checkpoints,
+decoded preview, export and the complete editor remain required work. Creating a
+solid-color binding here does not produce a video file.
 
 ## Commands and identity
 
@@ -16,6 +20,8 @@ work. Creating a solid-color binding here does not produce a video file.
 | `sequences.inspect` | `sequences inspect` | Read sequence detail, tracks or a bounded clip viewport. |
 | `clips.place` | `clips place` | Place a registered physical stream or finite solid-color source. |
 | `clips.move` | `clips move` | Move the selected/link-expanded clips by one exact delta. |
+| `clips.link` | `clips link` | Expand complete clip topology and assign one shared opaque group. |
+| `clips.unlink` | `clips unlink` | Expand complete clip topology and clear its groups and known link references. |
 | `clips.split` | `clips split` | Split the selected/link-expanded clips at an exact sequence time. |
 | `clips.remove` | `clips remove` | Lift clips without moving neighboring material. |
 | `history.undo` | `history undo` | Apply the retained original inverse at a new revision. |
@@ -67,8 +73,9 @@ numera-wiz --data-dir DATA projects create --name "First project" --replay-scope
 
 Creation returns `project_id`, `root_bin_id` and revision `"0"`. Retain the project
 ID or rediscover it with `numera-wiz --data-dir DATA projects list --limit 64`.
-Shared GUI project controls remain unfinished. Create a four-frame-per-second
-sequence, retaining `created.sequence_id` and `created.tracks[0].id`:
+The shared GUI also provides project and sequence creation. For this CLI
+walkthrough, create a four-frame-per-second sequence, retaining
+`created.sequence_id` and `created.tracks[0].id`:
 
 ```text
 numera-wiz --data-dir DATA sequences create --project PROJECT --expected-revision 0 --name "Sequence" --width 64 --height 48 --frame-rate 4/1 --sample-rate 48000 --audio-layout stereo --video-track Video --replay-scope SCOPE --idempotency-key sequence-1
@@ -95,6 +102,55 @@ projection for its exact source range. A zero-delta move or supported boundary
 split returns an accepted `no_change:true` receipt without changing revision,
 entity bytes, history or redo. Locks, grids and compatibility still apply.
 
+## Link and unlink topology
+
+`clips.link` and `clips.unlink` use the same canonical service through typed CLI
+and MCP. Both accept 1–128 distinct seed `clip_ids` and require
+`link_policy:"expand"`; the typed CLI supplies that policy. Repeated `--clip`
+flags select seeds. Duplicate seeds reject. Expansion includes complete group
+membership and both incoming and outgoing direct clip links, up to 128 resolved
+clips, all in the same sequence. Existing locks, compatibility, frozen binding
+validation and edit budgets still apply before any no-change acceptance.
+
+Link requires at least two resolved clips, even when one seed reaches the whole
+component. It assigns one fresh collision-checked opaque `link_group_id`, retaining
+direct links, geometry and source bindings. The ID is not a Group entity. If all
+resolved clips already share one non-null group, Link returns that same ID as a
+validated no-change without allocating another ID. Unlink needs at least one
+resolved clip, expands the whole component, and clears only group values and known
+`role:"link"` references. It allocates no IDs; already unlinked members retain
+their raw bytes.
+
+The following is an illustration, not a recorded CLI execution, and is independent
+of the preceding walkthrough. Starting state: project `PROJECT` is at revision
+`"8"`, with distinct unlinked clips `CLIP_A` and `CLIP_B` in one sequence, no direct
+links and no other group members. `DATA`, `PROJECT`, `CLIP_A`, `CLIP_B` and `SCOPE`
+are placeholders; replace them with an absolute data directory, returned IDs and
+a privately retained replay scope. The operation keys/request IDs below are
+illustrative, fresh identities in that scope.
+
+```text
+numera-wiz --data-dir DATA clips link --project PROJECT --expected-revision 8 --clip CLIP_A --clip CLIP_B --replay-scope SCOPE --idempotency-key topology-link-1 --request-id topology-link-1
+numera-wiz --data-dir DATA clips link --project PROJECT --expected-revision 9 --clip CLIP_A --replay-scope SCOPE --idempotency-key topology-link-noop-1 --request-id topology-link-noop-1
+numera-wiz --data-dir DATA clips unlink --project PROJECT --expected-revision 9 --clip CLIP_A --clip CLIP_B --replay-scope SCOPE --idempotency-key topology-unlink-1 --request-id topology-unlink-1
+numera-wiz --data-dir DATA history undo --project PROJECT --expected-revision 10 --replay-scope SCOPE --idempotency-key topology-undo-1 --request-id topology-undo-1
+numera-wiz --data-dir DATA history redo --project PROJECT --expected-revision 11 --replay-scope SCOPE --idempotency-key topology-redo-1 --request-id topology-redo-1
+```
+
+With no competing edits, Link advances to `"9"`; the second Link is no-change at
+`"9"`. Unlink advances to `"10"`, Undo to `"11"` and Redo to `"12"`. Undo restores
+the same group ID and retained entity images; Redo reapplies the stored images,
+without generating a replacement group.
+
+Link's `created` value is exactly `{link_group_id, clip_ids}`; Unlink's is exactly
+`{clip_ids}`. In each, `clip_ids` is the sorted complete resolved selection,
+including unchanged members. These fields describe the resolved topology;
+`changed_ids` contains only actual changes. A validated no-change returns an
+accepted, replayable receipt with `no_change:true` and empty `changed_ids`, while
+revision, raw project/entity bytes, history and redo remain unchanged. Retrying a
+lost response uses the exact original identity, expected revision and parameters,
+including for no-change; it is different from the fresh second Link above.
+
 ## Sources, time and authorization
 
 Times use exact integer fractions. Video positions must lie on the declared frame
@@ -110,14 +166,22 @@ and native source rights. The binding captures asset ID, content/probe digests,
 physical index and media kind; `extent_verification:"pending"` is not decoded
 coverage proof. Project reads expose no copied native source path or full probe.
 Move/lift/history operate on retained project facts; undo can restore a binding
-whose external file is offline without granting access to its bytes.
+whose external file is offline without granting access to its bytes. Both Link and
+Unlink are topology-only edits over frozen admitted binding facts. They require
+current command permission and Project Edit at acceptance, but do not open source
+bytes, add a fresh Asset Read/path-grant check or establish current-byte validity
+or decoded extent. Registered placement and media-consuming operations retain
+their current source rights and held-source preflight requirements.
 
 Command permission and Project Read/Edit are separate. Native owner and browser
 profiles are different principals. A browser's owned-object access does not grant
 an owner-created project. The owner can explicitly add a project object grant with
 `actions:["read","edit"]` through revision-checked profile update, preserving its
 other grants. Project access does not add asset or filesystem rights. Existing
-profiles do not automatically receive newly registered command IDs. See the
+profiles do not automatically receive newly registered command IDs. The owner
+must explicitly review and add `clips.link` and `clips.unlink` to a stored profile's
+command allowlist while preserving its unrelated grants; discovery never widens
+it. Project Edit grants no filesystem authority. See the
 [CLI authority instructions](CLI.md#authority-and-errors).
 
 One cooperating writer holds a user-scoped lease for each project UUID, independent
@@ -183,6 +247,16 @@ inspect with `--grants-out`, preserve principal/profile, roots and unrelated rig
 then update with the captured `--expected-revision`. Discovery and adapters never
 silently widen grants. Command permission and Project Read remain separate.
 
+## Discovery qualification
+
+The command table above lists 13 implemented project-family handlers.
+`descriptor_schema_version:2` and optional `result_schema` metadata do not imply
+complete command contracts: only `projects.create` currently publishes a
+`result_schema`. The new all-13 result-schema-presence probe has not executed;
+remaining input/result schemas, MCP output contracts and effective availability
+work are unfinished. Neither a metadata marker nor a stub establishes full schema
+qualification.
+
 ## Bounded reads and history
 
 Project inspection offers `summary`, `entity` and `bin_page`. Sequence inspection
@@ -206,7 +280,18 @@ to keep branch edits bounded. New edits clear redo atomically. Live bindings rem
 referenced independently of retained history. The operation journal has its own
 512-record/8 MiB bound, reported separately from the history floor.
 
-The [backend evidence](../development/evidence/project-core-43056099112.json)
-records four-target state regressions and the 13-job CI checkpoint. Actual
-previous/new packaged-binary preservation, project GUI/checkpoints, mixed
-audio/video linked variants and the complete media/editor release remain open.
+The historical [backend evidence](../development/evidence/project-core-43056099112.json)
+records four-target state regressions and that source's 13-job CI checkpoint.
+Actual prior/current packaged-binary preservation has qualified the unlinked
+project scenario within its exercised scope; it does not qualify positive public
+Link topology across those binaries. Shared native/Chrome project input journeys
+passed in [run 43232250861](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43232250861)
+for the controls described above. That run also reached the integrated Link/Unlink
+assertions on all four native targets before a separate later Split failure;
+[run 43237451380](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43237451380)
+subsequently exercised the complete focused Split model on all four targets.
+These are scoped observations, not claims that those whole runs or current CI
+are green. Linked GUI journeys, positive public-Link prior/current preservation,
+mixed audio/video and media variants, portable project files/full checkpoints,
+decoded preview/export, named external agent runtimes and the complete
+media/editor release remain open.
