@@ -438,5 +438,172 @@ mod tests {
             other_descriptor.get("result_schema").is_none(),
             "{other_response:?}"
         );
+
+        project_family_result_schemas_are_published_and_self_contained();
+    }
+
+    fn project_family_result_schemas_are_published_and_self_contained() {
+        let ids = [
+            "projects.create",
+            "projects.list",
+            "projects.inspect",
+            "sequences.create",
+            "sequences.inspect",
+            "clips.place",
+            "clips.move",
+            "clips.link",
+            "clips.unlink",
+            "clips.split",
+            "clips.remove",
+            "history.undo",
+            "history.redo",
+        ];
+        let list_response = CommandService.dispatch(
+            Principal::DiscoveryAgent,
+            Request::query("commands.list", serde_json::json!({})),
+        );
+        assert!(list_response.ok, "Project family commands.list must succeed");
+        assert!(
+            list_response.error.is_none(),
+            "Project family commands.list must have no error"
+        );
+        assert!(
+            list_response.receipt_id.is_none(),
+            "Project family commands.list must have no receipt"
+        );
+        let list_bytes = serde_json::to_vec(&list_response)
+            .expect("complete commands.list Response serializes")
+            .len();
+        eprintln!("Project family discovery: commands.list Response bytes={list_bytes}");
+        assert!(
+            list_bytes <= commands::MAX_RESULT_BYTES,
+            "Project family commands.list Response exceeds the byte budget: {list_bytes}"
+        );
+        let rows = list_response
+            .result
+            .as_ref()
+            .and_then(|result| result.get("commands"))
+            .and_then(serde_json::Value::as_array)
+            .expect("Project family commands.list must contain command rows");
+        for id in ids {
+            assert_eq!(
+                rows.iter()
+                    .filter(|row| row.get("id").and_then(serde_json::Value::as_str) == Some(id))
+                    .count(),
+                1,
+                "Project family commands.list must contain exactly one row for {id}"
+            );
+        }
+
+        let mut largest_schema_bytes = 0;
+        for id in ids {
+            let schema_response = CommandService.dispatch(
+                Principal::DiscoveryAgent,
+                Request::query("commands.schema", serde_json::json!({"id": id})),
+            );
+            assert!(
+                schema_response.ok,
+                "Project family commands.schema must succeed for {id}"
+            );
+            assert!(
+                schema_response.error.is_none(),
+                "Project family commands.schema must have no error for {id}"
+            );
+            assert!(
+                schema_response.receipt_id.is_none(),
+                "Project family commands.schema must have no receipt for {id}"
+            );
+            let response_bytes = serde_json::to_vec(&schema_response)
+                .expect("complete commands.schema Response serializes")
+                .len();
+            eprintln!(
+                "Project family discovery: commands.schema Response bytes={response_bytes} for {id}"
+            );
+            assert!(
+                response_bytes <= commands::MAX_RESULT_BYTES,
+                "Project family commands.schema Response exceeds the byte budget for {id}: {response_bytes}"
+            );
+            let descriptor = schema_response
+                .result
+                .as_ref()
+                .filter(|value| value.is_object())
+                .expect("Project family commands.schema must return a descriptor object");
+            assert_eq!(
+                descriptor.get("id").and_then(serde_json::Value::as_str),
+                Some(id),
+                "Project family descriptor ID must match {id}"
+            );
+            assert_eq!(
+                descriptor.get("version"),
+                Some(&serde_json::json!(1)),
+                "Project family command version must remain 1 for {id}"
+            );
+            assert_eq!(
+                descriptor.get("descriptor_schema_version"),
+                Some(&serde_json::json!(2)),
+                "Project family descriptor format must be 2 for {id}"
+            );
+            let row = rows
+                .iter()
+                .find(|row| row.get("id").and_then(serde_json::Value::as_str) == Some(id))
+                .expect("Project family descriptor row was counted above");
+            assert_eq!(
+                descriptor, row,
+                "Project family commands.schema must equal its commands.list row for {id}"
+            );
+            assert!(
+                descriptor
+                    .get("result_schema")
+                    .is_some_and(serde_json::Value::is_object),
+                "Project family result_schema must be published for {id}"
+            );
+            let result_schema = descriptor
+                .get("result_schema")
+                .expect("Project family result_schema presence was checked above");
+            assert!(
+                result_schema
+                    .as_object()
+                    .is_some_and(|object| !object.is_empty()),
+                "Project family result_schema must be a nonempty object for {id}"
+            );
+            let schema_bytes = serde_json::to_vec(result_schema)
+                .expect("Project family result_schema serializes")
+                .len();
+            assert!(
+                schema_bytes <= commands::MAX_RESULT_BYTES,
+                "Project family result_schema exceeds the byte budget for {id}: {schema_bytes}"
+            );
+            largest_schema_bytes = largest_schema_bytes.max(schema_bytes);
+            let mut pending = vec![result_schema];
+            let mut visited = 0;
+            while let Some(node) = pending.pop() {
+                visited += 1;
+                assert!(
+                    visited <= schema_bytes,
+                    "Project family result_schema traversal exceeds its byte-derived node budget for {id}"
+                );
+                match node {
+                    serde_json::Value::Object(object) => {
+                        if let Some(reference) = object.get("$ref") {
+                            let reference = reference.as_str().unwrap_or_else(|| {
+                                panic!("Project family result_schema $ref must be a string for {id}")
+                            });
+                            assert!(
+                                reference == "#" || reference.starts_with("#/"),
+                                "Project family result_schema $ref must be local for {id}"
+                            );
+                            assert!(
+                                result_schema.pointer(&reference[1..]).is_some(),
+                                "Project family result_schema $ref must resolve against its own root for {id}"
+                            );
+                        }
+                        pending.extend(object.values());
+                    }
+                    serde_json::Value::Array(values) => pending.extend(values),
+                    _ => {}
+                }
+            }
+        }
+        eprintln!("Project family discovery: largest result_schema bytes={largest_schema_bytes}");
     }
 }
