@@ -749,6 +749,7 @@ mod tests {
         project_queries::exercise_real_snapshot_lifetime().await;
         catalog_tests::retirement_and_quotas().await;
         catalog_tests::cursor_and_publication().await;
+        crate::runtime::projects::regression_tests::public_link_producer().await;
     }
     #[test]
     fn page_byte_ceiling_wins_over_row_count_without_truncating_items() {
