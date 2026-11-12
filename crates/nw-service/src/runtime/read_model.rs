@@ -512,6 +512,9 @@ impl Service {
             }
             self.catalog_publication(context, revision, snapshot.created, cancellation)?;
         }
+        if !projects {
+            check_cancel(cancellation)?;
+        }
         // Empty and single-page inventories need no retained lease or database snapshot.
         if page["next_cursor"].is_string() {
             // Projects alone defer count admission until a continuation really needs retention.
