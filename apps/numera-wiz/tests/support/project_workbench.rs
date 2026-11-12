@@ -699,7 +699,9 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
 }
 async fn select_source_track_after_reopen<D: Driver>(driver: &mut D) {
     // Same three-bin-row fixture; ROOT must verify this later capture.
-    driver.screenshot("tracks-before-reopened-source-selection").await;
+    driver
+        .screenshot("tracks-before-reopened-source-selection")
+        .await;
     driver.mark().await;
     driver.click(55, 353).await;
     driver.observed("projects.list").await;
