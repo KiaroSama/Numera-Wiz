@@ -1337,8 +1337,7 @@ async fn public_link_edges() {
         .collect::<Vec<_>>();
     for candidate in [read.header().root_bin_id.clone(), group.clone()] {
         let error = resolve_edit(&read, intent(), AllocatedIds(VecDeque::from([candidate])))
-            .err()
-            .expect("Occupied identity must reject the single candidate");
+            .expect_err("Occupied identity must reject the single candidate");
         assert_eq!(error.code, "OBJECT_CONFLICT");
     }
     let free = EntityId::parse(Uuid::new_v4().to_string()).unwrap();
@@ -1401,8 +1400,7 @@ async fn public_link_edges() {
     assert!(read.has_dependency_target(&occupied).unwrap());
     assert_eq!(
         resolve_edit(&read, intent(), AllocatedIds(VecDeque::from([occupied])))
-            .err()
-            .expect("Any dependency role occupies a candidate")
+            .expect_err("Any dependency role occupies a candidate")
             .code,
         "OBJECT_CONFLICT"
     );
