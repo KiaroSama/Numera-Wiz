@@ -326,8 +326,8 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     assert_eq!(jobs.len(), 3);
     // Both retained185 captures show the genuine Review control at this point.
     // Keep a valid reviewed Cleanup plan so the Projects shortcut guard is meaningful.
-    let review = activate(driver, 330, 570, "streams.clean.plan", 0).await;
-    evidence.push(review.evidence("streams.clean.plan"));
+    let review = activate(driver, 330, 570, "streams.clean", 0).await;
+    evidence.push(review.evidence("streams.clean"));
     driver.screenshot("retained-cleanup-plan").await;
     if driver.browser() {
         evidence.push(driver.policy(Policy::OlderCommands, None).await);

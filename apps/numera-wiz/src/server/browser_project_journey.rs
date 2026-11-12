@@ -9,7 +9,6 @@ use nw_domain::{
 };
 use serde_json::{Value, json};
 use sha2::Digest as _;
-use shared::Driver as _;
 use std::{
     path::Path,
     time::{Duration, Instant},

@@ -13,7 +13,6 @@ mod project_workbench;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use evidence::RetainLogs;
 use nw_domain::commands::Request;
-use project_workbench::Driver as _;
 use serde_json::{Value, json};
 use std::{
     path::{Path, PathBuf},

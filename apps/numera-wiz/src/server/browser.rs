@@ -356,7 +356,7 @@ mod tests {
                                 command,
                                 "assets.list"
                                     | "jobs.list"
-                                    | "streams.clean.plan"
+                                    | "streams.clean"
                                     | "jobs.submit"
                                     | "batches.submit"
                             )))
