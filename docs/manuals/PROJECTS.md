@@ -206,8 +206,9 @@ returns no durable receipt. For example, a canonical request is:
 }
 ```
 
-Each item contains exactly `id`, `name`, decimal-string `revision`, `schema_major`,
-`envelope_version` and `compatibility`. Items are ordered by ascending canonical
+Each item retains `id`, `name`, decimal-string `revision`, `schema_major`,
+`envelope_version` and `compatibility`, and adds `authorization` as described below.
+Items are ordered by ascending canonical
 project UUID (`id`); there is no arbitrary sorting or recency order. Compatibility
 is `supported` or `read_only_unsupported`, describing common schema/envelope
 readability. Unsupported common headers can remain visible without promising
@@ -247,15 +248,64 @@ inspect with `--grants-out`, preserve principal/profile, roots and unrelated rig
 then update with the captured `--expected-revision`. Discovery and adapters never
 silently widen grants. Command permission and Project Read remain separate.
 
-## Discovery qualification
+## Current authorization observations
+
+Catalog rows and every project/sequence inspection result include an additive
+`authorization` object with `schema_version:1`. It contains canonical decimal
+strings `policy_revision` and `observed_project_revision`, independent
+`current_read` and `current_edit` observations, and 11 project-target `actions`.
+Each right/action is either `unavailable` or `requires_request_validation`.
+The latter means that the observed predicates pass; it never means an edit is
+ready or already authorized. Each action names its exact command and reports
+finite `reasons` and `unchecked_gates`.
+
+Command allowance, Read and Edit remain separate. A Read-only profile can see
+Link as unavailable for `project_edit_not_granted` even when `clips.link` is
+allowed. Granting Edit does not add `clips.link` to its command allowlist.
+Unsupported headers or an already-observed busy writer can block write actions
+without changing the independent Edit observation. Summary reuses its existing
+writer observation; catalog and other projections do not probe writer leases.
+Even an available writer leaves `writer_lease` unchecked. Source rights/path,
+revision, selection/affected scope and history are validated by the actual fresh
+request where applicable, rather than by catalog discovery.
+
+One captured policy filters and annotates a page. A policy change before
+publication rejects the response instead of publishing mixed old/new rights.
+Retained content remains at its captured `project_revision`; its authorization
+can observe a newer `observed_project_revision`. Missing metadata or an unknown
+authorization schema version means unknown authority. Clients must not derive an
+Edit grant from legacy `read_only`, compatibility or writer-status fields.
+
+The 13 project-family descriptors also publish static
+`authorization_requirements`. These describe project action and request gates,
+without caller facts. Authenticated runtime `commands.list` adds a separate
+13-action `authorization` overlay that observes exact command allowance only;
+without a project context, Read/Edit remain unchecked. `commands.schema` stays
+a direct static descriptor. Pure static discovery and MCP tool metadata never
+manufacture owner authority. Live observations do not enter the static registry
+fingerprint.
+
+## Command contracts and qualification
 
 The command table above lists 13 implemented project-family handlers.
-`descriptor_schema_version:2` and optional `result_schema` metadata do not imply
-complete command contracts: only `projects.create` currently publishes a
-`result_schema`. The new all-13 result-schema-presence probe has not executed;
-remaining input/result schemas, MCP output contracts and effective availability
-work are unfinished. Neither a metadata marker nor a stub establishes full schema
-qualification.
+All 13 publish `result_schema` through `descriptor_schema_version:2`; historical
+descriptors without that additive member remain readable. Result documents are
+self-contained and describe the emitted result, including flattened entity
+payloads, explicit nullable fields and omitted no-change flags.
+[Run 43288625608](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43288625608)
+validated six service batches on all four native targets plus actual typed CLI,
+official stdio and both HTTP transport journeys with a separately locked JSON
+Schema validator. Its whole CI run was not green; these are scoped result-contract
+observations before the newer authorization/input changes.
+
+Input descriptors declare finite projection/sort/edit-policy values, query-specific
+required fields, page/selection bounds and explicit sequence settings. They retain
+existing optional nulls and defaults. JSON Schema character lengths do not replace
+runtime UTF-8 byte bounds, and exact time/grid/closure/source validation remains
+runtime work. Noncanonical accepted input fraction strings are not normalized in
+the original request or its retry digest. MCP whole-Response output contracts,
+new authorization publication/size coverage and the latest complete input-schema
+qualification remain in progress; descriptor presence alone does not qualify them.
 
 ## Bounded reads and history
 
@@ -283,15 +333,19 @@ referenced independently of retained history. The operation journal has its own
 The historical [backend evidence](../development/evidence/project-core-43056099112.json)
 records four-target state regressions and that source's 13-job CI checkpoint.
 Actual prior/current packaged-binary preservation has qualified the unlinked
-project scenario within its exercised scope; it does not qualify positive public
-Link topology across those binaries. Shared native/Chrome project input journeys
+project scenario and the positive group-only Link/Move/Unlink/Undo fixture within
+their exercised scope. In run 43288625608, the pinned old/current packages passed
+seven owner epochs on each native target, preserving the same group, two exact
+dependency rows, eight receipts and original raw/rollback checks. This does not
+qualify mixed audio/video, registered sources or other dependency roles.
+Shared native/Chrome project input journeys
 passed in [run 43232250861](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43232250861)
 for the controls described above. That run also reached the integrated Link/Unlink
 assertions on all four native targets before a separate later Split failure;
 [run 43237451380](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43237451380)
 subsequently exercised the complete focused Split model on all four targets.
 These are scoped observations, not claims that those whole runs or current CI
-are green. Linked GUI journeys, positive public-Link prior/current preservation,
-mixed audio/video and media variants, portable project files/full checkpoints,
+are green. Linked GUI journeys, mixed audio/video and media variants,
+portable project files/full checkpoints,
 decoded preview/export, named external agent runtimes and the complete
 media/editor release remain open.
