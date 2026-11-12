@@ -413,7 +413,7 @@ impl WizApp {
             && self.save_control.is_none()
     }
     fn cleanup_actions_allowed(&self, ctx: &egui::Context) -> bool {
-        !self.projects.active && self.request_idle() && !ctx.egui_wants_keyboard_input()
+        !self.projects.active && self.request_idle() && !ctx.text_edit_focused()
     }
     fn action_allowed(&self, action: Action, ctx: &egui::Context) -> bool {
         match action {
@@ -429,7 +429,7 @@ impl WizApp {
             | Action::BatchSubmit
             | Action::Register
             | Action::Intake
-            | Action::FolderRegister => !ctx.egui_wants_keyboard_input(),
+            | Action::FolderRegister => !ctx.text_edit_focused(),
             _ => true,
         }
     }
@@ -1115,7 +1115,7 @@ impl eframe::App for WizApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
         if !self.projects.active
-            && !ui.ctx().egui_wants_keyboard_input()
+            && !ui.ctx().text_edit_focused()
             && !self.folder.open
             && ui.ctx().input_mut(|input| {
                 input.consume_shortcut(&egui::KeyboardShortcut::new(

@@ -123,6 +123,8 @@ pub(crate) fn controller_cases() {
     changed_ticket_is_tracked();
     expired_staged_publication();
     cleanup_guards();
+    focused_button_actions();
+    focused_folder_scan();
     bounded_handle_tracking();
     full_projection_and_exact_forms();
 }
@@ -343,7 +345,7 @@ fn coherent_load_and_retirement() {
     app.receive(&ctx);
     assert!(!app.projects.active);
 }
-fn cleanup_guards() {
+fn reviewed_cleanup() -> (WizApp, Arc<MockJsonClient>, egui::Context) {
     let (mut app, port, ctx) = boot();
     let source = json!({"id":"asset","display_name":"Fixture","bytes":"0","stream_count":0});
     app.plan = Some(Arc::new(serde_json::from_value(json!({"schema_version":1,"required_rights":null,"rights_redacted":false,
@@ -357,6 +359,46 @@ fn cleanup_guards() {
     app.batch_select(&AssetSummary::from(&asset), true);
     app.receive_batch(Action::BatchPlan(1), json!({"schema_version":1,"id":"batch","hash":"00","created_at":"0","expires_at":"999","failure_policy":"reject_all","unresolved_policy":"reject","unresolved":[],"items":[]})).unwrap();
     app.scope = Some(scope());
+    (app, port, ctx)
+}
+fn widget_frame(ctx: &egui::Context, events: Vec<egui::Event>, draw: impl FnMut(&mut egui::Ui)) {
+    ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1440.0, 861.0))),
+            focused: true,
+            events,
+            ..Default::default()
+        },
+        draw,
+    )
+    .drop_without_applying_deltas();
+}
+fn key_events(key: egui::Key) -> Vec<egui::Event> {
+    [true, false].into_iter().map(|pressed| egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    }).collect()
+}
+fn text_frame(ctx: &egui::Context, text: &mut String, events: Vec<egui::Event>, focus: bool) {
+    widget_frame(ctx, events, |ui| {
+        let response = ui.add(egui::TextEdit::singleline(text).id(egui::Id::new("project-regression-text")));
+        if focus { response.request_focus(); }
+    });
+}
+fn exercise_cleanup_actions(app: &mut WizApp, ctx: &egui::Context) {
+    app.run_reviewed(ctx);
+    app.run_reviewed_batch(ctx);
+    app.query("streams.clean", json!({}), Action::Plan(0), ctx);
+    app.mutate("assets.register", json!({"path":"/must-not-register"}), Action::Register, ctx);
+    app.schedule_output(ctx);
+    app.schedule_batch(ctx);
+    app.choose_media(ctx);
+}
+fn cleanup_guards() {
+    let (mut app, port, ctx) = reviewed_cleanup();
     app.projects.active = true;
     app.run_reviewed(&ctx);
     app.run_reviewed_batch(&ctx);
@@ -375,8 +417,11 @@ fn cleanup_guards() {
         "Hidden Cleanup actions cannot steal the project slot"
     );
     app.projects.active = false;
-    ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("project-regression-text")));
+    let mut text = String::new();
+    text_frame(&ctx, &mut text, Vec::new(), true);
+    text_frame(&ctx, &mut text, Vec::new(), false);
     assert!(ctx.egui_wants_keyboard_input());
+    assert!(ctx.text_edit_focused(), "The fixture must focus a rendered TextEdit, not an arbitrary ID");
     app.run_reviewed(&ctx);
     app.run_reviewed_batch(&ctx);
     app.query("streams.clean", json!({}), Action::Plan(0), &ctx);
@@ -387,6 +432,119 @@ fn cleanup_guards() {
         port.empty(),
         "Text/IME focus suppresses actual review and submit paths"
     );
+    text_frame(&ctx, &mut text, vec![egui::Event::Ime(egui::ImeEvent::Preedit {
+        text: "かな".into(), active_range_chars: Some(0..2),
+    })], false);
+    assert_eq!(text, "かな", "The genuine TextEdit must process its IME preedit");
+    assert!(ctx.text_edit_focused());
+    exercise_cleanup_actions(&mut app, &ctx);
+    assert!(port.empty(), "Active text composition must not submit or schedule Cleanup work");
+    text_frame(&ctx, &mut text, vec![egui::Event::Ime(egui::ImeEvent::Commit("仮名".into()))], false);
+    assert_eq!(text, "仮名", "Commit must replace the actual composition");
+    assert!(ctx.text_edit_focused());
+    exercise_cleanup_actions(&mut app, &ctx);
+    assert!(port.empty(), "Committed text still owns focus until it is transferred");
+}
+fn review_button_frame(app: &mut WizApp, ctx: &egui::Context, events: Vec<egui::Event>, focus: bool) -> (egui::Rect, bool) {
+    let mut rect = egui::Rect::NOTHING;
+    let mut clicked = false;
+    widget_frame(ctx, events, |ui| {
+        let button = ui.button("Run reviewed fixture");
+        rect = button.rect;
+        if focus { button.request_focus(); }
+        if button.clicked() {
+            clicked = true;
+            app.run_reviewed(ui.ctx());
+        }
+    });
+    (rect, clicked)
+}
+fn activate_review_button(app: &mut WizApp, ctx: &egui::Context, rect: egui::Rect, pointer: bool) {
+    let clicked = if pointer {
+        let pos = rect.center();
+        let events = |pressed| vec![egui::Event::PointerMoved(pos), egui::Event::PointerButton {
+            pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE,
+        }];
+        let (_, down) = review_button_frame(app, ctx, events(true), false);
+        assert!(!down, "A press alone must not activate the normal button");
+        review_button_frame(app, ctx, events(false), false).1
+    } else {
+        review_button_frame(app, ctx, key_events(egui::Key::Space), false).1
+    };
+    assert!(clicked, "Real egui button input must activate before checking dispatch");
+}
+fn focused_button_actions() {
+    for pointer in [false, true] {
+        let (mut app, port, ctx) = reviewed_cleanup();
+        review_button_frame(&mut app, &ctx, Vec::new(), true);
+        let (rect, _) = review_button_frame(&mut app, &ctx, Vec::new(), false);
+        assert!(ctx.egui_wants_keyboard_input(), "A focused normal button wants keyboard input too");
+        assert!(!ctx.text_edit_focused());
+        assert!(app.request_idle());
+        app.projects.active = true;
+        activate_review_button(&mut app, &ctx, rect, pointer);
+        exercise_cleanup_actions(&mut app, &ctx);
+        assert!(port.empty() && app.request_idle(), "Button focus cannot bypass Projects mode");
+        app.projects.active = false;
+        activate_review_button(&mut app, &ctx, rect, pointer);
+        let (request, reply) = port.pop();
+        assert_eq!(request.command.id, "jobs.submit");
+        assert_eq!(request.params, json!({"plan_id":"reviewed","plan_hash":"00"}));
+        assert!(request.project.is_none());
+        assert_eq!(request.replay_scope.as_deref(), Some(scope().as_str()));
+        assert_eq!(request.idempotency_key.as_deref(), Some(request.request_id.as_str()));
+        assert!(port.empty(), "One input activation must send exactly one canonical request");
+        let captured = serde_json::to_vec(&request).unwrap();
+        reply(Err("Unknown acceptance after focused button activation".into()));
+        app.receive(&ctx);
+        assert!(!app.waiting && app.pending.is_some());
+        activate_review_button(&mut app, &ctx, rect, pointer);
+        exercise_cleanup_actions(&mut app, &ctx);
+        assert!(port.empty(), "A focused button cannot replace unresolved Pending");
+        assert_eq!(serde_json::to_vec(&app.pending.as_ref().unwrap().request).unwrap(), captured);
+        app.retry_pending(&ctx);
+        let (retry, _) = port.pop();
+        assert_eq!(serde_json::to_vec(&retry).unwrap(), captured);
+        assert!(port.empty());
+    }
+}
+fn folder_frame(app: &mut WizApp, ctx: &egui::Context, events: Vec<egui::Event>) {
+    widget_frame(ctx, events, |ui| app.folder_window(ui.ctx()));
+}
+fn focused_folder_scan() {
+    let (mut app, port, ctx) = boot();
+    app.scope = Some(scope());
+    app.folder.open = true;
+    folder_frame(&mut app, &ctx, Vec::new());
+    let path_id = egui::Id::new("folder-intake-path");
+    assert!(egui::TextEdit::load_state(&ctx, path_id).is_some(), "Focus must target the real rendered folder path");
+    ctx.memory_mut(|memory| memory.request_focus(path_id));
+    let path = "/controller-fixture/authorized-folder";
+    folder_frame(&mut app, &ctx, vec![egui::Event::Text(path.into())]);
+    assert!(ctx.text_edit_focused());
+    for _ in 0..4 {
+        folder_frame(&mut app, &ctx, key_events(egui::Key::Tab));
+        folder_frame(&mut app, &ctx, Vec::new());
+    }
+    assert!(ctx.egui_wants_keyboard_input());
+    assert!(!ctx.text_edit_focused(), "Four real Tab events must leave the path/exclusions TextEdits");
+    assert!(app.request_idle() && port.empty());
+    folder_frame(&mut app, &ctx, key_events(egui::Key::Space));
+    let (request, reply) = port.pop();
+    assert_eq!(request.command.id, "assets.register_folder", "The actual focused Scan control must dispatch");
+    assert_eq!(request.params["path"], path);
+    assert!(request.project.is_none());
+    assert_eq!(request.replay_scope.as_deref(), Some(scope().as_str()));
+    assert_eq!(request.idempotency_key.as_deref(), Some(request.request_id.as_str()));
+    assert!(port.empty());
+    folder_frame(&mut app, &ctx, Vec::new());
+    assert!(port.empty(), "A repeated frame must not duplicate an in-flight Scan");
+    reply(Ok(Response::error(&request.request_id, nw_domain::DomainError::new("PERMISSION_DENIED", "Fixture response; no filesystem scan runs"))));
+    app.receive(&ctx);
+    assert!(app.request_idle());
+    folder_frame(&mut app, &ctx, Vec::new());
+    folder_frame(&mut app, &ctx, Vec::new());
+    assert!(port.empty(), "Restored Scan focus without new input must not resubmit");
 }
 fn changed_ticket_is_tracked() {
     let (mut app, port, ctx) = ready();

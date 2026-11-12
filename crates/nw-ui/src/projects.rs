@@ -147,6 +147,7 @@ struct Handle {
     first_seen: Instant,
     bindings: BTreeSet<String>,
 }
+#[derive(Default)]
 pub(super) struct ProjectsUi {
     pub(super) active: bool,
     generation: u64,
@@ -168,32 +169,6 @@ pub(super) struct ProjectsUi {
     source_form: bool,
     acceptance: Option<String>,
     focus_catalog: bool,
-}
-impl Default for ProjectsUi {
-    fn default() -> Self {
-        Self {
-            active: false,
-            generation: 0,
-            catalog: Vec::new(),
-            navigation: None,
-            staging: None,
-            group: None,
-            stale: false,
-            terminal_failure: false,
-            handles: Vec::new(),
-            forms: Forms::default(),
-            assets: Vec::new(),
-            assets_cursor: None,
-            assets_snapshot: None,
-            asset: None,
-            stream: None,
-            sequence_form: false,
-            focus_sequence: false,
-            source_form: false,
-            acceptance: None,
-            focus_catalog: false,
-        }
-    }
 }
 impl ProjectsUi {
     fn advance(&mut self) -> Result<u64, String> {
