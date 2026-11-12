@@ -364,11 +364,16 @@ impl NativeClient {
                             let diagnostic = collect_owner_startup_failure(stdout, started).await;
                             tracing::warn!(
                                 exit_code = status.code(),
-                                startup_stage = diagnostic.record().map(|record| record.stage.as_str()),
-                                startup_code = diagnostic.record().map(|record| record.code.as_str()),
-                                diagnostic_missing = matches!(diagnostic, OwnerStartupObservation::Missing),
-                                diagnostic_overflow = matches!(diagnostic, OwnerStartupObservation::Overflow),
-                                diagnostic_malformed = matches!(diagnostic, OwnerStartupObservation::Malformed),
+                                startup_stage =
+                                    diagnostic.record().map(|record| record.stage.as_str()),
+                                startup_code =
+                                    diagnostic.record().map(|record| record.code.as_str()),
+                                diagnostic_missing =
+                                    matches!(diagnostic, OwnerStartupObservation::Missing),
+                                diagnostic_overflow =
+                                    matches!(diagnostic, OwnerStartupObservation::Overflow),
+                                diagnostic_malformed =
+                                    matches!(diagnostic, OwnerStartupObservation::Malformed),
                                 "Protected owner child exited with an error"
                             );
                         }
@@ -562,7 +567,10 @@ mod binding_tests {
         let known_codes = [
             ("OWNER_BUSY", OwnerStartupCode::OwnerBusy),
             ("LOG_FILE_UNOWNED", OwnerStartupCode::LogFileUnowned),
-            ("OWNER_IDENTITY_CONFLICT", OwnerStartupCode::OwnerIdentityConflict),
+            (
+                "OWNER_IDENTITY_CONFLICT",
+                OwnerStartupCode::OwnerIdentityConflict,
+            ),
             ("FILESYSTEM_ERROR", OwnerStartupCode::FilesystemError),
             ("LOG_STORAGE_ERROR", OwnerStartupCode::LogStorageError),
             ("INSECURE_DATA_ROOT", OwnerStartupCode::InsecureDataRoot),
@@ -578,13 +586,19 @@ mod binding_tests {
         }
         for code in ["UNLISTED_PRIVATE_CODE", "ADAPTER_ERROR", "OTHER_DOMAIN", ""] {
             let error = anyhow::Error::from(nw_domain::DomainError::new(code, "private message"));
-            assert_eq!(OwnerStartupCode::from_error(&error), OwnerStartupCode::OtherDomain);
+            assert_eq!(
+                OwnerStartupCode::from_error(&error),
+                OwnerStartupCode::OtherDomain
+            );
         }
         assert_eq!(
             OwnerStartupCode::from_error(&anyhow::anyhow!("private adapter message")),
             OwnerStartupCode::AdapterError
         );
-        for stage in [OwnerStartupStage::OwnerLogActivation, OwnerStartupStage::PostLogActivation] {
+        for stage in [
+            OwnerStartupStage::OwnerLogActivation,
+            OwnerStartupStage::PostLogActivation,
+        ] {
             for code in [
                 OwnerStartupCode::OwnerBusy,
                 OwnerStartupCode::LogFileUnowned,
@@ -595,17 +609,30 @@ mod binding_tests {
                 OwnerStartupCode::OtherDomain,
                 OwnerStartupCode::AdapterError,
             ] {
-                let record = OwnerStartupDiagnostic { schema_version: 1, stage, code };
+                let record = OwnerStartupDiagnostic {
+                    schema_version: 1,
+                    stage,
+                    code,
+                };
                 let bytes = record.frame().unwrap();
-                assert_eq!(bytes, format!(
-                    "{{\"schema_version\":1,\"stage\":\"{}\",\"code\":\"{}\"}}\n",
-                    stage.as_str(), code.as_str()
-                ).into_bytes());
+                assert_eq!(
+                    bytes,
+                    format!(
+                        "{{\"schema_version\":1,\"stage\":\"{}\",\"code\":\"{}\"}}\n",
+                        stage.as_str(),
+                        code.as_str()
+                    )
+                    .into_bytes()
+                );
                 assert!(bytes.len() <= OWNER_STARTUP_FRAME_LIMIT);
-                assert_eq!(OwnerStartupObservation::from_frame(&bytes).record(), Some(&record));
+                assert_eq!(
+                    OwnerStartupObservation::from_frame(&bytes).record(),
+                    Some(&record)
+                );
             }
         }
-        let canonical = b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n";
+        let canonical =
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n";
         for invalid in [
             "{\"schema_version\":0,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
             "{\"schema_version\":2,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
@@ -625,22 +652,43 @@ mod binding_tests {
             "[]\n",
             "not JSON\n",
         ] {
-            assert!(matches!(OwnerStartupObservation::from_frame(invalid.as_bytes()), OwnerStartupObservation::Malformed));
+            assert!(matches!(
+                OwnerStartupObservation::from_frame(invalid.as_bytes()),
+                OwnerStartupObservation::Malformed
+            ));
         }
-        assert!(matches!(OwnerStartupObservation::from_frame(&[0xff, b'\n']), OwnerStartupObservation::Malformed));
-        assert!(matches!(OwnerStartupObservation::from_frame(&canonical[..canonical.len() - 1]), OwnerStartupObservation::Malformed));
+        assert!(matches!(
+            OwnerStartupObservation::from_frame(&[0xff, b'\n']),
+            OwnerStartupObservation::Malformed
+        ));
+        assert!(matches!(
+            OwnerStartupObservation::from_frame(&canonical[..canonical.len() - 1]),
+            OwnerStartupObservation::Malformed
+        ));
         for suffix in [b"\n".as_slice(), b" ".as_slice(), b"{}\n".as_slice()] {
             let mut noncanonical = canonical.to_vec();
             noncanonical.extend_from_slice(suffix);
-            assert!(matches!(OwnerStartupObservation::from_frame(&noncanonical), OwnerStartupObservation::Malformed));
+            assert!(matches!(
+                OwnerStartupObservation::from_frame(&noncanonical),
+                OwnerStartupObservation::Malformed
+            ));
         }
         let mut at_limit = canonical.to_vec();
         at_limit.resize(OWNER_STARTUP_FRAME_LIMIT, b' ');
-        assert!(matches!(OwnerStartupObservation::from_frame(&at_limit), OwnerStartupObservation::Malformed));
+        assert!(matches!(
+            OwnerStartupObservation::from_frame(&at_limit),
+            OwnerStartupObservation::Malformed
+        ));
         at_limit.push(b' ');
         assert_eq!(at_limit.len(), 513);
-        assert!(matches!(OwnerStartupObservation::from_frame(&at_limit), OwnerStartupObservation::Overflow));
-        assert!(matches!(OwnerStartupObservation::from_frame(&[]), OwnerStartupObservation::Missing));
+        assert!(matches!(
+            OwnerStartupObservation::from_frame(&at_limit),
+            OwnerStartupObservation::Overflow
+        ));
+        assert!(matches!(
+            OwnerStartupObservation::from_frame(&[]),
+            OwnerStartupObservation::Missing
+        ));
 
         // MOCK in-process I/O coverage of the production reader; this does not
         // prove actual child reaping or platform standard-handle inheritance.
@@ -655,12 +703,8 @@ mod binding_tests {
                         stage: OwnerStartupStage::OwnerLogActivation,
                         code: OwnerStartupCode::OwnerBusy,
                     };
-                    let closed_valid = mock_owner_startup_io(
-                        canonical,
-                        true,
-                        std::time::Instant::now(),
-                    )
-                    .await;
+                    let closed_valid =
+                        mock_owner_startup_io(canonical, true, std::time::Instant::now()).await;
                     assert_eq!(closed_valid.record(), Some(&expected));
 
                     // A valid prefix cannot make a 513-byte stream a record,

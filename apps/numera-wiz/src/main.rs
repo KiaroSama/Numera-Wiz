@@ -166,7 +166,10 @@ async fn run() -> Result<()> {
     if matches!(&args.command, Some(Mode::Owner)) {
         if let Err(error) = nw_platform::logging::activate(&root) {
             let error = anyhow::Error::from(error);
-            client::emit_owner_startup_failure(client::OwnerStartupStage::OwnerLogActivation, &error);
+            client::emit_owner_startup_failure(
+                client::OwnerStartupStage::OwnerLogActivation,
+                &error,
+            );
             return Err(error);
         }
         tracing::info!("Protected structured owner logging activated");
