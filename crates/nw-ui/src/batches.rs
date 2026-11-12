@@ -91,7 +91,9 @@ impl BatchUi {
 }
 impl WizApp {
     pub(super) fn batch_select(&mut self, asset: &AssetSummary, included: bool) {
-        if self.projects.active || self.pending.is_some() { return; }
+        if self.projects.active || self.pending.is_some() {
+            return;
+        }
         if included {
             if self.batch.contains(&asset.id) {
                 return;
@@ -174,7 +176,9 @@ impl WizApp {
         }
     }
     fn review_batch(&mut self, ctx: &egui::Context) {
-        if !self.cleanup_actions_allowed(ctx) || self.folder.open { return; }
+        if !self.cleanup_actions_allowed(ctx) || self.folder.open {
+            return;
+        }
         let input = self.normalized_intent().and_then(|intent| {
             let input = CleanBatchInput {
                 items: self

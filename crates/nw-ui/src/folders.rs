@@ -107,7 +107,9 @@ fn reveal_focus(response: &egui::Response) {
 
 impl WizApp {
     fn register_folder(&mut self, ctx: &egui::Context) {
-        if !self.cleanup_actions_allowed(ctx) { return; }
+        if !self.cleanup_actions_allowed(ctx) {
+            return;
+        }
         let input = RegisterFolderInput {
             path: self.folder.path.clone(),
             recursive: self.folder.recursive,
@@ -206,7 +208,9 @@ impl WizApp {
     }
 
     pub(super) fn folder_controls(&mut self, ui: &mut egui::Ui) {
-        if self.projects.active { return; }
+        if self.projects.active {
+            return;
+        }
         if ui
             .button("Folder intake (authorized engine path)")
             .clicked()
