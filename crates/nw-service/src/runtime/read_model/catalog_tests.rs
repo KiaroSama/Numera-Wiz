@@ -1907,8 +1907,8 @@ async fn metadata_publication_races() {
                 "read" => tokio::time::timeout(
                     Duration::from_secs(5),
                     f.update(&reader, |input| {
-                        input["object_grants"] =
-                            json!([{"kind":"project","id":project,"actions":["edit"]}])
+                        // Public policies require Read on every grant; revoke the whole grant.
+                        input["object_grants"] = json!([])
                     }),
                 )
                 .await
