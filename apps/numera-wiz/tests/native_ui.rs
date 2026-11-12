@@ -1036,12 +1036,17 @@ impl project_workbench::Driver for NativeProjects<'_> {
                         })
                         .collect()
                 };
-                self.write("unexpected-project-mutation", &json!({
-                    "expected_command":command,"completion_limit":8,
-                    "overflow":overflow,"completions":completions,
-                }));
+                self.write(
+                    "unexpected-project-mutation",
+                    &json!({
+                        "expected_command":command,"completion_limit":8,
+                        "overflow":overflow,"completions":completions,
+                    }),
+                );
                 self.screenshot("unexpected-project-mutation").await;
-                panic!("Native input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG");
+                panic!(
+                    "Native input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG"
+                );
             }
             if let Some(completed) = events.iter().find(|event| {
                 event["fields"]["message"] == "command.completed"

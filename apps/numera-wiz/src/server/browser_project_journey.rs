@@ -168,7 +168,11 @@ impl shared::Driver for BrowserProjects<'_> {
                     .take(9)
                     .collect();
                 let overflow = mutations.len() > 8;
-                if overflow || mutations.iter().any(|response| response.command_id != command) {
+                if overflow
+                    || mutations
+                        .iter()
+                        .any(|response| response.command_id != command)
+                {
                     let completions: Vec<Value> = if overflow {
                         Vec::new()
                     } else {
@@ -191,12 +195,17 @@ impl shared::Driver for BrowserProjects<'_> {
                     };
                     drop(mutations);
                     drop(observed);
-                    self.write("unexpected-project-mutation", &json!({
-                        "expected_command":command,"completion_limit":8,
-                        "overflow":overflow,"completions":completions,
-                    }));
+                    self.write(
+                        "unexpected-project-mutation",
+                        &json!({
+                            "expected_command":command,"completion_limit":8,
+                            "overflow":overflow,"completions":completions,
+                        }),
+                    );
                     self.capture("unexpected-project-mutation").await;
-                    panic!("Chrome input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG");
+                    panic!(
+                        "Chrome input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG"
+                    );
                 }
                 if let Some(index) = observed
                     .iter()
