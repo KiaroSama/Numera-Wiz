@@ -315,8 +315,13 @@ unrelated MCP test-module path. Later source changes still require current check
 The MCP tools now publish whole-Response output schemas. Actual CLI, official
 stdio and both HTTP lifecycle responses passed their independent schema batches
 in [run 43319569511](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43319569511).
-Retained raw-frame byte-size evidence and latest-source full CI qualification
-remain pending. Schema presence alone does not establish that evidence or full v1.
+The same run retained and independently checked actual stdio frames on all four
+native targets: a complete 52-tool standard list result of 144107 bytes and its
+144151-byte JSON-RPC line, including the newline. All 13 project output-schema
+hashes matched the actual CLI, stdio and HTTP validation documents. This evidence
+is for source `438b06c`; the run still failed at the new media-promotion regression
+and formatting. Later source changes require fresh checks, and full v1 remains
+unfinished.
 
 ## Bounded reads and history
 

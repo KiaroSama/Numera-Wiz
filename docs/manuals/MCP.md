@@ -196,8 +196,12 @@ result and full JSON-RPC envelope, including the stdio newline, must fit the
 list. Whole-Response validation has passed the actual typed CLI, official stdio
 and both HTTP lifecycle journeys in
 [run 43319569511](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43319569511).
-Retained raw-wire evidence and latest-source full CI qualification remain in
-progress; see the [project contract guide](PROJECTS.md#command-contracts-and-qualification).
+That run retained the same complete 144151-byte stdio JSON-RPC line on all four
+native targets; the standard list result was 144107 bytes, with 52 active tools
+and 13 project output schemas. Independent artifact checks matched those emitted
+schemas to all three transport validation batches. Later source changes and new
+tools require fresh checks; this scoped evidence is not whole-current-CI or full-v1
+qualification. See the [project contract guide](PROJECTS.md#command-contracts-and-qualification).
 
 A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside

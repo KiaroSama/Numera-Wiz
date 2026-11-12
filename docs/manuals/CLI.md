@@ -458,6 +458,15 @@ opaque managed inputs; this field confers no path or object authority.
 
 ## Development data generation maintenance
 
+`maintenance promotion plan` is a development native-owner query that reviews an
+already-adopted, compatible schema3 source for MediaV1. It returns the actual
+source/prefix/guard facts, current build, bounded target profile, hash and
+300-second expiry. It preserves logical source records and issues no receipt.
+Its newly added implementation still requires current-source hosted qualification.
+Promotion acceptance, stopped restoration and fresh/zero-adoption initialization
+remain in development; this query does not enable media persistence or replace
+the legacy migration below.
+
 The owner-only commands `maintenance plan`, `maintenance migrate --plan-file
 <raw-plan.json> --replay-scope <retained-scope> --idempotency-key <retained-key>`
 and `maintenance inspect <id>` use the ordinary canonical owner interface.
