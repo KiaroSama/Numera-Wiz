@@ -2194,6 +2194,7 @@ async fn public_unlink_relations() {
 
 // Pure resolver collision model, reached only after every public Link/Unlink oracle above.
 async fn linked_split_right_group_collision() {
+    use nw_domain::time::Rational;
     let fixture = Fixture::new().await;
     let linked = fixture
         .accept(fixture.request(
