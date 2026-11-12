@@ -563,7 +563,24 @@ impl WizApp {
             return;
         }
         if !response.ok {
-            self.pending = None;
+            let completed = self.pending.take();
+            if let (Action::Project(action), Some(error), Some(completed)) =
+                (received.action, response.error.as_ref(), completed.as_ref())
+            {
+                match self.recover_project_selection(action, &completed.request, error, ctx) {
+                    Ok(true) => {
+                        self.deferred = None;
+                        return;
+                    }
+                    Ok(false) => {}
+                    Err(error) => {
+                        self.project_request_failed(received.action);
+                        self.deferred = None;
+                        self.error = Some(format!("Project selection recovery failed: {error}"));
+                        return;
+                    }
+                }
+            }
             self.project_request_failed(received.action);
             if let Some(error) = response.error {
                 if error.code == "SNAPSHOT_EXPIRED" {

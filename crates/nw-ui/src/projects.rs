@@ -25,6 +25,7 @@ const BINDINGS: usize = 8;
 pub(super) enum Phase {
     Catalog,
     Summary,
+    RevalidateSelection,
     Bin,
     Sequence,
     Tracks,
@@ -155,6 +156,7 @@ pub(super) struct ProjectsUi {
     navigation: Option<Navigation>,
     staging: Option<Staging>,
     group: Option<Arc<Group>>,
+    restoration: Option<(u64, View)>,
     stale: bool,
     pub(super) terminal_failure: bool,
     handles: Vec<Handle>,
@@ -171,6 +173,15 @@ pub(super) struct ProjectsUi {
     focus_catalog: bool,
 }
 impl ProjectsUi {
+    fn restored_view(&self, group: &Group) -> View {
+        self.restoration
+            .as_ref()
+            // This is only a selection hint: the caller supplies a fresh explicit
+            // Refresh or accepted revision, and every entity is read again.
+            .filter(|(_, view)| view.project == group.key.project)
+            .map_or(&group.view, |(_, view)| view)
+            .clone()
+    }
     fn advance(&mut self) -> Result<u64, String> {
         self.generation = self
             .generation
@@ -368,7 +379,7 @@ impl WizApp {
     }
     fn project_refresh(&mut self, ctx: &egui::Context) {
         if let Some(group) = self.projects.group.clone() {
-            let mut view = group.view.clone();
+            let mut view = self.projects.restored_view(&group);
             view.revision = None;
             self.project_navigate(Navigation::Open(view), ctx);
         } else {
@@ -376,6 +387,10 @@ impl WizApp {
         }
     }
     fn project_reselect(&mut self, mut view: View, ctx: &egui::Context) {
+        if !self.request_idle() {
+            return;
+        }
+        self.projects.restoration = None;
         if let Some(group) = &self.projects.group {
             view.revision = Some(group.key.revision.clone());
         }
@@ -422,6 +437,72 @@ impl WizApp {
             self.project_action(Phase::Create),
             ctx,
         );
+    }
+    pub(super) fn recover_project_selection(
+        &mut self,
+        action: ProjectAction,
+        request: &Request,
+        error: &nw_domain::DomainError,
+        ctx: &egui::Context,
+    ) -> Result<bool, String> {
+        // Only a correlated canonical entity absence can start this one-read recovery.
+        // Transport, malformed replies, policy/expiry errors and failed revalidation
+        // continue through the normal terminal/unknown-outcome paths.
+        if error.code != "OBJECT_NOT_FOUND"
+            || action.generation != self.projects.generation
+            || !matches!(action.phase, Phase::Sequence | Phase::Track | Phase::Clip)
+        {
+            return Ok(false);
+        }
+        let Some(stage) = self.projects.staging.as_mut() else {
+            return Ok(false);
+        };
+        let Some(group) = stage.group.as_mut() else {
+            return Ok(false);
+        };
+        let (command, field, selected) = match action.phase {
+            Phase::Sequence => ("sequences.inspect", "sequence_id", &group.view.sequence),
+            Phase::Track => ("projects.inspect", "entity_id", &group.view.track),
+            Phase::Clip => ("projects.inspect", "entity_id", &group.view.clip),
+            _ => return Ok(false),
+        };
+        if stage.phase != action.phase
+            || group.key.generation != action.generation
+            || request.project.as_ref().map(|reference| reference.id.as_str())
+                != Some(group.key.project.as_str())
+            || request.command.id != command
+            || selected.is_none()
+            || request.params != json!({"projection":"entity",(field):selected,"limit":PAGE,"revision":group.key.revision})
+        {
+            return Ok(false);
+        }
+        let restoration = group.view.clone();
+        if action.phase == Phase::Sequence {
+            group.view.sequence = None;
+            group.sequence = None;
+            group.tracks = Page::empty();
+            group.page_bytes[1] = 0;
+        }
+        if matches!(action.phase, Phase::Sequence | Phase::Track) {
+            group.view.track = None;
+            group.track = None;
+            group.viewport = Page::empty();
+            group.page_bytes[2] = 0;
+        }
+        group.view.clip = None;
+        group.clip = None;
+        group.source = None;
+        // Cleared payloads leave a conservative byte upper bound. The only new
+        // read must equal the retained summary, so it adds no cached payload.
+        self.projects.restoration = Some((action.generation, restoration));
+        self.project_query(
+            Phase::RevalidateSelection,
+            "projects.inspect",
+            json!({"projection":"summary","limit":PAGE}),
+            ctx,
+        )?;
+        self.status = "Selected entity is unavailable. Rechecking captured project history…".into();
+        Ok(true)
     }
     pub(super) fn project_request_failed(&mut self, action: Action) {
         if matches!(action, Action::Project(_))
@@ -494,10 +575,22 @@ impl WizApp {
         {
             return Err("Captured view expired before publication; explicitly Refresh".into());
         }
+        let unavailable = self.projects.restoration.as_ref().is_some_and(|(generation, view)| {
+            *generation == group.key.generation
+                && view.project == group.key.project
+                && view.revision.as_deref() == Some(group.key.revision.as_str())
+        });
+        if !unavailable {
+            self.projects.restoration = None;
+        }
         self.projects.group = Some(Arc::new(group));
         self.projects.stale = false;
         self.projects.terminal_failure = false;
-        self.status = "Captured project view ready. Changes are applied only after the owner's projected result.".into();
+        self.status = if unavailable {
+            "Selected entity is unavailable in this captured view. History is ready; explicit Refresh or history actions can recheck the same selection."
+        } else {
+            "Captured project view ready. Changes are applied only after the owner's projected result."
+        }.into();
         Ok(())
     }
     pub(super) fn receive_project(
@@ -514,6 +607,7 @@ impl WizApp {
         if matches!(
             action.phase,
             Phase::Summary
+                | Phase::RevalidateSelection
                 | Phase::Bin
                 | Phase::Sequence
                 | Phase::Tracks
@@ -566,11 +660,13 @@ impl WizApp {
                     .ok_or("Catalog navigation target is missing")?;
                 match target {
                     Navigation::Cleanup => {
+                        self.projects.restoration = None;
                         self.projects.active = false;
                         self.projects.group = None;
                         self.status="Cleanup. Previous captured project handles were acknowledged by the catalog.".into();
                     }
                     Navigation::Catalog => {
+                        self.projects.restoration = None;
                         self.projects.group = None;
                         self.projects.stale = false;
                         self.projects.focus_catalog = true;
@@ -624,7 +720,13 @@ impl WizApp {
                     self.projects
                         .group
                         .as_ref()
-                        .map(|group| group.view.clone())
+                        .map(|group| {
+                            if matches!(request.command.id.as_str(), "history.undo" | "history.redo") {
+                                self.projects.restored_view(group)
+                            } else {
+                                group.view.clone()
+                            }
+                        })
                         .unwrap_or_else(|| View::new(project.clone()))
                 };
                 view.project = project;
@@ -789,6 +891,14 @@ impl WizApp {
             .and_then(|stage| stage.group.as_mut())
             .ok_or("Missing staged captured summary")?;
         verify(group, request, &result)?;
+        if action.phase == Phase::RevalidateSelection {
+            // The identical summary binding must still resolve to this immutable
+            // ticket, revision and content under current owner authorization.
+            if result != group.summary {
+                return Err("Captured summary changed while reconciling the unavailable selection".into());
+            }
+            return self.publish_project();
+        }
         group.bytes = group
             .bytes
             .checked_add(bytes)
@@ -883,15 +993,8 @@ impl WizApp {
                         "Viewport contains a different track or invalid exact interval".into(),
                     );
                 }
-                if group.view.clip.is_some()
-                    && !group
-                        .viewport
-                        .items
-                        .iter()
-                        .any(|clip| Some(clip.id.as_str()) == group.view.clip.as_deref())
-                {
-                    group.view.clip = None;
-                }
+                // A bounded first page cannot disprove an explicit selection from
+                // another page. Its canonical detail read resolves that exact ID.
                 if group.view.clip.is_none() {
                     group.view.clip = group.viewport.items.first().map(|clip| clip.id.to_string());
                 }
