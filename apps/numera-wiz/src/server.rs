@@ -1045,10 +1045,14 @@ mod tests {
             tokens.push(token);
         }
         let at_capacity = || {
-            let error = service
-                .credential_for_origin_bound("agent", None, Some(&profile.principal))
-                .err()
-                .expect("A thirty-third live credential must be rejected");
+            let error = match service.credential_for_origin_bound(
+                "agent",
+                None,
+                Some(&profile.principal),
+            ) {
+                Err(error) => error,
+                Ok(_) => panic!("A thirty-third live credential must be rejected"),
+            };
             assert_eq!(error.code, "RESOURCE_LIMIT");
         };
         at_capacity();
