@@ -213,6 +213,12 @@ impl Sequences {
 }
 #[derive(Subcommand)]
 pub enum Clips {
+    Link {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long = "clip", required = true)]
+        clips: Vec<String>,
+    },
     Place {
         #[command(flatten)]
         context: WriteContext,
@@ -275,6 +281,7 @@ impl Clips {
                 };
                 context.request("clips.place", json!({"sequence_id":sequence,"track_id":track,"source":source,"source_range":{"start":rational(&source_start)?,"end":rational(&source_end)?},"sequence_start":rational(&sequence_start)?,"collision":"reject"}))
             }
+            Self::Link { context, clips } => context.request("clips.link", json!({"clip_ids":clips,"link_policy":"expand"})),
             Self::Move { context, clips, delta } => context.request("clips.move", json!({"clip_ids":clips,"delta":rational(&delta)?,"collision":"reject","link_policy":"expand"})),
             Self::Split { context, clip, at } => context.request("clips.split", json!({"clip_id":clip,"at_sequence":rational(&at)?,"link_policy":"expand"})),
             Self::Remove { context, clips } => context.request("clips.remove", json!({"clip_ids":clips,"mode":"lift","link_policy":"expand"})),

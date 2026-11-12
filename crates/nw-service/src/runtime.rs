@@ -500,7 +500,7 @@ impl Service {
             return Ok(response);
         };
         let readable = match request.command.id.as_str() {
-            "projects.create" | "sequences.create" | "clips.place" | "clips.move"
+            "projects.create" | "sequences.create" | "clips.place" | "clips.move" | "clips.link"
             | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
                 self.project_receipt_readable(context, &response)?
             }
@@ -920,7 +920,7 @@ impl Service {
                 &cancellation,
             )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
-            | "clips.place" | "clips.move" | "clips.split" | "clips.remove" | "history.undo"
+            | "clips.place" | "clips.move" | "clips.link" | "clips.split" | "clips.remove" | "history.undo"
             | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);

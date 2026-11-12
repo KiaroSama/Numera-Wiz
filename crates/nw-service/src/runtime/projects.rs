@@ -303,6 +303,9 @@ impl Service {
                     "clips.move" => {
                         ProjectEditIntent::Move(commands::parse(request.params.clone())?)
                     }
+                    "clips.link" => {
+                        ProjectEditIntent::Link(commands::parse(request.params.clone())?)
+                    }
                     "clips.split" => {
                         ProjectEditIntent::Split(commands::parse(request.params.clone())?)
                     }
@@ -325,7 +328,8 @@ impl Service {
                 ));
             }
             let (patch, created, history_action) = if let Some(intent) = intent {
-                let ids = (0..MAX_CHANGES * 2)
+                let id_budget = if matches!(&intent, ProjectEditIntent::Link(_)) { 1 } else { MAX_CHANGES * 2 };
+                let ids = (0..id_budget)
                     .map(|_| EntityId::parse(Uuid::new_v4().to_string()))
                     .collect::<Result<VecDeque<_>>>()?;
                 let resolved = resolve_edit(&read, intent, AllocatedIds(ids))?;

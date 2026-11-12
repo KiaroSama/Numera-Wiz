@@ -747,5 +747,29 @@ mod tests {
             json!({"limit":1,"cursor":"retained-cursor","replace_snapshot":null})
         );
         assert!(ProjectCli::try_parse_from(["test", "list", "--project", id]).is_err());
+        let partner = "22222222-2222-4222-8222-222222222222";
+        let make_link = || {
+            ClipCli::try_parse_from([
+                "test", "link", "--project", id, "--expected-revision", "5",
+                "--clip", id, "--clip", partner, "--replay-scope", "retained-scope",
+                "--idempotency-key", "same-link", "--request-id", "supplied-link-request",
+            ]).unwrap().command
+        };
+        let linked = prepare(Command::Clips(make_link())).unwrap();
+        let retry = prepare(Command::Clips(make_link())).unwrap();
+        assert_eq!(linked.command.id, "clips.link");
+        assert_eq!(linked.command.version, 1);
+        assert_eq!(linked.project.as_ref().unwrap().id, id);
+        assert_eq!(linked.project.as_ref().unwrap().expected_revision.as_deref(), Some("5"));
+        assert_eq!(linked.params, json!({"clip_ids":[id,partner],"link_policy":"expand"}));
+        assert_eq!(linked.request_id, "supplied-link-request");
+        assert_eq!(linked.replay_scope.as_deref(), Some("retained-scope"));
+        assert_eq!(linked.idempotency_key.as_deref(), Some("same-link"));
+        assert_eq!(linked.request_id, retry.request_id);
+        assert_eq!(linked.structural_digest(), retry.structural_digest());
+        assert!(ClipCli::try_parse_from([
+            "test", "link", "--project", id, "--expected-revision", "5",
+            "--replay-scope", "retained-scope", "--idempotency-key", "no-clip",
+        ]).is_err());
     }
 }

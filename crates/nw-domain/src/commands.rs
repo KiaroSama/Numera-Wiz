@@ -201,7 +201,7 @@ impl ProjectContextRule {
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
         "projects.inspect" | "sequences.inspect" => ProjectContextRule::RequiredRead,
-        "sequences.create" | "clips.place" | "clips.move" | "clips.split" | "clips.remove"
+        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.split" | "clips.remove"
         | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
@@ -312,6 +312,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Move the complete linked clip selection",
             DurableMutation,
             crate::projects::MoveInput
+        ),
+        row!(
+            "clips.link",
+            "Link complete same-sequence clip components without changing geometry",
+            DurableMutation,
+            crate::projects::LinkInput
         ),
         row!(
             "clips.split",
@@ -848,6 +854,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "sequences.create",
     "clips.place",
     "clips.move",
+    "clips.link",
     "clips.split",
     "clips.remove",
     "history.undo",

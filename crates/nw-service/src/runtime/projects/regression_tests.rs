@@ -908,28 +908,51 @@ pub(in crate::runtime) async fn public_link_producer() {
         "Project, eight entities and two occurrences must be distinct"
     );
 
-    // These pre-producer observations must run before the expected failing acceptance.
+    // Link discovery must describe the callable producer; Unlink is still unavailable.
     let listed = service
         .dispatch(context.clone(), Request::query("commands.list", json!({})))
         .await;
     assert!(listed.ok, "{listed:?}");
     assert!(listed.receipt_id.is_none(), "{listed:?}");
-    let listing = listed.result.unwrap();
-    assert!(listing.is_object());
-    assert_eq!(listing["release"], "development_only");
-    assert_eq!(listing["full_release"], "blocked");
-    let descriptors = listing["commands"].as_array().unwrap();
-    for command in ["clips.link", "clips.unlink"] {
+    let listing = listed.result.as_ref().unwrap_or_else(|| panic!("{listed:?}"));
+    assert!(listing.is_object(), "{listed:?}");
+    assert_eq!(listing["release"], "development_only", "{listed:?}");
+    assert_eq!(listing["full_release"], "blocked", "{listed:?}");
+    let descriptors = listing["commands"].as_array().unwrap_or_else(|| panic!("{listed:?}"));
+    let descriptor = descriptors.iter().find(|descriptor| descriptor["id"] == "clips.link")
+        .unwrap_or_else(|| panic!("{listed:?}"));
+    assert_eq!(descriptor["version"], 1, "{listed:?}");
+    assert_eq!(descriptor["state_class"], "durable_mutation", "{listed:?}");
+    assert_eq!(descriptor["project_context"], "required_write", "{listed:?}");
+    assert_eq!(descriptor["params_schema"]["additionalProperties"], false, "{listed:?}");
+    let required = descriptor["params_schema"]["required"].as_array().unwrap_or_else(|| panic!("{listed:?}"));
+    assert_eq!(required.len(), 2, "{listed:?}");
+    assert!(required.contains(&json!("clip_ids")) && required.contains(&json!("link_policy")), "{listed:?}");
+    let clip_schema = &descriptor["params_schema"]["properties"]["clip_ids"];
+    assert_eq!(clip_schema["minItems"], 1, "{listed:?}");
+    assert_eq!(clip_schema["maxItems"], 128, "{listed:?}");
+    assert_eq!(clip_schema["uniqueItems"], true, "{listed:?}");
+    assert_eq!(descriptor["params_schema"]["$defs"]["LinkPolicy"]["enum"], json!(["expand"]), "{listed:?}");
+    let registered = commands::descriptor("clips.link").unwrap_or_else(|| panic!("{listed:?}"));
+    assert_eq!(serde_json::to_value(registered).unwrap(), *descriptor, "{listed:?}");
+    assert_eq!(commands::registry().iter().filter(|row| row.id == "clips.link").count(), 1, "{listed:?}");
+    let schema = service.dispatch(context.clone(), Request::query("commands.schema", json!({"id":"clips.link"}))).await;
+    assert!(schema.ok && schema.error.is_none() && schema.receipt_id.is_none(), "{schema:?}");
+    assert_eq!(schema.result.as_ref(), Some(descriptor), "{schema:?}");
+    {
+        let command = "clips.unlink";
         assert!(
             !descriptors
                 .iter()
-                .any(|descriptor| descriptor["id"] == command)
+                .any(|descriptor| descriptor["id"] == command),
+            "{listed:?}"
         );
-        assert!(commands::descriptor(command).is_none());
+        assert!(commands::descriptor(command).is_none(), "{listed:?}");
         assert!(
             !commands::registry()
                 .iter()
-                .any(|descriptor| descriptor.id == command)
+                .any(|descriptor| descriptor.id == command),
+            "{listed:?}"
         );
         let schema = service
             .dispatch(
@@ -947,7 +970,7 @@ pub(in crate::runtime) async fn public_link_producer() {
         );
     }
 
-    // Current source must fail here with UNKNOWN_COMMAND, not pass the missing handler.
+    // The prior hosted A failure was this real Link request's UNKNOWN_COMMAND.
     let linked = accepted(
         write(
             &service,
@@ -1056,5 +1079,170 @@ pub(in crate::runtime) async fn public_link_producer() {
     );
     for (id, raw) in &before_nonclips {
         assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
+    }
+    let moved_clips = clip_ids.iter().map(|id| read.entity(id).unwrap()).collect::<Vec<_>>();
+    drop(read);
+    public_link_edges().await;
+
+    // Next staged missing-handler RED: no Unlink production handler is active yet.
+    let unlinked = accepted(write(
+        &service, &context, &scope, Some((project.as_str(), "5")),
+        "clips.unlink", "public-link-red-unlink",
+        json!({"clip_ids":[clip_ids[1]],"link_policy":"expand"}),
+    ).await);
+    assert_eq!(unlinked["project_id"], project.as_str());
+    assert_eq!(unlinked["base_revision"], "5");
+    assert_eq!(unlinked["revision"], "6");
+    OperationId::parse(unlinked["operation_id"].as_str().unwrap()).unwrap();
+    assert!(unlinked.get("no_change").is_none());
+    assert_eq!(unlinked["created"], json!({"clip_ids":expected_members}));
+    assert_eq!(unlinked["changed_ids"], json!(expected_members));
+    let read = service.store.project_read(project.as_str()).unwrap();
+    assert_eq!(read.header().revision, Revision(6));
+    assert_eq!(read.header().entity_count, 8);
+    assert!(read.raw_entity(&group).unwrap().is_none());
+    assert!(read.dependents(&group, 128).unwrap().is_empty());
+    for before in &moved_clips {
+        let after = read.entity(&before.id).unwrap();
+        assert_eq!(after.payload::<Clip>("clip").unwrap().link_group_id, None);
+        assert_eq!(clip_facts(&after, false), clip_facts(before, false));
+        assert!(!after.references.iter().any(|reference| reference.role == "link"));
+    }
+    for (id, raw) in &before_nonclips {
+        assert_eq!(read.raw_entity(id).unwrap().as_ref(), Some(raw));
+    }
+}
+
+// Public validation and real-store deterministic allocation models, after A's literal oracles.
+async fn public_link_edges() {
+    let fixture = Fixture::new().await;
+    for (key, seeds) in [
+        ("empty", vec![]),
+        ("duplicate", vec![fixture.clips[0].clone(), fixture.clips[0].clone()]),
+        ("singleton", vec![fixture.clips[0].clone()]),
+        ("cross-sequence", vec![fixture.clips[0].clone(), fixture.clips[3].clone()]),
+    ] {
+        fixture.reject_unchanged(fixture.request("clips.link", &format!("link-{key}"),
+            json!({"clip_ids":seeds,"link_policy":"expand"})), "VALIDATION_ERROR").await;
+    }
+    fixture.reject_unchanged(fixture.request("clips.link", "link-too-many",
+        json!({"clip_ids":vec![fixture.clips[0].clone();129],"link_policy":"expand"})), "RESOURCE_LIMIT").await;
+    for (key, params) in [
+        ("policy", json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"ignore"})),
+        ("field", json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand","group":"caller-group"})),
+    ] {
+        fixture.reject_unchanged(fixture.request("clips.link", &format!("link-{key}"), params), "VALIDATION_ERROR").await;
+    }
+    let linked = fixture.accept(fixture.request("clips.link", "link-model-group",
+        json!({"clip_ids":[fixture.clips[0],fixture.clips[2]],"link_policy":"expand"}))).await;
+    let group = EntityId::parse(linked["created"]["link_group_id"].as_str().unwrap()).unwrap();
+    let mut members = vec![fixture.clips[0].clone(), fixture.clips[2].clone()];
+    members.sort();
+    assert_eq!(linked["changed_ids"], json!(members));
+
+    // No-op validates a complete group from one seed and preserves project/history bytes.
+    let raw = members.iter().map(|id| fixture.raw(id)).collect::<Vec<_>>();
+    let history = fixture.history_hash();
+    let header = fixture.service.store.project_read(fixture.project.as_str()).unwrap().header_raw().to_owned();
+    let request = fixture.request("clips.link", "link-existing-group",
+        json!({"clip_ids":[fixture.clips[2]],"link_policy":"expand"}));
+    let response = fixture.service.dispatch(fixture.context.clone(), request.clone()).await;
+    assert!(response.ok && response.receipt_id.is_some(), "{response:?}");
+    let result = response.result.as_ref().unwrap();
+    assert_eq!(result["no_change"], true);
+    assert_eq!(result["revision"], linked["revision"]);
+    assert_eq!(result["base_revision"], linked["revision"]);
+    assert_eq!(result["changed_ids"], json!([]));
+    assert_eq!(result["created"], json!({"link_group_id":group,"clip_ids":members}));
+    assert_eq!(fixture.history_hash(), history);
+    assert_eq!(fixture.service.store.project_read(fixture.project.as_str()).unwrap().header_raw(), header);
+    assert_eq!(members.iter().map(|id| fixture.raw(id)).collect::<Vec<_>>(), raw);
+    let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+    assert_eq!(replay.receipt_id, response.receipt_id);
+    assert_eq!(replay.result, response.result);
+
+    // Add an unlinked partner to clip 1 by public placement; A's project is untouched.
+    let clip: Clip = fixture.entity(&fixture.clips[1]).payload("clip").unwrap();
+    let placed = fixture.accept(fixture.request("clips.place", "link-model-extra", json!({
+        "sequence_id":clip.sequence_id,"track_id":clip.track_id,
+        "source":{"kind":"solid_color","rgba":[0,0,0,1],"duration":{"num":"4","den":"1"}},
+        "source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},
+        "sequence_start":{"num":"6","den":"1"},"collision":"reject"
+    }))).await;
+    let extra = EntityId::parse(placed["created"]["clip_ids"][0].as_str().unwrap()).unwrap();
+    let seeds = vec![fixture.clips[1].clone(), extra.clone()];
+    let intent = || ProjectEditIntent::Link(commands::parse(json!({"clip_ids":seeds,"link_policy":"expand"})).unwrap());
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    assert!(read.raw_entity(&group).unwrap().is_none());
+    assert_eq!(read.dependents(&group, 128).unwrap(), members);
+    assert_eq!(read.dependents(&group, 1).unwrap_err().code, "RESOURCE_LIMIT");
+    assert!(read.has_dependency_target(&group).unwrap());
+    let unchanged = resolve_edit(&read,
+        ProjectEditIntent::Link(commands::parse(json!({"clip_ids":[members[0]],"link_policy":"expand"})).unwrap()),
+        AllocatedIds(VecDeque::new())).unwrap();
+    assert!(unchanged.forward.changes.is_empty() && unchanged.inverse.changes.is_empty());
+    assert_eq!(unchanged.created, json!({"link_group_id":group,"clip_ids":members}));
+    let header = read.header_raw().to_owned();
+    let before = seeds.iter().map(|id| read.raw_entity(id).unwrap().unwrap()).collect::<Vec<_>>();
+    for candidate in [read.header().root_bin_id.clone(), group.clone()] {
+        let error = resolve_edit(&read, intent(), AllocatedIds(VecDeque::from([candidate])))
+            .err().expect("Occupied identity must reject the single candidate");
+        assert_eq!(error.code, "OBJECT_CONFLICT");
+    }
+    let free = EntityId::parse(Uuid::new_v4().to_string()).unwrap();
+    assert!(!read.has_dependency_target(&free).unwrap());
+    assert!(read.raw_entity(&free).unwrap().is_none());
+    let resolved = resolve_edit(&read, intent(), AllocatedIds(VecDeque::from([free.clone()]))).unwrap();
+    let mut sorted_seeds = seeds.clone();
+    sorted_seeds.sort();
+    assert_eq!(resolved.changed_ids, sorted_seeds);
+    assert_eq!(resolved.created, json!({"link_group_id":free,"clip_ids":sorted_seeds}));
+    assert_eq!(resolved.forward.changes.len(), 2);
+    for change in &resolved.forward.changes {
+        let after: EntityEnvelope = serde_json::from_str(change.after.as_ref().unwrap()).unwrap();
+        assert_eq!(after.payload::<Clip>("clip").unwrap().link_group_id.as_ref(), Some(&free));
+        assert_eq!(change.before, read.raw_entity(&change.id).unwrap());
+    }
+    assert_eq!(read.header_raw(), header);
+    assert_eq!(seeds.iter().map(|id| read.raw_entity(id).unwrap().unwrap()).collect::<Vec<_>>(), before);
+    drop(read);
+
+    // Injected MODEL only: a known nonclip semantic_input occupies the same target namespace.
+    let occupied = EntityId::parse(Uuid::new_v4().to_string()).unwrap();
+    let mut source = fixture.entity(&fixture.sources[3]);
+    source.references.push(EntityReference { role: "semantic_input".into(), target: occupied.clone() });
+    fixture.install_future_envelope(source);
+    let read = fixture.service.store.project_read(fixture.project.as_str()).unwrap();
+    assert!(read.raw_entity(&occupied).unwrap().is_none());
+    assert_eq!(read.dependents(&occupied, 128).unwrap(), vec![fixture.sources[3].clone()]);
+    assert!(read.has_dependency_target(&occupied).unwrap());
+    assert_eq!(resolve_edit(&read, intent(), AllocatedIds(VecDeque::from([occupied])))
+        .err().expect("Any dependency role occupies a candidate").code, "OBJECT_CONFLICT");
+    drop(read);
+
+    // Injected relations exercise strict Link behavior without replacing legacy linked fixtures.
+    for relation in ["incoming-nonclip", "outgoing-nonclip", "semantic-input", "incoming-clip"] {
+        let fixture = Fixture::new().await;
+        let (id, target, role) = match relation {
+            "incoming-nonclip" => (&fixture.sources[3], &fixture.clips[0], "link"),
+            "outgoing-nonclip" => (&fixture.clips[0], &fixture.sources[3], "link"),
+            "semantic-input" => (&fixture.sources[3], &fixture.clips[0], "semantic_input"),
+            _ => (&fixture.clips[2], &fixture.clips[0], "link"),
+        };
+        let mut entity = fixture.entity(id);
+        entity.references.push(EntityReference { role: role.into(), target: target.clone() });
+        fixture.install_future_envelope(entity);
+        let seeds = if relation == "incoming-clip" { vec![fixture.clips[0].clone()] }
+            else { vec![fixture.clips[0].clone(), fixture.clips[2].clone()] };
+        let request = fixture.request("clips.link", relation, json!({"clip_ids":seeds,"link_policy":"expand"}));
+        if relation.ends_with("nonclip") {
+            fixture.reject_unchanged(request, "VALIDATION_ERROR").await;
+        } else {
+            let result = fixture.accept(request).await;
+            let mut expected = vec![fixture.clips[0].clone(), fixture.clips[2].clone()];
+            expected.sort();
+            assert_eq!(result["changed_ids"], json!(expected));
+            assert!(fixture.entity(id).references.iter().any(|r| r.role == role && &r.target == target));
+        }
     }
 }

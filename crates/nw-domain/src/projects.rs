@@ -459,6 +459,18 @@ pub struct MoveInput {
     pub link_policy: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkPolicy {
+    Expand,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LinkInput {
+    #[schemars(length(min = 1, max = 128), extend("uniqueItems" = true))]
+    pub clip_ids: Vec<EntityId>,
+    pub link_policy: LinkPolicy,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SplitInput {
     pub clip_id: EntityId,

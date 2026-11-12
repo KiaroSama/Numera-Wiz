@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 pub trait ProjectRead {
     fn header(&self) -> &ProjectHeader;
     fn raw_entity(&self, id: &EntityId) -> Result<Option<String>>;
+    fn has_dependency_target(&self, id: &EntityId) -> Result<bool>;
     fn dependents(&self, id: &EntityId, limit: usize) -> Result<Vec<EntityId>>;
     fn intersecting(
         &self,
@@ -35,6 +36,7 @@ pub enum ProjectEditIntent {
     Sequence(SequenceInput),
     Place(Box<PlaceInput>, SourceBinding),
     Move(MoveInput),
+    Link(LinkInput),
     Split(SplitInput),
     Remove(RemoveInput),
 }
@@ -234,6 +236,79 @@ fn expand_links<R: ProjectRead>(read: &R, ids: &[EntityId]) -> Result<Vec<Entity
     }
     Ok(clips)
 }
+// New topology authoring is stricter than the frozen legacy edit expansion.
+fn link_selection<R: ProjectRead>(read: &R, ids: &[EntityId]) -> Result<Vec<EntityEnvelope>> {
+    if ids.is_empty() {
+        return Err(invalid("Select at least one clip"));
+    }
+    if ids.len() > MAX_CHANGES {
+        return Err(limit("Select at most 128 clips"));
+    }
+    if ids.iter().collect::<BTreeSet<_>>().len() != ids.len() {
+        return Err(invalid("Duplicate clip IDs are not allowed"));
+    }
+    let mut pending: VecDeque<_> = ids.iter().cloned().collect();
+    let mut selected = BTreeMap::new();
+    while let Some(id) = pending.pop_front() {
+        if selected.contains_key(&id) {
+            continue;
+        }
+        if selected.len() >= MAX_CHANGES {
+            return Err(limit("Linked edit exceeds 128 clips"));
+        }
+        let entity = read.entity(&id)?;
+        entity.semantics()?;
+        if entity.known() && entity.kind != "clip" {
+            return Err(invalid("Link relations require clips"));
+        }
+        let clip: Clip = entity.payload("clip")?;
+        if let Some(group) = &clip.link_group_id {
+            for dependent in read.dependents(group, MAX_CLOSURE)? {
+                let member = read.entity(&dependent)?;
+                member.semantics()?;
+                // The dependency namespace also holds semantic_input and explicit link rows.
+                if member.known() && member.kind == "clip"
+                    && member.payload::<Clip>("clip")?.link_group_id.as_ref() == Some(group)
+                {
+                    pending.push_back(dependent);
+                }
+            }
+        }
+        for reference in entity.references.iter().filter(|reference| reference.role == "link") {
+            let target = read.entity(&reference.target)?;
+            target.semantics()?;
+            if target.known() && target.kind != "clip" {
+                return Err(invalid("Link relations require clips"));
+            }
+            target.payload::<Clip>("clip")?;
+            pending.push_back(reference.target.clone());
+        }
+        for dependent in read.dependents(&id, MAX_CLOSURE)? {
+            let incoming = read.entity(&dependent)?;
+            incoming.semantics()?;
+            if incoming.references.iter().any(|reference| reference.role == "link" && reference.target == id) {
+                if incoming.known() && incoming.kind != "clip" {
+                    return Err(invalid("Link relations require clips"));
+                }
+                incoming.payload::<Clip>("clip")?;
+                pending.push_back(dependent);
+            }
+        }
+        selected.insert(id, entity);
+    }
+    if selected.len() < 2 {
+        return Err(invalid("Link requires at least two resolved clips"));
+    }
+    let mut sequence = None;
+    for entity in selected.values() {
+        let clip: Clip = entity.payload("clip")?;
+        if sequence.as_ref().is_some_and(|id| id != &clip.sequence_id) {
+            return Err(invalid("Linked clips must belong to the same sequence"));
+        }
+        sequence = Some(clip.sequence_id);
+    }
+    Ok(selected.into_values().collect())
+}
 pub fn resolve_edit<R: ProjectRead>(
     read: &R,
     intent: ProjectEditIntent,
@@ -351,6 +426,32 @@ pub fn resolve_edit<R: ProjectRead>(
             edit.insert(entity)?;
             edit.sources.push(source);
             json!({"source_id":source_id,"clip_ids":[clip_id]})
+        }
+        ProjectEditIntent::Link(input) => {
+            let selected = link_selection(read, &input.clip_ids)?;
+            validate_unchanged(read, &selected)?;
+            let clip_ids = selected.iter().map(|entity| entity.id.clone()).collect::<Vec<_>>();
+            let existing = selected[0].payload::<Clip>("clip")?.link_group_id;
+            if let Some(group) = existing {
+                let mut common = true;
+                for entity in &selected {
+                    common &= entity.payload::<Clip>("clip")?.link_group_id.as_ref() == Some(&group);
+                }
+                if common {
+                    return edit.finish(json!({"link_group_id":group,"clip_ids":clip_ids}));
+                }
+            }
+            let group = ids.next()?;
+            if read.raw_entity(&group)?.is_some() || read.has_dependency_target(&group)? {
+                return Err(DomainError::new("OBJECT_CONFLICT", "Allocated link group ID is already present"));
+            }
+            for mut entity in selected {
+                let mut clip: Clip = entity.payload("clip")?;
+                clip.link_group_id = Some(group.clone());
+                entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({"link_group_id":group,"clip_ids":clip_ids})
         }
         ProjectEditIntent::Move(input) => {
             if input.collision != "reject" || input.link_policy != "expand" {

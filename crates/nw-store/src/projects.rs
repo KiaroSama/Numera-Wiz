@@ -245,7 +245,7 @@ impl Store {
                 header = serde_json::from_str(current.as_deref().expect("Existing header checked above")).map_err(storage)?;
                 if header.id != project || request.project.as_ref().map(|p| p.id.as_str()) != Some(project.as_str()) { return Err(domain::invalid("Project envelope and stored identity differ")); }
                 let history_matches = matches!((&prepared.history_action, request.command.id.as_str()), (HistoryAction::Undo(_), "history.undo") | (HistoryAction::Redo(_), "history.redo"))
-                    || (matches!(&prepared.history_action, HistoryAction::Normal) && ["sequences.create", "clips.place", "clips.move", "clips.split", "clips.remove"].contains(&request.command.id.as_str()));
+                    || (matches!(&prepared.history_action, HistoryAction::Normal) && ["sequences.create", "clips.place", "clips.move", "clips.link", "clips.split", "clips.remove"].contains(&request.command.id.as_str()));
                 if !history_matches { return Err(domain::invalid("Project command and prepared history action differ")); }
                 header.writable()?;
                 let expected = request.project.as_ref().and_then(|p| p.expected_revision.as_deref()).ok_or_else(|| domain::invalid("Project write revision required"))?;
@@ -849,6 +849,18 @@ impl ProjectRead for ProjectReadSnapshot {
     fn raw_entity(&self, id: &EntityId) -> Result<Option<String>> {
         let table = self.read.open_table(RECORDS).map_err(storage)?;
         bounded_table_raw(&table, &entity_key(&self.header.id, id), 192 * 1024)
+    }
+    fn has_dependency_target(&self, id: &EntityId) -> Result<bool> {
+        let table = self.read.open_table(RECORDS).map_err(storage)?;
+        let prefix = format!("project-dependency/{}/{id}/", self.header.id);
+        let mut rows = table.range(prefix.as_str()..).map_err(storage)?;
+        match rows.next() {
+            Some(row) => {
+                let (key, _) = row.map_err(storage)?;
+                Ok(key.value().starts_with(&prefix))
+            }
+            None => Ok(false),
+        }
     }
     fn dependents(&self, id: &EntityId, limit: usize) -> Result<Vec<EntityId>> {
         let table = self.read.open_table(RECORDS).map_err(storage)?;
