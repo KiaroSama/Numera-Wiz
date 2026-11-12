@@ -411,14 +411,13 @@ impl<'a> Session<'a> {
         protocol::check_proof_budget(&self.context.root, 0, 0)?;
         let files = protocol::proof_files(&self.context.root.join("review-proof"))?;
         require(
-            files.len() == self.ledger.len() && files.len() == self.transactions * 3,
+            files.len() == self.transactions * 3 && files.keys().eq(self.ledger.keys()),
             "SECURITY_CLASSIFIER_PROOF_INVALID",
         )?;
+        // Validate the entire expected filename set before any triple reread.
+        // Otherwise an earlier attempt can hit a missing completion before a
+        // later unexpected renamed filename, making rejection depend on order.
         for name in files.keys() {
-            require(
-                self.ledger.contains_key(name),
-                "SECURITY_CLASSIFIER_PROOF_INVALID",
-            )?;
             if let Some(id) = name.strip_suffix(".attempt") {
                 self.verify_transaction(id)?;
             }

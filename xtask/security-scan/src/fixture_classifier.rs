@@ -399,38 +399,96 @@ fn real_evaluator(fixture: &Fixture, repository: &Path) -> Result<()> {
         )?;
         session.verify()?;
         let directory = fixture.root.join("evaluator-proof-faults/review-proof");
-        let mut done = protocol::proof_files(&directory)?
+        let files = protocol::proof_files(&directory)?;
+        let stem = |name: &str| -> Result<u128> {
+            let (stem, _) = name
+                .split_once('.')
+                .ok_or(ScanFailure("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED"))?;
+            u128::from_str_radix(stem, 16).private("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED")
+        };
+        let first_stem = stem(
+            files
+                .first_key_value()
+                .ok_or(ScanFailure("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED"))?
+                .0,
+        )?;
+        let last_stem = stem(
+            files
+                .last_key_value()
+                .ok_or(ScanFailure("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED"))?
+                .0,
+        )?;
+        let before = format!(
+            "{:032x}.done",
+            first_stem
+                .checked_sub(1)
+                .ok_or(ScanFailure("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED"))?
+        );
+        let after = format!(
+            "{:032x}.done",
+            last_stem
+                .checked_add(1)
+                .ok_or(ScanFailure("SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED"))?
+        );
+        require(
+            files
+                .keys()
+                .all(|name| before.as_str() < name.as_str() && name.as_str() < after.as_str()),
+            "SECURITY_MOCK_RENAME_ORDER_SETUP_FAILED",
+        )?;
+        let mut done = files
             .into_iter()
             .filter(|(name, _)| name.ends_with(".done"));
         let (name, first) = done.next().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?;
         let (_, second) = done.next().ok_or(ScanFailure("SECURITY_FIXTURE_IO"))?;
         let original = private::read(&first, private::RECORD_LIMIT)?;
         let other = private::read(&second, private::RECORD_LIMIT)?;
-        let renamed = directory.join(format!("{}.done", private::nonce()?));
-        fs::rename(&first, &renamed).private("SECURITY_FIXTURE_IO")?;
-        require(
-            failed_at(&session.verify(), "SECURITY_CLASSIFIER_PROOF_INVALID"),
-            "SECURITY_MOCK_RENAMED_CLASSIFIER_PROOF_FAILED",
-        )?;
-        fs::rename(&renamed, &first).private("SECURITY_FIXTURE_IO")?;
+        // A later unexpected name previously allowed a missing old completion to
+        // reach the private-read error first. Exercise both lexical orders.
+        for name in [&before, &after] {
+            session.verify()?;
+            let renamed = directory.join(name);
+            fs::rename(&first, &renamed).private("SECURITY_FIXTURE_IO")?;
+            require(
+                failed_at(&session.verify(), "SECURITY_CLASSIFIER_PROOF_INVALID"),
+                "SECURITY_MOCK_RENAMED_CLASSIFIER_PROOF_FAILED",
+            )?;
+            fs::rename(&renamed, &first).private("SECURITY_FIXTURE_IO")?;
+            session.verify()?;
+        }
+        diagnostic("INFO", "SECURITY_MOCK_CLASSIFIER_RENAME_ORDER_PASS");
+        let renamed = directory.join(&after);
         private::write(&renamed, &original)?;
         require(
             failed_at(&session.verify(), "SECURITY_CLASSIFIER_PROOF_INVALID"),
             "SECURITY_MOCK_COPIED_CLASSIFIER_PROOF_FAILED",
         )?;
         fs::remove_file(&renamed).private("SECURITY_FIXTURE_IO")?;
+        session.verify()?;
         fs::write(&first, &other).private("SECURITY_FIXTURE_IO")?;
         require(
             failed_at(&session.verify(), "SECURITY_CLASSIFIER_PROOF_INVALID"),
             "SECURITY_MOCK_MIXED_CLASSIFIER_PROOF_FAILED",
         )?;
         fs::write(&first, &original).private("SECURITY_FIXTURE_IO")?;
+        session.verify()?;
         fs::remove_file(directory.join(&name)).private("SECURITY_FIXTURE_IO")?;
         require(
             failed_at(&session.verify(), "SECURITY_CLASSIFIER_PROOF_INVALID"),
             "SECURITY_MOCK_INCOMPLETE_CLASSIFIER_PROOF_FAILED",
         )?;
         private::write(&first, &original)?;
+        session.verify()?;
+        // Unrelated missing-context I/O must keep its own category, never count
+        // as a successful filename-set rejection. Restore before continuing.
+        let context = fixture.root.join("evaluator-proof-faults/context.json");
+        let held_context = fixture.root.join("evaluator-proof-faults/held-context.json");
+        fs::rename(&context, &held_context).private("SECURITY_FIXTURE_IO")?;
+        require(
+            failed_at(&session.verify(), "SECURITY_PRIVATE_IO_FAILED"),
+            "SECURITY_MOCK_CLASSIFIER_UNRELATED_IO_STAGE_FAILED",
+        )?;
+        fs::rename(&held_context, &context).private("SECURITY_FIXTURE_IO")?;
         session.verify()
     })?;
     diagnostic("INFO", "SECURITY_MOCK_CLASSIFIER_NONCE_PROOF_FAULTS_PASS");
