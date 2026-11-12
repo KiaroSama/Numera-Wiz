@@ -26,6 +26,10 @@ impl ProjectTicket {
     pub(super) fn expired(&self) -> bool {
         self.created.elapsed() >= LEASE
     }
+    #[cfg(test)]
+    pub(super) fn binding_count(&self) -> usize {
+        self.query_bindings.len()
+    }
     pub(super) fn principal(&self) -> &str {
         &self.principal
     }
@@ -291,7 +295,17 @@ impl Service {
             .ok_or_else(|| domain::invalid("Project query context required"))?;
         let query = Query::parse(request)?;
         let current = self.read_project(context, &reference.id, ObjectAction::Read)?;
-        let policy_revision = self.policy(context)?.as_ref().map_or(0, |p| p.revision);
+        let policy = self.policy(context)?;
+        if policy.as_ref().is_some_and(|profile| !profile.allows_command(&request.command.id)) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Project query is outside the current profile allowlist"));
+        }
+        if policy.as_ref().is_some_and(|profile| !profile.allows_object(
+            ObjectKind::Project, current.header().id.as_str(), &current.header().creator,
+            ObjectAction::Read,
+        )) {
+            return Err(DomainError::object_not_found());
+        }
+        let policy_revision = policy.as_ref().map_or(0, |profile| profile.revision);
         let mut cache = self
             .snapshots
             .try_lock()
@@ -325,6 +339,14 @@ impl Service {
             }
             let mut result = query.render(ticket, id, &binding, Some(&key), count)?;
             self.project_writer_projection(&reference.id, &query.projection, &mut result);
+            let response = super::super::project_authorization::query_result(
+                policy.as_ref(), current.header(), result, &request.request_id, MAX_PAGE_BYTES,
+            )?;
+            let created = ticket.created;
+            #[cfg(test)]
+            let created = if self.catalog_test_phase(CatalogPhase::ProjectCursor) {
+                Instant::now() - LEASE
+            } else { created };
             if ticket.expired() {
                 return Err(expired());
             }
@@ -333,9 +355,10 @@ impl Service {
                 request,
                 current.header(),
                 policy_revision,
+                created,
                 cancel,
             )?;
-            return Ok(Response::success(&request.request_id, result));
+            return Ok(response);
         }
         if let Some(id) = &query.replacement
             && cache.projects.get(id).is_some_and(|ticket| {
@@ -370,6 +393,14 @@ impl Service {
             }
             let mut result = query.render(ticket, &id, &binding, None, 0)?;
             self.project_writer_projection(&reference.id, &query.projection, &mut result);
+            let response = super::super::project_authorization::query_result(
+                policy.as_ref(), current.header(), result, &request.request_id, MAX_PAGE_BYTES,
+            )?;
+            let created = ticket.created;
+            #[cfg(test)]
+            let created = if self.catalog_test_phase(CatalogPhase::ProjectReused) {
+                Instant::now() - LEASE
+            } else { created };
             if ticket.expired() {
                 return Err(expired());
             }
@@ -378,10 +409,11 @@ impl Service {
                 request,
                 current.header(),
                 policy_revision,
+                created,
                 cancel,
             )?;
             ticket.query_bindings.insert(binding, query.binding);
-            return Ok(Response::success(&request.request_id, result));
+            return Ok(response);
         }
         if desired != current.header().revision {
             return Err(DomainError::new(
@@ -422,6 +454,14 @@ impl Service {
         }
         let mut result = query.render(&ticket, &id, &binding, None, 0)?;
         self.project_writer_projection(&reference.id, &query.projection, &mut result);
+        let response = super::super::project_authorization::query_result(
+            policy.as_ref(), ticket.read.header(), result, &request.request_id, MAX_PAGE_BYTES,
+        )?;
+        let created = ticket.created;
+        #[cfg(test)]
+        let created = if self.catalog_test_phase(CatalogPhase::ProjectFresh) {
+            Instant::now() - LEASE
+        } else { created };
         if ticket.expired() {
             return Err(expired());
         }
@@ -430,10 +470,11 @@ impl Service {
             request,
             ticket.read.header(),
             policy_revision,
+            created,
             cancel,
         )?;
         cache.projects.insert(id, ticket);
-        Ok(Response::success(&request.request_id, result))
+        Ok(response)
     }
     fn project_writer_projection(&self, project: &str, projection: &str, result: &mut Value) {
         if projection != "summary" {
@@ -467,6 +508,7 @@ impl Service {
         request: &Request,
         header: &ProjectHeader,
         policy_revision: u64,
+        created: Instant,
         cancel: &CancellationToken,
     ) -> Result<()> {
         if cancel.is_cancelled() {
@@ -480,13 +522,18 @@ impl Service {
         {
             return Err(expired());
         }
-        self.object_action(
-            context,
-            ObjectKind::Project,
-            header.id.as_str(),
-            &header.creator,
-            ObjectAction::Read,
-        )
+        if policy.as_ref().is_some_and(|profile| !profile.allows_object(
+            ObjectKind::Project, header.id.as_str(), &header.creator, ObjectAction::Read,
+        )) {
+            return Err(DomainError::object_not_found());
+        }
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Project query cancelled"));
+        }
+        if created.elapsed() >= LEASE {
+            return Err(expired());
+        }
+        Ok(())
     }
     pub(in crate::runtime) fn project_snapshot_pressure(
         &self,

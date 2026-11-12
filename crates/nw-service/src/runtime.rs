@@ -5,6 +5,7 @@ mod maintenance;
 pub use artifacts::ArtifactTransfer;
 mod clock;
 mod folders;
+mod project_authorization;
 mod projects;
 mod read_model;
 mod uploads;
@@ -985,7 +986,10 @@ impl Service {
                 }
                 value(&nw_platform::logging::status())?
             }
-            "commands.list" | "commands.schema" | "streams.clean.resolve" => {
+            "commands.list" | "commands.schema" => {
+                return self.project_discovery(&context, &request, policy.as_ref(), &cancellation);
+            }
+            "streams.clean.resolve" => {
                 return Ok(super::CommandService.dispatch(super::Principal::LocalUser, request));
             }
             "access.replay_scope.create" => {

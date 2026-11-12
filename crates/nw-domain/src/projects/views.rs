@@ -29,6 +29,14 @@ pub struct ProjectSummary {
     pub schema_major: u32,
     pub envelope_version: u32,
     pub compatibility: ProjectCompatibility,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<super::authorization::ProjectAuthorization>")]
+    pub authorization: Option<serde_json::Value>,
+}
+impl ProjectSummary {
+    pub fn known_authorization(&self) -> Option<super::authorization::ProjectAuthorization> {
+        super::authorization::ProjectAuthorization::from_observation(self.authorization.as_ref())
+    }
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

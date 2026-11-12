@@ -244,6 +244,8 @@ pub struct Descriptor {
     pub params_schema: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_schema: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_requirements: Option<crate::projects::authorization::AuthorizationRequirements>,
     #[serde(default, skip_serializing_if = "ProjectContextRule::forbidden")]
     pub project_context: ProjectContextRule,
 }
@@ -298,6 +300,7 @@ pub fn registry() -> Vec<Descriptor> {
                     .into(),
                 params_schema: serde_json::to_value(schema_for!($params)).expect("schema"),
                 result_schema: result_schema($id),
+                authorization_requirements: crate::projects::authorization::requirements($id),
                 project_context: project_context($id),
             }
         };

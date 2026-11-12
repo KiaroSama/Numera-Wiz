@@ -77,6 +77,82 @@ fn document(mut root: Value, definitions: Map<String, Value>) -> Value {
     root
 }
 
+fn availability_states() -> Value {
+    json!({"type":"string","enum":["unavailable","requires_request_validation"]})
+}
+
+fn ordered_reasons(allowed: &[super::authorization::BlockReason]) -> Value {
+    let choices: Vec<Vec<_>> = (0..(1usize << allowed.len())).map(|mask| {
+        allowed.iter().enumerate().filter_map(|(index, reason)| {
+            (mask & (1 << index) != 0).then_some(*reason)
+        }).collect()
+    }).collect();
+    json!({"type":"array","maxItems":allowed.len(),"enum":choices})
+}
+
+fn availability_relation(mut schema: Value) -> Value {
+    schema["oneOf"] = json!([
+        {"properties":{"state":{"const":"requires_request_validation"},"reasons":{"maxItems":0}}},
+        {"properties":{"state":{"const":"unavailable"},"reasons":{"minItems":1}}}
+    ]);
+    schema
+}
+
+fn query_definitions() -> Map<String, Value> {
+    use super::authorization::{BlockReason as Reason, ProjectAction, RequestGate, PROJECT_TARGET_COMMANDS, requirements};
+    let mut defs = definitions();
+    defs.insert("ProjectAvailabilityState".into(), availability_states());
+    defs.insert("ProjectReadReasons".into(), ordered_reasons(&[Reason::CommandNotAllowed, Reason::ProjectReadNotGranted]));
+    defs.insert("ProjectEditReasons".into(), ordered_reasons(&[Reason::CommandNotAllowed, Reason::ProjectEditNotGranted, Reason::UnsupportedProjectSchema, Reason::WriterObservedUnavailable]));
+    for (name, reason) in [
+        ("ProjectCurrentRead", Reason::ProjectReadNotGranted),
+        ("ProjectCurrentEdit", Reason::ProjectEditNotGranted),
+    ] {
+        defs.insert(name.into(), availability_relation(object([
+            ("state", reference("ProjectAvailabilityState")),
+            ("reasons", ordered_reasons(&[reason])),
+        ])));
+    }
+    for (name, command) in [
+        ("ProjectReadAction", "projects.inspect"),
+        ("ProjectEditAction", "sequences.create"),
+        ("ProjectPlaceAction", "clips.place"),
+        ("ProjectHistoryAction", "history.undo"),
+    ] {
+        let requirement = requirements(command).expect("Static project requirements");
+        let gates: Vec<_> = requirement.request_gates.into_iter()
+            .filter(|gate| *gate != RequestGate::ProjectRights).collect();
+        defs.insert(name.into(), availability_relation(object([
+            ("command_id", string()),
+            ("state", reference("ProjectAvailabilityState")),
+            ("reasons", reference(if requirement.project_action == Some(ProjectAction::Read) {
+                "ProjectReadReasons"
+            } else { "ProjectEditReasons" })),
+            ("unchecked_gates", json!({"type":"array","const":gates})),
+        ])));
+    }
+    let actions: Vec<_> = PROJECT_TARGET_COMMANDS.into_iter().map(|command| {
+        let class = match command {
+            "projects.inspect" | "sequences.inspect" => "ProjectReadAction",
+            "clips.place" => "ProjectPlaceAction",
+            "history.undo" | "history.redo" => "ProjectHistoryAction",
+            "sequences.create" | "clips.move" | "clips.link" | "clips.unlink"
+            | "clips.split" | "clips.remove" => "ProjectEditAction",
+            _ => unreachable!("Unknown project target schema"),
+        };
+        json!({"allOf":[reference(class),{"properties":{"command_id":{"const":command}}}]})
+    }).collect();
+    defs.insert("ProjectAuthorization".into(), object([
+        ("schema_version", json!({"const":1})),
+        ("policy_revision", reference("Revision")),
+        ("observed_project_revision", reference("Revision")),
+        ("current_read", reference("ProjectCurrentRead")),
+        ("current_edit", reference("ProjectCurrentEdit")),
+        ("actions", json!({"type":"array","prefixItems":actions,"items":false,"minItems":11,"maxItems":11})),
+    ]));
+    defs
+}
+
 fn history() -> Value {
     object([
         ("can_undo", boolean()),
@@ -90,7 +166,7 @@ fn history() -> Value {
 
 /// Header-only catalog: the store admits at most 64 headers, irrespective of page syntax.
 pub fn catalog() -> Value {
-    let mut defs = definitions();
+    let mut defs = query_definitions();
     defs.insert(
         "ProjectSummary".into(),
         object([
@@ -103,6 +179,7 @@ pub fn catalog() -> Value {
                 "compatibility",
                 enumeration(&["supported", "read_only_unsupported"]),
             ),
+            ("authorization", reference("ProjectAuthorization")),
         ]),
     );
     let root = object([
@@ -316,6 +393,7 @@ fn detail(projection: &str) -> Value {
         ("snapshot_expires_at", reference("Revision")),
         ("projection", json!({"const":projection})),
         ("event_cursor", json!({"type":"null"})),
+        ("authorization", reference("ProjectAuthorization")),
     ])
 }
 
@@ -332,7 +410,7 @@ fn collection(projection: &str, item: &str, accuracy: Value) -> Value {
 }
 
 pub fn inspect(sequence_only: bool) -> Value {
-    let mut defs = definitions();
+    let mut defs = query_definitions();
     entity_definitions(&mut defs);
     defs.insert("History".into(), history());
     let entity = extend(

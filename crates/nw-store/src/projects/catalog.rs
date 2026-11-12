@@ -22,7 +22,7 @@ impl Store {
     pub fn visit_project_summaries(
         &self,
         mut authorize: impl FnMut(&ProjectId, &str) -> Result<bool>,
-        mut visit: impl FnMut(ProjectSummary) -> Result<()>,
+        mut visit: impl FnMut(ProjectSummary, &str) -> Result<()>,
     ) -> Result<()> {
         let read = self.db.begin_read().map_err(storage)?;
         let table = read.open_table(RECORDS).map_err(storage)?;
@@ -58,7 +58,8 @@ impl Store {
                 schema_major: common.schema_major,
                 envelope_version: common.envelope_version,
                 compatibility,
-            })?;
+                authorization: None,
+            }, &identity.creator)?;
         }
         Ok(())
     }
