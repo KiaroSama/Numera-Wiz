@@ -247,10 +247,18 @@ mod tests {
             response.error.as_ref().map(|error| error.code.as_str())
         );
         assert_eq!(response.request_id, request_id);
-        assert!(response.result.as_ref().is_some_and(serde_json::Value::is_object));
+        assert!(
+            response
+                .result
+                .as_ref()
+                .is_some_and(serde_json::Value::is_object)
+        );
         assert!(response.receipt_id.is_none());
         assert_eq!(
-            service.store.adoption_revision(migration_id, activation).unwrap(),
+            service
+                .store
+                .adoption_revision(migration_id, activation)
+                .unwrap(),
             "1",
             "Review must not adopt media or reset the original source guard"
         );

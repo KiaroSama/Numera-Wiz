@@ -190,20 +190,37 @@ fn project_mcp_local_references(root: &serde_json::Value) -> Result<(), &'static
         for (keyword, value) in object {
             match keyword.as_str() {
                 "$ref" | "$dynamicRef" => {
-                    let pointer = value.as_str().and_then(|text| text.strip_prefix('#'))
+                    let pointer = value
+                        .as_str()
+                        .and_then(|text| text.strip_prefix('#'))
                         .ok_or("MCP_NONLOCAL_OUTPUT_REF")?;
                     if !pointer.is_empty() && root.pointer(pointer).is_none() {
                         return Err("MCP_DANGLING_OUTPUT_REF");
                     }
                 }
-                "$defs" | "definitions" | "properties" | "patternProperties" | "dependentSchemas" => {
-                    pending.extend(value.as_object().ok_or("MCP_INVALID_OUTPUT_SCHEMA_MAP")?.values());
+                "$defs" | "definitions" | "properties" | "patternProperties"
+                | "dependentSchemas" => {
+                    pending.extend(
+                        value
+                            .as_object()
+                            .ok_or("MCP_INVALID_OUTPUT_SCHEMA_MAP")?
+                            .values(),
+                    );
                 }
                 "allOf" | "anyOf" | "oneOf" | "prefixItems" => {
                     pending.extend(value.as_array().ok_or("MCP_INVALID_OUTPUT_SCHEMA_ARRAY")?);
                 }
-                "items" | "additionalProperties" | "unevaluatedProperties" | "propertyNames"
-                | "contains" | "not" | "if" | "then" | "else" | "unevaluatedItems" | "contentSchema" => {
+                "items"
+                | "additionalProperties"
+                | "unevaluatedProperties"
+                | "propertyNames"
+                | "contains"
+                | "not"
+                | "if"
+                | "then"
+                | "else"
+                | "unevaluatedItems"
+                | "contentSchema" => {
                     pending.push(value);
                 }
                 _ => {}
