@@ -376,7 +376,7 @@ fn cleanup_guards() {
     );
     app.projects.active = false;
     ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("project-regression-text")));
-    assert!(ctx.wants_keyboard_input());
+    assert!(ctx.egui_wants_keyboard_input());
     app.run_reviewed(&ctx);
     app.run_reviewed_batch(&ctx);
     app.query("streams.clean", json!({}), Action::Plan(0), &ctx);

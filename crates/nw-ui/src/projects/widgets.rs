@@ -47,7 +47,7 @@ impl WizApp {
             if self.projects.sequence_form || self.projects.source_form {
                 self.projects.sequence_form = false;
                 self.projects.source_form = false;
-            } else if !ui.ctx().wants_keyboard_input() && self.request_idle() {
+            } else if !ui.ctx().egui_wants_keyboard_input() && self.request_idle() {
                 if self.projects.group.is_some() {
                     self.project_navigate(Navigation::Catalog, ui.ctx());
                 } else {
