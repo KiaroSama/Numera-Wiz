@@ -21,10 +21,6 @@ jobs:
     if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      RUSTUP_HOME: ${{ runner.temp }}/security-active-rustup-${{ github.run_id }}-${{ github.run_attempt }}
-      CARGO_HOME: ${{ runner.temp }}/security-active-cargo-${{ github.run_id }}-${{ github.run_attempt }}
-      CARGO_TARGET_DIR: ${{ runner.temp }}/security-active-target-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Disable Actions step debug logging before security bootstrap
         if: ${{ runner.debug == '1' }}
@@ -37,17 +33,23 @@ jobs:
           /usr/bin/install --mode=0600 --no-target-directory -- /proc/uptime "${RUNNER_TEMP}/nw-security-bootstrap-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.stamp"
 
       - name: Create private compiler and build directories
+        env: &security_build_env
+          RUSTUP_HOME: ${{ runner.temp }}/security-active-rustup-${{ github.run_id }}-${{ github.run_attempt }}
+          CARGO_HOME: ${{ runner.temp }}/security-active-cargo-${{ github.run_id }}-${{ github.run_attempt }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/security-active-target-${{ github.run_id }}-${{ github.run_attempt }}
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
           /usr/bin/install --directory --mode=0700 -- "${RUSTUP_HOME}" "${CARGO_HOME}" "${CARGO_TARGET_DIR}"
 
       - name: Install the pinned Rust toolchain
+        env: *security_build_env
         working-directory: ${{ runner.temp }}
         shell: bash
         run: rustup toolchain install 1.99.1 --profile minimal
 
       - name: Record compiler and Cargo release provenance
+        env: *security_build_env
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
@@ -55,6 +57,7 @@ jobs:
           cargo +1.99.1 --version --verbose
 
       - name: Record the compiler executable SHA256
+        env: *security_build_env
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
@@ -80,17 +83,20 @@ jobs:
         run: /usr/bin/sha256sum < Cargo.lock
 
       - name: Build the isolated security executable with its qualified lock
+        env: *security_build_env
         working-directory: security-tool-source/xtask/security-scan
         shell: bash
         run: cargo +1.99.1 build --locked --manifest-path Cargo.toml --bin nw-security-scan
 
       - name: Record the built security executable SHA256
+        env: *security_build_env
         working-directory: security-tool-source/xtask/security-scan
         shell: bash
         run: |
           /usr/bin/sha256sum < "${CARGO_TARGET_DIR}/debug/nw-security-scan"
 
       - name: Export the original immutable bootstrap deadline
+        env: *security_build_env
         working-directory: security-tool-source/xtask/security-scan
         shell: bash
         run: '"${CARGO_TARGET_DIR}/debug/nw-security-scan" budget-from-marker'
@@ -103,6 +109,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan full Git history with the qualified Rust security tool
+        env: *security_build_env
         working-directory: security-tool-source/xtask/security-scan
         shell: bash
         run: '"${CARGO_TARGET_DIR}/debug/nw-security-scan" scan "${GITHUB_WORKSPACE}/security-scan-input"'
