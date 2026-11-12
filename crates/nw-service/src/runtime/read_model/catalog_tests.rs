@@ -1261,7 +1261,7 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
         "R2_CATALOG_PROJECTION_CHANGED"
     );
     assert!(
-        page["project_revision"] == Value::Null,
+        page.get("project_revision") == Some(&Value::Null),
         "R2_CATALOG_REVISION_CHANGED"
     );
     assert!(page["total_count"] == 1, "R2_CATALOG_COUNT_CHANGED");
@@ -1270,7 +1270,7 @@ fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&s
         "R2_CATALOG_ACCURACY_CHANGED"
     );
     assert!(
-        page["next_cursor"] == Value::Null,
+        page.get("next_cursor") == Some(&Value::Null),
         "R2_CATALOG_CURSOR_PRESENT"
     );
     let rows = page["items"].as_array().expect("R2_CATALOG_ITEMS_MISSING");
