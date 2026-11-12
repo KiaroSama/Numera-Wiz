@@ -91,6 +91,7 @@ impl BatchUi {
 }
 impl WizApp {
     pub(super) fn batch_select(&mut self, asset: &AssetSummary, included: bool) {
+        if self.projects.active || self.pending.is_some() { return; }
         if included {
             if self.batch.contains(&asset.id) {
                 return;
@@ -113,7 +114,7 @@ impl WizApp {
         self.batch.invalidate();
     }
     pub(super) fn schedule_batch(&mut self, ctx: &egui::Context) {
-        if self.waiting || self.pending.is_some() {
+        if !self.cleanup_actions_allowed(ctx) || self.waiting || self.pending.is_some() {
             return;
         }
         if let Some(index) = self
@@ -158,7 +159,9 @@ impl WizApp {
         self.batch.snapshot = None;
     }
     pub(super) fn run_reviewed_batch(&mut self, ctx: &egui::Context) {
-        if !self.waiting
+        if self.cleanup_actions_allowed(ctx)
+            && !self.folder.open
+            && !self.waiting
             && self.pending.is_none()
             && let Some(plan) = self.batch.plan.clone()
         {
@@ -171,6 +174,7 @@ impl WizApp {
         }
     }
     fn review_batch(&mut self, ctx: &egui::Context) {
+        if !self.cleanup_actions_allowed(ctx) || self.folder.open { return; }
         let input = self.normalized_intent().and_then(|intent| {
             let input = CleanBatchInput {
                 items: self
@@ -266,7 +270,7 @@ impl WizApp {
         Ok(())
     }
     pub(super) fn batch_window(&mut self, ctx: &egui::Context) {
-        if !self.batch.open {
+        if self.projects.active || !self.batch.open {
             return;
         }
         let mut open = true;

@@ -1,0 +1,361 @@
+//! Plain cases within the original shared UI controller test; no actual GUI claims.
+use super::*;
+use crate::{CommandClient, Reply, SaveReply, Preservation, Response};
+use std::{collections::VecDeque, sync::Mutex};
+
+const PROJECT: &str = "10000000-0000-4000-8000-000000000001";
+const BIN: &str = "10000000-0000-4000-8000-000000000002";
+const TICKET: &str = "10000000-0000-4000-8000-000000000003";
+
+#[derive(Default)]
+struct MockJsonClient {
+    requests: Mutex<VecDeque<(Request, Reply)>>,
+}
+impl CommandClient for MockJsonClient {
+    fn send(&self, request: Request, reply: Reply) {
+        self.requests.lock().unwrap().push_back((request, reply));
+    }
+    fn choose_media(&self, _: Reply) { panic!("Controller fixture must not invoke intake"); }
+    fn save_artifact(&self, _: nw_domain::artifacts::ArtifactManifest, _: Option<String>, _: Arc<nw_domain::download::SaveControl>, _: SaveReply) {
+        panic!("Controller fixture must not invoke artifact delivery");
+    }
+}
+impl MockJsonClient {
+    fn pop(&self) -> (Request, Reply) { self.requests.lock().unwrap().pop_front().expect("Expected canonical request") }
+    fn complete(&self, result: Value) -> Request {
+        let (request, reply) = self.pop();
+        reply(Ok(Response::success(&request.request_id, result)));
+        request
+    }
+    fn empty(&self) -> bool { self.requests.lock().unwrap().is_empty() }
+    fn accept(&self, result:Value) -> Request {
+        let (request,reply)=self.pop();
+        let mut response=Response::success(&request.request_id,result);
+        response.receipt_id=Some("fixture-receipt".into()); reply(Ok(response)); request
+    }
+}
+fn inventory(projection: &str, items: Value) -> Value {
+    let total = items.as_array().unwrap().len();
+    json!({"schema_version":1,"project_revision":null,"snapshot_id":"catalog","snapshot_expires_at":"30",
+        "projection":projection,"items":items,"next_cursor":null,"event_cursor":null,"total_count":total,"count_accuracy":"exact"})
+}
+fn catalog() -> Value {
+    inventory("projects.summary.v1", json!([{"id":PROJECT,"name":"Controller project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}]))
+}
+fn summary(ticket: &str, revision: &str) -> Value {
+    json!({"schema_version":1,"project_revision":revision,"snapshot_id":ticket,"snapshot_expires_at":"30","projection":"summary","event_cursor":null,
+        "project_id":PROJECT,"root_bin_id":BIN,"name":"Controller project","entity_count":1,"sequence_count":0,
+        "schema_major":1,"envelope_version":1,"compatibility":"supported","writer_status":"available","read_only":false,
+        "history":{"can_undo":revision != "0","can_redo":false}})
+}
+fn bin(ticket: &str, revision: &str) -> Value {
+    json!({"schema_version":1,"project_revision":revision,"snapshot_id":ticket,"snapshot_expires_at":"30","projection":"bin_page","event_cursor":null,
+        "items":[],"next_cursor":null,"total_count":0,"count_accuracy":"exact"})
+}
+fn scope() -> String { format!("eyJpZCI6ImNvbnRyb2xsZXItZml4dHVyZSJ9.{}", "A".repeat(43)) }
+fn boot() -> (WizApp, Arc<MockJsonClient>, egui::Context) {
+    let ctx = egui::Context::default();
+    let port = Arc::new(MockJsonClient::default());
+    let mut app = WizApp::with_context(&ctx, port.clone(), "project-controller".into());
+    port.complete(inventory("assets.summary.v1", json!([]))); app.receive(&ctx);
+    port.complete(inventory("jobs.summary.v1", json!([]))); app.receive(&ctx);
+    (app, port, ctx)
+}
+fn ready() -> (WizApp, Arc<MockJsonClient>, egui::Context) {
+    let (mut app, port, ctx) = boot();
+    app.enter_projects(&ctx);
+    assert_eq!(port.complete(catalog()).command.id, "projects.list"); app.receive(&ctx);
+    app.project_navigate(Navigation::Open(View::new(PROJECT.into())), &ctx);
+    assert_eq!(port.complete(catalog()).command.id, "projects.list"); app.receive(&ctx);
+    let request = port.complete(summary(TICKET, "0"));
+    assert_eq!(request.command.id, "projects.inspect");
+    assert_eq!(request.project.unwrap().id, PROJECT);
+    app.receive(&ctx);
+    assert!(app.projects.group.is_none(), "Summary alone is not a coherent group");
+    assert_eq!(app.projects.handles.len(), 1, "First summary handle must be tracked immediately");
+    let request = port.complete(bin(TICKET, "0"));
+    assert_eq!(request.params["revision"], "0"); app.receive(&ctx);
+    assert_eq!(app.projects.group.as_ref().unwrap().key.snapshot, TICKET);
+    assert!(!app.projects.stale && port.empty());
+    (app, port, ctx)
+}
+
+pub(in crate) fn controller_cases() {
+    creation_and_terminal_denial();
+    captured_scope_and_retry();
+    malformed_scope_retains_intent();
+    coherent_load_and_retirement();
+    changed_ticket_is_tracked();
+    expired_staged_publication();
+    cleanup_guards();
+    bounded_handle_tracking();
+    full_projection_and_exact_forms();
+}
+fn creation_and_terminal_denial() {
+    let (mut app,port,ctx)=boot();
+    app.enter_projects(&ctx); port.complete(catalog()); app.receive(&ctx);
+    app.projects.forms.project_name="Captured name".into();
+    app.create_project(&ctx);
+    let captured=app.deferred.as_ref().unwrap().request.clone();
+    assert_eq!(captured.params,json!({"name":"Captured name"}));
+    assert!(captured.project.is_none() && captured.idempotency_key.is_some());
+    app.projects.forms.project_name="Later form name".into();
+    port.complete(json!({"replay_scope":scope()})); app.receive(&ctx);
+    let created=port.accept(json!({"project_id":PROJECT,"root_bin_id":BIN,"revision":"0","created":{}})); app.receive(&ctx);
+    assert_eq!(created.params,captured.params);
+    assert_eq!(created.request_id,captured.request_id);
+    assert_eq!(created.command.id,"projects.create");
+    assert!(app.projects.group.is_none(),"Acceptance cannot publish project panes");
+    port.complete(catalog()); app.receive(&ctx);
+    port.complete(summary(TICKET,"0")); app.receive(&ctx);
+    port.complete(bin(TICKET,"0")); app.receive(&ctx);
+    assert!(app.project_ready());
+    app.project_navigate(Navigation::Catalog,&ctx);
+    let (request,reply)=port.pop();
+    assert_eq!(request.params["replace_snapshot"],TICKET);
+    reply(Ok(Response::error(&request.request_id,nw_domain::DomainError::new("PERMISSION_DENIED","Catalog permission revoked")))); app.receive(&ctx);
+    assert!(app.pending.is_none() && app.projects.stale && app.projects.terminal_failure);
+    app.leave_projects(&ctx);
+    assert!(!app.projects.active && app.projects.handles.len()==1 && port.empty());
+    assert!(app.status.contains("unconfirmed"));
+}
+fn captured_scope_and_retry() {
+    let (mut app, port, ctx) = ready();
+    let params = json!({"clip_ids":[BIN],"delta":{"num":"2","den":"1"},"collision":"reject","link_policy":"expand"});
+    app.mutate_project("clips.move", params.clone(), &ctx);
+    let captured = app.deferred.as_ref().unwrap().request.clone();
+    assert_eq!(captured.project.as_ref().unwrap().expected_revision.as_deref(), Some("0"));
+    assert!(captured.idempotency_key.is_some());
+    // Simulate a newer local observation while bootstrap is delayed. The intent
+    // must not reread it; the canonical stale response remains authoritative.
+    Arc::make_mut(app.projects.group.as_mut().unwrap()).key.revision = "9".into();
+    let bootstrap = port.complete(json!({"replay_scope":scope()}));
+    assert_eq!(bootstrap.command.id, "access.replay_scope.create");
+    assert_ne!(bootstrap.request_id, captured.request_id);
+    app.receive(&ctx);
+    let (sent, reply) = port.pop();
+    let mut expected = captured; expected.replay_scope = Some(scope());
+    assert_eq!(serde_json::to_vec(&sent).unwrap(), serde_json::to_vec(&expected).unwrap());
+    reply(Err("Connection lost after send".into())); app.receive(&ctx);
+    let pending_bytes = serde_json::to_vec(&app.pending.as_ref().unwrap().request).unwrap();
+    app.project_navigate(Navigation::Cleanup, &ctx);
+    app.project_navigate(Navigation::Open(View::new(PROJECT.into())), &ctx);
+    app.mutate_project("history.redo", json!({}), &ctx);
+    assert!(app.projects.active && port.empty());
+    app.retry_pending(&ctx);
+    let (retry, reply) = port.pop();
+    assert_eq!(serde_json::to_vec(&retry).unwrap(), pending_bytes);
+    assert_eq!(retry.params, params);
+    assert_eq!(retry.project.as_ref().unwrap().expected_revision.as_deref(), Some("0"));
+    reply(Ok(Response::error(&retry.request_id, nw_domain::DomainError::new("STALE_REVISION", "External edit committed"))));
+    app.receive(&ctx);
+    assert!(app.pending.is_none() && app.projects.stale && port.empty());
+    assert!(app.error.as_ref().unwrap().contains("STALE_REVISION"));
+    app.project_navigate(Navigation::Cleanup, &ctx);
+    assert!(!app.projects.active, "Canonical terminal failure permits explicit Cleanup");
+    assert_eq!(app.projects.handles.len(), 1, "Cleanup cannot claim unconfirmed retirement");
+}
+fn malformed_scope_retains_intent() {
+    for invalid in [json!({}),json!({"replay_scope":12}),json!({"replay_scope":""}),json!({"replay_scope":"not-a-token"}),json!({"replay_scope":"x".repeat(2049)}),json!({"replay_scope":format!("AA.{}B","A".repeat(42))})] {
+        let (mut app, port, ctx) = ready();
+        app.mutate_project("history.undo", json!({}), &ctx);
+        let deferred = serde_json::to_vec(&app.deferred.as_ref().unwrap().request).unwrap();
+        let bootstrap = port.complete(invalid); app.receive(&ctx);
+        assert!(port.empty() && !app.waiting && app.pending.is_some());
+        assert!(app.scope.is_none());
+        assert_eq!(serde_json::to_vec(&app.deferred.as_ref().unwrap().request).unwrap(), deferred);
+        assert_eq!(app.pending.as_ref().unwrap().request.request_id, bootstrap.request_id);
+        app.project_navigate(Navigation::Cleanup, &ctx);
+        assert!(app.projects.active && port.empty());
+        app.retry_pending(&ctx);
+        assert_eq!(port.complete(json!({"replay_scope":scope()})).request_id, bootstrap.request_id);
+        app.receive(&ctx);
+        let (write, reply) = port.pop();
+        assert_eq!(write.command.id, "history.undo");
+        assert_eq!(write.project.as_ref().unwrap().expected_revision.as_deref(), Some("0"));
+        reply(Ok(Response::error(&write.request_id, nw_domain::DomainError::new("NOTHING_TO_UNDO", "Fixture")))); app.receive(&ctx);
+        assert!(app.pending.is_none() && app.deferred.is_none());
+    }
+}
+fn coherent_load_and_retirement() {
+    let (mut app, port, ctx) = ready();
+    app.project_refresh(&ctx);
+    let retirement = port.complete(catalog());
+    assert_eq!(retirement.params, json!({"limit":64,"replace_snapshot":TICKET})); app.receive(&ctx);
+    let fresh = "10000000-0000-4000-8000-000000000004";
+    let summary_request = port.complete(summary(fresh, "1")); app.receive(&ctx);
+    assert!(app.projects.stale);
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "0", "No partial group publication");
+    assert_eq!(app.projects.handles.len(), 1);
+    let pending_id = app.pending.as_ref().unwrap().request.request_id.clone();
+    *app.inbox.lock().unwrap() = Some(crate::Received { request_id:Some(summary_request.request_id.clone()), action:Action::Project(ProjectAction { generation:0, phase:Phase::Summary }), response:Ok(Response::success(&summary_request.request_id, summary(fresh,"9"))) });
+    app.receive(&ctx);
+    assert!(app.waiting);
+    assert_eq!(app.pending.as_ref().unwrap().request.request_id, pending_id);
+    port.complete(bin(fresh, "2")); app.receive(&ctx);
+    assert!(app.projects.stale && app.projects.staging.is_none());
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "0");
+    assert_eq!(app.projects.handles[0].id, fresh, "Later load failure retains its first summary handle");
+    // A protocol group failure permits an explicit retirement retry.
+    app.project_navigate(Navigation::Catalog, &ctx);
+    let (request, reply) = port.pop();
+    assert_eq!(request.params["replace_snapshot"], fresh);
+    reply(Err("Unknown retirement acknowledgement".into())); app.receive(&ctx);
+    app.project_navigate(Navigation::Cleanup, &ctx);
+    assert!(app.projects.active && app.projects.navigation.is_some());
+    app.retry_pending(&ctx);
+    let retry = port.complete(catalog());
+    assert_eq!(serde_json::to_vec(&retry).unwrap(), serde_json::to_vec(&request).unwrap());
+    app.receive(&ctx);
+    assert!(app.projects.handles.is_empty() && app.projects.group.is_none());
+    assert!(app.projects.active && port.empty());
+    app.project_navigate(Navigation::Cleanup, &ctx);
+    port.complete(catalog()); app.receive(&ctx);
+    assert!(!app.projects.active);
+}
+fn cleanup_guards() {
+    let (mut app, port, ctx) = boot();
+    let source = json!({"id":"asset","display_name":"Fixture","bytes":"0","stream_count":0});
+    app.plan = Some(Arc::new(serde_json::from_value(json!({"schema_version":1,"required_rights":null,"rights_redacted":false,
+        "id":"reviewed","hash":"00","source":source,"source_sha256":"00","ffmpeg":{"file_name":"ffmpeg","bytes":"0","sha256":"00"},"ffprobe":{"file_name":"ffprobe","bytes":"0","sha256":"00"},
+        "source_path":null,"output_name":"out","output_path":null,"resolution":{"action":"copy_unchanged","streams":[],"outcomes":[],"reasons":[],"warnings":[],"preservation":Preservation::default()},"argv_template":null,
+        "created_at":"0","expires_at":"999","verification_scope":"Controller only","policy_revision":0,"effective_actions":["submit"]})).unwrap()));
+    let asset=fixture_asset();
+    app.selected=Some(asset.id.clone()); app.asset_detail=Some(Arc::new(asset.clone())); app.output_needed=true;
+    app.batch_select(&AssetSummary::from(&asset),true);
+    app.receive_batch(Action::BatchPlan(1), json!({"schema_version":1,"id":"batch","hash":"00","created_at":"0","expires_at":"999","failure_policy":"reject_all","unresolved_policy":"reject","unresolved":[],"items":[]})).unwrap();
+    app.scope = Some(scope());
+    app.projects.active = true;
+    app.run_reviewed(&ctx); app.run_reviewed_batch(&ctx);
+    app.query("streams.clean", json!({}), Action::Plan(0), &ctx);
+    app.mutate("assets.register", json!({"path":"/must-not-register"}), Action::Register, &ctx);
+    app.schedule_output(&ctx); app.schedule_batch(&ctx);
+    app.choose_media(&ctx);
+    assert!(port.empty(), "Hidden Cleanup actions cannot steal the project slot");
+    app.projects.active = false;
+    ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("project-regression-text")));
+    assert!(ctx.wants_keyboard_input());
+    app.run_reviewed(&ctx); app.run_reviewed_batch(&ctx);
+    app.query("streams.clean", json!({}), Action::Plan(0), &ctx);
+    app.schedule_output(&ctx); app.schedule_batch(&ctx); app.choose_media(&ctx);
+    assert!(port.empty(), "Text/IME focus suppresses actual review and submit paths");
+}
+fn changed_ticket_is_tracked() {
+    let (mut app,port,ctx)=ready();
+    let first="30000000-0000-4000-8000-000000000001";
+    let second="30000000-0000-4000-8000-000000000002";
+    app.project_refresh(&ctx); port.complete(catalog()); app.receive(&ctx);
+    port.complete(summary(first,"0")); app.receive(&ctx);
+    port.complete(bin(second,"0")); app.receive(&ctx);
+    assert!(app.projects.stale && app.projects.staging.is_none());
+    assert_eq!(app.projects.group.as_ref().unwrap().key.snapshot,TICKET);
+    assert_eq!(app.projects.handles.len(),2,"A later acknowledged replacement ticket must not be abandoned");
+    app.project_navigate(Navigation::Catalog,&ctx);
+    assert_eq!(port.complete(catalog()).params["replace_snapshot"],first); app.receive(&ctx);
+    assert_eq!(port.complete(catalog()).params["replace_snapshot"],second); app.receive(&ctx);
+    assert!(app.projects.handles.is_empty() && app.projects.group.is_none() && port.empty());
+}
+fn expired_staged_publication() {
+    for prune_before_reply in [false,true] {
+        let (mut app,port,ctx)=ready();
+        let ticket="30000000-0000-4000-8000-000000000003";
+        app.project_refresh(&ctx); port.complete(catalog()); app.receive(&ctx);
+        port.complete(summary(ticket,"1")); app.receive(&ctx);
+        let expired=Instant::now()-Duration::from_secs(31);
+        app.projects.handles[0].first_seen=expired;
+        app.projects.staging.as_mut().unwrap().group.as_mut().unwrap().key.first_seen=expired;
+        if prune_before_reply { app.projects.prune_handles(); }
+        port.complete(bin(ticket,"1")); app.receive(&ctx);
+        app.projects.prune_handles();
+        assert!(app.projects.stale && app.projects.staging.is_none() && app.projects.handles.is_empty());
+        assert_eq!(app.projects.group.as_ref().unwrap().key.revision,"0","An expired staged group must not replace the last coherent view or renew a pruned lease");
+        assert!(app.pending.is_none() && port.empty());
+    }
+}
+fn fixture_asset() -> Asset {
+    serde_json::from_value(json!({"id":"registered-fixture","creator":"fixture-principal","display_name":"Registered source",
+        "identity":{"path":"/fixture/source.mkv","bytes":"0","sha256":"00"},
+        "probe":{"streams":[{"index":7,"kind":"video","codec":"fixture","tags":{},"dispositions":[]}],
+        "format":"controller-only","global_tags":{},"chapters":[],"verification_scope":"No media execution"}})).unwrap()
+}
+fn projection(ticket:&str,revision:&str,kind:&str,body:Value) -> Value {
+    let mut value=json!({"schema_version":1,"project_revision":revision,"snapshot_id":ticket,"snapshot_expires_at":"30","projection":kind,"event_cursor":null});
+    value.as_object_mut().unwrap().extend(body.as_object().unwrap().clone()); value
+}
+fn sequence_summary(ticket:&str,revision:&str,entities:usize) -> Value {
+    let mut value=summary(ticket,revision);
+    value["entity_count"]=json!(entities); value["sequence_count"]=json!(1); value
+}
+fn full_projection_and_exact_forms() {
+    const SEQUENCE:&str="20000000-0000-4000-8000-000000000001";
+    const TRACK:&str="20000000-0000-4000-8000-000000000002";
+    const CLIP:&str="20000000-0000-4000-8000-000000000003";
+    const SOURCE:&str="20000000-0000-4000-8000-000000000004";
+    let (mut app,port,ctx)=ready();
+    app.scope=Some(scope());
+    let defaults=app.projects.forms.sequence().unwrap();
+    assert_eq!(defaults["settings"]["frame_rate"],json!({"num":"25","den":"1"}));
+    assert!(defaults["tracks"].as_array().unwrap().iter().any(|track|track["kind"]=="audio"));
+    app.projects.forms.video_tracks="Video".into(); app.projects.forms.audio_tracks.clear();
+    let sequence=app.projects.forms.sequence().unwrap();
+    app.mutate_project("sequences.create",sequence.clone(),&ctx);
+    let accepted=port.accept(json!({"project_id":PROJECT,"revision":"1","created":{"sequence_id":SEQUENCE}})); app.receive(&ctx);
+    assert_eq!(accepted.project.unwrap().expected_revision.as_deref(),Some("0"));
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision,"0","Acceptance is not geometry authority");
+    port.complete(catalog()); app.receive(&ctx);
+    let ticket="20000000-0000-4000-8000-000000000005";
+    port.complete(sequence_summary(ticket,"1",3)); app.receive(&ctx);
+    port.complete(projection(ticket,"1","bin_page",json!({"items":[{"id":SEQUENCE,"kind":"sequence","name":"Sequence"}],"next_cursor":null,"total_count":1,"count_accuracy":"exact"}))); app.receive(&ctx);
+    port.complete(projection(ticket,"1","entity",json!({"entity":{"id":SEQUENCE,"kind":"sequence","settings":sequence["settings"],"track_count":1,"locked":false}}))); app.receive(&ctx);
+    port.complete(projection(ticket,"1","track_page",json!({"items":[{"id":TRACK,"kind":"video","name":"Video","order":0,"clip_count":0}],"next_cursor":null,"total_count":1,"count_accuracy":"exact"}))); app.receive(&ctx);
+    port.complete(projection(ticket,"1","entity",json!({"entity":{"id":TRACK,"kind":"video","sequence_id":SEQUENCE,"order":0,"grid":{"num":"25","den":"1"},"clip_count":0,"locked":false}}))); app.receive(&ctx);
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision,"0");
+    port.complete(projection(ticket,"1","viewport",json!({"items":[],"next_cursor":null,"total_count":0,"count_accuracy":"exact"}))); app.receive(&ctx);
+    let group=app.projects.group.as_ref().unwrap().clone();
+    assert_eq!(group.key.revision,"1");
+    assert_eq!(group.track.as_ref().unwrap().grid,Rational::new(25,1).unwrap());
+    let params=app.projects.forms.place(&group,None,None).unwrap();
+    assert_eq!(params["source"]["duration"],json!({"num":"4","den":"1"}));
+    assert_eq!(params["source_range"],json!({"start":{"num":"0","den":"1"},"end":{"num":"4","den":"1"}}));
+    app.mutate_project("clips.place",params,&ctx);
+    port.accept(json!({"project_id":PROJECT,"revision":"2","created":{"clip_ids":[CLIP],"source_id":SOURCE}})); app.receive(&ctx);
+    port.complete(catalog()); app.receive(&ctx);
+    let ticket="20000000-0000-4000-8000-000000000006";
+    port.complete(sequence_summary(ticket,"2",5)); app.receive(&ctx);
+    port.complete(projection(ticket,"2","bin_page",json!({"items":[{"id":SEQUENCE,"kind":"sequence","name":"Sequence"}],"next_cursor":null,"total_count":1,"count_accuracy":"exact"}))); app.receive(&ctx);
+    port.complete(projection(ticket,"2","entity",json!({"entity":{"id":SEQUENCE,"kind":"sequence","settings":sequence["settings"],"track_count":1,"locked":false}}))); app.receive(&ctx);
+    port.complete(projection(ticket,"2","track_page",json!({"items":[{"id":TRACK,"kind":"video","name":"Video","order":0,"clip_count":1}],"next_cursor":null,"total_count":1,"count_accuracy":"exact"}))); app.receive(&ctx);
+    port.complete(projection(ticket,"2","entity",json!({"entity":{"id":TRACK,"kind":"video","sequence_id":SEQUENCE,"order":0,"grid":{"num":"25","den":"1"},"clip_count":1,"locked":false}}))); app.receive(&ctx);
+    port.complete(projection(ticket,"2","viewport",json!({"items":[{"id":CLIP,"track_id":TRACK,"source_id":SOURCE,"sequence_start":{"num":"0","den":"1"},"duration":{"num":"4","den":"1"}}],"next_cursor":"same-query-next","total_count":1,"count_accuracy":"lower_bound"}))); app.receive(&ctx);
+    port.complete(projection(ticket,"2","entity",json!({"entity":{"id":CLIP,"kind":"clip","sequence_id":SEQUENCE,"track_id":TRACK,"source_id":SOURCE,"occurrence_id":CLIP,"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"4","den":"1"}},"sequence_start":{"num":"0","den":"1"},"duration":{"num":"4","den":"1"},"rate":{"num":"1","den":"1"},"link_group_id":null,"locked":false}}))); app.receive(&ctx);
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision,"1","Selected source must agree before publication");
+    port.complete(projection(ticket,"2","entity",json!({"entity":{"id":SOURCE,"kind":"source_binding","source_kind":"solid_color","rgba":[0.2,0.4,0.8,1],"duration":{"num":"4","den":"1"}}}))); app.receive(&ctx);
+    assert_eq!(app.projects.group.as_ref().unwrap().key.revision,"2");
+    assert_eq!(app.projects.handles[0].bindings.len(),8);
+    app.projects.forms.registered=true;
+    let registered=app.projects.forms.place(app.projects.group.as_ref().unwrap(),Some(&fixture_asset()),Some(7)).unwrap();
+    assert_eq!(registered["source"],json!({"kind":"registered","asset_id":"registered-fixture","stream_index":7}));
+    app.project_next_page(Phase::NextViewport,&ctx);
+    assert_eq!(app.projects.handles[0].bindings.len(),8,"Cursor continuation must reuse its binding");
+    port.complete(projection(ticket,"2","viewport",json!({"items":[],"next_cursor":null,"total_count":1,"count_accuracy":"exact"}))); app.receive(&ctx);
+    assert!(app.projects.group.as_ref().unwrap().clip.is_none());
+    assert!(app.pending.is_none() && port.empty());
+}
+fn bounded_handle_tracking() {
+    let (mut app, port, ctx) = boot();
+    app.projects.active = true;
+    for index in 0..4 { app.projects.remember_ticket(&format!("ticket-{index}"), PROJECT).unwrap(); }
+    let first_seen = app.projects.handles[0].first_seen;
+    app.projects.remember_ticket("ticket-0", PROJECT).unwrap();
+    assert_eq!(app.projects.handles.len(), 4);
+    assert_eq!(app.projects.handles[0].first_seen, first_seen);
+    assert!(app.projects.remember_ticket("ticket-4", PROJECT).is_err());
+    app.project_navigate(Navigation::Open(View::new(PROJECT.into())), &ctx);
+    assert!(port.empty(), "Full unconfirmed metadata blocks more project opens");
+    app.projects.terminal_failure = true;
+    app.project_navigate(Navigation::Cleanup, &ctx);
+    assert!(!app.projects.active && app.projects.handles.len() == 4);
+    for handle in &mut app.projects.handles { handle.first_seen = Instant::now() - Duration::from_secs(31); }
+    app.projects.prune_handles();
+    assert!(app.projects.handles.is_empty() && port.empty(), "Local expiry is bookkeeping, never an edit or release bypass");
+}

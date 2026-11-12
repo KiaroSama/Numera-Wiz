@@ -3,10 +3,11 @@ mod batches;
 mod cleanup;
 pub mod client;
 mod folders;
+mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
-    commands::{Request, Response},
+    commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
     views::{AssetSummary, JobSummary, PlanReview, SnapshotPage},
@@ -18,8 +19,9 @@ use std::{
 };
 use web_time::Instant;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Action {
+    Project(projects::ProjectAction),
     Assets,
     Asset,
     Register,
@@ -48,9 +50,32 @@ struct Pending {
     request: Request,
     action: Action,
 }
+struct DeferredIntent {
+    request: Request,
+    action: Action,
+}
 struct Received {
+    request_id: Option<String>,
     action: Action,
     response: Result<Response, String>,
+}
+fn valid_scope(result: &Value) -> Option<String> {
+    let token=result["replay_scope"].as_str()?;
+    if token.len() > 2048 { return None; }
+    let (payload,signature)=token.split_once('.')?;
+    let encoded=|part: &str| {
+        let alphabet=part.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte));
+        let tail=part.as_bytes().last().copied().unwrap_or_default();
+        alphabet && match part.len() % 4 {
+            0 => true,
+            2 => b"AQgw".contains(&tail),
+            3 => b"AEIMQUYcgkosw048".contains(&tail),
+            _ => false,
+        }
+    };
+    if payload.len() < 2 || signature.len() != 43 || !encoded(payload) || !encoded(signature) { return None; }
+    // The signed token remains opaque. Only the owner verifies authority/signature.
+    Some(token.into())
 }
 pub struct WizApp {
     client: Arc<dyn CommandClient>,
@@ -62,7 +87,7 @@ pub struct WizApp {
     error: Option<String>,
     status: String,
     scope: Option<String>,
-    deferred: Option<(String, Value, Action)>,
+    deferred: Option<DeferredIntent>,
     assets: Vec<AssetSummary>,
     asset_detail: Option<Arc<Asset>>,
     assets_cursor: Option<String>,
@@ -102,14 +127,28 @@ pub struct WizApp {
     report_page: usize,
     batch: batches::BatchUi,
     folder: folders::FolderUi,
+    projects: projects::ProjectsUi,
 }
 impl WizApp {
+    fn intake_allowed(&self, ctx: &egui::Context) -> bool {
+        self.cleanup_actions_allowed(ctx) && !self.folder.open && !self.batch.open
+            && self.artifact_manifest.is_none() && self.selection_report.is_none()
+    }
+    fn choose_media(&mut self, ctx: &egui::Context) {
+        if !self.intake_allowed(ctx) { return; }
+        self.waiting=true; self.error=None; self.status="Selecting media…".into();
+        let inbox=self.inbox.clone(); let repaint=ctx.clone();
+        self.client.choose_media(Box::new(move|response| {
+            if let Ok(mut slot)=inbox.lock() { *slot=Some(Received { request_id:None,action:Action::Intake,response }); }
+            repaint.request_repaint();
+        }));
+    }
     fn save_artifact(
         &mut self,
         manifest: nw_domain::artifacts::ArtifactManifest,
         ctx: &egui::Context,
     ) {
-        if self.save_control.is_some() {
+        if self.projects.active || !self.request_idle() || self.save_control.is_some() {
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -155,7 +194,8 @@ impl WizApp {
         }
     }
     fn run_reviewed(&mut self, ctx: &egui::Context) {
-        if !self.folder.open
+        if self.cleanup_actions_allowed(ctx)
+            && !self.folder.open
             && !self.waiting
             && self.pending.is_none()
             && let Some(plan) = self.plan.clone()
@@ -247,6 +287,7 @@ impl WizApp {
             report_page: 0,
             batch: batches::BatchUi::default(),
             folder: folders::FolderUi::default(),
+            projects: projects::ProjectsUi::default(),
         };
         app.query("assets.list", json!({}), Action::Assets, ctx);
         app
@@ -266,7 +307,8 @@ impl WizApp {
         ctx.request_repaint();
     }
     fn schedule_output(&mut self, ctx: &egui::Context) {
-        if self.output_needed
+        if self.cleanup_actions_allowed(ctx)
+            && self.output_needed
             && !self.waiting
             && self.pending.is_none()
             && let Some(asset) = self.selected_asset()
@@ -306,6 +348,10 @@ impl WizApp {
         if self.waiting {
             return;
         }
+        if let Some(pending) = &self.pending
+            && (pending.action != action || serde_json::to_vec(&pending.request).ok() != serde_json::to_vec(&request).ok()) {
+            return;
+        }
         self.error = None;
         self.waiting = true;
         self.pending = Some(Pending {
@@ -314,46 +360,95 @@ impl WizApp {
         });
         let inbox = self.inbox.clone();
         let repaint = ctx.clone();
+        let request_id = request.request_id.clone();
         self.client.send(
             request,
             Box::new(move |response| {
                 if let Ok(mut slot) = inbox.lock() {
-                    *slot = Some(Received { action, response });
+                    *slot = Some(Received { request_id:Some(request_id), action, response });
                 }
                 repaint.request_repaint();
             }),
         );
     }
     fn query(&mut self, id: &str, params: Value, action: Action, ctx: &egui::Context) {
-        if self.waiting || self.pending.is_some() {
+        self.query_with_project(id,params,None,action,ctx);
+    }
+    fn request_idle(&self) -> bool {
+        !self.waiting && self.pending.is_none() && self.deferred.is_none()
+    }
+    fn workspace_switch_allowed(&self) -> bool {
+        self.request_idle() && !self.folder.open && !self.batch.open && self.artifact_manifest.is_none()
+            && self.selection_report.is_none() && self.save_control.is_none()
+    }
+    fn cleanup_actions_allowed(&self, ctx: &egui::Context) -> bool {
+        !self.projects.active && self.request_idle() && !ctx.wants_keyboard_input()
+    }
+    fn action_allowed(&self, action: Action, ctx: &egui::Context) -> bool {
+        match action {
+            Action::Project(_) => self.projects.active,
+            Action::Scope => self.deferred.is_some(),
+            _ if self.projects.active => false,
+            Action::Plan(_) | Action::Submit | Action::Output(_) | Action::SelectionReport(_)
+                | Action::BatchOutput(_,_) | Action::BatchPlan(_) | Action::BatchSubmit
+                | Action::Register | Action::Intake | Action::FolderRegister => !ctx.wants_keyboard_input(),
+            _ => true,
+        }
+    }
+    fn new_request(&mut self, id: &str, params: Value, project: Option<ProjectRef>) -> Option<Request> {
+        let Some(sequence)=self.sequence.checked_add(1) else { self.error=Some("Request identity exhausted; reopen the application.".into()); return None; };
+        self.sequence=sequence;
+        let mut request=Request::query(id,params);
+        request.request_id=format!("{}-{}",self.session,sequence);
+        request.project=project;
+        if let Err(error)=request.validate() { self.error=Some(format!("{}: {}",error.code,error.message)); return None; }
+        Some(request)
+    }
+    fn query_with_project(&mut self, id: &str, params: Value, project: Option<ProjectRef>, action: Action, ctx: &egui::Context) {
+        if self.waiting || self.pending.is_some() || !self.action_allowed(action,ctx)
+            || (self.deferred.is_some() && !matches!(action,Action::Scope)) {
             return;
         }
-        self.sequence += 1;
-        let mut request = Request::query(id, params);
-        request.request_id = format!("{}-{}", self.session, self.sequence);
-        self.dispatch(request, action, ctx);
+        if let Some(request)=self.new_request(id,params,project) { self.dispatch(request,action,ctx); }
     }
     fn mutate(&mut self, id: &str, params: Value, action: Action, ctx: &egui::Context) {
-        if self.waiting || self.pending.is_some() {
-            return;
-        }
+        self.mutate_with_project(id,params,None,action,ctx);
+    }
+    fn mutate_with_project(&mut self, id: &str, params: Value, project: Option<ProjectRef>, action: Action, ctx: &egui::Context) -> bool {
+        if !self.request_idle() || !self.action_allowed(action,ctx) { return false; }
+        let Some(mut request)=self.new_request(id,params,project) else { return false; };
+        // Allocate the complete intent identity before scope bootstrap; no continuation
+        // rereads a selected project, form, expected revision or idempotency key.
+        request.idempotency_key=Some(request.request_id.clone());
         let Some(scope) = self.scope.clone() else {
-            self.deferred = Some((id.into(), params, action));
+            self.deferred = Some(DeferredIntent { request, action });
             self.query("access.replay_scope.create", json!({}), Action::Scope, ctx);
-            return;
+            if self.pending.is_none() { self.deferred=None; return false; }
+            return true;
         };
-        self.sequence += 1;
-        let mut request = Request::query(id, params);
-        request.request_id = format!("{}-{}", self.session, self.sequence);
         request.replay_scope = Some(scope);
-        request.idempotency_key = Some(format!("{}-{}", self.session, self.sequence));
         self.dispatch(request, action, ctx);
+        true
+    }
+    fn retry_pending(&mut self, ctx: &egui::Context) {
+        if !self.waiting && let Some(pending)=&self.pending {
+            let request=pending.request.clone(); let action=pending.action;
+            self.dispatch(request,action,ctx);
+        }
     }
     fn receive(&mut self, ctx: &egui::Context) {
         let received = self.inbox.lock().ok().and_then(|mut slot| slot.take());
         let Some(received) = received else {
             return;
         };
+        if let Some(id)=&received.request_id {
+            if !self.pending.as_ref().is_some_and(|pending| pending.request.request_id == *id && pending.action == received.action) { return; }
+            if received.response.as_ref().is_ok_and(|response| response.request_id != *id) {
+                self.waiting=false;
+                self.error=Some("Owner response correlation changed. Retry retains the captured request.".into());
+                return;
+            }
+        } else if !matches!(received.action,Action::Intake) || self.pending.is_some() || self.projects.active { return; }
         self.waiting = false;
         let response = match received.response {
             Ok(response) => response,
@@ -368,8 +463,13 @@ impl WizApp {
                 return;
             }
         };
-        self.pending = None;
+        if !response.ok && response.error.is_none() {
+            self.error=Some("Invalid owner error acknowledgement; retry the captured request.".into());
+            return;
+        }
         if !response.ok {
+            self.pending=None;
+            self.project_request_failed(received.action);
             if let Some(error) = response.error {
                 if error.code == "SNAPSHOT_EXPIRED" {
                     match received.action {
@@ -400,9 +500,29 @@ impl WizApp {
             self.folder_request_failed(received.action);
             return;
         }
+        if matches!(received.action,Action::Scope) {
+            let token=response.result.as_ref().and_then(valid_scope);
+            let Some(token)=token.filter(|_| response.receipt_id.is_none()) else {
+                self.error=Some("Invalid owner replay scope. The captured intent is retained; retry the same bootstrap request.".into());
+                return;
+            };
+            self.scope=Some(token.clone());
+            self.pending=None;
+            if let Some(mut intent)=self.deferred.take() {
+                intent.request.replay_scope=Some(token);
+                self.dispatch(intent.request,intent.action,ctx);
+            } else { self.error=Some("Scope arrived without a captured intent; no mutation was dispatched.".into()); }
+            return;
+        }
+        let completed=self.pending.take();
+        let receipt=response.receipt_id.clone();
         let result = response.result.unwrap_or(Value::Null);
         let parsed: Result<(), String> = (|| {
             match received.action {
+                Action::Project(action) => {
+                    let request=&completed.as_ref().ok_or("Project response has no captured request")?.request;
+                    self.receive_project(action,result,request,receipt.as_deref(),ctx)?;
+                }
                 Action::Assets => {
                     let page: SnapshotPage<AssetSummary> =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -438,12 +558,7 @@ impl WizApp {
                     self.status = "Media registered. Review stream selection and output.".into();
                 }
                 Action::Scope => {
-                    self.scope = Some(
-                        result["replay_scope"]
-                            .as_str()
-                            .ok_or("Replay scope missing")?
-                            .into(),
-                    );
+                    return Err("Scope continuation was not validated".into());
                 }
                 Action::Plan(generation) => {
                     let plan: PlanReview =
@@ -524,12 +639,15 @@ impl WizApp {
         })();
         if let Err(error) = parsed {
             self.error = Some(format!("Invalid owner response: {error}"));
+            self.project_request_failed(received.action);
+            if matches!(received.action,Action::Project(projects::ProjectAction { phase:projects::Phase::Create|projects::Phase::Mutation, .. })) {
+                self.pending=completed;
+                self.projects.terminal_failure=false;
+                self.status="Mutation acknowledgement is incomplete. Retry the exact captured intent before navigating.".into();
+            }
+            return;
         }
-        if matches!(received.action, Action::Scope)
-            && let Some((id, params, action)) = self.deferred.take()
-        {
-            self.mutate(&id, params, action, ctx);
-        } else if matches!(received.action, Action::FolderRegister) {
+        if matches!(received.action, Action::FolderRegister) {
             self.refresh_assets(ctx);
         } else if matches!(
             received.action,
@@ -817,9 +935,11 @@ impl eframe::App for WizApp {
             };
         }
         self.receive(ctx);
+        self.schedule_projects(ctx);
         self.schedule_output(ctx);
         self.schedule_batch(ctx);
-        if !self.waiting
+        if !self.projects.active
+            && !self.waiting
             && self.pending.is_none()
             && self.jobs.iter().any(|job| !job.state.terminal())
         {
@@ -829,7 +949,8 @@ impl eframe::App for WizApp {
             ctx.request_repaint_after(Duration::from_millis(250));
         }
         #[cfg(target_arch = "wasm32")]
-        if !self.waiting
+        if self.intake_allowed(ctx)
+            && !self.waiting
             && self.pending.is_none()
             && let Some(file) = ctx.input(|input| {
                 input
@@ -849,6 +970,7 @@ impl eframe::App for WizApp {
                 Box::new(move |response| {
                     if let Ok(mut slot) = inbox.lock() {
                         *slot = Some(Received {
+                            request_id:None,
                             action: Action::Intake,
                             response,
                         });
@@ -865,6 +987,7 @@ impl eframe::App for WizApp {
                 .find_map(|file| file.path().is_absolute().then(|| file.path().to_owned()))
         });
         if let Some(path) = dropped
+            && self.intake_allowed(ctx)
             && !self.waiting
             && self.pending.is_none()
         {
@@ -883,7 +1006,9 @@ impl eframe::App for WizApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
-        if !self.folder.open
+        if !self.projects.active
+            && !ui.ctx().wants_keyboard_input()
+            && !self.folder.open
             && ui.ctx().input_mut(|input| {
                 input.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND,
@@ -924,8 +1049,21 @@ impl eframe::App for WizApp {
                 ui.strong("Media tools");
                 ui.separator();
                 ui.label("Stream Cleanup");
+                ui.separator();
+                if self.projects.active {
+                    ui.strong("Projects");
+                    if ui.add_enabled(self.request_idle(),egui::Button::new("Return to Cleanup")).clicked() {
+                        self.leave_projects(ui.ctx());
+                    }
+                } else if ui.add_enabled(self.workspace_switch_allowed(),egui::Button::new("Projects")).clicked() {
+                    self.enter_projects(ui.ctx());
+                }
             });
         });
+        if self.projects.active {
+            self.project_workspace(ui);
+            return;
+        }
         egui::Panel::bottom("job-queue")
             .default_size(160.0)
             .resizable(true)
@@ -943,7 +1081,7 @@ impl eframe::App for WizApp {
             ui.label("Inspect the original streams, select what to keep, then review the plan before running it.");
             ui.separator();
             if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Choose media…")).clicked(){
-                self.waiting=true;self.error=None;self.status="Selecting media…".into();let inbox=self.inbox.clone();let repaint=ui.ctx().clone();self.client.choose_media(Box::new(move|response|{if let Ok(mut slot)=inbox.lock(){*slot=Some(Received{action:Action::Intake,response});}repaint.request_repaint();}));
+                self.choose_media(ui.ctx());
             }
             ui.horizontal(|ui| { ui.label("Input"); ui.add(egui::TextEdit::singleline(&mut self.source).hint_text("Absolute path granted to this session").desired_width((ui.available_width()-150.0).max(80.0))); if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.source.trim().is_empty(),egui::Button::new("Add media")).clicked() { self.mutate("assets.register",json!({"path":self.source}),Action::Register,ui.ctx()); } });
             if let Some(asset) = self.selected_asset() { self.cleanup(ui,&asset); }
@@ -1065,5 +1203,6 @@ mod tests {
         app.receive(&ctx);
         assert_eq!(app.output, "/controller-unit/manually-selected.mkv");
         assert!(app.plan.is_none());
+        crate::projects::tests::controller_cases();
     }
 }
