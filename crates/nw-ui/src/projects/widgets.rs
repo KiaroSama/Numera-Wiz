@@ -309,7 +309,10 @@ impl WizApp {
         ui.add_enabled_ui(ready, |ui| {
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(group.sequence.is_some() && group.track.is_some(), egui::Button::new("Place source…"))
+                    .add_enabled(
+                        group.sequence.is_some() && group.track.is_some(),
+                        egui::Button::new("Place source…"),
+                    )
                     .clicked()
                 {
                     self.projects.sequence_form = false;
@@ -468,7 +471,12 @@ impl WizApp {
             return;
         };
         ui.monospace(group.view.clip.as_deref().unwrap_or(""));
-        if !group.viewport.items.iter().any(|row| Some(row.id.as_str()) == group.view.clip.as_deref()) {
+        if !group
+            .viewport
+            .items
+            .iter()
+            .any(|row| Some(row.id.as_str()) == group.view.clip.as_deref())
+        {
             ui.small("Selected clip is outside the current viewport page; these controls retain its exact ID.");
         }
         ui.label(format!("Sequence start: {} s", exact(clip.sequence_start)));

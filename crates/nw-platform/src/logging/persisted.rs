@@ -131,8 +131,12 @@ impl Control {
         }
         state.scope_taken = true;
         Ok((
-            OwnerLoggingScope { control: self.clone() },
-            OwnerLoggingBinding { control: self.clone() },
+            OwnerLoggingScope {
+                control: self.clone(),
+            },
+            OwnerLoggingBinding {
+                control: self.clone(),
+            },
         ))
     }
     fn is_open(&self) -> bool {
@@ -247,7 +251,11 @@ impl Worker {
             counters,
         });
         (
-            Self { rotation: Some(rotation), control, clean: false },
+            Self {
+                rotation: Some(rotation),
+                control,
+                clean: false,
+            },
             receiver,
         )
     }
@@ -256,7 +264,13 @@ impl Worker {
         while let Ok(packet) = receiver.recv() {
             match packet {
                 Packet::Record(bytes) => {
-                    if self.rotation.as_mut().expect("owned rotation").append(&bytes).is_err() {
+                    if self
+                        .rotation
+                        .as_mut()
+                        .expect("owned rotation")
+                        .append(&bytes)
+                        .is_err()
+                    {
                         self.control.counters.failed.fetch_add(1, Ordering::AcqRel);
                         self.control.counters.dropped.fetch_add(1, Ordering::AcqRel);
                         self.control.begin_close();
@@ -266,7 +280,10 @@ impl Worker {
                             }
                         }
                         write_healthy = false;
-                        eprintln!("[{}] [WARNING] Structured log writer failed; query logs.status. Authoritative job facts remain in the store.", chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+                        eprintln!(
+                            "[{}] [WARNING] Structured log writer failed; query logs.status. Authoritative job facts remain in the store.",
+                            chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                        );
                         break;
                     }
                 }
@@ -292,7 +309,10 @@ impl Drop for Worker {
         };
         // Even a panicking opaque destructor cannot skip completion publication.
         // No control lock spans Rotation I/O, waits, or opaque Drop.
-        let completed = Completed { control: self.control.clone(), clean: self.clean };
+        let completed = Completed {
+            control: self.control.clone(),
+            clean: self.clean,
+        };
         drop(keepalive);
         drop(completed);
     }
@@ -906,7 +926,11 @@ mod tests {
         assert!(!control.admit(Packet::Record(b"queue overflow\n".to_vec())));
         let deadline = control.begin_close();
         assert_eq!(control.begin_close(), deadline);
-        assert!(!control.wait_until(std::time::Instant::now()).resources_closed);
+        assert!(
+            !control
+                .wait_until(std::time::Instant::now())
+                .resources_closed
+        );
         assert_busy(&root.path().join("logs"));
         assert_busy(&root.path().join("state"));
         assert!(!control.admit(Packet::Record(b"closed admission\n".to_vec())));
@@ -933,11 +957,21 @@ mod tests {
             let (fence, observed) = test_fence(root.path());
             let mut fence = Some(fence);
             if bind_before_close {
-                assert!(binding.take().unwrap().bind_keepalive(fence.take().unwrap()));
+                assert!(
+                    binding
+                        .take()
+                        .unwrap()
+                        .bind_keepalive(fence.take().unwrap())
+                );
             }
             drop(scope);
             if !bind_before_close {
-                assert!(!binding.take().unwrap().bind_keepalive(fence.take().unwrap()));
+                assert!(
+                    !binding
+                        .take()
+                        .unwrap()
+                        .bind_keepalive(fence.take().unwrap())
+                );
             }
             assert_busy(&root.path().join("logs"));
             assert_busy(&root.path().join("state"));
@@ -962,7 +996,10 @@ mod tests {
         });
         let _was_open = binding.bind_keepalive(fence);
         let deadline = completed.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert!(control.owner_scope().is_err(), "Only one binding token may exist");
+        assert!(
+            control.owner_scope().is_err(),
+            "Only one binding token may exist"
+        );
         assert_busy(&root.path().join("logs"));
         assert_busy(&root.path().join("state"));
         gate.release();
@@ -988,14 +1025,24 @@ mod tests {
             let (fence, observed) = test_fence(root.path());
             let mut fence = Some(fence);
             if bind_before_exit {
-                assert!(binding.take().unwrap().bind_keepalive(fence.take().unwrap()));
+                assert!(
+                    binding
+                        .take()
+                        .unwrap()
+                        .bind_keepalive(fence.take().unwrap())
+                );
             }
             assert!(control.admit(Packet::Record(record)));
             gate.release();
             let closed = scope.finish();
             assert!(closed.resources_closed && !closed.writer_healthy);
             if !bind_before_exit {
-                assert!(!binding.take().unwrap().bind_keepalive(fence.take().unwrap()));
+                assert!(
+                    !binding
+                        .take()
+                        .unwrap()
+                        .bind_keepalive(fence.take().unwrap())
+                );
             }
             assert_ordered_release(root.path(), observed);
             assert_eq!(fs::read(&retained).unwrap(), unowned);

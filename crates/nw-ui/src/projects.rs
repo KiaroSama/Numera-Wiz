@@ -468,11 +468,15 @@ impl WizApp {
         };
         if stage.phase != action.phase
             || group.key.generation != action.generation
-            || request.project.as_ref().map(|reference| reference.id.as_str())
+            || request
+                .project
+                .as_ref()
+                .map(|reference| reference.id.as_str())
                 != Some(group.key.project.as_str())
             || request.command.id != command
             || selected.is_none()
-            || request.params != json!({"projection":"entity",(field):selected,"limit":PAGE,"revision":group.key.revision})
+            || request.params
+                != json!({"projection":"entity",(field):selected,"limit":PAGE,"revision":group.key.revision})
         {
             return Ok(false);
         }
@@ -575,11 +579,15 @@ impl WizApp {
         {
             return Err("Captured view expired before publication; explicitly Refresh".into());
         }
-        let unavailable = self.projects.restoration.as_ref().is_some_and(|(generation, view)| {
-            *generation == group.key.generation
-                && view.project == group.key.project
-                && view.revision.as_deref() == Some(group.key.revision.as_str())
-        });
+        let unavailable = self
+            .projects
+            .restoration
+            .as_ref()
+            .is_some_and(|(generation, view)| {
+                *generation == group.key.generation
+                    && view.project == group.key.project
+                    && view.revision.as_deref() == Some(group.key.revision.as_str())
+            });
         if !unavailable {
             self.projects.restoration = None;
         }
@@ -721,7 +729,10 @@ impl WizApp {
                         .group
                         .as_ref()
                         .map(|group| {
-                            if matches!(request.command.id.as_str(), "history.undo" | "history.redo") {
+                            if matches!(
+                                request.command.id.as_str(),
+                                "history.undo" | "history.redo"
+                            ) {
                                 self.projects.restored_view(group)
                             } else {
                                 group.view.clone()
@@ -895,7 +906,9 @@ impl WizApp {
             // The identical summary binding must still resolve to this immutable
             // ticket, revision and content under current owner authorization.
             if result != group.summary {
-                return Err("Captured summary changed while reconciling the unavailable selection".into());
+                return Err(
+                    "Captured summary changed while reconciling the unavailable selection".into(),
+                );
             }
             return self.publish_project();
         }

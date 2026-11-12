@@ -891,7 +891,6 @@ fn bounded_handle_tracking() {
     );
 }
 
-
 const SELECT_SEQUENCE: &str = "70000000-0000-4000-8000-000000000001";
 const SELECT_TRACK: &str = "70000000-0000-4000-8000-000000000002";
 const SELECT_SOURCE: &str = "70000000-0000-4000-8000-000000000003";
@@ -923,7 +922,10 @@ fn selected_prefix(
     let request = port.complete(selected_summary(ticket, revision, sequences, can_redo));
     assert_eq!(request.params["projection"], "summary");
     app.receive(ctx);
-    let rows: Vec<_> = sequences.iter().map(|id| json!({"id":id,"kind":"sequence","name":"Fixture sequence"})).collect();
+    let rows: Vec<_> = sequences
+        .iter()
+        .map(|id| json!({"id":id,"kind":"sequence","name":"Fixture sequence"}))
+        .collect();
     port.complete(projection(ticket, revision, "bin_page", json!({"items":rows,"next_cursor":null,"total_count":sequences.len(),"count_accuracy":"exact"})));
     app.receive(ctx);
     request
@@ -946,12 +948,28 @@ fn selected_tracks(
     assert_eq!(request.params["entity_id"], SELECT_TRACK);
     app.receive(ctx);
 }
-fn selected_page(ticket: &str, revision: &str, start: usize, count: usize, next: Option<&str>) -> Value {
+fn selected_page(
+    ticket: &str,
+    revision: &str,
+    start: usize,
+    count: usize,
+    next: Option<&str>,
+) -> Value {
     let rows: Vec<_> = (start..start + count).map(|index| json!({"id":selected_clip_id(index),"track_id":SELECT_TRACK,"source_id":SELECT_SOURCE,"sequence_start":Rational::new(index as i64,25).unwrap(),"duration":{"num":"1","den":"25"}})).collect();
-    projection(ticket, revision, "viewport", json!({"items":rows,"next_cursor":next,"total_count":start+count,"count_accuracy":if next.is_some(){"lower_bound"}else{"exact"}}))
+    projection(
+        ticket,
+        revision,
+        "viewport",
+        json!({"items":rows,"next_cursor":next,"total_count":start+count,"count_accuracy":if next.is_some(){"lower_bound"}else{"exact"}}),
+    )
 }
 fn selected_clip(ticket: &str, revision: &str, index: usize) -> Value {
-    projection(ticket, revision, "entity", json!({"entity":{"id":selected_clip_id(index),"kind":"clip","sequence_id":SELECT_SEQUENCE,"track_id":SELECT_TRACK,"source_id":SELECT_SOURCE,"occurrence_id":selected_clip_id(index),"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"25"}},"sequence_start":Rational::new(index as i64,25).unwrap(),"duration":{"num":"1","den":"25"},"rate":{"num":"1","den":"1"},"link_group_id":null,"locked":false}}))
+    projection(
+        ticket,
+        revision,
+        "entity",
+        json!({"entity":{"id":selected_clip_id(index),"kind":"clip","sequence_id":SELECT_SEQUENCE,"track_id":SELECT_TRACK,"source_id":SELECT_SOURCE,"occurrence_id":selected_clip_id(index),"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"25"}},"sequence_start":Rational::new(index as i64,25).unwrap(),"duration":{"num":"1","den":"25"},"rate":{"num":"1","den":"1"},"link_group_id":null,"locked":false}}),
+    )
 }
 fn selected_detail(
     app: &mut WizApp,
@@ -974,20 +992,45 @@ fn selected_sequence_created() -> (WizApp, Arc<MockJsonClient>, egui::Context) {
     app.scope = Some(scope());
     app.projects.forms.video_tracks = "Video".into();
     app.projects.forms.audio_tracks.clear();
-    app.mutate_project("sequences.create", app.projects.forms.sequence().unwrap(), &ctx);
-    let request = port.accept(json!({"project_id":PROJECT,"revision":"1","created":{"sequence_id":SELECT_SEQUENCE}}));
-    assert_eq!(request.project.unwrap().expected_revision.as_deref(), Some("0"));
+    app.mutate_project(
+        "sequences.create",
+        app.projects.forms.sequence().unwrap(),
+        &ctx,
+    );
+    let request = port.accept(
+        json!({"project_id":PROJECT,"revision":"1","created":{"sequence_id":SELECT_SEQUENCE}}),
+    );
+    assert_eq!(
+        request.project.unwrap().expected_revision.as_deref(),
+        Some("0")
+    );
     app.receive(&ctx);
-    selected_prefix(&mut app, &port, &ctx, SELECT_TICKET, "1", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        SELECT_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, SELECT_TICKET, "1", 0);
     port.complete(selected_page(SELECT_TICKET, "1", 0, 0, None));
     app.receive(&ctx);
     assert!(app.project_ready() && port.empty());
     (app, port, ctx)
 }
-fn selected_failure(app: &mut WizApp, port: &MockJsonClient, ctx: &egui::Context, code: &str) -> Request {
+fn selected_failure(
+    app: &mut WizApp,
+    port: &MockJsonClient,
+    ctx: &egui::Context,
+    code: &str,
+) -> Request {
     let (request, reply) = port.pop();
-    reply(Ok(Response::failure(&request.request_id, nw_domain::DomainError::new(code, "Canonical selection fixture"))));
+    reply(Ok(Response::failure(
+        &request.request_id,
+        nw_domain::DomainError::new(code, "Canonical selection fixture"),
+    )));
     app.receive(ctx);
     request
 }
@@ -995,9 +1038,23 @@ fn later_page_selection_keeps_exact_target() {
     let (mut app, port, ctx) = ready();
     app.scope = Some(scope());
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, SELECT_TICKET, "1", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        SELECT_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, SELECT_TICKET, "1", 129);
-    port.complete(selected_page(SELECT_TICKET, "1", 0, 128, Some("second-nonempty-page")));
+    port.complete(selected_page(
+        SELECT_TICKET,
+        "1",
+        0,
+        128,
+        Some("second-nonempty-page"),
+    ));
     app.receive(&ctx);
     selected_detail(&mut app, &port, &ctx, SELECT_TICKET, "1", 0);
     assert_eq!(app.projects.handles[0].bindings.len(), 8);
@@ -1013,54 +1070,107 @@ fn later_page_selection_keeps_exact_target() {
     let mut view = group.view.clone();
     view.clip = Some(selected.clone());
     app.project_reselect(view, &ctx);
-    assert_eq!(app.pending.as_ref().unwrap().request.params["replace_snapshot"], SELECT_TICKET);
-    let reload = selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "1", &[SELECT_SEQUENCE], false);
+    assert_eq!(
+        app.pending.as_ref().unwrap().request.params["replace_snapshot"],
+        SELECT_TICKET
+    );
+    let reload = selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     assert_eq!(reload.params["revision"], "1");
     selected_tracks(&mut app, &port, &ctx, RELOAD_TICKET, "1", 129);
-    let viewport = port.complete(selected_page(RELOAD_TICKET, "1", 0, 128, Some("reloaded-second-page")));
+    let viewport = port.complete(selected_page(
+        RELOAD_TICKET,
+        "1",
+        0,
+        128,
+        Some("reloaded-second-page"),
+    ));
     assert!(viewport.params.get("cursor").is_none());
     app.receive(&ctx);
-    assert_eq!(app.projects.group.as_ref().unwrap().key.snapshot, SELECT_TICKET, "Do not publish partial replacement geometry");
+    assert_eq!(
+        app.projects.group.as_ref().unwrap().key.snapshot,
+        SELECT_TICKET,
+        "Do not publish partial replacement geometry"
+    );
     selected_detail(&mut app, &port, &ctx, RELOAD_TICKET, "1", 128);
     let group = app.projects.group.as_ref().unwrap().clone();
     assert_eq!(group.view.clip.as_deref(), Some(selected.as_str()));
-    assert_eq!(group.clip.as_ref().unwrap().source_id.as_str(), SELECT_SOURCE);
-    assert_eq!(group.clip.as_ref().unwrap().sequence_start, Rational::new(128,25).unwrap());
-    assert!(!group.viewport.items.iter().any(|clip| clip.id.as_str() == selected.as_str()));
+    assert_eq!(
+        group.clip.as_ref().unwrap().source_id.as_str(),
+        SELECT_SOURCE
+    );
+    assert_eq!(
+        group.clip.as_ref().unwrap().sequence_start,
+        Rational::new(128, 25).unwrap()
+    );
+    assert!(
+        !group
+            .viewport
+            .items
+            .iter()
+            .any(|clip| clip.id.as_str() == selected.as_str())
+    );
     assert_eq!(group.viewport.items.len(), 128);
     assert_eq!(app.projects.handles[0].bindings.len(), 8);
     assert!(group.bytes <= GROUP_BYTES);
     app.mutate_project("clips.move", json!({"clip_ids":[group.view.clip],"delta":{"num":"2","den":"1"},"collision":"reject","link_policy":"expand"}), &ctx);
     let (edit, reply) = port.pop();
     assert_eq!(edit.params["clip_ids"], json!([selected]));
-    assert_eq!(edit.project.as_ref().unwrap().expected_revision.as_deref(), Some("1"));
-    assert_eq!(edit.idempotency_key.as_deref(), Some(edit.request_id.as_str()));
+    assert_eq!(
+        edit.project.as_ref().unwrap().expected_revision.as_deref(),
+        Some("1")
+    );
+    assert_eq!(
+        edit.idempotency_key.as_deref(),
+        Some(edit.request_id.as_str())
+    );
     let captured = serde_json::to_value(&edit).unwrap();
     reply(Err("Unknown selection edit acceptance".into()));
     app.receive(&ctx);
-    assert_eq!(serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(), captured);
+    assert_eq!(
+        serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(),
+        captured
+    );
     assert!(port.empty());
 }
 fn sequence_history_and_external_removal_recover() {
     let (mut app, port, ctx) = selected_sequence_created();
     app.mutate_project("history.undo", json!({}), &ctx);
     let undo = port.accept(json!({"project_id":PROJECT,"revision":"2","created":{}}));
-    assert_eq!(undo.project.unwrap().expected_revision.as_deref(), Some("1"));
+    assert_eq!(
+        undo.project.unwrap().expected_revision.as_deref(),
+        Some("1")
+    );
     app.receive(&ctx);
     let initial_summary = selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "2", &[], true);
     let first_seen = app.projects.handles[0].first_seen;
     let bindings = app.projects.handles[0].bindings.len();
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["sequence_id"], SELECT_SEQUENCE);
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["sequence_id"],
+        SELECT_SEQUENCE
+    );
     assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "1");
     let revalidation = port.complete(selected_summary(RELOAD_TICKET, "2", &[], true));
     assert_eq!(revalidation.command.id, initial_summary.command.id);
-    assert_eq!(revalidation.params, initial_summary.params, "Revalidation reuses the exact summary binding");
+    assert_eq!(
+        revalidation.params, initial_summary.params,
+        "Revalidation reuses the exact summary binding"
+    );
     app.receive(&ctx);
     let group = app.projects.group.as_ref().unwrap();
     assert!(app.project_ready() && port.empty());
     assert_eq!(group.key.revision, "2");
     assert_eq!(group.summary["history"]["can_redo"], true);
-    assert!(group.view.sequence.is_none() && group.view.track.is_none() && group.view.clip.is_none());
+    assert!(
+        group.view.sequence.is_none() && group.view.track.is_none() && group.view.clip.is_none()
+    );
     assert!(group.sequence.is_none() && group.track.is_none() && group.clip.is_none());
     assert!(group.tracks.items.is_empty() && group.viewport.items.is_empty());
     assert!(app.projects.forms.place(group, None, None).is_err());
@@ -1069,10 +1179,21 @@ fn sequence_history_and_external_removal_recover() {
     assert_eq!(app.projects.handles[0].first_seen, first_seen);
     app.mutate_project("history.redo", json!({}), &ctx);
     let redo = port.accept(json!({"project_id":PROJECT,"revision":"3","created":{}}));
-    assert_eq!(redo.project.unwrap().expected_revision.as_deref(), Some("2"));
+    assert_eq!(
+        redo.project.unwrap().expected_revision.as_deref(),
+        Some("2")
+    );
     app.receive(&ctx);
     assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "2");
-    selected_prefix(&mut app, &port, &ctx, RESTORED_TICKET, "3", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RESTORED_TICKET,
+        "3",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, RESTORED_TICKET, "3", 0);
     port.complete(selected_page(RESTORED_TICKET, "3", 0, 0, None));
     app.receive(&ctx);
@@ -1084,36 +1205,86 @@ fn sequence_history_and_external_removal_recover() {
     let (mut app, port, ctx) = selected_sequence_created();
     // An external Undo removed the selected sequence; another sequence remains.
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "2", &[OTHER_SEQUENCE], true);
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["sequence_id"], SELECT_SEQUENCE);
-    port.complete(selected_summary(RELOAD_TICKET, "2", &[OTHER_SEQUENCE], true));
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "2",
+        &[OTHER_SEQUENCE],
+        true,
+    );
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["sequence_id"],
+        SELECT_SEQUENCE
+    );
+    port.complete(selected_summary(
+        RELOAD_TICKET,
+        "2",
+        &[OTHER_SEQUENCE],
+        true,
+    ));
     app.receive(&ctx);
     let group = app.projects.group.as_ref().unwrap();
     assert!(app.project_ready() && port.empty());
     assert_eq!(group.summary["sequence_count"], 1);
     assert_eq!(group.bins.items[0].id.as_str(), OTHER_SEQUENCE);
-    assert!(group.view.sequence.is_none(), "Do not replace a missing human selection with another sequence");
+    assert!(
+        group.view.sequence.is_none(),
+        "Do not replace a missing human selection with another sequence"
+    );
     assert_eq!(group.summary["history"]["can_redo"], true);
     app.project_refresh(&ctx);
     selected_failure(&mut app, &port, &ctx, "PERMISSION_DENIED");
     assert!(app.projects.stale && port.empty());
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RESTORED_TICKET, "3", &[OTHER_SEQUENCE, SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RESTORED_TICKET,
+        "3",
+        &[OTHER_SEQUENCE, SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, RESTORED_TICKET, "3", 0);
     port.complete(selected_page(RESTORED_TICKET, "3", 0, 0, None));
     app.receive(&ctx);
-    assert_eq!(app.projects.group.as_ref().unwrap().view.sequence.as_deref(), Some(SELECT_SEQUENCE), "Explicit Refresh rechecks the bounded restoration hint, not the first other row");
+    assert_eq!(
+        app.projects
+            .group
+            .as_ref()
+            .unwrap()
+            .view
+            .sequence
+            .as_deref(),
+        Some(SELECT_SEQUENCE),
+        "Explicit Refresh rechecks the bounded restoration hint, not the first other row"
+    );
     assert!(app.project_ready() && port.empty());
 }
 fn missing_sequence_stage() -> (WizApp, Arc<MockJsonClient>, egui::Context) {
     let (mut app, port, ctx) = selected_sequence_created();
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "2", &[OTHER_SEQUENCE], true);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "2",
+        &[OTHER_SEQUENCE],
+        true,
+    );
     (app, port, ctx)
 }
 fn selection_recovery_rejects_other_failures() {
     selected_track_and_clip_recovery();
-    for code in ["PERMISSION_DENIED", "SNAPSHOT_EXPIRED", "CANCELLED", "STALE_REVISION"] {
+    for code in [
+        "PERMISSION_DENIED",
+        "SNAPSHOT_EXPIRED",
+        "CANCELLED",
+        "STALE_REVISION",
+    ] {
         let (mut app, port, ctx) = missing_sequence_stage();
         selected_failure(&mut app, &port, &ctx, code);
         assert!(app.projects.stale && app.projects.staging.is_none());
@@ -1125,37 +1296,80 @@ fn selection_recovery_rejects_other_failures() {
     let captured = serde_json::to_value(&request).unwrap();
     reply(Err("Unknown query outcome".into()));
     app.receive(&ctx);
-    assert_eq!(serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(), captured);
+    assert_eq!(
+        serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(),
+        captured
+    );
     assert!(port.empty() && app.projects.staging.is_some());
     app.retry_pending(&ctx);
     let (retried, reply) = port.pop();
     assert_eq!(serde_json::to_value(&retried).unwrap(), captured);
-    reply(Ok(Response::failure(&retried.request_id, nw_domain::DomainError::object_not_found())));
+    reply(Ok(Response::failure(
+        &retried.request_id,
+        nw_domain::DomainError::object_not_found(),
+    )));
     app.receive(&ctx);
-    assert_eq!(app.pending.as_ref().unwrap().request.params["projection"], "summary");
+    assert_eq!(
+        app.pending.as_ref().unwrap().request.params["projection"],
+        "summary"
+    );
     // A failed revalidation is terminal; it must not start a second recovery.
     selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND");
     assert!(port.empty() && app.pending.is_none() && app.projects.staging.is_none());
 
     let (mut app, port, ctx) = missing_sequence_stage();
-    port.complete(projection(RELOAD_TICKET, "2", "entity", json!({"entity":{"id":SELECT_SEQUENCE,"kind":"clip"}})));
+    port.complete(projection(
+        RELOAD_TICKET,
+        "2",
+        "entity",
+        json!({"entity":{"id":SELECT_SEQUENCE,"kind":"clip"}}),
+    ));
     app.receive(&ctx);
     assert!(port.empty() && app.pending.is_none() && app.projects.staging.is_none());
-    for changed in ["generation", "phase", "request_project", "request_revision", "request_entity"] {
+    for changed in [
+        "generation",
+        "phase",
+        "request_project",
+        "request_revision",
+        "request_entity",
+    ] {
         let (mut app, port, ctx) = missing_sequence_stage();
         match changed {
             "generation" => app.projects.generation += 1,
             "phase" => app.projects.staging.as_mut().unwrap().phase = Phase::Track,
-            "request_project" => app.pending.as_mut().unwrap().request.project.as_mut().unwrap().id = OTHER_SEQUENCE.into(),
-            "request_revision" => app.pending.as_mut().unwrap().request.params["revision"] = json!("999"),
-            "request_entity" => app.pending.as_mut().unwrap().request.params["sequence_id"] = json!(OTHER_SEQUENCE),
+            "request_project" => {
+                app.pending
+                    .as_mut()
+                    .unwrap()
+                    .request
+                    .project
+                    .as_mut()
+                    .unwrap()
+                    .id = OTHER_SEQUENCE.into()
+            }
+            "request_revision" => {
+                app.pending.as_mut().unwrap().request.params["revision"] = json!("999")
+            }
+            "request_entity" => {
+                app.pending.as_mut().unwrap().request.params["sequence_id"] = json!(OTHER_SEQUENCE)
+            }
             _ => unreachable!(),
         }
         selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND");
-        assert!(port.empty() && app.pending.is_none() && app.projects.staging.is_none(), "{changed} must not authorize recovery");
+        assert!(
+            port.empty() && app.pending.is_none() && app.projects.staging.is_none(),
+            "{changed} must not authorize recovery"
+        );
         assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "1");
     }
-    for changed in ["project", "revision", "ticket", "projection", "history", "expiry"] {
+    for changed in [
+        "project",
+        "revision",
+        "ticket",
+        "projection",
+        "history",
+        "expiry",
+    ] {
         let (mut app, port, ctx) = missing_sequence_stage();
         selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND");
         let mut response = selected_summary(RELOAD_TICKET, "2", &[OTHER_SEQUENCE], true);
@@ -1167,14 +1381,25 @@ fn selection_recovery_rejects_other_failures() {
             "history" => response["history"]["can_redo"] = json!(false),
             "expiry" => {
                 let expired = Instant::now() - Duration::from_secs(31);
-                app.projects.staging.as_mut().unwrap().group.as_mut().unwrap().key.first_seen = expired;
+                app.projects
+                    .staging
+                    .as_mut()
+                    .unwrap()
+                    .group
+                    .as_mut()
+                    .unwrap()
+                    .key
+                    .first_seen = expired;
                 app.projects.handles[0].first_seen = expired;
             }
             _ => unreachable!(),
         }
         port.complete(response);
         app.receive(&ctx);
-        assert!(app.projects.stale && app.projects.staging.is_none(), "{changed} must fail closed");
+        assert!(
+            app.projects.stale && app.projects.staging.is_none(),
+            "{changed} must fail closed"
+        );
         assert_eq!(app.projects.group.as_ref().unwrap().key.revision, "1");
         assert!(app.pending.is_none() && port.empty());
     }
@@ -1183,15 +1408,36 @@ fn selection_recovery_rejects_other_failures() {
 fn selected_track_and_clip_recovery() {
     let (mut app, port, ctx) = selected_sequence_created();
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "2", &[SELECT_SEQUENCE, OTHER_SEQUENCE], true);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "2",
+        &[SELECT_SEQUENCE, OTHER_SEQUENCE],
+        true,
+    );
     let settings = app.projects.forms.sequence().unwrap()["settings"].clone();
     port.complete(projection(RELOAD_TICKET, "2", "entity", json!({"entity":{"id":SELECT_SEQUENCE,"kind":"sequence","settings":settings,"track_count":0,"locked":false}})));
     app.receive(&ctx);
-    port.complete(projection(RELOAD_TICKET, "2", "track_page", json!({"items":[],"next_cursor":null,"total_count":0,"count_accuracy":"exact"})));
+    port.complete(projection(
+        RELOAD_TICKET,
+        "2",
+        "track_page",
+        json!({"items":[],"next_cursor":null,"total_count":0,"count_accuracy":"exact"}),
+    ));
     app.receive(&ctx);
     let bindings = app.projects.handles[0].bindings.len();
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"], SELECT_TRACK);
-    port.complete(selected_summary(RELOAD_TICKET, "2", &[SELECT_SEQUENCE, OTHER_SEQUENCE], true));
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"],
+        SELECT_TRACK
+    );
+    port.complete(selected_summary(
+        RELOAD_TICKET,
+        "2",
+        &[SELECT_SEQUENCE, OTHER_SEQUENCE],
+        true,
+    ));
     app.receive(&ctx);
     let group = app.projects.group.as_ref().unwrap();
     assert!(app.project_ready() && port.empty());
@@ -1204,20 +1450,48 @@ fn selected_track_and_clip_recovery() {
     replacement.track = None;
     replacement.clip = None;
     app.project_reselect(replacement, &ctx);
-    selected_prefix(&mut app, &port, &ctx, RESTORED_TICKET, "2", &[SELECT_SEQUENCE, OTHER_SEQUENCE], true);
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "PERMISSION_DENIED").params["sequence_id"], OTHER_SEQUENCE, "An explicit row choice supersedes the old restoration hint");
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RESTORED_TICKET,
+        "2",
+        &[SELECT_SEQUENCE, OTHER_SEQUENCE],
+        true,
+    );
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "PERMISSION_DENIED").params["sequence_id"],
+        OTHER_SEQUENCE,
+        "An explicit row choice supersedes the old restoration hint"
+    );
 
     let (mut app, port, ctx) = selected_sequence_created();
     let mut view = app.projects.group.as_ref().unwrap().view.clone();
     view.clip = Some(selected_clip_id(128));
     app.project_reselect(view, &ctx);
-    selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "1", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, RELOAD_TICKET, "1", 1);
     port.complete(selected_page(RELOAD_TICKET, "1", 0, 1, None));
     app.receive(&ctx);
     let bindings = app.projects.handles[0].bindings.len();
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"], selected_clip_id(128));
-    port.complete(selected_summary(RELOAD_TICKET, "1", &[SELECT_SEQUENCE], false));
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"],
+        selected_clip_id(128)
+    );
+    port.complete(selected_summary(
+        RELOAD_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    ));
     app.receive(&ctx);
     let group = app.projects.group.as_ref().unwrap();
     assert!(app.project_ready() && port.empty());
@@ -1226,30 +1500,67 @@ fn selected_track_and_clip_recovery() {
     assert_eq!(group.viewport.items[0].id.as_str(), selected_clip_id(0));
     assert_eq!(app.projects.handles[0].bindings.len(), bindings);
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RESTORED_TICKET, "2", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RESTORED_TICKET,
+        "2",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, RESTORED_TICKET, "2", 2);
-    port.complete(selected_page(RESTORED_TICKET, "2", 0, 1, Some("restored-target-on-another-page")));
+    port.complete(selected_page(
+        RESTORED_TICKET,
+        "2",
+        0,
+        1,
+        Some("restored-target-on-another-page"),
+    ));
     app.receive(&ctx);
     selected_detail(&mut app, &port, &ctx, RESTORED_TICKET, "2", 128);
-    assert_eq!(app.projects.group.as_ref().unwrap().view.clip.as_deref(), Some(selected_clip_id(128).as_str()));
+    assert_eq!(
+        app.projects.group.as_ref().unwrap().view.clip.as_deref(),
+        Some(selected_clip_id(128).as_str())
+    );
 
     let (mut app, port, ctx) = missing_sequence_stage();
     let (request, reply) = port.pop();
     let captured = serde_json::to_value(&request).unwrap();
-    reply(Ok(Response::failure("unrelated-response", nw_domain::DomainError::object_not_found())));
+    reply(Ok(Response::failure(
+        "unrelated-response",
+        nw_domain::DomainError::object_not_found(),
+    )));
     app.receive(&ctx);
-    assert_eq!(serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(), captured);
+    assert_eq!(
+        serde_json::to_value(&app.pending.as_ref().unwrap().request).unwrap(),
+        captured
+    );
     assert!(port.empty() && app.projects.staging.is_some());
 
     let (mut app, port, ctx) = selected_sequence_created();
     app.project_refresh(&ctx);
-    selected_prefix(&mut app, &port, &ctx, RELOAD_TICKET, "2", &[SELECT_SEQUENCE], false);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "2",
+        &[SELECT_SEQUENCE],
+        false,
+    );
     selected_tracks(&mut app, &port, &ctx, RELOAD_TICKET, "2", 1);
     port.complete(selected_page(RELOAD_TICKET, "2", 0, 1, None));
     app.receive(&ctx);
     port.complete(selected_clip(RELOAD_TICKET, "2", 0));
     app.receive(&ctx);
-    assert_eq!(selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"], SELECT_SOURCE);
+    assert_eq!(
+        selected_failure(&mut app, &port, &ctx, "OBJECT_NOT_FOUND").params["entity_id"],
+        SELECT_SOURCE
+    );
     assert!(app.projects.stale && app.projects.staging.is_none());
-    assert!(app.pending.is_none() && port.empty(), "A source failure is not proof that the selected clip is absent");
+    assert!(
+        app.pending.is_none() && port.empty(),
+        "A source failure is not proof that the selected clip is absent"
+    );
 }
