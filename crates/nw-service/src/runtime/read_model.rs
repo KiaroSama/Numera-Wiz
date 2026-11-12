@@ -40,6 +40,7 @@ pub(super) enum CatalogPhase {
     Entry,
     Fresh,
     Cursor,
+    LegacyAssetsEntry,
 }
 #[cfg(test)]
 pub(super) struct CatalogHook {
@@ -239,6 +240,10 @@ impl Service {
         #[cfg(test)]
         if projects {
             self.catalog_test_phase(CatalogPhase::Entry);
+        }
+        #[cfg(test)]
+        if kind == InventoryKind::Assets {
+            self.catalog_test_phase(CatalogPhase::LegacyAssetsEntry);
         }
         let policy = if projects {
             self.catalog_policy(context)?
@@ -585,6 +590,7 @@ mod tests {
 
         project_catalog_lists_committed_public_headers(&service).await;
         catalog_tests::headers_and_rights().await;
+        legacy_assets_entry_rechecks_current_command_allowlist().await;
     }
     async fn project_catalog_lists_committed_public_headers(service: &Arc<Service>) {
         let owner = service.owner();
@@ -787,5 +793,149 @@ mod tests {
                 .code,
             "RESOURCE_LIMIT"
         );
+    }
+    async fn legacy_assets_entry_rechecks_current_command_allowlist() {
+        // Keep the catalog race fixtures' isolated runtime: the unchanged reaper
+        // must leave a worker available for the real public policy update.
+        tokio::task::spawn_blocking(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
+                    let root = tempfile::tempdir().unwrap();
+                    let service = Service::open(root.path().join("data"), None).await.unwrap();
+                    let owner = service.owner();
+                    let reader = service.profile_context("browser").unwrap();
+                    let original: AccessProfile =
+                        service.store.get("profile/browser").unwrap().unwrap();
+                    assert_eq!(original.id, "browser");
+                    assert_eq!(original.name, "browser");
+                    assert_eq!(Some(&original.id), reader.profile.as_ref());
+                    assert_eq!(original.principal, reader.principal);
+                    assert!(original.enabled);
+                    assert_eq!(original.mode, ProfileMode::Operate);
+                    assert!(original.owned_object_access);
+                    assert!(original.allows_command("assets.list"));
+
+                    let owned = asset("legacy-entry-owned", &reader.principal);
+                    assert!(original.allows_asset(&owned.creator));
+                    service.store.put("asset/legacy-entry-owned", &owned).unwrap();
+                    let readable = page(&service, &reader, json!({"limit":1})).await;
+                    assert!(readable.ok, "Legacy Assets positive control: {readable:?}");
+                    assert!(readable.error.is_none(), "{readable:?}");
+                    assert!(readable.receipt_id.is_none(), "{readable:?}");
+                    let readable_page = readable.result.as_ref().unwrap();
+                    assert_eq!(readable_page["projection"], "assets.summary.v1");
+                    assert_eq!(readable_page["total_count"], 1);
+                    assert_eq!(readable_page["count_accuracy"], "exact");
+                    assert_eq!(readable_page["next_cursor"], Value::Null);
+                    assert_eq!(
+                        readable_page["items"],
+                        json!([{
+                            "id":"legacy-entry-owned",
+                            "display_name":"legacy-entry-owned.mkv",
+                            "bytes":"100",
+                            "stream_count":0
+                        }])
+                    );
+
+                    let mut bootstrap = Request::query("access.replay_scope.create", json!({}));
+                    bootstrap.request_id = "legacy-assets-entry-scope".into();
+                    let bootstrapped = service.dispatch(owner.clone(), bootstrap).await;
+                    assert!(bootstrapped.ok, "Legacy Assets owner scope: {bootstrapped:?}");
+                    assert!(bootstrapped.error.is_none(), "{bootstrapped:?}");
+                    assert!(bootstrapped.receipt_id.is_none(), "{bootstrapped:?}");
+                    let scope = bootstrapped.result.as_ref().unwrap()["replay_scope"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned();
+                    let mut allowed = original.allowed_command_ids.clone();
+                    assert!(allowed.remove("assets.list"));
+                    let mut update = Request::query(
+                        "access.profiles.update",
+                        json!({
+                            "name":original.id,
+                            "expected_revision":original.revision,
+                            "enabled":original.enabled,
+                            "mode":original.mode,
+                            "owned_object_access":original.owned_object_access,
+                            "client_sessions":original.client_sessions,
+                            "allowed_command_ids":allowed,
+                            "object_grants":original.object_grants,
+                            "read_roots":original.read_roots,
+                            "write_roots":original.write_roots
+                        }),
+                    );
+                    update.request_id = "legacy-assets-entry-revoke".into();
+                    update.replay_scope = Some(scope);
+                    update.idempotency_key = Some("legacy-assets-entry-revoke-once".into());
+                    let mut expected = value(&original).unwrap();
+                    expected["revision"] = json!(original.revision + 1);
+                    expected["allowed_command_ids"] = json!(allowed);
+                    let retained_before = service.snapshots.lock().unwrap().count();
+                    assert_eq!(retained_before, 0);
+
+                    let (started, ready) = std::sync::mpsc::channel();
+                    let (resume, waiting) = std::sync::mpsc::channel();
+                    *service.catalog_hook.lock().unwrap() = Some(CatalogHook {
+                        phase: CatalogPhase::LegacyAssetsEntry,
+                        started,
+                        waiting,
+                    });
+                    let task_service = service.clone();
+                    let task_reader = reader.clone();
+                    let task = tokio::spawn(async move {
+                        page(&task_service, &task_reader, json!({"limit":1})).await
+                    });
+                    tokio::task::spawn_blocking(move || {
+                        ready
+                            .recv_timeout(Duration::from_secs(5))
+                            .expect("Legacy Assets entry phase not reached")
+                    })
+                    .await
+                    .unwrap();
+
+                    // Entry is before policy capture and the cache/scan locks.
+                    // No fixture lock is held while the owner commits the update.
+                    let changed = tokio::time::timeout(
+                        Duration::from_secs(5),
+                        service.dispatch(owner, update),
+                    )
+                    .await
+                    .expect("Legacy Assets public policy update did not finish");
+                    assert!(changed.ok, "Legacy Assets allowlist update: {changed:?}");
+                    assert!(changed.error.is_none(), "{changed:?}");
+                    assert!(changed.receipt_id.is_some(), "{changed:?}");
+                    assert_eq!(changed.result.as_ref(), Some(&expected), "{changed:?}");
+                    let current: AccessProfile =
+                        service.store.get("profile/browser").unwrap().unwrap();
+                    assert_eq!(value(&current).unwrap(), expected);
+                    assert_eq!(current.revision, original.revision + 1);
+                    assert!(!current.allows_command("assets.list"));
+                    assert!(current.allows_asset(&owned.creator));
+                    resume.send(false).unwrap();
+                    let response = tokio::time::timeout(Duration::from_secs(5), task)
+                        .await
+                        .expect("Legacy Assets dispatch did not resume")
+                        .unwrap();
+                    let retained_after = service.snapshots.lock().unwrap().count();
+                    assert!(
+                        !response.ok,
+                        "Legacy assets entry must recheck the current command allowlist: {response:?}"
+                    );
+                    assert_eq!(
+                        response.error.as_ref().map(|error| error.code.as_str()),
+                        Some("PERMISSION_DENIED"),
+                        "{response:?}"
+                    );
+                    assert!(response.result.is_none(), "{response:?}");
+                    assert!(response.receipt_id.is_none(), "{response:?}");
+                    assert_eq!(retained_after, retained_before);
+                });
+        })
+        .await
+        .unwrap();
     }
 }
