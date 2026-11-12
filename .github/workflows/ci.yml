@@ -367,6 +367,10 @@ jobs:
         run: cargo test --locked -p nw-engine --test media -- --ignored --nocapture
       - name: Transfer an artifact larger than the isolated reader memory budget
         run: cargo test --locked -p nw-platform --test artifact_memory -- --ignored --nocapture
+      - name: Exercise real producer inventory publication barriers
+        env:
+          NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
+        run: cargo test --locked -p nw-service --lib runtime::read_model::tests::page_byte_ceiling_wins_over_row_count_without_truncating_items -- --exact --nocapture
       - name: Save fixture components and actual configuration
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

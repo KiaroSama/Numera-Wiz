@@ -3,6 +3,9 @@ use super::*;
 #[cfg(test)]
 #[path = "read_model/catalog_tests.rs"]
 mod catalog_tests;
+#[cfg(test)]
+#[path = "read_model/real_producer_tests.rs"]
+mod real_producer_tests;
 #[path = "projects/queries.rs"]
 mod project_queries;
 use nw_domain::views::{AssetSummary, JobSummary, PageInput, SnapshotPage};
@@ -51,6 +54,8 @@ pub(super) enum CatalogPhase {
     Cursor,
     LegacyAssetsEntry,
     LegacyAssetsFresh,
+    LegacyFresh(InventoryKind),
+    LegacyCursor(InventoryKind),
 }
 #[cfg(test)]
 pub(super) struct CatalogHook {
@@ -309,13 +314,21 @@ impl Service {
                     created
                 };
                 self.catalog_publication(context, revision, created, cancellation)?;
-            } else if self
-                .policy(context)?
-                .as_ref()
-                .map_or(0, |profile| profile.revision)
-                != revision
-            {
-                return Err(expired());
+            } else {
+                #[cfg(test)]
+                if self.catalog_test_phase(CatalogPhase::LegacyCursor(kind)) {
+                    // The owned page no longer borrows the entry. Age the very
+                    // same retained ticket after cursor validation/rendering.
+                    cache.entries.get_mut(id).unwrap().created = Instant::now() - LEASE;
+                }
+                if self
+                    .policy(context)?
+                    .as_ref()
+                    .map_or(0, |profile| profile.revision)
+                    != revision
+                {
+                    return Err(expired());
+                }
             }
             return Ok(page);
         }
@@ -504,6 +517,10 @@ impl Service {
         #[cfg(test)]
         if kind == InventoryKind::Assets {
             self.catalog_test_phase(CatalogPhase::LegacyAssetsFresh);
+        }
+        #[cfg(test)]
+        if !projects && self.catalog_test_phase(CatalogPhase::LegacyFresh(kind)) {
+            snapshot.created = Instant::now() - LEASE;
         }
         if projects {
             #[cfg(test)]
@@ -821,6 +838,7 @@ mod tests {
             "RESOURCE_LIMIT"
         );
         legacy_empty_assets_final_publication_rejects_cancellation();
+        real_producer_tests::run_if_admitted();
     }
     fn legacy_empty_assets_final_publication_rejects_cancellation() {
         // The original synchronous unit has no runtime. Keep a second worker
