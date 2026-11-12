@@ -658,6 +658,7 @@ mod tests {
         project_catalog_lists_committed_public_headers(&service).await;
         catalog_tests::headers_and_rights().await;
         legacy_assets_entry_rechecks_current_command_allowlist().await;
+        catalog_tests::rights_and_command_metadata().await;
     }
     async fn project_catalog_lists_committed_public_headers(service: &Arc<Service>) {
         let owner = service.owner();

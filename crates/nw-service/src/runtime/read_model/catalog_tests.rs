@@ -1144,3 +1144,252 @@ async fn publication_races(f: &Fixture, projects: &[String]) {
         }
     }
 }
+
+pub(super) async fn rights_and_command_metadata() {
+    let f = Fixture::new().await;
+    let owner = f.service.owner();
+    let name = "R2 command metadata";
+    let project = f.project(&owner, name).await;
+    let reader = f
+        .profile("r2-catalog-reader", std::slice::from_ref(&project))
+        .await;
+    let original = metadata_profile(&f, &reader, &project, json!(["read"]));
+    assert!(!original.allows_command("clips.link"));
+    assert!(!original.allows_command("clips.unlink"));
+    f.update(&reader, |input| {
+        let commands = input["allowed_command_ids"].as_array_mut().unwrap();
+        commands.push(json!("clips.link"));
+        commands.push(json!("clips.unlink"));
+    })
+    .await;
+    let read_only = metadata_profile(&f, &reader, &project, json!(["read"]));
+    let mut allowed = original.allowed_command_ids.clone();
+    allowed.insert("clips.link".into());
+    allowed.insert("clips.unlink".into());
+    assert!(read_only.allowed_command_ids == allowed);
+    assert!(read_only.revision > original.revision);
+    let root = f.root.path().to_str().unwrap();
+    let private = [
+        owner.principal.as_str(),
+        reader.principal.as_str(),
+        reader.profile.as_deref().unwrap(),
+        root,
+    ];
+    let first = metadata_catalog(
+        f.list(&reader, json!({"limit":64})).await,
+        &project,
+        name,
+        &private,
+    );
+    // First intended behavioral RED, after public setup, legacy facts and privacy.
+    assert_eq!(
+        first["authorization"]["schema_version"].as_u64(),
+        Some(1),
+        "R2_AUTHORIZATION_SCHEMA_MISSING"
+    );
+
+    // UNEXECUTED until the marker boundary above passes in hosted execution.
+    assert_command_metadata(&first["authorization"], &read_only, false, false);
+    f.update(&reader, |input| {
+        input["object_grants"] =
+            json!([{"kind":"project","id":project,"actions":["read","edit"]}]);
+    })
+    .await;
+    let editable = metadata_profile(&f, &reader, &project, json!(["read", "edit"]));
+    assert!(editable.allowed_command_ids == read_only.allowed_command_ids);
+    assert!(editable.revision > read_only.revision);
+    let second = metadata_catalog(
+        f.list(&reader, json!({"limit":64})).await,
+        &project,
+        name,
+        &private,
+    );
+    assert_command_metadata(&second["authorization"], &editable, true, false);
+
+    // UNEXECUTED until both preceding metadata stages pass.
+    f.update(&reader, |input| {
+        input["allowed_command_ids"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|id| id != "clips.link");
+    })
+    .await;
+    let unlink_only = metadata_profile(&f, &reader, &project, json!(["read", "edit"]));
+    allowed.remove("clips.link");
+    assert!(unlink_only.allowed_command_ids == allowed);
+    assert!(unlink_only.revision > editable.revision);
+    let third = metadata_catalog(
+        f.list(&reader, json!({"limit":64})).await,
+        &project,
+        name,
+        &private,
+    );
+    assert_command_metadata(&third["authorization"], &unlink_only, true, true);
+}
+
+fn metadata_profile(f: &Fixture, reader: &Context, project: &str, actions: Value) -> AccessProfile {
+    let profile: AccessProfile = f
+        .service
+        .store
+        .get(&format!("profile/{}", reader.profile.as_ref().unwrap()))
+        .unwrap()
+        .unwrap();
+    assert!(profile.principal == reader.principal, "R2_PRINCIPAL_CHANGED");
+    assert!(Some(&profile.id) == reader.profile.as_ref(), "R2_PROFILE_CHANGED");
+    assert!(!profile.owned_object_access);
+    assert!(
+        serde_json::to_value(&profile.object_grants).unwrap()
+            == json!([{"kind":"project","id":project,"actions":actions}]),
+        "R2_EXPLICIT_PROJECT_GRANTS_CHANGED"
+    );
+    profile
+}
+
+fn metadata_catalog(response: Response, project: &str, name: &str, private: &[&str]) -> Value {
+    assert!(response.ok, "R2_CATALOG_NOT_OK");
+    assert!(response.error.is_none(), "R2_CATALOG_ERROR");
+    assert!(response.receipt_id.is_none(), "R2_CATALOG_RECEIPT");
+    let page = response.result.expect("R2_CATALOG_RESULT_MISSING");
+    assert!(page["schema_version"] == 1, "R2_CATALOG_SCHEMA_CHANGED");
+    assert!(page["projection"] == "projects.summary.v1", "R2_CATALOG_PROJECTION_CHANGED");
+    assert!(page["project_revision"] == Value::Null, "R2_CATALOG_REVISION_CHANGED");
+    assert!(page["total_count"] == 1, "R2_CATALOG_COUNT_CHANGED");
+    assert!(page["count_accuracy"] == "exact", "R2_CATALOG_ACCURACY_CHANGED");
+    assert!(page["next_cursor"] == Value::Null, "R2_CATALOG_CURSOR_PRESENT");
+    let rows = page["items"].as_array().expect("R2_CATALOG_ITEMS_MISSING");
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    let mut legacy = row.clone();
+    let _ = legacy
+        .as_object_mut()
+        .expect("R2_CATALOG_ROW_NOT_OBJECT")
+        .remove("authorization");
+    assert!(
+        legacy == json!({"id":project,"name":name,"revision":"0","schema_major":1,
+            "envelope_version":1,"compatibility":"supported"}),
+        "R2_LEGACY_HEADER_CHANGED"
+    );
+    let serialized = page.to_string();
+    for forbidden in private.iter().copied().chain([
+        "creator",
+        "principal",
+        "profile",
+        "read_roots",
+        "write_roots",
+        "private_path",
+        "source_identity",
+        "\"path\"",
+        "\"paths\"",
+        "\"root\"",
+        "\"roots\"",
+        "\"private\"",
+        "\"payload\"",
+        "future",
+    ]) {
+        let encoded = serde_json::to_string(forbidden).unwrap();
+        assert!(
+            !serialized.contains(forbidden)
+                && !serialized.contains(&encoded[1..encoded.len() - 1]),
+            "R2_CATALOG_PRIVACY_LEAK"
+        );
+    }
+    row.clone()
+}
+
+fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, link_removed: bool) {
+    let fields = auth.as_object().expect("R2_AUTHORIZATION_NOT_OBJECT");
+    assert_eq!(fields.len(), 6);
+    assert!(auth["schema_version"] == 1, "R2_AUTHORIZATION_SCHEMA_CHANGED");
+    assert!(auth["policy_revision"] == profile.revision.to_string(), "R2_POLICY_REVISION_CHANGED");
+    assert!(auth["observed_project_revision"] == "0", "R2_OBSERVED_REVISION_CHANGED");
+    assert!(
+        auth["current_read"] == json!({"state":"requires_request_validation","reasons":[]}),
+        "R2_CURRENT_READ_CHANGED"
+    );
+    assert!(
+        auth["current_edit"] == if edit {
+            json!({"state":"requires_request_validation","reasons":[]})
+        } else {
+            json!({"state":"unavailable","reasons":["project_edit_not_granted"]})
+        },
+        "R2_CURRENT_EDIT_CHANGED"
+    );
+    let commands = [
+        "projects.inspect",
+        "sequences.create",
+        "sequences.inspect",
+        "clips.place",
+        "clips.move",
+        "clips.link",
+        "clips.unlink",
+        "clips.split",
+        "clips.remove",
+        "history.undo",
+        "history.redo",
+    ];
+    let reasons = [
+        "command_not_allowed",
+        "project_read_not_granted",
+        "project_edit_not_granted",
+        "unsupported_project_schema",
+        "writer_observed_unavailable",
+    ];
+    let gates = [
+        "current_policy",
+        "project_context",
+        "project_rights",
+        "request_parameters",
+        "expected_revision",
+        "writer_lease",
+        "affected_scope",
+        "history_state",
+        "source_object_rights",
+        "source_path_and_identity",
+    ];
+    let actions = auth["actions"].as_array().expect("R2_ACTIONS_NOT_ARRAY");
+    assert_eq!(actions.len(), commands.len());
+    for (action, command) in actions.iter().zip(commands) {
+        assert_eq!(action.as_object().expect("R2_ACTION_NOT_OBJECT").len(), 4);
+        assert!(action["command_id"] == command, "R2_ACTION_ORDER_CHANGED");
+        assert_finite_metadata_labels(&action["reasons"], &reasons);
+        assert_finite_metadata_labels(&action["unchecked_gates"], &gates);
+        let blocked = !action["reasons"].as_array().unwrap().is_empty();
+        assert!(
+            action["state"] == if blocked { "unavailable" } else { "requires_request_validation" },
+            "R2_ACTION_STATE_CHANGED"
+        );
+        let unchecked = action["unchecked_gates"].as_array().unwrap();
+        assert!(unchecked.contains(&json!("current_policy")));
+        assert!(unchecked.contains(&json!("request_parameters")));
+        if command == "clips.link" || command == "clips.unlink" {
+            let expected_reasons = if !edit {
+                json!(["project_edit_not_granted"])
+            } else if command == "clips.link" && link_removed {
+                json!(["command_not_allowed"])
+            } else {
+                json!([])
+            };
+            assert!(action["reasons"] == expected_reasons, "R2_LINK_UNLINK_REASONS_CHANGED");
+            assert!(
+                action["unchecked_gates"] == json!(["current_policy","project_context","request_parameters",
+                    "expected_revision","writer_lease","affected_scope"]),
+                "R2_LINK_UNLINK_GATES_CHANGED"
+            );
+        }
+    }
+}
+
+fn assert_finite_metadata_labels(value: &Value, vocabulary: &[&str]) {
+    let labels = value.as_array().expect("R2_LABELS_NOT_ARRAY");
+    assert!(labels.len() <= vocabulary.len());
+    let positions: Vec<_> = labels
+        .iter()
+        .map(|label| {
+            vocabulary
+                .iter()
+                .position(|known| label.as_str() == Some(*known))
+                .expect("R2_UNKNOWN_METADATA_LABEL")
+        })
+        .collect();
+    assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
+}
