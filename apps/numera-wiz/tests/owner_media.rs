@@ -797,6 +797,160 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .unwrap(),
         std::fs::read(&output).unwrap()[131067..131098]
     );
+    {
+        let mut scoped_cli_finish_rules = fixture::rules();
+        scoped_cli_finish_rules.audio_order = vec![2, 1];
+        scoped_cli_finish_rules.stream_tag_patches = vec![StreamTagPatch {
+            kind: StreamKind::Audio,
+            source_indices: vec![2],
+            original_languages: vec![],
+            language: TagPatch::Keep,
+            title: TagPatch::Set {
+                value: "Scoped CLI finish".into(),
+            },
+        }];
+        let scoped_cli_finish_output = media.directory.path().join("scoped-cli-finish-remux.mkv");
+        let scoped_cli_finish_plan = call!(
+            stdio,
+            "streams.clean",
+            json!({"asset_id":operator_asset["id"],"output":scoped_cli_finish_output,"intent":scoped_cli_finish_rules,"file_times":"require_reviewed"}),
+            json!({})
+        );
+        assert_eq!(
+            scoped_cli_finish_plan["output_path"],
+            json!(scoped_cli_finish_output)
+        );
+        let scoped_cli_finish_parent: nw_domain::records::NativeObjectIdentity =
+            serde_json::from_value(
+                scoped_cli_finish_plan["required_rights"]["output_create"]["parent_object"].clone(),
+            )
+            .unwrap();
+        let scoped_cli_finish_claims = nw_platform::claims::DestinationClaims::try_acquire(vec![
+            nw_platform::claims::Destination::reviewed(
+                &scoped_cli_finish_output,
+                &scoped_cli_finish_parent,
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        assert!(!scoped_cli_finish_output.exists());
+
+        // The OS claim excludes publication until after the selected CLI exits.
+        let (scoped_cli_finish_accepted, scoped_cli_finish_exit) = cli
+            .human(&[
+                "--access-profile",
+                "operator",
+                "jobs",
+                "submit",
+                "--plan",
+                scoped_cli_finish_plan["id"].as_str().unwrap(),
+                "--plan-hash",
+                scoped_cli_finish_plan["hash"].as_str().unwrap(),
+                "--replay-scope",
+                &operator_scope,
+                "--idempotency-key",
+                "submit-scoped-cli-finish",
+                "--request-id",
+                "scoped-cli-finish-request",
+            ])
+            .await;
+        assert_eq!(scoped_cli_finish_exit, 0, "{scoped_cli_finish_accepted}");
+        assert_eq!(scoped_cli_finish_accepted["ok"], true);
+        assert_eq!(
+            scoped_cli_finish_accepted["request_id"],
+            "scoped-cli-finish-request"
+        );
+        assert!(
+            scoped_cli_finish_accepted["receipt_id"]
+                .as_str()
+                .is_some_and(|scoped_cli_finish_receipt| !scoped_cli_finish_receipt.is_empty())
+        );
+        let scoped_cli_finish_job_id = scoped_cli_finish_accepted["result"]["job_id"]
+            .as_str()
+            .filter(|scoped_cli_finish_id| !scoped_cli_finish_id.is_empty())
+            .unwrap();
+        let scoped_cli_finish_pending = call!(
+            stdio,
+            "jobs.inspect",
+            json!({"id":scoped_cli_finish_job_id}),
+            json!({})
+        );
+        assert!(
+            ["queued", "running", "verifying"]
+                .contains(&scoped_cli_finish_pending["state"].as_str().unwrap()),
+            "{scoped_cli_finish_pending}"
+        );
+        assert!(scoped_cli_finish_pending["artifact"].is_null());
+        assert!(!scoped_cli_finish_output.exists());
+        drop(scoped_cli_finish_claims);
+
+        let mut scoped_cli_finish_command = cli.command();
+        scoped_cli_finish_command.args(["bridge", "--access-profile", "operator"]);
+        let scoped_cli_finish_stdio = ()
+            .serve(TokioChildProcess::new(scoped_cli_finish_command).unwrap())
+            .await
+            .unwrap();
+        let scoped_cli_finish_replay = scoped_cli_finish_stdio
+            .call_tool(
+                CallToolRequestParams::new("jobs.submit").with_arguments(
+                    json!({"params":{"plan_id":scoped_cli_finish_plan["id"],"plan_hash":scoped_cli_finish_plan["hash"]},"context":{"request_id":"scoped-cli-finish-request","replay_scope":operator_scope,"idempotency_key":"submit-scoped-cli-finish"}})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                ),
+            )
+            .await
+            .unwrap();
+        let scoped_cli_finish_replay = serde_json::to_value(scoped_cli_finish_replay).unwrap();
+        assert_eq!(
+            scoped_cli_finish_replay["structuredContent"],
+            scoped_cli_finish_accepted
+        );
+        let scoped_cli_finish_job = cli.completed(scoped_cli_finish_job_id).await;
+        assert_eq!(scoped_cli_finish_job["state"], "succeeded", "{scoped_cli_finish_job}");
+        assert_eq!(scoped_cli_finish_job["file_times"]["policy"], "require_reviewed");
+        assert_eq!(scoped_cli_finish_job["file_times"]["preserved"], true);
+        assert_eq!(
+            scoped_cli_finish_job["file_times"]["desired"],
+            scoped_cli_finish_job["file_times"]["observed"]
+        );
+        let scoped_cli_finish_artifact_id = format!("job-{scoped_cli_finish_job_id}");
+        let scoped_cli_finish_manifest = call!(
+            scoped_cli_finish_stdio,
+            "artifacts.manifest",
+            json!({"artifact_id":scoped_cli_finish_artifact_id}),
+            json!({})
+        );
+        assert_eq!(
+            scoped_cli_finish_manifest["sha256"],
+            scoped_cli_finish_job["artifact"]["sha256"]
+        );
+        assert_eq!(
+            scoped_cli_finish_manifest["suggested_name"],
+            "scoped-cli-finish-remux.mkv"
+        );
+        let scoped_cli_finish_chunk = call!(
+            scoped_cli_finish_stdio,
+            "artifacts.read_chunk",
+            json!({"artifact_id":scoped_cli_finish_artifact_id,"expected_sha256":scoped_cli_finish_manifest["sha256"],"offset":"0","length":29}),
+            json!({})
+        );
+        assert_eq!(
+            STANDARD
+                .decode(scoped_cli_finish_chunk["data_base64"].as_str().unwrap())
+                .unwrap(),
+            std::fs::read(&scoped_cli_finish_output).unwrap()[..29]
+        );
+        let scoped_cli_finish_observed =
+            fixture::probe(&media.bin, &scoped_cli_finish_output).await;
+        assert_eq!(scoped_cli_finish_observed["streams"].as_array().unwrap().len(), 3);
+        assert_eq!(scoped_cli_finish_observed["streams"][1]["tags"]["language"], "fas");
+        assert_eq!(
+            scoped_cli_finish_observed["streams"][1]["tags"]["title"],
+            "Scoped CLI finish"
+        );
+        scoped_cli_finish_stdio.cancel().await.unwrap();
+    }
     // Delegation is an explicit object action; it never borrows the creator's authority.
     let delegated_output = media.directory.path().join("delegated-copy.mkv");
     let delegated_plan = cli.query("streams.clean", json!({"asset_id":registered["result"]["id"],"output":delegated_output,"intent":fixture::rules()})).await;
