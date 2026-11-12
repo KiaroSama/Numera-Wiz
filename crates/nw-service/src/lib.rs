@@ -462,7 +462,10 @@ mod tests {
             Principal::DiscoveryAgent,
             Request::query("commands.list", serde_json::json!({})),
         );
-        assert!(list_response.ok, "Project family commands.list must succeed");
+        assert!(
+            list_response.ok,
+            "Project family commands.list must succeed"
+        );
         assert!(
             list_response.error.is_none(),
             "Project family commands.list must have no error"
@@ -586,7 +589,9 @@ mod tests {
                     serde_json::Value::Object(object) => {
                         if let Some(reference) = object.get("$ref") {
                             let reference = reference.as_str().unwrap_or_else(|| {
-                                panic!("Project family result_schema $ref must be a string for {id}")
+                                panic!(
+                                    "Project family result_schema $ref must be a string for {id}"
+                                )
                             });
                             assert!(
                                 reference == "#" || reference.starts_with("#/"),
