@@ -1,8 +1,10 @@
 # MuxCls migration and current resolver
 
 The complete standalone/embedded MuxCls rewrite is required initial scope under
-F08. It is not complete yet. The original source, MIT notice, comparison and
-behavior ledger remain in `docs/research-pack/research_v7/muxcls-sources/`.
+F08. It is not complete yet. The original source was reviewed outside this
+repository. Its source manifest and inventories, license files, and comparison
+record remain in `docs/research-pack/research_v7/muxcls-sources/`; program source
+bodies and compressed source archives are not shipped in this repository.
 
 ## Current implemented internals
 
