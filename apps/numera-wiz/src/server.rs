@@ -976,5 +976,280 @@ mod tests {
                 .ok
         );
         task.abort();
+        private_credential_self_release_preserves_admission_and_survivors().await;
+    }
+
+    async fn private_credential_self_release_preserves_admission_and_survivors() {
+        let data = tempfile::tempdir().unwrap();
+        let service = Service::open(data.path().to_owned(), None).await.unwrap();
+        let private_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let public_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let private_port = private_listener.local_addr().unwrap().port();
+        let public_port = public_listener.local_addr().unwrap().port();
+        assert_ne!(private_port, public_port);
+        let private_endpoint = format!("http://127.0.0.1:{private_port}");
+        let public_endpoint = format!("http://127.0.0.1:{public_port}");
+        let record = OwnerRecord {
+            canonical_root: "unit".into(),
+            root_id: service.store.root_id().into(),
+            epoch: service.epoch.clone(),
+            build: "unit".into(),
+            registry: registry_fingerprint(),
+            port: private_port,
+            bearer: "private-release-owner-token".into(),
+        };
+        let owner = Arc::new(Owner {
+            service: service.clone(),
+            record,
+            leases: Mutex::new(HashMap::new()),
+            public: Mutex::new(None),
+            public_active: Arc::new(AtomicUsize::new(0)),
+            stop: CancellationToken::new(),
+            active: Arc::new(AtomicUsize::new(0)),
+            slots: Arc::new(Semaphore::new(32)),
+            pairing: Mutex::new(HashMap::new()),
+        });
+        let private_stop = CancellationToken::new();
+        let public_stop = CancellationToken::new();
+        let private_routes = router(owner.clone(), private_port, true, private_stop.clone());
+        let public_routes = router(owner.clone(), public_port, false, public_stop.clone());
+        let private_task = tokio::spawn(async move {
+            axum::serve(private_listener, private_routes).await.unwrap();
+        });
+        let public_task = tokio::spawn(async move {
+            axum::serve(public_listener, public_routes).await.unwrap();
+        });
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
+        let profile = service.profile_context("agent").unwrap();
+        let mut tokens = Vec::new();
+        for _ in 0..32 {
+            let (token, context) = service
+                .credential_for_origin_bound("agent", None, Some(&profile.principal))
+                .unwrap();
+            assert!(
+                context.principal == profile.principal && context.profile == profile.profile,
+                "Every admitted credential must retain the same seeded profile and principal"
+            );
+            assert!(
+                !tokens.contains(&token),
+                "Each admitted credential must have a distinct bearer"
+            );
+            tokens.push(token);
+        }
+        let at_capacity = || {
+            let error = service
+                .credential_for_origin_bound("agent", None, Some(&profile.principal))
+                .err()
+                .expect("A thirty-third live credential must be rejected");
+            assert_eq!(error.code, "RESOURCE_LIMIT");
+        };
+        at_capacity();
+        let target = &tokens[0];
+        let survivor = &tokens[1];
+        for bearer in [target, survivor] {
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(bearer)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "Admitted private credentials must authenticate before release"
+            );
+        }
+
+        // This actual HTTP status is the first intended RED on an owner without
+        // private self-release. Later safety oracles require that route to exist.
+        let release_endpoint = format!("{private_endpoint}/internal/credential/release");
+        let mut released = client
+            .post(&release_endpoint)
+            .bearer_auth(target)
+            .json(&json!({}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            released.status(),
+            StatusCode::OK,
+            "Private scoped self-release must be available after quota admission"
+        );
+        let mut acknowledgement = Vec::new();
+        while let Some(chunk) = released.chunk().await.unwrap() {
+            assert!(
+                acknowledgement.len() + chunk.len() <= 64,
+                "Self-release acknowledgement must be finite"
+            );
+            acknowledgement.extend_from_slice(&chunk);
+        }
+        let acknowledgement = commands::decode_json(&acknowledgement)
+            .expect("Self-release acknowledgement must be JSON");
+        assert!(
+            acknowledgement == json!({"released": true}),
+            "Self-release must acknowledge only the exact completed release"
+        );
+        for (bearer, status) in [
+            (target, StatusCode::UNAUTHORIZED),
+            (survivor, StatusCode::OK),
+        ] {
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(bearer)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                status,
+                "Self-release must remove only its authenticated bearer"
+            );
+        }
+        let (replacement, context) = service
+            .credential_for_origin_bound("agent", None, Some(&profile.principal))
+            .unwrap();
+        assert!(
+            context.principal == profile.principal && context.profile == profile.profile,
+            "Replacement admission must retain the original authority"
+        );
+        assert!(
+            !tokens.contains(&replacement),
+            "Replacement admission must issue a fresh bearer"
+        );
+        at_capacity();
+
+        let (public_token, public_context) = service
+            .credential_for_origin_bound("browser", Some(public_endpoint.clone()), None)
+            .unwrap();
+        assert!(
+            public_context.principal != profile.principal,
+            "The public audience control must not consume the private principal's quota"
+        );
+        assert_eq!(
+            client
+                .get(format!("{public_endpoint}/health"))
+                .bearer_auth(&public_token)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK,
+            "The public-origin control bearer must authenticate on its actual listener"
+        );
+        let release = || client.post(&release_endpoint).json(&json!({}));
+        for (label, request, expected) in [
+            (
+                "A deleted bearer cannot release twice",
+                release().bearer_auth(target),
+                Some(StatusCode::UNAUTHORIZED),
+            ),
+            (
+                "The native owner bearer cannot self-release",
+                release().bearer_auth(&owner.record.bearer),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release is unavailable on the public listener",
+                client
+                    .post(format!("{public_endpoint}/internal/credential/release"))
+                    .bearer_auth(&public_token)
+                    .json(&json!({})),
+                None,
+            ),
+            (
+                "A public-origin bearer cannot release on the private listener",
+                release().bearer_auth(&public_token),
+                Some(StatusCode::UNAUTHORIZED),
+            ),
+            (
+                "Self-release preserves exact Host validation",
+                release()
+                    .bearer_auth(survivor)
+                    .header("Host", "other.invalid"),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release preserves present Origin validation",
+                release().bearer_auth(survivor).header("Origin", "null"),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release requires POST",
+                client.get(&release_endpoint).bearer_auth(survivor),
+                None,
+            ),
+            (
+                "Self-release rejects a target supplied in the body",
+                client
+                    .post(&release_endpoint)
+                    .bearer_auth(survivor)
+                    .json(&json!({"target": "another"})),
+                None,
+            ),
+        ] {
+            let status = request.send().await.unwrap().status();
+            if let Some(expected) = expected {
+                assert_eq!(status, expected, "{label}");
+            } else {
+                assert!(!status.is_success(), "{label}");
+            }
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(survivor)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "A denied release must preserve the same-principal survivor: {label}"
+            );
+        }
+        for path in [
+            "/internal/credential",
+            "/internal/lease",
+            "/internal/public",
+            "/internal/pair",
+        ] {
+            assert_eq!(
+                client
+                    .post(format!("{private_endpoint}{path}"))
+                    .bearer_auth(survivor)
+                    .json(&json!({}))
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::FORBIDDEN,
+                "Self-release must not grant other internal controls"
+            );
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(survivor)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "Denied internal controls must preserve the same-principal survivor"
+            );
+        }
+        at_capacity();
+        owner.stop.cancel();
+        private_stop.cancel();
+        public_stop.cancel();
+        private_task.abort();
+        public_task.abort();
+        let _ = private_task.await;
+        let _ = public_task.await;
     }
 }
