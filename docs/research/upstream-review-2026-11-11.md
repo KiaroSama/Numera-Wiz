@@ -301,3 +301,37 @@ performance. Portable FFmpeg/ffprobe packages, same-build browser assets, offlin
 first-use and source/license closure need actual per-platform package evidence.
 None can be inferred from an upstream release, a successful source read, or a
 hosted CPU build.
+
+
+## Focused FFmWiz and MuxCls follow-up — 2026-11-12
+
+The [new two-donor observation](upstream-donor-update-2026-11-12.json) records
+full commit identities, comparison and source URLs, and verified workflow hashes.
+The table above and [original source manifest](upstream-sources-2026-11-11.json)
+retain their 2026-11-11 observations.
+
+FFmWiz advanced from `661a0d240ee29ca7cda496b635ae8c50e43d916b` to
+[`b4968cafb3dcce15b1c4313763d74c9fd07748a6`](https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6),
+committed at 2026-11-11T19:43:01Z. MuxCls advanced from
+`0cf9596f7510f894babf36595efbc827fbbfaf04` to
+[`1269bd71712466469d539fbf279432659ccaa6a2`](https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2),
+committed at 2026-11-11T19:41:09Z. Each complete comparison contains two commits
+and only one added file, `.github/workflows/gitleaks.yml` (238 lines, 12,946
+bytes). The [FFmWiz comparison](https://github.com/KiaroSama/FFmWiz/compare/661a0d240ee29ca7cda496b635ae8c50e43d916b...b4968cafb3dcce15b1c4313763d74c9fd07748a6)
+and [MuxCls comparison](https://github.com/KiaroSama/MuxCls/compare/0cf9596f7510f894babf36595efbc827fbbfaf04...1269bd71712466469d539fbf279432659ccaa6a2)
+change no CLI, media or application source files. The historical CLI behavior
+references therefore remain unchanged, separately from these current-head
+observations.
+
+The donor workflows add checksum-pinned Gitleaks 8.30.1, quiet/redacted
+diagnostics and verified Git child-process exit status. Their contents differ
+only in the weekly schedule: FFmWiz runs Tuesday at 04:18 UTC; MuxCls runs Monday
+at 04:37 UTC. Numera Wiz's reviewed Rust scan controller already retains
+equivalent protections; [SECURITY.md](../../SECURITY.md#active-secret-scanning)
+records the integration evidence and coverage limits. No donor Python workflow
+or executable source was imported.
+
+This follow-up covers only these two donors. It refreshes no other repository,
+release or dependency observation and supplies no new application, media or
+security qualification. It makes no blanket clean, universal credential coverage,
+full-history coverage, full version 1, release or current CI success claim.
