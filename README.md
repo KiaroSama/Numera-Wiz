@@ -41,9 +41,10 @@ Current work and required gaps are recorded in the
   native/browser controls implement catalog discovery, project/sequence creation,
   solid-color/registered-source placement, move/split/lift, bounded clip selection,
   Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen. New
-  Link/Unlink controls and their actual native/Chrome input journey await hosted
-  qualification. Mixed audio/video, decoded preview and the complete editor
-  remain unfinished.
+  [Actual native/Chrome input checks](docs/development/evidence/gui-topology-ci277.json)
+  passed finite solid-color Link/Unlink, Undo/Redo and frontend reopen. Mixed
+  audio/video, cross-track input, decoded preview and the complete editor remain
+  unfinished.
 - Shared finite project input/result schemas and captured Read/Edit/command
   observations; discovery keeps static requirements separate from live policy
   facts. Validation and pending MCP wire evidence are recorded in the
@@ -58,8 +59,11 @@ Current work and required gaps are recorded in the
   The [adopted-r1 package lifecycle](docs/development/evidence/media-v1-package-ci265.json)
   also passed on all four targets: actual old-package refusal, restoration,
   one old-package edit and current-package receipt replay preserved the original source.
-  Fresh-root and unadopted-source package cases remain under qualification.
-  Preview, general export and the complete editor remain under construction.
+  [Fresh-root and migrated-r0 package cases](docs/development/evidence/media-origin-packages-ci277.json)
+  subsequently passed on all four native targets, alongside the original and
+  adopted-r1 journeys, under the unchanged shared deadline. Resource/RSS and
+  fault-cut qualification remain open. Preview, general export and the complete
+  editor remain under construction.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
 
@@ -101,8 +105,9 @@ For deliberate local owner automation, the [stdio owner option](docs/manuals/MCP
 uses the same owner authority as the native CLI; shipped client defaults stay scoped.
 [Four-native MCP checks](docs/development/evidence/native-owner-mcp-ci269.json)
 passed protected credential-file delivery, actual authentication/revocation and
-known pre-issuance cancellation. Later SDK and package-origin changes require
-their own current-source checks.
+known pre-issuance cancellation. The [later four-native evidence](docs/development/evidence/media-origin-packages-ci277.json)
+retains the same actual65-tool discovery frame with SDK3.10 and qualifies the
+specified package-origin journeys. Named-client loading remains unfinished.
 
 ## Source policy and contributing
 

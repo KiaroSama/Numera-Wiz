@@ -83,6 +83,30 @@ It exercises SDK3.9. Later SDK3.10, genuine fresh/r0 package origins and source
 guard corrections remain unqualified by this run. Named-client loading and full
 agent parity remain unfinished.
 
+[CI277 package evidence](evidence/media-origin-packages-ci277.json) now qualifies
+actual adopted-r1, fresh/genesis and migrated-r0 prior/current lifecycles on all
+four native targets at source `05d2a3184470d22828f6a180c4524e2cf2b0b872`.
+Each target retains three independent roots and twenty actual owner epochs under
+the unchanged shared600-second deadline: Linux299043ms, Windows293171ms,
+macOS ARM401866ms and Intel403346ms. Direct physical equality precedes recovery;
+original S path/native identity, newer rows and genuine caller receipts survive
+restoration and one old-package edit. Fresh auto-bootstrap does not expose its
+internal opaque Scope, so caller initialization replay is not claimed there.
+All four actual65-tool MCP frames remain184764 bytes with SDK3.10.
+
+[CI277 GUI evidence](evidence/gui-topology-ci277.json) also qualifies genuine
+Chrome and Linux native input through two finite solid-color placements,
+Link/Unlink, Undo/Redo and actual frontend reopen. Independent source/payload,
+receipt/revision checks and original linked/reopened PNGs were inspected. It does
+not qualify registered mixed A/V, cross-track input, decoded preview or full C_M1.
+The complete run has twelve passing jobs and one formatting failure; Gitleaks
+passes. Its entire formatter artifact is applied once later with its Rust AST
+preserved. Later snapshot-pressure changes have separate source review and still
+need their own hosted qualification. CI279 subsequently exposes an explicit
+child test-module lookup failure in that pressure change; the one-line source
+correction is prepared separately. These failures remain visible, and no later
+source or full-v1 success is inferred from CI277.
+
 The full first version remains unfinished: accepted general multi-source/stage/
 output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
 and complete editor controls, preview/audio transport, checkpoints/interchange,
