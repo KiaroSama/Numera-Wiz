@@ -23,11 +23,18 @@ pub fn verify(root: &Path) -> Result<()> {
             bail!("Local-only planning material is tracked: {name}");
         }
         let path = Path::new(name);
+        let filename = path.file_name().and_then(|value| value.to_str()).unwrap_or("");
+        let build_name = filename.to_ascii_lowercase();
+        if ["configure", "makefile", "gnumakefile", "cmakelists.txt"].contains(&build_name.as_str())
+            || build_name.ends_with("_makefile")
+        {
+            bail!("Non-Rust build program is tracked: {name}");
+        }
         let extension = path.extension().and_then(|value| value.to_str());
         if extension.is_some_and(|extension| {
             [
                 "py", "pyc", "c", "h", "cc", "cpp", "cxx", "hpp", "go", "sh", "ps1", "bat", "cmd",
-                "js", "ts", "tsx", "jsx", "html", "wasm",
+                "js", "ts", "tsx", "jsx", "html", "wasm", "mk", "cmake", "m4",
             ]
             .contains(&extension)
                 || [

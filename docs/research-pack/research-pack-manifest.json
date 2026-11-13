@@ -315,11 +315,6 @@
       "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
     },
     {
-      "path": "research_v2/ffmpeg-upstream/configure",
-      "bytes": 311304,
-      "sha256": "5b281b249ad5ad859030b4da0a24ec105b5abff7b3d87a65b302df8bf5fd9833"
-    },
-    {
       "path": "research_v2/ffmpeg-upstream/doc-manifest.json",
       "bytes": 60818,
       "sha256": "bd83728adb3389d733ded31ded57a6a04131de96ebf5757fe74b0a4586be086f"
@@ -563,11 +558,6 @@
       "path": "research_v2/ffmpeg-upstream/doc_utils.texi",
       "bytes": 23837,
       "sha256": "2eca333c720c88b04934d72d10a60b3b1e4650666ab657fa9a029697b39df3a2"
-    },
-    {
-      "path": "research_v2/ffmpeg-upstream/libavfilter_Makefile",
-      "bytes": 44687,
-      "sha256": "12829bb7b6446098cf7fc9e6453a901e2f9b3cb08b4b8294f2c5c1888d70d0c8"
     },
     {
       "path": "research_v2/ffmwiz-source-inventory.json",
@@ -1187,6 +1177,11 @@
       "sha256": "3bd5351f717b42b4d1246691e870768231c657da9d5795627fab7ca6df7e7155"
     },
     {
+      "path": "research_v2/ffmpeg-upstream/configure",
+      "bytes": 311304,
+      "sha256": "5b281b249ad5ad859030b4da0a24ec105b5abff7b3d87a65b302df8bf5fd9833"
+    },
+    {
       "path": "research_v2/ffmpeg-upstream/ffbuild_common.mak",
       "bytes": 7183,
       "sha256": "4cfa39b9f824cd17559297f45f71f25f5e552402aba255721f2111964dfb28ae"
@@ -1225,6 +1220,11 @@
       "path": "research_v2/ffmpeg-upstream/libavcodec_videotoolboxenc.c",
       "bytes": 105407,
       "sha256": "60f43ca0c482473420d53dde58d386c29a2a3c4595bd62f3f4c7714c72a38e5a"
+    },
+    {
+      "path": "research_v2/ffmpeg-upstream/libavfilter_Makefile",
+      "bytes": 44687,
+      "sha256": "12829bb7b6446098cf7fc9e6453a901e2f9b3cb08b4b8294f2c5c1888d70d0c8"
     },
     {
       "path": "research_v2/ffmpeg-upstream/libavfilter_af_atempo.c",
