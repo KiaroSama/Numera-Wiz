@@ -145,22 +145,15 @@ impl Service {
         application_startup: bool,
         defer_dispatcher: bool,
     ) -> Result<Arc<Self>> {
-        let _startup = startup::StageTiming::start(
-            application_startup,
-            "Open application service",
-        );
-        let root_stage = startup::StageTiming::start(
-            application_startup,
-            "Resolve protected root path",
-        );
+        let _startup = startup::StageTiming::start(application_startup, "Open application service");
+        let root_stage =
+            startup::StageTiming::start(application_startup, "Resolve protected root path");
         std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
         drop(root_stage);
-        let store_stage = startup::StageTiming::start(
-            application_startup,
-            "Attach and recover selected store",
-        );
+        let store_stage =
+            startup::StageTiming::start(application_startup, "Attach and recover selected store");
         let (store, root_lease) = tokio::task::spawn_blocking(move || {
             let selection_stage = startup::StageTiming::start(
                 application_startup,
@@ -239,10 +232,8 @@ impl Service {
         .await
         .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
         drop(store_stage);
-        let profiles_stage = startup::StageTiming::start(
-            application_startup,
-            "Check default profile availability",
-        );
+        let profiles_stage =
+            startup::StageTiming::start(application_startup, "Check default profile availability");
         let maintenance_pending =
             store.pending_migration()?.is_some() || store.pending_media_maintenance()?;
         if !maintenance_pending && store.get::<AccessProfile>("profile/agent")?.is_none() {
@@ -292,19 +283,15 @@ impl Service {
             )?;
         }
         drop(profiles_stage);
-        let engine_stage = startup::StageTiming::start(
-            application_startup,
-            "Initialize engine components",
-        );
+        let engine_stage =
+            startup::StageTiming::start(application_startup, "Initialize engine components");
         let engine = match components {
             Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?),
             None => None,
         };
         drop(engine_stage);
-        let state_stage = startup::StageTiming::start(
-            application_startup,
-            "Construct owner runtime state",
-        );
+        let state_stage =
+            startup::StageTiming::start(application_startup, "Construct owner runtime state");
         let executable = std::env::current_exe().map_err(files::io_error)?;
         let mut code_roots = vec![
             std::fs::canonicalize(executable.parent().ok_or_else(|| {
@@ -375,10 +362,8 @@ impl Service {
         if defer_dispatcher {
             return Ok(service);
         }
-        let dispatcher_stage = startup::StageTiming::start(
-            application_startup,
-            "Recover durable dispatcher",
-        );
+        let dispatcher_stage =
+            startup::StageTiming::start(application_startup, "Recover durable dispatcher");
         service.dispatcher_ready.store(true, Ordering::Release);
         let starting = service.clone();
         tokio::task::spawn_blocking(move || starting.resume_dispatcher())
