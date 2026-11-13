@@ -1,4 +1,4 @@
-# Current owner direction — 2026-11-11
+# Current owner direction — 2026-11-13
 
 The active task is the complete attached version 1 mandate, Pure Rust with
 FFmpeg, plus repository-owned agent skills/plugins and full CLI/MCP access to
@@ -20,14 +20,24 @@ The [scoped evidence](evidence/rust-completion-43026539369.json) records inspect
 folder input and all four package manifests. Later source changes require their own
 current-head checks; the baseline does not qualify a new candidate or full v1.
 
-The full first version remains unfinished: authoritative projects/edit history,
-timeline/DAG/render compiler, preview/audio transport, the remaining utility/effect
-families and command domains, complete MuxCls companions/replacement, retention and
-rollback qualification, standard offline FFmpeg packages, full manuals/resource
-proof and the matching owner hardware report. Existing cleanup plans/jobs cannot
-be relabeled as a general editor pipeline. The current fixture profile cannot
-satisfy standard codec/filter delivery. Preserve legacy hashes/receipts while
-adding a versioned general multi-source/stage/output model.
+Authoritative project editing/history, bounded catalogs, shared native/browser
+project controls and finite CLI/MCP contracts now have scoped hosted evidence.
+The [finite timeline review](../manuals/CLI.md#finite-timeline-review-in-development)
+captures raw committed facts under a cumulative admission budget and checks the
+actual identified FFmpeg profile. Its initial opaque solid-color/silence graph
+returns a separate media plan without a receipt. The [CI249 report](evidence/finite-compiler-review-ci249.json)
+records the actual public CLI review/schema checks and Store adversarial controls;
+it does not qualify decoded output or the complete CI run.
+
+The full first version remains unfinished: accepted general multi-source/stage/
+output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
+and complete editor controls, preview/audio transport, checkpoints/interchange,
+remaining utility/effect families and command domains, complete MuxCls companions/
+replacement, retention and rollback qualification, standard offline FFmpeg
+packages, full manuals/resource proof and the matching owner hardware report.
+Existing cleanup plans/jobs cannot be relabeled as a general editor pipeline.
+The current fixture profile cannot satisfy standard codec/filter delivery.
+Preserve legacy hashes/receipts throughout the connected media implementation.
 
 The following record is historical evidence, not the current repository policy.
 

@@ -556,3 +556,9 @@ project/schema, source, quota and current authority checks can reject a review.
 Delegated callers need explicit `timeline.render` permission and Project Read;
 Project Edit does not follow from this command. A returned frame/sample count is
 a declared contract, not evidence that a file has been rendered or decoded.
+
+The [CI249 review evidence](../development/evidence/finite-compiler-review-ci249.json)
+records an actual component-backed public review, typed CLI parity and finite
+result-schema checks on Linux. It also records real Store admission/reference
+controls. This evidence does not qualify a rendered output, media job acceptance,
+the standard offline profile or all current CI checks.

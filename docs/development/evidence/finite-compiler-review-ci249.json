@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "source": "08bff79966f69e07ab746245eae8837a296c5e6e",
+  "workflow_run": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/43352287979",
+  "scope": "Finite project compiler review and Store admission/reference controls; no decoded media output or durable media job qualification",
+  "public_review": {
+    "job_id": 131647404202,
+    "target": "x86_64-unknown-linux-gnu",
+    "command": "cargo test --locked -p numera-wiz --test owner_media -- --ignored --nocapture",
+    "entry": "cli_and_both_official_mcp_transports_share_real_verified_jobs",
+    "result": "passed",
+    "elapsed_seconds": 113.12,
+    "assertions": [
+      "Actual public project revision3 with red, black gap and blue clips",
+      "Identified FFmpeg/ffprobe and actual filter/encoder/muxer observations",
+      "Separate media_v1 envelope and valid regenerated semantic hash",
+      "Declared10 video frames and120000 audio samples for the selected range",
+      "No query receipt or leaked native paths/replay credentials",
+      "Edited declared frame count rejected",
+      "Typed timeline render CLI semantic-hash parity",
+      "Stale revision and unknown request parameter rejected"
+    ]
+  },
+  "schema_validation": {
+    "suite": 18,
+    "schemas": 1,
+    "instances": 14,
+    "passed_checks": 15,
+    "failed_checks": 0,
+    "elapsed_ms": 23,
+    "schema_sha256": "8f8f1a354856b0ddf4357e3158fcc2f8239f54d89b0d18b74d3eb8e109ee76eb",
+    "validator_manifest_sha256": "45a388f38b087d21610f44641e87e66e1933f636e398e5d29498a31eead974f6",
+    "validator_lock_sha256": "d9e62c6c4237f30282b20f88c41152c3e1c7e249af65ba53879c911844b2bc13"
+  },
+  "artifact": {
+    "id": 14005385278,
+    "name": "owner-media-evidence-linux",
+    "zip_bytes": 17612,
+    "zip_sha256": "2a62a48d75637cb635739722d1c55dbe69c9feedb35e4fd57011302aae6aadb7",
+    "members_rehashed": 13,
+    "validator_manifest_and_lock_match_source_bytes": true
+  },
+  "store_controls": {
+    "job_id": 131647067810,
+    "command": "cargo test --locked --workspace --exclude nw-platform --exclude nw-service --all-targets --no-fail-fast",
+    "entry": "tests::late_child_failure_rolls_back_every_job_group_and_receipt_before_a_safe_retry",
+    "result": "passed",
+    "store_suite_passed": 27,
+    "store_suite_failed": 0,
+    "store_suite_elapsed_seconds": 28.64,
+    "assertions": [
+      "Actual32 stored disabled clips exceed cumulative1MiB while individual rows remain bounded",
+      "Store raw AccessGuard length rejects before copying an over-budget row",
+      "Unique compiler raw reads and remaining-byte propagation; legacy full-vector prefetch forbidden",
+      "Actual raw reference extensions rejected for enabled, disabled and annotation entities",
+      "Duplicate unknown reference keys and wrong role/target types rejected",
+      "Legacy reference codec preserved and exact original stored row restored to a valid capture"
+    ],
+    "limits": "Successful Cargo stdout is captured, so dynamic copied-byte/attempt metrics are not reported. The unchanged original entry unconditionally invokes these controls."
+  },
+  "qualification_limits": [
+    "Overall native job failed on unfinished promotion acceptance and lint diagnostics; this report claims no all-jobs success",
+    "No decoded pixel/sample/container timing qualification",
+    "No durable media payload, job, queue, receipt or output publication",
+    "No media-generation promotion/restoration/fresh initialization qualification",
+    "No standard offline profile, named-client runtime or owner-hardware qualification",
+    "No full version1 completion claim"
+  ]
+}

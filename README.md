@@ -46,6 +46,10 @@ Current work and required gaps are recorded in the
   observations; discovery keeps static requirements separate from live policy
   facts. Validation and pending MCP wire evidence are recorded in the
   [project contract guide](docs/manuals/PROJECTS.md#command-contracts-and-qualification).
+- [Finite timeline render reviews](docs/manuals/CLI.md#finite-timeline-review-in-development)
+  capture a committed revision and check actual FFmpeg components. The initial
+  solid-color/silence route returns a separate media plan; accepted media jobs,
+  preview, export and the complete editor remain under construction.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
 
