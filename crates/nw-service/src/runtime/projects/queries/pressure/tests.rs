@@ -11,7 +11,10 @@ fn capture(service: &Arc<Service>, context: &Context, project: &str) -> Result<S
     let response = service.dispatch_sync(context.clone(), request, CancellationToken::new())?;
     if !response.ok || response.receipt_id.is_some() {
         return Err(response.error.unwrap_or_else(|| {
-            DomainError::new("PRESSURE_CONTROL_FAILED", "Capture query produced a receipt")
+            DomainError::new(
+                "PRESSURE_CONTROL_FAILED",
+                "Capture query produced a receipt",
+            )
         }));
     }
     response
@@ -32,9 +35,9 @@ async fn while_observing<T>(
     let task = tokio::task::spawn_blocking(move || {
         worker.project_snapshot_pressure_observing(projected, || {
             started.send(()).map_err(|_| lock_error())?;
-            waiting
-                .recv_timeout(Duration::from_secs(2))
-                .map_err(|_| DomainError::new("PRESSURE_CONTROL_FAILED", "Observer not released"))?;
+            waiting.recv_timeout(Duration::from_secs(2)).map_err(|_| {
+                DomainError::new("PRESSURE_CONTROL_FAILED", "Observer not released")
+            })?;
             observe(&worker)
         })
     });
@@ -136,7 +139,8 @@ pub(super) async fn exercise_pressure_scheduling() {
         assert!(cache.projects.contains_key(&ticket));
         assert_eq!(cache.project_write_estimate, 32 * 1024 * 1024);
         assert!(
-            observed_bytes.saturating_sub(cache.projects[&ticket].generation_bytes) < 32 * 1024 * 1024
+            observed_bytes.saturating_sub(cache.projects[&ticket].generation_bytes)
+                < 32 * 1024 * 1024
         );
     }
     service.project_snapshot_pressure(1).unwrap();
@@ -170,7 +174,10 @@ pub(super) async fn exercise_pressure_scheduling() {
     // observation must use its new baseline, rather than the retired capture's minimum.
     service
         .store
-        .put("unit/pressure-current-baseline", &"g".repeat(8 * 1024 * 1024))
+        .put(
+            "unit/pressure-current-baseline",
+            &"g".repeat(8 * 1024 * 1024),
+        )
         .unwrap();
     let current_baseline = service.store.project_generation_bytes().unwrap();
     assert!(current_baseline > retired_baseline);
