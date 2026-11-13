@@ -1,6 +1,6 @@
 # MCP manual - development implementation
 
-The adapters use official rmcp 3.9.0 and the implemented 2025-11-25 initialize and
+The adapters use official rmcp 3.10.0 and the implemented 2025-11-25 initialize and
 2026-07-28 discover lifecycle profiles. They forward typed operations to the same
 protected owner as the native/browser UI and CLI. Hosted integration runs actual
 media jobs through stdio and both direct-HTTP lifecycle profiles. Named external

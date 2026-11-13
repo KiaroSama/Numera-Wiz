@@ -11,7 +11,7 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 Spec Kit and feature specifications remain local only. Upstream executable source
 snapshots are external; schema-2 research metadata records the separation. Current
 changes add bounded folder registration/inspection and shared controls, CLI job
-waiting, client plugin packages, rmcp 3.9.0 listener cancellation, current CI action
+waiting, client plugin packages, rmcp 3.10.0 listener cancellation, current CI action
 pins, exact source-HEAD builds/provenance, Pure Rust/test-inventory enforcement,
 four native development package targets and the exact owner-supplied logo. Hosted
 [run 43026539369](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43026539369)
