@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "source_sha": "b464e8183995e064f6610c615036e3d242a7a301",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/43056099112",
+  "run_attempt": 1,
+  "conclusion": "success",
+  "required_expanded_jobs": 13,
+  "jobs": [
+    {
+      "id": 130645982243,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 130645982794,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 130645982853,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 130645983204,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647180356,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647180429,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647180499,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647180520,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647753664,
+      "name": "owner-batch",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647753679,
+      "name": "owner-transports",
+      "conclusion": "success"
+    },
+    {
+      "id": 130647753910,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 130653382529,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 130655346013,
+      "name": "artifact-http",
+      "conclusion": "success"
+    }
+  ],
+  "source_check_run_join": {
+    "verified": true,
+    "github_actions_checks": 13,
+    "all_head_sha": "b464e8183995e064f6610c615036e3d242a7a301",
+    "external_optional_check": "CodeRabbit skipped; not one of the 13 workflow jobs"
+  },
+  "test_inventory": {
+    "original_entrypoints": 179,
+    "unit": 131,
+    "async": 48,
+    "identity_and_ignore_states": "unchanged; platform cfg selects the original applicable subset"
+  },
+  "asserted_scope": [
+    "Ten shared project/sequence/clip/history command handlers with canonical typed CLI and MCP project context",
+    "Four-target ordinary regressions and Clippy; create/replay/restart, exact time/grids, atomic schema3 adoption rollback and stable entity identities",
+    "Affected unknown semantics/missing references; independent branches; duplicate-key rejection and exact opaque numeric text; zero-delta byte/revision/redo preservation",
+    "512-source history cardinality fixture; complete-original bounded eviction and current source-reference preservation",
+    "Linked video incoming/group/split/move/lift/undo assertions; real MVCC continuation, observed generation growth, absolute 30-second TTL and read-lease release",
+    "Existing real media, CLI/official SDK, batch, artifact HTTP, native/Linux Chrome cleanup/folder regressions"
+  ],
+  "covering_commands": [
+    "cargo test --locked -p nw-platform --all-targets",
+    "cargo test --locked --workspace --exclude nw-platform --all-targets --no-fail-fast",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "covering_results": {
+    "domain": "38/38 on all four targets",
+    "service": "30/30 on Unix; 29/29 original cfg-selected Windows tests",
+    "store": "27/27 on all four targets"
+  },
+  "independent_source_review": {
+    "findings_addressed": 5,
+    "findings_open": 0,
+    "new_critical_or_important": 0,
+    "scope": "Five sealed project-backend findings and new breakage in the correction diff; not a full-product approval"
+  },
+  "personally_inspected_gui_artifacts": [
+    {
+      "id": 13871569603,
+      "name": "native-ui-evidence-linux",
+      "bytes": 3065560,
+      "sha256": "bda901c17a3cba7d13cf9c554b928c7bb17c54f068096b860018962c1e746a17",
+      "download_sha256_verified": true,
+      "viewed_png": "native-folder-failures-companion.png",
+      "observed": "Readable retained media/failure/inventory-only companion rows, three producer jobs; no project GUI"
+    },
+    {
+      "id": 13870244667,
+      "name": "browser-boot-evidence-linux-chrome",
+      "bytes": 2254063,
+      "sha256": "8e473f8d433c3b9f8985041d754c9f74a369195161c0fb3293acf8cb7a02a357",
+      "download_sha256_verified": true,
+      "viewed_png": "folder-failures-companion.png",
+      "observed": "Readable retained media/failure/inventory-only companion rows, three producer jobs; no project GUI"
+    }
+  ],
+  "remaining": [
+    "Actual prior/current package-binary raw preservation and migration/replay/adoption gate",
+    "Shared project workbench, durable catalog and external checkpoint/save/open/clone",
+    "Mixed audio/video linked-grid and broader five-surface variant qualification",
+    "General compiler/decoded preview/export, remaining utilities/effects and complete media lifecycle",
+    "Standard offline FFmpeg profile, final package/resource/browser/owner-hardware qualification",
+    "No on-open repair/reindex qualification for defective pre-fix development project data"
+  ],
+  "qualification_limit": "This is a reviewed data-editing backend and existing regression checkpoint. Full v1 remains unfinished; the 13 green jobs do not qualify absent product behavior."
+}

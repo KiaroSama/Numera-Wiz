@@ -1,0 +1,1651 @@
+//! One owner process serves private IPC and the explicitly enabled public listener.
+use crate::client::{OwnerRecord, registry_fingerprint};
+mod artifacts;
+mod browser;
+mod listener;
+mod uploads;
+use anyhow::{Context as _, Result};
+use axum::{
+    Json, Router,
+    extract::{DefaultBodyLimit, Request, State},
+    http::{StatusCode, header},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+};
+use listener::{PublicListener, PublicRoute};
+use nw_domain::commands;
+use nw_service::{Context, Service};
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
+use subtle::ConstantTimeEq;
+use tokio::{
+    net::TcpListener,
+    sync::{Mutex, OwnedSemaphorePermit, Semaphore},
+};
+use tokio_util::sync::CancellationToken;
+
+struct Lease {
+    principal: String,
+    profile: Option<String>,
+    public: bool,
+    expires: Instant,
+}
+pub struct Owner {
+    service: Arc<Service>,
+    record: OwnerRecord,
+    leases: Mutex<HashMap<String, Lease>>,
+    public: Mutex<Option<PublicListener>>,
+    public_active: Arc<AtomicUsize>,
+    stop: CancellationToken,
+    active: Arc<AtomicUsize>,
+    slots: Arc<Semaphore>,
+    pairing: Mutex<HashMap<String, browser::Pairing>>,
+}
+#[derive(Clone)]
+struct Auth {
+    owner: Arc<Owner>,
+    host: String,
+    origin: String,
+    private: bool,
+    listener_stop: CancellationToken,
+}
+#[derive(Deserialize, Serialize)]
+struct LeaseInput {
+    id: String,
+    #[serde(default)]
+    release: bool,
+    #[serde(default)]
+    public: bool,
+}
+#[derive(Deserialize)]
+struct PublicInput {
+    port: u16,
+}
+#[derive(Clone)]
+struct ReleaseBearer(String);
+fn failure(status: StatusCode, code: &str, message: &str) -> Response {
+    (
+        status,
+        Json(json!({"error":{"code":code,"message":message}})),
+    )
+        .into_response()
+}
+struct Work {
+    active: Arc<AtomicUsize>,
+    public: Option<Arc<AtomicUsize>>,
+    _permit: OwnedSemaphorePermit,
+}
+impl Drop for Work {
+    fn drop(&mut self) {
+        self.active.fetch_sub(1, Ordering::AcqRel);
+        if let Some(public) = &self.public {
+            public.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+}
+struct ActiveBody {
+    deadline: std::pin::Pin<Box<tokio::time::Sleep>>,
+    finished: bool,
+    body: std::pin::Pin<Box<axum::body::Body>>,
+    _work: Work,
+}
+impl http_body::Body for ActiveBody {
+    type Data = bytes::Bytes;
+    type Error = axum::Error;
+    fn poll_frame(
+        self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<std::result::Result<http_body::Frame<Self::Data>, Self::Error>>>
+    {
+        let state = self.get_mut();
+        if state.finished {
+            return std::task::Poll::Ready(None);
+        }
+        if std::future::Future::poll(state.deadline.as_mut(), context).is_ready() {
+            state.finished = true;
+            return std::task::Poll::Ready(Some(Err(axum::Error::new(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "Response stream deadline exceeded",
+            )))));
+        }
+        let frame = state.body.as_mut().poll_frame(context);
+        if matches!(frame, std::task::Poll::Ready(None)) {
+            state.finished = true;
+        }
+        frame
+    }
+    fn is_end_stream(&self) -> bool {
+        self.finished || self.body.is_end_stream()
+    }
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.body.size_hint()
+    }
+}
+async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next) -> Response {
+    let private_release = auth.private
+        && request.method() == axum::http::Method::POST
+        && request.uri().path() == "/internal/credential/release";
+    let permit = match auth.owner.slots.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "RESOURCE_LIMIT",
+                "HTTP admission capacity reached",
+            );
+        }
+    };
+
+    if request
+        .headers()
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        != Some(auth.host.as_str())
+    {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "HOST_DENIED",
+            "Unexpected exact Host",
+        );
+    }
+    if let Some(origin) = request.headers().get(header::ORIGIN)
+        && origin.to_str().ok() != Some(auth.origin.as_str())
+    {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "ORIGIN_DENIED",
+            "Unexpected or null Origin",
+        );
+    }
+    let supplied = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .unwrap_or("")
+        .to_owned();
+    let download_token = supplied.clone();
+    let context = if auth.private
+        && bool::from(
+            supplied
+                .as_bytes()
+                .ct_eq(auth.owner.record.bearer.as_bytes()),
+        ) {
+        auth.owner.service.owner()
+    } else {
+        let service = auth.owner.service.clone();
+        let origin = if auth.private {
+            None
+        } else {
+            Some(auth.origin.clone())
+        };
+        let active = !request.uri().path().ends_with("/lease") && request.uri().path() != "/health";
+        match tokio::task::spawn_blocking(move || {
+            service.authenticate_at(&supplied, origin.as_deref(), active)
+        })
+        .await
+        {
+            Ok(Ok(context)) => context,
+            _ => {
+                return failure(
+                    StatusCode::UNAUTHORIZED,
+                    "AUTHENTICATION_REQUIRED",
+                    "A current scoped bearer is required",
+                );
+            }
+        }
+    };
+    {
+        let _lease_guard = auth.owner.leases.lock().await;
+        if auth.owner.stop.is_cancelled() || auth.listener_stop.is_cancelled() {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "OWNER_STOPPING",
+                "Reconnect to a compatible owner",
+            );
+        }
+        auth.owner.active.fetch_add(1, Ordering::AcqRel);
+        if !auth.private {
+            auth.owner.public_active.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+    let work = Work {
+        active: auth.owner.active.clone(),
+        public: (!auth.private).then(|| auth.owner.public_active.clone()),
+        _permit: permit,
+    };
+    if request.uri().path().starts_with("/internal/")
+        && context.profile.is_some()
+        && !private_release
+    {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Internal controls require native owner authority",
+        );
+    }
+    if request.headers().contains_key("Mcp-Session-Id") {
+        return failure(
+            StatusCode::BAD_REQUEST,
+            "INVALID_SESSION",
+            "This endpoint uses official stateless MCP profiles",
+        );
+    }
+    if request.method() == axum::http::Method::POST {
+        let (parts, body) = request.into_parts();
+        let bytes = match tokio::time::timeout(
+            Duration::from_secs(10),
+            axum::body::to_bytes(body, commands::MAX_COMMAND_BYTES),
+        )
+        .await
+        {
+            Ok(Ok(bytes)) => bytes,
+            _ => {
+                return failure(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "RESOURCE_LIMIT",
+                    "Request exceeds 1 MiB",
+                );
+            }
+        };
+        let value = match commands::decode_json(&bytes) {
+            Ok(value) => value,
+            Err(_) => {
+                return failure(
+                    StatusCode::BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    "Invalid or ambiguous JSON request",
+                );
+            }
+        };
+        if private_release && value != json!({}) {
+            return failure(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "Scoped credential release requires an empty object",
+            );
+        }
+        request = Request::from_parts(parts, axum::body::Body::from(bytes));
+    }
+    if private_release {
+        request
+            .extensions_mut()
+            .insert(ReleaseBearer(download_token));
+    } else if request.uri().path().starts_with("/api/v1/artifacts/") {
+        request
+            .extensions_mut()
+            .insert(artifacts::DownloadAuthority {
+                owner: auth.owner.clone(),
+                token: context.profile.as_ref().map(|_| download_token),
+                origin: (!auth.private).then(|| auth.origin.clone()),
+                context: context.clone(),
+                listener_stop: auth.listener_stop.clone(),
+            });
+    }
+    request.extensions_mut().insert(context);
+    request.extensions_mut().insert(PublicRoute(!auth.private));
+    let deadline = if request.method() == axum::http::Method::PUT
+        && request.uri().path().starts_with("/api/v1/uploads/")
+    {
+        900
+    } else {
+        130
+    };
+    let expires = tokio::time::Instant::now() + Duration::from_secs(deadline);
+    let response = match tokio::time::timeout_at(expires, next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => failure(
+            StatusCode::REQUEST_TIMEOUT,
+            "REQUEST_TIMEOUT",
+            "Bounded request deadline exceeded",
+        ),
+    };
+    let (parts, body) = response.into_parts();
+    Response::from_parts(
+        parts,
+        axum::body::Body::new(ActiveBody {
+            deadline: Box::pin(tokio::time::sleep_until(expires)),
+            finished: false,
+            body: Box::pin(body),
+            _work: work,
+        }),
+    )
+}
+async fn dispatch(
+    State(owner): State<Arc<Owner>>,
+    axum::Extension(context): axum::Extension<Context>,
+    Json(request): Json<commands::Request>,
+) -> Response {
+    let response = owner.service.dispatch(context, request).await;
+    match serde_json::to_vec(&response) {
+        Ok(bytes) if bytes.len() <= 256 * 1024 => {
+            ([(header::CONTENT_TYPE, "application/json")], bytes).into_response()
+        }
+        _ => failure(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "RESOURCE_LIMIT",
+            "Response exceeds its admitted byte budget",
+        ),
+    }
+}
+async fn lease(
+    State(owner): State<Arc<Owner>>,
+    axum::Extension(context): axum::Extension<Context>,
+    axum::Extension(purpose): axum::Extension<PublicRoute>,
+    Json(input): Json<LeaseInput>,
+) -> Response {
+    if owner.service.client_lease_allowed(&context).is_err() {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Profile does not admit editor-client leases",
+        );
+    }
+    if uuid::Uuid::parse_str(&input.id).is_err() {
+        return failure(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Client lease ID must be a UUID",
+        );
+    }
+    let mut leases = owner.leases.lock().await;
+    leases.retain(|_, lease| lease.expires > Instant::now());
+    if let Some(lease) = leases.get(&input.id)
+        && lease.principal != context.principal
+    {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Another principal owns this lease",
+        );
+    }
+    if input.release {
+        leases.remove(&input.id);
+    } else {
+        if leases.len() >= 64 && !leases.contains_key(&input.id) {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "RESOURCE_LIMIT",
+                "Client lease budget reached",
+            );
+        }
+        leases.insert(
+            input.id,
+            Lease {
+                principal: context.principal,
+                profile: context.profile,
+                public: purpose.0 || input.public,
+                expires: Instant::now() + Duration::from_secs(90),
+            },
+        );
+    }
+    Json(json!({"ok":true,"expires_in_seconds":90})).into_response()
+}
+async fn health(State(owner): State<Arc<Owner>>) -> Json<Value> {
+    Json(
+        json!({"product":"Numera Wiz","epoch":owner.record.epoch,"root_id":owner.record.root_id,"build":owner.record.build,"registry":owner.record.registry,"ui_source":crate::web_assets::UI_SOURCE}),
+    )
+}
+async fn credential(
+    State(owner): State<Arc<Owner>>,
+    Json(input): Json<nw_domain::access::CredentialInput>,
+) -> Response {
+    if let Some(port) = input.port
+        && owner
+            .public
+            .lock()
+            .await
+            .as_ref()
+            .map(|listener| listener.port)
+            != Some(port)
+    {
+        return failure(
+            StatusCode::CONFLICT,
+            "PUBLIC_LISTENER_REQUIRED",
+            "Enable the selected listener before issuing its credential",
+        );
+    }
+    let service = owner.service.clone();
+    match tokio::task::spawn_blocking(move || {
+        service.credential_for_origin_bound(
+            &input.profile,
+            input.port.map(|port| format!("http://127.0.0.1:{port}")),
+            input.expected_principal.as_deref(),
+        )
+    })
+    .await
+    {
+        Ok(Ok((bearer, identity))) => Json(json!({"bearer":bearer,"principal":identity.principal,"profile":identity.profile,"expires_in_seconds":28800})).into_response(),
+        Ok(Err(error)) => (StatusCode::FORBIDDEN, Json(json!({"error":error}))).into_response(),
+        Err(_) => failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "WORKER_FAILED",
+            "Credential setup failed",
+        ),
+    }
+}
+async fn release_credential(
+    State(owner): State<Arc<Owner>>,
+    axum::Extension(context): axum::Extension<Context>,
+    axum::Extension(ReleaseBearer(bearer)): axum::Extension<ReleaseBearer>,
+    Json(_input): Json<commands::Empty>,
+) -> Response {
+    if context.profile.is_none() {
+        return failure(
+            StatusCode::FORBIDDEN,
+            "PERMISSION_DENIED",
+            "Only a scoped credential can release itself",
+        );
+    }
+    let service = owner.service.clone();
+    match tokio::task::spawn_blocking(move || service.release_private_credential(&bearer, &context))
+        .await
+    {
+        Ok(Ok(())) => Json(json!({"released":true})).into_response(),
+        Ok(Err(error)) => {
+            let (status, code) = match error.code.as_str() {
+                "AUTHENTICATION_REQUIRED" => (StatusCode::UNAUTHORIZED, "AUTHENTICATION_REQUIRED"),
+                "PERMISSION_DENIED" => (StatusCode::FORBIDDEN, "PERMISSION_DENIED"),
+                "OWNER_BUSY" | "RESOURCE_LIMIT" => {
+                    (StatusCode::SERVICE_UNAVAILABLE, "RESOURCE_LIMIT")
+                }
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "CREDENTIAL_RELEASE_FAILED",
+                ),
+            };
+            failure(status, code, "Scoped credential release was not confirmed")
+        }
+        Err(_) => failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "WORKER_FAILED",
+            "Scoped credential release was not confirmed",
+        ),
+    }
+}
+fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: CancellationToken) -> Router {
+    let host = format!("127.0.0.1:{port}");
+    let origin = format!("http://{host}");
+    let mut config = StreamableHttpServerConfig::default()
+        .with_allowed_hosts([host.clone()])
+        .with_allowed_origins([origin.clone()])
+        .enforce_origin_validation()
+        .with_legacy_session_mode(false)
+        .with_cancellation_token(listener_stop.child_token());
+    config.max_request_body_bytes = commands::MAX_COMMAND_BYTES;
+    let service = owner.service.clone();
+    let mcp = StreamableHttpService::new(
+        move || Ok(crate::mcp::Bridge::http(service.clone())),
+        LocalSessionManager::default().into(),
+        config,
+    );
+    let mut router = Router::new()
+        .route(
+            "/api/v1/commands",
+            post(dispatch).get(
+                |State(owner): State<Arc<Owner>>,
+                 axum::Extension(context): axum::Extension<Context>| async move {
+                    Json(
+                        owner
+                            .service
+                            .dispatch(
+                                context,
+                                commands::Request::query("commands.list", json!({})),
+                            )
+                            .await,
+                    )
+                },
+            ),
+        )
+        .route("/api/v1/artifacts/{id}/bytes", get(artifacts::receive))
+        .route("/api/v1/uploads", post(uploads::create))
+        .route("/api/v1/uploads/{id}", axum::routing::put(uploads::receive))
+        .route("/api/v1/lease", post(lease))
+        .route("/api/v1/session", post(health))
+        .route("/health", get(health))
+        .nest_service("/mcp", mcp);
+    if private {
+        router = router
+            .route("/internal/credential", post(credential))
+            .route("/internal/credential/release", post(release_credential))
+            .route("/internal/lease", post(lease))
+            .route("/internal/public", post(public))
+            .route("/internal/pair", post(browser::create_pairing));
+    }
+    let routes = router
+        .layer(DefaultBodyLimit::max(commands::MAX_COMMAND_BYTES))
+        .layer(middleware::from_fn_with_state(
+            Auth {
+                owner: owner.clone(),
+                host,
+                origin,
+                private,
+                listener_stop,
+            },
+            authenticate,
+        ))
+        .with_state(owner.clone());
+    let routes = if private {
+        routes
+    } else {
+        routes
+            .merge(crate::web_assets::router())
+            .merge(browser::routes(owner.clone()))
+    };
+    routes.layer(middleware::from_fn_with_state(
+        browser::OriginGuard {
+            host: format!("127.0.0.1:{port}"),
+            origin: format!("http://127.0.0.1:{port}"),
+        },
+        browser::secure_headers,
+    ))
+}
+async fn public(State(owner): State<Arc<Owner>>, Json(input): Json<PublicInput>) -> Response {
+    if input.port == 0 {
+        return failure(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Public port must be explicit and nonzero",
+        );
+    }
+    let mut active = owner.public.lock().await;
+    if let Some(listener) = active.as_ref() {
+        let port = listener.port;
+        return if port == input.port {
+            Json(json!({"endpoint":format!("http://127.0.0.1:{port}")})).into_response()
+        } else {
+            failure(
+                StatusCode::CONFLICT,
+                "PUBLIC_LISTENER_CONFLICT",
+                "Another explicit public port is active; close its sessions before changing it",
+            )
+        };
+    }
+    let listener = match TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, input.port)).await {
+        Ok(listener) => listener,
+        Err(_) => {
+            return failure(
+                StatusCode::CONFLICT,
+                "PORT_IN_USE",
+                "The requested port is busy; it was not silently incremented",
+            );
+        }
+    };
+    if let Err(error) = owner
+        .service
+        .advance_origin(&format!("http://127.0.0.1:{}", input.port))
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error":error})),
+        )
+            .into_response();
+    }
+    let stop = owner.stop.child_token();
+    *active = Some(PublicListener {
+        port: input.port,
+        stop: stop.clone(),
+        last_used: Instant::now(),
+    });
+    let routes = router(owner.clone(), input.port, false, stop.clone());
+    tokio::spawn(async move {
+        if let Err(error) = axum::serve(listener, routes)
+            .with_graceful_shutdown(stop.cancelled_owned())
+            .await
+        {
+            tracing::error!(%error,"Public listener stopped");
+        }
+    });
+    Json(json!({"endpoint":format!("http://127.0.0.1:{}",input.port)})).into_response()
+}
+pub async fn run_owner(
+    root: PathBuf,
+    components: Option<PathBuf>,
+    logging_binding: nw_platform::logging::OwnerLoggingBinding,
+) -> Result<()> {
+    let binaries = components.map(|path| {
+        (
+            path.join(if cfg!(windows) {
+                "ffmpeg.exe"
+            } else {
+                "ffmpeg"
+            }),
+            path.join(if cfg!(windows) {
+                "ffprobe.exe"
+            } else {
+                "ffprobe"
+            }),
+        )
+    });
+    let service = Service::open_application(root.clone(), binaries).await?;
+    if !logging_binding.bind_keepalive(service.clone()) {
+        return Err(nw_domain::DomainError::new(
+            "LOG_STORAGE_ERROR",
+            "Protected owner log handoff could not be confirmed",
+        )
+        .into());
+    }
+    nw_platform::logging::bind_owner(service.store.root_id(), &service.epoch)?;
+    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
+    let port = listener.local_addr()?.port();
+    let exe = std::env::current_exe()?;
+    let build = tokio::task::spawn_blocking(move || {
+        nw_platform::files::identity(&exe, &CancellationToken::new()).inspect_err(|error| {
+            tracing::error!(stage = "executable_identity", code = %error.code, "Owner startup stage failed");
+        })
+    })
+    .await??
+    .sha256;
+    let record = OwnerRecord {
+        canonical_root: nw_platform::files::path_text(&root)?,
+        root_id: service.store.root_id().into(),
+        epoch: service.epoch.clone(),
+        build,
+        registry: registry_fingerprint(),
+        port,
+        bearer: format!(
+            "{}{}",
+            uuid::Uuid::new_v4().simple(),
+            uuid::Uuid::new_v4().simple()
+        ),
+    };
+    let runtime = nw_platform::security::private_directory(&root.join("runtime"))
+        .inspect_err(|error| {
+            tracing::error!(stage = "runtime_directory", code = %error.code, "Owner startup stage failed");
+        })?;
+    nw_platform::security::write_private(
+        &runtime.join("owner.json"),
+        &serde_json::to_vec(&record)?,
+        true,
+    )
+    .inspect_err(|error| {
+        tracing::error!(stage = "owner_record_publish", code = %error.code, "Owner startup stage failed");
+    })?;
+    let owner = Arc::new(Owner {
+        service,
+        record,
+        leases: Mutex::new(HashMap::new()),
+        public: Mutex::new(None),
+        public_active: Arc::new(AtomicUsize::new(0)),
+        stop: CancellationToken::new(),
+        active: Arc::new(AtomicUsize::new(0)),
+        slots: Arc::new(Semaphore::new(32)),
+        pairing: Mutex::new(HashMap::new()),
+    });
+    tokio::spawn(owner.clone().monitor());
+    tracing::info!(port,epoch=%owner.record.epoch,"Protected owner ready; credential omitted");
+    axum::serve(
+        listener,
+        router(owner.clone(), port, true, owner.stop.clone()),
+    )
+    .with_graceful_shutdown(owner.stop.clone().cancelled_owned())
+    .await?;
+    // The logging worker retains Service ownership until its Rotation is closed,
+    // even after these drained route/worker references and this local Arc drop.
+    tracing::info!("Owner idle grace completed");
+    Ok(())
+}
+pub async fn serve(
+    client: crate::client::NativeClient,
+    port: u16,
+    token_file: PathBuf,
+    profile: String,
+) -> Result<()> {
+    serve_browser(client, port, Some(token_file), profile, false).await
+}
+pub async fn serve_browser(
+    client: crate::client::NativeClient,
+    port: u16,
+    token_file: Option<PathBuf>,
+    profile: String,
+    open_browser: bool,
+) -> Result<()> {
+    if token_file.is_none() && !open_browser {
+        anyhow::bail!(
+            "Choose --open-browser for paired UI or --token-file for a scoped HTTP client"
+        );
+    }
+    let lease = uuid::Uuid::new_v4().to_string();
+    client
+        .internal("internal/lease", json!({"id":lease,"public":true}))
+        .await?;
+    let endpoint = client
+        .internal("internal/public", json!({"port":port}))
+        .await?;
+    if let Some(token_file) = token_file {
+        let issued = client
+            .internal(
+                "internal/credential",
+                json!({"profile":profile,"port":port}),
+            )
+            .await?;
+        let token = issued["bearer"].as_str().context("Scoped bearer missing")?;
+        nw_platform::security::write_private(&token_file, token.as_bytes(), false)?;
+    }
+    if open_browser {
+        let paired = client
+            .internal("internal/pair", json!({"profile":profile}))
+            .await?;
+        browser::launch(paired["url"].as_str().context("Pairing URL missing")?).await?;
+    }
+    tracing::info!(endpoint=%endpoint["endpoint"],"Scoped HTTP API/MCP ready; credential omitted");
+    loop {
+        tokio::select! { _ = tokio::signal::ctrl_c() => break, _ = tokio::time::sleep(Duration::from_secs(15)) => { client.internal("internal/lease", json!({"id":lease,"public":true})).await?; } }
+    }
+    let _ = client
+        .internal("internal/lease", json!({"id":lease,"release":true}))
+        .await;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn actual_http_checks_host_origin_bearer_and_profile() {
+        let data = tempfile::tempdir().unwrap();
+        let service = Service::open(data.path().to_owned(), None).await.unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let token = service
+            .credential_for_origin("agent", Some(format!("http://127.0.0.1:{port}")))
+            .unwrap();
+        let record = OwnerRecord {
+            canonical_root: "unit".into(),
+            root_id: service.store.root_id().into(),
+            epoch: service.epoch.clone(),
+            build: "unit".into(),
+            registry: registry_fingerprint(),
+            port,
+            bearer: "private-owner-token".into(),
+        };
+        let owner = Arc::new(Owner {
+            service,
+            record,
+            leases: Mutex::new(HashMap::new()),
+            public: Mutex::new(None),
+            public_active: Arc::new(AtomicUsize::new(0)),
+            stop: CancellationToken::new(),
+            active: Arc::new(AtomicUsize::new(0)),
+            slots: Arc::new(Semaphore::new(32)),
+            pairing: Mutex::new(HashMap::new()),
+        });
+        let listener_stop = CancellationToken::new();
+        let routes = router(owner.clone(), port, false, listener_stop.clone());
+        let task = tokio::spawn(async move {
+            axum::serve(listener, routes).await.unwrap();
+        });
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
+        let endpoint = format!("http://127.0.0.1:{port}");
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .bearer_auth(&token)
+                .header("Origin", "null")
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .bearer_auth(&token)
+                .header("Host", "other.invalid")
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .bearer_auth("private-owner-token")
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        let fixture: commands::Request =
+            serde_json::from_str(include_str!("../tests/fixtures/clean-resolve.json")).unwrap();
+        let denied: commands::Response = client
+            .post(format!("{endpoint}/api/v1/commands"))
+            .bearer_auth(&token)
+            .json(&fixture)
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(denied.error.unwrap().code, "PERMISSION_DENIED");
+        assert_eq!(
+            client
+                .post(format!("{endpoint}/api/v1/commands"))
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .body(r#"{"params":{"index":0,"index":1}}"#)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+
+        // Exercise the registered authenticated MCP boundary, including rmcp 3.9's
+        // exact media-type parsing. Substring matches must not admit lookalikes.
+        let mcp_endpoint = format!("{endpoint}/mcp");
+        let list = json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}});
+        let request = || {
+            client
+                .post(&mcp_endpoint)
+                .bearer_auth(&token)
+                .header("MCP-Protocol-Version", "2025-11-25")
+                .body(list.to_string())
+        };
+        let rpc = |body: &str| {
+            serde_json::from_str::<Value>(body)
+                .ok()
+                .or_else(|| {
+                    body.lines()
+                        .filter_map(|line| line.strip_prefix("data:"))
+                        .find_map(|data| serde_json::from_str::<Value>(data.trim()).ok())
+                })
+                .expect("A JSON or SSE JSON-RPC response is required")
+        };
+        for content_type in ["application/json", "Application/JSON; charset=UTF-8"] {
+            let response = request()
+                .header(header::CONTENT_TYPE, content_type)
+                .header(header::ACCEPT, "application/json, text/event-stream")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{content_type}");
+            let result = rpc(&response.text().await.unwrap());
+            assert_eq!(result["id"], 1);
+            assert!(
+                result["result"]["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|tool| tool["name"] == "commands.list")
+            );
+        }
+        let response = request()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "Application/JSON; note=\"a,b;c\";q=1")
+            .header(header::ACCEPT, "TEXT/EVENT-STREAM; q=0.5")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(rpc(&response.text().await.unwrap())["result"]["tools"].is_array());
+        for content_type in [
+            "application/jsonp",
+            "application/json-patch+json",
+            "text/plain",
+        ] {
+            assert_eq!(
+                request()
+                    .header(header::CONTENT_TYPE, content_type)
+                    .header(header::ACCEPT, "application/json, text/event-stream")
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "{content_type}"
+            );
+        }
+        for accept in [
+            "application/json, text/event-stream;q=0",
+            "application/json;q=0.000, text/event-stream",
+            "application/jsonp, text/event-stream",
+            "application/json, text/event-stream-extra",
+            "text/plain; note=\"application/json, text/event-stream\"",
+        ] {
+            assert_eq!(
+                request()
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::ACCEPT, accept)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::NOT_ACCEPTABLE,
+                "{accept}"
+            );
+        }
+
+        // Standard headers must describe the actual named command. Current tool
+        // schemas have no x-mcp-header annotations, so this does not claim coverage
+        // of the SDK's annotated Mcp-Param validation path.
+        let call = json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+            "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},
+            "name":"commands.list","arguments":{"params":{}}
+        }});
+        let modern = || {
+            client
+                .post(&mcp_endpoint)
+                .bearer_auth(&token)
+                .header("MCP-Protocol-Version", "2026-07-28")
+                .header(header::ACCEPT, "application/json, text/event-stream")
+                .json(&call)
+        };
+        let response = modern()
+            .header("Mcp-Method", "tools/call")
+            .header("Mcp-Name", "commands.list")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            rpc(&response.text().await.unwrap())["result"]["structuredContent"]["ok"],
+            true
+        );
+        for (label, method, name, duplicate_method) in [
+            (
+                "method mismatch",
+                "tools/list",
+                axum::http::HeaderValue::from_static("commands.list"),
+                false,
+            ),
+            (
+                "name mismatch",
+                "tools/call",
+                axum::http::HeaderValue::from_static("jobs.cancel"),
+                false,
+            ),
+            (
+                "duplicate method",
+                "tools/call",
+                axum::http::HeaderValue::from_static("commands.list"),
+                true,
+            ),
+            (
+                "non-ASCII name",
+                "tools/call",
+                axum::http::HeaderValue::from_bytes(b"\xff").unwrap(),
+                false,
+            ),
+        ] {
+            let mut request = modern()
+                .header("Mcp-Method", method)
+                .header("Mcp-Name", name);
+            if duplicate_method {
+                request = request.header("Mcp-Method", method);
+            }
+            let response = request.send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{label}");
+            let error: Value = response.json().await.unwrap();
+            assert_eq!(error["id"], 2, "{label}");
+            assert_eq!(error["error"]["code"], -32020, "{label}");
+        }
+
+        // A public listener's lifetime is separate from its native owner. This
+        // fixture has no media engine and makes no accepted-media-job claim.
+        listener_stop.cancel();
+        assert!(!owner.stop.is_cancelled());
+        assert_eq!(
+            client
+                .get(format!("{endpoint}/health"))
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert!(
+            owner
+                .service
+                .dispatch(
+                    owner.service.owner(),
+                    commands::Request::query("commands.list", json!({})),
+                )
+                .await
+                .ok
+        );
+        task.abort();
+        private_credential_self_release_preserves_admission_and_survivors().await;
+        native_one_shot_lifecycle_uses_real_private_routes().await;
+    }
+
+    #[derive(Default)]
+    struct LifecycleProbe {
+        bootstraps: AtomicUsize,
+        commands: AtomicUsize,
+        releases: AtomicUsize,
+        reject_commands: AtomicUsize,
+        acknowledgement: AtomicUsize,
+        stop: CancellationToken,
+    }
+
+    async fn observe_lifecycle(
+        State(probe): State<Arc<LifecycleProbe>>,
+        request: Request,
+        next: Next,
+    ) -> Response {
+        let path = request.uri().path();
+        let release = path == "/internal/credential/release";
+        let command = path == "/api/v1/commands";
+        if command {
+            probe.commands.fetch_add(1, Ordering::AcqRel);
+        }
+        if path == "/internal/credential" {
+            probe.bootstraps.fetch_add(1, Ordering::AcqRel);
+        }
+        if release {
+            probe.releases.fetch_add(1, Ordering::AcqRel);
+        }
+        let response = next.run(request).await;
+        if command
+            && probe
+                .reject_commands
+                .try_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                    count.checked_sub(1)
+                })
+                .is_ok()
+        {
+            return failure(
+                StatusCode::UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Fixture reconnect",
+            );
+        }
+        if release {
+            match probe.acknowledgement.load(Ordering::Acquire) {
+                1 => return Json(json!({"not_released":true})).into_response(),
+                2 => {
+                    // The real handler has completed. Keep the lost acknowledgement
+                    // bounded by fixture teardown, without sleeping or retrying.
+                    drop(response);
+                    probe.stop.cancelled().await;
+                    return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                }
+                _ => {}
+            }
+        }
+        response
+    }
+
+    fn lifecycle_error<T>(result: Result<T>) -> anyhow::Error {
+        match result {
+            Err(error) => error,
+            Ok(_) => panic!("The lifecycle operation must retain its original error"),
+        }
+    }
+
+    async fn native_one_shot_lifecycle_uses_real_private_routes() {
+        use crate::client::NativeClient;
+        let data = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(data.path()).unwrap();
+        let service = Service::open(root.clone(), None).await.unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let record = OwnerRecord {
+            canonical_root: nw_platform::files::path_text(&root).unwrap(),
+            root_id: service.store.root_id().into(),
+            epoch: service.epoch.clone(),
+            build: "lifecycle-fixture".into(),
+            registry: registry_fingerprint(),
+            port,
+            bearer: "lifecycle-fixture-owner".into(),
+        };
+        // Real reconnect reads the protected fixture record and verifies /health;
+        // it never hashes a test executable or launches an owner process.
+        let runtime = nw_platform::security::private_directory(&root.join("runtime")).unwrap();
+        nw_platform::security::write_private(
+            &runtime.join("owner.json"),
+            &serde_json::to_vec(&record).unwrap(),
+            false,
+        )
+        .unwrap();
+        let owner = Arc::new(Owner {
+            service,
+            record: record.clone(),
+            leases: Mutex::new(HashMap::new()),
+            public: Mutex::new(None),
+            public_active: Arc::new(AtomicUsize::new(0)),
+            stop: CancellationToken::new(),
+            active: Arc::new(AtomicUsize::new(0)),
+            slots: Arc::new(Semaphore::new(32)),
+            pairing: Mutex::new(HashMap::new()),
+        });
+        let probe = Arc::new(LifecycleProbe::default());
+        let listener_stop = CancellationToken::new();
+        let routes = router(owner.clone(), port, true, listener_stop.clone()).layer(
+            middleware::from_fn_with_state(probe.clone(), observe_lifecycle),
+        );
+        let task = tokio::spawn(async move {
+            axum::serve(listener, routes).await.unwrap();
+        });
+        let new_client = |one_shot| {
+            NativeClient::for_test_owner(record.clone(), Some("agent".into()), one_shot).unwrap()
+        };
+        let query = commands::Request::query("commands.list", json!({}));
+        let body_token = owner.service.credential("agent").unwrap();
+        let body_client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
+        let release_url = format!("http://127.0.0.1:{port}/internal/credential/release");
+        assert_eq!(
+            body_client
+                .post(&release_url)
+                .bearer_auth(&body_token)
+                .json(&json!([]))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert!(owner.service.authenticate(&body_token).is_ok());
+        assert_eq!(
+            body_client
+                .post(&release_url)
+                .bearer_auth(&body_token)
+                .json(&json!({}))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+        assert!(owner.service.authenticate(&body_token).is_err());
+        probe.releases.store(0, Ordering::Release);
+        let survivor = new_client(false);
+        assert!(survivor.request(&query).await.unwrap().ok);
+        assert_eq!(survivor.finish().await.attempted, 0);
+        assert!(survivor.request(&query).await.unwrap().ok);
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), 1);
+        assert_eq!(probe.releases.load(Ordering::Acquire), 0);
+
+        let one_shot = new_client(true);
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query))
+            .await
+            .unwrap();
+        assert!(response.ok);
+        assert_eq!(response.request_id, query.request_id);
+        assert_eq!(probe.releases.load(Ordering::Acquire), 1);
+        assert_eq!(one_shot.finish().await.attempted, 0);
+        assert!(!one_shot.has_cached_credential().await);
+        let before = probe.bootstraps.load(Ordering::Acquire);
+        let error = lifecycle_error(one_shot.request(&query).await);
+        assert_eq!(
+            error.downcast_ref::<nw_domain::DomainError>().unwrap().code,
+            "CLIENT_CLOSED"
+        );
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), before);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        let denied = commands::Request::query("unknown.lifecycle.command", json!({}));
+        let one_shot = new_client(true);
+        let before = probe.releases.load(Ordering::Acquire);
+        let result: Result<()> = crate::finish_one_shot(&one_shot, async {
+            let response = one_shot.request(&denied).await?;
+            assert!(!response.ok);
+            assert_eq!(response.request_id, denied.request_id);
+            Err(response
+                .error
+                .expect("Canonical error must remain present")
+                .into())
+        })
+        .await;
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "UNKNOWN_COMMAND"
+        );
+        assert_eq!(probe.releases.load(Ordering::Acquire), before + 1);
+
+        for rejections in [1, 2] {
+            let one_shot = new_client(true);
+            let bootstraps = probe.bootstraps.load(Ordering::Acquire);
+            let releases = probe.releases.load(Ordering::Acquire);
+            probe.reject_commands.store(rejections, Ordering::Release);
+            let result = crate::finish_one_shot(&one_shot, async {
+                let result = one_shot.request(&query).await;
+                if rejections == 2 {
+                    assert!(!one_shot.has_cached_credential().await);
+                }
+                result
+            })
+            .await;
+            if rejections == 1 {
+                assert!(result.unwrap().ok);
+            } else {
+                let error = lifecycle_error(result);
+                assert_eq!(
+                    error.downcast_ref::<nw_domain::DomainError>().unwrap().code,
+                    "AUTHENTICATION_REQUIRED"
+                );
+            }
+            assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps + 2);
+            assert_eq!(probe.releases.load(Ordering::Acquire), releases + 2);
+            assert_eq!(one_shot.finish().await.attempted, 0);
+            assert!(one_shot.request(&query).await.is_err());
+            assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps + 2);
+            assert!(survivor.request(&query).await.unwrap().ok);
+        }
+
+        // Malformed acknowledgement preserves the original successful response.
+        let one_shot = new_client(true);
+        probe.acknowledgement.store(1, Ordering::Release);
+        let response = crate::finish_one_shot(&one_shot, one_shot.request(&query))
+            .await
+            .unwrap();
+        assert!(response.ok);
+        assert_eq!(response.request_id, query.request_id);
+        probe.acknowledgement.store(0, Ordering::Release);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        // Two known owned credentials, one total deadline, and no second release
+        // attempt after the first acknowledgement consumes that entire deadline.
+        let one_shot = new_client(true);
+        probe.reject_commands.store(1, Ordering::Release);
+        assert!(one_shot.request(&query).await.unwrap().ok);
+        let bootstraps = probe.bootstraps.load(Ordering::Acquire);
+        let releases = probe.releases.load(Ordering::Acquire);
+        probe.acknowledgement.store(2, Ordering::Release);
+        let result: Result<()> = tokio::time::timeout(
+            Duration::from_secs(10),
+            crate::finish_one_shot(&one_shot, async {
+                let response = one_shot.request(&denied).await?;
+                assert!(!response.ok);
+                Err(response
+                    .error
+                    .expect("Canonical error must remain present")
+                    .into())
+            }),
+        )
+        .await
+        .expect("Total one-second finish must remain bounded");
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "UNKNOWN_COMMAND"
+        );
+        assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert_eq!(one_shot.finish().await.attempted, 0);
+        assert!(one_shot.request(&query).await.is_err());
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert!(survivor.request(&query).await.unwrap().ok);
+
+        // Pre-attachment input errors and owner-only finite operations mint nothing.
+        let unused = new_client(true);
+        let result: Result<()> = crate::finish_one_shot(&unused, async {
+            Err(nw_domain::DomainError::new("VALIDATION_ERROR", "Fixture input error").into())
+        })
+        .await;
+        assert_eq!(
+            lifecycle_error(result)
+                .downcast_ref::<nw_domain::DomainError>()
+                .unwrap()
+                .code,
+            "VALIDATION_ERROR"
+        );
+        let unscoped = NativeClient::for_test_owner(record, None, true).unwrap();
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        let commands_before = probe.commands.load(Ordering::Acquire);
+        let credentials_before = owner
+            .service
+            .store
+            .rows::<serde_json::Value>("credential/", 10000)
+            .unwrap()
+            .len();
+        let forbidden = root.join("cancelled-delivery-must-not-exist/token");
+        let result = crate::access::credential_file::deliver(
+            &unscoped,
+            &commands::Request::query("access.credentials.issue", json!({"profile":"agent"})),
+            &forbidden,
+            &cancelled,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.error.unwrap().code, "CANCELLED");
+        assert!(!forbidden.parent().unwrap().exists());
+        assert_eq!(probe.commands.load(Ordering::Acquire), commands_before);
+        assert_eq!(
+            owner
+                .service
+                .store
+                .rows::<serde_json::Value>("credential/", 10000)
+                .unwrap()
+                .len(),
+            credentials_before
+        );
+        assert!(
+            crate::finish_one_shot(&unscoped, unscoped.request(&query))
+                .await
+                .unwrap()
+                .ok
+        );
+        assert_eq!(probe.bootstraps.load(Ordering::Acquire), bootstraps);
+        assert_eq!(probe.releases.load(Ordering::Acquire), releases + 1);
+        probe.stop.cancel();
+        owner.stop.cancel();
+        listener_stop.cancel();
+        task.abort();
+        let _ = task.await;
+    }
+
+    async fn private_credential_self_release_preserves_admission_and_survivors() {
+        let data = tempfile::tempdir().unwrap();
+        let service = Service::open(data.path().to_owned(), None).await.unwrap();
+        let private_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let public_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let private_port = private_listener.local_addr().unwrap().port();
+        let public_port = public_listener.local_addr().unwrap().port();
+        assert_ne!(private_port, public_port);
+        let private_endpoint = format!("http://127.0.0.1:{private_port}");
+        let public_endpoint = format!("http://127.0.0.1:{public_port}");
+        let record = OwnerRecord {
+            canonical_root: "unit".into(),
+            root_id: service.store.root_id().into(),
+            epoch: service.epoch.clone(),
+            build: "unit".into(),
+            registry: registry_fingerprint(),
+            port: private_port,
+            bearer: "private-release-owner-token".into(),
+        };
+        let owner = Arc::new(Owner {
+            service: service.clone(),
+            record,
+            leases: Mutex::new(HashMap::new()),
+            public: Mutex::new(None),
+            public_active: Arc::new(AtomicUsize::new(0)),
+            stop: CancellationToken::new(),
+            active: Arc::new(AtomicUsize::new(0)),
+            slots: Arc::new(Semaphore::new(32)),
+            pairing: Mutex::new(HashMap::new()),
+        });
+        let private_stop = CancellationToken::new();
+        let public_stop = CancellationToken::new();
+        let private_routes = router(owner.clone(), private_port, true, private_stop.clone());
+        let public_routes = router(owner.clone(), public_port, false, public_stop.clone());
+        let private_task = tokio::spawn(async move {
+            axum::serve(private_listener, private_routes).await.unwrap();
+        });
+        let public_task = tokio::spawn(async move {
+            axum::serve(public_listener, public_routes).await.unwrap();
+        });
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
+        let profile = service.profile_context("agent").unwrap();
+        let mut tokens = Vec::new();
+        for _ in 0..32 {
+            let (token, context) = service
+                .credential_for_origin_bound("agent", None, Some(&profile.principal))
+                .unwrap();
+            assert!(
+                context.principal == profile.principal && context.profile == profile.profile,
+                "Every admitted credential must retain the same seeded profile and principal"
+            );
+            assert!(
+                !tokens.contains(&token),
+                "Each admitted credential must have a distinct bearer"
+            );
+            tokens.push(token);
+        }
+        let at_capacity = || {
+            let error = match service.credential_for_origin_bound(
+                "agent",
+                None,
+                Some(&profile.principal),
+            ) {
+                Err(error) => error,
+                Ok(_) => panic!("A thirty-third live credential must be rejected"),
+            };
+            assert_eq!(error.code, "RESOURCE_LIMIT");
+        };
+        at_capacity();
+        let target = &tokens[0];
+        let survivor = &tokens[1];
+        for bearer in [target, survivor] {
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(bearer)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "Admitted private credentials must authenticate before release"
+            );
+        }
+
+        // This actual HTTP status is the first intended RED on an owner without
+        // private self-release. Later safety oracles require that route to exist.
+        let release_endpoint = format!("{private_endpoint}/internal/credential/release");
+        let mut released = client
+            .post(&release_endpoint)
+            .bearer_auth(target)
+            .json(&json!({}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            released.status(),
+            StatusCode::OK,
+            "Private scoped self-release must be available after quota admission"
+        );
+        let mut acknowledgement = Vec::new();
+        while let Some(chunk) = released.chunk().await.unwrap() {
+            assert!(
+                acknowledgement.len() + chunk.len() <= 64,
+                "Self-release acknowledgement must be finite"
+            );
+            acknowledgement.extend_from_slice(&chunk);
+        }
+        let acknowledgement = commands::decode_json(&acknowledgement)
+            .expect("Self-release acknowledgement must be JSON");
+        assert!(
+            acknowledgement == json!({"released": true}),
+            "Self-release must acknowledge only the exact completed release"
+        );
+        for (bearer, status) in [
+            (target, StatusCode::UNAUTHORIZED),
+            (survivor, StatusCode::OK),
+        ] {
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(bearer)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                status,
+                "Self-release must remove only its authenticated bearer"
+            );
+        }
+        let (replacement, context) = service
+            .credential_for_origin_bound("agent", None, Some(&profile.principal))
+            .unwrap();
+        assert!(
+            context.principal == profile.principal && context.profile == profile.profile,
+            "Replacement admission must retain the original authority"
+        );
+        assert!(
+            !tokens.contains(&replacement),
+            "Replacement admission must issue a fresh bearer"
+        );
+        at_capacity();
+
+        let (public_token, public_context) = service
+            .credential_for_origin_bound("browser", Some(public_endpoint.clone()), None)
+            .unwrap();
+        assert!(
+            public_context.principal != profile.principal,
+            "The public audience control must not consume the private principal's quota"
+        );
+        assert_eq!(
+            client
+                .get(format!("{public_endpoint}/health"))
+                .bearer_auth(&public_token)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK,
+            "The public-origin control bearer must authenticate on its actual listener"
+        );
+        let release = || client.post(&release_endpoint).json(&json!({}));
+        for (label, request, expected) in [
+            (
+                "A deleted bearer cannot release twice",
+                release().bearer_auth(target),
+                Some(StatusCode::UNAUTHORIZED),
+            ),
+            (
+                "The native owner bearer cannot self-release",
+                release().bearer_auth(&owner.record.bearer),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release is unavailable on the public listener",
+                client
+                    .post(format!("{public_endpoint}/internal/credential/release"))
+                    .bearer_auth(&public_token)
+                    .json(&json!({})),
+                None,
+            ),
+            (
+                "A public-origin bearer cannot release on the private listener",
+                release().bearer_auth(&public_token),
+                Some(StatusCode::UNAUTHORIZED),
+            ),
+            (
+                "Self-release preserves exact Host validation",
+                release()
+                    .bearer_auth(survivor)
+                    .header("Host", "other.invalid"),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release preserves present Origin validation",
+                release().bearer_auth(survivor).header("Origin", "null"),
+                Some(StatusCode::FORBIDDEN),
+            ),
+            (
+                "Self-release requires POST",
+                client.get(&release_endpoint).bearer_auth(survivor),
+                None,
+            ),
+            (
+                "Self-release rejects a target supplied in the body",
+                client
+                    .post(&release_endpoint)
+                    .bearer_auth(survivor)
+                    .json(&json!({"target": "another"})),
+                None,
+            ),
+        ] {
+            let status = request.send().await.unwrap().status();
+            if let Some(expected) = expected {
+                assert_eq!(status, expected, "{label}");
+            } else {
+                assert!(!status.is_success(), "{label}");
+            }
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(survivor)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "A denied release must preserve the same-principal survivor: {label}"
+            );
+        }
+        for path in [
+            "/internal/credential",
+            "/internal/lease",
+            "/internal/public",
+            "/internal/pair",
+        ] {
+            assert_eq!(
+                client
+                    .post(format!("{private_endpoint}{path}"))
+                    .bearer_auth(survivor)
+                    .json(&json!({}))
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::FORBIDDEN,
+                "Self-release must not grant other internal controls"
+            );
+            assert_eq!(
+                client
+                    .get(format!("{private_endpoint}/health"))
+                    .bearer_auth(survivor)
+                    .send()
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::OK,
+                "Denied internal controls must preserve the same-principal survivor"
+            );
+        }
+        at_capacity();
+        owner.stop.cancel();
+        private_stop.cancel();
+        public_stop.cancel();
+        private_task.abort();
+        public_task.abort();
+        let _ = private_task.await;
+        let _ = public_task.await;
+    }
+}

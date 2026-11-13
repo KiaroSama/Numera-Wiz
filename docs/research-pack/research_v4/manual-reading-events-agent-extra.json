@@ -1,0 +1,1885 @@
+{
+  "schema_version": 1,
+  "reviewer": "v4_manuals_finish",
+  "pinned_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "assignment": "Zero-based batches 12 through 25 inclusive from manual-reading-batches-small-root.json",
+  "method": "Actual full-body text was read in bounded untruncated tool output, with each range displayed. A truncated initial metadata-listing output was not source-body reading and was not credited.",
+  "events": [
+    {
+      "title": "boxblur",
+      "start_line": 9234,
+      "end_line": 9297,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 9298,
+      "end_line": 9322,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "bwdif",
+      "start_line": 9323,
+      "end_line": 9375,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "ccrepack",
+      "start_line": 9376,
+      "end_line": 9385,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "cas",
+      "start_line": 9386,
+      "end_line": 9400,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9401,
+      "end_line": 9403,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "chromahold",
+      "start_line": 9404,
+      "end_line": 9428,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9429,
+      "end_line": 9436,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "chromakey",
+      "start_line": 9437,
+      "end_line": 9465,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9466,
+      "end_line": 9472,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 9473,
+      "end_line": 9488,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "chromanr",
+      "start_line": 9489,
+      "end_line": 9550,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9551,
+      "end_line": 9554,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "chromashift",
+      "start_line": 9555,
+      "end_line": 9571,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9572,
+      "end_line": 9575,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "ciescope",
+      "start_line": 9576,
+      "end_line": 9634,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "codecview",
+      "start_line": 9635,
+      "end_line": 9692,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 9693,
+      "end_line": 9708,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorbalance",
+      "start_line": 9709,
+      "end_line": 9741,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 9742,
+      "end_line": 9751,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9752,
+      "end_line": 9755,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorcontrast",
+      "start_line": 9756,
+      "end_line": 9781,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9782,
+      "end_line": 9785,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorcorrect",
+      "start_line": 9786,
+      "end_line": 9827,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9828,
+      "end_line": 9831,
+      "file": "doc_filters.texi",
+      "batch": 12,
+      "note": "Read boxblur through colorcorrect, full ranges; bwdif default field-rate output, keyer color-domain distinction, chroma radius geometry and side-data prerequisites.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorchannelmixer",
+      "start_line": 9832,
+      "end_line": 9899,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 9900,
+      "end_line": 9914,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9915,
+      "end_line": 9918,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colordetect",
+      "start_line": 9919,
+      "end_line": 9945,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorize",
+      "start_line": 9946,
+      "end_line": 9968,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 9969,
+      "end_line": 9972,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorkey",
+      "start_line": 9973,
+      "end_line": 10001,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10002,
+      "end_line": 10017,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10018,
+      "end_line": 10024,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorhold",
+      "start_line": 10025,
+      "end_line": 10042,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10043,
+      "end_line": 10049,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colorlevels",
+      "start_line": 10050,
+      "end_line": 10109,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10110,
+      "end_line": 10137,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10138,
+      "end_line": 10141,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colormap",
+      "start_line": 10142,
+      "end_line": 10176,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colormatrix",
+      "start_line": 10177,
+      "end_line": 10221,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "colortemperature",
+      "start_line": 10505,
+      "end_line": 10523,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10524,
+      "end_line": 10526,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "convolution",
+      "start_line": 10527,
+      "end_line": 10563,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10564,
+      "end_line": 10567,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10568,
+      "end_line": 10607,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "convolve",
+      "start_line": 10608,
+      "end_line": 10625,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "copy",
+      "start_line": 10626,
+      "end_line": 10631,
+      "file": "doc_filters.texi",
+      "batch": 13,
+      "note": "Read colorchannelmixer through copy; colorkey is 8-bit RGB, colordetect inferential alpha/range detection, convolution source/backend normalization ambiguity needs qualification.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "coreimage",
+      "start_line": 10632,
+      "end_line": 10704,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10705,
+      "end_line": 10735,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "corr",
+      "start_line": 10736,
+      "end_line": 10759,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "cover_rect",
+      "start_line": 10760,
+      "end_line": 10783,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10784,
+      "end_line": 10793,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "crop",
+      "start_line": 10794,
+      "end_line": 10895,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 10896,
+      "end_line": 10974,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 10975,
+      "end_line": 10990,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "cropdetect",
+      "start_line": 10991,
+      "end_line": 11058,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11059,
+      "end_line": 11080,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11081,
+      "end_line": 11091,
+      "file": "doc_filters.texi",
+      "batch": 14,
+      "note": "Read coreimage/corr/cover/crop/cropdetect; CoreImage may be software, transitions limited, exact subsampled crop and initialization vs frame evaluation.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "cue",
+      "start_line": 11092,
+      "end_line": 11122,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "curves",
+      "start_line": 11123,
+      "end_line": 11203,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11204,
+      "end_line": 11207,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11208,
+      "end_line": 11258,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "datascope",
+      "start_line": 11259,
+      "end_line": 11304,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11305,
+      "end_line": 11308,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "dblur",
+      "start_line": 11309,
+      "end_line": 11324,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11325,
+      "end_line": 11331,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "dctdnoiz",
+      "start_line": 11332,
+      "end_line": 11381,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11382,
+      "end_line": 11398,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deband",
+      "start_line": 11399,
+      "end_line": 11440,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11441,
+      "end_line": 11444,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deblock",
+      "start_line": 11445,
+      "end_line": 11474,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11475,
+      "end_line": 11503,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11504,
+      "end_line": 11508,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "decimate",
+      "start_line": 11509,
+      "end_line": 11552,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deconvolve",
+      "start_line": 11553,
+      "end_line": 11575,
+      "file": "doc_filters.texi",
+      "batch": 15,
+      "note": "Read cue/curves/datascope/dblur/dctdnoiz/deband/deblock/decimate/deconvolve; wallclock cue not frame-accurate guarantee, monotonic curve choice, decimation mixed VFR.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "dedot",
+      "start_line": 11576,
+      "end_line": 11599,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deflate",
+      "start_line": 11600,
+      "end_line": 11617,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11618,
+      "end_line": 11621,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deflicker",
+      "start_line": 11622,
+      "end_line": 11662,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deinterlace_d3d12",
+      "start_line": 11663,
+      "end_line": 11729,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11730,
+      "end_line": 11761,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "dejudder",
+      "start_line": 11762,
+      "end_line": 11793,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "delogo",
+      "start_line": 11794,
+      "end_line": 11824,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 11825,
+      "end_line": 11837,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "derain",
+      "start_line": 11838,
+      "end_line": 11885,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "deshake",
+      "start_line": 11886,
+      "end_line": 11961,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "despill",
+      "start_line": 11962,
+      "end_line": 11996,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 11997,
+      "end_line": 12000,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "detelecine",
+      "start_line": 12001,
+      "end_line": 12028,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "dilation",
+      "start_line": 12029,
+      "end_line": 12055,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 12056,
+      "end_line": 12059,
+      "file": "doc_filters.texi",
+      "batch": 16,
+      "note": "Read dedot through dilation; D3D12 deinterlace driver-specific algorithm and reference-frame queue, pattern phase for detelecine after cuts, DNN external models.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "drawbox",
+      "start_line": 12311,
+      "end_line": 12387,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 12388,
+      "end_line": 12420,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 12421,
+      "end_line": 12428,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "drawgraph",
+      "start_line": 12429,
+      "end_line": 12535,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "drawgrid",
+      "start_line": 12536,
+      "end_line": 12604,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 12605,
+      "end_line": 12620,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 12621,
+      "end_line": 12628,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "drawtext",
+      "start_line": 12629,
+      "end_line": 12640,
+      "file": "doc_filters.texi",
+      "batch": 17,
+      "note": "Read drawbox/grid/graph and drawtext introduction; replace preserves/overwrites alpha by explicit mode, text requires freetype+HarfBuzz and optional bidi/font fallback dependencies.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Syntax",
+      "start_line": 12641,
+      "end_line": 12956,
+      "file": "doc_filters.texi",
+      "batch": 18,
+      "note": "Read full drawtext syntax/text-expansion; textfile UTF8 mutual exclusion, atomic reload, literal expansion none, wallclock vs PTS and rounded timecode-rate distinction.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Text expansion",
+      "start_line": 12957,
+      "end_line": 13063,
+      "file": "doc_filters.texi",
+      "batch": 18,
+      "note": "Read full drawtext syntax/text-expansion; textfile UTF8 mutual exclusion, atomic reload, literal expansion none, wallclock vs PTS and rounded timecode-rate distinction.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 13064,
+      "end_line": 13109,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 13110,
+      "end_line": 13235,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "edgedetect",
+      "start_line": 13309,
+      "end_line": 13349,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 13350,
+      "end_line": 13365,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "elbg",
+      "start_line": 13366,
+      "end_line": 13399,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "entropy",
+      "start_line": 13400,
+      "end_line": 13413,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "epx",
+      "start_line": 13414,
+      "end_line": 13425,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "eq",
+      "start_line": 13426,
+      "end_line": 13500,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 13501,
+      "end_line": 13536,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "erosion",
+      "start_line": 13537,
+      "end_line": 13563,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 13564,
+      "end_line": 13567,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "estdif",
+      "start_line": 13568,
+      "end_line": 13653,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 13654,
+      "end_line": 13656,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "exposure",
+      "start_line": 13657,
+      "end_line": 13671,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 13672,
+      "end_line": 13675,
+      "file": "doc_filters.texi",
+      "batch": 19,
+      "note": "Read drawtext commands/examples, edges/posterization/entropy/EPX/eq/erosion/estdif/exposure; invalid reinit preserves old params, EQ approximate gamma, default deinterlace modes differ.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "extractplanes",
+      "start_line": 13676,
+      "end_line": 13702,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 13703,
+      "end_line": 13713,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fade",
+      "start_line": 13714,
+      "end_line": 13757,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 13758,
+      "end_line": 13804,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fftdnoiz",
+      "start_line": 13849,
+      "end_line": 13883,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fftfilt",
+      "start_line": 13884,
+      "end_line": 13942,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 13943,
+      "end_line": 13971,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "field",
+      "start_line": 13972,
+      "end_line": 13986,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fieldhint",
+      "start_line": 13987,
+      "end_line": 14034,
+      "file": "doc_filters.texi",
+      "batch": 20,
+      "note": "Read extractplanes/fade/FFT denoise+filter/field/fieldhint; fade duration/start precedence, temporal denoise lookahead, field hint constrained mapping.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fieldmatch",
+      "start_line": 14035,
+      "end_line": 14257,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "p/c/n/u/b meaning",
+      "start_line": 14258,
+      "end_line": 14259,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "p/c/n",
+      "start_line": 14260,
+      "end_line": 14314,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "u/b",
+      "start_line": 14315,
+      "end_line": 14349,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 14350,
+      "end_line": 14361,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fieldorder",
+      "start_line": 14362,
+      "end_line": 14392,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fillborders",
+      "start_line": 14393,
+      "end_line": 14446,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 14447,
+      "end_line": 14453,
+      "file": "doc_filters.texi",
+      "batch": 21,
+      "note": "Read fieldmatch all strategies/examples and fieldorder/fillborders; fieldmatch does not decimate, mixed-mode pipeline distinctions, fieldorder changes pixels not only flags.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "find_rect",
+      "start_line": 14454,
+      "end_line": 14509,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 14510,
+      "end_line": 14529,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "framepack",
+      "start_line": 14703,
+      "end_line": 14747,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "framerate",
+      "start_line": 14748,
+      "end_line": 14792,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "frc_amf",
+      "start_line": 14793,
+      "end_line": 14859,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "framestep",
+      "start_line": 14860,
+      "end_line": 14870,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "freezedetect",
+      "start_line": 14871,
+      "end_line": 14899,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "freezeframes",
+      "start_line": 14900,
+      "end_line": 14919,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "frei0r",
+      "start_line": 14920,
+      "end_line": 14954,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 14955,
+      "end_line": 14982,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 14983,
+      "end_line": 14986,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fspp",
+      "start_line": 14987,
+      "end_line": 15018,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "fsync",
+      "start_line": 15019,
+      "end_line": 15058,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "gblur",
+      "start_line": 15059,
+      "end_line": 15079,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 15080,
+      "end_line": 15086,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "gradfun",
+      "start_line": 15235,
+      "end_line": 15266,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 15267,
+      "end_line": 15285,
+      "file": "doc_filters.texi",
+      "batch": 22,
+      "note": "Read find_rect/framepack/framerate/AMF FRC/framestep/freeze/frei0r/fspp/fsync/gblur/gradfun. FPS mapping fsync supports aligned metrics; gradfun explicitly playback-only before lossy compression.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "graphmonitor",
+      "start_line": 15286,
+      "end_line": 15385,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "grayworld",
+      "start_line": 15386,
+      "end_line": 15397,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "greyedge",
+      "start_line": 15398,
+      "end_line": 15421,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 15422,
+      "end_line": 15438,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "guided",
+      "start_line": 15439,
+      "end_line": 15470,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 15471,
+      "end_line": 15473,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 15474,
+      "end_line": 15492,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hflip",
+      "start_line": 15575,
+      "end_line": 15583,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "histeq",
+      "start_line": 15584,
+      "end_line": 15617,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "histogram",
+      "start_line": 15618,
+      "end_line": 15689,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 15690,
+      "end_line": 15702,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hqdn3d",
+      "start_line": 15703,
+      "end_line": 15728,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 15729,
+      "end_line": 15736,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hqx",
+      "start_line": 15859,
+      "end_line": 15873,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hstack",
+      "start_line": 15874,
+      "end_line": 15892,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hsvhold",
+      "start_line": 15893,
+      "end_line": 15930,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hsvkey",
+      "start_line": 15931,
+      "end_line": 15968,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hue",
+      "start_line": 15969,
+      "end_line": 16015,
+      "file": "doc_filters.texi",
+      "batch": 23,
+      "note": "Read graphmonitor/grayworld/greyedge/guided/hflip/histeq/histogram/hqdn3d/hqx/hstack/HSV/hue. Linear-light prerequisites, queue diagnostics, input matching, hue angle-unit mutual exclusion.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 16016,
+      "end_line": 16061,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16062,
+      "end_line": 16076,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "huesaturation",
+      "start_line": 16077,
+      "end_line": 16132,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "hysteresis",
+      "start_line": 16133,
+      "end_line": 16153,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "iccdetect",
+      "start_line": 16154,
+      "end_line": 16167,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "iccgen",
+      "start_line": 16168,
+      "end_line": 16188,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "identity",
+      "start_line": 16189,
+      "end_line": 16212,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "idet",
+      "start_line": 16213,
+      "end_line": 16296,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 16297,
+      "end_line": 16305,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "il",
+      "start_line": 16306,
+      "end_line": 16342,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16343,
+      "end_line": 16346,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "inflate",
+      "start_line": 16347,
+      "end_line": 16364,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16365,
+      "end_line": 16368,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "interlace, interlace_vulkan",
+      "start_line": 16369,
+      "end_line": 16411,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "kerndeint",
+      "start_line": 16412,
+      "end_line": 16441,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 16442,
+      "end_line": 16463,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "kirsch",
+      "start_line": 16464,
+      "end_line": 16480,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16481,
+      "end_line": 16484,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "lagfun",
+      "start_line": 16485,
+      "end_line": 16499,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16500,
+      "end_line": 16503,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "lenscorrection",
+      "start_line": 16504,
+      "end_line": 16522,
+      "file": "doc_filters.texi",
+      "batch": 24,
+      "note": "Read hue examples through lenscorrection intro; detected invalid generic fade-in formula, ICC tags/profile defaults, idet uncertainty and interlaced flag mutation, interlace rate behavior.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Options",
+      "start_line": 16523,
+      "end_line": 16557,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 16558,
+      "end_line": 16561,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "lensfun",
+      "start_line": 16562,
+      "end_line": 16678,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 16679,
+      "end_line": 16699,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "lcevc",
+      "start_line": 16700,
+      "end_line": 16704,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "libvmaf",
+      "start_line": 17442,
+      "end_line": 17484,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 17485,
+      "end_line": 17515,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "libvmaf_cuda",
+      "start_line": 17516,
+      "end_line": 17523,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 17524,
+      "end_line": 17541,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "limitdiff",
+      "start_line": 17542,
+      "end_line": 17568,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 17569,
+      "end_line": 17572,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "limiter",
+      "start_line": 17573,
+      "end_line": 17589,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Commands",
+      "start_line": 17590,
+      "end_line": 17593,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "loop",
+      "start_line": 17594,
+      "end_line": 17615,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "Examples",
+      "start_line": 17616,
+      "end_line": 17637,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    },
+    {
+      "title": "maskedclamp",
+      "start_line": 17988,
+      "end_line": 18008,
+      "file": "doc_filters.texi",
+      "batch": 25,
+      "note": "Read lens options/database, LCEVC, VMAF/CUDA, limitdiff/limiter/loop/maskedclamp; CUDA VMAF recipe invokes nonfree, VMAF reference-second, loop bounded state and database identity.",
+      "reading_status": "actual_read"
+    }
+  ],
+  "line_count": 6512,
+  "batches_complete": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+  ],
+  "unfinished_assigned_ranges": [],
+  "limitations": [
+    "Source/documentation reading only; no application build, FFmpeg/media execution or tests.",
+    "Split ranges preserved exactly for parent coverage-union merging."
+  ]
+}

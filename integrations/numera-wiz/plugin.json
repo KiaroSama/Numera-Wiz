@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "numera-wiz",
+  "version": "0.1.0",
+  "description": "Operate the implemented Numera Wiz Rust command registry through local MCP with explicit access grants and reviewed media plans.",
+  "author": { "name": "Numera Wiz contributors" },
+  "homepage": "https://github.com/KiaroSama/Numera-Wiz",
+  "repository": "https://github.com/KiaroSama/Numera-Wiz",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["media", "ffmpeg", "rust", "mcp", "muxcls"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Numera Wiz",
+        "shortDescription": "Local media with Rust and MCP",
+        "longDescription": "Discover implemented Numera Wiz commands, inspect authorized media, review cleanup plans, submit and observe jobs, and retrieve verified artifacts. The default connection is discovery-only; an owner must configure any operating profile.",
+        "developerName": "Numera Wiz contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": "Use Numera Wiz to discover the available commands and current limits, then help me review and perform an authorized media workflow."
+      }
+    }
+  }
+}

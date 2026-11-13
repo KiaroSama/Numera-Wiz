@@ -1,0 +1,73 @@
+{
+  "revision": "5.0",
+  "scope": "Document/data corrections only; not runtime qualification",
+  "changed_from_revision_4": {
+    "filmcraft": {
+      "count": 39,
+      "source_ids": [
+        "brightness_contrast",
+        "tint",
+        "color_balance",
+        "leave_color",
+        "change_to_color",
+        "unsharp_mask",
+        "black_white",
+        "color_pass",
+        "gamma_correction",
+        "invert",
+        "levels",
+        "proc_amp",
+        "extract",
+        "posterize",
+        "find_edges",
+        "emboss",
+        "strobe",
+        "noise",
+        "four_color_gradient",
+        "ramp",
+        "lens_flare",
+        "asc_cdl",
+        "video_limiter",
+        "vignette",
+        "turbulent_displace",
+        "gradient",
+        "channel_mix",
+        "color_replace",
+        "echo_glow",
+        "edge_glow",
+        "glint",
+        "light_leaks",
+        "volumetric_rays",
+        "wonder_glow",
+        "color_emboss",
+        "cineon_converter",
+        "cell_pattern",
+        "alpha_glow",
+        "noise_legacy"
+      ]
+    },
+    "effectcraft": {
+      "count": 13,
+      "source_ids": [
+        "ec.blur.unsharp",
+        "ec.channel.invert",
+        "ec.color.brightnesscontrast",
+        "ec.distort.turbulentdisplace",
+        "ec.generate.fourcolor",
+        "ec.generate.cellpattern",
+        "ec.generate.gradientramp",
+        "ec.noise.noise",
+        "ec.stylize.ccvignette",
+        "ec.stylize.coloremboss",
+        "ec.stylize.emboss",
+        "ec.stylize.findedges",
+        "ec.stylize.strobe"
+      ]
+    }
+  },
+  "source_sets_identities_dispositions_runtime_status_preserved": true,
+  "canonical_alias_semantics_updated": [
+    "nw.video.noise.add"
+  ],
+  "application_or_media_execution": false
+}

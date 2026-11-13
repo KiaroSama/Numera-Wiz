@@ -1,0 +1,1778 @@
+{
+  "schema_version": 1,
+  "inherited_research_ledger": "../research-pack/research_v4/ffmpeg-section-reading-ledger.json",
+  "inherited_ledger_is_personal_reading": false,
+  "complete_manual_study": "complete_preserved_48_bodies",
+  "session_reading": [
+    "handoff/00-front-matter-and-fixed-requirements.md",
+    "handoff/01-1-workflow-and-research.md",
+    "handoff/02-2-functional-scope-and-migration.md lines 1-140",
+    "handoff/04-4-engine-ownership-and-durable-state.md lines 1-200 and selected remaining contracts",
+    "handoff/05-5-domain-model-and-interface-contracts.md selected command/access/edit sections",
+    "handoff/09-9-implementation-sequence.md",
+    "handoff/11-11-work-packages-traceability-and-acceptance.md lines 1-95",
+    "handoff/15-annex-d-complete-muxcls-rust-rewrite.md",
+    "research_v7/muxcls-sources/standalone/muxcls/models.py lines 1-100",
+    "research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+    "research_v7/muxcls-sources/standalone/muxcls/constants.py lines 1-100",
+    "research_v7/muxcls-sources/standalone/muxcls/textutil.py lines 1-85"
+  ],
+  "manual_reads": [
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffprobe.texi",
+      "sha256": "9f28004a19dcba2f854595ac96f122dbd44fd82119944456f209fd990e0c58a9",
+      "lines": [
+        1,
+        730
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete wrapper body; included manual files are not credited by this read",
+      "interpretation": [
+        "show_entries selection does not define field order; parse names, not positional columns.",
+        "Packet payload hashing and codec extradata hashing are separate from timing, packet side data and whole-file identity.",
+        "JSON/XML can omit invalid or inapplicable fields. Writers default to replacing invalid strings; preservation-oriented probes should fail on invalid metadata instead.",
+        "read_intervals seeks are not exact; interval duration is anchored to the actual seek point and cannot establish exact preview/sample timing."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T015",
+        "T025"
+      ],
+      "unresolved": [
+        "Complete the included manual bodies separately.",
+        "Qualify full packet/timestamp/decoded preservation and exact observation against actual fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_nut.texi",
+      "sha256": "7164e76d02547123fdb12982bcc443105fb6220b979b6883d4a84c132f4994b5",
+      "lines": [
+        1,
+        159
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "The wrapper describes PIPE/BROADCAST variants and codec tags, not the complete NUT bitstream specification.",
+        "PIPE omits syncpoints; BROADCAST assumes synchronized endpoint clocks and cannot supply the application render clock by itself."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-formats.texi",
+      "sha256": "7d5c644af0da0481720a3cc7a0eebaf96a361ab2ff9a60aab5ffa2471c1d5a19",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes formats.texi; the included format/demuxer/muxer bodies require separate study."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-protocols.texi",
+      "sha256": "32c0cf1045aab88639ae82c2302b830720be3a7b167c80650a1e885fb79efda5",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes protocols.texi; it is not coverage of individual protocol behaviors."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-devices.texi",
+      "sha256": "e93369b9c48f095a0274da1ec771a8b53f4f096924128e7e3b1c614b9898b03a",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes devices.texi; device permission, buffering and timing rules remain separate dependencies."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-codecs.texi",
+      "sha256": "11f90289b4c0b234019c566459d9b1787dcac9b0357905464630910d6b443661",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "This wrapper includes codecs.texi; compiled codec availability and encoder-specific controls must be qualified separately."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-bitstream-filters.texi",
+      "sha256": "59fcee9ec319ff62a0ec9930aeec8f0f50782a9773487ba55e0999c6fb6f7ab8",
+      "lines": [
+        1,
+        46
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "Bitstream filters modify encoded data without decoding. Packet-copy verification must declare framing/header transformations separately.",
+        "The included bitstream_filters.texi body is not credited by the wrapper read."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-filters.texi",
+      "sha256": "faea65ae2f9670f5aad620fff18bbddf9c7e96ba88fb335f973907d1cab71ba8",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; no credit for included files or referenced external specifications",
+      "interpretation": [
+        "The filter wrapper includes filters.texi; it supplies no per-filter semantic or parameter-domain qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Read/qualify the included or referenced implementation-dependent bodies separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_protocols.texi",
+      "sha256": "9bc84820073cf7cedc7b26bda62a805e963bdae7f20974ee27ed49d0b42e3ead",
+      "lines": [
+        1,
+        2408
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-23",
+      "coverage": "Complete file body; referenced third-party manuals and implementation source require separate evidence",
+      "interpretation": [
+        "protocol_whitelist restricts protocols, including nested protocols; it does not implement application filesystem-root grants.",
+        "file truncates existing outputs by default, so only owned staging may be handed to a replacing FFmpeg output.",
+        "file/fd blocksize affects termination reaction; follow ignores the reported file size and needs an independent termination policy.",
+        "async/cache wrappers introduce background I/O or temporary storage; they are not admitted implicitly by the file-only media profile.",
+        "HTTP reconnect retries, total retry delay and redirects are distinct controls; none substitutes for per-destination authorization.",
+        "shared cache uses a URL-derived identity and can mix different contents behind the same URL; a content/credential/policy identity is required for application caches.",
+        "Protocol timeout units vary by protocol and option; canonical typed durations must convert explicitly.",
+        "The pinned TLS/DTLS manual distinguishes certificate-chain checks from hostname validation for its OpenSSL backend; network ingest needs an independently qualified TLS/destination policy.",
+        "UDP and RIST/SRT carry additional socket/queue/latency/drop budgets; ordinary file admission does not enable those routes."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T016",
+        "T023"
+      ],
+      "unresolved": [
+        "Qualify manifest/sequence dependency resolvers and per-package descriptor inheritance.",
+        "Implement bounded authorized network materialization and qualify any required direct-live route against an exact corrected component."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_demuxers.texi",
+      "sha256": "d8dfe0ac1ea18fc30d85471a11d6b1a9641c997706cce0407020e87629de9491",
+      "lines": [
+        1,
+        1231
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external specifications and referenced implementation/API source are not credited by this read",
+      "interpretation": [
+        "MOV enable_drefs and use_absolute_path are disabled by default and must remain reserved planner options.",
+        "The ordinary probe inherits a read-only regular file on descriptor 0, selects fd-only access and a content-admitted demuxer.",
+        "Backward seeks through a tail-indexed MP4 require actual component/runtime evidence; a pipe is not equivalent.",
+        "Concat duration/inpoint/outpoint operate on demuxer clocks and may include preroll/overlap or gaps; they are not exact decoded edit boundaries.",
+        "concat safe=1 is filename syntax policy, not an authorization/root check; option directives and auto_convert require explicit resolver policy.",
+        "HLS child segment options, reload counters and HTTP concurrency do not establish a closed authorized reference set.",
+        "IMF can find a sibling ASSETMAP automatically; image2 defaults to sequence patterns and can derive timestamps from non-monotonic filesystem modification times.",
+        "DVD, subtitle/data extraction and module-emulator routes have different dependencies, loss and memory behavior; a compiled demuxer name alone does not admit them."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T016"
+      ],
+      "unresolved": [
+        "Complete typed dependency resolvers and native package canary evidence for required reference-bearing families.",
+        "Qualify selected timestamp, edit-list, loop and materialization policies against actual fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_formats.texi",
+      "sha256": "01eaac2ca2dc8c6240f1cef30db8700bd98101beb3b2a46ebd7ca906d9acb885",
+      "lines": [
+        1,
+        293
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "The format body includes other manuals; reading the wrapper does not credit demuxers/muxers bodies.",
+        "Probing limits bound analysis, not complete stream absence; max_streams and buffered probe packets are separate resource controls.",
+        "avoid_negative_ts applies a common timestamp shift; inter-stream differences are preserved, while disabled requests no such shift.",
+        "max_interleave_delta=0 can retain sparse-stream packets without a timestamp-difference bound.",
+        "autobsf defaults on; a copy plan must account for admitted packet reframing instead of treating all containers as byte-identical."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_metadata.texi",
+      "sha256": "1a9e61c62d9f82f1f2bec283eeb35471a319e1886bb664303d4c10d7e6e70875",
+      "lines": [
+        1,
+        89
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "FFmetadata requires escaping equals, semicolon, hash, backslash and newline in keys/values.",
+        "Whitespace is semantic tag data and must not be trimmed incidentally.",
+        "Chapter TIMEBASE is explicit; the body states nanoseconds if absent, requiring pinned parser/output qualification rather than rounded seconds."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_scaler.texi",
+      "sha256": "05ef7135691a63b1bc02b7bc1a292111de04cda37435e657b2cc05528c390fe3",
+      "lines": [
+        1,
+        234
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "The pin exposes scaler/scaler_sub separately from deprecated algorithm selections through sws_flags.",
+        "Scaling, range conversion, gamma handling, alpha compositing and dithering are independent declared policies.",
+        "sws_backends includes CPU SIMD and Vulkan SPIR-V; CPU-only plans need a qualified backend policy rather than assuming auto cannot touch a GPU."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_resampler.texi",
+      "sha256": "493e3ae03901dc63ca4282c19f081817ab631b887fd0017b77fc0ba1f6e7aaf9",
+      "lines": [
+        1,
+        228
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; included files and external implementation/API references are not credited",
+      "interpretation": [
+        "Resampling engine, channel layout/rematrix, internal/output format, dither and precision are distinct semantics.",
+        "exact_rational may fall back to a bounded phase count; it is not proof of exact project-clock sampling.",
+        "async and first_pts can insert/drop/stretch samples; they must not silently repair a preservation request.",
+        "Native swr and optional soxr support different controls; an unavailable engine cannot silently substitute another profile."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify the selected concrete lowering and resource behavior with independent hosted fixtures."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_fftools-common-opts.texi",
+      "sha256": "567a15a6eb6c3fcaa516ff93abf20b338e4bf1398e1b2524e1883ff7895f3519",
+      "lines": [
+        1,
+        440
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; referenced implementation/API manuals require separate evidence",
+      "interpretation": [
+        "max_alloc limits one FFmpeg-family heap allocation; it is not a total RSS or process-tree memory cap.",
+        "Output stream indices and per-type ordinals are distinct; metadata-based stream matching is input-only.",
+        "Dash-slash option syntax can load values from files; it is not admitted as a caller override to reserved planner options.",
+        "Log repeat/level/time flags, display verbosity and report-file output are distinct; FFREPORT/report may expose argv and must not be inherited implicitly.",
+        "Buildconf/codec/filter lists are compiled inventory, not evidence of working media, device or qualified GPU execution."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T016",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete actual aggregate process/RSS/scratch budgets and persisted bounded diagnostics."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavcodec.texi",
+      "sha256": "a80d4706d21388e5832d9ab2078fdd6c0c21dcd5de69f5018e17f7bc214ebb86",
+      "lines": [
+        1,
+        49
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavformat.texi",
+      "sha256": "df61fa8ac18bc913851e97ddd666cd10c75b9e6af8c91741fe0adb126ce5536b",
+      "lines": [
+        1,
+        49
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavfilter.texi",
+      "sha256": "2ab8b642f54084d106a6c54466ab99d09bf146b03044bfe08b4e7a10acb9dceb",
+      "lines": [
+        1,
+        45
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavdevice.texi",
+      "sha256": "a6b4adf5464bb27ddf9120bb593382d86b220a1d844975177ce41d3d3b50066d",
+      "lines": [
+        1,
+        46
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libavutil.texi",
+      "sha256": "5a654e8ee602cea2a081ff022459135920413ab37d1648e94d5cafe4537ccf95",
+      "lines": [
+        1,
+        63
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libswscale.texi",
+      "sha256": "f9ec10486841c682be1bfac491372eebb0a51a122510ed7fcd3db33548fa6465",
+      "lines": [
+        1,
+        64
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_libswresample.texi",
+      "sha256": "052a858e69aa6ced2642fb3b6e024a4a4a8eb3246a948c2e208c4645d9e9fb0d",
+      "lines": [
+        1,
+        71
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete overview-wrapper body only; includes, detailed linked manuals and API headers are not credited",
+      "interpretation": [
+        "This overview names the library boundary; it is not per-codec/filter/device semantic or runtime qualification.",
+        "Scaling, colorspace, sample-format, channel-rematrix and sample-rate conversions may be lossy; a shared backend does not establish preservation."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Study the detailed bodies and qualify concrete lowering separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_authors.texi",
+      "sha256": "fb5fac6dd8f7474033e933814491a8297d8723c52be4dcbcc82eef9c4f008dd2",
+      "lines": [
+        1,
+        11
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_devices.texi",
+      "sha256": "c399576ab8e09931445713c962c25471699f33c8cef359d5d5ce2015650ff050",
+      "lines": [
+        1,
+        25
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification.",
+        "Devices share format interfaces but have private options and independent grants; ordinary fd-only file admission does not authorize device access."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_general.texi",
+      "sha256": "abf058dc4502a49ebc3185579806ce9224a7f1373d3560df5930894f146bb0bd",
+      "lines": [
+        1,
+        15
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-utils.texi",
+      "sha256": "39e9be347e6dfa9aa8aa88e409b3c7e393b668e25e748fb1043a4c0cff9274cc",
+      "lines": [
+        1,
+        43
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-scaler.texi",
+      "sha256": "35392efb228c8e6695a9d3d19cd71e695ef7ea2dd0bd243a1c990abd406e011f",
+      "lines": [
+        1,
+        44
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg-resampler.texi",
+      "sha256": "5e1cf89af0ba868832c24beee39a59e998dd2324c79909fe48b59ca1c7c7674b",
+      "lines": [
+        1,
+        45
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffplay.texi",
+      "sha256": "94c1a468402f6f3be51ae8dbd5834b5f300c0945d06143e4a61d4e79bf9c75a7",
+      "lines": [
+        1,
+        352
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body only; included files and external/API references are not credited",
+      "interpretation": [
+        "Wrapper/body read is not credit for included files, external references or runtime qualification.",
+        "FFplay is an SDL-based test player; its seek/frame-drop/unbounded-buffer defaults do not define the shared Rust preview contract.",
+        "A nearest seek point, auto-rotation, audio master clock and dropped frames need explicit project timing/display policies; they do not establish exact observation sampling."
+      ],
+      "tasks": [
+        "T005",
+        "T025",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete detailed include bodies and actual preview/device qualification separately."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_utils.texi",
+      "sha256": "2eca333c720c88b04934d72d10a60b3b1e4650666ab657fa9a029697b39df3a2",
+      "lines": [
+        1,
+        1129
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external API/implementation references are not credited",
+      "interpretation": [
+        "FFmpeg token/filter escaping is separate from shell escaping; argument-vector execution removes a shell layer but not filtergraph/metadata syntax.",
+        "Frame rates admit exact numerator/denominator forms; ratio syntax also admits undefined/infinite values that require domain validation.",
+        "Channel count, known channel layout and unknown layout are distinct; uppercase C and lowercase c have different semantics.",
+        "Expression evaluation uses floating-point arithmetic, state variables are expression-local, and while/root/taylor can require bounded work.",
+        "Wallclock time(0), unseeded random color/state and implicit local-time dates cannot stand in for a deterministic project clock or immutable plan."
+      ],
+      "tasks": [
+        "T005",
+        "T015",
+        "T025",
+        "T030",
+        "T031",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify concrete graph escaping, channel-layout and exact clock lowering against the pinned runtime."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_outdevs.texi",
+      "sha256": "102210c02844d9f873b0c2785e84d5940653ef38390d71ff63e21de84e859faa",
+      "lines": [
+        1,
+        450
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body; linked third-party/toolchain/device specifications are not credited",
+      "interpretation": [
+        "Device, device-format, output-clock and buffering choices need independent grants and actual target evidence.",
+        "An audio server or X11 display can be a network endpoint; an output filename is not automatically an ordinary file.",
+        "Device VANC/drop and PulseAudio prebuffer/latency policies must not silently define the project preview clock."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify actual native payload dependencies, device/clock behavior and descriptor/file permissions per target."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_platform.texi",
+      "sha256": "a5c72d479dd33a39a2d08fe78a9817ee22e0bc7fdaf91b4f73724dc0df421c5a",
+      "lines": [
+        1,
+        349
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body; linked third-party/toolchain/device specifications are not credited",
+      "interpretation": [
+        "The platform document includes historical toolchain details; present toolchains and ABI/dependency closure still require exact hosted evidence.",
+        "A MinGW native Windows build and an MSYS/Cygwin environment build have different runtime dependencies.",
+        "Static/shared MSVC library choices and C-runtime linkage need a coherent profile; the Rust host ABI alone does not qualify descriptor inheritance into FFmpeg."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Qualify actual native payload dependencies, device/clock behavior and descriptor/file permissions per target."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_community.texi",
+      "sha256": "cfc63c474573fa734d8966bb158e55c6a53fc978923f1ceef9f9cf0d135d575b",
+      "lines": [
+        1,
+        182
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "This pinned body describes upstream governance and technical/community conflict resolution, not Numera runtime authorization or media support.",
+        "Upstream contributor roles and example contact addresses confer no authority to send messages on the user's behalf."
+      ],
+      "tasks": [
+        "T005",
+        "T039"
+      ],
+      "unresolved": [
+        "No current community membership or contact availability was inferred from this archived body."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_fate.texi",
+      "sha256": "07b49cf2c33b20d04b828166ce569f6d7d57e4b2791b113bcd6b134e7960ecba",
+      "lines": [
+        1,
+        300
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "FATE is a regression suite whose enabled tests, sample set, compiler/CPU, threads and hardware configuration must be identified with results.",
+        "The GEN flag regenerates missing/mismatched references; generated references are not independent preservation evidence.",
+        "Preserve sample identity across old checkouts; optional wrappers and HWACCEL alter the tested execution boundary."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T035",
+        "T037"
+      ],
+      "unresolved": [
+        "Qualify the selected standard component build with pinned samples and retained actual logs in CI; no FATE run was performed by reading this body."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_decoders.texi",
+      "sha256": "242db22415822bcf09e891e6063b1fcbe3760b4670cfc601bca110afe87776c8",
+      "lines": [
+        1,
+        690
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Compiled decoder presence and external-library configuration are separate from container admission and actual runtime/hardware qualification.",
+        "QSV async_depth trades buffering/latency and gpu_copy can perform GPU transfers; CPU-only policy must exclude these routes deliberately.",
+        "AC-3 DRC and AV1 film-grain/layer/operating-point defaults alter decoded semantics and must be frozen for preview/export/decoded oracles.",
+        "Subtitle decoders can access font/config/IFO files or dump images, while ARIB layout, teletext whitespace/duration and DVD forced-only/palette choices change the result."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T027"
+      ],
+      "unresolved": [
+        "Complete decoder dependency/canary admission for the standard payload, including subtitle fonts/configuration/palette file opens; the minimal fixture does not qualify those libraries."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_mailing-list-faq.texi",
+      "sha256": "7ba38b8b16e6b94d6054d64da6dfa17738c874b693d85fe8ee9f62b36b7ac0f6",
+      "lines": [
+        1,
+        389
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Minimal reproducible FFmpeg commands and text diagnostics are separate evidence from third-party wrapper behavior or screenshots.",
+        "The pinned body recommends complete console diagnostics for upstream reports; any future user-authorized export still needs protected-data redaction and explicit inclusion choices."
+      ],
+      "tasks": [
+        "T005",
+        "T039"
+      ],
+      "unresolved": [
+        "No upstream message, subscription, sample upload or contact action was requested or performed."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_git-howto.texi",
+      "sha256": "aeaced97ff2709f2c4ca829054712787658e63ff9d583eb48f2752ba124db182",
+      "lines": [
+        1,
+        484
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Review exact diffs and the intended source/branch before publication; upstream workflows are contextual documentation, not authorization to modify this repository's main branch.",
+        "Regression suites do not establish correctness of new behavior without new meaningful assertions."
+      ],
+      "tasks": [
+        "T005",
+        "T035",
+        "T040"
+      ],
+      "unresolved": [
+        "Keep Numera's one-branch/draft-PR rule and hosted-only build/test mandate; no upstream git/mailing workflow was executed."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_faq.texi",
+      "sha256": "88bbf6e78d9e9effabdafc095a1194502e09e2cf4a3534fd16f2d6acfa224487",
+      "lines": [
+        1,
+        686
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; includes, external references, runtime commands and current upstream state are not credited by this read",
+      "interpretation": [
+        "Container recognition does not imply support for every codec/stream; finite initial probe scans can miss later streams in header-poor formats.",
+        "Concat filter, demuxer and protocol are different semantic/authority operations; file-byte joining is only valid for specific admitted representations.",
+        "Auto-inserted resampling/channel conversion, interlace settings, SAR/DAR and quality options can change output semantics and cannot stand in for preservation proofs.",
+        "r_frame_rate is not an exact VFR timeline or an average frame rate; retain timestamp/time-base data. Background ffmpeg requires nostdin or an explicit admitted stdin route."
+      ],
+      "tasks": [
+        "T005",
+        "T014",
+        "T015",
+        "T025",
+        "T028",
+        "T029",
+        "T035"
+      ],
+      "unresolved": [
+        "Complete late-stream, joining, format/channel and actual standard-profile output fixtures; historical platform/codec examples are not current compatibility recommendations."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_codecs.texi",
+      "sha256": "a6d8697c6847d5f1d5b2e34edfec900064c52425091fe5fa9ab0d75c23ea2c46",
+      "lines": [
+        1,
+        1043
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body in ranges 1-120, 121-650 and 651-1043; decoder/encoder includes are not credited by this wrapper read",
+      "interpretation": [
+        "Generic codec options can be ignored by specific codecs; a typed admitted codec/profile must resolve supported options explicitly.",
+        "bitexact excludes IDCT variability; automatic DCT/IDCT, thread defaults and frame-thread delay do not establish CPU/GPU decoded equivalence.",
+        "Cropping alignment and hardware treatment differ, while skip_frame/skip_alpha/lowres/DRC and side-data export choices alter decoded semantics.",
+        "Color primaries, transfer, matrix, range, chroma location and alpha mode are separate facts from actual pixel conversion.",
+        "codec_whitelist defaults to all decoders; max_pixels limits image dimensions but is not an aggregate RSS/process-tree budget."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T030",
+        "T034"
+      ],
+      "unresolved": [
+        "Read the encoder include separately and qualify typed options/cropping/side-data/timing/color behavior against actual admitted component profiles.",
+        "Finish explicit decoder dependency admission and process-tree/RSS/scratch qualification; no codec invocation was run by reading this body."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_bitstream_filters.texi",
+      "sha256": "29de3d86573538d348b0be5c35c784ccba95c4f41896f088f7b76aeb89b2fc20",
+      "lines": [
+        1,
+        1095
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in ranges 1-410, 411-800 and 801-1095; external standards/references are not credited",
+      "interpretation": [
+        "Stream copy can auto-insert AAC ADTS-to-ASC or H.264/HEVC Annex-B conversions; packet payload and extradata changes need a frozen permitted-normalization contract and independent semantic proof.",
+        "Core extraction, unit removal, Dolby Vision stripping and E-AC-3/TrueHD changes can discard channels, captions, HDR or ATMOS data despite codec copy.",
+        "Bitstream color/SAR/tick-rate/cropping metadata changes are distinct from pixel conversion and exact container/decoded timing. MPEG-2 metadata can round an unrepresentable frame rate.",
+        "PCM rechunk defaults to padding the final packet; a framing-only preservation contract must forbid added samples and independently verify exact timing and sample count.",
+        "PGS display-set merging, MOV text headers and VP9 packet splitting/reordering alter packet boundaries; generic decoded equality alone cannot excuse lost unexposed metadata or changed clocks.",
+        "setts expressions can change PTS/DTS/duration/time base; input/output time-base and prescale semantics must be explicit, especially with B-frames."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T015",
+        "T025",
+        "T028",
+        "T029",
+        "T034"
+      ],
+      "unresolved": [
+        "Implement and qualify each required permitted reframing route; retain strict packet/metadata failure until its explicit normalization and independent oracle exist.",
+        "Complete standard component BSF closure and actual caption/HDR/audio-tail/timing fixtures; no bitstream filter was executed by reading this manual."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_developer.texi",
+      "sha256": "26549522babfb7af744059d68077440064de6693ee6ff8c41b53ea3c36534e4c",
+      "lines": [
+        1,
+        1184
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; referenced headers, external pages, samples and included manuals are not credited",
+      "interpretation": [
+        "FFmpeg public library APIs and ABI remain compatible within a major version; this does not establish stable CLI media defaults or waive candidate-specific component qualification.",
+        "Runtime CPU dispatch has portable C and architecture-specific implementations. checkasm and bitstream regression coverage are separate from application output/resource oracles.",
+        "New modules must treat malformed inputs as untrusted and avoid crashes, infinite work and excessive allocation; allocation failure and cleanup behavior need explicit fixtures.",
+        "FATE, sanitizer/memcheck and performance coverage answer different questions. Updated reference results require a reviewed semantic reason and do not become an independent oracle merely because the updated test passes.",
+        "Release branches and point-release source/ABI rules do not authorize automatic application releases; the owner review and exact packaged payload gates remain controlling."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T034",
+        "T035",
+        "T038"
+      ],
+      "unresolved": [
+        "Complete remaining manual bodies and external implementation qualification separately.",
+        "Qualify actual package/profile/platform malformed-media, memory and performance behavior in hosted and matching owner evidence."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_indevs.texi",
+      "sha256": "0deb468a38fdfe18db7a61c9b8d7d9153cae96598baea08af6ae2e47b0f7fc23",
+      "lines": [
+        1,
+        1596
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external device APIs, linked pages and hardware operation are not credited",
+      "interpretation": [
+        "Input device availability is a build/runtime fact. File media grants do not authorize camera, microphone, screen, display-server, network audio or privileged DRM capture.",
+        "AVFoundation can fall back to the first supported pixel format, frame rate or size; a frozen exact request must detect and report the resolved capture parameters rather than silently claim the requested format.",
+        "DirectShow filter load/save opens additional files and can overwrite; crossbar/dialog changes may persist across later invocations. Unattended admitted routes must enumerate and constrain those effects.",
+        "DeckLink default capture buffering is 1 GiB and signal loss can generate bars or repeated frames. These defaults are media semantics and exceed an unexamined small-memory assumption.",
+        "V4L2 timestamps can use wall or monotonic clocks, PulseAudio initially uses wall time, and KMS sampling is not synchronized to display changes. Exact application capture clocks require explicit mapping.",
+        "lavfi graph_file and movie/amovie sources open dependencies; CPU-only headless commands must not initialize device capture or GPU-backed KMS routes."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T025",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Complete device-specific authorization, dependency enumeration, budgets and actual admitted target qualification before advertising capture.",
+        "Finish the remaining full manual bodies."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_general_contents.texi",
+      "sha256": "4569ace25b4c6f6947dd58ce770524f6f4107593e7a64c1458e75292d778c526",
+      "lines": [
+        1,
+        1600
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete external-library and capability-table body; no external-library source/API, binary or hardware qualification is credited",
+      "interpretation": [
+        "Broad upstream format/codec tables are neither a concrete build manifest nor successful runtime admission; query and qualify the exact bundled component candidate.",
+        "Native codecs and external encoders/decoders have different dependency, feature and quality closure. H.264, HEVC, AV1, JPEG XL, Opus and subtitle capability must identify the actual selected implementation.",
+        "Optional script engines such as AviSynth and VapourSynth are execution/dependency surfaces, not ordinary granted file formats; automatic script execution is not an admitted file probe.",
+        "Optional external libraries and GPU dispatchers introduce package, redistribution and driver/runtime requirements. No nonfree-enabled profile is silently substituted for the selected redistributable payload.",
+        "Image formats with separate planes, VobSub companion pairs and reference/network formats require complete dependency enumeration rather than admission by filename extension.",
+        "Integer-only availability, experimental codec flags, restricted encoder pixel formats and table footnotes are explicit capability constraints; a catalogue row does not prove exact media or preservation behavior."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T028",
+        "T029",
+        "T034",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Finish full encoder/muxer/filter/ffmpeg/drawvg bodies separately.",
+        "Implement exact runtime capability cache and standard offline component payload with candidate-specific closure and qualification."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_ffmpeg.texi",
+      "sha256": "c845782067f5e6291a5aefc6e567bbeba107107ffa771f75d4c5bf70c5ee3d91",
+      "lines": [
+        1,
+        3338
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete wrapper body including all main/advanced options and examples; included manual bodies retain their independent reading entries",
+      "interpretation": [
+        "Input/output option placement and last matching per-stream option determine actual behavior. Explicit maps must bind original streams and exact labeled graph outputs; automatic choices omit attachments/data and can add unlabeled filter outputs.",
+        "Input -ss seeks to an earlier seek point; streamcopy retains preroll while accurate transcoding discards it. Seek correctness must be independently asserted against source clocks and actual presentation intervals.",
+        "copyts does not by itself prevent muxer/fps-mode timestamp changes. start_at_zero is an explicit time shift; copytb and enc_time_base affect VFR correctness and must be frozen and verified.",
+        "Input/output frame-rate options have different effects. Output streamcopy -r changes declared rate without changing packet timestamps, and output -s appends a scale stage; these are not interchangeable with an exact timeline transform.",
+        "Automatic pixel-format conversion, autorotate, apply_cropping, autoscale, channel-layout guessing and filter reinitialization can change pixels/audio/state. Explicit graph/profile policy must account for these defaults and mid-stream changes.",
+        "Filter thread pools default to all CPUs; filter-buffered frames default unlimited; muxing queues admit 50 MB per stream before packet-count limits; shortest/subtitle-duration repair can buffer sparse streams substantially. max_alloc/process-count limits are not aggregate memory qualification.",
+        "Hardware type enumeration is not usable device qualification; QSV decoders can initialize hardware independently of -hwaccel and a chosen device/driver/frame domain must be explicit.",
+        "Preset searches, pass logs, graph/stat/progress/SDP outputs, attachment filenames and image patterns create additional reads/writes. All must be enumerated under owned plan namespaces and explicit grants; environment clearing alone does not make an arbitrary option safe.",
+        "max_error_rate affects final status without immediately stopping processing, and timelimit is CPU-user-time rather than a wall deadline. A successful process exit or progress=end does not replace mandatory artifact verification."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T039"
+      ],
+      "unresolved": [
+        "Read full encoder, muxer, filter and drawvg bodies independently.",
+        "Complete exact timeline/graph, resource bounds, secondary-open admission and candidate-specific media/target qualification."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_muxers.texi",
+      "sha256": "81d092c67f16221178c6ec8c1b1332c764bfe0147023ade0aa72175c8b98f302",
+      "lines": [
+        1,
+        4092
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete file body; external container specifications, device/network operation and linked codec implementations are not credited",
+      "interpretation": [
+        "Raw codec and PCM muxers omit source timestamps/metadata. Framehash/framecrc default to decoded conversions and hash/streamhash ignore timestamps; the oracle must select its exact decoded or packet identity and clock contract.",
+        "Ordinary MOV/MP4 buffers packet index metadata until close; fragmentation/hybrid modes trade memory/recovery against compatibility. Faststart rewrites the index in a second pass. Frozen budgets and plan stages must include these effects.",
+        "Movie/video timescales, edit lists, CTTS offsets, chapters/timecode/color/ICC flags and stream-group behavior can change semantics even with streamcopy. Stream-specific automatic defaults require explicit verification.",
+        "DASH/HDS/HLS/segment/image2/tee generate multiple artifacts, secondary outputs, optional key/certificate/network opens, automatic companion planes, deletions, append/overwrite and retry behavior. A shell-free argv alone does not confine their internal mini-languages.",
+        "FIFO recovery may be unlimited and drop packets; tee onfail=ignore deliberately permits an incomplete destination. These are not complete verified export success without a separately admitted finite policy.",
+        "Matroska reserve_index_space writes seekable Cues/Void space; default_mode defaults passthrough. Metadata flip flags do not flip pixels. MP3 attached pictures may buffer preceding audio.",
+        "Segment times are keyframe-dependent, reset_timestamps changes clocks, and break_non_keyframes changes decode/seek reliability. Exact interval operations need a separate qualified lowering and oracle.",
+        "RIFF default never-RF64 can overflow above 4 GiB; choosing RF64 has compatibility implications. NUT write_index=0 disables growing index tables; disabling syncpoints instead damages seek/recovery behavior.",
+        "WHIP uses HTTP/ICE/STUN/DTLS/SRTP with independent timeouts and secret-bearing authorization/certificate/key fields. A future admitted network route needs protected secret delivery/redaction and explicit network/device grants."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T022",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T035",
+        "T039"
+      ],
+      "unresolved": [
+        "Finish full encoder/filter/drawvg manual bodies.",
+        "Implement all admitted output families and their multi-artifact publication/dependency/clock/resource/package qualification."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_encoders.texi",
+      "sha256": "3dc2f777ab802bc087705a41b44fc0c70dee9989a2cf8a0e8c2b33287c06e644",
+      "lines": [
+        1,
+        4801
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in contiguous ranges 1-460 through 4141-4600 and 4601-4801; external library APIs, actual binaries and devices are not credited",
+      "interpretation": [
+        "Native AAC defaults/tools and codec-specific quality/rate controls are explicit profile semantics; not all encoders share meanings for b/q.",
+        "AC-3 fixed versus floating point is not a universal speed ranking. Dialnorm/downmix metadata can alter decoded playback levels even when the encoded samples were otherwise unchanged.",
+        "Dolby Surround/Headphone/EX metadata labels do not apply the named DSP; claiming a processing effect from the label alone is incorrect.",
+        "Native Opus implements only CELT in this manual and is not an equivalent quality substitute for libopus. FDK AAC HE/VBR/profile restrictions and nonfree GPL packaging constraints cannot be hidden by a generic AAC label.",
+        "FLAC prediction/search/compression knobs change CPU cost without changing the lossless decoded claim; exact decoded/sample-count/timing verification is still required.",
+        "LC3 frame duration, high-resolution auto behavior and LAME algorithm quality versus rate-control quality are separate codec-specific semantics.",
+        "Opus channel mapping, FEC, packet-loss, DTX, phase inversion and latency mode alter the coding contract. AMR bitrates may be rounded rather than applied exactly.",
+        "AV1 tile/row thread controls and lookahead have separate resource effects. CRF/QP and preset values are codec-specific; library version and actual capability must be part of the frozen profile.",
+        "Lossless JPEG 2000 and JPEG XL require explicit modes; WebP can convert between RGB/YUV internally and its quality knob means different things in lossless and lossy modes.",
+        "x264/x265 parameter mini-languages include stats-file reads/writes, defaults, reference/GOP and SEI/caption policies. A typed admitted profile must enumerate those effects rather than expose an unconstrained option string.",
+        "MediaCodec async global-header and PTS-as-DTS behavior depend on mode/device; MediaFoundation hardware requires its D3D11 route rather than general hardware availability.",
+        "ProRes profile, quantization, alpha precision and bit constraints are explicit media/profile choices; overriding vendor metadata does not prove encoder provenance.",
+        "QSV may select a different rate-control mode at runtime and clamp bitrates; frozen admission must inspect the resolved mode, driver and capability rather than infer it from requested options.",
+        "VAAPI requires hardware surfaces and explicit upload. Async depth and frame pools consume resources; low-power modes can reduce features. VP9 reordering/superframe and HDR/SEI policies require exact qualified bitstream contracts.",
+        "Subtitle palette/even-row fixes and LRC fractional precision change representation or timing; explicit profiles and independent subtitle/clock oracles remain necessary."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T028",
+        "T029",
+        "T034",
+        "T035"
+      ],
+      "unresolved": [
+        "Read full filters and drawvg bodies; finish actual codec/profile, runtime-resolution, resource, subtitle and package qualification."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_drawvg-reference.texi",
+      "sha256": "0e500136012ea70c935907a55b4dafbc7d4f8c9404674791c66571b92f43828a",
+      "lines": [
+        1,
+        2793
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body in contiguous ranges 1-460, 461-920, 921-1380, 1381-2070 and 2071-2793; linked Cairo, SVG, external expression sources and runtime behavior are not credited",
+      "interpretation": [
+        "drawvg has its own token, color, expression, implicit-command and procedure grammar. Shell/JSON/filter escaping do not substitute for generating valid admitted VGS.",
+        "Paths are cleared by fill/stroke/clip unless preserve is used; clipping intersects existing regions, and transforms affect newly added segments rather than earlier path segments. Shared geometry must freeze those semantics.",
+        "Coordinates, line widths, fill rules, alpha and gradient stops are distinct rendering choices; RGBA and HSLA bounds/clamping and color-variable shadowing must be resolved explicitly.",
+        "Expression-local st/ld state persists across frames while separate expressions do not share it. randomg instead shares seeded per-frame state; seek/restart/export determinism requires explicit state and seed policy.",
+        "Procedures restore argument variables while mutations to other variables persist. Loops, nesting, variable counts and generated script size require finite application budgets; nonfinite loop/condition inputs skip execution.",
+        "Frame t/ts/duration and metadata-based values depend on admitted clock/prefix context. Missing/non-numeric metadata yields NaN, so graphics must not silently acquire unrelated default timing.",
+        "print writes expression source/values to FFmpeg logs and can affect performance. Generated script and diagnostic paths remain subject to bounded buffers and sensitive-data policy."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T025",
+        "T027",
+        "T030",
+        "T034"
+      ],
+      "unresolved": [
+        "Read the complete filter manual; implement and qualify admitted graphics generation, clock/state/color/alpha behavior, script budgets and matching packaged component closure."
+      ]
+    },
+    {
+      "path": "../vendor/ffmpeg/n9.0.2/doc_filters.texi",
+      "sha256": "65661cccd35c02e12894f674b706df8e465fd6862cf0aa64db7d3383271e5a9e",
+      "lines": [
+        1,
+        34370
+      ],
+      "reviewer": "implementation-agent/root",
+      "date": "2026-10-24",
+      "coverage": "Complete body personally read in contiguous ranges from 1-500 through 33901-34370; truncated tool passages were re-read in full before credit. External APIs/implementations, actual effects, libraries and devices are not credited.",
+      "interpretation": [
+        "The graph and each option have distinct escaping layers; slash-prefixed option values load files. Automatic scaler/resampler insertion is semantic and must be frozen. FFmpeg may support cycles, while the application canonical media DAG must reject invalid cycles.",
+        "Timeline enable can bypass a processor; framesync defaults repeat secondary frames and use nearest-lower timestamp. Freeze EOF/repeat/sync policy explicitly.",
+        "Compressor/gate detector, channel-link, attack/release, makeup and mode affect state and audible output; metadata/labels are not DSP. Adaptive denoising and measured threshold modes require the correct upstream prefix.",
+        "Acrossfade sample-count versus duration precedence and overlap/curve selection affect exact length. Acrusher simulates quantization without changing actual sample bit depth.",
+        "AFIR IR normalization, per-channel linking, partition sizes, load timing and bounded duration affect gain, resources and latency. IR/model/ASR files and firequalizer dumpfiles are separate admitted opens.",
+        "Alimiter lookahead delay equals attack; latency compensation also flushes valid EOF audio. Reverse IIR block_size adds that many samples of delay and requires adequate impulse-response support.",
+        "Amerge may reorder channels and guess an arbitrary layout; amix is float-only, can auto-resample, normalizes by default and changes gain during dropout transition. Explicit routing and gain policies are mandatory.",
+        "Areverse buffers the whole clip; aloop and unconstrained apad can run indefinitely. Bound source windows/scratch and output extent rather than rely on filter defaults.",
+        "Asetnsamples defaults to zero-padding EOF, asetrate changes speed/pitch without changing PCM, while aresample may insert/drop samples to match timestamps. These are distinct sample/timing contracts.",
+        "Atrim timestamp constraints differ from counted samples and do not reset PTS; multiple constraints are greedy union, so intersection requires chaining. At tempo above 2, atempo skips samples; a selected high-quality route needs explicit decomposition and output oracles.",
+        "Dynaudnorm includes centered preceding/following frame windows, boundary gain assumptions, channel coupling and optional DC/compression; arbitrary chunk restarts do not preserve the declared processor.",
+        "Loudnorm linear mode can silently fall back to dynamic when measured constraints fail; dynamic true-peak processing upsamples to 192 kHz. The actual mode and output sample rate must be frozen/verified.",
+        "LADSPA/LV2 load executable plugins and search ambient library paths; model, HRIR/SOFA, dictionary, text and log destinations are explicit dependencies, not implied by a source-file grant.",
+        "Silencedetect reports interval start after a minimum detection delay; silenceremove can rewrite timestamps or retain holes. Canonical cut maps must transform dependent streams/captions exactly once.",
+        "Volume eval=once lacks time variables; frame-evaluated gain is not sample-accurate automation. ReplayGain side data is dropped by default; volumedetect forces signed 16-bit input and does not measure original high-precision peaks directly.",
+        "Whisper defaults use_gpu=true and can overwrite or network-write a destination; a CPU-only or granted-source route must explicitly disable GPU use and admit exact model/output dependencies.",
+        "Noise sources need explicit seed and finite duration. Generated source duration can end at a complete audio frame rather than the requested rational boundary.",
+        "addroi passes pixels unchanged but changes encoder side data. Temporal amplify/atadenoise require bounded neighboring-frame prefixes; bm3d search/group ranges need application resource limits tighter than native integer maxima.",
+        "ASS shaping depends on HarfBuzz-backed complex shaping and pinned fonts. Alpha reconstruction, blend plane units/framesync and black detection range/alpha modes are distinct media contracts.",
+        "Bwdif defaults send_field, all frames, and unknown parity falls back to top-field-first; a plan must record field/clock interpretation and verify output cadence.",
+        "Colordetect infers effective range/alpha from observed pixels, not original intent. Colorspace needs explicit characterized input; fast skips gamma/primary correction and is a changed approximation, not equivalent conversion.",
+        "RGB colorkey is 8-bit while chromakey uses YUV; channel/plane units and alpha association need a declared working representation. Colorlevels/curves can clip values and master curves apply a second mapping.",
+        "Crop rounds subsampled dimensions unless exact; keep_aspect changes SAR. Cropdetect defaults skip/round/history selection and is an analysis hint requiring a reviewed crop.",
+        "Cue uses wall-clock buffering without guaranteed frame accuracy. DCT denoise may leave borders unprocessed; decimate mixed creates VFR, and clean-source frame selection is distinct from processed metrics.",
+        "D3D12 custom deinterlacing is driver-defined and can need temporal references; CPU/GPU output equivalence is not implied. DNN backends have specific tensor ranks/layouts, device providers and async behavior; ONNX here is single-input synchronous NCHW float.",
+        "Drawtext text expansion can introduce wall-clock values and has separate escaping; freeze expansion mode, text/font bytes and shaping dependencies. Reloaded text/parameter failures retaining old state are not a valid committed edit result. Drawbox/grid default composition retains existing alpha unless replace=1.",
+        "Fade uses later-of-frame/time start and duration precedence; fieldmatch reconstructs fields but needs separate decimation. Detelecine needs the original pattern phase, and fieldorder shifts picture data rather than merely changing metadata.",
+        "FPS duplicates/drops with explicit PTS rounding/start/EOF; framerate interpolates and is not valid directly for interlaced inputs. AMF FRC may use future frames and a declared duplicate/blend fallback, so route/latency/objective must be qualified.",
+        "Geq expression state is per thread slice; stateful generated expressions need an explicit threading/seed policy. Missing alpha expressions can make output opaque.",
+        "Hald CLUT padding is ignored and last LUT can persist after EOF; guided fast is an approximation with subsampled guidance. Grayworld expects linear-light input. Hardware downloads/maps require exact supported formats and compatible devices, not a generic zero-copy assumption.",
+        "ICCdetection overwrites characterization tags by default and ICC generation may infer BT.709/sRGB; metadata defaults are not measured source characterization. Idet combines current/history classifications and can clear or trust flags after a finite analysis.",
+        "Lensfun resolves incomplete names to a best match and can load an ambient database; freeze exact resolved models/database bytes. Lens geometry correction and vignetting are different ordered operations.",
+        "Libplacebo can apply and strip film grain/Dolby Vision by default and resamples subsampled chroma even at unchanged dimensions. SAR normalization, format/alpha modes and view transform are explicit semantics.",
+        "Libplacebo peak detection is history-dependent, enabled by default and not written back as output metadata. Disable or qualify its prefix for deterministic seeks/exports. Shader caches are not automatically collected; custom shader/LUT files are admitted dependencies.",
+        "Tone/gamut algorithms, LUT interpretation, dithering and subjective color controls have distinct effects; conversion LUT can override ICC/tone/color settings. GPU/CPU emulation and round trips need actual objective/resource qualification.",
+        "VMAF requires explicit reference ordering, frame/time alignment, model/pool/subsample/thread policy and admitted log output. A perceptual score is not pixel/clock identity; the CUDA variant has separate surface/nonfree profile requirements.",
+        "LUT defaults clip to nominal component ranges; masks and plane merging use negotiated plane domains, not a generic normalized-alpha assumption. Minterpolate duplicates/blends/motion-compensates with explicit scene fallback and resource-heavy search.",
+        "Normalize smoothing and independent versus linked RGB channels affect temporal state and hue. OCIO can use ambient configuration and context-dependent file transforms; OCR/NNEDI/custom morphology need exact admitted data files.",
+        "Motion-vector side data and analysis scores require the right decoded representation and frame alignment; frame-drop and interpolation routes cannot be treated as preserved timing.",
+        "Overlay defaults to 8-bit 4:2:0 and auto alpha, repeats/synchronizes secondary input under framesync, and invalid positions can hide the overlay. Freeze working precision/alpha/clocks instead of silently accepting these defaults.",
+        "Premultiply_dynamic can choose premultiply/unpremultiply/no-op from downstream requirements; explicit association and identical picture formats are required. PSNR/SSIM compare frame pairs with equal resolution/format and are separate from timing/sample-count proofs.",
+        "Scale may convert format and changes SAR to preserve DAR; reset_sar, chroma siting, range, transfer, primaries, ICC intent, interlaced scaling and rational divisibility must be explicit. Perceptual ICC details can change with the component candidate.",
+        "Setfield/setparams/SAR tags alter interpretation without changing picture samples. Separatefields doubles cadence at half height; pullup consumes future field context and can drop frames.",
+        "Palette quantization/dithering/transparency thresholds change color/alpha; shader/model/font/LUT/bitmap/statistics files remain secondary opens. QR/text wall-clock and random expansion must not become nondeterministic export defaults.",
+        "The SITI implementation explicitly follows a superseded P.910 version; reporting must name that algorithm/version and not claim current-standard compliance from its filter name.",
+        "Subtitle burn original_size affects ASS aspect/font scaling; fontsdir supplements ambient font-provider inputs and wrap/shaping depends on exact component libraries.",
+        "Temporal medians/mixes, thumbnails, vidstab and vectorscope history consume lookback/lookahead; giant tile grids and tpad infinite modes need explicit checked extent and memory admission.",
+        "tinterlace changes cadence/geometry/field phase; trim counts versus timestamps and greedy unions do not reset clocks. tonemap needs linear float input and even none may still desaturate.",
+        "v360 projection/stereo/rotation order/padding/interpolation and zoompan previous-frame state/duration/FPS require explicit profiles. xfade requires identical geometry, format, frame rate and time base.",
+        "zscale input/output range, primaries, transfer, matrix, chroma location and nominal peak luminance are independent explicit conversion semantics.",
+        "CUDA/OpenCL require an identified matching device/frame layout and explicit uploads/downloads. colorspace_cuda only converts range; it is not equivalent to software colorspace. CUDA scaling cannot convert YUV to RGB, and passthrough versus allocated frames affects decoder pool pressure.",
+        "CUDA thumbnail batches retain frames; OpenCL deshake smoothing windows add memory/latency. program_opencl loads executable kernel source as an explicit dependency; its frame index is not an exact timeline clock.",
+        "OpenCL tonemap uses different desaturation and scene-adaptive running averages from CPU tonemap; identical filter names do not establish an equivalent objective. VAAPI HDR/HDR-to-SDR defaults and native scalers are explicit target contracts.",
+        "Vulkan nlmeans parallelism increases VRAM without guaranteed speed; hardware variant layout, precision, alpha and driver behavior require independent evidence.",
+        "Cellular/noise sources often default to random seeds and infinite extent. Video source duration rounds up to complete frame durations; nullsrc is unprocessed data, not a black generator.",
+        "Desktop capture selects native identities, has variable compositor timing and hardware surfaces. dup_frames, resize/crop/alpha modes are explicit live-source semantics; device grants and observations remain separate from ordinary media reads.",
+        "Concat pads shorter audio to the longest segment (except last), requires segment timestamps to start at zero, and may produce VFR. Splitting audio/video independently can desynchronize joins.",
+        "EBU R128 converts to double samples, metadata mode segments into 100 ms frames, and true peak requires oversampling. Scope displays, loudness and channel/dual-mono measurements are separate from sample/timing identity.",
+        "Interleave must queue at least one frame per input and may stall until EOF for a dropping source. Latency/alatency report previous-filter delay rather than whole application presentation latency.",
+        "Metadata print accepts writable URLs. sendcmd uses its own interval/target/command grammar and half-open intervals; those dynamic state changes need canonical sampled automation and prefix/seek rules.",
+        "Select uses frame-level samples/counts and can route negative/NaN to the first output; audio selection is not a substitute for exact sample trimming. setpts operates in the declared time base and optional strip_fps changes metadata.",
+        "Constant-Q/wavelet/FFT scopes have explicit windows, overlap, future support, averaging and precision. Whole-track picture scopes require bounded input/scratch; a perceptual display is not a reconstruction oracle.",
+        "spectrumsynth without phase recreates random phase and cannot prove audio identity. sidedata removal changes interpretation independently of picture/sample payload.",
+        "ZMQ filters create independent network listeners. movie/amovie can open devices/protocol URLs with independent format options and infinite loops without timestamp rebasing; these must never bypass explicit dependency/network/device admission."
+      ],
+      "tasks": [
+        "T005",
+        "T013",
+        "T014",
+        "T015",
+        "T025",
+        "T027",
+        "T028",
+        "T029",
+        "T030",
+        "T031",
+        "T032",
+        "T034",
+        "T037",
+        "T039"
+      ],
+      "unresolved": [
+        "Implement and qualify the required graph/effect/utility families with exact prefixes, clocks, colors/alpha/channels, admitted dependencies, resources and packaged component evidence."
+      ]
+    }
+  ],
+  "in_progress_manual_reads": [],
+  "donor_followup_reads": [
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/models.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "1ab144405bc5f173f6c6e86bfee92aa79b0d6ee6",
+      "read_scope": "complete_body",
+      "lines": 179,
+      "interpretation": "Donor unknown-value parsing, complete stream categories, partial orders and estimated sizes must become strict typed observations and explicit confidence. Float parsing is behavioral evidence, not the selected exact-time representation."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/output.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "76035c056702441b5fb85e426245092cd297c1d8",
+      "read_scope": "complete_body",
+      "lines": 274,
+      "interpretation": "Original extension and relative tree are retained by default; single-file suffixes, numbered collisions, nested-output rejection, companion discovery, exclusion pruning and truthful byte accounting need the shared authority/publication pipeline. Donor resolve/stat failures cannot prove path separation; normal filename generation cannot become implicit authorization."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/copying.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "cb33fa2f71e2d1289599d4b2166bb3eefda0faa2",
+      "read_scope": "complete_body",
+      "lines": 330,
+      "interpretation": "The donor supplies progress-aware 4 MiB copy, best-effort access/modification times and companion counts. Its predictable partial deletion, replace-after-exists race and size-only copy checks are defects; Rust uses journal-owned staging, mandatory full bytes and atomic no-replace publication. Donor robocopy speed claims are not measured qualification. Copy deadline and truthful companion accounting remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/processing.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "5118adf5184586cc40abc1f27871ac6c4dec8085",
+      "read_scope": "complete_body",
+      "lines": 457,
+      "interpretation": "Every candidate, including probe failures and no-audio matches, contributes an explicit terminal result. Successful per-file byte deltas exclude skipped/failed source sizes. The donor rc=0 plus final.exists path can falsely credit old output; publication must use this attempt's verified staging and durable proof. Folder batching, separate companion outcomes, measured progress and complete failure/partial-result semantics remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/reporting.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "c199e4a47b372f846b8d5a3cdbf7df6fca67385a",
+      "read_scope": "complete_body",
+      "lines": 409,
+      "interpretation": "Scan inventory, case-insensitive unique language/title/codec summaries, original stream-index counts and per-file selection previews are product behavior. Shared typed paged projections must replace console-only reporting without losing unmatched files or confusing inventory with verification. Echo-to-log behavior must preserve privacy and bounded diagnostics; display colors are adapter presentation, not domain authority."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/__init__.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "ca91a49572d12e4ba4c51059c1c57ca3986400ff",
+      "read_scope": "complete_body",
+      "lines": 5,
+      "interpretation": "The package initializer exposes version 1.3.1 while constants.py says 1.8.0. Those donor labels are inconsistent behavioral provenance, never the runtime/component identity. Numera uses its own identified application, registry and exact component hashes."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/constants.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "32e3863e08b459dde984251c040c737d1c5581cb",
+      "read_scope": "complete_body",
+      "lines": 98,
+      "interpretation": "The six filename hints, 120-second probe, 5-second kill grace, 4 MiB copy buffer and 10800-second operation default are concrete donor behavior. Timeout disabling must be explicit and finite typed validation must reject NaN/infinity; filename partial markers are not ownership. Source container and full copy deadlines remain implementation obligations."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/metadata_edits.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "cf4a8f3109df824d65fb4fb230f64979a2099889",
+      "read_scope": "complete_body",
+      "lines": 230,
+      "interpretation": "Only retained audio/subtitle streams are editable, with original index/language choices and partial stable reorders. Editing output never mutates source. Rust's typed Keep/Set/Clear and original-snapshot predicates preserve the behavior without the donor's empty-string ambiguity; full actual control variants remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "0d458aaef747551b972a41d972221e07267aa4e9",
+      "read_scope": "complete_body",
+      "lines": 264,
+      "interpretation": "Selection uses original indices and normalized language, ordered subsets preserve unnamed relative order, duplicate order entries are honored once, and patches match original stream properties. The donor maps only video/audio/subtitle/attachments and restores default alone; Rust requires explicit complete retained-category maps and full dispositions. Copy is valid only when the entire effective outcome is unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/logsetup.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "292c475b7216b4ae849b41952f05ca55acaa9a6f",
+      "read_scope": "complete_body",
+      "lines": 120,
+      "interpretation": "UTC severity, environment/component provenance and useful failure tails are required, but debug-only command visibility, unbounded captured strings and unsanitized raw argv are unsuitable. Rust logs prepared vectors before execution with protected bounded rotating records and credential/privacy handling; support export remains mandatory."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/app.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "bb7beaa493e95e0d14e0d39305f24adfa604f8a0",
+      "read_scope": "complete_body",
+      "lines": 233,
+      "interpretation": "The no-project utility flow includes native/drag-drop intake, explicit probe failures, inventories, rule review/back, output review, processing, per-file result summaries and repeated tasks. Optional postpublication verification is a donor defect. The new query covers inventory/selection preview only; folder work, defaults and remaining full workflow still require implementation and evidence."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/media.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "c57a4e87d7bd147fee20c3f76dbc2f7386ca5482",
+      "read_scope": "complete_body",
+      "lines": 382,
+      "interpretation": "Discovery and scan failures must remain explicit; timeout/progress parsing must distinguish unavailable, invalid and exact observations. Donor float NaN/infinity, UTF-8 replacement, full lifetime output rereads, shell/PATH tool selection and termination claims cannot be copied as safety evidence. Rust uses admitted held inputs and finite supervised processes; complete discovery/progress and copy deadline behavior remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/prompts.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "282cfa035bae8a75593c01b0150b03a7d304dcf3",
+      "read_scope": "complete_body",
+      "lines": 313,
+      "interpretation": "Defaults, back/quit navigation, unknown index review and no-overwrite output choices need equivalent shared human controls. Donor navigation token 0 conflicts with a valid original stream index, so the Rust typed index field retains index 0. A failed path resolve cannot establish separation or authority, and private prompt values must not be logged wholesale."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/textutil.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "f87ffd9671607b9d0e416346c1211a10dc213a90",
+      "read_scope": "complete_body",
+      "lines": 326,
+      "interpretation": "Language aliases and original indices, truthful unknown sizes, escaped human display and redirected plain output are reusable semantics. The donor CSV parser silently accepts valid subsets of malformed input, and its byte-size/elapsed floats are presentation rather than exact media time. Rust rejects malformed numeric CSV and keeps exact domain clocks; complete reporting/progress remains required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/colors.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "01c5f1024681d868fbe40114c0f56b9d606cab7c",
+      "read_scope": "complete_body",
+      "lines": 264,
+      "interpretation": "This module is presentation-only ANSI palette/stripping and Windows console activation. No shell/ctypes runtime should be imported into Rust. Shared GUI uses the admitted FilmCraft presentation; CLI JSON/MCP remain protocol-only and logs must not contain terminal cursor/control sequences or credentials."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/progressview.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "ac00eb813b28dca1d079c7a71a35aae66f7f2535",
+      "read_scope": "complete_body",
+      "lines": 406,
+      "interpretation": "The donor uses bounded terminal viewport rendering and frame throttling, but deriving shown bytes from a percentage is an estimate, not measured I/O, and finished-file progress includes skipped/failed files. Rust must keep unknown progress unknown, measured bytes separate from estimates, explicit success totals and bounded paged human views. Full live progress remains required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/selection.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "6e41f183bfbca7def676c419f59c8110fbef62de",
+      "read_scope": "complete_body",
+      "lines": 589,
+      "interpretation": "All/language/title/original-index selection, explicit no-track choices, stable back/revisit state, retained-stream metadata edits and folder companion defaults are real behavior. Automatic attachment removal when subtitles are absent/removed is the confirmed coupling defect; Rust preserves independent attachment policy. A single audio track remains a choice. These bodies do not qualify complete F08."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/constants.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "8db5cb8e33f60ecbd7c1e2a5ce0ab16b779432ef",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 99,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/constants.py",
+        "standalone_git_blob_sha": "32e3863e08b459dde984251c040c737d1c5581cb",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/copying.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "fc1d33834046ebd544015b420e56c9646f54fb74",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 331,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/copying.py",
+        "standalone_git_blob_sha": "cb33fa2f71e2d1289599d4b2166bb3eefda0faa2",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/metadata_edits.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "8fc0fb97c9690e9b87558a14e03460c003459786",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 231,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/metadata_edits.py",
+        "standalone_git_blob_sha": "cf4a8f3109df824d65fb4fb230f64979a2099889",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/models.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "f63964eb5b72d5aeb77d46260ada02ff730e84d7",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 180,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/models.py",
+        "standalone_git_blob_sha": "1ab144405bc5f173f6c6e86bfee92aa79b0d6ee6",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/muxlogic.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "9e14e462a1dfe6c9113e6f9bac6b38bae3fe7079",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 265,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/muxlogic.py",
+        "standalone_git_blob_sha": "0d458aaef747551b972a41d972221e07267aa4e9",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/output.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "e57caa44ddff23ac6d46694573a3a8c33337e5e9",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 275,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/output.py",
+        "standalone_git_blob_sha": "76035c056702441b5fb85e426245092cd297c1d8",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/processing.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "3f612ba83b671e71b2f08a6a4dbc97c25ad8defe",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 458,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/processing.py",
+        "standalone_git_blob_sha": "5118adf5184586cc40abc1f27871ac6c4dec8085",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/progressview.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "d4c1854070160180844a1adfe70168c08ea20452",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 407,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/progressview.py",
+        "standalone_git_blob_sha": "ac00eb813b28dca1d079c7a71a35aae66f7f2535",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/prompts.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "31b1dd3110768872c002641a2fdba0a7fd9f7f75",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 314,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/prompts.py",
+        "standalone_git_blob_sha": "282cfa035bae8a75593c01b0150b03a7d304dcf3",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/reporting.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "2ed1bc6a25eda9dc41218681771de165d833c389",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 410,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/reporting.py",
+        "standalone_git_blob_sha": "c199e4a47b372f846b8d5a3cdbf7df6fca67385a",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/selection.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "3e19f796437a4a2dd64d17426d5321b3d56c9df5",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 590,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/selection.py",
+        "standalone_git_blob_sha": "6e41f183bfbca7def676c419f59c8110fbef62de",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/textutil.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "687549c8659656a59981639d8a4f5db9f289a31b",
+      "read_scope": "complete_body_via_verified_identical_standalone",
+      "lines": 327,
+      "comparison": {
+        "standalone_path": "docs/research-pack/research_v7/muxcls-sources/standalone/muxcls/textutil.py",
+        "standalone_git_blob_sha": "f87ffd9671607b9d0e416346c1211a10dc213a90",
+        "exact_executable_body_equal": true,
+        "only_difference": "One leading non-executable attribution comment line",
+        "comparison_method": "Fetched both immutable archive blobs, checked their Git IDs and compared every remaining character; no source execution"
+      },
+      "interpretation": "The complete executable body is identical to the personally read standalone body. Its recorded interpretation and remaining Rust implementation obligations apply unchanged."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/__init__.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "e4ccf3362b83f6ba20f53577187b925269d7b119",
+      "read_scope": "complete_body",
+      "lines": 6,
+      "interpretation": "Embedded namespace/docstring differs while APP_VERSION remains 1.3.1. This is source provenance, not a Numera release or runtime dependency."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/app.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "65163294e020ecf502b0649682f74371694701f2",
+      "read_scope": "complete_body",
+      "lines": 246,
+      "interpretation": "The embedded entry adds allow_back and returns the last ProcessSummary to the host wizard. Back/cancel before work is not a produced result; failed media/companions remain in aggregate outcome. PATH discovery, sys.exit and optional postpublication verification are donor behaviors to replace with the shared Rust client/owner and mandatory verification."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/logsetup.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "c4df0f4d2fc3967f30a5c6a3aa92a68064654a2b",
+      "read_scope": "complete_body",
+      "lines": 121,
+      "interpretation": "Embedding moves Logs two directories above the package and uses timezone.utc rather than UTC. UTC provenance is retained; debug-only command disclosure, ambient timeout settings, unsanitized argv and post-capture truncation do not replace bounded protected Rust logging."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/media.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "74ce65ba26f69f78b71320ad4a2629263f84b3a4",
+      "read_scope": "complete_body",
+      "lines": 408,
+      "interpretation": "The embedded runner fixes false robocopy success by changing launch/capture failure from 1 to 127 and explicitly decodes version text as UTF-8 with replacement. Rust retains proper typed launch/capture errors instead of return-code conventions, uses bounded strict probe/diagnostic handling and owned process groups. Float NaN/infinity timeout acceptance, complete capture rereads, recursive inventory memory and termination claims remain donor defects; explicit deadline/progress/discovery work is still required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/muxcleanup/colors.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "2c695618f6d17a1de5af8cb1afe7df4fc28ed159",
+      "read_scope": "complete_body",
+      "lines": 275,
+      "interpretation": "Embedded ANSI names align with the parent wizard palette and remove the duplicate blue/sky language entry. Console presentation does not become another GUI theme/engine. Rust protocol/JSON output remains plain and external control sequences must be handled safely."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/embedded/ffmwiz/support/ext00b.py",
+      "source_pin": "KiaroSama/FFmWiz@661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "git_blob_sha": "01dfad3afd94316eb8c05325253edf63ac3f367c",
+      "read_scope": "complete_body",
+      "lines": 566,
+      "interpretation": "The integration adapter clears/restores argv, maps only actual media/companion failures to an aggregate code, distinguishes leaving before work, and releases terminal ownership. It does not implement a machine-config API from base_answers. Full body also includes source-dependent GPU probes, crop previews and join helpers: actual qualified device probing is separate from a compiled encoder list and remains owner-harness work; no GPU result is inferred or executed here."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_process_control.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "8a2c08ee9ec2fcfe19a3eb98840a74285bb5cd31",
+      "read_scope": "complete_body",
+      "lines": 99,
+      "interpretation": "Complete body confirms the alleged tree/ignored-terminate test creates one ordinary sleeper, with no descendant and no ignored signal. Escalation is tested against a stand-in. These names cannot qualify Numera process-tree cleanup. New typed-policy tests use the real hosted fixture but do not close the still-required descendant/termination-failure matrix."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_progressview.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "8dbb77de3d93902bde313504d445b7475c759335",
+      "read_scope": "complete_body",
+      "lines": 307,
+      "interpretation": "Complete body pins unknown ratios, finished elapsed time, all terminal states in finished totals, bounded viewport and redirected-output silence. Percentage-derived donor byte display is an estimate, not measured bytes. Numera records measured copy/verification pass bytes with coalescing; remux/ETA and complete batch accounting remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_copying.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "d590f9cd8181fdb02f29e24f563424ad726b419b",
+      "read_scope": "complete_body",
+      "lines": 392,
+      "interpretation": "Complete body covers existing-destination safety, writable copied outputs, timestamps, finite copy/companion control and failure cleanup. Many Windows assertions replace robocopy with fake functions; they do not qualify Numera's OS publication or descendant boundary. Numera keeps mandatory full-byte verification and owned no-replace publication; equivalent replacement and complete companion accounting remain required."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_output_paths.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "6cf5fd70c1316569f9a63007d3edaf139479cf72",
+      "read_scope": "complete_body",
+      "lines": 221,
+      "interpretation": "Complete body pins relative-tree roots, single-file suffixes, numbered collisions before review, nested-output rejection, directory-boundary exclusion, companion classification and stable presentation order. Its string-case/resolve examples do not qualify symlink/reparse aliases, Unicode/case filesystem identity or external replacement races. New batch traversal must remain bounded and preserve every candidate/error; publication cannot silently renumber after review."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_app_flow.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "4ca878ec64195c426476fbcb59b9117dcfd29bbe",
+      "read_scope": "complete_body",
+      "lines": 237,
+      "interpretation": "Complete body covers missing tools, empty discovery, explicit refusal after unreadable probes, reviewed confirmation before work, conventional exit reporting and optional donor post-run verification. Every external tool/process call is patched: this is decision coverage, not real media or OS evidence. Numera keeps mandatory per-output verification. Explicit registered-asset batches now retain planning rejections; discovery/probe failures still require the mandatory folder intake manifest instead of silently omitting unregistered files."
+    },
+    {
+      "path": "docs/research-pack/research_v7/muxcls-sources/standalone/tests/test_processing_rules.py",
+      "source_pin": "KiaroSama/MuxCls@0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "git_blob_sha": "70351b31281d3e4fc60b300f003bc77578e0993a",
+      "read_scope": "complete_body",
+      "lines": 357,
+      "interpretation": "Complete body covers video-required precedence over no-audio skips, explicit Audio None, retained probe failures, failed-output cleanup, existing-output safety, finite remux budgets, N/A progress with actual byte fallback and signed per-success output-minus-input accounting. Its FFmpeg runners write fake bytes: they do not qualify actual preservation or publication. New batch totals separately retain rejected/skipped/cancelled/interrupted rows and exclude them from successful byte deltas. Full discovery/probe-failure intake, companion counts and reviewed replacement remain required."
+    }
+  ]
+}

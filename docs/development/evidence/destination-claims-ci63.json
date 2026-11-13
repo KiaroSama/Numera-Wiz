@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "run_id": 40069492408,
+  "branch_head": "14145ba3642042d2120304d860aef78be7235096",
+  "boundary": "cross-platform real OS process claims and actual Linux media publication; development",
+  "passed": [
+    {
+      "job_id": 120799645247,
+      "name": "media"
+    },
+    {
+      "job_id": 120799645435,
+      "name": "dependency-lock"
+    },
+    {
+      "job_id": 120799645478,
+      "name": "web"
+    },
+    {
+      "job_id": 120799954169,
+      "name": "checks (windows-2025)"
+    },
+    {
+      "job_id": 120799954173,
+      "name": "checks (macos-15)"
+    },
+    {
+      "job_id": 120799954203,
+      "name": "checks (macos-15-intel)"
+    },
+    {
+      "job_id": 120799954207,
+      "name": "checks (ubuntu-24.04)"
+    },
+    {
+      "job_id": 120802037958,
+      "name": "native-ui"
+    },
+    {
+      "job_id": 120802037987,
+      "name": "browser"
+    }
+  ],
+  "failed": [
+    "formatting"
+  ],
+  "asserted": [
+    "two distinct executable copies and environments share absent-target claims",
+    "conservative case/normalization alias exclusion",
+    "cancellation of waiting acquisition",
+    "killed holder releases actual OS lock",
+    "all four native tests, Clippy and desktop builds",
+    "actual engine retains claim at its fence",
+    "second verified engine attempt cancels before its fence",
+    "winning artifact independently matches all source bytes",
+    "missing/replaced parent rejection",
+    "existing actual CLI/official SDK lost-response and large HTTP journeys",
+    "actual Linux native and Chrome input"
+  ],
+  "artifacts": [
+    {
+      "id": 12551100056,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "960a4908d497abe4c2c6c812e97cc8bd4c9d575041f329187c713d1483442e4e",
+      "downloaded": false
+    },
+    {
+      "id": 12550796726,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "a915d4a4f5b5b4b734071268ec19fe4062435b6ec00f3a1975c284a4e31f94f3",
+      "downloaded": false
+    },
+    {
+      "id": 12550559811,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "a96316b8f628e38dc0be02bef01e0585dcf85ef3a39f533a6e2004dc6b4e269e",
+      "downloaded": false
+    }
+  ],
+  "formatter_diagnostic_hunks_applied": 43,
+  "screenshots_personally_inspected": false,
+  "not_qualified": [
+    "full T017",
+    "handle-relative Unix publication",
+    "project checkpoint writer leases",
+    "ambiguous namespace initialization repair",
+    "all crash/multi-output cases",
+    "portable packages/filesystems",
+    "aggregate R20",
+    "owner GPU"
+  ]
+}

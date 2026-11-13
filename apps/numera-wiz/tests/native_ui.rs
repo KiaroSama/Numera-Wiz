@@ -1,0 +1,1262 @@
+//! Actual CI-built native window and human input, exercised under hosted X11.
+#![cfg(target_os = "linux")]
+#[path = "support/evidence.rs"]
+mod evidence;
+#[allow(
+    dead_code,
+    reason = "This shared fixture also supports deeper output oracles"
+)]
+#[path = "../../../test-support/media.rs"]
+mod fixture;
+#[path = "support/project_workbench.rs"]
+mod project_workbench;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use evidence::RetainLogs;
+use nw_domain::commands::Request;
+use serde_json::{Value, json};
+use std::{
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::{Duration, Instant},
+};
+use tokio_util::sync::CancellationToken;
+async fn xdo(args: &[&str]) -> std::process::Output {
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio::process::Command::new("/usr/bin/xdotool")
+            .args(args)
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await
+    .expect("X11 input deadline")
+    .expect("X11 input command")
+}
+async fn input(args: &[&str]) {
+    assert!(
+        xdo(args).await.status.success(),
+        "X11 input operation failed"
+    );
+}
+async fn click(window: &str, x: &str, y: &str) {
+    input(&["mousemove", "--window", window, x, y]).await;
+    tokio::time::sleep(Duration::from_millis(80)).await;
+    input(&["mousedown", "1"]).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    input(&["mouseup", "1"]).await;
+}
+async fn screenshot(window: &str, path: &Path) {
+    let status = tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio::process::Command::new("/usr/bin/import")
+            .args(["-window", window])
+            .arg(path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .status(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(status.success(), "Native screenshot failed");
+}
+async fn query(root: &Path, id: &str) -> Option<Value> {
+    query_params(root, id, json!({})).await
+}
+async fn query_params(root: &Path, id: &str, params: Value) -> Option<Value> {
+    let bytes =
+        nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).ok()?;
+    let record: Value = serde_json::from_slice(&bytes).ok()?;
+    let port = record["port"].as_u64()?;
+    let bearer = record["bearer"].as_str()?;
+    let response = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok()?
+        .post(format!("http://127.0.0.1:{port}/api/v1/commands"))
+        .bearer_auth(bearer)
+        .json(&Request::query(id, params))
+        .send()
+        .await
+        .ok()?;
+    let value: Value = response.json().await.ok()?;
+    if value["ok"] == true {
+        Some(value["result"].clone())
+    } else {
+        None
+    }
+}
+async fn ui_event(root: &Path, message: &str, command: Option<&str>, after: usize) -> Value {
+    let started = Instant::now();
+    loop {
+        let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
+        if let Some(event) = log
+            .lines()
+            .skip(after)
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == message
+                    && event["fields"]["request_id"] != "local"
+                    && command.is_none_or(|id| {
+                        event["fields"]["command"] == id && event["fields"]["ok"] == true
+                    })
+            })
+        {
+            return event;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Actual folder controls did not complete the expected UI event: {message}"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+#[tokio::test]
+#[ignore = "Actual desktop input runs only with the hosted matching executable and Xvfb"]
+async fn native_window_imports_real_media_through_the_human_controls() {
+    nw_platform::init_logging();
+    tokio::time::timeout(Duration::from_secs(240), journey())
+        .await
+        .expect("Native UI journey deadline");
+}
+async fn journey() {
+    let journey_started = Instant::now();
+    let executable = PathBuf::from(
+        std::env::var_os("NW_DESKTOP_EXE").expect("Matching CI-built desktop executable"),
+    );
+    assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+    let evidence = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/native-evidence");
+    std::fs::create_dir_all(&evidence).unwrap();
+    let mut wm = tokio::process::Command::new("/usr/bin/openbox")
+        .arg("--sm-disable")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .expect("Hosted X11 window manager");
+    let media = fixture::generate().await;
+    let root = media.directory.path().join("native-data");
+    let _owner_logs = RetainLogs {
+        source: root.join("logs"),
+        destination: evidence.join("native-owner-logs"),
+    };
+    let identity =
+        nw_platform::files::identity(&executable, &tokio_util::sync::CancellationToken::new())
+            .unwrap();
+    let log = std::fs::File::create(evidence.join("native-stderr.log")).unwrap();
+    let mut app = tokio::process::Command::new(&executable)
+        .arg("--data-dir")
+        .arg(&root)
+        .arg("--components-dir")
+        .arg(&media.bin)
+        .env("LIBGL_ALWAYS_SOFTWARE", "1")
+        .env("WINIT_X11_SCALE_FACTOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(log)
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let start = Instant::now();
+    let mut window = loop {
+        let output = xdo(&["search", "--onlyvisible", "--name", "^Numera Wiz$"]).await;
+        let text = String::from_utf8(output.stdout).unwrap();
+        if output.status.success()
+            && let Some(window) = text.lines().next()
+            && !window.is_empty()
+            && window.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            break window.to_owned();
+        }
+        if let Some(status) = app.try_wait().unwrap() {
+            panic!("Native application exited before showing its workspace: {status}");
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(60),
+            "Native workspace did not open within the functional CI deadline; inspect retained startup timings"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    std::fs::write(evidence.join("native-startup.json"), serde_json::to_vec_pretty(&json!({"visible_window_ms":start.elapsed().as_millis().to_string(),"functional_deadline_seconds":60,"scope":"Unoptimized development executable under hosted X11/software GL; not packaged startup or memory qualification"})).unwrap()).unwrap();
+    input(&["windowsize", &window, "1440", "861"]).await;
+    input(&["windowactivate", "--sync", &window]).await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-workspace.png")).await;
+    click(&window, "560", "116").await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "2",
+        media.source.to_str().unwrap(),
+    ])
+    .await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    click(&window, "995", "116").await;
+    let start = Instant::now();
+    let assets = loop {
+        if let Some(assets) = query(&root, "assets.list").await
+            && assets["items"]
+                .as_array()
+                .is_some_and(|items| !items.is_empty())
+        {
+            break assets["items"].clone();
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "Human input did not register its actual native media source"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    let asset = query_params(&root, "assets.inspect", json!({"id":assets[0]["id"]}))
+        .await
+        .unwrap();
+    assert_eq!(
+        asset["identity"]["path"].as_str().unwrap(),
+        std::fs::canonicalize(&media.source)
+            .unwrap()
+            .to_str()
+            .unwrap()
+    );
+    assert_eq!(asset["probe"]["streams"].as_array().unwrap().len(), 3);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    screenshot(&window, &evidence.join("native-loaded-workspace.png")).await;
+    click(&window, "331", "625").await;
+    let started = Instant::now();
+    let report_event = loop {
+        let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "streams.clean.report"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
+            break event;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Human Selection report input did not complete its canonical request"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    screenshot(&window, &evidence.join("native-selection-report.png")).await;
+    {
+        use std::io::Read as _;
+        let mut png = Vec::new();
+        std::fs::File::open(evidence.join("native-selection-report.png"))
+            .unwrap()
+            .take(256 * 1024 + 1)
+            .read_to_end(&mut png)
+            .unwrap();
+        if png.len() <= 256 * 1024 {
+            println!("NW_NATIVE_SELECTION_IMAGE:{}", STANDARD.encode(png));
+        }
+    }
+    let report = query_params(
+        &root,
+        "streams.clean.report",
+        json!({"asset_ids":[assets[0]["id"]],"intent":fixture::rules()}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(report["resolved_files"], 1);
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
+    std::fs::write(evidence.join("native-selection-report.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":report_event,"independent_report":report,"scope":"Actual Selection report pointer input completed before the harness query, retained window PNG, Escape closes the report"})).unwrap()).unwrap();
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    click(&window, "331", "602").await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    screenshot(&window, &evidence.join("native-reviewed-workspace.png")).await;
+    input(&["windowactivate", "--sync", &window]).await;
+    input(&["key", "--clearmodifiers", "ctrl+Return"]).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    screenshot(&window, &evidence.join("native-run-requested.png")).await;
+    let start = Instant::now();
+    let job = loop {
+        if let Some(jobs) = query(&root, "jobs.list").await
+            && let Some(summary) = jobs["items"].as_array().and_then(|jobs| jobs.first())
+            && let Some(job) =
+                query_params(&root, "jobs.inspect", json!({"id":summary["id"]})).await
+            && let Ok(job) = serde_json::from_value::<nw_domain::views::JobView>(job)
+            && job.state.terminal()
+        {
+            break job;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "Native review/Run controls did not produce a terminal job"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    assert_eq!(job.state, nw_domain::records::JobState::Succeeded);
+    let artifact = job
+        .artifact
+        .as_ref()
+        .expect("Native UI must produce a verified artifact");
+    assert_eq!(
+        std::fs::read(&media.source).unwrap(),
+        std::fs::read(
+            artifact
+                .path
+                .as_ref()
+                .expect("Owner inspection retains the authorized output path")
+        )
+        .unwrap()
+    );
+    assert_eq!(job.plan.source.id, assets[0]["id"].as_str().unwrap());
+    std::fs::write(evidence.join("native-output.json"), serde_json::to_vec_pretty(&json!({"job_id":job.id,"plan_hash":job.plan.hash,"artifact":artifact,"verification":job.verification,"oracle":"Independent source/output byte equality after native input, Review and Ctrl+Enter Run"})).unwrap()).unwrap();
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    screenshot(&window, &evidence.join("native-completed-workspace.png")).await;
+    // Observe the canonical UI request before this harness asks for its own manifest oracle.
+    click(&window, "533", "850").await;
+    let started = Instant::now();
+    let manifest_event = loop {
+        let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "artifacts.manifest"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
+            break event;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "Human Output details input did not complete a canonical manifest request"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-output-details.png")).await;
+    // A bounded image transport keeps visual review possible without running a local GUI.
+    {
+        use std::io::Read as _;
+        let mut png = Vec::new();
+        std::fs::File::open(evidence.join("native-output-details.png"))
+            .unwrap()
+            .take(256 * 1024 + 1)
+            .read_to_end(&mut png)
+            .unwrap();
+        if png.len() <= 256 * 1024 {
+            println!("NW_NATIVE_MANIFEST_IMAGE:{}", STANDARD.encode(png));
+        }
+    }
+    let manifest = query_params(
+        &root,
+        "artifacts.manifest",
+        json!({"artifact_id":format!("job-{}",job.id)}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(manifest["sha256"], artifact.sha256);
+    assert_eq!(manifest["encoded_byte_count"], artifact.bytes);
+    std::fs::write(evidence.join("native-manifest.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":manifest_event,"manifest":manifest,"scope":"Actual Output details mouse input, canonical completion before the independent manifest query, and retained dialog screenshot"})).unwrap()).unwrap();
+    // Coordinates match the personally inspected CI75 Output details screenshot.
+    // Real pointer/keyboard input edits the destination and activates Save.
+    let saved_path = evidence.join("native-client-saved-copy.mkv");
+    assert!(!saved_path.exists());
+    click(&window, "300", "400").await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        saved_path.to_str().unwrap(),
+    ])
+    .await;
+    click(&window, "100", "436").await;
+    let started = Instant::now();
+    loop {
+        if saved_path.exists()
+            && let Ok(saved) = nw_platform::files::identity(&saved_path, &CancellationToken::new())
+            && saved.sha256 == artifact.sha256
+            && saved.bytes == artifact.bytes
+        {
+            break;
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot(&window, &evidence.join("native-client-save-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-client-save-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_SAVE_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
+            panic!("Native human Save verified copy controls did not publish the selected bytes");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(
+        std::fs::read(&saved_path).unwrap(),
+        std::fs::read(&media.source).unwrap()
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-client-saved.png")).await;
+    let png = std::fs::read(evidence.join("native-client-saved.png")).unwrap();
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_SAVE_IMAGE:{}", STANDARD.encode(png));
+    }
+    let producer_job_count = query(&root, "jobs.list").await.unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(producer_job_count, 1);
+    std::fs::write(evidence.join("native-client-save.json"), serde_json::to_vec_pretty(&json!({
+        "artifact_id":manifest["artifact_id"], "sha256":artifact.sha256, "bytes":artifact.bytes,
+        "oracle":"Actual destination-field pointer/keyboard input and Save button pointer activation; independent saved/source byte equality",
+        "producer_job_count":producer_job_count,
+        "not_qualified":["native OS Save As picker", "other desktop platforms", "browser file handles"]
+    })).unwrap()).unwrap();
+    // A second actual Save uses the native OS picker, with an empty client field.
+    click(&window, "300", "400").await;
+    input(&["key", "--clearmodifiers", "ctrl+a", "BackSpace"]).await;
+    click(&window, "100", "436").await;
+    let started = Instant::now();
+    let picker = loop {
+        let found = xdo(&["search", "--onlyvisible", "--name", "^Save"]).await;
+        if found.status.success() {
+            let windows = String::from_utf8(found.stdout).unwrap();
+            if let Some(window) = windows.lines().last() {
+                break window.to_owned();
+            }
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot("root", &evidence.join("native-picker-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-picker-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_PICKER_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
+            panic!("Actual native Save control did not open its OS file picker");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    screenshot(&picker, &evidence.join("native-save-picker.png")).await;
+    let png = std::fs::read(evidence.join("native-save-picker.png")).unwrap();
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_PICKER_IMAGE:{}", STANDARD.encode(png));
+    }
+    let picker_saved_path = evidence.join("native-picker-saved-copy.mkv");
+    assert!(!picker_saved_path.exists());
+    input(&["windowactivate", "--sync", &picker]).await;
+    input(&["key", "--clearmodifiers", "ctrl+l"]).await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        picker_saved_path.to_str().unwrap(),
+    ])
+    .await;
+    input(&["key", "--clearmodifiers", "Return"]).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    if xdo(&["search", "--onlyvisible", "--name", "^Save"])
+        .await
+        .status
+        .success()
+    {
+        input(&["key", "--clearmodifiers", "alt+s"]).await;
+    }
+    let started = Instant::now();
+    loop {
+        if picker_saved_path.exists()
+            && let Ok(saved) =
+                nw_platform::files::identity(&picker_saved_path, &CancellationToken::new())
+            && saved.sha256 == artifact.sha256
+            && saved.bytes == artifact.bytes
+        {
+            break;
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot("root", &evidence.join("native-picker-save-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-picker-save-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_PICKER_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
+            panic!("Native OS picker and authenticated copy did not publish the selected bytes");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(
+        std::fs::read(&picker_saved_path).unwrap(),
+        std::fs::read(&media.source).unwrap()
+    );
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-picker-saved.png")).await;
+    let png = std::fs::read(evidence.join("native-picker-saved.png")).unwrap();
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_PICKER_SAVE_IMAGE:{}", STANDARD.encode(png));
+    }
+    std::fs::write(evidence.join("native-picker-save.json"),serde_json::to_vec_pretty(&json!({
+        "artifact_id":manifest["artifact_id"],"sha256":artifact.sha256,"bytes":artifact.bytes,
+        "oracle":"Actual empty destination field, native Save pointer input, real OS file picker and independent saved/source byte equality",
+        "producer_job_count":1,
+        "not_qualified":["other desktop platforms", "crash recovery", "full product"]
+    })).unwrap()).unwrap();
+
+    // Keep the single-producer Save oracles above intact, then exercise a distinct
+    // real two-file batch exclusively through pointer/keyboard input.
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    let second_source = media.directory.path().join("native-second.mkv");
+    let ffmpeg_args = [
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        media.source.to_str().unwrap(),
+        "-map",
+        "0:0",
+        "-map",
+        "0:1",
+        "-c",
+        "copy",
+        "-f",
+        "matroska",
+        second_source.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &ffmpeg_args,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    click(&window, "560", "116").await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        second_source.to_str().unwrap(),
+    ])
+    .await;
+    click(&window, "995", "116").await;
+    let started = Instant::now();
+    loop {
+        if let Some(assets) = query(&root, "assets.list").await
+            && assets["items"].as_array().unwrap().len() == 2
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(20),
+            "Second human registration did not finish"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-batch-candidates.png")).await;
+    click(&window, "16", "94").await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    click(&window, "16", "132").await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    click(&window, "158", "68").await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-batch-draft.png")).await;
+    click(&window, "85", "199").await;
+    let started = Instant::now();
+    let batch_review_event = loop {
+        let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
+        if let Some(event) = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == "streams.clean.batch_plan"
+                    && event["fields"]["ok"] == true
+                    && event["fields"]["request_id"] != "local"
+            })
+        {
+            break event;
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            screenshot(&window, &evidence.join("native-batch-review-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-batch-review-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
+            panic!("Human batch Review did not complete its canonical request");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "Batch review must not start media jobs"
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-batch-reviewed.png")).await;
+    click(&window, "215", "199").await;
+    let started = Instant::now();
+    let batch_result = loop {
+        if let Some(groups) = query(&root, "batches.list").await
+            && let Some(group) = groups["items"].as_array().and_then(|items| items.first())
+            && let Some(result) =
+                query_params(&root, "batches.inspect", json!({"id":group["id"]})).await
+            && result["complete"] == true
+        {
+            break result;
+        }
+        if started.elapsed() >= Duration::from_secs(30) {
+            screenshot(&window, &evidence.join("native-batch-run-timeout.png")).await;
+            let png = std::fs::read(evidence.join("native-batch-run-timeout.png")).unwrap();
+            if png.len() <= 256 * 1024 {
+                println!("NW_NATIVE_BATCH_FAILURE_IMAGE:{}", STANDARD.encode(png));
+            }
+            panic!("Actual reviewed batch Run did not produce a terminal group");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(batch_result["total"], 2, "{batch_result}");
+    assert_eq!(batch_result["succeeded"], 2, "{batch_result}");
+    for member in batch_result["items"].as_array().unwrap() {
+        let child = query_params(&root, "jobs.inspect", json!({"id":member["job_id"]}))
+            .await
+            .unwrap();
+        let source = query_params(&root, "assets.inspect", json!({"id":member["asset_id"]}))
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(child["artifact"]["path"].as_str().unwrap()).unwrap(),
+            std::fs::read(source["identity"]["path"].as_str().unwrap()).unwrap()
+        );
+    }
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    screenshot(&window, &evidence.join("native-batch-completed.png")).await;
+    let png = std::fs::read(evidence.join("native-batch-completed.png")).unwrap();
+    if png.len() <= 256 * 1024 {
+        println!("NW_NATIVE_BATCH_IMAGE:{}", STANDARD.encode(png));
+    }
+    std::fs::write(evidence.join("native-batch.json"),serde_json::to_vec_pretty(&json!({
+        "review_event":batch_review_event,"result":batch_result,"producer_job_count":3,
+        "oracle":"Actual second-file registration, two media checkboxes, batch Review and Run mouse input; independent full bytes for each source/output",
+        "not_qualified":["GUI cancellation", "folder expansion", "companions", "replacement", "other native platforms"]
+    })).unwrap()).unwrap();
+
+    // Preserve every original producer/save/batch oracle before adding folder input.
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    let folder = media.directory.path().join("native-folder-input");
+    std::fs::create_dir(&folder).unwrap();
+    let folder_source = folder.join("a-registered.mkv");
+    std::fs::copy(&media.source, &folder_source).unwrap();
+    std::fs::write(folder.join("b-probe-failure.mkv"), b"Invalid media fixture").unwrap();
+    std::fs::write(
+        folder.join("c-companion.txt"),
+        b"Inventory is not copying\n",
+    )
+    .unwrap();
+    let source_identity =
+        nw_platform::files::identity(&folder_source, &CancellationToken::new()).unwrap();
+    let after = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    // Hosted captures place the bottom launcher at 276,699. The dedicated
+    // dialog explicitly focuses its visible path field; no hidden Tab search.
+    click(&window, "276", "699").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(&window, &evidence.join("native-folder-expanded.png")).await;
+    input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+    input(&[
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        folder.to_str().unwrap(),
+    ])
+    .await;
+    screenshot(&window, &evidence.join("native-folder-path.png")).await;
+    // From explicit path focus: the two visible checkboxes, exclusions, then Scan.
+    for _ in 0..4 {
+        input(&["key", "--clearmodifiers", "Tab"]).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    screenshot(&window, &evidence.join("native-folder-scan-ready.png")).await;
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let folder_event = ui_event(&root, "folder.snapshot.accepted", None, after).await;
+    let folder_id = folder_event["fields"]["snapshot_id"].as_str().unwrap();
+    let snapshot: nw_domain::ingest::FolderReview = serde_json::from_value(
+        query_params(&root, "assets.folder_inspect", json!({"id":folder_id}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    use nw_domain::ingest::FolderEntryOutcome;
+    assert!(snapshot.complete);
+    assert!(snapshot.scan_error.is_none());
+    assert_eq!(snapshot.entries.len(), 3);
+    assert_eq!(snapshot.limits.manifest_entries, 32);
+    assert_eq!(
+        snapshot.hash,
+        folder_event["fields"]["snapshot_hash"].as_str().unwrap()
+    );
+    assert_eq!(folder_event["fields"]["complete"], true);
+    assert_eq!(folder_event["fields"]["entry_count"], 3);
+    assert_eq!(folder_event["fields"]["registered_count"], 1);
+    assert_eq!(folder_event["fields"]["media_failure_count"], 1);
+    assert!(!snapshot.input.recursive);
+    assert_eq!(snapshot.input.path, folder.to_str().unwrap());
+    let registered = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "a-registered.mkv")
+        .unwrap();
+    assert_eq!(registered.outcome, FolderEntryOutcome::Registered);
+    let asset_id = registered.asset_id.as_ref().unwrap();
+    assert_eq!(registered.identity.as_ref().unwrap(), &source_identity);
+    let failed = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "b-probe-failure.mkv")
+        .unwrap();
+    assert_eq!(failed.outcome, FolderEntryOutcome::ProbeFailed);
+    assert!(failed.error.is_some());
+    assert!(failed.asset_id.is_none());
+    let companion = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.relative_path == "c-companion.txt")
+        .unwrap();
+    assert_eq!(companion.outcome, FolderEntryOutcome::CompanionInventoried);
+    assert!(companion.asset_id.is_none());
+    assert_eq!(
+        companion.identity.as_ref().unwrap(),
+        &nw_platform::files::identity(&folder.join("c-companion.txt"), &CancellationToken::new())
+            .unwrap()
+    );
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    let after_inspect = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    // Completion deliberately restores focus to Inspect after controls re-enable.
+    screenshot(&window, &evidence.join("native-folder-snapshot.png")).await;
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let inspect_event = ui_event(
+        &root,
+        "command.completed",
+        Some("assets.folder_inspect"),
+        after_inspect,
+    )
+    .await;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(
+        &window,
+        &evidence.join("native-folder-registered-entry.png"),
+    )
+    .await;
+    let after_open = std::fs::read_to_string(root.join("logs/owner.jsonl"))
+        .unwrap()
+        .lines()
+        .count();
+    input(&["key", "--clearmodifiers", "space"]).await;
+    let open_event = ui_event(
+        &root,
+        "command.completed",
+        Some("assets.inspect"),
+        after_open,
+    )
+    .await;
+    let opened = query_params(&root, "assets.inspect", json!({"id":asset_id}))
+        .await
+        .unwrap();
+    assert_eq!(opened["identity"], json!(source_identity));
+    assert_eq!(opened["display_name"], "a-registered.mkv");
+    assert_eq!(
+        query_params(&root, "assets.folder_inspect", json!({"id":folder_id}))
+            .await
+            .unwrap()["hash"]
+            .as_str()
+            .unwrap(),
+        snapshot.hash.as_str()
+    );
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3,
+        "Folder intake, inspection and Open must not create media jobs"
+    );
+    assert_eq!(
+        query(&root, "assets.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3,
+        "Retained inspection and Open must not rescan or duplicate registration"
+    );
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    screenshot(&window, &evidence.join("native-folder-opened-media.png")).await;
+    // Open closes the dialog after the real asset response. Reopening retains
+    // its immutable snapshot; scroll only that window to expose every outcome.
+    click(&window, "276", "680").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    screenshot(
+        &window,
+        &evidence.join("native-folder-retained-after-reopen.png"),
+    )
+    .await;
+    input(&["mousemove", "--window", &window, "700", "500"]).await;
+    input(&["click", "--repeat", "8", "--delay", "100", "5"]).await;
+    screenshot(
+        &window,
+        &evidence.join("native-folder-failures-companion.png"),
+    )
+    .await;
+    input(&["key", "--clearmodifiers", "Escape"]).await;
+    assert_eq!(
+        query(&root, "jobs.list").await.unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3,
+        "Dialog focus, reopen and scrolling must not execute a background plan"
+    );
+    std::fs::write(evidence.join("native-folder-intake.json"),serde_json::to_vec_pretty(&json!({
+        "source":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),
+        "registration_event":folder_event,"inspect_event":inspect_event,"open_event":open_event,
+        "snapshot":snapshot,"independent_source_identity":source_identity,"opened_asset":opened,
+        "producer_job_count":3,
+        "oracle":"Actual folder-header pointer input, keyboard path/Scan/Inspect/Open input; committed audit identity before independent authorized snapshot/source checks; no duplicate registration or media producer",
+        "not_qualified":["companion copying","replacement","full F08","other native platforms"]
+    })).unwrap()).unwrap();
+    let projects_started = Instant::now();
+    let before_projects_ms = journey_started.elapsed().as_millis().to_string();
+    project_workbench::run(
+        &mut NativeProjects {
+            root: &root,
+            evidence: &evidence,
+            window: &mut window,
+            app: &mut app,
+            executable: &executable,
+            components: &media.bin,
+            identity: json!(identity),
+            watermark: 0,
+        },
+        "Native C",
+    )
+    .await;
+    std::fs::write(evidence.join("native-project-phase-timing.json"),serde_json::to_vec_pretty(&json!({"before_projects_ms":before_projects_ms,"projects_ms":projects_started.elapsed().as_millis().to_string(),"combined_ms":journey_started.elapsed().as_millis().to_string(),"unchanged_combined_deadline_seconds":240})).unwrap()).unwrap();
+    let record: Value = serde_json::from_slice(
+        &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(record["build"], identity.sha256);
+    std::fs::write(evidence.join("native.json"),serde_json::to_vec_pretty(&json!({"schema_version":1,"source":std::env::var("NW_SOURCE_SHA").or_else(|_| std::env::var("GITHUB_SHA")).ok(),"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"runner_image":std::env::var("ImageVersion").ok(),"executable":identity,"registry":record["registry"],"renderer":"Glow; LIBGL_ALWAYS_SOFTWARE=1","viewport":[1440,861],"observed":"Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output","not_qualified":["Windows or macOS native input","preview/playback","full five-surface qualification"]})).unwrap()).unwrap();
+    input(&["windowactivate", "--sync", &window]).await;
+    input(&["key", "--clearmodifiers", "alt+F4"]).await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(10), app.wait())
+            .await
+            .expect("Native close did not drain its client lease")
+            .unwrap()
+            .success()
+    );
+    let _ = wm.kill().await;
+    let _ = wm.wait().await;
+}
+
+struct NativeProjects<'a> {
+    root: &'a Path,
+    evidence: &'a Path,
+    window: &'a mut String,
+    app: &'a mut tokio::process::Child,
+    executable: &'a Path,
+    components: &'a Path,
+    identity: Value,
+    watermark: u64,
+}
+impl NativeProjects<'_> {
+    fn owner(&self) -> Value {
+        serde_json::from_slice(
+            &nw_platform::security::read_private(&self.root.join("runtime/owner.json"), 16384)
+                .unwrap(),
+        )
+        .unwrap()
+    }
+    fn events(&self) -> Vec<Value> {
+        use std::io::{Read as _, Seek as _};
+        let mut file = std::fs::File::open(self.root.join("logs/owner.jsonl")).unwrap();
+        assert!(
+            file.metadata().unwrap().len() >= self.watermark,
+            "Owner log changed during the input action"
+        );
+        file.seek(std::io::SeekFrom::Start(self.watermark)).unwrap();
+        let mut bytes = Vec::new();
+        file.take(256 * 1024 + 1).read_to_end(&mut bytes).unwrap();
+        assert!(
+            bytes.len() <= 256 * 1024,
+            "One project input exceeded the bounded audit suffix"
+        );
+        String::from_utf8(bytes)
+            .unwrap()
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|event| {
+                event["fields"]["request_id"].as_str().is_some_and(|id| {
+                    id != "local" && !id.starts_with(project_workbench::OBSERVER_PREFIX)
+                })
+            })
+            .collect()
+    }
+    async fn timeout_image(&self) {
+        screenshot(
+            self.window,
+            &self.evidence.join("native-project-input-timeout.png"),
+        )
+        .await;
+    }
+}
+impl project_workbench::Driver for NativeProjects<'_> {
+    fn browser(&self) -> bool {
+        false
+    }
+    fn metadata(&self) -> Value {
+        let owner = self.owner();
+        json!({"source":std::env::var("NW_SOURCE_SHA").or_else(|_|std::env::var("GITHUB_SHA")).ok(),"executable":self.identity,"root_id":owner["root_id"],"registry":owner["registry"],"viewport":[1440,861],"combined_journey_deadline_seconds":240,"input_deadline_seconds":5,"command_deadline_seconds":10,"scenario_commands":project_workbench::project_commands()})
+    }
+    async fn mark(&mut self) {
+        self.watermark = std::fs::metadata(self.root.join("logs/owner.jsonl"))
+            .unwrap()
+            .len();
+    }
+    async fn click(&mut self, x: u32, y: u32) {
+        click(self.window, &x.to_string(), &y.to_string()).await;
+    }
+    async fn key(&mut self, key: project_workbench::Key) {
+        let key = match key {
+            project_workbench::Key::Tab => "Tab",
+            project_workbench::Key::Space => "space",
+            project_workbench::Key::Escape => "Escape",
+            project_workbench::Key::CtrlEnter => "ctrl+Return",
+        };
+        input(&["key", "--clearmodifiers", key]).await;
+    }
+    async fn replace(&mut self, text: &str) {
+        input(&["key", "--clearmodifiers", "ctrl+a"]).await;
+        for (index, segment) in text.split('\n').enumerate() {
+            if index != 0 {
+                input(&["key", "--clearmodifiers", "Return"]).await;
+            }
+            input(&["type", "--clearmodifiers", "--delay", "2", segment]).await;
+        }
+    }
+    async fn screenshot(&mut self, name: &str) {
+        screenshot(
+            self.window,
+            &self.evidence.join(format!("native-project-{name}.png")),
+        )
+        .await;
+    }
+    async fn observed(&mut self, command: &str) -> project_workbench::Observation {
+        let started = Instant::now();
+        loop {
+            let events = self.events();
+            let mutations: Vec<_> = events
+                .iter()
+                .filter(|event| {
+                    event["fields"]["message"] == "command.completed"
+                        && event["fields"]["command"]
+                            .as_str()
+                            .is_some_and(project_workbench::project_mutation)
+                })
+                .take(9)
+                .collect();
+            let overflow = mutations.len() > 8;
+            if overflow
+                || mutations
+                    .iter()
+                    .any(|event| event["fields"]["command"] != command)
+            {
+                let completions: Vec<Value> = if overflow {
+                    Vec::new()
+                } else {
+                    mutations
+                        .iter()
+                        .map(|event| {
+                            let fields = &event["fields"];
+                            let audit = events.iter().find(|audit| {
+                                audit["fields"]["request_id"] == fields["request_id"]
+                                    && matches!(
+                                        audit["fields"]["event"].as_str(),
+                                        Some("project.created" | "project.edit.accepted")
+                                    )
+                            });
+                            let code = fields["code"].as_str();
+                            json!({
+                                "command":fields["command"].as_str(),
+                                "request_id":fields["request_id"].as_str(),
+                                "project":audit.and_then(|audit|audit["fields"]["project_id"].as_str()),
+                                "expected_revision":audit.and_then(|audit|audit["fields"]["base_revision"].as_str()),
+                                "code":code,
+                                "outcome":match code { Some("OK")=>"accepted",Some(_)=>"rejected",None=>"unknown" },
+                                "accepted_revision":if code==Some("OK") { audit.and_then(|audit|audit["fields"]["revision"].as_str()) } else { None },
+                                "receipt":fields["receipt_id"].as_str().filter(|id|!id.is_empty()),
+                            })
+                        })
+                        .collect()
+                };
+                self.write(
+                    "unexpected-project-mutation",
+                    &json!({
+                        "expected_command":command,"completion_limit":8,
+                        "overflow":overflow,"completions":completions,
+                    }),
+                );
+                self.screenshot("unexpected-project-mutation").await;
+                panic!(
+                    "Native input completed an unexpected project mutation or exceeded eight completions while awaiting {command}; inspect the bounded diagnostic JSON and PNG"
+                );
+            }
+            if let Some(completed) = events.iter().find(|event| {
+                event["fields"]["message"] == "command.completed"
+                    && event["fields"]["command"] == command
+            }) {
+                let fields = &completed["fields"];
+                let request_id = fields["request_id"].as_str().unwrap().to_owned();
+                let audit = events.iter().find(|event| {
+                    event["fields"]["request_id"] == request_id
+                        && matches!(
+                            event["fields"]["event"].as_str(),
+                            Some("project.created" | "project.edit.accepted")
+                        )
+                });
+                let code = fields["code"].as_str().unwrap().to_owned();
+                if code == "OK"
+                    && matches!(
+                        command,
+                        "projects.create"
+                            | "sequences.create"
+                            | "clips.place"
+                            | "clips.move"
+                            | "clips.split"
+                            | "clips.remove"
+                            | "clips.link"
+                            | "clips.unlink"
+                            | "history.undo"
+                            | "history.redo"
+                    )
+                {
+                    assert!(
+                        audit.is_some(),
+                        "UI mutation has no correlated committed project audit event"
+                    );
+                }
+                if code != "OK" {
+                    assert!(
+                        audit.is_none(),
+                        "Rejected UI request must not have an accepted edit"
+                    );
+                }
+                return project_workbench::Observation {
+                    request_id,
+                    project: audit
+                        .and_then(|event| event["fields"]["project_id"].as_str())
+                        .map(str::to_owned),
+                    revision: audit
+                        .and_then(|event| event["fields"]["revision"].as_str())
+                        .map(str::to_owned),
+                    expected_revision: audit
+                        .and_then(|event| event["fields"]["base_revision"].as_str())
+                        .map(str::to_owned),
+                    code,
+                    receipt: fields["receipt_id"]
+                        .as_str()
+                        .filter(|id| !id.is_empty())
+                        .map(str::to_owned),
+                };
+            }
+            if started.elapsed() >= Duration::from_secs(10) {
+                self.timeout_image().await;
+                panic!("Native project input did not complete {command}");
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+    async fn loaded(&mut self, reads: usize) {
+        let started = Instant::now();
+        loop {
+            let completed: std::collections::BTreeSet<_> = self
+                .events()
+                .into_iter()
+                .filter(|event| {
+                    event["fields"]["message"] == "command.completed"
+                        && matches!(
+                            event["fields"]["command"].as_str(),
+                            Some("projects.inspect" | "sequences.inspect")
+                        )
+                })
+                .map(|event| event["fields"]["request_id"].as_str().unwrap().to_owned())
+                .collect();
+            if completed.len() >= reads {
+                assert_eq!(
+                    completed.len(),
+                    reads,
+                    "Unexpected extra UI projection request"
+                );
+                return;
+            }
+            if started.elapsed() >= Duration::from_secs(10) {
+                self.timeout_image().await;
+                panic!(
+                    "Native project load completed {} of {reads} canonical reads",
+                    completed.len()
+                );
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+    async fn no_cleanup_submission(&mut self) {
+        assert!(
+            !self
+                .events()
+                .iter()
+                .any(|event| event["fields"]["message"] == "command.completed"
+                    && matches!(
+                        event["fields"]["command"].as_str(),
+                        Some("jobs.submit" | "batches.submit")
+                    )),
+            "Projects input dispatched a hidden Cleanup submission"
+        );
+    }
+    async fn request(
+        &mut self,
+        request: Request,
+        _external: bool,
+    ) -> nw_domain::commands::Response {
+        let owner = self.owner();
+        let response = reqwest::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap()
+            .post(format!(
+                "http://127.0.0.1:{}/api/v1/commands",
+                owner["port"].as_u64().unwrap()
+            ))
+            .bearer_auth(owner["bearer"].as_str().unwrap())
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+        assert!(response.status().is_success());
+        let response: nw_domain::commands::Response = response.json().await.unwrap();
+        assert_eq!(response.request_id, request.request_id);
+        response
+    }
+    async fn policy(&mut self, _phase: project_workbench::Policy, _project: Option<&str>) -> Value {
+        panic!("Native owner journey must not use browser policy fixtures")
+    }
+    async fn reopen(&mut self) -> Value {
+        let before = self.owner();
+        let stderr_path = self.evidence.join("native-project-reopen-stderr.log");
+        let stderr_path = if stderr_path.exists() {
+            self.evidence.join("native-project-group-reopen-stderr.log")
+        } else {
+            stderr_path
+        };
+        input(&["windowactivate", "--sync", self.window]).await;
+        input(&["key", "--clearmodifiers", "alt+F4"]).await;
+        assert!(
+            tokio::time::timeout(Duration::from_secs(10), self.app.wait())
+                .await
+                .expect("Project frontend close deadline")
+                .unwrap()
+                .success()
+        );
+        self.watermark = std::fs::metadata(self.root.join("logs/owner.jsonl"))
+            .unwrap()
+            .len();
+        *self.app = tokio::process::Command::new(self.executable)
+            .arg("--data-dir")
+            .arg(self.root)
+            .arg("--components-dir")
+            .arg(self.components)
+            .env("LIBGL_ALWAYS_SOFTWARE", "1")
+            .env("WINIT_X11_SCALE_FACTOR", "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(std::fs::File::create(stderr_path).unwrap())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let started = Instant::now();
+        loop {
+            let output = xdo(&["search", "--onlyvisible", "--name", "^Numera Wiz$"]).await;
+            if output.status.success()
+                && let Some(window) = String::from_utf8(output.stdout)
+                    .unwrap()
+                    .lines()
+                    .find(|line| !line.is_empty() && line.bytes().all(|c| c.is_ascii_digit()))
+            {
+                *self.window = window.into();
+                break;
+            }
+            assert!(
+                self.app.try_wait().unwrap().is_none(),
+                "Reopened frontend exited before its window"
+            );
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "Reopened native window deadline"
+            );
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        input(&["windowsize", self.window, "1440", "861"]).await;
+        input(&["windowactivate", "--sync", self.window]).await;
+        self.observed("jobs.list").await;
+        let after = self.owner();
+        assert_eq!(after["root_id"], before["root_id"]);
+        assert_eq!(after["canonical_root"], before["canonical_root"]);
+        assert_eq!(after["build"], self.identity["sha256"]);
+        json!({"reopen":"actual native frontend process","root_id":after["root_id"],"build":after["build"],"elapsed_ms":started.elapsed().as_millis().to_string(),"owner_restart_claimed":false})
+    }
+    fn write(&self, name: &str, value: &Value) {
+        std::fs::write(
+            self.evidence.join(format!("native-project-{name}.json")),
+            serde_json::to_vec_pretty(value).unwrap(),
+        )
+        .unwrap();
+    }
+}

@@ -1,0 +1,628 @@
+//! Manifest-bound closed-store copies used by generation migration and recovery.
+//! The source is never opened writable, overwritten, repaired or deleted here.
+use crate::{
+    storage,
+    versions::{self, GenerationFacts},
+};
+use nw_domain::{DomainError, Result, records::FileIdentity};
+use nw_platform::{
+    files::{self, DirectoryStamp, RootLock},
+    security,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
+use tokio_util::sync::CancellationToken;
+
+const MAX_WORKSPACES: usize = 16;
+const SPACE_MARGIN: u64 = 64 * 1024 * 1024;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CopyManifest {
+    pub schema_version: u32,
+    pub operation_id: String,
+    pub role: String,
+    pub source: GenerationFacts,
+    pub source_file_sha256: String,
+    pub source_file_bytes: String,
+}
+pub struct ClosedCopy {
+    pub path: PathBuf,
+    pub facts: GenerationFacts,
+    pub file_sha256: String,
+}
+fn conflict(message: &'static str) -> DomainError {
+    DomainError::new("STORE_COPY_CONFLICT", message)
+}
+fn same_facts(expected: &GenerationFacts, actual: &GenerationFacts) -> bool {
+    expected == actual
+}
+fn manifest_bytes(manifest: &CopyManifest) -> Result<Vec<u8>> {
+    let bytes = serde_json::to_vec_pretty(manifest).map_err(storage)?;
+    if bytes.len() > 65536 {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Generation copy manifest exceeds64KiB",
+        ));
+    }
+    Ok(bytes)
+}
+/// Reserve one canonical UUID workspace without claiming unrelated files as owned.
+pub fn workspace(lease: &crate::generations::RootLease, operation_id: &str) -> Result<PathBuf> {
+    let parsed = uuid::Uuid::parse_str(operation_id)
+        .map_err(|_| conflict("Copy operation identity must be a UUID"))?;
+    if parsed.to_string() != operation_id {
+        return Err(conflict("Copy operation identity must be canonical"));
+    }
+    lease.revalidate()?;
+    let parent = security::private_directory(&lease.state().join("generation-workspaces"))?;
+    let stamp = DirectoryStamp::capture_resolved(&parent)?;
+    let mut count = 0usize;
+    for member in std::fs::read_dir(&parent).map_err(files::io_error)? {
+        member.map_err(files::io_error)?;
+        count += 1;
+        if count > MAX_WORKSPACES {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained generation workspace quota reached; nothing was evicted",
+            ));
+        }
+    }
+    let path = parent.join(operation_id);
+    if !path.try_exists().map_err(files::io_error)? && count >= MAX_WORKSPACES {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "At most16 generation workspaces may be retained",
+        ));
+    }
+    let path = security::private_directory(&path)?;
+    stamp.revalidate()?;
+    lease.revalidate()?;
+    Ok(path)
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestorationSlot {
+    schema_version: u32,
+    enablement_id: String,
+    root_id: String,
+    restoration_id: String,
+}
+/// Inspect the aggregate retained workspace inventory before accepting new work.
+/// Unknown entries are charged and preserved; no quota is recovered by eviction.
+pub(crate) fn workspace_headroom(
+    lease: &crate::generations::RootLease,
+    additional: usize,
+) -> Result<()> {
+    lease.revalidate()?;
+    let parent = security::private_directory(&lease.state().join("generation-workspaces"))?;
+    let stamp = DirectoryStamp::capture_resolved(&parent)?;
+    let mut workspaces = 0usize;
+    for entry in std::fs::read_dir(&parent).map_err(files::io_error)? {
+        let entry = entry.map_err(files::io_error)?;
+        workspaces += 1;
+        if workspaces
+            .checked_add(additional)
+            .is_none_or(|count| count > MAX_WORKSPACES)
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained workspaces leave no reserved restoration slot",
+            ));
+        }
+        let mut pending = vec![(entry.path(), 0usize)];
+        let mut entries = 0usize;
+        let mut metadata_bytes = 0u64;
+        let mut directory_bytes = std::collections::BTreeMap::<PathBuf, u64>::new();
+        let mut database_directories = std::collections::BTreeSet::new();
+        while let Some((path, depth)) = pending.pop() {
+            let metadata = std::fs::symlink_metadata(&path).map_err(files::io_error)?;
+            entries += 1;
+            if entries > 256 || metadata.file_type().is_symlink() || depth > 4 {
+                return Err(conflict(
+                    "Workspace inventory exceeds its bounded entry structure",
+                ));
+            }
+            if metadata.is_dir() {
+                for child in std::fs::read_dir(path).map_err(files::io_error)? {
+                    if pending.len() + entries >= 256 {
+                        return Err(conflict("Workspace entry headroom is exhausted"));
+                    }
+                    pending.push((child.map_err(files::io_error)?.path(), depth + 1));
+                }
+            } else if metadata.is_file() {
+                let directory = path
+                    .parent()
+                    .ok_or_else(|| conflict("Workspace parent is missing"))?;
+                let retained = directory_bytes.entry(directory.to_owned()).or_default();
+                *retained = retained
+                    .checked_add(metadata.len())
+                    .ok_or_else(|| conflict("Workspace payload byte count overflow"))?;
+                let database = path.with_file_name("store.redb");
+                // The common verified-copy publisher retains its original staging
+                // name as a hard link. Its name is not authority: only held native
+                // identity with the actual sibling database classifies that payload.
+                let database_payload = path == database
+                    || (database.try_exists().map_err(files::io_error)?
+                        && files::same_object(&path, &database)?);
+                if database_payload {
+                    if metadata.len() == 0 || metadata.len() > versions::MAX_GENERATION_BYTES {
+                        return Err(conflict("Retained generation length exceeds its bound"));
+                    }
+                    database_directories.insert(directory.to_owned());
+                } else {
+                    if metadata.len() > 65536 {
+                        return Err(conflict("Retained workspace metadata exceeds64KiB"));
+                    }
+                    metadata_bytes = metadata_bytes
+                        .checked_add(metadata.len())
+                        .ok_or_else(|| conflict("Workspace metadata count overflow"))?;
+                    if metadata_bytes > 256 * 65536 {
+                        return Err(conflict("Workspace metadata headroom is exhausted"));
+                    }
+                }
+            } else {
+                return Err(conflict("Unexpected workspace member was preserved"));
+            }
+        }
+        for directory in database_directories {
+            if directory_bytes[&directory] > 2 * versions::MAX_GENERATION_BYTES {
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Retained copy workspace bytes exceed their finite quota; nothing was evicted",
+                ));
+            }
+        }
+    }
+    stamp.revalidate()?;
+    lease.revalidate()
+}
+fn require_entry_headroom(path: &Path, additional: usize) -> Result<()> {
+    let mut pending = vec![path.to_owned()];
+    let mut entries = additional;
+    while let Some(path) = pending.pop() {
+        entries += 1;
+        if entries > 256 {
+            return Err(conflict(
+                "Operation workspace lacks complete archive/proof entry headroom",
+            ));
+        }
+        let metadata = std::fs::symlink_metadata(&path).map_err(files::io_error)?;
+        if metadata.file_type().is_symlink() {
+            return Err(conflict("Workspace substitution was preserved"));
+        }
+        if metadata.is_dir() {
+            for child in std::fs::read_dir(path).map_err(files::io_error)? {
+                if pending.len() + entries >= 256 {
+                    return Err(conflict("Operation workspace entry headroom is exhausted"));
+                }
+                pending.push(child.map_err(files::io_error)?.path());
+            }
+        }
+    }
+    Ok(())
+}
+pub(crate) fn restoration_slot(
+    lease: &crate::generations::RootLease,
+    enablement_id: &str,
+) -> Result<String> {
+    let path = lease
+        .state()
+        .join("generation-workspaces")
+        .join(enablement_id);
+    let slot: RestorationSlot = serde_json::from_slice(&security::read_private(
+        &path.join("restoration-slot.json"),
+        65536,
+    )?)
+    .map_err(storage)?;
+    if slot.schema_version != 1
+        || slot.enablement_id != enablement_id
+        || lease.selection()?.root_id.as_deref() != Some(slot.root_id.as_str())
+        || uuid::Uuid::parse_str(&slot.restoration_id)
+            .map_err(storage)?
+            .to_string()
+            != slot.restoration_id
+        || slot.restoration_id == enablement_id
+    {
+        return Err(conflict("Reserved restoration workspace identity differs"));
+    }
+    let reserved = lease
+        .state()
+        .join("generation-workspaces")
+        .join(&slot.restoration_id);
+    let metadata = std::fs::symlink_metadata(&reserved).map_err(files::io_error)?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(conflict(
+            "Reserved restoration workspace is absent or substituted",
+        ));
+    }
+    workspace_headroom(lease, 0)?;
+    // Three independent copies, up to64 archived activations, authority,
+    // installation/completion observations and bounded auxiliary metadata.
+    require_entry_headroom(&reserved, 96)?;
+    Ok(slot.restoration_id)
+}
+pub(crate) fn reserve_restoration_slot(
+    lease: &crate::generations::RootLease,
+    enablement_id: &str,
+) -> Result<()> {
+    let path = lease
+        .state()
+        .join("generation-workspaces")
+        .join(enablement_id);
+    if path
+        .join("restoration-slot.json")
+        .try_exists()
+        .map_err(files::io_error)?
+    {
+        restoration_slot(lease, enablement_id)?;
+        return Ok(());
+    }
+    workspace_headroom(
+        lease,
+        if path.try_exists().map_err(files::io_error)? {
+            1
+        } else {
+            2
+        },
+    )?;
+    let operation = workspace(lease, enablement_id)?;
+    require_entry_headroom(&operation, 32)?;
+    let restoration_id = uuid::Uuid::new_v4().to_string();
+    workspace(lease, &restoration_id)?;
+    let slot = RestorationSlot {
+        schema_version: 1,
+        enablement_id: enablement_id.into(),
+        restoration_id,
+        root_id: lease
+            .selection()?
+            .root_id
+            .ok_or_else(|| conflict("Reservation requires an existing selected root"))?,
+    };
+    let raw = serde_json::to_vec(&slot).map_err(storage)?;
+    let mapping = operation.join("restoration-slot.json");
+    security::write_private(&mapping, &raw, false)?;
+    nw_platform::generation_restoration::QualifiedDirectory::open(&operation)?.flush_final_file(
+        "restoration-slot.json",
+        &files::source_object(&mapping)?,
+        &nw_domain::projects::hash(&raw),
+        65536,
+    )?;
+    #[cfg(unix)]
+    std::fs::File::open(
+        operation
+            .parent()
+            .ok_or_else(|| conflict("Workspace parent is missing"))?,
+    )
+    .and_then(|file| file.sync_all())
+    .map_err(files::io_error)?;
+    lease.revalidate()
+}
+/// Check the complete copy requirement before allocating either retained generation.
+/// Reservations remain conservative; another disk user can still exhaust space later.
+pub fn require_copy_space(parent: &Path, bytes: u64, copies: u64) -> Result<()> {
+    if bytes == 0 || bytes > versions::MAX_GENERATION_BYTES || !(1..=3).contains(&copies) {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Generation copy size/count is outside admitted limits",
+        ));
+    }
+    let required = bytes
+        .checked_mul(copies)
+        .and_then(|value| value.checked_add(SPACE_MARGIN))
+        .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Generation space estimate overflow"))?;
+    if fs2::available_space(parent).map_err(files::io_error)? < required {
+        return Err(DomainError::new(
+            "SCRATCH_EXHAUSTED",
+            "Complete retained generation copies and64MiB safety margin do not fit; source is untouched",
+        ));
+    }
+    Ok(())
+}
+/// Copy a closed generation through the existing full-byte verified copy primitive.
+/// A resumable destination requires the exact private manifest and complete file hash.
+/// A matching-looking filename alone never proves ownership or completeness.
+pub fn copy_closed(
+    lease: &crate::generations::RootLease,
+    operation_id: &str,
+    role: &str,
+    source: &Path,
+    cancel: &CancellationToken,
+) -> Result<ClosedCopy> {
+    if !["rollback", "target", "restoration"].contains(&role) {
+        return Err(conflict("Unknown generation workspace role"));
+    }
+    lease.revalidate()?;
+    let source = std::fs::canonicalize(source).map_err(files::io_error)?;
+    let _source_guard = RootLock::acquire(&source).map_err(|mut error| {
+        if error.code == "OWNER_BUSY" {
+            error.message = "The source generation is still owned".into();
+        }
+        error
+    })?;
+    copy_locked(lease, operation_id, role, &source, cancel)
+}
+/// The caller already retains the source's generation lock, including after redb closes.
+/// Kept crate-private so the ordinary command path cannot bypass ownership.
+pub(crate) fn copy_locked(
+    lease: &crate::generations::RootLease,
+    operation_id: &str,
+    role: &str,
+    source: &Path,
+    cancel: &CancellationToken,
+) -> Result<ClosedCopy> {
+    if !["rollback", "target", "restoration"].contains(&role) {
+        return Err(conflict("Unknown generation workspace role"));
+    }
+    let source_facts = versions::inspect_closed(source)?;
+    let source_file = source.join("store.redb");
+    let source_identity = files::identity(&source_file, cancel)?;
+    if source_identity.bytes != source_facts.store_bytes {
+        return Err(conflict("Source length changed after closed inspection"));
+    }
+    let operation = workspace(lease, operation_id)?;
+    require_copy_space(
+        &operation,
+        source_identity.bytes.parse().map_err(storage)?,
+        1,
+    )?;
+    let destination = security::private_directory(&operation.join(role))?;
+    let destination_stamp = DirectoryStamp::capture_resolved(&destination)?;
+    let mut retained_bytes = 0u64;
+    let mut retained_entries = 0usize;
+    for entry in std::fs::read_dir(&destination).map_err(files::io_error)? {
+        let entry = entry.map_err(files::io_error)?;
+        retained_entries += 1;
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(files::io_error)?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(conflict("Unexpected copy workspace member was preserved"));
+        }
+        retained_bytes = retained_bytes
+            .checked_add(metadata.len())
+            .ok_or_else(|| conflict("Copy workspace byte count overflow"))?;
+        if retained_entries > 256 || retained_bytes > 2 * versions::MAX_GENERATION_BYTES {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained copy workspace entries/bytes exceed their finite quota; nothing was evicted",
+            ));
+        }
+    }
+    let _destination_guard = RootLock::acquire(&destination).map_err(|mut error| {
+        if error.code == "OWNER_BUSY" {
+            error.message = "The copy destination is still owned".into();
+        }
+        error
+    })?;
+    let mut manifest = CopyManifest {
+        schema_version: 1,
+        operation_id: operation_id.into(),
+        role: role.into(),
+        source: source_facts.clone(),
+        source_file_sha256: source_identity.sha256.clone(),
+        source_file_bytes: source_identity.bytes.clone(),
+    };
+    let manifest_path = destination.join("copy.json");
+    if manifest_path.try_exists().map_err(files::io_error)? {
+        let bytes = security::read_private(&manifest_path, 65536)?;
+        let existing: CopyManifest = serde_json::from_slice(&bytes).map_err(storage)?;
+        if existing != manifest {
+            let mut original = existing.source.clone();
+            original.store_bytes = source_facts.store_bytes.clone();
+            if existing.schema_version != 1
+                || existing.operation_id != operation_id
+                || existing.role != role
+                || original != source_facts
+                || !destination
+                    .join("store.redb")
+                    .try_exists()
+                    .map_err(files::io_error)?
+            {
+                return Err(conflict(
+                    "Existing workspace manifest belongs to different source facts",
+                ));
+            }
+            // Reopening a writer may change redb's physical transaction pages
+            // without changing a single retained raw record. A previously completed
+            // copy is reusable only against its own original file hash AND today's
+            // complete raw-record snapshot; never relabel or overwrite its manifest.
+            manifest = existing;
+        }
+    } else {
+        if destination
+            .join("store.redb")
+            .try_exists()
+            .map_err(files::io_error)?
+        {
+            return Err(conflict(
+                "Existing database has no matching ownership manifest; it was preserved",
+            ));
+        }
+        security::write_private(&manifest_path, &manifest_bytes(&manifest)?, false)?;
+    }
+    let output = destination.join("store.redb");
+    let actual: FileIdentity = if output.try_exists().map_err(files::io_error)? {
+        files::identity(&output, cancel)?
+    } else {
+        files::verified_copy_expected(&source_identity, &output, cancel)?
+    };
+    if actual.bytes != manifest.source_file_bytes || actual.sha256 != manifest.source_file_sha256 {
+        return Err(conflict(
+            "Owned copy is incomplete or differs; it was retained for explicit recovery",
+        ));
+    }
+    // A second independent database traversal proves record and metadata identity.
+    let copied = versions::inspect_closed(&destination)?;
+    let mut logical_copy = copied.clone();
+    logical_copy.store_bytes = source_facts.store_bytes.clone();
+    if !same_facts(&source_facts, &logical_copy) {
+        return Err(conflict(
+            "Copied generation records differ from the closed source",
+        ));
+    }
+    let current = versions::inspect_closed(source)?;
+    if !same_facts(&source_facts, &current) {
+        return Err(conflict("Source facts changed during verified copy"));
+    }
+    destination_stamp.revalidate()?;
+    lease.revalidate()?;
+    let complete = serde_json::to_vec(&serde_json::json!({
+        "schema_version":1,
+        "manifest_sha256":hex::encode(Sha256::digest(manifest_bytes(&manifest)?)),
+        "store_sha256":actual.sha256,
+        "store_bytes":actual.bytes,
+        "records_sha256":copied.records_sha256,
+    }))
+    .map_err(storage)?;
+    let completion = destination.join("complete.json");
+    if completion.try_exists().map_err(files::io_error)? {
+        if security::read_private(&completion, 65536)? != complete {
+            return Err(conflict("Existing completion proof differs"));
+        }
+    } else {
+        security::write_private(&completion, &complete, false)?;
+    }
+    Ok(ClosedCopy {
+        path: destination,
+        facts: copied,
+        file_sha256: actual.sha256,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Store, generations::RootLease};
+    #[test]
+    fn immutable_copy_preserves_exact_records_receipts_and_restarts_from_complete_proof() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = security::private_directory(&temporary.path().join("root")).unwrap();
+        let source = security::private_directory(&root.join("state/generations/1")).unwrap();
+        let store = Store::open(&source).unwrap();
+        store
+            .put(
+                "exact/value",
+                &serde_json::json!({"ticks":"9007199254740993","unknown":{"keep":true}}),
+            )
+            .unwrap();
+        let large_payload = "v".repeat(65537);
+        store.put("exact/large-payload", &large_payload).unwrap();
+        let scope = store.issue_scope("alice", 100).unwrap();
+        let mut request = nw_domain::commands::Request::query(
+            "assets.register",
+            serde_json::json!({"path":"retained"}),
+        );
+        request.replay_scope = Some(scope);
+        request.idempotency_key = Some("retained-key".into());
+        let accepted = store
+            .commit_with_clock(
+                "alice",
+                &request,
+                || Ok(101),
+                serde_json::json!({"asset_id":"same"}),
+                &[],
+            )
+            .unwrap();
+        let root_id = store.root_id().to_owned();
+        drop(store);
+        let lease = RootLease::acquire(&root).unwrap();
+        let operation = uuid::Uuid::new_v4().to_string();
+        let copied = copy_closed(
+            &lease,
+            &operation,
+            "rollback",
+            &source,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        let repeated = copy_closed(
+            &lease,
+            &operation,
+            "rollback",
+            &source,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        assert_eq!(copied.file_sha256, repeated.file_sha256);
+        assert_eq!(copied.facts, repeated.facts);
+        let copy = Store::open(&copied.path).unwrap();
+        assert_eq!(copy.root_id(), root_id);
+        assert_eq!(
+            copy.get::<serde_json::Value>("exact/value")
+                .unwrap()
+                .unwrap()["ticks"],
+            "9007199254740993"
+        );
+        assert_eq!(
+            copy.replay("alice", &request, 102)
+                .unwrap()
+                .unwrap()
+                .receipt_id,
+            accepted.receipt_id
+        );
+        assert_eq!(
+            copy.get::<String>("exact/large-payload").unwrap().unwrap(),
+            large_payload
+        );
+        drop(copy);
+        let database = copied.path.join("store.redb");
+        let alias = std::fs::read_dir(&copied.path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| path != &database && files::same_object(path, &database).unwrap())
+            .expect("The actual common copy producer retains its native payload alias");
+        assert!(std::fs::metadata(&alias).unwrap().len() > 65536);
+        workspace_headroom(&lease, 0).unwrap();
+        // An unrelated large file cannot acquire database treatment by its name.
+        let unrelated = copied.path.join(".tmp-unrelated-proof");
+        std::fs::write(&unrelated, vec![7u8; 65537]).unwrap();
+        assert!(!files::same_object(&unrelated, &database).unwrap());
+        assert_eq!(
+            workspace_headroom(&lease, 0).unwrap_err().message,
+            "Retained workspace metadata exceeds64KiB"
+        );
+        assert_eq!(std::fs::read(&unrelated).unwrap(), vec![7u8; 65537]);
+    }
+    #[test]
+    fn live_source_and_unproven_existing_destination_are_preserved() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = security::private_directory(&temporary.path().join("root")).unwrap();
+        let source = security::private_directory(&root.join("state/generations/1")).unwrap();
+        let store = Store::open(&source).unwrap();
+        let lease = RootLease::acquire(&root).unwrap();
+        let operation = uuid::Uuid::new_v4().to_string();
+        assert_eq!(
+            copy_closed(
+                &lease,
+                &operation,
+                "rollback",
+                &source,
+                &CancellationToken::new()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "OWNER_BUSY"
+        );
+        drop(store);
+        let destination =
+            security::private_directory(&workspace(&lease, &operation).unwrap().join("rollback"))
+                .unwrap();
+        let output = destination.join("store.redb");
+        std::fs::write(&output, b"unproven").unwrap();
+        assert_eq!(
+            copy_closed(
+                &lease,
+                &operation,
+                "rollback",
+                &source,
+                &CancellationToken::new()
+            )
+            .err()
+            .unwrap()
+            .code,
+            "STORE_COPY_CONFLICT"
+        );
+        assert_eq!(std::fs::read(output).unwrap(), b"unproven");
+        assert!(!destination.join("copy.json").exists());
+    }
+}

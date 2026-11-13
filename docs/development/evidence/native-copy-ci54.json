@@ -1,0 +1,48 @@
+{
+  "hosted_evidence": {
+    "run_id": 40061709915,
+    "branch_head": "7a327cdc2d0cc63f9a8701da9dcc76208129ad0b",
+    "artifact_id": 12547717000,
+    "zip_sha256": "b0ff386da1894a086c2e5a956089703905cef806c5566b78d92a6a9e8b09e5a1"
+  },
+  "native": {
+    "architecture": "x86_64",
+    "executable": {
+      "bytes": "128002672",
+      "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/native-app/numera-wiz",
+      "sha256": "21ab2af6cf967d61c11f3dfe4e7c33f8bda94bec3ded8b667476fa99aff1683c"
+    },
+    "not_qualified": [
+      "Windows or macOS native input",
+      "preview/playback",
+      "full five-surface qualification"
+    ],
+    "observed": "Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output",
+    "os": "linux",
+    "registry": "b8e5644f6fcf3c35a5080aef818754a9b8f9d8fe9ae2451d4d1dbf393e00a31e",
+    "renderer": "Glow; LIBGL_ALWAYS_SOFTWARE=1",
+    "runner_image": "20261012.334.1",
+    "schema_version": 1,
+    "source": "1b9e36d394d08cd31b40c6f1d60728c0e4793dbc",
+    "viewport": [
+      1440,
+      861
+    ]
+  },
+  "output": {
+    "artifact": {
+      "bytes": "197983",
+      "path": "/tmp/.tmpas3Zql/source-clean-d38f616f01f542558aa8881f8e7ebc0d.mkv",
+      "sha256": "615a0326ac8cb7cef9d9ddabc4d09fa363228055daccbe2f24e0543bc8ce2648"
+    },
+    "job_id": "cf847150-3a2b-4f67-88fd-c295fd3ae53a",
+    "oracle": "Independent source/output byte equality after native input, Review and Ctrl+Enter Run",
+    "plan_hash": "b5c3e3ceced79a13ebd5aac4c2ba88cb5355746d9b8f79412b12f6a060ccdfc1",
+    "verification": "Full byte SHA-256 and length verified before no-replace publication"
+  },
+  "startup": {
+    "functional_deadline_seconds": 60,
+    "scope": "Unoptimized development executable under hosted X11/software GL; not packaged startup or memory qualification",
+    "visible_window_ms": "10178"
+  }
+}

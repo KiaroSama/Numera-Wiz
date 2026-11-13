@@ -1,0 +1,12 @@
+{
+  "name": "numera-wiz-local",
+  "interface": { "displayName": "Numera Wiz local integrations" },
+  "plugins": [
+    {
+      "name": "numera-wiz",
+      "source": { "source": "local", "path": "./numera-wiz" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_USE" },
+      "category": "Productivity"
+    }
+  ]
+}

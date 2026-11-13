@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "scope": "Actual adopted-r1 MediaV1 prior/current package lifecycle on all four native targets; full v1 unfinished",
+  "source": "c005778975b22f1960996bd3cd7ee73f5346a3c8",
+  "rust_run": 43393274542,
+  "run_number": 265,
+  "prior_package_source": "9a171e9fea96eb756d346972d9a8b392f6977294",
+  "whole_workflow": {
+    "all13_terminal": true,
+    "passed": 12,
+    "failed": 1,
+    "jobs": [
+      {
+        "id": 131778071428,
+        "name": "formatting",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 131778071725,
+        "name": "media",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131778071801,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131778071868,
+        "name": "dependency-lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779175645,
+        "name": "checks (macos-15-intel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779175675,
+        "name": "checks (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779175761,
+        "name": "checks (macos-15)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779175764,
+        "name": "checks (windows-2025)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779822331,
+        "name": "owner-batch",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779822360,
+        "name": "browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131779822366,
+        "name": "owner-transports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131791424134,
+        "name": "native-ui",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131792831633,
+        "name": "artifact-http",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "formatting": "Only failed job. Entire exact hosted formatter artifact applied once in d25fb207035752960ec3441319d256cf1fa139d6; all three normalized Rust ASTs preserved. This does not make the earlier run green.",
+  "native_observations": [
+    {
+      "target": "ubuntu-24.04",
+      "original_ms": 259458,
+      "added_ms": 68796,
+      "total_ms": 328282,
+      "original_epochs": 7,
+      "added_epochs": 4,
+      "old_exit_code": 3,
+      "same_S_native_identity_all4_boundaries": true,
+      "old_floor_no_mutation_before_recovery": true,
+      "old_guard_before": "1",
+      "old_guard_after": "2",
+      "current_project_receipts_replayed": true,
+      "newer_rows_preserved": true
+    },
+    {
+      "target": "windows-2025",
+      "original_ms": 247576,
+      "added_ms": 71865,
+      "total_ms": 319481,
+      "original_epochs": 7,
+      "added_epochs": 4,
+      "old_exit_code": 3,
+      "same_S_native_identity_all4_boundaries": true,
+      "old_floor_no_mutation_before_recovery": true,
+      "old_guard_before": "1",
+      "old_guard_after": "2",
+      "current_project_receipts_replayed": true,
+      "newer_rows_preserved": true
+    },
+    {
+      "target": "macos-15",
+      "original_ms": 335341,
+      "added_ms": 84524,
+      "total_ms": 419910,
+      "original_epochs": 7,
+      "added_epochs": 4,
+      "old_exit_code": 3,
+      "same_S_native_identity_all4_boundaries": true,
+      "old_floor_no_mutation_before_recovery": true,
+      "old_guard_before": "1",
+      "old_guard_after": "2",
+      "current_project_receipts_replayed": true,
+      "newer_rows_preserved": true
+    },
+    {
+      "target": "macos-15-intel",
+      "original_ms": 354814,
+      "added_ms": 90766,
+      "total_ms": 445641,
+      "original_epochs": 7,
+      "added_epochs": 4,
+      "old_exit_code": 3,
+      "same_S_native_identity_all4_boundaries": true,
+      "old_floor_no_mutation_before_recovery": true,
+      "old_guard_before": "1",
+      "old_guard_after": "2",
+      "current_project_receipts_replayed": true,
+      "newer_rows_preserved": true
+    }
+  ],
+  "artifacts": [
+    {
+      "target": "ubuntu-24.04",
+      "id": 14022258109,
+      "zip_bytes": 209443,
+      "zip_sha256": "47c2862433501e42b80c36dc765eb6fea21aeb57d1ad191eb5c7a9326b6e04ab",
+      "verified_members": 42
+    },
+    {
+      "target": "windows-2025",
+      "id": 14023480288,
+      "zip_bytes": 210626,
+      "zip_sha256": "6e51887ea6d1a3dec6283448b290b4d489e70a7630d9c5e498aa23040639c32a",
+      "verified_members": 42
+    },
+    {
+      "target": "macos-15",
+      "id": 14022472865,
+      "zip_bytes": 210319,
+      "zip_sha256": "241327a6b3be0f69823910e8fa0b8e3d1f2b6cef8d98aa7142d1d8b1aa85d6e7",
+      "verified_members": 42
+    },
+    {
+      "target": "macos-15-intel",
+      "id": 14022634314,
+      "zip_bytes": 210604,
+      "zip_sha256": "1b369fce8db3fb47b285e6243728873cb74365488d76701db75313335bfb03d5",
+      "verified_members": 42
+    }
+  ],
+  "all_native_artifact_members_verified": 168,
+  "preserved_limits": {
+    "test_identities": 179,
+    "unit": 131,
+    "async": 48,
+    "ignored": 8,
+    "expanded_jobs": 13,
+    "original_prior_current_seconds": 600
+  },
+  "qualified_controls": [
+    "Actual pinned old executable refuses promoted media generation with exit3 STORE_VERSION_UNSUPPORTED, without OWNER_BUSY or forced termination",
+    "Direct physical source/native identity equality before any current recovery",
+    "Same original S path, activation and native object at before-promotion/after-restoration/after-old-business/final-current boundaries",
+    "One actual old business operation advances adoption guard from1 to2 after restoration",
+    "Newer control rows and receipts preserved and accepted Project/LinkedProject/control requests replayed by current package"
+  ],
+  "not_qualified": [
+    "Later explicit native-owner MCP or credential delivery/cancellation corrections",
+    "Fresh-root and unadopted migrated-r0 package lifecycle, fault cut points, unknown writers and RSS matrices",
+    "Registered/multi-source/still/mixed A/V and wider frame-rate/container cases",
+    "Actual named Claude/Codex/Cursor loading and full agent/native/browser parity",
+    "Complete editor, decoded playback, standard offline distribution and owner hardware/full v1"
+  ]
+}

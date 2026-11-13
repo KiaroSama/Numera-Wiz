@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "candidate_head": "fbea8ef35285c9fd5027e283652dae569ef73c5b",
+  "ci_merge_commit": "ba6f2fea3bffbc4133010dc949790439a63bf224",
+  "run": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40041324965",
+  "artifact_id": 12539373641,
+  "artifact_zip_sha256": "3e7c37c114abcd53d65b961cd3d8e1be249d012cff78f04153505e223df8c5fd",
+  "screenshot": "native-cleanup-copy.png",
+  "screenshot_sha256": "1819fd8cd97735a0a0e0d0225b06fc2c26668d12e1c6713bbd7f1f383dc14021",
+  "native": {
+    "architecture": "x86_64",
+    "executable": {
+      "bytes": "443544968",
+      "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/native-app/numera-wiz",
+      "sha256": "292b6db7f5f7df63a00f26aace0d4dd1fa9f7d79ee9aef30c64d574b74a41df5"
+    },
+    "not_qualified": [
+      "Windows or macOS native input",
+      "preview/playback",
+      "full five-surface qualification"
+    ],
+    "observed": "Real native CI executable, window input, media registration, Review and keyboard Run, verified byte-identical output",
+    "os": "linux",
+    "registry": "be70192a3b20a7bf22d48d2df360fc48aa684edb44ef03a561ba1ae52b58ff96",
+    "renderer": "Glow; LIBGL_ALWAYS_SOFTWARE=1",
+    "runner_image": "20261012.334.1",
+    "schema_version": 1,
+    "source": "ba6f2fea3bffbc4133010dc949790439a63bf224",
+    "viewport": [
+      1440,
+      861
+    ]
+  },
+  "output_assertion": {
+    "artifact": {
+      "bytes": "197900",
+      "path": "/tmp/.tmpZEYu9N/source-clean-72d2fa2b78814cf4ad93c08c4784180c.mkv",
+      "sha256": "9aa0f9de53623894d33d42e2b88722fc6f29136e8a0f7671b64406ba7340447a"
+    },
+    "job_id": "494a20de-a0c8-4251-942b-c301ed4acf8e",
+    "oracle": "Independent source/output byte equality after native input, Review and Ctrl+Enter Run",
+    "plan_hash": "1a84f2e3eac7203d88e9c1fed73bfada16a9368cd30713224f8d0517804bae6f",
+    "verification": "Full byte SHA-256 and length verified before no-replace publication"
+  }
+}

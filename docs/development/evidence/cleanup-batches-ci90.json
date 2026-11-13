@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "full_release": "blocked",
+  "source_head": "e0ed712d22ea7e993a7bd08fa10f2111fbb73c54",
+  "compiled_merge": "72e29647b288e78251546e8d6e0f502fd9747121",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40120155167",
+  "all13_jobs_passed": true,
+  "batch_report": {
+    "case": "two_source_cleanup_batch",
+    "cli_batch": "8b246997-95a3-4c32-9473-b56902d12771",
+    "confirmed_cancelled": 2,
+    "copy_full_byte_equality": true,
+    "http_batch": "96ecd921-131b-4bd0-a5ba-fe25fd8c4c06",
+    "independent_retained_packet_equality": true,
+    "partial_exit": 9,
+    "scope": "Explicit candidates only; directory expansion, companions, replacement and GUI batching remain separate qualification",
+    "sdk_batch": "b935db01-1da0-469e-b3d6-469e66f5e7b7",
+    "skipped": 2,
+    "source_commit": "72e29647b288e78251546e8d6e0f502fd9747121",
+    "transports": [
+      "typed_cli",
+      "official_sdk_stdio",
+      "official_sdk_streamable_http"
+    ]
+  },
+  "lost_accepted_response_restart": {
+    "accepted_identity": "476a77ad-86f5-4265-a58c-f227d0ada452",
+    "automatic_retry_request_unchanged": true,
+    "boundary": "actual_owner_official_sdk_stdio",
+    "command": "batches.submit",
+    "durable_job_count": 2,
+    "lost_accepted_responses": 2,
+    "member_ids": [
+      "8b1e3c15-4bfe-462a-9691-9ec9cf360b6d",
+      "b2f5e527-d07c-44e0-97f0-75c4f8c3c2c0"
+    ],
+    "output_bytes": "197983",
+    "output_sha256": "8a0be71aea20db5ce235e3f88f9c3f892c440ff3dd0b33c820e0144d1c118504",
+    "owner_epoch_changed": true,
+    "owner_log_only": true,
+    "root_and_principal_unchanged": true,
+    "same_job_after_restart": true,
+    "same_member_set_after_restart": true,
+    "same_receipt_after_restart": true,
+    "schema_version": 1,
+    "source_commit": "72e29647b288e78251546e8d6e0f502fd9747121"
+  },
+  "human_journeys": {
+    "native_job": 120952080698,
+    "browser_job": 120950413654,
+    "native_and_browser_genuine_os_save_and_two_file_review_run": true,
+    "independent_full_source_output_bytes_per_child": true,
+    "original_single_producer_save_oracles_preserved": true,
+    "all_four_successful_pngs_personally_inspected": true,
+    "human_state_action_and_seconds_labels": true
+  },
+  "github_reported_artifacts": [
+    {
+      "id": 12571321616,
+      "name": "artifact-http-evidence-linux",
+      "zip_bytes": 4269,
+      "github_zip_digest": "sha256:346d7016b5018d74bd1c87b9f055c3694b1c55b61535f6bd99296b58c3d2fa04",
+      "downloaded": false
+    },
+    {
+      "id": 12571201584,
+      "name": "owner-batch-evidence-linux",
+      "zip_bytes": 2918,
+      "github_zip_digest": "sha256:e52753e1756efdad4ad29f1b8bc8bb0ba864a40d093d7eda6c0a06bb031d447a",
+      "downloaded": false
+    },
+    {
+      "id": 12571161568,
+      "name": "browser-boot-evidence-linux-chrome",
+      "zip_bytes": 1098082,
+      "github_zip_digest": "sha256:807642da6cff30d12fc8960119f4bfae2d7f92205ec63e18c6dd64c9ed82a962",
+      "downloaded": false
+    },
+    {
+      "id": 12570638108,
+      "name": "native-ui-evidence-linux",
+      "zip_bytes": 1744125,
+      "github_zip_digest": "sha256:2d909a85dc0d71e2c80f191cb977e6878da6f9bd7d655876a4c259bde328ddc6",
+      "downloaded": false
+    }
+  ],
+  "limits": "Explicit registered assets only. All full product/folder/companion/replacement/migration/retention/package/owner-harness gates remain mandatory."
+}

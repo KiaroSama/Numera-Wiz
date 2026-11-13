@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "run_id": 40088110391,
+  "branch_head": "635ee48a3a943f4f04a6281074a48c94e2ec9002",
+  "all_functional_jobs": "success",
+  "jobs": [
+    {
+      "id": 120855074509,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855074702,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120855074721,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855074735,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855442259,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855442274,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855442276,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120855442285,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120857480060,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120857480069,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "four complete native regression/Clippy/desktop targets and WASM",
+    "new real CLI verified client save, existing-target preservation, wrong selected SHA-256 and foreign-principal denial",
+    "domain/platform bounded verification, independently corrupted staging, cancellation and unknown-file preservation tests",
+    "existing complete actual engine/CLI/official SDK/lost-response/large HTTP and native/Chrome report/output journeys"
+  ],
+  "formatting": {
+    "status": "failure",
+    "exact_hosted_hunks_applied": 46,
+    "source_literal_log_mask_reconstructed": "The public literal format!(Bearer placeholder) was masked in the hosted diagnostic; exact unchanged source literal was restored while applying its formatting hunk."
+  },
+  "personally_inspected_images": [
+    "native-output-details.png; actual new destination field and Save button, without a Save input claim"
+  ],
+  "artifacts": [
+    {
+      "id": 12558221432,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:122cb5804409be02d7d8dd09fd06888252c6635cf58bb6c8e5a4b1bff95c641c",
+      "downloaded": false
+    },
+    {
+      "id": 12558148144,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:e6c44f4a4fdce2b53e4775feeaf473bcb46782de5d098dd9ccdc48e62af86731",
+      "downloaded": false
+    },
+    {
+      "id": 12557973887,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:d3a9652016a64a384eecd6928aa80945c974d1b99ba9d060c4fdbeb2f7695027",
+      "downloaded": false
+    },
+    {
+      "id": 12557642251,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:d3d379ef18046b059161e85492140148d182e91f1c82d20717dfe2809cced12e",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "new GUI save journeys and client-copy large-memory/cancellation assertions added after this run",
+    "native OS Save As picker and other browser/platform variants",
+    "complete product/package/resource/owner gates"
+  ]
+}

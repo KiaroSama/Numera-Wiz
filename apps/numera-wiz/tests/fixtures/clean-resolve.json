@@ -1,0 +1,18 @@
+{
+  "api_version": 1,
+  "request_id": "resolver-fixture",
+  "command": {"id": "streams.clean.resolve", "version": 1},
+  "params": {
+    "streams": [
+      {"index":0,"kind":"audio","codec":"aac","tags":{"language":"eng"},"dispositions":["default"]},
+      {"index":1,"kind":"video","codec":"h264","tags":{},"dispositions":[]},
+      {"index":2,"kind":"subtitle","codec":"subrip","tags":{"language":"fas"},"dispositions":[]},
+      {"index":3,"kind":"attachment","codec":"ttf","tags":{"filename":"font.ttf","mimetype":"application/x-truetype-font"},"dispositions":[]}
+    ],
+    "intent": {
+      "audio_selection":{"selector":{"mode":"source_indices","values":[0]},"no_match":"skip_file"},
+      "subtitle_selection":{"selector":{"mode":"none"},"no_match":"allow_empty"},
+      "preservation":{"additional_video":true,"attached_pictures":true,"attachments":true,"data":true,"unknown":true,"global_tags":true,"stream_tags":true,"chapters":true,"dispositions":true}
+    }
+  }
+}

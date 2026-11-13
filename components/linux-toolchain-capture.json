@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "purpose": "metadata_only_prerequisite_not_a_compiler_or_standard_profile",
+  "image": "docker.io/library/ubuntu@sha256:78d4744ead1f5b19b04d0df558ab182a5300903900755e515b2ca4d10eb2044d",
+  "platform": "linux/amd64",
+  "snapshot": "https://snapshot.ubuntu.com/ubuntu/20261101T000000Z",
+  "suites": ["noble", "noble-updates", "noble-security", "noble-backports"],
+  "components": ["main", "restricted", "universe", "multiverse"],
+  "architecture": "amd64",
+  "signed_by": "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
+  "roots": ["gcc-13", "g++-13", "binutils", "libc6-dev", "make", "autoconf", "automake", "libtool", "pkgconf", "m4", "perl", "python3", "python3-venv", "ca-certificates", "bash", "coreutils", "sed", "grep", "gawk", "diffutils", "findutils", "file", "patch", "tar", "gzip", "xz-utils", "zstd"],
+  "policy": {
+    "install_recommends": false,
+    "install_suggests": false,
+    "allow_remove": false,
+    "allow_downgrades": false,
+    "allow_unauthenticated": false,
+    "check_valid_until": true,
+    "check_date": true,
+    "verify_tls_peer": true,
+    "verify_tls_host": true,
+    "allow_redirect": false,
+    "redirect_policy": "refuse redirects; exact requested HTTPS URL is final on successful acquisition",
+    "payloads": "not_downloaded",
+    "bootstrap": "requires_separate_review_of_actual_capture"
+  },
+  "limits": {
+    "total_seconds": 300,
+    "pull_seconds": 100,
+    "apt_update_seconds": 100,
+    "diagnostic_stream_bytes": 16777216,
+    "report_bytes": 8388608,
+    "raw_total_bytes": 536870912,
+    "raw_files": 500,
+    "raw_file_bytes": 134217728,
+    "package_stanza_bytes": 1048576,
+    "package_count": 1000000,
+    "transport_chunk_bytes": 8388608,
+    "container_memory": "1536m",
+    "container_cpus": "2",
+    "container_pids": 128
+  },
+  "external_build_tool_inputs": [
+    {"name":"cmake","version":"4.4.5","url":"https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-x86_64.tar.gz","bytes":64865573,"sha256":"ed85135c5a5135b45e50423cb406dea04ca3338da0b8ef3c9ede963559680be0","identity_evidence":"published_release_digest_only","payload":"not_downloaded","runtime_closure":"pending_separate_bootstrap"},
+    {"name":"ninja","version":"1.13.2","url":"https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip","bytes":134040,"sha256":"5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6","identity_evidence":"prior_independent_hash_not_reverified_here","payload":"not_downloaded","runtime_closure":"pending_separate_bootstrap"},
+    {"name":"meson","version":"1.12.1","url":"https://files.pythonhosted.org/packages/57/99/36cd25f9598eef70db97577440a70a360af505f6f01c2338a18d1556079c/meson-1.12.1-py3-none-any.whl","bytes":1108668,"sha256":"930bc7542cbd9f57009e182fd014eba48cf1a0180a7b9006d2d32d8f168d8b02","identity_evidence":"prior_independent_hash_not_reverified_here","payload":"not_downloaded","runtime_closure":"pending_separate_bootstrap","use":"unpack_wheel_no_pip_resolution"},
+    {"name":"nasm","version":"3.02","url":"https://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.xz","bytes":1531636,"sha256":"87336eba53b4acfe917424ab5d500d2b0054d9f5148d35c2273ccf2cfb712f0d","identity_evidence":"prior_independent_source_hash_not_reverified_here","payload":"not_downloaded","runtime_closure":"pending_separate_source_bootstrap"},
+    {"name":"gperf","version":"3.3","url":"https://ftp.gnu.org/gnu/gperf/gperf-3.3.tar.gz","bytes":1831294,"sha256":"fd87e0aba7e43ae054837afd6cd4db03a3f2693deb3619085e6ed9d8d9604ad8","identity_evidence":"prior_independent_source_hash_not_reverified_here","payload":"not_downloaded","runtime_closure":"pending_separate_source_bootstrap"}
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "run_id": 40105897346,
+  "branch_head": "5d9b1106f3725051b42c4aaf7e1492baf4271875",
+  "status": "all_10_jobs_passed",
+  "jobs": [
+    {
+      "id": 120907391403,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907391570,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907391575,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907391599,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907828188,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907828204,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907828255,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120907828376,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120911101715,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120911101720,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "four complete native regressions/Clippy/desktop targets; WASM/lock/formatting; preserved research integrity",
+    "strict timeout/selector/tag validation; frozen future execution limits; completed source probe audit; original cross-principal plan hash equality",
+    "actual copy/remux progress and independent media preservation; ordinary CLI finite/disabled/scoped-denied source probe and durable retry",
+    "official SDK/lost-response/media tests; 268633400-byte scoped client copy; confirmed cancellation/revocation/disconnect/index cleanup",
+    "actual Linux native and headed Chrome cleanup/report/review/run/output inspection/genuine OS Save As; full independent 197983-byte saved/source equality; one producer job; normal native close"
+  ],
+  "personally_inspected_images": [
+    "browser-client-saved.png",
+    "native-picker-saved.png"
+  ],
+  "compiled_merge_source": "fb5513ae062dfe4c0052dbb906680be1f3fd98dd",
+  "artifacts": [
+    {
+      "id": 12565685030,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:9ed879393fe569ff8793bb07c6baa5f1ae8c4b23daa6ab74887bb40cb6e7fae4",
+      "downloaded": false
+    },
+    {
+      "id": 12565281569,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:e6d2198a5854944f68eaf6ed1e82a5f51ff6297402d30f5a408217a2489206f4",
+      "downloaded": false
+    },
+    {
+      "id": 12565267008,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:7cd65b8a003a61b62fe0854e058571495f9d73cf8983ac47cb825683047280a4",
+      "downloaded": false
+    }
+  ],
+  "review_boundaries": {
+    "public": true,
+    "main": "80ec75ea5a97285276c4173534d1c73de02466ed",
+    "pr_draft": true,
+    "pr_state": "open"
+  },
+  "not_qualified": [
+    "new batch source draft",
+    "other browser/platform/package GUI/media boundaries and full aggregate R20",
+    "complete full-product/package/resource/manual/owner gates"
+  ]
+}

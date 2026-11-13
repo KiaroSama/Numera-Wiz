@@ -1,0 +1,186 @@
+[
+  {
+    "source_path": "fftools/ffmpeg_filter.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/fftools/ffmpeg_filter.c",
+    "sha256": "85a5f5fec249430381d43ecbda28170ee6f4f2b86adfd5991c23cfeb1d57e273",
+    "git_blob_sha1": "5b68d831d8cc8615e82f5fcb118b637e97016e7f",
+    "local_path": "research_v3/ffmpeg-source/fftools_ffmpeg_filter.c",
+    "retrieved_at": "2026-10-21T17:53:33.887862+00:00"
+  },
+  {
+    "source_path": "fftools/ffmpeg_sched.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/fftools/ffmpeg_sched.c",
+    "sha256": "7b5451d2be2eb4fde4c030b46626ea266e7f261611d3391c4f24a1b3a2d695a2",
+    "git_blob_sha1": "dddd1d2c6746448500493e10fc08eb306dc3e5e9",
+    "local_path": "research_v3/ffmpeg-source/fftools_ffmpeg_sched.c",
+    "retrieved_at": "2026-10-21T17:53:33.996025+00:00"
+  },
+  {
+    "source_path": "fftools/ffmpeg_opt.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/fftools/ffmpeg_opt.c",
+    "sha256": "9b452dd88d471954e745fa9b74e4d501ae7438e4dde0228b0031bd9e4b08940b",
+    "git_blob_sha1": "2c362c64af8fffb02438af0051609281bfaa45d5",
+    "local_path": "research_v3/ffmpeg-source/fftools_ffmpeg_opt.c",
+    "retrieved_at": "2026-10-21T17:53:34.102904+00:00"
+  },
+  {
+    "source_path": "libavformat/file.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/file.c",
+    "sha256": "ea64c460b843ecd7ff4d72ba4b2b24c5ff738d71bfef2621ed3e86c3fa477d04",
+    "git_blob_sha1": "71d30a25c47eeb0169b96305bcf2062610461e59",
+    "local_path": "research_v3/ffmpeg-source/libavformat_file.c",
+    "retrieved_at": "2026-10-21T17:53:34.303705+00:00"
+  },
+  {
+    "source_path": "libavformat/tls_openssl.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/tls_openssl.c",
+    "sha256": "0567d5c8204c80a61074065a5044abea1f972694d41b60cbcd03dd89d05b677f",
+    "git_blob_sha1": "48b4a2226a0efc8fda99007e22b543386e370dde",
+    "local_path": "research_v3/ffmpeg-source/libavformat_tls_openssl.c",
+    "retrieved_at": "2026-10-21T17:53:34.489238+00:00"
+  },
+  {
+    "source_path": "libswscale/utils.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libswscale/utils.c",
+    "sha256": "41f863d372aa3683de5e4877d02b59cd8e749b1bb8619539b967cb553eebf91d",
+    "git_blob_sha1": "fa070c270aba29f3278d7bcb2c9e3f109fd885ea",
+    "local_path": "research_v3/ffmpeg-source/libswscale_utils.c",
+    "retrieved_at": "2026-10-21T17:53:34.676852+00:00"
+  },
+  {
+    "source_path": "libavfilter/vf_scale.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_scale.c",
+    "sha256": "3efdf8a46613c3545f50887f6dbb5a9c95ce8d38d7312f9ee544ae4453be3079",
+    "git_blob_sha1": "f2d3021080c6601ec4bbbfa18a8794c42ff2f483",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_vf_scale.c",
+    "retrieved_at": "2026-10-21T17:53:34.822085+00:00"
+  },
+  {
+    "source_path": "libavcodec/exr.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavcodec/exr.c",
+    "sha256": "12e82e6a6373f0327e66f03c3aeec1e8490e5ebd29ea51b7cb8a4ec4a0c6980c",
+    "git_blob_sha1": "0e9c734a106f3378d7ea84f61292e0b9d7207f9b",
+    "local_path": "research_v3/ffmpeg-source/libavcodec_exr.c",
+    "retrieved_at": "2026-10-21T17:59:43.040571+00:00"
+  },
+  {
+    "source_path": "libswscale/swscale.h",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libswscale/swscale.h",
+    "sha256": "3c3c7c2aec2494f4881e8fed8baf01ef0db8c08e7c01a3300946ea3bb102a162",
+    "git_blob_sha1": "c913e76985b7fcf656f266498905cfcd689b8454",
+    "local_path": "research_v3/ffmpeg-source/libswscale_swscale.h",
+    "retrieved_at": "2026-10-21T17:59:43.164297+00:00"
+  },
+  {
+    "source_path": "fftools/thread_queue.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/fftools/thread_queue.c",
+    "sha256": "44c8c9df1d0defd7eb9becee10fb5fba1b42cf0125cfe180ed4a53b9fe5eb479",
+    "git_blob_sha1": "9fa8a46cacb91ba16adfa55b309ad2d5c3c24df1",
+    "local_path": "research_v3/ffmpeg-source/fftools_thread_queue.c",
+    "retrieved_at": "2026-10-21T17:59:43.266819+00:00"
+  },
+  {
+    "source_path": "libavfilter/f_zmq.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/f_zmq.c",
+    "sha256": "3753249ee251e77a04149e29e255cbfeb6df667f74d5b072a8b911681c75adfb",
+    "git_blob_sha1": "647ee3796394674395eebb4c955cc2e84ca8590f",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_f_zmq.c",
+    "retrieved_at": "2026-10-21T17:59:43.457187+00:00"
+  },
+  {
+    "source_path": "libavfilter/vf_xfade.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_xfade.c",
+    "sha256": "efc4b9d81b6da2da8d18a97a88235f624858947b0958209899775f60a367d560",
+    "git_blob_sha1": "53dcf3e1e5e7149ef47c926fd08988e91b887d0c",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_vf_xfade.c",
+    "retrieved_at": "2026-10-21T17:59:43.619522+00:00"
+  },
+  {
+    "source_path": "libavfilter/af_amix.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/af_amix.c",
+    "sha256": "88ec30e4ffdb71f59167cf73e5a0c6881950ee423e73bee0f07239fe2ae812cb",
+    "git_blob_sha1": "082d69b97fc972c11eee1b5e4fff83d5cb921852",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_af_amix.c",
+    "retrieved_at": "2026-10-21T17:59:43.720503+00:00"
+  },
+  {
+    "source_path": "libavfilter/af_volume.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/af_volume.c",
+    "sha256": "c3fc6a3591038eadaddb1d095bef296d5fc91b1c6d138ca846a86436e0945a67",
+    "git_blob_sha1": "cd40014345a2d1b8447410627906fc8971357ca3",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_af_volume.c",
+    "retrieved_at": "2026-10-21T17:59:43.873891+00:00"
+  },
+  {
+    "source_path": "libavfilter/f_sidedata.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/f_sidedata.c",
+    "sha256": "f41254b4484a76da5f2e75bc3e76ef61ced848b11c50b1cfc753d465a8a52ad4",
+    "git_blob_sha1": "6c81c6b6a5e6dbf3aec8192b487662dcea350cf2",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_f_sidedata.c",
+    "retrieved_at": "2026-10-21T17:59:44.065196+00:00"
+  },
+  {
+    "source_path": "libavformat/nut.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/nut.c",
+    "sha256": "88836e14c554b13aaa5cea89ba5206204329e0e80cc12c1e500c69a3439f9e77",
+    "git_blob_sha1": "f31743581391bf3bb96c13c1ce74c10530dd4b61",
+    "local_path": "research_v3/ffmpeg-source/libavformat_nut.c",
+    "retrieved_at": "2026-10-21T18:03:17.456270+00:00"
+  },
+  {
+    "source_path": "libavformat/nutdec.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/nutdec.c",
+    "sha256": "d0d4b0aa1d03ff18af1a63f555d19a27895af526b77f845349acbaf1b5b107f1",
+    "git_blob_sha1": "b0a997cad6278ca92e280dfbdd5437b0cafa7ddc",
+    "local_path": "research_v3/ffmpeg-source/libavformat_nutdec.c",
+    "retrieved_at": "2026-10-21T18:03:17.632946+00:00"
+  },
+  {
+    "source_path": "libavformat/nutenc.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/nutenc.c",
+    "sha256": "ff4195551175987c4ad9f7b4aed1f394d588d0f3fe752d69c6a8aa095029d7da",
+    "git_blob_sha1": "55efb114c3ce58b1995532243a9bfc87c4f761e8",
+    "local_path": "research_v3/ffmpeg-source/libavformat_nutenc.c",
+    "retrieved_at": "2026-10-21T18:03:17.750833+00:00"
+  },
+  {
+    "source_path": "libavcodec/rawenc.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavcodec/rawenc.c",
+    "sha256": "3104d187bbdd7f1d3b7d9f609f0508d42616c9e062431872fe581766b3d24071",
+    "git_blob_sha1": "8c577006d922d497a45deefb8eee473b5a2ea65b",
+    "local_path": "research_v3/ffmpeg-source/libavcodec_rawenc.c",
+    "retrieved_at": "2026-10-21T18:03:17.865447+00:00"
+  },
+  {
+    "source_path": "libavutil/file_open.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavutil/file_open.c",
+    "sha256": "67c5c007f53735f9d6fdd64fd18c5d1098b792b6eac6a1111b8dfe02f653a0bf",
+    "git_blob_sha1": "121a562fcb6b1d40102b8553f16065337c45eff3",
+    "local_path": "research_v3/ffmpeg-source/libavutil_file_open.c",
+    "retrieved_at": "2026-10-21T18:03:17.992650+00:00"
+  },
+  {
+    "source_path": "libavfilter/vf_floodfill.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_floodfill.c",
+    "sha256": "c12bf956d96ffb94f3d125d5c885cfbdb66ce8eb745bbb0e6279677facf2dc71",
+    "git_blob_sha1": "9bc72e2a781b73525592a523cf90590c694cae5a",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_vf_floodfill.c",
+    "retrieved_at": "2026-10-21T18:05:29.048268+00:00"
+  },
+  {
+    "source_path": "libavfilter/vf_zscale.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_zscale.c",
+    "sha256": "0f891efc5d0f4f60a90b10619ed19119dd0f69079b55ef26fa874a0ed8a6f523",
+    "git_blob_sha1": "b14d704663abe76de9f12124fa60d7a8a2eec4ee",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_vf_zscale.c",
+    "retrieved_at": "2026-10-21T18:05:29.190638+00:00"
+  },
+  {
+    "source_path": "libavfilter/vf_geq.c",
+    "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavfilter/vf_geq.c",
+    "sha256": "ec00991bb6dd6e0869aa76c46f8511a06ed3aaf2134b676a41a664e74509db97",
+    "git_blob_sha1": "1256bbe97126115873699a2cf530be93d3e16ed5",
+    "local_path": "research_v3/ffmpeg-source/libavfilter_vf_geq.c",
+    "retrieved_at": "2026-10-21T18:05:49.285864+00:00"
+  }
+]

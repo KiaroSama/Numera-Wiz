@@ -1,0 +1,922 @@
+{
+  "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "files": [
+    {
+      "name": "authors.texi",
+      "path": "doc/authors.texi",
+      "sha": "ce088392f882123b8f0530c58f6b52ceb426cf70",
+      "size": 403,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/authors.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/authors.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ce088392f882123b8f0530c58f6b52ceb426cf70",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/authors.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/authors.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ce088392f882123b8f0530c58f6b52ceb426cf70",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/authors.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_authors.texi",
+      "sha256": "fb5fac6dd8f7474033e933814491a8297d8723c52be4dcbcc82eef9c4f008dd2",
+      "git_blob_verified": true
+    },
+    {
+      "name": "bitstream_filters.texi",
+      "path": "doc/bitstream_filters.texi",
+      "sha": "c6705bbd39a571b942afafc34312f87ebdace7b6",
+      "size": 32582,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/bitstream_filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/bitstream_filters.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c6705bbd39a571b942afafc34312f87ebdace7b6",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/bitstream_filters.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/bitstream_filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c6705bbd39a571b942afafc34312f87ebdace7b6",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/bitstream_filters.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_bitstream_filters.texi",
+      "sha256": "29de3d86573538d348b0be5c35c784ccba95c4f41896f088f7b76aeb89b2fc20",
+      "git_blob_verified": true
+    },
+    {
+      "name": "codecs.texi",
+      "path": "doc/codecs.texi",
+      "sha": "63319551de46f70a99c7f4a54c6c27b44facce75",
+      "size": 25689,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/codecs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/codecs.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/63319551de46f70a99c7f4a54c6c27b44facce75",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/codecs.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/codecs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/63319551de46f70a99c7f4a54c6c27b44facce75",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/codecs.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_codecs.texi",
+      "sha256": "a6d8697c6847d5f1d5b2e34edfec900064c52425091fe5fa9ab0d75c23ea2c46",
+      "git_blob_verified": true
+    },
+    {
+      "name": "community.texi",
+      "path": "doc/community.texi",
+      "sha": "97a49f15ede714c1edf9dd879293a07383eed41e",
+      "size": 8190,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/community.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/community.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/97a49f15ede714c1edf9dd879293a07383eed41e",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/community.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/community.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/97a49f15ede714c1edf9dd879293a07383eed41e",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/community.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_community.texi",
+      "sha256": "cfc63c474573fa734d8966bb158e55c6a53fc978923f1ceef9f9cf0d135d575b",
+      "git_blob_verified": true
+    },
+    {
+      "name": "decoders.texi",
+      "path": "doc/decoders.texi",
+      "sha": "c8177c15e74d733e1680d2ef22b495e95d8574cf",
+      "size": 20948,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/decoders.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/decoders.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c8177c15e74d733e1680d2ef22b495e95d8574cf",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/decoders.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/decoders.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c8177c15e74d733e1680d2ef22b495e95d8574cf",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/decoders.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_decoders.texi",
+      "sha256": "242db22415822bcf09e891e6063b1fcbe3760b4670cfc601bca110afe87776c8",
+      "git_blob_verified": true
+    },
+    {
+      "name": "demuxers.texi",
+      "path": "doc/demuxers.texi",
+      "sha": "8603069949f0086fa012437fe78b1c200708d952",
+      "size": 44051,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/demuxers.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/demuxers.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/8603069949f0086fa012437fe78b1c200708d952",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/demuxers.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/demuxers.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/8603069949f0086fa012437fe78b1c200708d952",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/demuxers.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_demuxers.texi",
+      "sha256": "d8dfe0ac1ea18fc30d85471a11d6b1a9641c997706cce0407020e87629de9491",
+      "git_blob_verified": true
+    },
+    {
+      "name": "developer.texi",
+      "path": "doc/developer.texi",
+      "sha": "0a0cce63f516fedd2d1f90d697aa062d07467dcb",
+      "size": 45328,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/developer.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/developer.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0a0cce63f516fedd2d1f90d697aa062d07467dcb",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/developer.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/developer.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0a0cce63f516fedd2d1f90d697aa062d07467dcb",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/developer.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_developer.texi",
+      "sha256": "26549522babfb7af744059d68077440064de6693ee6ff8c41b53ea3c36534e4c",
+      "git_blob_verified": true
+    },
+    {
+      "name": "devices.texi",
+      "path": "doc/devices.texi",
+      "sha": "5e74a962d770779d3dc9faa50913a22e8ffea79e",
+      "size": 815,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/devices.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/devices.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5e74a962d770779d3dc9faa50913a22e8ffea79e",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/devices.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/devices.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5e74a962d770779d3dc9faa50913a22e8ffea79e",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/devices.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_devices.texi",
+      "sha256": "c399576ab8e09931445713c962c25471699f33c8cef359d5d5ce2015650ff050",
+      "git_blob_verified": true
+    },
+    {
+      "name": "drawvg-reference.texi",
+      "path": "doc/drawvg-reference.texi",
+      "sha": "c503bcec06cc220e961c1a60fdfbe365c17258fa",
+      "size": 67260,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/drawvg-reference.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/drawvg-reference.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c503bcec06cc220e961c1a60fdfbe365c17258fa",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/drawvg-reference.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/drawvg-reference.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/c503bcec06cc220e961c1a60fdfbe365c17258fa",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/drawvg-reference.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_drawvg-reference.texi",
+      "sha256": "0e500136012ea70c935907a55b4dafbc7d4f8c9404674791c66571b92f43828a",
+      "git_blob_verified": true
+    },
+    {
+      "name": "encoders.texi",
+      "path": "doc/encoders.texi",
+      "sha": "605638e0402f8c74a3142180957783d165443461",
+      "size": 139231,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/encoders.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/encoders.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/605638e0402f8c74a3142180957783d165443461",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/encoders.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/encoders.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/605638e0402f8c74a3142180957783d165443461",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/encoders.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_encoders.texi",
+      "sha256": "3dc2f777ab802bc087705a41b44fc0c70dee9989a2cf8a0e8c2b33287c06e644",
+      "git_blob_verified": true
+    },
+    {
+      "name": "faq.texi",
+      "path": "doc/faq.texi",
+      "sha": "477cc60533a9b4864cbad4614737469cec9f827d",
+      "size": 25900,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/faq.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/faq.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/477cc60533a9b4864cbad4614737469cec9f827d",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/faq.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/faq.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/477cc60533a9b4864cbad4614737469cec9f827d",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/faq.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_faq.texi",
+      "sha256": "88bbf6e78d9e9effabdafc095a1194502e09e2cf4a3534fd16f2d6acfa224487",
+      "git_blob_verified": true
+    },
+    {
+      "name": "fate.texi",
+      "path": "doc/fate.texi",
+      "sha": "12c884047ccd78dd1be32264f371493d6f2dc57f",
+      "size": 9855,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/fate.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fate.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/12c884047ccd78dd1be32264f371493d6f2dc57f",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fate.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/fate.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/12c884047ccd78dd1be32264f371493d6f2dc57f",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fate.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_fate.texi",
+      "sha256": "07b49cf2c33b20d04b828166ce569f6d7d57e4b2791b113bcd6b134e7960ecba",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-bitstream-filters.texi",
+      "path": "doc/ffmpeg-bitstream-filters.texi",
+      "sha": "63c0b33a32ebec3f6f1a7b9563abc4468f4a9917",
+      "size": 879,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-bitstream-filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-bitstream-filters.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/63c0b33a32ebec3f6f1a7b9563abc4468f4a9917",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-bitstream-filters.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-bitstream-filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/63c0b33a32ebec3f6f1a7b9563abc4468f4a9917",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-bitstream-filters.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-bitstream-filters.texi",
+      "sha256": "59fcee9ec319ff62a0ec9930aeec8f0f50782a9773487ba55e0999c6fb6f7ab8",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-codecs.texi",
+      "path": "doc/ffmpeg-codecs.texi",
+      "sha": "e46cd3aeb8f7eeb10f92f042835356055d4807ce",
+      "size": 708,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-codecs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-codecs.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e46cd3aeb8f7eeb10f92f042835356055d4807ce",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-codecs.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-codecs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e46cd3aeb8f7eeb10f92f042835356055d4807ce",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-codecs.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-codecs.texi",
+      "sha256": "11f90289b4c0b234019c566459d9b1787dcac9b0357905464630910d6b443661",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-devices.texi",
+      "path": "doc/ffmpeg-devices.texi",
+      "sha": "a51de0014ab4ba6284f5e2e228fadc003895b37a",
+      "size": 711,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-devices.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-devices.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a51de0014ab4ba6284f5e2e228fadc003895b37a",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-devices.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-devices.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a51de0014ab4ba6284f5e2e228fadc003895b37a",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-devices.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-devices.texi",
+      "sha256": "e93369b9c48f095a0274da1ec771a8b53f4f096924128e7e3b1c614b9898b03a",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-filters.texi",
+      "path": "doc/ffmpeg-filters.texi",
+      "sha": "a8ababa9cfbc8b8d632d7ac9014dc168b9ac3d5c",
+      "size": 710,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-filters.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a8ababa9cfbc8b8d632d7ac9014dc168b9ac3d5c",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-filters.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a8ababa9cfbc8b8d632d7ac9014dc168b9ac3d5c",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-filters.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-filters.texi",
+      "sha256": "faea65ae2f9670f5aad620fff18bbddf9c7e96ba88fb335f973907d1cab71ba8",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-formats.texi",
+      "path": "doc/ffmpeg-formats.texi",
+      "sha": "a1917a7267a794c246a9a0c841759f6669e2488c",
+      "size": 726,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-formats.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-formats.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a1917a7267a794c246a9a0c841759f6669e2488c",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-formats.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-formats.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a1917a7267a794c246a9a0c841759f6669e2488c",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-formats.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-formats.texi",
+      "sha256": "7d5c644af0da0481720a3cc7a0eebaf96a361ab2ff9a60aab5ffa2471c1d5a19",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-protocols.texi",
+      "path": "doc/ffmpeg-protocols.texi",
+      "sha": "7f0e62ac6550d8532152a615464db715098c4bb0",
+      "size": 723,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-protocols.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-protocols.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7f0e62ac6550d8532152a615464db715098c4bb0",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-protocols.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-protocols.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7f0e62ac6550d8532152a615464db715098c4bb0",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-protocols.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-protocols.texi",
+      "sha256": "32c0cf1045aab88639ae82c2302b830720be3a7b167c80650a1e885fb79efda5",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-resampler.texi",
+      "path": "doc/ffmpeg-resampler.texi",
+      "sha": "0e9a3dd950f2fe963fc240474a0734c4cd0d500c",
+      "size": 883,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-resampler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-resampler.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0e9a3dd950f2fe963fc240474a0734c4cd0d500c",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-resampler.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-resampler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0e9a3dd950f2fe963fc240474a0734c4cd0d500c",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-resampler.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-resampler.texi",
+      "sha256": "5e1cf89af0ba868832c24beee39a59e998dd2324c79909fe48b59ca1c7c7674b",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-scaler.texi",
+      "path": "doc/ffmpeg-scaler.texi",
+      "sha": "d259da90352429d046064acaea7025f83f682156",
+      "size": 837,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-scaler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-scaler.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d259da90352429d046064acaea7025f83f682156",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-scaler.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-scaler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d259da90352429d046064acaea7025f83f682156",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-scaler.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-scaler.texi",
+      "sha256": "35392efb228c8e6695a9d3d19cd71e695ef7ea2dd0bd243a1c990abd406e011f",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg-utils.texi",
+      "path": "doc/ffmpeg-utils.texi",
+      "sha": "d8e08841ef7006413776b65d1082592b957ca6a3",
+      "size": 712,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-utils.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-utils.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d8e08841ef7006413776b65d1082592b957ca6a3",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-utils.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg-utils.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d8e08841ef7006413776b65d1082592b957ca6a3",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg-utils.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg-utils.texi",
+      "sha256": "39e9be347e6dfa9aa8aa88e409b3c7e393b668e25e748fb1043a4c0cff9274cc",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffmpeg.texi",
+      "path": "doc/ffmpeg.texi",
+      "sha": "882503142e22895cda9dd818ea67a0ba9a582130",
+      "size": 139582,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/882503142e22895cda9dd818ea67a0ba9a582130",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffmpeg.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/882503142e22895cda9dd818ea67a0ba9a582130",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffmpeg.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffmpeg.texi",
+      "sha256": "c845782067f5e6291a5aefc6e567bbeba107107ffa771f75d4c5bf70c5ee3d91",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffplay.texi",
+      "path": "doc/ffplay.texi",
+      "sha": "5273c158bd852138f34eaf0e46e9f5464e3b5591",
+      "size": 10165,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffplay.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffplay.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5273c158bd852138f34eaf0e46e9f5464e3b5591",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffplay.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffplay.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5273c158bd852138f34eaf0e46e9f5464e3b5591",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffplay.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffplay.texi",
+      "sha256": "94c1a468402f6f3be51ae8dbd5834b5f300c0945d06143e4a61d4e79bf9c75a7",
+      "git_blob_verified": true
+    },
+    {
+      "name": "ffprobe.texi",
+      "path": "doc/ffprobe.texi",
+      "sha": "41dbba465688d1c2ea20807f22421f428dfe8344",
+      "size": 21757,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffprobe.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffprobe.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/41dbba465688d1c2ea20807f22421f428dfe8344",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffprobe.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/ffprobe.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/41dbba465688d1c2ea20807f22421f428dfe8344",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/ffprobe.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_ffprobe.texi",
+      "sha256": "9f28004a19dcba2f854595ac96f122dbd44fd82119944456f209fd990e0c58a9",
+      "git_blob_verified": true
+    },
+    {
+      "name": "fftools-common-opts.texi",
+      "path": "doc/fftools-common-opts.texi",
+      "sha": "7b5a11b634ee42991b8ebb4c93b041e2006c2909",
+      "size": 15369,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/fftools-common-opts.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fftools-common-opts.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7b5a11b634ee42991b8ebb4c93b041e2006c2909",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fftools-common-opts.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/fftools-common-opts.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7b5a11b634ee42991b8ebb4c93b041e2006c2909",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/fftools-common-opts.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_fftools-common-opts.texi",
+      "sha256": "567a15a6eb6c3fcaa516ff93abf20b338e4bf1398e1b2524e1883ff7895f3519",
+      "git_blob_verified": true
+    },
+    {
+      "name": "filters.texi",
+      "path": "doc/filters.texi",
+      "sha": "3534c87c9be9374db14189a28324cf95efc4b576",
+      "size": 949519,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/filters.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/3534c87c9be9374db14189a28324cf95efc4b576",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/filters.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/filters.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/3534c87c9be9374db14189a28324cf95efc4b576",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/filters.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_filters.texi",
+      "sha256": "65661cccd35c02e12894f674b706df8e465fd6862cf0aa64db7d3383271e5a9e",
+      "git_blob_verified": true
+    },
+    {
+      "name": "formats.texi",
+      "path": "doc/formats.texi",
+      "sha": "0722e3f5125c3c9d7f454588817ad9bbc59e6140",
+      "size": 10791,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/formats.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/formats.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0722e3f5125c3c9d7f454588817ad9bbc59e6140",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/formats.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/formats.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0722e3f5125c3c9d7f454588817ad9bbc59e6140",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/formats.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_formats.texi",
+      "sha256": "01eaac2ca2dc8c6240f1cef30db8700bd98101beb3b2a46ebd7ca906d9acb885",
+      "git_blob_verified": true
+    },
+    {
+      "name": "general.texi",
+      "path": "doc/general.texi",
+      "sha": "253c0ba5a177543390d3daadd5ac43a675fdd706",
+      "size": 214,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/general.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/253c0ba5a177543390d3daadd5ac43a675fdd706",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/general.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/253c0ba5a177543390d3daadd5ac43a675fdd706",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_general.texi",
+      "sha256": "abf058dc4502a49ebc3185579806ce9224a7f1373d3560df5930894f146bb0bd",
+      "git_blob_verified": true
+    },
+    {
+      "name": "general_contents.texi",
+      "path": "doc/general_contents.texi",
+      "sha": "7a1c4f3a211b39c6b8275b07b94bec2b77983163",
+      "size": 68987,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/general_contents.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general_contents.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7a1c4f3a211b39c6b8275b07b94bec2b77983163",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general_contents.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/general_contents.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7a1c4f3a211b39c6b8275b07b94bec2b77983163",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/general_contents.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_general_contents.texi",
+      "sha256": "4569ace25b4c6f6947dd58ce770524f6f4107593e7a64c1458e75292d778c526",
+      "git_blob_verified": true
+    },
+    {
+      "name": "git-howto.texi",
+      "path": "doc/git-howto.texi",
+      "sha": "e20d114f9ee62ea7eea9536ad36187274c09cd19",
+      "size": 13442,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/git-howto.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/git-howto.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e20d114f9ee62ea7eea9536ad36187274c09cd19",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/git-howto.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/git-howto.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e20d114f9ee62ea7eea9536ad36187274c09cd19",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/git-howto.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_git-howto.texi",
+      "sha256": "aeaced97ff2709f2c4ca829054712787658e63ff9d583eb48f2752ba124db182",
+      "git_blob_verified": true
+    },
+    {
+      "name": "indevs.texi",
+      "path": "doc/indevs.texi",
+      "sha": "8822e070fe74969a40dd8dd768c1b9169223a494",
+      "size": 49624,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/indevs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/indevs.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/8822e070fe74969a40dd8dd768c1b9169223a494",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/indevs.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/indevs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/8822e070fe74969a40dd8dd768c1b9169223a494",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/indevs.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_indevs.texi",
+      "sha256": "0deb468a38fdfe18db7a61c9b8d7d9153cae96598baea08af6ae2e47b0f7fc23",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libavcodec.texi",
+      "path": "doc/libavcodec.texi",
+      "sha": "b22c47ae87c7734495f81bd843c3d418f496ba51",
+      "size": 1130,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavcodec.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavcodec.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/b22c47ae87c7734495f81bd843c3d418f496ba51",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavcodec.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavcodec.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/b22c47ae87c7734495f81bd843c3d418f496ba51",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavcodec.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libavcodec.texi",
+      "sha256": "a80d4706d21388e5832d9ab2078fdd6c0c21dcd5de69f5018e17f7bc214ebb86",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libavdevice.texi",
+      "path": "doc/libavdevice.texi",
+      "sha": "0abdaaff06f0d4d0bacc460b8eab5deff81ad0f1",
+      "size": 991,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavdevice.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavdevice.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0abdaaff06f0d4d0bacc460b8eab5deff81ad0f1",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavdevice.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavdevice.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/0abdaaff06f0d4d0bacc460b8eab5deff81ad0f1",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavdevice.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libavdevice.texi",
+      "sha256": "a6b4adf5464bb27ddf9120bb593382d86b220a1d844975177ce41d3d3b50066d",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libavfilter.texi",
+      "path": "doc/libavfilter.texi",
+      "sha": "d9472eb0ad3b82b21e9633ace6e1cec3e42983f0",
+      "size": 1040,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavfilter.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavfilter.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d9472eb0ad3b82b21e9633ace6e1cec3e42983f0",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavfilter.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavfilter.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/d9472eb0ad3b82b21e9633ace6e1cec3e42983f0",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavfilter.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libavfilter.texi",
+      "sha256": "2ab8b642f54084d106a6c54466ab99d09bf146b03044bfe08b4e7a10acb9dceb",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libavformat.texi",
+      "path": "doc/libavformat.texi",
+      "sha": "7cf41fdfd4552d4b913ada55d7f4bc738b24ce9d",
+      "size": 1089,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavformat.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavformat.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7cf41fdfd4552d4b913ada55d7f4bc738b24ce9d",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavformat.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavformat.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/7cf41fdfd4552d4b913ada55d7f4bc738b24ce9d",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavformat.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libavformat.texi",
+      "sha256": "df61fa8ac18bc913851e97ddd666cd10c75b9e6af8c91741fe0adb126ce5536b",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libavutil.texi",
+      "path": "doc/libavutil.texi",
+      "sha": "ee50362f694870df7d571be689bfe295f18d3e2d",
+      "size": 1363,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavutil.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavutil.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ee50362f694870df7d571be689bfe295f18d3e2d",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavutil.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libavutil.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ee50362f694870df7d571be689bfe295f18d3e2d",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libavutil.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libavutil.texi",
+      "sha256": "5a654e8ee602cea2a081ff022459135920413ab37d1648e94d5cafe4537ccf95",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libswresample.texi",
+      "path": "doc/libswresample.texi",
+      "sha": "3108cb1ba490a322e7741b7f06c3664c6acd014a",
+      "size": 1878,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libswresample.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswresample.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/3108cb1ba490a322e7741b7f06c3664c6acd014a",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswresample.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libswresample.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/3108cb1ba490a322e7741b7f06c3664c6acd014a",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswresample.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libswresample.texi",
+      "sha256": "052a858e69aa6ced2642fb3b6e024a4a4a8eb3246a948c2e208c4645d9e9fb0d",
+      "git_blob_verified": true
+    },
+    {
+      "name": "libswscale.texi",
+      "path": "doc/libswscale.texi",
+      "sha": "e137c24a499ab4be5865ea0619c33a4fa79afac9",
+      "size": 1531,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libswscale.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswscale.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e137c24a499ab4be5865ea0619c33a4fa79afac9",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswscale.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/libswscale.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e137c24a499ab4be5865ea0619c33a4fa79afac9",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/libswscale.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_libswscale.texi",
+      "sha256": "f9ec10486841c682be1bfac491372eebb0a51a122510ed7fcd3db33548fa6465",
+      "git_blob_verified": true
+    },
+    {
+      "name": "mailing-list-faq.texi",
+      "path": "doc/mailing-list-faq.texi",
+      "sha": "49328de7acc3c86b3a3ec54ae7e2a8e4bfa0af68",
+      "size": 13148,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/mailing-list-faq.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/mailing-list-faq.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/49328de7acc3c86b3a3ec54ae7e2a8e4bfa0af68",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/mailing-list-faq.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/mailing-list-faq.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/49328de7acc3c86b3a3ec54ae7e2a8e4bfa0af68",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/mailing-list-faq.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_mailing-list-faq.texi",
+      "sha256": "7ba38b8b16e6b94d6054d64da6dfa17738c874b693d85fe8ee9f62b36b7ac0f6",
+      "git_blob_verified": true
+    },
+    {
+      "name": "metadata.texi",
+      "path": "doc/metadata.texi",
+      "sha": "e081da7735faa2885dfaec7898d95c3be85c72bd",
+      "size": 2466,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/metadata.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/metadata.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e081da7735faa2885dfaec7898d95c3be85c72bd",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/metadata.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/metadata.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/e081da7735faa2885dfaec7898d95c3be85c72bd",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/metadata.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_metadata.texi",
+      "sha256": "1a9e61c62d9f82f1f2bec283eeb35471a319e1886bb664303d4c10d7e6e70875",
+      "git_blob_verified": true
+    },
+    {
+      "name": "muxers.texi",
+      "path": "doc/muxers.texi",
+      "sha": "03f0bcd24d0840a44eda3b3f80d7e4a57911b776",
+      "size": 141719,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/muxers.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/muxers.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/03f0bcd24d0840a44eda3b3f80d7e4a57911b776",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/muxers.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/muxers.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/03f0bcd24d0840a44eda3b3f80d7e4a57911b776",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/muxers.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_muxers.texi",
+      "sha256": "81d092c67f16221178c6ec8c1b1332c764bfe0147023ade0aa72175c8b98f302",
+      "git_blob_verified": true
+    },
+    {
+      "name": "nut.texi",
+      "path": "doc/nut.texi",
+      "sha": "ff5e3456ed10903bc68ad890e1105b88b4abae06",
+      "size": 4545,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/nut.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/nut.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ff5e3456ed10903bc68ad890e1105b88b4abae06",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/nut.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/nut.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/ff5e3456ed10903bc68ad890e1105b88b4abae06",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/nut.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_nut.texi",
+      "sha256": "7164e76d02547123fdb12982bcc443105fb6220b979b6883d4a84c132f4994b5",
+      "git_blob_verified": true
+    },
+    {
+      "name": "outdevs.texi",
+      "path": "doc/outdevs.texi",
+      "sha": "86c78f31b7221f71a27eb5c21ca7bde5d7ac5aeb",
+      "size": 13121,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/outdevs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/outdevs.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/86c78f31b7221f71a27eb5c21ca7bde5d7ac5aeb",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/outdevs.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/outdevs.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/86c78f31b7221f71a27eb5c21ca7bde5d7ac5aeb",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/outdevs.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_outdevs.texi",
+      "sha256": "102210c02844d9f873b0c2785e84d5940653ef38390d71ff63e21de84e859faa",
+      "git_blob_verified": true
+    },
+    {
+      "name": "platform.texi",
+      "path": "doc/platform.texi",
+      "sha": "5ed6997cef61b3128ab71f622bcc2d03bf053209",
+      "size": 11679,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/platform.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/platform.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5ed6997cef61b3128ab71f622bcc2d03bf053209",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/platform.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/platform.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/5ed6997cef61b3128ab71f622bcc2d03bf053209",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/platform.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_platform.texi",
+      "sha256": "a5c72d479dd33a39a2d08fe78a9817ee22e0bc7fdaf91b4f73724dc0df421c5a",
+      "git_blob_verified": true
+    },
+    {
+      "name": "protocols.texi",
+      "path": "doc/protocols.texi",
+      "sha": "368ae005f817387d78a380f10ecfb5b86ebf1059",
+      "size": 76573,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/protocols.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/protocols.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/368ae005f817387d78a380f10ecfb5b86ebf1059",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/protocols.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/protocols.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/368ae005f817387d78a380f10ecfb5b86ebf1059",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/protocols.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_protocols.texi",
+      "sha256": "9bc84820073cf7cedc7b26bda62a805e963bdae7f20974ee27ed49d0b42e3ead",
+      "git_blob_verified": true
+    },
+    {
+      "name": "resampler.texi",
+      "path": "doc/resampler.texi",
+      "sha": "a6224eefb30fb4142e37517d11c580d892786e5b",
+      "size": 7444,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/resampler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/resampler.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a6224eefb30fb4142e37517d11c580d892786e5b",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/resampler.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/resampler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/a6224eefb30fb4142e37517d11c580d892786e5b",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/resampler.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_resampler.texi",
+      "sha256": "493e3ae03901dc63ca4282c19f081817ab631b887fd0017b77fc0ba1f6e7aaf9",
+      "git_blob_verified": true
+    },
+    {
+      "name": "scaler.texi",
+      "path": "doc/scaler.texi",
+      "sha": "274e50083789ecccd26709223bfd7e460c0739bb",
+      "size": 5471,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/scaler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/scaler.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/274e50083789ecccd26709223bfd7e460c0739bb",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/scaler.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/scaler.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/274e50083789ecccd26709223bfd7e460c0739bb",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/scaler.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_scaler.texi",
+      "sha256": "05ef7135691a63b1bc02b7bc1a292111de04cda37435e657b2cc05528c390fe3",
+      "git_blob_verified": true
+    },
+    {
+      "name": "utils.texi",
+      "path": "doc/utils.texi",
+      "sha": "9c50dac94969949dd6a1b48d7aa708698f260dd4",
+      "size": 23837,
+      "url": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/utils.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "html_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/utils.texi",
+      "git_url": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/9c50dac94969949dd6a1b48d7aa708698f260dd4",
+      "download_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/utils.texi",
+      "type": "file",
+      "_links": {
+        "self": "https://api.github.com/repos/FFmpeg/FFmpeg/contents/doc/utils.texi?ref=946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+        "git": "https://api.github.com/repos/FFmpeg/FFmpeg/git/blobs/9c50dac94969949dd6a1b48d7aa708698f260dd4",
+        "html": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/doc/utils.texi"
+      },
+      "local_path": "research_v2/ffmpeg-upstream/doc_utils.texi",
+      "sha256": "2eca333c720c88b04934d72d10a60b3b1e4650666ab657fa9a029697b39df3a2",
+      "git_blob_verified": true
+    }
+  ],
+  "verification": {
+    "files_checked": 48,
+    "failures": [],
+    "method": "SHA-1 of Git blob header plus exact UTF-8 bytes; SHA-256 recorded"
+  }
+}

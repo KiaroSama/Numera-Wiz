@@ -1,0 +1,10 @@
+{
+  "probe": {
+    "mode": "finite",
+    "seconds": 120
+  },
+  "operation": {
+    "mode": "finite",
+    "seconds": 10800
+  }
+}

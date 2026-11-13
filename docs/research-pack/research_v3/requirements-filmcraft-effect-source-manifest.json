@@ -1,0 +1,607 @@
+{
+  "revision": "d643a886650bfbf16f24762274054575aa1e8f20",
+  "evidence_level": "Source inspection only; no application build or media execution",
+  "files": [
+    {
+      "repository_path": "crates/audio-dsp/src/biquad.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__biquad.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/biquad.rs",
+      "sha256": "ad6c9d7891e356286b71477bd3bafd6d2077ac683381075cf13eed41dec068b4",
+      "bytes": 8959,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/channels.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__channels.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/channels.rs",
+      "sha256": "6f439d9dcd15a1361965ffae91a5d0c8b55bc08e85eec3c3258abc43f925fb55",
+      "bytes": 16803,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/design.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__design.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/design.rs",
+      "sha256": "73104808cee8d56e88e1376e619417fb994f296d2e6417db01141bcc3bd1281f",
+      "bytes": 24867,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/ducking.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__ducking.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/ducking.rs",
+      "sha256": "bf514efd5321fcc0d2c44f16895feaa746ea66f31e18628545e38732b3671768",
+      "bytes": 9823,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/channel.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__channel.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/channel.rs",
+      "sha256": "ced957c01970ec3ddbe4569291a94395d90879914d9b74bd42905c26ec8df524",
+      "bytes": 10898,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/declick.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__declick.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/declick.rs",
+      "sha256": "0fe8b3a6cef3e28dfd177acea5d902a56d644e0e8fdd2a57185fc8dde571e89c",
+      "bytes": 8043,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/dynamics.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__dynamics.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/dynamics.rs",
+      "sha256": "080b74e2de7c084f5c6e8887bf05d823b77811964d6a2dd65789f773dbfee30e",
+      "bytes": 20306,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/eq.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__eq.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/eq.rs",
+      "sha256": "6727678a59c2c9f9e94690b2183362963fb36285d8e22f337c8ac153b51d9a5a",
+      "bytes": 21111,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/essential.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__essential.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/essential.rs",
+      "sha256": "b410fc1e6be1206f4830d557f8a28299eac947bb4a9c3b326056499843542580",
+      "bytes": 30433,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/filters.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__filters.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/filters.rs",
+      "sha256": "d8e1b14099c0caead5f2926b7023f2667b4109c2d972724669f280b620a4b9b5",
+      "bytes": 27736,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/mod.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/audio-dsp/src/effects/mod.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/mod.rs",
+      "sha256": "e9f457119eceae18d56c02c492558926622bb3c74c8c610fb5d2249d1dc5ae9e",
+      "bytes": 12711,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/modulation.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__modulation.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/modulation.rs",
+      "sha256": "b3f009f1c44ae472f9513cccb0a740f381ad4f7f2bbecd4f85d331c555533bc1",
+      "bytes": 21305,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/multiband.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__multiband.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/multiband.rs",
+      "sha256": "6af26da535d9324f4d9f1cfca40a9db15309b73928054b2870da7e5cf92fbe7e",
+      "bytes": 23434,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/pitch.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__pitch.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/pitch.rs",
+      "sha256": "6275c15f3768f5bb5700d0c1654a5ce4392639b20f6bf4191946eec1ac094993",
+      "bytes": 8828,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/restoration.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__restoration.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/restoration.rs",
+      "sha256": "bd461bdb01691b11151cd4f83b604b0828240a0dc183f486a81141c488181863",
+      "bytes": 12577,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/reverbs.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__reverbs.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/reverbs.rs",
+      "sha256": "63fca5413b78b7e8342462cc254804d5a1826978db880542570cd3cb4f957966",
+      "bytes": 19714,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/special.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__special.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/special.rs",
+      "sha256": "cd939e4759f189ff71eb55cdeac2059b3aa42b0502f847239531e299997fbedd",
+      "bytes": 34932,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/stft.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__stft.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/stft.rs",
+      "sha256": "f9c7e697cd09f3f63502efa638a7146264c7384d66f20be567867c08c5c0c957",
+      "bytes": 3233,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/time.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__time.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/time.rs",
+      "sha256": "ad383fa1bf755b3ad20bbc3753ffb57127191252233a4e30446ba19bbd273086",
+      "bytes": 19212,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/effects/util.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__effects__util.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/effects/util.rs",
+      "sha256": "aa46de8a6b073f24cabb1e88c14dfce545a5d469621650948cb6ba188c87e59b",
+      "bytes": 6796,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/fft.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__fft.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/fft.rs",
+      "sha256": "e4df0e2538648efa768684a0fda229e47768c5ab1297a1d320cfbaa28ac39582",
+      "bytes": 3580,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/lib.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__lib.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/lib.rs",
+      "sha256": "de0760423456ee9fa63aae58a80e3bf04b8c9a1fd610cbc61a10e85b9273c9a2",
+      "bytes": 10961,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/loudness.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__loudness.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/loudness.rs",
+      "sha256": "a715c03b1e9302ac1633b0c131a0c165a33b24abc291e265f5a96f70f79820ba",
+      "bytes": 26888,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/oversample.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__oversample.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/oversample.rs",
+      "sha256": "ae97e405d2a24b8d0458a44595671e76bbcb3f94d2ea3e43cba7d3b69f218ff7",
+      "bytes": 4650,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/remix.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__remix.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/remix.rs",
+      "sha256": "e7a84ded9176c1e94e8b1261244375829ff223e0b22b6e817d7476a6238f514f",
+      "bytes": 36737,
+      "status": "existing_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/resample.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__resample.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/resample.rs",
+      "sha256": "766027a9a34918f20a79ba90877189bc44e8426662b57ee057f85bc642df36e5",
+      "bytes": 7685,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/smooth.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__smooth.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/smooth.rs",
+      "sha256": "cf4959ea99233f48b8ddfed019dbfb5fc2816b7336743a6ec4f8a61009f0fb08",
+      "bytes": 2877,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/audio-dsp/src/sync.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__audio-dsp__src__sync.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/audio-dsp/src/sync.rs",
+      "sha256": "c0f03f5ef3bf91f8babb5bf712701aca6f78c5c45bdabdbae452f110e40b4059",
+      "bytes": 21301,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/grade.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__grade.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/grade.rs",
+      "sha256": "81e25d621062fd3fa5f4307ba687eeeba349082dc4620effb76a307ea7258d0c",
+      "bytes": 8268,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/lib.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__lib.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/lib.rs",
+      "sha256": "72bdcbe32c1d0c25d867e9ee564b2662778d104e642ba46fb84a01d48044b3c3",
+      "bytes": 12291,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/log.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__log.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/log.rs",
+      "sha256": "bfda734d73721a23b4ab17be876af991aa2475af18f3923172be8fd10a4727f4",
+      "bytes": 13107,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/lut.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__lut.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/lut.rs",
+      "sha256": "04afed93200b6a5979b5e53fba89106869d93b3dde3b65a9270e72014b3df098",
+      "bytes": 29598,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/spaces.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__spaces.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/spaces.rs",
+      "sha256": "c149b7cd94d049cc7aafa208769c0189faad3238a701c7a5c78d1dcaa0819cac",
+      "bytes": 16174,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/color/src/transform.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__color__src__transform.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/color/src/transform.rs",
+      "sha256": "ace89501783a5228cd1c40f3b7184a1ad2e1a2e4bce43cdc731e213545da2894",
+      "bytes": 24445,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/audio.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__audio.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/audio.rs",
+      "sha256": "30f5d9dc63e48d4405096170b98ee25c15a25d5302c7a416bcbe2973124cc48f",
+      "bytes": 23557,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/audio_fx.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__audio_fx.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/audio_fx.rs",
+      "sha256": "6b9609a79f32fac87db6fec4769c884474e3be0f17a961cca5e2076c98772d52",
+      "bytes": 22400,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/blend.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__blend.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/blend.rs",
+      "sha256": "44b65219756108487163e31db8ba4ff3fdbeb5bb842e5d08f915922a6f9222fc",
+      "bytes": 10040,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/color_match.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__color_match.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/color_match.rs",
+      "sha256": "e387c1fcbfe81ba531d00799b03992bd53fed58ba3d832dda970b68d3ef7017a",
+      "bytes": 17569,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/colorman.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__colorman.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/colorman.rs",
+      "sha256": "e1320cb1757f27d77ca57a72a04f9a18a2a26fdd47f5ac0023fd76088ae4e3bf",
+      "bytes": 10474,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/effects.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/render/src/effects.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/effects.rs",
+      "sha256": "185e16c2c3f2cde37381f3645fc805d3bfca6068708ad27a7d03981e172b94e6",
+      "bytes": 67623,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/flow.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__flow.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/flow.rs",
+      "sha256": "bd9cd57793b7679f4f11dd431d094c7d1e104e4d31c72310530200acf3a313a1",
+      "bytes": 26311,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/gpufx.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__gpufx.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/gpufx.rs",
+      "sha256": "207f0ee3b29c2b0b7105a8f206b3935ab4f27129684e6bad7cf17795198de48d",
+      "bytes": 51498,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/graphic_clip.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__graphic_clip.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/graphic_clip.rs",
+      "sha256": "8581c20d3dde550411e809c403b093e84259c462168a9e727add5354b1612dca",
+      "bytes": 43622,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/graphics.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__graphics.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/graphics.rs",
+      "sha256": "ff66de1388739eaccb9caed5a068f3de4ce6c831d22c5a455aa7bd739e7533d7",
+      "bytes": 3744,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/image.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__image.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/image.rs",
+      "sha256": "846004212031e20a89c383dd028a8a153d2eb2cae50591c1377baf35d866c97e",
+      "bytes": 7826,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/lib.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__lib.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/lib.rs",
+      "sha256": "8e0abb1870f0c67bb167bbba495664ead9d7eb12e312153576675f6ab2648519",
+      "bytes": 33434,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/lumetri_presets.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__lumetri_presets.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/lumetri_presets.rs",
+      "sha256": "5683e8826e2a641e3365a49809d5e4abf9539ee84f30300d01c41c7bbc154eca",
+      "bytes": 13303,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/luts.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__luts.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/luts.rs",
+      "sha256": "711a8e91c0dd60ed76fddce25568c9c82e3978e60b3939b7dad0833f134c3b9f",
+      "bytes": 6839,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/mask.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__mask.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/mask.rs",
+      "sha256": "66473726ecdec5cc35fa8a1d5f58c7caf01929f5faa103372f90b3e9ad7ad73c",
+      "bytes": 12614,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/mixer.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__mixer.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/mixer.rs",
+      "sha256": "c075fbf0c1600da765186a681a715480327d0e458c25c5036d735f5c3fd14e06",
+      "bytes": 38165,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/multicam.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__multicam.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/multicam.rs",
+      "sha256": "aec3f023eb2fdf64ca1f2990d3d4b235838b1d240987fd0bb80bfb813730b27e",
+      "bytes": 8016,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/offline.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__offline.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/offline.rs",
+      "sha256": "5b733612ed8f7bab805869c615bcc63b6ca0cf66c75bf378a5d364a3e20ab926",
+      "bytes": 5599,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/plan.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__plan.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/plan.rs",
+      "sha256": "d2720e1ee91d33a175e18240b0604e078547792611fcfab4efcb0999810bd82b",
+      "bytes": 27904,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/preview.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__preview.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/preview.rs",
+      "sha256": "385af6b3408653168961b5794285e1e3dd817ae15fbf070a298b5f2f677a1243",
+      "bytes": 23060,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/remix.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__remix.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/remix.rs",
+      "sha256": "177d987d942ffdbd8c9b54a0e0d0bd1240571d2bab3e795f93b433ae76b82070",
+      "bytes": 9060,
+      "status": "existing_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/scene.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__scene.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/scene.rs",
+      "sha256": "55ceb328de894f1ac845737bbe986a12ce2d7b15ba08a201ece5caee4898d9b7",
+      "bytes": 9794,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/track.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__track.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/track.rs",
+      "sha256": "0292812f27499478190b9f8269f2a699a75d74ecc06adb40f170910f102e7e35",
+      "bytes": 20055,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/cards.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__transitions__cards.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/cards.rs",
+      "sha256": "1ce9b9eeaf99196a733c3cb34d75621371d3fac2bf8eaa854d4511879f30fcf9",
+      "bytes": 4032,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/dissolve.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/render/src/transitions/dissolve.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/dissolve.rs",
+      "sha256": "5c3a3f550715971e98ec5684a20228239f6e9e150bf3f34fc8b3217a9a3bcd84",
+      "bytes": 4637,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/grunge.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__transitions__grunge.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/grunge.rs",
+      "sha256": "da41577f890bf27cca652d2dc0bf2dd38934d5f54758b6f50f2461eb5c7c2c4a",
+      "bytes": 10282,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/legacy.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__transitions__legacy.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/legacy.rs",
+      "sha256": "470a41c297964c3f8802815c7ab371774d659422ed9e16024e18e61420ceab48",
+      "bytes": 10445,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/lights.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__transitions__lights.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/lights.rs",
+      "sha256": "590cbfc87a6e7419d30b0afc9c3c7cc51696e9303e336185361c3de418524b31",
+      "bytes": 12244,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/mod.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/render/src/transitions/mod.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/mod.rs",
+      "sha256": "17efb819e2a136c3851f01fbbb9b8e08220699b25fc648c879beab1901de06fc",
+      "bytes": 15738,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/motion.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/render/src/transitions/motion.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/motion.rs",
+      "sha256": "29b6330eab5d6823a660d6d855f88b6e053ede3612f8063a84f45dbac04f01d3",
+      "bytes": 32268,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/special.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__transitions__special.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/special.rs",
+      "sha256": "88fb5b79990533e6fb805f80e7f1a7e396d775bd68cbf7d2e59116d58aa300e9",
+      "bytes": 8890,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/transitions/wipe.rs",
+      "local_path": "research_v2/sources/filmcraft/crates/render/src/transitions/wipe.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/transitions/wipe.rs",
+      "sha256": "0ec70c6cc611812899ccfe47c49455d8435cd456be8e0ff715b414b1beebaac7",
+      "bytes": 10984,
+      "status": "existing_v2_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/blur.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__blur.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/blur.rs",
+      "sha256": "ba0fb47e3197ed35cfd8adf09e88c99c2eabc1423d9fb596519c0b2d59d2f28e",
+      "bytes": 7651,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/color.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__color.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/color.rs",
+      "sha256": "425639d21025b2708a1413675321c9551deba144d1a66beca3073e5532c73d88",
+      "bytes": 15309,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/distort.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__distort.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/distort.rs",
+      "sha256": "ecbddac98f182656610f95ad786afa0dd6d309a7a84dc32fbbc38f511e29d01f",
+      "bytes": 23956,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/immersive.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__immersive.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/immersive.rs",
+      "sha256": "6102a57bea849b1b512b43dc38747ec319b6e835014fe6c559a72f0c97df88fe",
+      "bytes": 19030,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/lights.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__lights.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/lights.rs",
+      "sha256": "eafeda1866971c13377b882df229a961bc73cc03464b69250bd089294738d4f2",
+      "bytes": 15494,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/mod.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__mod.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs",
+      "sha256": "44f91abf40ece6c8537e1c0c6df6ca78886c6c416014818ecdd92ee3fccf6cf1",
+      "bytes": 21451,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/stylize.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__stylize.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/stylize.rs",
+      "sha256": "35dfb478cda62802b7905f80a30b9dd2165e83f949d07a8867a3e5df53d26d1b",
+      "bytes": 32883,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/temporal.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__temporal.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs",
+      "sha256": "7ef13bc905435c462b1114b5855ff538ff0c1801afe83e6191347c9b25c29fcb",
+      "bytes": 17975,
+      "status": "fetched_v3_snapshot"
+    },
+    {
+      "repository_path": "crates/render/src/vfx/text.rs",
+      "local_path": "research_v3/requirements-filmcraft-crates__render__src__vfx__text.rs",
+      "source_url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/text.rs",
+      "sha256": "85f064da8beff18a33ed79c24e4b114a03ad1dec5879f571c91bac872218f973",
+      "bytes": 4154,
+      "status": "fetched_v3_snapshot"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "finding_id": "MF7-01",
+  "status": "SOURCE_DOCUMENT_CORRECTION_ONLY",
+  "files": [
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_count_before": 303,
+      "row_count_after": 303,
+      "changed_row_ids": [
+        "posterize_time",
+        "echo"
+      ],
+      "changed_field_count": 10,
+      "before_sha256": "3c637a7fa5bb9a21e66f8429fedcd696ee4f2e29b737233aa881799b40c326b5",
+      "after_sha256": "4ee40184d251dca203651c2907e7578c561a187687d75ad7501affdcf55946a6"
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_count_before": 307,
+      "row_count_after": 307,
+      "changed_row_ids": [
+        "ec.time.echo",
+        "ec.time.posterizetime"
+      ],
+      "changed_field_count": 6,
+      "before_sha256": "17527163ea5f8db73450e8c5d4cbd4055c4d7c18f01c8b25c6b0a75bbaacbc24",
+      "after_sha256": "4e06a30d9c4237ec85a3697576d2b4804ba755b0f199e4d59c6948fbdbff2b8c"
+    },
+    {
+      "file": "research_v7/cross-donor-capability-aliases.csv",
+      "key_field": "source_target_capability_id",
+      "row_count_before": 296,
+      "row_count_after": 296,
+      "changed_row_ids": [
+        "nw.video.time.echo",
+        "nw.video.time.posterize"
+      ],
+      "changed_field_count": 4,
+      "before_sha256": "39baca4aea09296e5f2a1f51c54fa989d44e0865ee9f4cecd67a059f103621d8",
+      "after_sha256": "12320936e896be18b57ae968ea57121d1e8195650f20eb35dd2d532d18f7193d"
+    }
+  ],
+  "csv_rows_changed": 6,
+  "csv_fields_changed": 20,
+  "markdown_files_changed": [
+    "research_v7/cross-donor-capability-aliases.md",
+    "research_v7/effectcraft-functional-mapping-final.md",
+    "research_v7/filmcraft-functional-mapping-final.md"
+  ],
+  "markdown_replacement_count": 8,
+  "effectcraft_posterize_same_defect_corrected": true,
+  "application_tests_run": false,
+  "ffmpeg_or_media_executed": false,
+  "browser_or_gpu_tests_run": false,
+  "validation": "Document-only structural comparison verified equal row counts/order and exact allowed field changes; all unrelated CSV values preserved."
+}
