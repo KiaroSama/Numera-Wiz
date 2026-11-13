@@ -3740,7 +3740,7 @@ mod tests {
         assert_eq!(boundary_viewport["snapshot_id"], viewport["snapshot_id"]);
         assert_eq!(boundary_viewport["items"].as_array().unwrap().len(), 1);
         assert_eq!(boundary_viewport["items"][0]["id"], right_id);
-        // The real edited/restarted project must feed a finite media compiler review.
+        // This fixture has no engine; a compiler must report that missing component.
         let render = project_request(
             "timeline.render",
             json!({"sequence_id":sequence_id,"revision":revision,
@@ -3753,14 +3753,15 @@ mod tests {
         );
         let render_request_id = render.request_id.clone();
         let reviewed = service.dispatch(service.owner(), render).await;
-        assert!(
-            reviewed.ok,
-            "TIMELINE_RENDER_PUBLIC_COMPILER_MISSING code={:?}",
-            reviewed.error.as_ref().map(|error| error.code.as_str())
+        assert!(!reviewed.ok);
+        assert_eq!(
+            reviewed.error.as_ref().unwrap().code,
+            "COMPONENT_UNAVAILABLE",
+            "TIMELINE_RENDER_COMPONENT_BOUNDARY_MISSING"
         );
         assert_eq!(reviewed.request_id, render_request_id);
         assert!(reviewed.receipt_id.is_none());
-        assert!(reviewed.result.as_ref().is_some_and(Value::is_object));
+        assert!(reviewed.result.is_none());
     }
     #[tokio::test]
     async fn file_grants_and_object_rights_are_checked_independently() {
