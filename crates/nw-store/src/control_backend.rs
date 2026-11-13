@@ -116,11 +116,18 @@ impl Store {
     ) -> Result<redb::Database> {
         lease.revalidate()?;
         let source = crate::generations::location_path(lease.root(), &authority.source_location)?;
-        let overlay = lease.state().join("generation-workspaces").join(&authority.record.id).join("restoration");
+        let overlay = lease
+            .state()
+            .join("generation-workspaces")
+            .join(&authority.record.id)
+            .join("restoration");
         if (path != source && path != overlay)
             || (path == source && *expected != authority.barrier.source_object)
         {
-            return Err(DomainError::new("RESTORATION_REFUSED", "Control attachment differs from the accepted source or overlay"));
+            return Err(DomainError::new(
+                "RESTORATION_REFUSED",
+                "Control attachment differs from the accepted source or overlay",
+            ));
         }
         self.db.retain_existing_lock(path)?;
         open_validated_backend(path, expected, self.root_id(), |snapshot| {
@@ -153,11 +160,17 @@ fn open_validated_backend(
 ) -> Result<redb::Database> {
     let stamp = nw_platform::files::SourceStamp::capture_resolved(&path.join("store.redb"))?;
     if nw_platform::files::source_object(&path.join("store.redb"))? != *expected {
-        return Err(DomainError::new("SOURCE_CHANGED", "Accepted source native identity changed"));
+        return Err(DomainError::new(
+            "SOURCE_CHANGED",
+            "Accepted source native identity changed",
+        ));
     }
     let (facts, snapshot) = versions::existing_snapshot(path)?;
     if facts.root_id != root_id {
-        return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Accepted generation has another root"));
+        return Err(DomainError::new(
+            "OWNER_IDENTITY_CONFLICT",
+            "Accepted generation has another root",
+        ));
     }
     // A dirty file is repaired only in the independently copied probe above.
     // Full logical eligibility precedes any writable open of the original object.

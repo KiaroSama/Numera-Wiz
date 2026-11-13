@@ -169,20 +169,36 @@ impl Service {
 
 #[cfg(test)]
 pub(super) async fn exercise_uncertain_cancellation() {
-    for code in ["TREE_TERMINATION_UNCERTAIN", "PROCESS_WAIT_FAILED", "PROCESS_CAPTURE_FAILED", "PROCESS_LAUNCH_FAILED"] {
+    for code in [
+        "TREE_TERMINATION_UNCERTAIN",
+        "PROCESS_WAIT_FAILED",
+        "PROCESS_CAPTURE_FAILED",
+        "PROCESS_LAUNCH_FAILED",
+    ] {
         let error = DomainError::new(code, "deterministic supervisor lifetime result");
         assert!(process_lifetime_uncertain(&error));
-        assert_eq!(media_failure_state(MediaJobState::Cancelling, &error), MediaJobState::Failed);
+        assert_eq!(
+            media_failure_state(MediaJobState::Cancelling, &error),
+            MediaJobState::Failed
+        );
         assert_eq!(error.code, code, "The supervisor's exact error is retained");
     }
     for code in ["CANCELLED", "PROCESS_FAILED"] {
         let error = DomainError::new(code, "confirmed supervised completion");
         assert!(!process_lifetime_uncertain(&error));
-        assert_eq!(media_failure_state(MediaJobState::Cancelling, &error), MediaJobState::Cancelled);
+        assert_eq!(
+            media_failure_state(MediaJobState::Cancelling, &error),
+            MediaJobState::Cancelled
+        );
     }
     let temporary = tempfile::tempdir().unwrap();
-    let service = Service::open(temporary.path().to_owned(), None).await.unwrap();
-    let scope = service.store.issue_scope(&service.owner().principal, service.clock.now().unwrap()).unwrap();
+    let service = Service::open(temporary.path().to_owned(), None)
+        .await
+        .unwrap();
+    let scope = service
+        .store
+        .issue_scope(&service.owner().principal, service.clock.now().unwrap())
+        .unwrap();
     let permit = service.heavy.clone().acquire_owned().await.unwrap();
     service.pending.fetch_add(1, Ordering::AcqRel);
     let running = Pending(service.pending.clone());
@@ -193,11 +209,20 @@ pub(super) async fn exercise_uncertain_cancellation() {
     assert_eq!(service.pending.load(Ordering::Acquire), 1);
     assert_eq!(service.heavy.available_permits(), 0);
     assert!(service.heavy.clone().try_acquire_owned().is_err());
-    let discovery = service.dispatch(service.owner(), Request::query("commands.list", json!({}))).await;
+    let discovery = service
+        .dispatch(service.owner(), Request::query("commands.list", json!({})))
+        .await;
     assert!(discovery.ok, "{:?}", discovery.error);
-    let inspection = service.dispatch(service.owner(), Request::query("jobs.list", json!({}))).await;
+    let inspection = service
+        .dispatch(service.owner(), Request::query("jobs.list", json!({})))
+        .await;
     assert!(inspection.ok, "{:?}", inspection.error);
-    let maintenance = service.dispatch(service.owner(), Request::query("maintenance.plan", json!({}))).await;
+    let maintenance = service
+        .dispatch(
+            service.owner(),
+            Request::query("maintenance.plan", json!({})),
+        )
+        .await;
     assert_eq!(maintenance.error.unwrap().code, "OWNER_BUSY");
     let mut submit = Request::query("jobs.submit", json!({"plan_id":Uuid::new_v4().to_string()}));
     submit.replay_scope = Some(scope);

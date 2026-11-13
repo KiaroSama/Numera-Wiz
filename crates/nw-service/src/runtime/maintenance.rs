@@ -701,13 +701,20 @@ mod tests {
     async fn exercise_nonfresh_sibling_refusal() {
         for sibling in ["2", "history", "unknown"] {
             let temporary = tempfile::tempdir().unwrap();
-            let root = nw_platform::security::private_directory(&temporary.path().join("root")).unwrap();
-            let retained = nw_platform::security::private_directory(&root.join("state/generations").join(sibling)).unwrap();
+            let root =
+                nw_platform::security::private_directory(&temporary.path().join("root")).unwrap();
+            let retained = nw_platform::security::private_directory(
+                &root.join("state/generations").join(sibling),
+            )
+            .unwrap();
             let history = retained.join("retained.bin");
             std::fs::write(&history, b"unknown retained generation history").unwrap();
             assert!(Service::open_application(root.clone(), None).await.is_err());
             assert!(!root.join("state/generations/1/store.redb").exists());
-            assert_eq!(std::fs::read(history).unwrap(), b"unknown retained generation history");
+            assert_eq!(
+                std::fs::read(history).unwrap(),
+                b"unknown retained generation history"
+            );
         }
     }
     async fn issue_owner_scope(service: &Arc<Service>) -> String {
@@ -928,10 +935,25 @@ mod tests {
         );
         let original_source = temporary.path().join("state/generations/1");
         let held_identity = files::source_object(&original_source.join("store.redb")).unwrap();
-        assert_eq!(files::RootLock::acquire(&original_source).err().unwrap().code, "OWNER_BUSY");
+        assert_eq!(
+            files::RootLock::acquire(&original_source)
+                .err()
+                .unwrap()
+                .code,
+            "OWNER_BUSY"
+        );
         exercise_public_restoration(&successor, &promotion, false).await;
-        assert_eq!(files::source_object(&original_source.join("store.redb")).unwrap(), held_identity);
-        assert_eq!(files::RootLock::acquire(&original_source).err().unwrap().code, "OWNER_BUSY");
+        assert_eq!(
+            files::source_object(&original_source.join("store.redb")).unwrap(),
+            held_identity
+        );
+        assert_eq!(
+            files::RootLock::acquire(&original_source)
+                .err()
+                .unwrap()
+                .code,
+            "OWNER_BUSY"
+        );
         assert_eq!(
             successor
                 .store

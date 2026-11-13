@@ -972,7 +972,8 @@ impl Service {
                 self.store
                     .replay_with_clock(&context.principal, &request, || self.clock.now())?
         {
-            if request.command.id == "maintenance.migrate" && policy.is_none()
+            if request.command.id == "maintenance.migrate"
+                && policy.is_none()
                 && !self.execution_quarantined.load(Ordering::Acquire)
             {
                 self.store
@@ -1010,9 +1011,17 @@ impl Service {
             ));
         }
         if self.execution_quarantined.load(Ordering::Acquire)
-            && ["jobs.submit", "batches.submit", "timeline.render", "media.probe",
-                "assets.register", "assets.register_folder", "streams.clean", "streams.clean.batch_plan"]
-                .contains(&request.command.id.as_str())
+            && [
+                "jobs.submit",
+                "batches.submit",
+                "timeline.render",
+                "media.probe",
+                "assets.register",
+                "assets.register_folder",
+                "streams.clean",
+                "streams.clean.batch_plan",
+            ]
+            .contains(&request.command.id.as_str())
         {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",

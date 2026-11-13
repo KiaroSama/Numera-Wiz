@@ -248,7 +248,11 @@ impl Store {
         if matches!(plan.kind, RestorationKind::InitializationRestorationV1) != initialization
             || plan.application_build != build
             || plan.root_id != self.root_id()
-            || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, clock()?)?
+            || !nw_domain::media_execution::review_current(
+                &plan.created_at,
+                &plan.expires_at,
+                clock()?,
+            )?
         {
             return Err(refused(
                 "Restoration review kind, root, build or lifetime differs",
@@ -530,8 +534,12 @@ impl Store {
         let preimage = preimage_read.open_table(RECORDS).map_err(storage)?;
         // B on S is authoritative. A missing external completion or reappearing F
         // cannot authorize copying, applying the overlay again, or resetting clocks.
-        let repaired =
-            self.open_restoration_control(lease, &source, &authority.barrier.source_object, authority)?;
+        let repaired = self.open_restoration_control(
+            lease,
+            &source,
+            &authority.barrier.source_object,
+            authority,
+        )?;
         drop(repaired);
         let live = open_closed(&source)?;
         let armed = control::has_barrier(&live, &authority.record.id)?;
@@ -785,7 +793,8 @@ pub(crate) fn validate_source_snapshot(
     let workspace = operation_path(lease, &authority.record.id)?;
     let preimage_db = open_closed(&workspace.join("rollback"))?;
     let promoted_db = open_closed(&workspace.join("target"))?;
-    let baseline_db = open_closed(&operation_path(lease, &authority.operation.id)?.join("rollback"))?;
+    let baseline_db =
+        open_closed(&operation_path(lease, &authority.operation.id)?.join("rollback"))?;
     let preimage_read = preimage_db.begin_read().map_err(storage)?;
     let promoted_read = promoted_db.begin_read().map_err(storage)?;
     let baseline_read = baseline_db.begin_read().map_err(storage)?;
@@ -793,23 +802,47 @@ pub(crate) fn validate_source_snapshot(
     let baseline = baseline_read.open_table(RECORDS).map_err(storage)?;
     if let Some(barrier) = control::has_barrier(&current_db, &authority.record.id)? {
         if encode(&barrier)? != encode(&authority.barrier)? {
-            return Err(refused("Source exposure barrier contradicts accepted lineage"));
+            return Err(refused(
+                "Source exposure barrier contradicts accepted lineage",
+            ));
         }
         control::validate_continuity(
-            &preimage_read.open_table(RECORDS).map_err(storage)?, &current,
-            &promoted, &baseline, &authority.operation, &authority.record, &authority.barrier,
+            &preimage_read.open_table(RECORDS).map_err(storage)?,
+            &current,
+            &promoted,
+            &baseline,
+            &authority.operation,
+            &authority.record,
+            &authority.barrier,
         )
     } else {
-        if raw_hash(&current)? != (authority.source_prestate.record_count, authority.source_prestate.records_sha256.clone()) {
-            return Err(refused("Unarmed source differs from the exact accepted prestate"));
+        if raw_hash(&current)?
+            != (
+                authority.source_prestate.record_count,
+                authority.source_prestate.records_sha256.clone(),
+            )
+        {
+            return Err(refused(
+                "Unarmed source differs from the exact accepted prestate",
+            ));
         }
         let history = generations::activations(lease.root())?;
-        if history.last().is_none_or(|(entry, _)| entry.id != authority.record.plan.fenced_activation_id)
+        if history
+            .last()
+            .is_none_or(|(entry, _)| entry.id != authority.record.plan.fenced_activation_id)
             || prefix_digest(&history) != authority.record.plan.history_sha256
         {
-            return Err(refused("Absent B requires the complete original history with F still selected"));
+            return Err(refused(
+                "Absent B requires the complete original history with F still selected",
+            ));
         }
-        control::validate_prestate(&baseline, &current, &promoted, &authority.operation, Some(&authority.record))
+        control::validate_prestate(
+            &baseline,
+            &current,
+            &promoted,
+            &authority.operation,
+            Some(&authority.record),
+        )
     }
 }
 pub(crate) fn validate_continuity(lease: &RootLease, authority: &Authority) -> Result<()> {
@@ -926,13 +959,19 @@ fn observe_installed_source(lease: &RootLease, authority: &Authority) -> Result<
     let barrier_sha256 = nw_domain::projects::hash(&encode(&authority.barrier)?);
     if path.try_exists().map_err(storage)? {
         let observed: InstalledObservation = decode(&security::read_private(&path, 65536)?)?;
-        if observed.schema_version != 1 || observed.restoration_id != authority.record.id
-            || observed.root_id != authority.record.plan.root_id || observed.authority_sha256 != authority_sha256
-            || observed.barrier_sha256 != barrier_sha256 || observed.source_object != authority.barrier.source_object
+        if observed.schema_version != 1
+            || observed.restoration_id != authority.record.id
+            || observed.root_id != authority.record.plan.root_id
+            || observed.authority_sha256 != authority_sha256
+            || observed.barrier_sha256 != barrier_sha256
+            || observed.source_object != authority.barrier.source_object
             || observed.record_count > versions::MAX_GENERATION_RECORDS
             || observed.observation != "closed_source_with_verified_B_point_in_time_only"
-            || !(1..=versions::MAX_GENERATION_BYTES).contains(&nw_domain::media_execution::exact(&observed.file_bytes)?)
-        { return Err(refused("Retained installed observation binding differs")); }
+            || !(1..=versions::MAX_GENERATION_BYTES)
+                .contains(&nw_domain::media_execution::exact(&observed.file_bytes)?)
+        {
+            return Err(refused("Retained installed observation binding differs"));
+        }
         nw_domain::media_execution::hash(&observed.records_sha256)?;
         nw_domain::media_execution::hash(&observed.file_sha256)?;
         // Old work may legitimately change all physical/raw facts after exposure.
@@ -948,15 +987,27 @@ fn observe_installed_source(lease: &RootLease, authority: &Authority) -> Result<
     let source_object = files::source_object(&file)?;
     stamp.revalidate()?;
     if source_object != authority.barrier.source_object || physical.bytes != facts.store_bytes {
-        return Err(refused("Installed observation source changed during capture"));
+        return Err(refused(
+            "Installed observation source changed during capture",
+        ));
     }
-    write_fact(&directory, "restoration-installed.json", &InstalledObservation {
-        schema_version: 1, restoration_id: authority.record.id.clone(), root_id: facts.root_id,
-        authority_sha256, barrier_sha256, source_object,
-        records_sha256: facts.records_sha256, record_count: facts.record_count,
-        file_sha256: physical.sha256, file_bytes: physical.bytes,
-        observation: "closed_source_with_verified_B_point_in_time_only".into(),
-    })
+    write_fact(
+        &directory,
+        "restoration-installed.json",
+        &InstalledObservation {
+            schema_version: 1,
+            restoration_id: authority.record.id.clone(),
+            root_id: facts.root_id,
+            authority_sha256,
+            barrier_sha256,
+            source_object,
+            records_sha256: facts.records_sha256,
+            record_count: facts.record_count,
+            file_sha256: physical.sha256,
+            file_bytes: physical.bytes,
+            observation: "closed_source_with_verified_B_point_in_time_only".into(),
+        },
+    )
 }
 pub(crate) fn complete_observation(lease: &RootLease, authority: &Authority) -> Result<()> {
     observe_installed_source(lease, authority)?;
@@ -1044,11 +1095,7 @@ pub(crate) fn repair_owned_suffix(lease: &RootLease) -> Result<()> {
         return Ok(());
     }
     let source = generations::location_path(lease.root(), &authority.source_location)?;
-    crate::control_backend::repair_accepted_source(
-        lease,
-        &source,
-        authority,
-    )?;
+    crate::control_backend::repair_accepted_source(lease, &source, authority)?;
     let database = open_closed(&source)?;
     let barrier = control::has_barrier(&database, &authority.record.id)?;
     drop(database);

@@ -101,8 +101,14 @@ pub(crate) fn workspace_headroom(
     for entry in std::fs::read_dir(&parent).map_err(files::io_error)? {
         let entry = entry.map_err(files::io_error)?;
         workspaces += 1;
-        if workspaces.checked_add(additional).is_none_or(|count| count > MAX_WORKSPACES) {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Retained workspaces leave no reserved restoration slot"));
+        if workspaces
+            .checked_add(additional)
+            .is_none_or(|count| count > MAX_WORKSPACES)
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Retained workspaces leave no reserved restoration slot",
+            ));
         }
         let mut pending = vec![(entry.path(), 0usize)];
         let mut entries = 0usize;
@@ -111,7 +117,9 @@ pub(crate) fn workspace_headroom(
             let metadata = std::fs::symlink_metadata(&path).map_err(files::io_error)?;
             entries += 1;
             if entries > 256 || metadata.file_type().is_symlink() || depth > 4 {
-                return Err(conflict("Workspace inventory exceeds its bounded entry structure"));
+                return Err(conflict(
+                    "Workspace inventory exceeds its bounded entry structure",
+                ));
             }
             if metadata.is_dir() {
                 for child in std::fs::read_dir(path).map_err(files::io_error)? {
@@ -129,7 +137,8 @@ pub(crate) fn workspace_headroom(
                     if metadata.len() > 65536 {
                         return Err(conflict("Retained workspace metadata exceeds64KiB"));
                     }
-                    metadata_bytes = metadata_bytes.checked_add(metadata.len())
+                    metadata_bytes = metadata_bytes
+                        .checked_add(metadata.len())
                         .ok_or_else(|| conflict("Workspace metadata count overflow"))?;
                     if metadata_bytes > 256 * 65536 {
                         return Err(conflict("Workspace metadata headroom is exhausted"));
@@ -148,12 +157,20 @@ fn require_entry_headroom(path: &Path, additional: usize) -> Result<()> {
     let mut entries = additional;
     while let Some(path) = pending.pop() {
         entries += 1;
-        if entries > 256 { return Err(conflict("Operation workspace lacks complete archive/proof entry headroom")); }
+        if entries > 256 {
+            return Err(conflict(
+                "Operation workspace lacks complete archive/proof entry headroom",
+            ));
+        }
         let metadata = std::fs::symlink_metadata(&path).map_err(files::io_error)?;
-        if metadata.file_type().is_symlink() { return Err(conflict("Workspace substitution was preserved")); }
+        if metadata.file_type().is_symlink() {
+            return Err(conflict("Workspace substitution was preserved"));
+        }
         if metadata.is_dir() {
             for child in std::fs::read_dir(path).map_err(files::io_error)? {
-                if pending.len() + entries >= 256 { return Err(conflict("Operation workspace entry headroom is exhausted")); }
+                if pending.len() + entries >= 256 {
+                    return Err(conflict("Operation workspace entry headroom is exhausted"));
+                }
                 pending.push(child.map_err(files::io_error)?.path());
             }
         }
@@ -164,21 +181,35 @@ pub(crate) fn restoration_slot(
     lease: &crate::generations::RootLease,
     enablement_id: &str,
 ) -> Result<String> {
-    let path = lease.state().join("generation-workspaces").join(enablement_id);
-    let slot: RestorationSlot = serde_json::from_slice(
-        &security::read_private(&path.join("restoration-slot.json"), 65536)?,
-    ).map_err(storage)?;
-    if slot.schema_version != 1 || slot.enablement_id != enablement_id
+    let path = lease
+        .state()
+        .join("generation-workspaces")
+        .join(enablement_id);
+    let slot: RestorationSlot = serde_json::from_slice(&security::read_private(
+        &path.join("restoration-slot.json"),
+        65536,
+    )?)
+    .map_err(storage)?;
+    if slot.schema_version != 1
+        || slot.enablement_id != enablement_id
         || lease.selection()?.root_id.as_deref() != Some(slot.root_id.as_str())
-        || uuid::Uuid::parse_str(&slot.restoration_id).map_err(storage)?.to_string() != slot.restoration_id
+        || uuid::Uuid::parse_str(&slot.restoration_id)
+            .map_err(storage)?
+            .to_string()
+            != slot.restoration_id
         || slot.restoration_id == enablement_id
     {
         return Err(conflict("Reserved restoration workspace identity differs"));
     }
-    let reserved = lease.state().join("generation-workspaces").join(&slot.restoration_id);
+    let reserved = lease
+        .state()
+        .join("generation-workspaces")
+        .join(&slot.restoration_id);
     let metadata = std::fs::symlink_metadata(&reserved).map_err(files::io_error)?;
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return Err(conflict("Reserved restoration workspace is absent or substituted"));
+        return Err(conflict(
+            "Reserved restoration workspace is absent or substituted",
+        ));
     }
     workspace_headroom(lease, 0)?;
     // Three independent copies, up to64 archived activations, authority,
@@ -190,29 +221,56 @@ pub(crate) fn reserve_restoration_slot(
     lease: &crate::generations::RootLease,
     enablement_id: &str,
 ) -> Result<()> {
-    let path = lease.state().join("generation-workspaces").join(enablement_id);
-    if path.join("restoration-slot.json").try_exists().map_err(files::io_error)? {
+    let path = lease
+        .state()
+        .join("generation-workspaces")
+        .join(enablement_id);
+    if path
+        .join("restoration-slot.json")
+        .try_exists()
+        .map_err(files::io_error)?
+    {
         restoration_slot(lease, enablement_id)?;
         return Ok(());
     }
-    workspace_headroom(lease, if path.try_exists().map_err(files::io_error)? { 1 } else { 2 })?;
+    workspace_headroom(
+        lease,
+        if path.try_exists().map_err(files::io_error)? {
+            1
+        } else {
+            2
+        },
+    )?;
     let operation = workspace(lease, enablement_id)?;
     require_entry_headroom(&operation, 32)?;
     let restoration_id = uuid::Uuid::new_v4().to_string();
     workspace(lease, &restoration_id)?;
     let slot = RestorationSlot {
-        schema_version: 1, enablement_id: enablement_id.into(), restoration_id,
-        root_id: lease.selection()?.root_id.ok_or_else(|| conflict("Reservation requires an existing selected root"))?,
+        schema_version: 1,
+        enablement_id: enablement_id.into(),
+        restoration_id,
+        root_id: lease
+            .selection()?
+            .root_id
+            .ok_or_else(|| conflict("Reservation requires an existing selected root"))?,
     };
     let raw = serde_json::to_vec(&slot).map_err(storage)?;
     let mapping = operation.join("restoration-slot.json");
     security::write_private(&mapping, &raw, false)?;
     nw_platform::generation_restoration::QualifiedDirectory::open(&operation)?.flush_final_file(
-        "restoration-slot.json", &files::source_object(&mapping)?, &nw_domain::projects::hash(&raw), 65536,
+        "restoration-slot.json",
+        &files::source_object(&mapping)?,
+        &nw_domain::projects::hash(&raw),
+        65536,
     )?;
     #[cfg(unix)]
-    std::fs::File::open(operation.parent().ok_or_else(|| conflict("Workspace parent is missing"))?)
-        .and_then(|file| file.sync_all()).map_err(files::io_error)?;
+    std::fs::File::open(
+        operation
+            .parent()
+            .ok_or_else(|| conflict("Workspace parent is missing"))?,
+    )
+    .and_then(|file| file.sync_all())
+    .map_err(files::io_error)?;
     lease.revalidate()
 }
 /// Check the complete copy requirement before allocating either retained generation.

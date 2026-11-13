@@ -2,11 +2,9 @@
 use crate::{RECORDS, Store, copies, generations::RootLease, storage};
 use nw_domain::{
     DomainError, Result,
-    maintenance::{
-        promotion::{
-            GenerationPromotionPlan, MEDIA_V1_CAPABILITIES, PromotionKind, RollbackCondition,
-            SourceGuard, TargetProfile,
-        },
+    maintenance::promotion::{
+        GenerationPromotionPlan, MEDIA_V1_CAPABILITIES, PromotionKind, RollbackCondition,
+        SourceGuard, TargetProfile,
     },
 };
 

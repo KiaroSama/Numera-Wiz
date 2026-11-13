@@ -37,10 +37,19 @@ pub(crate) fn source_ancestry(
     selection: &crate::generations::Selection,
     prefix: &crate::generations::CompatiblePrefix,
 ) -> Result<(Guard, InitializationOrigin)> {
-    let refused = || DomainError::new("GENERATION_ANCESTRY_INVALID", "Current source lacks the selected genuine migration or genesis ancestry");
+    let refused = || {
+        DomainError::new(
+            "GENERATION_ANCESTRY_INVALID",
+            "Current source lacks the selected genuine migration or genesis ancestry",
+        )
+    };
     let original = guard(table)?;
-    let root = table.get("meta/root").map_err(storage)?.ok_or_else(refused)?;
-    if root.value() != root_id.as_bytes() || prefix.root_id != root_id
+    let root = table
+        .get("meta/root")
+        .map_err(storage)?
+        .ok_or_else(refused)?;
+    if root.value() != root_id.as_bytes()
+        || prefix.root_id != root_id
         || selection.root_id.as_deref() != Some(root_id)
         || selection.activation_id.as_deref() != Some(prefix.activation_id.as_str())
         || original.activation_id != prefix.activation_id
@@ -48,13 +57,21 @@ pub(crate) fn source_ancestry(
     {
         return Err(refused());
     }
-    let genesis = table.get(format!("generation-genesis/{}", original.migration_id).as_str()).map_err(storage)?;
+    let genesis = table
+        .get(format!("generation-genesis/{}", original.migration_id).as_str())
+        .map_err(storage)?;
     if let Some(row) = genesis {
         let origin: GenesisOrigin = decode(row.value())?;
-        let marker = table.get("meta/genesis-origin").map_err(storage)?.ok_or_else(refused)?;
-        if selection.generation != 1 || !matches!(&selection.location, GenerationLocation::LegacyOne {})
-            || origin.schema_version != 1 || origin.operation_id != original.migration_id
-            || origin.activation_id != original.activation_id || origin.root_id != root_id
+        let marker = table
+            .get("meta/genesis-origin")
+            .map_err(storage)?
+            .ok_or_else(refused)?;
+        if selection.generation != 1
+            || !matches!(&selection.location, GenerationLocation::LegacyOne {})
+            || origin.schema_version != 1
+            || origin.operation_id != original.migration_id
+            || origin.activation_id != original.activation_id
+            || origin.root_id != root_id
             || marker.value() != original.migration_id.as_bytes()
         {
             return Err(refused());
@@ -62,13 +79,18 @@ pub(crate) fn source_ancestry(
         nw_domain::media_execution::hash(&origin.profiles_sha256)?;
         return Ok((original, InitializationOrigin::CompatibleGenesisV1));
     }
-    let row = table.get(format!("generation-migration/{}", original.migration_id).as_str())
-        .map_err(storage)?.ok_or_else(refused)?;
+    let row = table
+        .get(format!("generation-migration/{}", original.migration_id).as_str())
+        .map_err(storage)?
+        .ok_or_else(refused)?;
     let migration: nw_domain::maintenance::MigrationRecord = decode(row.value())?;
     migration.plan.validate_hash()?;
-    if migration.schema_version != 1 || migration.id != original.migration_id
-        || migration.plan.id != original.migration_id || migration.phase != MigrationPhase::Succeeded
-        || migration.plan.root_id != root_id || migration.plan.target_generation != selection.generation
+    if migration.schema_version != 1
+        || migration.id != original.migration_id
+        || migration.plan.id != original.migration_id
+        || migration.phase != MigrationPhase::Succeeded
+        || migration.plan.root_id != root_id
+        || migration.plan.target_generation != selection.generation
         || migration.activation_id.as_deref() != Some(original.activation_id.as_str())
     {
         return Err(refused());
@@ -107,7 +129,12 @@ impl Store {
         let selection = lease.selection()?;
         let (original, origin) = {
             let read = self.db.begin_read().map_err(storage)?;
-            source_ancestry(&read.open_table(RECORDS).map_err(storage)?, self.root_id(), &selection, &prefix)?
+            source_ancestry(
+                &read.open_table(RECORDS).map_err(storage)?,
+                self.root_id(),
+                &selection,
+                &prefix,
+            )?
         };
         if original.validate()? != 0
             || original.activation_id != prefix.activation_id
@@ -127,12 +154,23 @@ impl Store {
                 ));
             }
         }
-        let existing_reservation = reserved.map(|id| {
-            lease.state().join("generation-workspaces").join(id).join("restoration-slot.json")
-                .try_exists().map_err(storage)
-        }).transpose()?.unwrap_or(false);
+        let existing_reservation = reserved
+            .map(|id| {
+                lease
+                    .state()
+                    .join("generation-workspaces")
+                    .join(id)
+                    .join("restoration-slot.json")
+                    .try_exists()
+                    .map_err(storage)
+            })
+            .transpose()?
+            .unwrap_or(false);
         if existing_reservation {
-            copies::restoration_slot(lease, reserved.expect("existing reservation has an identity"))?;
+            copies::restoration_slot(
+                lease,
+                reserved.expect("existing reservation has an identity"),
+            )?;
         } else {
             copies::workspace_headroom(lease, 2)?;
         }
@@ -231,11 +269,16 @@ impl Store {
         plan.validate_hash()?;
         if plan.root_id != self.root_id()
             || plan.application_build != build
-            || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, clock()?)?
+            || !nw_domain::media_execution::review_current(
+                &plan.created_at,
+                &plan.expires_at,
+                clock()?,
+            )?
         {
             return Err(invalid("Initialization review root/build/lifetime differs"));
         }
-        let mut current = self.prepare_initialization_with_reservation(lease, build, &clock, Some(&plan.id))?;
+        let mut current =
+            self.prepare_initialization_with_reservation(lease, build, &clock, Some(&plan.id))?;
         current.source_bytes = plan.source_bytes.clone();
         current.estimated_additional_bytes = plan.estimated_additional_bytes.clone();
         if current.digest()? != plan.hash {
@@ -331,13 +374,20 @@ impl Store {
         }
         let generations = security::private_directory(&lease.state().join("generations"))?;
         let parent_stamp = files::DirectoryStamp::capture_resolved(&generations)?;
-        for (count, entry) in std::fs::read_dir(&generations).map_err(storage)?.enumerate() {
+        for (count, entry) in std::fs::read_dir(&generations)
+            .map_err(storage)?
+            .enumerate()
+        {
             let entry = entry.map_err(storage)?;
             let metadata = std::fs::symlink_metadata(entry.path()).map_err(storage)?;
-            if count >= 256 || entry.file_name() != "1" || !metadata.is_dir()
+            if count >= 256
+                || entry.file_name() != "1"
+                || !metadata.is_dir()
                 || metadata.file_type().is_symlink()
             {
-                return Err(invalid("Retained generation siblings are not empty bootstrap scaffolding"));
+                return Err(invalid(
+                    "Retained generation siblings are not empty bootstrap scaffolding",
+                ));
             }
         }
         parent_stamp.revalidate()?;

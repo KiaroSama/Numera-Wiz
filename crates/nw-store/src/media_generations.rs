@@ -312,10 +312,16 @@ impl Store {
         {
             let read = self.db.begin_read().map_err(storage)?;
             let table = read.open_table(RECORDS).map_err(storage)?;
-            let (original, _) = crate::initialization::source_ancestry(&table, self.root_id(), &selection, &prefix)?;
+            let (original, _) = crate::initialization::source_ancestry(
+                &table,
+                self.root_id(),
+                &selection,
+                &prefix,
+            )?;
             if original.migration_id != plan.source_guard.migration_id
                 || original.activation_id != plan.source_guard.activation_id
-                || original.revision != plan.source_guard.revision || original.validate()? == 0
+                || original.revision != plan.source_guard.revision
+                || original.validate()? == 0
             {
                 return Err(invalid("Original source adoption provenance changed"));
             }

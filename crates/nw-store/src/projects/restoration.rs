@@ -34,11 +34,16 @@ fn validate_entity(
     entity: &EntityEnvelope,
 ) -> Result<()> {
     entity.validate()?;
-    if !entity.known() { return Ok(()); }
+    if !entity.known() {
+        return Ok(());
+    }
     let get = |id: &EntityId| -> Result<EntityEnvelope> {
-        let row: EntityEnvelope = table_value(table, &entity_key(&header.id, id))?.ok_or_else(refused)?;
+        let row: EntityEnvelope =
+            table_value(table, &entity_key(&header.id, id))?.ok_or_else(refused)?;
         row.validate()?;
-        if row.id != *id || row.project_id != header.id { return Err(refused()); }
+        if row.id != *id || row.project_id != header.id {
+            return Err(refused());
+        }
         Ok(row)
     };
     let owner_kind = match entity.kind.as_str() {
@@ -48,27 +53,45 @@ fn validate_entity(
         _ => return Err(refused()),
     };
     if entity.id == header.root_bin_id {
-        if entity.kind != "bin" || entity.owner_id.is_some() { return Err(refused()); }
+        if entity.kind != "bin" || entity.owner_id.is_some() {
+            return Err(refused());
+        }
     } else {
         let owner = entity.owner_id.as_ref().ok_or_else(refused)?;
-        if get(owner)?.kind != owner_kind || !entity.references.iter().any(|reference| reference.role == "ownership" && reference.target == *owner) {
+        if get(owner)?.kind != owner_kind
+            || !entity
+                .references
+                .iter()
+                .any(|reference| reference.role == "ownership" && reference.target == *owner)
+        {
             return Err(refused());
         }
     }
     let mut ancestor = entity.owner_id.clone();
     let mut seen = BTreeSet::from([entity.id.clone()]);
     while let Some(id) = ancestor {
-        if !seen.insert(id.clone()) || seen.len() > MAX_CLOSURE { return Err(refused()); }
+        if !seen.insert(id.clone()) || seen.len() > MAX_CLOSURE {
+            return Err(refused());
+        }
         let parent = get(&id)?;
-        if parent.owner_id.is_none() && parent.id != header.root_bin_id { return Err(refused()); }
+        if parent.owner_id.is_none() && parent.id != header.root_bin_id {
+            return Err(refused());
+        }
         ancestor = parent.owner_id;
     }
     match entity.kind.as_str() {
-        "bin" => { let value: Bin = entity.payload("bin")?; if value.member_count > MAX_ENTITIES { return Err(refused()); } }
+        "bin" => {
+            let value: Bin = entity.payload("bin")?;
+            if value.member_count > MAX_ENTITIES {
+                return Err(refused());
+            }
+        }
         "sequence" => {
             let value: Sequence = entity.payload("sequence")?;
             value.settings.validate()?;
-            if value.track_count > MAX_ENTITIES { return Err(refused()); }
+            if value.track_count > MAX_ENTITIES {
+                return Err(refused());
+            }
         }
         "track" => {
             let value: Track = entity.payload("track")?;
@@ -76,51 +99,98 @@ fn validate_entity(
             sequence.settings.validate()?;
             let grid = match value.kind {
                 TrackKind::Video => sequence.settings.frame_rate,
-                TrackKind::Audio => nw_domain::time::Rational::new(i64::from(sequence.settings.sample_rate), 1)?,
+                TrackKind::Audio => {
+                    nw_domain::time::Rational::new(i64::from(sequence.settings.sample_rate), 1)?
+                }
             };
-            if entity.owner_id.as_ref() != Some(&value.sequence_id) || value.grid != grid || value.clip_count > MAX_ENTITIES { return Err(refused()); }
+            if entity.owner_id.as_ref() != Some(&value.sequence_id)
+                || value.grid != grid
+                || value.clip_count > MAX_ENTITIES
+            {
+                return Err(refused());
+            }
         }
         "clip" => {
             let value: Clip = entity.payload("clip")?;
             let track: Track = get(&value.track_id)?.payload("track")?;
             let _: Sequence = get(&value.sequence_id)?.payload("sequence")?;
             let source: SourceBinding = get(&value.source_id)?.payload("source_binding")?;
-            if entity.owner_id.as_ref() != Some(&value.track_id) || track.sequence_id != value.sequence_id
-                || value.rate != nw_domain::time::Rational::new(1, 1)? || value.duration != value.source_range.duration()?
-            { return Err(refused()); }
+            if entity.owner_id.as_ref() != Some(&value.track_id)
+                || track.sequence_id != value.sequence_id
+                || value.rate != nw_domain::time::Rational::new(1, 1)?
+                || value.duration != value.source_range.duration()?
+            {
+                return Err(refused());
+            }
             grid_tick(value.sequence_start, track.grid)?;
             grid_tick(value.end()?, track.grid)?;
             domain::edit::source_valid(&source, &value.source_range, track.kind)?;
-            if !entity.references.iter().any(|reference| reference.role == "source" && reference.target == value.source_id) {
+            if !entity
+                .references
+                .iter()
+                .any(|reference| reference.role == "source" && reference.target == value.source_id)
+            {
                 return Err(refused());
             }
-            for reference in entity.references.iter().filter(|reference| reference.role == "link") {
+            for reference in entity
+                .references
+                .iter()
+                .filter(|reference| reference.role == "link")
+            {
                 let linked: Clip = get(&reference.target)?.payload("clip")?;
-                if linked.sequence_id != value.sequence_id { return Err(refused()); }
+                if linked.sequence_id != value.sequence_id {
+                    return Err(refused());
+                }
             }
             if let Some(group) = &value.link_group_id {
-                if table.get(entity_key(&header.id, group).as_str()).map_err(storage)?.is_some() { return Err(refused()); }
+                if table
+                    .get(entity_key(&header.id, group).as_str())
+                    .map_err(storage)?
+                    .is_some()
+                {
+                    return Err(refused());
+                }
                 let prefix = format!("project-dependency/{}/{group}/", header.id);
                 let mut members = 0usize;
                 for row in table.range(prefix.as_str()..).map_err(storage)? {
                     let (key, _) = row.map_err(storage)?;
-                    if !key.value().starts_with(&prefix) { break; }
+                    if !key.value().starts_with(&prefix) {
+                        break;
+                    }
                     members += 1;
-                    if members > MAX_CLOSURE { return Err(refused()); }
-                    let member = EntityId::parse(key.value().rsplit('/').next().ok_or_else(refused)?)?;
+                    if members > MAX_CLOSURE {
+                        return Err(refused());
+                    }
+                    let member =
+                        EntityId::parse(key.value().rsplit('/').next().ok_or_else(refused)?)?;
                     let other = get(&member)?;
                     if other.known() && other.kind == "clip" {
                         let linked: Clip = other.payload("clip")?;
-                        if linked.link_group_id.as_ref() == Some(group) && linked.sequence_id != value.sequence_id { return Err(refused()); }
+                        if linked.link_group_id.as_ref() == Some(group)
+                            && linked.sequence_id != value.sequence_id
+                        {
+                            return Err(refused());
+                        }
                     }
                 }
             }
         }
         "source_binding" => match entity.payload::<SourceBinding>("source_binding")? {
             SourceBinding::SolidColor { rgba, duration } => {
-                if duration <= nw_domain::time::Rational::ZERO || rgba.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value)) { return Err(refused()); }
+                if duration <= nw_domain::time::Rational::ZERO
+                    || rgba
+                        .iter()
+                        .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+                {
+                    return Err(refused());
+                }
             }
-            SourceBinding::Registered { asset_id, content_sha256, probe_sha256, .. } => {
+            SourceBinding::Registered {
+                asset_id,
+                content_sha256,
+                probe_sha256,
+                ..
+            } => {
                 domain::validate_id(&asset_id)?;
                 nw_domain::media_execution::hash(&content_sha256)?;
                 nw_domain::media_execution::hash(&probe_sha256)?;
@@ -341,7 +411,9 @@ pub(crate) fn validate_project(
                         "track" => Some(entity.payload::<Track>("track")?.clip_count),
                         _ => None,
                     };
-                    if let Some(count) = count { declared.insert(entity.id, count); }
+                    if let Some(count) = count {
+                        declared.insert(entity.id, count);
+                    }
                 } else if let Some(owner) = entity.owner_id {
                     // Opaque baseline children keep their exact bytes; do not
                     // invent a membership/count meaning for an unknown codec.
@@ -350,7 +422,9 @@ pub(crate) fn validate_project(
             }
         }
     }
-    if declared.iter().any(|(id, count)| !opaque_owners.contains(id) && counts.get(id).copied().unwrap_or(0) != *count) {
+    if declared.iter().any(|(id, count)| {
+        !opaque_owners.contains(id) && counts.get(id).copied().unwrap_or(0) != *count
+    }) {
         return Err(refused());
     }
     if entities != header.entity_count || sequences != header.sequence_count {
@@ -377,26 +451,40 @@ pub(super) fn exercise_known_corruption(store: &Store, project: &ProjectId) {
         validate_project(&table, &key, row.value())
     };
     validate().unwrap();
-    let rows = store.rows::<EntityEnvelope>(&format!("project-entity/{project}/"), MAX_ENTITIES).unwrap();
-    let (entity_key, mut sequence) = rows.into_iter().find(|(_, entity)| entity.kind == "sequence").unwrap();
+    let rows = store
+        .rows::<EntityEnvelope>(&format!("project-entity/{project}/"), MAX_ENTITIES)
+        .unwrap();
+    let (entity_key, mut sequence) = rows
+        .into_iter()
+        .find(|(_, entity)| entity.kind == "sequence")
+        .unwrap();
     let original = store.get::<EntityEnvelope>(&entity_key).unwrap().unwrap();
     sequence.payload_json = "{}".into();
     sequence.payload_sha256 = domain::hash(sequence.payload_json.as_bytes());
     sequence.validate().unwrap();
     store.put(&entity_key, &sequence).unwrap();
-    assert!(validate().is_err(), "Valid envelope/hash cannot stand in for Sequence payload validation");
+    assert!(
+        validate().is_err(),
+        "Valid envelope/hash cannot stand in for Sequence payload validation"
+    );
     store.put(&entity_key, &original).unwrap();
     let header: ProjectHeader = store.get(&key).unwrap().unwrap();
     let journal_key = format!("project-op/{project}/{:020}", header.revision.0);
     let journal: Value = store.get(&journal_key).unwrap().unwrap();
     store.remove(&journal_key).unwrap();
-    assert!(validate().is_err(), "Latest checkpoint journal is required even when every remaining journal parses");
+    assert!(
+        validate().is_err(),
+        "Latest checkpoint journal is required even when every remaining journal parses"
+    );
     store.put(&journal_key, &journal).unwrap();
     let mut wrong = journal.clone();
     wrong["change_digest"] = json!("ab".repeat(32));
     wrong["forward_sha256"] = wrong["change_digest"].clone();
     store.put(&journal_key, &wrong).unwrap();
-    assert!(validate().is_err(), "Latest journal must bind the actual header change digest");
+    assert!(
+        validate().is_err(),
+        "Latest journal must bind the actual header change digest"
+    );
     store.put(&journal_key, &journal).unwrap();
     validate().unwrap();
 }

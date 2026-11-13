@@ -151,25 +151,25 @@ fn validate_checkpoint(
     header: &ProjectHeader,
 ) -> Result<()> {
     if header.revision.0 > 0 {
-                let journal: Value = table_value(
-                    table,
-                    &format!("project-op/{}/{:020}", header.id, header.revision.0),
-                )?
-                .ok_or_else(|| {
-                    DomainError::new(
-                        "PROJECT_CORRUPT",
-                        "Latest committed change journal is missing",
-                    )
-                })?;
-                if journal["after_revision"] != header.revision.to_string()
-                    || journal["change_digest"] != header.change_digest
-                {
-                    return Err(DomainError::new(
-                        "PROJECT_CORRUPT",
-                        "Latest committed change facts differ",
-                    ));
-                }
-            }
+        let journal: Value = table_value(
+            table,
+            &format!("project-op/{}/{:020}", header.id, header.revision.0),
+        )?
+        .ok_or_else(|| {
+            DomainError::new(
+                "PROJECT_CORRUPT",
+                "Latest committed change journal is missing",
+            )
+        })?;
+        if journal["after_revision"] != header.revision.to_string()
+            || journal["change_digest"] != header.change_digest
+        {
+            return Err(DomainError::new(
+                "PROJECT_CORRUPT",
+                "Latest committed change facts differ",
+            ));
+        }
+    }
     Ok(())
 }
 impl Store {
