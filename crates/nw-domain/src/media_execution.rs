@@ -31,11 +31,17 @@ pub struct MediaExecutionEvent {
 #[derive(Debug, Clone)]
 pub enum MediaExecutionFact {
     StagingIntent(StagingIntent),
-    Prepared { executable_sha256: String, argv: Vec<String> },
+    Prepared {
+        executable_sha256: String,
+        argv: Vec<String>,
+    },
     Running,
     Verifying,
     Fence(crate::access::Publication),
-    Published { identity: FileIdentity, verification: String },
+    Published {
+        identity: FileIdentity,
+        verification: String,
+    },
     Progress(crate::execution::RemuxProgress),
 }
 #[derive(Debug, Clone)]
@@ -65,7 +71,10 @@ pub enum MediaJobState {
 }
 impl MediaJobState {
     pub fn terminal(self) -> bool {
-        matches!(self, Self::Succeeded | Self::Failed | Self::Cancelled | Self::Interrupted)
+        matches!(
+            self,
+            Self::Succeeded | Self::Failed | Self::Cancelled | Self::Interrupted
+        )
     }
 }
 
@@ -139,7 +148,10 @@ impl MediaResourceReservation {
         let capture = &plan.payload.capture;
         let rate = capture.settings.frame_rate;
         if (1000i128 * i128::from(rate.denominator())) % i128::from(rate.numerator()) != 0 {
-            return Err(DomainError::new("UNSUPPORTED_MEDIA_SETTINGS", "This exact-PTS Matroska execution route requires a frame interval representable on its millisecond clock"));
+            return Err(DomainError::new(
+                "UNSUPPORTED_MEDIA_SETTINGS",
+                "This exact-PTS Matroska execution route requires a frame interval representable on its millisecond clock",
+            ));
         }
         let pixels = u64::from(capture.settings.width)
             .checked_mul(u64::from(capture.settings.height))
@@ -155,22 +167,30 @@ impl MediaResourceReservation {
         if video_decode.is_none_or(|n| n > MAX_VERIFICATION_BYTES)
             || audio_decode.is_none_or(|n| n > MAX_VERIFICATION_BYTES)
         {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Media verification exceeds the existing4GiB per-child stream budget"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Media verification exceeds the existing4GiB per-child stream budget",
+            ));
         }
         // FFV1 worst-case coding plus PCM, muxing overhead and bounded finalization.
-        let maximum = pixels.checked_mul(8)
+        let maximum = pixels
+            .checked_mul(8)
             .and_then(|n| n.checked_mul(frames))
             .and_then(|n| n.checked_add(samples.checked_mul(channels * 4)?))
             .and_then(|n| n.checked_add(frames.checked_mul(4096)?))
             .and_then(|n| n.checked_add(64 * 1024 * 1024))
             .filter(|n| *n <= MAX_OUTPUT_BYTES)
-            .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Media output reservation exceeds64GiB"))?;
-        let memory = pixels.checked_mul(64)
+            .ok_or_else(|| {
+                DomainError::new("RESOURCE_LIMIT", "Media output reservation exceeds64GiB")
+            })?;
+        let memory = pixels
+            .checked_mul(64)
             .and_then(|n| n.checked_mul(plan.payload.graph.segments.len() as u64))
             .and_then(|n| n.checked_add(192 * 1024 * 1024))
             .and_then(|n| n.checked_add(MEDIA_QUEUE_METADATA_BYTES))
             .ok_or_else(|| invalid("Media memory estimate overflow"))?;
-        let scratch = maximum.checked_mul(2)
+        let scratch = maximum
+            .checked_mul(2)
             .and_then(|n| n.checked_add(64 * 1024 * 1024))
             .ok_or_else(|| invalid("Media scratch estimate overflow"))?;
         Ok(Self {
@@ -197,7 +217,9 @@ impl MediaResourceReservation {
             expected.observed_peak_memory_bytes = Some(observed.clone());
         }
         if *self != expected {
-            return Err(invalid("Media reservation differs from the accepted payload"));
+            return Err(invalid(
+                "Media reservation differs from the accepted payload",
+            ));
         }
         Ok(())
     }
@@ -267,37 +289,55 @@ impl MediaJobV1 {
         hash(&self.payload_sha256)?;
         exact(&self.revision)?;
         let accepted = exact(&self.accepted_at)?;
-        if self.envelope_version != 1 || self.creator.is_empty()
+        if self.envelope_version != 1
+            || self.creator.is_empty()
             || self.queue_ticket != format!("{accepted:020}/{}", self.id)
-            || self.output.job_id != self.id || self.output.principal != self.creator
+            || self.output.job_id != self.id
+            || self.output.principal != self.creator
             || self.output.artifact_id != MEDIA_OUTPUT_ARTIFACT
             || self.artifact.id != MEDIA_OUTPUT_ARTIFACT
             || self.resources.plan_id != self.plan_id
             || self.resources.plan_hash != self.plan_hash
             || self.resources.raw_sha256 != self.payload_sha256
             || self.stages.iter().map(|s| s.id.as_str()).ne([
-                MEDIA_RENDER_STAGE, MEDIA_VERIFY_STAGE, MEDIA_PUBLISH_STAGE,
+                MEDIA_RENDER_STAGE,
+                MEDIA_VERIFY_STAGE,
+                MEDIA_PUBLISH_STAGE,
             ])
-            || self.stages.iter().any(|s| s.invocations.len() > MAX_INVOCATIONS)
-            || (self.state.terminal() && self.stages.iter().any(|stage|
-                !stage.state.terminal() && stage.state != MediaJobState::Queued))
+            || self
+                .stages
+                .iter()
+                .any(|s| s.invocations.len() > MAX_INVOCATIONS)
+            || (self.state.terminal()
+                && self
+                    .stages
+                    .iter()
+                    .any(|stage| !stage.state.terminal() && stage.state != MediaJobState::Queued))
         {
             return Err(invalid("Media job identity or stage contract differs"));
         }
         if self.state == MediaJobState::Succeeded
             && (self.artifact.state != MediaArtifactState::Published
-                || self.artifact.identity.is_none() || self.artifact.verification.is_none()
-                || self.stages.iter().any(|stage| stage.state != MediaJobState::Succeeded))
+                || self.artifact.identity.is_none()
+                || self.artifact.verification.is_none()
+                || self
+                    .stages
+                    .iter()
+                    .any(|stage| stage.state != MediaJobState::Succeeded))
         {
-            return Err(invalid("Media success requires a published verified artifact"));
+            return Err(invalid(
+                "Media success requires a published verified artifact",
+            ));
         }
         Ok(())
     }
     pub fn validate_payload(&self, payload: &AcceptedMediaPayload) -> Result<MediaPlanV1> {
         self.validate()?;
         let plan = payload.plan()?;
-        if self.plan_id != payload.plan_id || self.plan_hash != payload.plan_hash
-            || self.payload_sha256 != payload.raw_sha256 || self.creator != plan.creator
+        if self.plan_id != payload.plan_id
+            || self.plan_hash != payload.plan_hash
+            || self.payload_sha256 != payload.raw_sha256
+            || self.creator != plan.creator
         {
             return Err(invalid("Media job and accepted payload differ"));
         }
@@ -323,13 +363,22 @@ pub enum StoredJob {
 }
 impl StoredJob {
     pub fn id(&self) -> &str {
-        match self { Self::Legacy(job) => &job.id, Self::MediaV1(job) => &job.id }
+        match self {
+            Self::Legacy(job) => &job.id,
+            Self::MediaV1(job) => &job.id,
+        }
     }
     pub fn creator(&self) -> &str {
-        match self { Self::Legacy(job) => &job.creator, Self::MediaV1(job) => &job.creator }
+        match self {
+            Self::Legacy(job) => &job.creator,
+            Self::MediaV1(job) => &job.creator,
+        }
     }
     pub fn terminal(&self) -> bool {
-        match self { Self::Legacy(job) => job.state.terminal(), Self::MediaV1(job) => job.state.terminal() }
+        match self {
+            Self::Legacy(job) => job.state.terminal(),
+            Self::MediaV1(job) => job.state.terminal(),
+        }
     }
     pub fn queued(&self) -> bool {
         match self {
@@ -361,14 +410,22 @@ pub fn decode_job(raw: Value) -> Result<StoredJob> {
         job.validate()?;
         Ok(StoredJob::MediaV1(job))
     } else {
-        crate::plans::decode(raw.get("plan").cloned()
-            .ok_or_else(|| invalid("Stored legacy job has no plan"))?)?;
-        Ok(StoredJob::Legacy(serde_json::from_value(raw).map_err(codec)?))
+        crate::plans::decode(
+            raw.get("plan")
+                .cloned()
+                .ok_or_else(|| invalid("Stored legacy job has no plan"))?,
+        )?;
+        Ok(StoredJob::Legacy(
+            serde_json::from_value(raw).map_err(codec)?,
+        ))
     }
 }
 pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
     if raw.is_empty() || raw.len() > crate::media::MAX_PLAN_BYTES {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Media plan exceeds128KiB"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Media plan exceeds128KiB",
+        ));
     }
     // Direct struct decoding rejects duplicate keys as well as unknown fields at every level.
     let plan: MediaPlanV1 = serde_json::from_str(raw).map_err(codec)?;
@@ -376,15 +433,27 @@ pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
     Ok(plan)
 }
 pub fn exact(value: &str) -> Result<u64> {
-    let number = value.parse::<u64>().map_err(|_| invalid("Invalid decimal counter"))?;
-    if number.to_string() != value { return Err(invalid("Noncanonical decimal counter")); }
+    let number = value
+        .parse::<u64>()
+        .map_err(|_| invalid("Invalid decimal counter"))?;
+    if number.to_string() != value {
+        return Err(invalid("Noncanonical decimal counter"));
+    }
     Ok(number)
 }
 pub fn hash(value: &str) -> Result<()> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         return Err(invalid("Expected lowercase SHA256"));
     }
     Ok(())
 }
-fn codec(error: serde_json::Error) -> DomainError { invalid(error.to_string()) }
-fn invalid(message: impl Into<String>) -> DomainError { DomainError::new("INVALID_RECORD", message) }
+fn codec(error: serde_json::Error) -> DomainError {
+    invalid(error.to_string())
+}
+fn invalid(message: impl Into<String>) -> DomainError {
+    DomainError::new("INVALID_RECORD", message)
+}

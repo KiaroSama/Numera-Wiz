@@ -702,7 +702,11 @@ impl WizApp {
                 Action::Jobs => {
                     let page: SnapshotPage<Value> =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
-                    self.jobs = page.items.into_iter().map(jobs::JobRow::decode).collect::<Result<_, _>>()?;
+                    self.jobs = page
+                        .items
+                        .into_iter()
+                        .map(jobs::JobRow::decode)
+                        .collect::<Result<_, _>>()?;
                     self.jobs_cursor = page.next_cursor;
                     self.jobs_snapshot = Some(page.snapshot_id);
                     self.last_jobs = Instant::now();

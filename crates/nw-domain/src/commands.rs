@@ -220,8 +220,18 @@ fn result_schema(id: &str) -> Option<Value> {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
         }
         "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
-        "maintenance.initialization.plan" => Some(serde_json::to_value(schema_for!(crate::maintenance::media_lifecycle::MediaInitializationPlan)).expect("schema")),
-        "maintenance.promotion.restore.plan" | "maintenance.initialization.restore.plan" => Some(serde_json::to_value(schema_for!(crate::maintenance::media_lifecycle::GenerationRestorationPlan)).expect("schema")),
+        "maintenance.initialization.plan" => Some(
+            serde_json::to_value(schema_for!(
+                crate::maintenance::media_lifecycle::MediaInitializationPlan
+            ))
+            .expect("schema"),
+        ),
+        "maintenance.promotion.restore.plan" | "maintenance.initialization.restore.plan" => Some(
+            serde_json::to_value(schema_for!(
+                crate::maintenance::media_lifecycle::GenerationRestorationPlan
+            ))
+            .expect("schema"),
+        ),
         "projects.create" => Some(
             serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
                 .expect("schema"),
@@ -438,17 +448,72 @@ pub fn registry() -> Vec<Descriptor> {
             Query,
             Empty
         ),
-        row!("maintenance.promotion.accept", "Accept the reviewed media promotion", DurableMutation, crate::maintenance::media_lifecycle::PromotionSubmitInput),
-        row!("maintenance.promotion.inspect", "Inspect accepted media promotion", Query, IdInput),
-        row!("maintenance.promotion.restore.plan", "Review stopped restoration before media adoption", Query, IdInput),
-        row!("maintenance.promotion.restore.accept", "Accept reviewed stopped restoration", DurableMutation, crate::maintenance::media_lifecycle::RestorationSubmitInput),
-        row!("maintenance.promotion.restore.inspect", "Inspect accepted stopped restoration", Query, IdInput),
-        row!("maintenance.initialization.plan", "Review a trusted compatible zero-revision baseline", Query, Empty),
-        row!("maintenance.initialization.accept", "Accept reviewed zero-revision media initialization", DurableMutation, crate::maintenance::media_lifecycle::InitializationSubmitInput),
-        row!("maintenance.initialization.inspect", "Inspect accepted media initialization", Query, IdInput),
-        row!("maintenance.initialization.restore.plan", "Review stopped zero-revision baseline restoration", Query, IdInput),
-        row!("maintenance.initialization.restore.accept", "Accept reviewed zero-revision baseline restoration", DurableMutation, crate::maintenance::media_lifecycle::RestorationSubmitInput),
-        row!("maintenance.initialization.restore.inspect", "Inspect accepted zero-revision restoration", Query, IdInput),
+        row!(
+            "maintenance.promotion.accept",
+            "Accept the reviewed media promotion",
+            DurableMutation,
+            crate::maintenance::media_lifecycle::PromotionSubmitInput
+        ),
+        row!(
+            "maintenance.promotion.inspect",
+            "Inspect accepted media promotion",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.promotion.restore.plan",
+            "Review stopped restoration before media adoption",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.promotion.restore.accept",
+            "Accept reviewed stopped restoration",
+            DurableMutation,
+            crate::maintenance::media_lifecycle::RestorationSubmitInput
+        ),
+        row!(
+            "maintenance.promotion.restore.inspect",
+            "Inspect accepted stopped restoration",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.initialization.plan",
+            "Review a trusted compatible zero-revision baseline",
+            Query,
+            Empty
+        ),
+        row!(
+            "maintenance.initialization.accept",
+            "Accept reviewed zero-revision media initialization",
+            DurableMutation,
+            crate::maintenance::media_lifecycle::InitializationSubmitInput
+        ),
+        row!(
+            "maintenance.initialization.inspect",
+            "Inspect accepted media initialization",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.initialization.restore.plan",
+            "Review stopped zero-revision baseline restoration",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.initialization.restore.accept",
+            "Accept reviewed zero-revision baseline restoration",
+            DurableMutation,
+            crate::maintenance::media_lifecycle::RestorationSubmitInput
+        ),
+        row!(
+            "maintenance.initialization.restore.inspect",
+            "Inspect accepted zero-revision restoration",
+            Query,
+            IdInput
+        ),
         row!(
             "streams.clean.batch_plan",
             "Review every explicit cleanup batch candidate",

@@ -17,8 +17,17 @@ pub const MAX_SEGMENTS: usize = 256;
 pub const MAX_RAW_BYTES: usize = 1024 * 1024;
 pub const MAX_PLAN_BYTES: usize = 128 * 1024;
 pub const FILTERS: &[&str] = &[
-    "color", "trim", "setpts", "settb", "concat", "anullsrc", "atrim", "asetpts", "format",
-    "aformat", "setparams",
+    "color",
+    "trim",
+    "setpts",
+    "settb",
+    "concat",
+    "anullsrc",
+    "atrim",
+    "asetpts",
+    "format",
+    "aformat",
+    "setparams",
 ];
 pub const ENCODERS: &[&str] = &["ffv1", "pcm_s16le"];
 pub const MUXERS: &[&str] = &["matroska"];

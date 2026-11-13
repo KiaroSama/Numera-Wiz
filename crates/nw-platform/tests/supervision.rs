@@ -62,7 +62,10 @@ async fn independent_pipe_draining_stays_bounded_under_flood() {
         }
         .unwrap();
         assert!(result.stdout.is_empty());
-        assert_eq!(total.load(std::sync::atomic::Ordering::Relaxed), 2 * 1024 * 1024);
+        assert_eq!(
+            total.load(std::sync::atomic::Ordering::Relaxed),
+            2 * 1024 * 1024
+        );
         assert_eq!(result.stderr_tail.as_bytes(), &[b'x'; 4096]);
         assert!(result.diagnostic_bytes >= 2 * 1024 * 1024);
     }

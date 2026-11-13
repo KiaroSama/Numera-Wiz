@@ -1,8 +1,8 @@
 //! Published bytes use a current job-read purpose, independently of output roots.
 use super::*;
-use nw_domain::media_execution::{MediaArtifactState, StoredJob};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use nw_domain::artifacts::{ARTIFACT_CHUNK_BYTES, ArtifactChunk, ArtifactManifest, ChunkInput};
+use nw_domain::media_execution::{MediaArtifactState, StoredJob};
 use nw_platform::artifacts::ArtifactReader;
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -61,24 +61,51 @@ impl Service {
         }
         let (id, media) = if let Some(id) = artifact_id.strip_prefix("job-") {
             (id, false)
-        } else if let Some(id) = artifact_id.strip_prefix("media-").and_then(|id| id.strip_suffix("-output")) {
+        } else if let Some(id) = artifact_id
+            .strip_prefix("media-")
+            .and_then(|id| id.strip_suffix("-output"))
+        {
             (id, true)
         } else {
             return Err(DomainError::object_not_found());
         };
         let job = self.store.inspect_execution(id)?;
-        self.object_action(context, ObjectKind::Job, job.id(), job.creator(), ObjectAction::Read)?;
+        self.object_action(
+            context,
+            ObjectKind::Job,
+            job.id(),
+            job.creator(),
+            ObjectAction::Read,
+        )?;
         let (intent, identity, available) = match &job {
-            StoredJob::Legacy(job) if !media => (job.owned_staging.as_ref(), job.artifact.as_ref(), job.state == JobState::Succeeded),
-            StoredJob::MediaV1(job) if media => (job.owned_staging.as_ref(), job.artifact.identity.as_ref(), job.artifact.state == MediaArtifactState::Published),
+            StoredJob::Legacy(job) if !media => (
+                job.owned_staging.as_ref(),
+                job.artifact.as_ref(),
+                job.state == JobState::Succeeded,
+            ),
+            StoredJob::MediaV1(job) if media => (
+                job.owned_staging.as_ref(),
+                job.artifact.identity.as_ref(),
+                job.artifact.state == MediaArtifactState::Published,
+            ),
             _ => return Err(DomainError::object_not_found()),
         };
         if !available {
-            return Err(DomainError::new("ARTIFACT_UNAVAILABLE", "This artifact has no verified published bytes"));
+            return Err(DomainError::new(
+                "ARTIFACT_UNAVAILABLE",
+                "This artifact has no verified published bytes",
+            ));
         }
-        let publication_key = if media { format!("publication/{id}/output") } else { named("publication", id)? };
+        let publication_key = if media {
+            format!("publication/{id}/output")
+        } else {
+            named("publication", id)?
+        };
         let publication: Publication = self.store.get(&publication_key)?.ok_or_else(|| {
-            DomainError::new("ARTIFACT_UNAVAILABLE", "Retained physical publication proof is unavailable")
+            DomainError::new(
+                "ARTIFACT_UNAVAILABLE",
+                "Retained physical publication proof is unavailable",
+            )
         })?;
         if publication.read_purpose_version != 1 {
             return Err(DomainError::new(

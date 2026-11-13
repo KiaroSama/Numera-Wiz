@@ -211,7 +211,12 @@ pub async fn review(cli: &Cli, scope: &str) {
     accepted_output(cli, scope, project, &decoded).await;
 }
 
-async fn accepted_output(cli: &Cli, scope: &str, project: &str, plan: &nw_domain::media::MediaPlanV1) {
+async fn accepted_output(
+    cli: &Cli,
+    scope: &str,
+    project: &str,
+    plan: &nw_domain::media::MediaPlanV1,
+) {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use sha2::{Digest, Sha256};
 
@@ -220,17 +225,32 @@ async fn accepted_output(cli: &Cli, scope: &str, project: &str, plan: &nw_domain
     let review_file = cli.data.join("finite-media-review.json");
     std::fs::write(&review_file, &raw).unwrap();
     let arguments = [
-        "jobs", "submit-media", "--plan-file", review_file.to_str().unwrap(),
-        "--replay-scope", scope, "--idempotency-key", "finite-media-v1-accepted",
-        "--request-id", "finite-media-v1-request",
+        "jobs",
+        "submit-media",
+        "--plan-file",
+        review_file.to_str().unwrap(),
+        "--replay-scope",
+        scope,
+        "--idempotency-key",
+        "finite-media-v1-accepted",
+        "--request-id",
+        "finite-media-v1-request",
     ];
     let (accepted, code) = cli.human(&arguments).await;
-    assert_eq!(code, 0, "Actual MediaV1 submission failed: {}", accepted["error"]["code"]);
+    assert_eq!(
+        code, 0,
+        "Actual MediaV1 submission failed: {}",
+        accepted["error"]["code"]
+    );
     assert_eq!(accepted["ok"], true);
     assert!(accepted["receipt_id"].is_string());
     let id = accepted["result"]["job_id"].as_str().unwrap();
     let job = cli.completed(id).await;
-    assert_eq!(job["state"], "succeeded", "Actual MediaV1 execution failed: {}", job["error"]);
+    assert_eq!(
+        job["state"], "succeeded",
+        "Actual MediaV1 execution failed: {}",
+        job["error"]
+    );
     assert_eq!(job["envelope_version"], 1);
     assert_eq!(job["payload_kind"], "media_job_v1");
     assert_eq!(job["plan_id"], plan.id);
@@ -245,35 +265,55 @@ async fn accepted_output(cli: &Cli, scope: &str, project: &str, plan: &nw_domain
     }
     assert_eq!(stages[0]["invocations"].as_array().unwrap().len(), 1);
     assert_eq!(stages[1]["invocations"].as_array().unwrap().len(), 3);
-    assert_eq!(stages[0]["invocations"][0]["executable_sha256"], plan.payload.tools.ffmpeg.sha256);
+    assert_eq!(
+        stages[0]["invocations"][0]["executable_sha256"],
+        plan.payload.tools.ffmpeg.sha256
+    );
     for (call, sha) in stages[1]["invocations"].as_array().unwrap().iter().zip([
-        &plan.payload.tools.ffprobe.sha256, &plan.payload.tools.ffmpeg.sha256, &plan.payload.tools.ffmpeg.sha256,
+        &plan.payload.tools.ffprobe.sha256,
+        &plan.payload.tools.ffmpeg.sha256,
+        &plan.payload.tools.ffmpeg.sha256,
     ]) {
         assert_eq!(call["executable_sha256"], *sha);
     }
-    let (waited, code) = cli.human(&["jobs", "wait", id, "--timeout-seconds", "5"]).await;
+    let (waited, code) = cli
+        .human(&["jobs", "wait", id, "--timeout-seconds", "5"])
+        .await;
     assert_eq!(code, 0);
     assert_eq!(waited["result"]["id"], id);
     assert_eq!(waited["result"]["state"], "succeeded");
     let artifact = job["artifact"]["id"].as_str().unwrap();
     assert_eq!(artifact, format!("media-{id}-output"));
-    let manifest = cli.query("artifacts.manifest", json!({"artifact_id":artifact})).await;
+    let manifest = cli
+        .query("artifacts.manifest", json!({"artifact_id":artifact}))
+        .await;
     assert_eq!(manifest["artifact_id"], artifact);
     assert_eq!(manifest["job_id"], id);
     assert_eq!(manifest["plan_id"], plan.id);
     assert_eq!(manifest["availability"], "retained_published_object");
-    let bytes: u64 = manifest["encoded_byte_count"].as_str().unwrap().parse().unwrap();
+    let bytes: u64 = manifest["encoded_byte_count"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
     assert!(bytes > 0 && bytes <= 1024 * 1024);
     assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
     let mut offset = 0u64;
     let mut hash = Sha256::new();
     while offset < bytes {
         let length = (bytes - offset).min(128 * 1024) as u32;
-        let chunk = cli.query("artifacts.read_chunk", json!({
-            "artifact_id":artifact,"expected_sha256":manifest["sha256"],
-            "offset":offset.to_string(),"length":length,
-        })).await;
-        let decoded = STANDARD.decode(chunk["data_base64"].as_str().unwrap()).unwrap();
+        let chunk = cli
+            .query(
+                "artifacts.read_chunk",
+                json!({
+                    "artifact_id":artifact,"expected_sha256":manifest["sha256"],
+                    "offset":offset.to_string(),"length":length,
+                }),
+            )
+            .await;
+        let decoded = STANDARD
+            .decode(chunk["data_base64"].as_str().unwrap())
+            .unwrap();
         assert_eq!(decoded.len(), length as usize);
         assert_eq!(chunk["actual_length"], length);
         assert_eq!(chunk["offset"], offset.to_string());
@@ -283,20 +323,37 @@ async fn accepted_output(cli: &Cli, scope: &str, project: &str, plan: &nw_domain
     }
     assert_eq!(hex::encode(hash.finalize()), manifest["sha256"]);
     let exported = cli.data.join("exports").join(format!("media-{id}.mkv"));
-    let actual = nw_platform::files::identity(&exported, &tokio_util::sync::CancellationToken::new()).unwrap();
+    let actual =
+        nw_platform::files::identity(&exported, &tokio_util::sync::CancellationToken::new())
+            .unwrap();
     assert_eq!(actual.sha256, manifest["sha256"]);
     assert_eq!(actual.bytes, manifest["encoded_byte_count"]);
     let inspected = serde_json::to_string(&job).unwrap();
-    for private in ["owned_staging", "argv", "proof", "signing_key", "replay_scope"] {
+    for private in [
+        "owned_staging",
+        "argv",
+        "proof",
+        "signing_key",
+        "replay_scope",
+    ] {
         assert!(!inspected.contains(private));
     }
     assert!(!inspected.contains(cli.data.to_string_lossy().as_ref()));
     // Real project drift cannot turn an accepted retry into a second acceptance.
-    let changed = edit(cli, scope, project, "3", "finite-media-after-acceptance", "sequences.create", json!({
-        "name":"After accepted media","settings":{"width":64,"height":48,
-            "frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},
-        "tracks":[{"kind":"video","name":"Video"}]
-    })).await;
+    let changed = edit(
+        cli,
+        scope,
+        project,
+        "3",
+        "finite-media-after-acceptance",
+        "sequences.create",
+        json!({
+            "name":"After accepted media","settings":{"width":64,"height":48,
+                "frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},
+            "tracks":[{"kind":"video","name":"Video"}]
+        }),
+    )
+    .await;
     assert_eq!(changed["revision"], "4");
     let (replayed, code) = cli.human(&arguments).await;
     assert_eq!(code, 0);
@@ -330,7 +387,11 @@ async fn accepted_output(cli: &Cli, scope: &str, project: &str, plan: &nw_domain
         });
         let encoded = serde_json::to_vec_pretty(&evidence).unwrap();
         assert!(encoded.len() <= 16 * 1024);
-        std::fs::write(std::path::PathBuf::from(directory).join("finite-media-job.json"), encoded).unwrap();
+        std::fs::write(
+            std::path::PathBuf::from(directory).join("finite-media-job.json"),
+            encoded,
+        )
+        .unwrap();
     }
 }
 

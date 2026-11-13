@@ -82,7 +82,8 @@ impl Store {
             if facts.store_version != 3
                 || facts.root_id != self.root_id()
                 || facts.record_count > 49000
-                || facts.required_capabilities.len() != crate::generations::CURRENT_CAPABILITIES.len()
+                || facts.required_capabilities.len()
+                    != crate::generations::CURRENT_CAPABILITIES.len()
                 || facts.required_capabilities.iter().any(|capability| {
                     !crate::generations::CURRENT_CAPABILITIES.contains(&capability.as_str())
                 })

@@ -817,10 +817,8 @@ async fn publish_output(
         parent: parent_stamp,
         parent_object,
     } = destination;
-    let destination = nw_platform::claims::Destination::reviewed(
-        Path::new(&output_path),
-        &parent_object,
-    )?;
+    let destination =
+        nw_platform::claims::Destination::reviewed(Path::new(&output_path), &parent_object)?;
     let claims =
         nw_platform::claims::DestinationClaims::acquire(vec![destination], cancel.clone()).await?;
     let output = files::revalidate_output(&output_path)?;

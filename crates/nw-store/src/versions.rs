@@ -205,7 +205,9 @@ pub(crate) fn preflight_existing(generation: &Path) -> Result<()> {
 pub(crate) fn preflight_existing_facts(generation: &Path) -> Result<GenerationFacts> {
     existing_snapshot(generation).map(|(facts, _)| facts)
 }
-pub(crate) fn existing_snapshot(generation: &Path) -> Result<(GenerationFacts, std::path::PathBuf)> {
+pub(crate) fn existing_snapshot(
+    generation: &Path,
+) -> Result<(GenerationFacts, std::path::PathBuf)> {
     let (facts, snapshot) = match inspect_closed(generation) {
         Ok(facts) => (facts, generation.to_owned()),
         Err(error) if error.code == "STORE_RECOVERY_REQUIRED" => {

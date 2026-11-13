@@ -320,66 +320,147 @@ mod tests {
     fn raw_rows(store: &Store, prefix: &str) -> Vec<(String, Vec<u8>)> {
         let read = store.db.begin_read().unwrap();
         let table = read.open_table(RECORDS).unwrap();
-        table.range(prefix..).unwrap().map(|row| {
-            let (key, value) = row.unwrap();
-            (key.value().to_owned(), value.value().to_vec())
-        }).take_while(|(key, _)| key.starts_with(prefix)).collect()
+        table
+            .range(prefix..)
+            .unwrap()
+            .map(|row| {
+                let (key, value) = row.unwrap();
+                (key.value().to_owned(), value.value().to_vec())
+            })
+            .take_while(|(key, _)| key.starts_with(prefix))
+            .collect()
     }
     fn exercise_restoration_overlay() {
         let f = fixture();
-        f.store.put("unit/opaque-baseline", &serde_json::json!({"unknown":[1,2,3]})).unwrap();
+        f.store
+            .put(
+                "unit/opaque-baseline",
+                &serde_json::json!({"unknown":[1,2,3]}),
+            )
+            .unwrap();
         let source_path = f.store.generation_path().unwrap();
-        let source_object = nw_platform::files::source_object(&source_path.join("store.redb")).unwrap();
+        let source_object =
+            nw_platform::files::source_object(&source_path.join("store.redb")).unwrap();
         let original_guard = raw_rows(&f.store, "meta/rollback-guard");
         let original_receipts = raw_rows(&f.store, "receipt/");
-        let plan = f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(105)).unwrap();
-        let mut accept = Request::query("maintenance.promotion.accept", serde_json::json!({"plan":plan}));
+        let plan = f
+            .store
+            .prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(105))
+            .unwrap();
+        let mut accept = Request::query(
+            "maintenance.promotion.accept",
+            serde_json::json!({"plan":plan}),
+        );
         accept.replay_scope = Some(f.scope.clone());
         accept.idempotency_key = Some("real-promotion-for-overlay".into());
-        let promoted = f.store.accept_media_promotion(&f.lease, &f.principal, &accept,
-            &"ab".repeat(32), || Ok(106), &tokio_util::sync::CancellationToken::new()).unwrap();
+        let promoted = f
+            .store
+            .accept_media_promotion(
+                &f.lease,
+                &f.principal,
+                &accept,
+                &"ab".repeat(32),
+                || Ok(106),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .unwrap();
         assert!(promoted.ok);
         assert!(!f.store.pending_media_maintenance().unwrap());
-        let restoration = f.store.prepare_media_restoration(&f.lease, &plan.id, false,
-            &"ab".repeat(32), || Ok(107)).unwrap();
-        let mut restore = Request::query("maintenance.promotion.restore.accept", serde_json::json!({"plan":restoration}));
+        let restoration = f
+            .store
+            .prepare_media_restoration(&f.lease, &plan.id, false, &"ab".repeat(32), || Ok(107))
+            .unwrap();
+        let mut restore = Request::query(
+            "maintenance.promotion.restore.accept",
+            serde_json::json!({"plan":restoration}),
+        );
         restore.replay_scope = Some(f.scope.clone());
         restore.idempotency_key = Some("real-restoration-with-abort".into());
         // First install validates the independent overlay copy; abort the second,
         // real-S transaction after receipt/capability updates but before B.
         crate::restoration_control::ABORT_INSTALL.with(|count| count.set(2));
-        let accepted = f.store.accept_media_restoration(&f.lease, &f.principal, &restore, false,
-            &"ab".repeat(32), || Ok(108)).unwrap();
+        let accepted = f
+            .store
+            .accept_media_restoration(
+                &f.lease,
+                &f.principal,
+                &restore,
+                false,
+                &"ab".repeat(32),
+                || Ok(108),
+            )
+            .unwrap();
         assert!(accepted.ok);
         assert!(accepted.receipt_id.is_some());
         assert!(f.store.pending_media_maintenance().unwrap());
         assert_eq!(f.lease.selection().unwrap().generation, 5);
-        let source = redb::Database::builder().open_read_only(source_path.join("store.redb")).unwrap();
+        let source = redb::Database::builder()
+            .open_read_only(source_path.join("store.redb"))
+            .unwrap();
         let read = source.begin_read().unwrap();
         let table = read.open_table(RECORDS).unwrap();
-        assert!(table.get(format!("restoration-control/{}", restoration.id).as_str()).unwrap().is_none());
-        assert_eq!(table.get("meta/rollback-guard").unwrap().unwrap().value(), original_guard[0].1);
-        assert_eq!(crate::decode::<Vec<String>>(table.get("meta/required-capabilities").unwrap().unwrap().value()).unwrap().len(), 9);
+        assert!(
+            table
+                .get(format!("restoration-control/{}", restoration.id).as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            table.get("meta/rollback-guard").unwrap().unwrap().value(),
+            original_guard[0].1
+        );
+        assert_eq!(
+            crate::decode::<Vec<String>>(
+                table
+                    .get("meta/required-capabilities")
+                    .unwrap()
+                    .unwrap()
+                    .value()
+            )
+            .unwrap()
+            .len(),
+            9
+        );
         let receipt_key = f.store.replay_key(&f.principal, &restore, 108).unwrap().0;
-        assert!(table.get(receipt_key.as_str()).unwrap().is_none(), "Aborted receipt union and B must disappear together");
-        drop(table); drop(read); drop(source);
+        assert!(
+            table.get(receipt_key.as_str()).unwrap().is_none(),
+            "Aborted receipt union and B must disappear together"
+        );
+        drop(table);
+        drop(read);
+        drop(source);
         crate::restoration_control::UNCERTAIN_INSTALL.with(|count| count.set(1));
         f.store.recover_media_restoration(&f.lease).unwrap();
         assert_eq!(f.lease.selection().unwrap().generation, 3);
-        assert_eq!(nw_platform::files::source_object(&source_path.join("store.redb")).unwrap(), source_object);
+        assert_eq!(
+            nw_platform::files::source_object(&source_path.join("store.redb")).unwrap(),
+            source_object
+        );
         assert_eq!(raw_rows(&f.store, "meta/rollback-guard"), original_guard);
         for (key, raw) in original_receipts {
             assert_eq!(raw_rows(&f.store, &key), vec![(key, raw)]);
         }
         let barrier = raw_rows(&f.store, "restoration-control/");
         assert_eq!(barrier.len(), 1);
-        let replay = f.store.replay_with_clock(&f.principal, &restore, || Ok(10000)).unwrap().unwrap();
-        assert_eq!(replay.receipt_id, accepted.receipt_id, "Expired review still replays the genuine raw receipt");
+        let replay = f
+            .store
+            .replay_with_clock(&f.principal, &restore, || Ok(10000))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            replay.receipt_id, accepted.receipt_id,
+            "Expired review still replays the genuine raw receipt"
+        );
         f.store.close_generation(&f.lease).unwrap();
         crate::restorations::repair_owned_suffix(&f.lease).unwrap();
         f.store.attach_media_selection(&f.lease).unwrap();
         assert_eq!(raw_rows(&f.store, "restoration-control/"), barrier);
-        assert_eq!(f.store.get::<serde_json::Value>("unit/opaque-baseline").unwrap().unwrap(), serde_json::json!({"unknown":[1,2,3]}));
+        assert_eq!(
+            f.store
+                .get::<serde_json::Value>("unit/opaque-baseline")
+                .unwrap()
+                .unwrap(),
+            serde_json::json!({"unknown":[1,2,3]})
+        );
     }
-
 }

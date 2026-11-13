@@ -131,10 +131,19 @@ impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
         Self::open_internal(root, components, false).await
     }
-    async fn open_internal(root: PathBuf, components: Option<(PathBuf, PathBuf)>, application_startup: bool) -> Result<Arc<Self>> {
+    async fn open_internal(
+        root: PathBuf,
+        components: Option<(PathBuf, PathBuf)>,
+        application_startup: bool,
+    ) -> Result<Arc<Self>> {
         Self::open_runtime(root, components, application_startup, false).await
     }
-    async fn open_runtime(root: PathBuf, components: Option<(PathBuf, PathBuf)>, application_startup: bool, defer_dispatcher: bool) -> Result<Arc<Self>> {
+    async fn open_runtime(
+        root: PathBuf,
+        components: Option<(PathBuf, PathBuf)>,
+        application_startup: bool,
+        defer_dispatcher: bool,
+    ) -> Result<Arc<Self>> {
         std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
@@ -174,7 +183,8 @@ impl Service {
         })
         .await
         .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
-        let maintenance_pending = store.pending_migration()?.is_some() || store.pending_media_maintenance()?;
+        let maintenance_pending =
+            store.pending_migration()?.is_some() || store.pending_media_maintenance()?;
         if !maintenance_pending && store.get::<AccessProfile>("profile/agent")?.is_none() {
             store.put(
                 "profile/agent",
@@ -281,17 +291,22 @@ impl Service {
             catalog_hook: Mutex::new(None),
         });
         Self::start_snapshot_reaper(&service);
-        if service.store.pending_migration()?.is_some() || service.store.pending_media_maintenance()? {
+        if service.store.pending_migration()?.is_some()
+            || service.store.pending_media_maintenance()?
+        {
             service.dispatcher_ready.store(true, Ordering::Release);
             return Ok(service);
         }
         if application_startup {
             service.initialize_application_media().await?;
         }
-        if defer_dispatcher { return Ok(service); }
+        if defer_dispatcher {
+            return Ok(service);
+        }
         service.dispatcher_ready.store(true, Ordering::Release);
         let starting = service.clone();
-        tokio::task::spawn_blocking(move || starting.resume_dispatcher()).await
+        tokio::task::spawn_blocking(move || starting.resume_dispatcher())
+            .await
             .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
         Ok(service)
     }
@@ -959,9 +974,12 @@ impl Service {
                 self.store
                     .recover_migration(&self.root_lease, || self.clock.now())?;
             }
-            if policy.is_none() && request.command.id.starts_with("maintenance.")
-                && request.command.id.ends_with(".accept") {
-                self.store.recover_media_enablement(&self.root_lease, || self.clock.now())?;
+            if policy.is_none()
+                && request.command.id.starts_with("maintenance.")
+                && request.command.id.ends_with(".accept")
+            {
+                self.store
+                    .recover_media_enablement(&self.root_lease, || self.clock.now())?;
                 self.store.recover_media_restoration(&self.root_lease)?;
             }
             return self.replay_view(&context, &request, response);
@@ -1685,12 +1703,32 @@ impl Service {
             }
             "plans.inspect" => {
                 let input: IdInput = commands::parse(params)?;
-                let raw: Value = self.store.get(&named("plan", &input.id)?)?.ok_or_else(DomainError::object_not_found)?;
-                self.object_action(&context, ObjectKind::Plan, &input.id, raw.get("creator").and_then(Value::as_str).unwrap_or_default(), ObjectAction::Read)?;
+                let raw: Value = self
+                    .store
+                    .get(&named("plan", &input.id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Plan,
+                    &input.id,
+                    raw.get("creator")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                    ObjectAction::Read,
+                )?;
                 if raw.get("envelope_version").is_some() || raw.get("payload_kind").is_some() {
-                    let plan = nw_domain::media_execution::decode_plan(&serde_json::to_string(&raw).map_err(|error| DomainError::new("INVALID_PLAN", error.to_string()))?)?;
-                    if plan.id != input.id { return Err(DomainError::new("INVALID_PLAN", "Media plan key differs")); }
-                    self.read_project(&context, plan.payload.capture.project_id.as_str(), ObjectAction::Read)?;
+                    let plan = nw_domain::media_execution::decode_plan(
+                        &serde_json::to_string(&raw)
+                            .map_err(|error| DomainError::new("INVALID_PLAN", error.to_string()))?,
+                    )?;
+                    if plan.id != input.id {
+                        return Err(DomainError::new("INVALID_PLAN", "Media plan key differs"));
+                    }
+                    self.read_project(
+                        &context,
+                        plan.payload.capture.project_id.as_str(),
+                        ObjectAction::Read,
+                    )?;
                     return Ok(Response::success(&request.request_id, plan));
                 }
                 let plan = self.read_plan(&context, &input.id, ObjectAction::Read)?;
@@ -1851,11 +1889,19 @@ impl Service {
                 let input: IdInput = commands::parse(params)?;
                 let job = self.store.inspect_execution(&input.id)?;
                 self.object_action(
-                    &context, ObjectKind::Job, job.id(), job.creator(), ObjectAction::Read,
+                    &context,
+                    ObjectKind::Job,
+                    job.id(),
+                    job.creator(),
+                    ObjectAction::Read,
                 )?;
                 match job {
-                    nw_domain::media_execution::StoredJob::Legacy(job) => value(&self.job_view(&context, &job)?)?,
-                    nw_domain::media_execution::StoredJob::MediaV1(job) => self.media_job_view(&job),
+                    nw_domain::media_execution::StoredJob::Legacy(job) => {
+                        value(&self.job_view(&context, &job)?)?
+                    }
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => {
+                        self.media_job_view(&job)
+                    }
                 }
             }
             "jobs.list" => self.inventory_page(
@@ -1867,10 +1913,26 @@ impl Service {
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
                 let execution = self.store.inspect_execution(&input.id)?;
-                self.object_action(&context, ObjectKind::Job, execution.id(), execution.creator(), ObjectAction::Control)?;
+                self.object_action(
+                    &context,
+                    ObjectKind::Job,
+                    execution.id(),
+                    execution.creator(),
+                    ObjectAction::Control,
+                )?;
                 if let nw_domain::media_execution::StoredJob::MediaV1(job) = execution {
-                    let response = self.store.cancel_media_with_clock(&context.principal, &request, &job.id, || self.clock.now())?;
-                    if let Some(token) = self.cancellations.lock().map_err(|_| lock_error())?.get(&job.id) {
+                    let response = self.store.cancel_media_with_clock(
+                        &context.principal,
+                        &request,
+                        &job.id,
+                        || self.clock.now(),
+                    )?;
+                    if let Some(token) = self
+                        .cancellations
+                        .lock()
+                        .map_err(|_| lock_error())?
+                        .get(&job.id)
+                    {
                         token.cancel();
                     }
                     return Ok(response);
@@ -1923,7 +1985,10 @@ impl Service {
         if self.dispatcher.try_send(id.clone()).is_err() {
             tokens.remove(&id);
             self.pending.fetch_sub(1, Ordering::AcqRel);
-            return Err(DomainError::new("RESOURCE_LIMIT", "Fixed job dispatcher is at capacity"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Fixed job dispatcher is at capacity",
+            ));
         }
         Ok(())
     }
@@ -1955,9 +2020,7 @@ impl Service {
                     Box::pin(async move {
                         tokio::task::spawn_blocking(move || service.execution_event(&id, event))
                             .await
-                            .map_err(|error| {
-                                DomainError::new("WORKER_FAILED", error.to_string())
-                            })?
+                            .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))?
                     })
                 });
                 match service.engine() {
@@ -1985,9 +2048,8 @@ impl Service {
                         match outcome {
                             Ok(()) => {
                                 job.state = JobState::Skipped;
-                                job.verification = Some(
-                                    "Explicit no-match policy produced no artifact".into(),
-                                );
+                                job.verification =
+                                    Some("Explicit no-match policy produced no artifact".into());
                             }
                             Err(error) => {
                                 job.state = if error.code == "CANCELLED" {
@@ -2024,8 +2086,12 @@ impl Service {
             if self.store.execution_allowed(&id).is_err() {
                 let job = self.store.inspect_execution(&id)?;
                 let publishing = match &job {
-                    nw_domain::media_execution::StoredJob::Legacy(job) => job.state == JobState::Publishing,
-                    nw_domain::media_execution::StoredJob::MediaV1(job) => job.state == nw_domain::media_execution::MediaJobState::Publishing,
+                    nw_domain::media_execution::StoredJob::Legacy(job) => {
+                        job.state == JobState::Publishing
+                    }
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => {
+                        job.state == nw_domain::media_execution::MediaJobState::Publishing
+                    }
                 };
                 if !publishing && !job.terminal() {
                     token.cancel();

@@ -1,17 +1,17 @@
 //! Ordinary composable CLI commands lower to the existing canonical request port.
 use crate::{client::NativeClient, print_response};
+mod maintenance;
 mod projects;
 mod timeline;
-mod maintenance;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+pub use maintenance::Maintenance;
 use nw_domain::{
     DomainError,
     commands::{self, Request, Response},
     mux::{CleanIntent, Stream},
 };
 pub use projects::{Clips, History, Projects, Sequences};
-pub use maintenance::Maintenance;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -386,13 +386,18 @@ pub fn prepare(command: Command) -> Result<Request> {
             identity.apply(&mut request)?;
             request
         }
-        Command::Jobs(Jobs::SubmitMedia { plan_file, identity }) => {
+        Command::Jobs(Jobs::SubmitMedia {
+            plan_file,
+            identity,
+        }) => {
             let mut bytes = Vec::new();
             std::fs::File::open(plan_file)?
                 .take((nw_domain::media::MAX_PLAN_BYTES + 1) as u64)
                 .read_to_end(&mut bytes)?;
             if bytes.len() > nw_domain::media::MAX_PLAN_BYTES {
-                return Err(DomainError::new("RESOURCE_LIMIT", "Media review exceeds 128 KiB").into());
+                return Err(
+                    DomainError::new("RESOURCE_LIMIT", "Media review exceeds 128 KiB").into(),
+                );
             }
             let raw = String::from_utf8(bytes)
                 .map_err(|_| DomainError::new("VALIDATION_ERROR", "Media review must be UTF-8"))?;
@@ -500,15 +505,26 @@ async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Resu
                 response.error = Some(error);
                 return Ok::<_, anyhow::Error>(response);
             }
-            if let Some(media) = response.result.as_ref().filter(|result| result["payload_kind"] == "media_job_v1") {
+            if let Some(media) = response
+                .result
+                .as_ref()
+                .filter(|result| result["payload_kind"] == "media_job_v1")
+            {
                 if media["envelope_version"] != 1 || media["id"] != id {
-                    return Err(DomainError::new("INVALID_RECORD", "Media job observation identity differs").into());
+                    return Err(DomainError::new(
+                        "INVALID_RECORD",
+                        "Media job observation identity differs",
+                    )
+                    .into());
                 }
-                let state: nw_domain::media_execution::MediaJobState = commands::parse(media["state"].clone())?;
+                let state: nw_domain::media_execution::MediaJobState =
+                    commands::parse(media["state"].clone())?;
                 if state.terminal() {
                     let error = match state {
                         nw_domain::media_execution::MediaJobState::Succeeded => None,
-                        nw_domain::media_execution::MediaJobState::Cancelled => Some(DomainError::new("CANCELLED", "Accepted media job was cancelled")),
+                        nw_domain::media_execution::MediaJobState::Cancelled => Some(
+                            DomainError::new("CANCELLED", "Accepted media job was cancelled"),
+                        ),
                         _ => Some(DomainError::new(
                             media["error"]["code"].as_str().unwrap_or("JOB_FAILED"),
                             "Accepted media job did not succeed",
@@ -518,7 +534,7 @@ async fn wait_job(client: &NativeClient, id: &str, timeout_seconds: u32) -> Resu
                     response.error = error;
                     return Ok(response);
                 }
-                tracing::debug!(job_id=id, ?state, "job.wait.progress");
+                tracing::debug!(job_id = id, ?state, "job.wait.progress");
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 continue;
             }

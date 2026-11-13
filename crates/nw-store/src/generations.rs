@@ -30,13 +30,24 @@ pub const CURRENT_CAPABILITIES: &[&str] = &[
 ];
 /// Reader support is separate from the frozen seven-capability migration producer.
 pub(crate) fn supports_capabilities(capabilities: &[String]) -> bool {
-    if capabilities.is_empty() { return false; }
-    if capabilities.iter().all(|value| CURRENT_CAPABILITIES.contains(&value.as_str())) {
+    if capabilities.is_empty() {
+        return false;
+    }
+    if capabilities
+        .iter()
+        .all(|value| CURRENT_CAPABILITIES.contains(&value.as_str()))
+    {
         return true;
     }
     capabilities.len() == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.len()
-        && capabilities.iter().map(String::as_str).collect::<std::collections::BTreeSet<_>>()
-            == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.iter().copied().collect()
+        && capabilities
+            .iter()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES
+                .iter()
+                .copied()
+                .collect()
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -303,7 +314,10 @@ impl RootLease {
         let guard = RootLock::acquire(&state)?;
         let stamp = DirectoryStamp::capture_resolved(&state)?;
         let lease = Arc::new(Self {
-            root, state, stamp, _guard: guard,
+            root,
+            state,
+            stamp,
+            _guard: guard,
             _legacy_guard: std::sync::Mutex::new(None),
             historical_guards: std::sync::Mutex::new(Vec::new()),
         });
@@ -335,8 +349,12 @@ impl RootLease {
     }
     pub(crate) fn retain_existing_generation(&self, path: &Path) -> Result<()> {
         self.revalidate()?;
-        if !path.starts_with(&self.state) || !path.join("store.redb").try_exists().map_err(storage)? {
-            return Err(invalid("Accepted historical source is missing or outside the stable root"));
+        if !path.starts_with(&self.state)
+            || !path.join("store.redb").try_exists().map_err(storage)?
+        {
+            return Err(invalid(
+                "Accepted historical source is missing or outside the stable root",
+            ));
         }
         let mut guards = self.historical_guards.lock().map_err(storage)?;
         if !guards.iter().any(|(held, _)| held == path) {
@@ -346,10 +364,15 @@ impl RootLease {
     }
     pub(crate) fn take_generation_guard(&self, path: &Path) -> Result<Option<RootLock>> {
         let mut guards = self.historical_guards.lock().map_err(storage)?;
-        Ok(guards.iter().position(|(held, _)| held == path).map(|index| guards.remove(index).1))
+        Ok(guards
+            .iter()
+            .position(|(held, _)| held == path)
+            .map(|index| guards.remove(index).1))
     }
     pub(crate) fn take_historical_guards(&self) -> Result<Vec<(PathBuf, RootLock)>> {
-        Ok(std::mem::take(&mut *self.historical_guards.lock().map_err(storage)?))
+        Ok(std::mem::take(
+            &mut *self.historical_guards.lock().map_err(storage)?,
+        ))
     }
     pub fn root(&self) -> &Path {
         &self.root

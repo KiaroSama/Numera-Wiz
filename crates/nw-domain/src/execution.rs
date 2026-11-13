@@ -198,14 +198,30 @@ mod tests {
         use crate::media_execution::{MediaJobState as State, MediaStage, finish_stages};
         for terminal in [State::Failed, State::Cancelled, State::Interrupted] {
             let mut stages = [
-                MediaStage { id: "render".into(), state: State::Succeeded, invocations: vec![] },
-                MediaStage { id: "verify".into(), state: State::Verifying, invocations: vec![] },
-                MediaStage { id: "publish".into(), state: State::Queued, invocations: vec![] },
+                MediaStage {
+                    id: "render".into(),
+                    state: State::Succeeded,
+                    invocations: vec![],
+                },
+                MediaStage {
+                    id: "verify".into(),
+                    state: State::Verifying,
+                    invocations: vec![],
+                },
+                MediaStage {
+                    id: "publish".into(),
+                    state: State::Queued,
+                    invocations: vec![],
+                },
             ];
             finish_stages(terminal, &mut stages);
             assert_eq!(stages[0].state, State::Succeeded);
             assert_eq!(stages[1].state, terminal);
-            assert_eq!(stages[2].state, State::Queued, "Never-run publication cannot become success or imply output");
+            assert_eq!(
+                stages[2].state,
+                State::Queued,
+                "Never-run publication cannot become success or imply output"
+            );
         }
     }
 }

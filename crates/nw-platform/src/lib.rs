@@ -46,5 +46,5 @@ pub mod publication;
 
 pub mod download;
 
-pub mod project_lease;
 pub mod generation_restoration;
+pub mod project_lease;
