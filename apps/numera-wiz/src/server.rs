@@ -1329,18 +1329,33 @@ mod tests {
         let cancelled = CancellationToken::new();
         cancelled.cancel();
         let commands_before = probe.commands.load(Ordering::Acquire);
-        let credentials_before = owner.service.store.rows::<serde_json::Value>("credential/", 10000).unwrap().len();
+        let credentials_before = owner
+            .service
+            .store
+            .rows::<serde_json::Value>("credential/", 10000)
+            .unwrap()
+            .len();
         let forbidden = root.join("cancelled-delivery-must-not-exist/token");
         let result = crate::access::credential_file::deliver(
             &unscoped,
             &commands::Request::query("access.credentials.issue", json!({"profile":"agent"})),
             &forbidden,
             &cancelled,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         assert_eq!(result.error.unwrap().code, "CANCELLED");
         assert!(!forbidden.parent().unwrap().exists());
         assert_eq!(probe.commands.load(Ordering::Acquire), commands_before);
-        assert_eq!(owner.service.store.rows::<serde_json::Value>("credential/", 10000).unwrap().len(), credentials_before);
+        assert_eq!(
+            owner
+                .service
+                .store
+                .rows::<serde_json::Value>("credential/", 10000)
+                .unwrap()
+                .len(),
+            credentials_before
+        );
         assert!(
             crate::finish_one_shot(&unscoped, unscoped.request(&query))
                 .await

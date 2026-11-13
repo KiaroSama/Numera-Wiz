@@ -93,7 +93,8 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     );
     project_mcp_output_contract(&first_page);
     project_mcp_wire_page(data.path(), &first_page).await;
-    let owner_profiles = native_owner_mcp_query(data.path(), "access.profiles.list", serde_json::json!({})).await;
+    let owner_profiles =
+        native_owner_mcp_query(data.path(), "access.profiles.list", serde_json::json!({})).await;
     assert_eq!(owner_profiles["ok"], true);
     assert!(owner_profiles["result"].as_array().unwrap().len() >= 2);
     let still_scoped = client
@@ -109,12 +110,18 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         "Explicit owner access on another bridge must not change the original scoped session"
     );
     let forbidden = data.path().join("must-not-create-credentials/token");
-    let refused = client.call_tool(
-        CallToolRequestParams::new("access.credentials.issue").with_arguments(rmcp::object!({
-            "params":{"profile":"agent"},"credential_file":forbidden.to_str().unwrap(),
-        })),
-    ).await.unwrap();
-    assert_eq!(serde_json::to_value(refused).unwrap()["structuredContent"]["error"]["code"], "PERMISSION_DENIED");
+    let refused = client
+        .call_tool(
+            CallToolRequestParams::new("access.credentials.issue").with_arguments(rmcp::object!({
+                "params":{"profile":"agent"},"credential_file":forbidden.to_str().unwrap(),
+            })),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(refused).unwrap()["structuredContent"]["error"]["code"],
+        "PERMISSION_DENIED"
+    );
     assert!(!forbidden.parent().unwrap().exists());
     native_owner_credential_files(data.path()).await;
     reject_ambiguous_owner_bridge().await;
@@ -126,84 +133,170 @@ async fn native_owner_credential_files(root: &std::path::Path) {
         use serde_json::json;
         use sha2::{Digest, Sha256};
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
-        command.arg("--data-dir").arg(root).args(["bridge", "--native-owner"]).kill_on_drop(true);
+        command
+            .arg("--data-dir")
+            .arg(root)
+            .args(["bridge", "--native-owner"])
+            .kill_on_drop(true);
         let owner = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
         macro_rules! call {
             ($client:expr, $id:expr, $arguments:expr) => {{
-                let result = $client.call_tool(
-                    CallToolRequestParams::new($id).with_arguments($arguments),
-                ).await.unwrap();
+                let result = $client
+                    .call_tool(CallToolRequestParams::new($id).with_arguments($arguments))
+                    .await
+                    .unwrap();
                 serde_json::to_value(result).unwrap()
             }};
         }
         let record: serde_json::Value = serde_json::from_slice(
             &nw_platform::security::read_private(&root.join("runtime/owner.json"), 16384).unwrap(),
-        ).unwrap();
-        let native = reqwest::Client::builder().no_proxy()
-            .redirect(reqwest::redirect::Policy::none()).timeout(std::time::Duration::from_secs(10)).build().unwrap();
+        )
+        .unwrap();
+        let native = reqwest::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap();
         let private_url = format!("http://127.0.0.1:{}", record["port"].as_u64().unwrap());
         let port_probe = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         let public_port = port_probe.local_addr().unwrap().port();
         drop(port_probe);
-        native.post(format!("{private_url}/internal/public"))
-            .bearer_auth(record["bearer"].as_str().unwrap()).json(&json!({"port":public_port}))
-            .send().await.unwrap().error_for_status().unwrap();
+        native
+            .post(format!("{private_url}/internal/public"))
+            .bearer_auth(record["bearer"].as_str().unwrap())
+            .json(&json!({"port":public_port}))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
         let mut delivered = Vec::new();
         for (ordinal, (id, params)) in [
             ("access.credentials.issue", json!({"profile":"agent"})),
-            ("access.tokens.issue", json!({"for_access_profile":"agent","port":public_port})),
-        ].into_iter().enumerate() {
+            (
+                "access.tokens.issue",
+                json!({"for_access_profile":"agent","port":public_port}),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let missing = call!(owner, id, rmcp::object!({"params":params.clone()}));
-            assert_eq!(missing["structuredContent"]["error"]["code"], "VALIDATION_ERROR");
+            assert_eq!(
+                missing["structuredContent"]["error"]["code"],
+                "VALIDATION_ERROR"
+            );
             let file = root.join(format!("mcp-credentials/issued-{ordinal}"));
-            let output = call!(owner, id, rmcp::object!({
-                "params":params.clone(),"credential_file":file.to_str().unwrap(),
-            }));
+            let output = call!(
+                owner,
+                id,
+                rmcp::object!({
+                    "params":params.clone(),"credential_file":file.to_str().unwrap(),
+                })
+            );
             assert_eq!(output["structuredContent"]["ok"], true);
-            assert!(output["structuredContent"]["result"].get("bearer").is_none());
+            assert!(
+                output["structuredContent"]["result"]
+                    .get("bearer")
+                    .is_none()
+            );
             let bytes = nw_platform::security::read_private(&file, 256).unwrap();
-            let bearer = String::from_utf8(bytes.clone()).unwrap_or_else(|_| panic!("Credential file encoding failure"));
+            let bearer = String::from_utf8(bytes.clone())
+                .unwrap_or_else(|_| panic!("Credential file encoding failure"));
             assert_eq!(bearer.len(), 64);
-            assert!(!output.to_string().contains(&bearer), "Credential value appeared in protocol output");
+            assert!(
+                !output.to_string().contains(&bearer),
+                "Credential value appeared in protocol output"
+            );
             let token_id = hex::encode(Sha256::digest(&bytes));
             assert_eq!(output["structuredContent"]["result"]["token_id"], token_id);
-            let collision = call!(owner, id, rmcp::object!({
-                "params":params,"credential_file":file.to_str().unwrap(),
-            }));
-            assert_eq!(collision["structuredContent"]["error"]["code"], "OUTPUT_COLLISION");
+            let collision = call!(
+                owner,
+                id,
+                rmcp::object!({
+                    "params":params,"credential_file":file.to_str().unwrap(),
+                })
+            );
+            assert_eq!(
+                collision["structuredContent"]["error"]["code"],
+                "OUTPUT_COLLISION"
+            );
             assert!(nw_platform::security::read_private(&file, 256).unwrap() == bytes);
             delivered.push((token_id, bearer));
         }
-        let queried: serde_json::Value = native.post(format!("{private_url}/api/v1/commands"))
-            .bearer_auth(&delivered[0].1).json(&nw_domain::commands::Request::query("commands.list", json!({})))
-            .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
-        assert_eq!(queried["ok"], true, "Delivered private credential did not authenticate");
+        let queried: serde_json::Value = native
+            .post(format!("{private_url}/api/v1/commands"))
+            .bearer_auth(&delivered[0].1)
+            .json(&nw_domain::commands::Request::query(
+                "commands.list",
+                json!({}),
+            ))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(
+            queried["ok"], true,
+            "Delivered private credential did not authenticate"
+        );
         let transport = rmcp::transport::StreamableHttpClientTransport::with_client(
-            reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).build().unwrap(),
+            reqwest::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
             rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig::with_uri(
                 format!("http://127.0.0.1:{public_port}/mcp"),
-            ).auth_header(&delivered[1].1),
+            )
+            .auth_header(&delivered[1].1),
         );
         let http = ().serve(transport).await.unwrap();
         let forbidden = root.join("http-must-not-create/token");
-        let refused = call!(http, "access.credentials.issue", rmcp::object!({
-            "params":{"profile":"agent"},"credential_file":forbidden.to_str().unwrap(),
-        }));
-        assert_eq!(refused["structuredContent"]["error"]["code"], "PERMISSION_DENIED");
+        let refused = call!(
+            http,
+            "access.credentials.issue",
+            rmcp::object!({
+                "params":{"profile":"agent"},"credential_file":forbidden.to_str().unwrap(),
+            })
+        );
+        assert_eq!(
+            refused["structuredContent"]["error"]["code"],
+            "PERMISSION_DENIED"
+        );
         assert!(!forbidden.parent().unwrap().exists());
         http.cancel().await.unwrap();
-        let scope = call!(owner, "access.replay_scope.create", rmcp::object!({"params":{}}));
-        let scope = scope["structuredContent"]["result"]["replay_scope"].as_str().unwrap();
+        let scope = call!(
+            owner,
+            "access.replay_scope.create",
+            rmcp::object!({"params":{}})
+        );
+        let scope = scope["structuredContent"]["result"]["replay_scope"]
+            .as_str()
+            .unwrap();
         for (token_id, _) in delivered {
-            let revoked = call!(owner, "access.tokens.revoke", rmcp::object!({
-                "params":{"token_id":token_id},"context":{
-                    "replay_scope":scope,"idempotency_key":uuid::Uuid::new_v4().to_string(),
-                },
-            }));
-            assert_eq!(revoked["structuredContent"]["ok"], true, "Delivered credential was not actually revocable");
+            let revoked = call!(
+                owner,
+                "access.tokens.revoke",
+                rmcp::object!({
+                    "params":{"token_id":token_id},"context":{
+                        "replay_scope":scope,"idempotency_key":uuid::Uuid::new_v4().to_string(),
+                    },
+                })
+            );
+            assert_eq!(
+                revoked["structuredContent"]["ok"], true,
+                "Delivered credential was not actually revocable"
+            );
         }
         owner.cancel().await.unwrap();
-    }).await.expect("Native owner credential file controls exceeded their40-second bound");
+    })
+    .await
+    .expect("Native owner credential file controls exceeded their40-second bound");
 }
 
 async fn native_owner_mcp_query(
@@ -213,34 +306,79 @@ async fn native_owner_mcp_query(
 ) -> serde_json::Value {
     tokio::time::timeout(std::time::Duration::from_secs(40), async {
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
-        command.arg("--data-dir").arg(root).args(["bridge", "--native-owner"]).kill_on_drop(true);
+        command
+            .arg("--data-dir")
+            .arg(root)
+            .args(["bridge", "--native-owner"])
+            .kill_on_drop(true);
         let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
-        let result = client.call_tool(
-            CallToolRequestParams::new(id.to_owned()).with_arguments(rmcp::object!({"params":params})),
-        ).await.unwrap();
+        let result = client
+            .call_tool(
+                CallToolRequestParams::new(id.to_owned())
+                    .with_arguments(rmcp::object!({"params":params})),
+            )
+            .await
+            .unwrap();
         let result = serde_json::to_value(result).unwrap()["structuredContent"].clone();
-        assert!(result.is_object(), "Native owner MCP must return a canonical Response");
+        assert!(
+            result.is_object(),
+            "Native owner MCP must return a canonical Response"
+        );
         client.cancel().await.unwrap();
         result
-    }).await.expect("Native owner SDK query exceeded its40-second fixture bound")
+    })
+    .await
+    .expect("Native owner SDK query exceeded its40-second fixture bound")
 }
 
 async fn reject_ambiguous_owner_bridge() {
     for (case, args) in [
-        ("http", vec!["bridge", "--native-owner", "--transport", "http"]),
-        ("profile-before-bridge", vec!["--access-profile", "agent", "bridge", "--native-owner"]),
-        ("profile-after-bridge", vec!["bridge", "--native-owner", "--access-profile", "agent"]),
-        ("token-file", vec!["bridge", "--native-owner", "--token-file", "must-not-use-a-token"]),
+        (
+            "http",
+            vec!["bridge", "--native-owner", "--transport", "http"],
+        ),
+        (
+            "profile-before-bridge",
+            vec!["--access-profile", "agent", "bridge", "--native-owner"],
+        ),
+        (
+            "profile-after-bridge",
+            vec!["bridge", "--native-owner", "--access-profile", "agent"],
+        ),
+        (
+            "token-file",
+            vec![
+                "bridge",
+                "--native-owner",
+                "--token-file",
+                "must-not-use-a-token",
+            ],
+        ),
     ] {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("must-not-bootstrap");
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
-        command.arg("--data-dir").arg(&root).args(args).kill_on_drop(true);
+        command
+            .arg("--data-dir")
+            .arg(&root)
+            .args(args)
+            .kill_on_drop(true);
         let output = tokio::time::timeout(std::time::Duration::from_secs(5), command.output())
-            .await.unwrap().unwrap();
-        assert!(!output.status.success(), "Rejected bridge configuration succeeded: {case}");
-        assert!(output.stdout.is_empty(), "Rejected bridge configuration polluted protocol stdout: {case}");
-        assert!(!root.exists(), "Rejected bridge configuration must not initialize or attach an owner: {case}");
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "Rejected bridge configuration succeeded: {case}"
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "Rejected bridge configuration polluted protocol stdout: {case}"
+        );
+        assert!(
+            !root.exists(),
+            "Rejected bridge configuration must not initialize or attach an owner: {case}"
+        );
     }
 }
 

@@ -200,20 +200,23 @@ pub async fn run(client: &NativeClient, command: AccessCommand) -> Result<()> {
                 out,
                 port,
             } => {
-                let issued = credential_file::deliver(client, &Request::query(
+                let issued = credential_file::deliver(
+                    client,
+                    &Request::query(
                         "access.tokens.issue",
                         json!({"for_access_profile":for_access_profile,"port":port}),
-                    ), &out, &tokio_util::sync::CancellationToken::new()).await?;
+                    ),
+                    &out,
+                    &tokio_util::sync::CancellationToken::new(),
+                )
+                .await?;
                 if !issued.ok {
                     return print_checked(issued);
                 }
                 let result = issued
                     .result
                     .context("Issued credential metadata is missing")?;
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&result)?
-                );
+                println!("{}", serde_json::to_string_pretty(&result)?);
                 Ok(())
             }
         },

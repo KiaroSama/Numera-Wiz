@@ -29,9 +29,13 @@ impl Bridge {
         context: &RequestContext<RoleServer>,
     ) -> Result<commands::Response, ErrorData> {
         if crate::access::credential_file::is_issue(&canonical.command.id) {
-            return Ok(commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
-                "VALIDATION_ERROR", "Credential issuance requires protected credential_file delivery",
-            )));
+            return Ok(commands::Response::error(
+                &canonical.request_id,
+                nw_domain::DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Credential issuance requires protected credential_file delivery",
+                ),
+            ));
         }
         match &self.backend {
             Backend::Native(client) => {
@@ -93,7 +97,9 @@ fn tool(name: &str) -> Option<Tool> {
             "type":"string","minLength":1,"maxLength":32767,
             "description":"Absolute local protected output file; explicit native-owner stdio only; no overwrite"
         });
-        schema["required"].as_array_mut()?.push(serde_json::json!("credential_file"));
+        schema["required"]
+            .as_array_mut()?
+            .push(serde_json::json!("credential_file"));
     }
     let mut tool = Tool::new(
         descriptor.id,
@@ -276,32 +282,53 @@ impl ServerHandler for Bridge {
         canonical.idempotency_key = metadata.idempotency_key;
         let issuance = crate::access::credential_file::is_issue(&canonical.command.id);
         if credential_file.is_some() && !issuance {
-            return Err(ErrorData::invalid_params("credential_file is only valid for credential issuance", None));
+            return Err(ErrorData::invalid_params(
+                "credential_file is only valid for credential issuance",
+                None,
+            ));
         }
         let response = if issuance {
             match &self.backend {
-                Backend::Native(client) if client.profile.is_none() && context.ct.is_cancelled() => {
-                    commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
-                        "CANCELLED", "Credential delivery cancelled before issuance",
-                    ))
+                Backend::Native(client)
+                    if client.profile.is_none() && context.ct.is_cancelled() =>
+                {
+                    commands::Response::error(
+                        &canonical.request_id,
+                        nw_domain::DomainError::new(
+                            "CANCELLED",
+                            "Credential delivery cancelled before issuance",
+                        ),
+                    )
                 }
                 Backend::Native(client) if client.profile.is_none() => {
-                    let path = credential_file.as_ref().and_then(serde_json::Value::as_str)
-                        .filter(|path| !path.is_empty() && path.chars().take(32768).count() <= 32767)
+                    let path = credential_file
+                        .as_ref()
+                        .and_then(serde_json::Value::as_str)
+                        .filter(|path| {
+                            !path.is_empty() && path.chars().take(32768).count() <= 32767
+                        })
                         .map(std::path::Path::new)
                         .filter(|path| path.is_absolute());
                     if let Some(path) = path {
                         crate::access::credential_file::deliver(client, &canonical, path, &context.ct).await
                             .map_err(|_| ErrorData::internal_error("Protected credential file delivery failed; no credential value returned", None))?
                     } else {
-                        commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
-                            "VALIDATION_ERROR", "Choose an explicit absolute credential_file; raw credentials are never returned",
-                        ))
+                        commands::Response::error(
+                            &canonical.request_id,
+                            nw_domain::DomainError::new(
+                                "VALIDATION_ERROR",
+                                "Choose an explicit absolute credential_file; raw credentials are never returned",
+                            ),
+                        )
                     }
                 }
-                _ => commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
-                    "PERMISSION_DENIED", "Credential file delivery requires explicit native-owner stdio",
-                )),
+                _ => commands::Response::error(
+                    &canonical.request_id,
+                    nw_domain::DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Credential file delivery requires explicit native-owner stdio",
+                    ),
+                ),
             }
         } else {
             self.execute(canonical, &context).await?
