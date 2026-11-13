@@ -409,7 +409,9 @@ mod tests {
                     .push(json!("media_execution.v1")),
                 19 => copy["estimated_additional_bytes"] = json!("01"),
                 20 => {
-                    copy.as_object_mut().unwrap().remove("estimated_additional_bytes");
+                    copy.as_object_mut()
+                        .unwrap()
+                        .remove("estimated_additional_bytes");
                 }
                 _ => unreachable!(),
             }
