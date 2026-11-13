@@ -82,10 +82,10 @@ macro_rules! project_sdk {
 }
 #[path = "support/lost_ack.rs"]
 mod lost_ack;
-#[path = "support/project_topology.rs"]
-mod project_topology;
 #[path = "support/project_render.rs"]
 mod project_render;
+#[path = "support/project_topology.rs"]
+mod project_topology;
 
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
@@ -1614,7 +1614,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     server.kill().await.unwrap();
     server.wait().await.unwrap();
     lost_ack::verify(&media, None).await;
-    tokio::time::timeout(Duration::from_secs(40), project_render::review(&cli, &scope))
-        .await
-        .expect("Whole finite compiler review exceeded 40 seconds");
+    tokio::time::timeout(
+        Duration::from_secs(40),
+        project_render::review(&cli, &scope),
+    )
+    .await
+    .expect("Whole finite compiler review exceeded 40 seconds");
 }
