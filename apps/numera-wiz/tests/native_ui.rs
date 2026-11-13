@@ -227,7 +227,7 @@ async fn journey() {
     assert_eq!(asset["probe"]["streams"].as_array().unwrap().len(), 3);
     tokio::time::sleep(Duration::from_millis(500)).await;
     screenshot(&window, &evidence.join("native-loaded-workspace.png")).await;
-    click(&window, "331", "591").await;
+    click(&window, "331", "625").await;
     let started = Instant::now();
     let report_event = loop {
         let log = std::fs::read_to_string(root.join("logs/owner.jsonl")).unwrap();
