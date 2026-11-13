@@ -26,6 +26,8 @@ use tokio::{
 
 #[path = "project_compatibility/linked.rs"]
 mod linked;
+#[path = "project_compatibility/media_lifecycle.rs"]
+mod media_lifecycle;
 
 const RECORDS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("versioned_records");
 const MAX_BODY: usize = 2 * 1024 * 1024;
@@ -731,24 +733,24 @@ fn record_snapshot(
 }
 fn closed(root: &Path, name: &str, evidence: &Evidence) -> Result<Snapshot> {
     let lease = RootLease::acquire(root)?;
-    let selection = lease.selection()?;
-    let path = fs::canonicalize(lease.path(&selection)?)?;
-    ensure!(
-        path.starts_with(root),
-        "Selected generation escaped fixture root"
-    );
-    // LegacyOne has no retained legacy guard. With a workspace selected,
-    // RootLease already owns generation1; this lock is only the selected target.
-    let _selected_lock = RootLock::acquire(&path)?;
-    let snapshot = raw_locked(&path, selection.activation_id)?;
-    if let Some(version) = selection.store_version {
-        ensure!(
-            snapshot.facts.store_version == version,
-            "Selected raw schema differs from activation"
-        );
-    }
-    record_snapshot(name, &snapshot, &path, evidence)?;
-    Ok(snapshot)
+    lease.with_selected_generation_read(|path, selection| {
+        let observed = || -> Result<Snapshot> {
+            ensure!(
+                path.starts_with(root),
+                "Selected generation escaped fixture root"
+            );
+            let snapshot = raw_locked(path, selection.activation_id.clone())?;
+            if let Some(version) = selection.store_version {
+                ensure!(
+                    snapshot.facts.store_version == version,
+                    "Selected raw schema differs from activation"
+                );
+            }
+            record_snapshot(name, &snapshot, path, evidence)?;
+            Ok(snapshot)
+        };
+        observed().map_err(nw_platform::files::io_error)
+    }).map_err(anyhow::Error::from)
 }
 fn preserved(
     original: &Snapshot,
@@ -1811,6 +1813,19 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         "Every controlled owner must establish a new epoch"
     );
     evidence.record(json!({"phase":"complete","status":"passed","mode":"additive-preservation","owner_epochs":epochs.len(),"root_id":root_id,"project_id":project.id,"final_revision":"6","migration_id":migration_id,"fixture_version":2,"variant":"public-group-only","linked_fixture":linked_project.completion(),"base_project_namespaces_required_nonempty":POPULATED_PROJECT_NAMESPACES,"project_namespaces_required_nonempty":linked::combined_namespaces(),"project_dependency_rows":final_raw.facts.namespaces.get("project-dependency").copied().unwrap_or(0),"unlinked_project_dependency_rows":0,"linked_project_dependency_rows":2,"nonempty_group_dependency_preservation":"passed","mixed_av_preservation":"unqualified","semantic_input_dependency_preservation":"unqualified","legacy_v1":"shape/echo plus independently frozen digest and exact raw preservation","legacy_v2":"actual decoder acceptance plus independently frozen semantic digest and exact raw preservation","registered_media":false}))?;
+    evidence.record(json!({"phase":"media-package-started","status":"running",
+        "original_seven_epoch_assertions_completed":true,"same_600_second_aggregate":true}))?;
+    media_lifecycle::run(media_lifecycle::Journey {
+        configuration: &configuration,
+        root: &root,
+        epochs: &mut epochs,
+        root_id: &mut root_id,
+        evidence,
+        scope: &scope,
+        old_profile: (&original, &accepted),
+        migration: (&migration_request, &migration_accepted),
+        before: &final_raw,
+    }).await?;
     Ok(())
 }
 pub async fn run() {

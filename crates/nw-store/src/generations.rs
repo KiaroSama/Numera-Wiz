@@ -78,7 +78,7 @@ pub struct Activation {
     pub required_capabilities: Vec<String>,
     pub previous_sha256: Option<String>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
     pub generation: u32,
     pub store_version: Option<u32>,
@@ -404,6 +404,43 @@ impl RootLease {
     pub fn path(&self, selection: &Selection) -> Result<PathBuf> {
         self.revalidate()?;
         location_path(&self.root, &selection.location)
+    }
+    /// Observe the actual selected closed generation under the same lock registry
+    /// used by recovery and Store attachment. This never opens a writable database
+    /// or initializes a missing generation. The observer must not reenter an
+    /// attachment/registry operation while its selected guard is retained here.
+    pub fn with_selected_generation_read<T>(
+        &self,
+        observe: impl FnOnce(&Path, &Selection) -> Result<T>,
+    ) -> Result<T> {
+        let selected = self.selection()?;
+        let path = std::fs::canonicalize(self.path(&selected)?).map_err(storage)?;
+        if !path.starts_with(&self.state) {
+            return Err(invalid("Selected generation is outside the stable root"));
+        }
+        let directory = DirectoryStamp::capture_resolved(&path)?;
+        let source = files::SourceStamp::capture_resolved(&path.join("store.redb"))?;
+        let mut guards = self.historical_guards.lock().map_err(storage)?;
+        if !guards.iter().any(|(held, _)| held == &path) {
+            guards.push((path.clone(), RootLock::acquire(&path)?));
+        }
+        // Keep the registry mutex and original selected guard throughout the
+        // observation; concurrent attachment cannot transfer it out underneath us.
+        directory.revalidate()?;
+        source.revalidate()?;
+        let facts = versions::inspect_closed(&path)?;
+        if selected.root_id.as_ref().is_some_and(|id| id != &facts.root_id)
+            || selected.store_version.is_some_and(|version| version != facts.store_version)
+        {
+            return Err(invalid("Observed generation differs from its activation envelope"));
+        }
+        let result = observe(&path, &selected);
+        source.revalidate()?;
+        directory.revalidate()?;
+        if self.selection()? != selected {
+            return Err(invalid("Selected generation changed during observation"));
+        }
+        result
     }
     pub fn inspect_selected(&self) -> Result<GenerationFacts> {
         let selection = self.selection()?;
@@ -778,6 +815,35 @@ mod tests {
         assert_eq!(RootLock::acquire(&target).err().unwrap().code, "OWNER_BUSY");
         store.close_generation(&lease).unwrap();
         store.reopen_current_generation(&lease).unwrap();
+        let mut observed_while_writing = false;
+        let refused = lease.with_selected_generation_read(|_, _| {
+            observed_while_writing = true;
+            Ok(())
+        });
+        assert_eq!(refused.unwrap_err().code, "OWNER_BUSY");
+        assert!(!observed_while_writing);
+        drop(store);
+        for _ in 0..2 {
+            lease
+                .with_selected_generation_read(|path, selected| {
+                    assert_eq!(path, target);
+                    assert_eq!(selected.generation, 3);
+                    assert_eq!(RootLock::acquire(path).err().unwrap().code, "OWNER_BUSY");
+                    assert_eq!(versions::inspect_closed(path)?.root_id, root_id);
+                    Ok(())
+                })
+                .unwrap();
+        }
+        // The read observer retains the same guard; normal attachment must take
+        // that guard from the registry rather than acquire a duplicate lock.
+        let reopened = Store::open_selected(&lease).unwrap();
+        assert_eq!(
+            reopened
+                .get::<serde_json::Value>("unit/preserved")
+                .unwrap()
+                .unwrap()["value"],
+            "9007199254740993"
+        );
     }
     #[test]
     fn a_copy_with_the_same_root_uuid_but_another_replay_key_cannot_activate() {
