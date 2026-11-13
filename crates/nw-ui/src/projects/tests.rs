@@ -1784,7 +1784,13 @@ fn clip_group_selection_and_requests() {
     assert_ne!(Some(inspected), clip.link_group_id.as_deref());
     // Invalid controller captures must never guess another payload identity or
     // send a request. Production capture publication already checks correlation.
-    for invalid in ["missing id", "invalid id", "missing payload", "sequence", "track"] {
+    for invalid in [
+        "missing id",
+        "invalid id",
+        "missing payload",
+        "sequence",
+        "track",
+    ] {
         let captured = app.projects.group.as_ref().unwrap().clone();
         let group = Arc::make_mut(app.projects.group.as_mut().unwrap());
         match invalid {
