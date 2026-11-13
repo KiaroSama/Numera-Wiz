@@ -1,13 +1,13 @@
 //! OS-enforced protection is established before credentials are written.
 use crate::files::{diagnostic_io_error, io_error};
 use nw_domain::{DomainError, Result};
+#[cfg(all(test, windows))]
+use std::process::Command;
 use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
 };
-#[cfg(all(test, windows))]
-use std::process::Command;
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
@@ -55,9 +55,7 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let uid = rustix::process::geteuid().as_raw();
-        if metadata.uid() != uid
-            || metadata.permissions().mode() & 0o077 != 0
-        {
+        if metadata.uid() != uid || metadata.permissions().mode() & 0o077 != 0 {
             return Err(denied(
                 "Directory must belong to the current user and exclude group/other access; choose a protected data root",
             ));
