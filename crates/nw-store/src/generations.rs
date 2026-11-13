@@ -373,13 +373,18 @@ impl RootLease {
     pub(crate) fn compatible_prefix(&self) -> Result<CompatiblePrefix> {
         self.revalidate()?;
         let history = activations(&self.root)?;
-        let (last, _) = history.last().ok_or_else(|| invalid(
-            "Promotion requires a genuine nonempty compatible activation prefix",
-        ))?;
-        if history.iter().any(|(record, _)| record.required_capabilities.iter()
-            .any(|capability| !CURRENT_CAPABILITIES.contains(&capability.as_str())))
-        {
-            return Err(invalid("The complete prefix must be readable by the legacy reader"));
+        let (last, _) = history.last().ok_or_else(|| {
+            invalid("Promotion requires a genuine nonempty compatible activation prefix")
+        })?;
+        if history.iter().any(|(record, _)| {
+            record
+                .required_capabilities
+                .iter()
+                .any(|capability| !CURRENT_CAPABILITIES.contains(&capability.as_str()))
+        }) {
+            return Err(invalid(
+                "The complete prefix must be readable by the legacy reader",
+            ));
         }
         let mut hash = Sha256::new();
         hash.update(b"NumeraWiz.CompatibleActivationPrefix.v1\0");

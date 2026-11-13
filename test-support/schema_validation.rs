@@ -40,7 +40,10 @@ impl Batch {
         Self::for_schemas(suite, expected, schemas)
     }
     pub fn for_schemas(suite: u16, expected: &[u16], schemas: Vec<Value>) -> Self {
-        assert!(!schemas.is_empty() && schemas.len() <= 64, "SCHEMA_DOCUMENT_COUNT");
+        assert!(
+            !schemas.is_empty() && schemas.len() <= 64,
+            "SCHEMA_DOCUMENT_COUNT"
+        );
         assert_eq!(
             expected.iter().copied().collect::<BTreeSet<_>>().len(),
             expected.len(),

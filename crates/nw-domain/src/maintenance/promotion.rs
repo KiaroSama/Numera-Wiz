@@ -97,14 +97,26 @@ impl GenerationPromotionPlan {
         {
             return Err(invalid());
         }
-        let source_caps: std::collections::BTreeSet<_> =
-            self.source_capabilities.iter().map(String::as_str).collect();
-        let target_caps: std::collections::BTreeSet<_> =
-            self.required_capabilities.iter().map(String::as_str).collect();
+        let source_caps: std::collections::BTreeSet<_> = self
+            .source_capabilities
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let target_caps: std::collections::BTreeSet<_> = self
+            .required_capabilities
+            .iter()
+            .map(String::as_str)
+            .collect();
         if self.schema_version != 1
-            || [&self.id, &self.root_id, &self.source_activation_id,
-                &self.source_guard.migration_id, &self.source_guard.activation_id]
-                .into_iter().any(|id| uuid_text(id).is_err())
+            || [
+                &self.id,
+                &self.root_id,
+                &self.source_activation_id,
+                &self.source_guard.migration_id,
+                &self.source_guard.activation_id,
+            ]
+            .into_iter()
+            .any(|id| uuid_text(id).is_err())
             || self.source_generation == 0
             || self.source_generation > MAX_GENERATIONS
             || self.rollback_generation != self.source_generation.checked_add(1).unwrap_or(0)
@@ -124,12 +136,18 @@ impl GenerationPromotionPlan {
             || !(1..=49000).contains(&self.source_records)
             || source_caps.len() != self.source_capabilities.len()
             || !source_caps.contains("adoption_guard.v1")
-            || !source_caps.iter().all(|value| MEDIA_V1_CAPABILITIES[..7].contains(value))
+            || !source_caps
+                .iter()
+                .all(|value| MEDIA_V1_CAPABILITIES[..7].contains(value))
             || target_caps.len() != self.required_capabilities.len()
             || target_caps != MEDIA_V1_CAPABILITIES.iter().copied().collect()
             || !exact_u64(&self.created_at)
             || !exact_u64(&self.expires_at)
-            || self.created_at.parse::<u64>().ok().and_then(|now| now.checked_add(300))
+            || self
+                .created_at
+                .parse::<u64>()
+                .ok()
+                .and_then(|now| now.checked_add(300))
                 != self.expires_at.parse::<u64>().ok()
         {
             return Err(invalid());
@@ -143,7 +161,10 @@ impl GenerationPromotionPlan {
         semantic.required_capabilities.sort();
         let encoded = serde_json::to_vec(&semantic).map_err(|_| invalid())?;
         if encoded.len() > 32768 {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Promotion review exceeds32KiB"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Promotion review exceeds32KiB",
+            ));
         }
         let mut hash = Sha256::new();
         hash.update(b"NumeraWiz.GenerationPromotionPlan.v1\0");
@@ -159,12 +180,15 @@ impl GenerationPromotionPlan {
 }
 
 pub fn result_schema() -> serde_json::Value {
-    let mut schema = serde_json::to_value(schemars::schema_for!(GenerationPromotionPlan)).expect("schema");
+    let mut schema =
+        serde_json::to_value(schemars::schema_for!(GenerationPromotionPlan)).expect("schema");
     let fields = &mut schema["properties"];
     assert!(fields.is_object(), "promotion schema fields");
     for (name, minimum, maximum) in [
-        ("source_generation", 1, 16), ("rollback_generation", 2, 16),
-        ("target_generation", 3, 16), ("source_activation_sequence", 1, 64),
+        ("source_generation", 1, 16),
+        ("rollback_generation", 2, 16),
+        ("target_generation", 3, 16),
+        ("source_activation_sequence", 1, 64),
         ("source_records", 1, 49000),
     ] {
         fields[name]["minimum"] = serde_json::json!(minimum);

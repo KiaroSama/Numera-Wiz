@@ -23,8 +23,8 @@ pub mod generations;
 mod live;
 pub mod migrations;
 mod profiles;
-mod promotions;
 pub mod projects;
+mod promotions;
 mod records;
 pub mod versions;
 fn storage(error: impl std::fmt::Display) -> DomainError {

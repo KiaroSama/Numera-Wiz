@@ -2,10 +2,13 @@
 use crate::{Store, adoption::Guard, copies, generations::RootLease, storage};
 use nw_domain::{
     DomainError, Result,
-    maintenance::{MigrationPhase, promotion::{
-        GenerationPromotionPlan, MEDIA_V1_CAPABILITIES, PromotionKind,
-        RollbackCondition, SourceGuard, TargetProfile,
-    }},
+    maintenance::{
+        MigrationPhase,
+        promotion::{
+            GenerationPromotionPlan, MEDIA_V1_CAPABILITIES, PromotionKind, RollbackCondition,
+            SourceGuard, TargetProfile,
+        },
+    },
 };
 
 fn invalid(message: &'static str) -> DomainError {
@@ -21,24 +24,34 @@ impl Store {
         clock: impl Fn() -> Result<u64>,
     ) -> Result<GenerationPromotionPlan> {
         if self.pending_migration()?.is_some() {
-            return Err(DomainError::new("OWNER_BUSY", "Accepted migration recovery must finish before promotion review"));
+            return Err(DomainError::new(
+                "OWNER_BUSY",
+                "Accepted migration recovery must finish before promotion review",
+            ));
         }
         if self.store_version()? != 3 {
-            return Err(invalid("Use the supported legacy schema2-to3 migration before this review"));
+            return Err(invalid(
+                "Use the supported legacy schema2-to3 migration before this review",
+            ));
         }
         let selection = lease.selection()?;
         let prefix = lease.compatible_prefix()?;
-        let guard: Guard = self.get("meta/rollback-guard")?
+        let guard: Guard = self
+            .get("meta/rollback-guard")?
             .ok_or_else(|| invalid("A missing adoption guard is unknown, never zero"))?;
         if guard.validate()? == 0 {
-            return Err(invalid("This review requires prior adoption; zero-adoption initialization remains in development"));
+            return Err(invalid(
+                "This review requires prior adoption; zero-adoption initialization remains in development",
+            ));
         }
         if selection.activation_id.as_deref() != Some(prefix.activation_id.as_str())
             || prefix.root_id != self.root_id()
             || guard.activation_id != prefix.activation_id
             || guard.migration_id != prefix.operation_id
         {
-            return Err(invalid("Source guard and selected compatible prefix provenance differ"));
+            return Err(invalid(
+                "Source guard and selected compatible prefix provenance differ",
+            ));
         }
         let migration = self.inspect_migration(&guard.migration_id)?;
         migration.plan.validate_hash()?;
@@ -50,28 +63,44 @@ impl Store {
             || migration.plan.target_generation != selection.generation
             || migration.activation_id.as_deref() != Some(prefix.activation_id.as_str())
         {
-            return Err(invalid("The original compatible migration is not a completed trusted ancestor"));
+            return Err(invalid(
+                "The original compatible migration is not a completed trusted ancestor",
+            ));
         }
         self.validate_migration_records()?;
         self.close_generation(lease)?;
         let result = (|| {
             let facts = lease.inspect_selected()?;
-            if facts.store_version != 3 || facts.root_id != self.root_id()
+            if facts.store_version != 3
+                || facts.root_id != self.root_id()
                 || facts.record_count > 49000
-                || facts.required_capabilities.iter().any(|capability|
-                    !crate::generations::CURRENT_CAPABILITIES.contains(&capability.as_str()))
+                || facts.required_capabilities.iter().any(|capability| {
+                    !crate::generations::CURRENT_CAPABILITIES.contains(&capability.as_str())
+                })
             {
-                return Err(invalid("Source floor, identity or raw record headroom is not eligible"));
+                return Err(invalid(
+                    "Source floor, identity or raw record headroom is not eligible",
+                ));
             }
-            let rollback_generation = selection.generation.checked_add(1)
+            let rollback_generation = selection
+                .generation
+                .checked_add(1)
                 .ok_or_else(|| invalid("Generation identity overflow"))?;
-            let target_generation = rollback_generation.checked_add(1)
+            let target_generation = rollback_generation
+                .checked_add(1)
                 .ok_or_else(|| invalid("Generation identity overflow"))?;
             if target_generation > nw_domain::maintenance::MAX_GENERATIONS {
-                return Err(DomainError::new("RESOURCE_LIMIT", "Promotion exceeds the existing generation limit"));
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Promotion exceeds the existing generation limit",
+                ));
             }
             // Two independent copies plus conservative COW headroom; no space is reserved.
-            copies::require_copy_space(lease.state(), facts.store_bytes.parse().map_err(storage)?, 3)?;
+            copies::require_copy_space(
+                lease.state(),
+                facts.store_bytes.parse().map_err(storage)?,
+                3,
+            )?;
             let now = clock()?;
             let mut plan = GenerationPromotionPlan {
                 schema_version: 1,
@@ -96,11 +125,17 @@ impl Store {
                 rollback_generation,
                 target_generation,
                 target_profile: TargetProfile::MediaV1,
-                required_capabilities: MEDIA_V1_CAPABILITIES.iter().map(|value| (*value).into()).collect(),
+                required_capabilities: MEDIA_V1_CAPABILITIES
+                    .iter()
+                    .map(|value| (*value).into())
+                    .collect(),
                 rollback_condition: RollbackCondition::StoppedRootRestorationBeforeAdoption,
                 application_build: application_build.into(),
                 created_at: now.to_string(),
-                expires_at: now.checked_add(300).ok_or_else(|| invalid("Review clock overflow"))?.to_string(),
+                expires_at: now
+                    .checked_add(300)
+                    .ok_or_else(|| invalid("Review clock overflow"))?
+                    .to_string(),
             };
             plan.hash = plan.digest()?;
             Ok(plan)
