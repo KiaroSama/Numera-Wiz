@@ -180,10 +180,86 @@ fn filesystem_cases() -> Result<()> {
         ensure!(written["complete_snapshot_lock"] == false && written["initial_inventory"][0] == "synthetic-base-row" && reasons.contains("synthetic original capture failure") && reasons.contains("synthetic finalization write failure"), "actual failed report preserves original context and finalization error");
         let available = evidence::parse_canonical(&fs::read(output.join("raw-manifest.json"))?)?;
         ensure!(available["raw_bytes"] == 4 && available["transport_files"] == 2, "published available manifest remains truthful after failure");
+        unknown_handoff_case(&owned.path, deadline)?;
         ensure!(Instant::now() < deadline, "tiny filesystem fixtures exceeded their HOST budget"); Ok(())
     })();
     let cleanup = owned.cleanup();
     result.with_context(|| format!("owned filesystem fixture cleanup: {cleanup:?}"))?; cleanup
+}
+
+fn unknown_handoff_case(owned: &Path, deadline: Instant) -> Result<()> {
+    let source = owned.join("unknown-source"); fs::create_dir(&source)?; fs::create_dir(source.join("raw"))?;
+    for (path, bytes) in [("raw/chunk-0000", b"a"), ("raw/chunk-0001", b"b"), ("raw/chunk-0002", b"b"), ("raw/chunk-0003", b"c")] {
+        evidence::write_new(&source.join(path), bytes, 1)?;
+    }
+    let known = |path: &str, bytes: &[u8]| -> Result<Value> { Ok(json!({"path":path,"bytes":bytes.len(),"sha256":fixture_hash(bytes)?})) };
+    let manifest = json!({"schema_version":1,"complete":false,"raw_files":3,"raw_bytes":4,"transport_files":4,"files":[
+        {"logical_path":"before-unknown","bytes":1,"sha256":fixture_hash(b"a")?,"capture_status":"complete","chunks":[known("raw/chunk-0000",b"a")?]},
+        {"logical_path":"with-unknown","bytes":2,"sha256":null,"expected_bytes":2,"expected_sha256":fixture_hash(b"bc")?,"capture_status":"incomplete","chunks":[known("raw/chunk-0001",b"b")?,{"path":"raw/chunk-0002","bytes":1,"sha256":null,"integrity":"UNKNOWN","reserved_upper_bound":true}]},
+        {"logical_path":"after-unknown","bytes":1,"sha256":fixture_hash(b"c")?,"capture_status":"complete","chunks":[known("raw/chunk-0003",b"c")?]}
+    ]});
+    let mut child = json!({"schema_version":1,"initial_inventory":["handoff-base-row"],"unresolved_reasons":[]});
+    let finalized = evidence::Finalized { manifest, errors: vec!["synthetic UNKNOWN finalization failure".into()] };
+    ensure!(super::inner::finish_capture(&source, &mut child, Err(anyhow::anyhow!("synthetic handoff capture failure")), finalized).is_err(), "UNKNOWN child report remains unsuccessful");
+    let inner_bytes = fs::read(source.join("report.json"))?; let manifest_bytes = fs::read(source.join("raw-manifest.json"))?;
+    let destination = owned.join("unknown-host"); fs::create_dir(&destination)?; fs::create_dir(destination.join("raw"))?;
+    let mut host = super::Host { output: destination.clone(), files: Vec::new(), total: 0, chunks: 0, deadline, diagnostic_failures: Vec::new(), sequence: 0 };
+    let mut report = json!({"complete_snapshot_lock":false}); let mut fetched = Vec::new();
+    let result = super::receive_raw_with(&mut host, &mut report, &inner_bytes, &manifest_bytes, |_, path| {
+        ensure!(path != "raw/chunk-0002", "UNKNOWN bytes must not be fetched as verified evidence");
+        fetched.push(path.to_string()); Ok(fs::read(source.join(path))?)
+    });
+    ensure!(result.is_err() && report["complete_snapshot_lock"] == false && report["metadata_capture"]["complete_snapshot_lock"] == false, "UNKNOWN handoff cannot become a successful lock");
+    let reasons = report["metadata_capture"]["unresolved_reasons"].to_string();
+    ensure!(reasons.contains("synthetic handoff capture failure") && reasons.contains("synthetic UNKNOWN finalization failure"), "handoff preserves child original and finalization errors");
+    ensure!(fetched == ["raw/chunk-0000", "raw/chunk-0001", "raw/chunk-0003"] && host.files[2]["capture_status"] == "incomplete" && host.files[3]["capture_status"] == "complete", "known prefix and valid later file are actually exported after UNKNOWN");
+    ensure!(host.files[2]["unexported_chunks"][0]["path"] == "raw/chunk-0002" && host.files[2]["unexported_chunks"][0]["sha256"].is_null() && host.files[2]["expected_sha256"].is_null(), "UNKNOWN source identity remains explicit and unexported");
+    // The first host row is the exact child manifest; audit payload rows with
+    // independent literal hashes, then reconcile the complete physical set.
+    let retained_manifest = &host.files[0]["chunks"][0];
+    ensure!(fs::read(destination.join(retained_manifest["path"].as_str().context("saved child manifest")?))? == manifest_bytes, "exact source manifest retained beside failed child report");
+    let mut expected_paths = std::collections::BTreeSet::new(); let mut retained_bytes = 0_u64;
+    for file in &host.files { for chunk in file["chunks"].as_array().context("handoff chunks")? {
+        let path = chunk["path"].as_str().context("handoff path")?; expected_paths.insert(path.to_string());
+        let bytes = fs::read(destination.join(path))?; retained_bytes += bytes.len() as u64;
+        ensure!(chunk["bytes"].as_u64() == Some(bytes.len() as u64), "handoff physical size matches manifest");
+        if path != retained_manifest["path"].as_str().context("source manifest path")? { ensure!(chunk["sha256"].as_str() == Some(fixture_hash(&bytes)?), "handoff fixed payload digest"); }
+    } }
+    let physical = fs::read_dir(destination.join("raw"))?.map(|entry| -> Result<String> { let entry = entry?; ensure!(entry.file_type()?.is_file(), "handoff regular physical file"); Ok(format!("raw/{}", entry.file_name().to_str().context("handoff filename")?)) }).collect::<Result<std::collections::BTreeSet<_>>>()?;
+    ensure!(physical == expected_paths && host.chunks == 4 && host.total == retained_bytes && retained_bytes == manifest_bytes.len() as u64 + 3, "all retained files and bytes reconciled after UNKNOWN handoff");
+    let report_path = destination.join("report"); fs::create_dir(&report_path)?;
+    let exported = json!({"schema_version":1,"encoding":"ordered_concatenation_of_sha256_checked_chunks","complete":false,"raw_bytes":host.total,"raw_files":host.files.len(),"transport_files":host.chunks,"files":host.files});
+    let exported_bytes = evidence::canonical(&exported)?;
+    report["raw_manifest"] = json!({"path":"raw-manifest.json","bytes":exported_bytes.len(),"sha256":metadata::digest(&exported_bytes)});
+    evidence::write_small(&report_path, &report, &exported)?;
+    let stored = evidence::parse_canonical(&fs::read(report_path.join("report.json"))?)?;
+    ensure!(stored["metadata_capture"] == child && stored["complete_snapshot_lock"] == false, "stored outer failed report preserves the exact child report and its errors");
+
+    for mode in ["invalid-unknown", "unsafe-unknown", "bad-known-digest", "no-known-prefix", "known-chunks-unknown-logical"] {
+        let mut declared = evidence::parse_canonical(&manifest_bytes)?;
+        match mode {
+            "invalid-unknown" => declared["files"][1]["chunks"][1]["reserved_upper_bound"] = json!(false),
+            "unsafe-unknown" => declared["files"][1]["chunks"][1]["path"] = json!("../escape"),
+            "no-known-prefix" => { declared["files"][1]["chunks"].as_array_mut().context("unknown chunks")?.remove(0); declared["files"][1]["bytes"] = json!(1); declared["raw_bytes"] = json!(3); declared["transport_files"] = json!(3); },
+            "known-chunks-unknown-logical" => { declared["files"][1]["chunks"].as_array_mut().context("known chunks")?.remove(1); declared["files"][1]["bytes"] = json!(1); declared["raw_bytes"] = json!(3); declared["transport_files"] = json!(3); },
+            _ => {},
+        }
+        let directory = owned.join(mode); fs::create_dir(&directory)?; fs::create_dir(directory.join("raw"))?;
+        let mut checked = super::Host { output: directory.clone(), files: Vec::new(), total: 0, chunks: 0, deadline, diagnostic_failures: Vec::new(), sequence: 0 };
+        let mut later = false;
+        let result = super::transfer_raw_with(&mut checked, &declared, |_, path| {
+            ensure!(matches!(path, "raw/chunk-0000" | "raw/chunk-0001" | "raw/chunk-0003"), "unsafe or UNKNOWN path must never be fetched");
+            if path == "raw/chunk-0003" { later = true; if mode == "bad-known-digest" { return Ok(b"a".to_vec()); } }
+            Ok(fs::read(source.join(path))?)
+        });
+        ensure!(result.is_err(), "failed or malformed source never produces successful transfer");
+        let supported = matches!(mode, "no-known-prefix" | "known-chunks-unknown-logical");
+        ensure!(later == (supported || mode == "bad-known-digest"), "malformed UNKNOWN rejects; supported UNKNOWN continues to later data");
+        let retained = if mode == "known-chunks-unknown-logical" { 3 } else { 2 };
+        ensure!(checked.total == retained && checked.chunks == retained as usize, "rejected data never enters physical accounting");
+        audit_files(&directory, &checked.files, retained, retained as usize)?;
+    }
+    Ok(())
 }
 
 fn tar_fixture() -> Vec<u8> {

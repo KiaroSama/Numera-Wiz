@@ -56,7 +56,7 @@ struct Host {
 }
 
 impl Host {
-    fn begin_file(&mut self, logical: &str, size: u64, hash: &str) -> Result<usize> {
+    fn begin_file(&mut self, logical: &str, size: u64, hash: Option<&str>) -> Result<usize> {
         ensure!(self.files.len() < 500, "host evidence file count exceeded");
         metadata::safe_path(logical)?;
         ensure!(!self.files.iter().any(|file| file["logical_path"].as_str().is_some_and(|path| path.eq_ignore_ascii_case(logical))), "duplicate host evidence path");
@@ -96,7 +96,7 @@ impl Host {
         row["capture_status"] = json!("complete"); Ok(())
     }
     fn record_with(&mut self, logical: &str, bytes: &[u8], mut writer: impl FnMut(&mut fs::File, &[u8]) -> std::io::Result<()>) -> Result<()> {
-        let index = self.begin_file(logical, bytes.len() as u64, &metadata::digest(bytes))?;
+        let index = self.begin_file(logical, bytes.len() as u64, Some(&metadata::digest(bytes)))?;
         let mut hash = Sha256::new();
         for bytes in bytes.chunks(evidence::CHUNK_LIMIT as usize) {
             let path = format!("raw/host-{:04}", self.sequence); self.sequence = self.sequence.checked_add(1).context("host filename sequence overflow")?;
@@ -273,12 +273,7 @@ fn capture(root: &Path, _config: &Value, nonce: &str, host: &mut Host, report: &
     // turn a partial inventory into a lock, and no package installation is run.
     let inner_bytes = host.copy_out(container, "report.json", evidence::SMALL_LIMIT)?;
     let manifest_bytes = host.copy_out(container, "raw-manifest.json", evidence::SMALL_LIMIT)?;
-    let inner_report = evidence::parse_canonical(&inner_bytes)?;
-    let manifest = evidence::parse_canonical(&manifest_bytes)?;
-    ensure!(inner_report["schema_version"] == 1 && inner_report["raw_manifest"]["sha256"].as_str() == Some(metadata::digest(&manifest_bytes).as_str()) && inner_report["raw_manifest"]["bytes"].as_u64() == Some(manifest_bytes.len() as u64), "inner raw manifest identity mismatch");
-    report["metadata_capture"] = inner_report;
-    host.record("host/container-raw-manifest.json", &manifest_bytes)?;
-    transfer_raw(host, container, &manifest)?;
+    receive_raw_with(host, report, &inner_bytes, &manifest_bytes, |host, path| host.copy_out(container, path, evidence::CHUNK_LIMIT))?;
     let run = run?; run.success()?;
     ensure!(report["metadata_capture"]["complete_snapshot_lock"] == true && report["metadata_capture"]["unresolved_reasons"].as_array().is_some_and(Vec::is_empty), "container capture has unresolved required evidence");
     if report["metadata_capture"]["trust"]["tls"]["input"]["provenance"] == "host_actual_/etc/ssl/certs/ca-certificates.crt_transport_only_not_archive_signing_trust" {
@@ -289,8 +284,13 @@ fn capture(root: &Path, _config: &Value, nonce: &str, host: &mut Host, report: &
     Ok(())
 }
 
-fn transfer_raw(host: &mut Host, container: &str, manifest: &Value) -> Result<()> {
-    transfer_raw_with(host, manifest, |host, path| host.copy_out(container, path, evidence::CHUNK_LIMIT))
+fn receive_raw_with(host: &mut Host, report: &mut Value, inner_bytes: &[u8], manifest_bytes: &[u8], fetch: impl FnMut(&mut Host, &str) -> Result<Vec<u8>>) -> Result<()> {
+    let inner_report = evidence::parse_canonical(inner_bytes)?;
+    let manifest = evidence::parse_canonical(manifest_bytes)?;
+    ensure!(inner_report["schema_version"] == 1 && inner_report["raw_manifest"]["sha256"].as_str() == Some(metadata::digest(manifest_bytes).as_str()) && inner_report["raw_manifest"]["bytes"].as_u64() == Some(manifest_bytes.len() as u64), "inner raw manifest identity mismatch");
+    report["metadata_capture"] = inner_report;
+    host.record("host/container-raw-manifest.json", manifest_bytes)?;
+    transfer_raw_with(host, &manifest, fetch)
 }
 
 fn transfer_raw_with(host: &mut Host, manifest: &Value, mut fetch: impl FnMut(&mut Host, &str) -> Result<Vec<u8>>) -> Result<()> {
@@ -299,37 +299,65 @@ fn transfer_raw_with(host: &mut Host, manifest: &Value, mut fetch: impl FnMut(&m
     let mut seen = BTreeSet::new();
     for file in &host.files { metadata::unique_path(&mut seen, file["logical_path"].as_str().context("host logical path")?)?; }
     let mut chunks_seen = BTreeSet::new(); let mut raw_total = 0_u64; let mut physical = 0_u64;
+    let mut incomplete = manifest["complete"] == false;
     for entry in files {
         ensure!(Instant::now() < host.deadline, "raw transfer deadline exhausted");
         let logical = entry["logical_path"].as_str().context("raw logical path")?; metadata::unique_path(&mut seen, logical)?;
         let expected_size = entry["bytes"].as_u64().context("raw size")?; ensure!(expected_size <= process::FILE_LIMIT, "raw file exceeds 128MiB");
-        process::check_count(host.total, expected_size, evidence::RAW_LIMIT)?;
-        let expected_hash = entry["sha256"].as_str().context("raw SHA256")?; metadata::sha256(expected_hash)?;
-        let index = host.begin_file(logical, expected_size, expected_hash)?;
+        let expected_hash = match entry.get("sha256") {
+            Some(Value::String(hash)) => { metadata::sha256(hash)?; Some(hash.as_str()) },
+            Some(Value::Null) => {
+                ensure!(manifest["complete"] == false && entry["capture_status"] == "incomplete", "UNKNOWN identity requires an explicitly failed manifest and logical entry");
+                ensure!(entry["expected_bytes"].as_u64().is_some_and(|size| size >= expected_size && size <= process::FILE_LIMIT), "UNKNOWN original size bound");
+                metadata::sha256(entry["expected_sha256"].as_str().context("UNKNOWN original SHA256")?)?; None
+            },
+            _ => bail!("raw SHA256 missing or invalid"),
+        };
+        let chunks = entry["chunks"].as_array().context("raw chunks")?;
+        ensure!(chunks.len() <= 500, "raw chunk count exceeded");
+        // UNKNOWN source bytes are never host files. Admit only the declared
+        // independently verifiable portion, with per-chunk checks again below.
+        let admission = if expected_hash.is_some() { expected_size } else {
+            chunks.iter().filter(|chunk| chunk["sha256"].is_string()).try_fold(0_u64, |total, chunk| process::check_count(total, chunk["bytes"].as_u64().context("known chunk size")?, expected_size))?
+        };
+        let index = host.begin_file(logical, admission, expected_hash)?;
+        host.files[index]["source_manifest_bytes"] = json!(expected_size);
+        if expected_hash.is_none() { host.files[index]["source_integrity"] = json!("UNKNOWN"); incomplete = true; }
         host.files[index]["source_expected_bytes"] = entry.get("expected_bytes").unwrap_or(&entry["bytes"]).clone();
         host.files[index]["source_expected_sha256"] = entry.get("expected_sha256").unwrap_or(&entry["sha256"]).clone();
-        let mut hash = Sha256::new(); let mut size = 0;
-        for chunk in entry["chunks"].as_array().context("raw chunks")? {
+        let mut hash = Sha256::new(); let mut size = 0; let mut unknown = Vec::new();
+        for chunk in chunks {
             let path = chunk["path"].as_str().context("raw chunk path")?; metadata::unique_path(&mut chunks_seen, path)?;
             let tail = path.strip_prefix("raw/chunk-").context("unexpected raw chunk namespace")?;
             ensure!(tail.len() == 4 && tail.bytes().all(|b| b.is_ascii_digit()), "unexpected raw chunk name");
             physical = physical.checked_add(1).context("chunk count overflow")?; ensure!(physical <= 500, "raw transport file count exceeded");
-            ensure!(host.chunks < 500, "combined transport file count exceeded");
             let chunk_size = chunk["bytes"].as_u64().context("chunk size")?;
             ensure!(chunk_size <= evidence::CHUNK_LIMIT, "invalid chunk byte bound");
             let next_size = process::check_count(size, chunk_size, expected_size)?;
+            if chunk.get("sha256") == Some(&Value::Null) {
+                ensure!(expected_hash.is_none() && chunk["integrity"] == "UNKNOWN" && chunk["reserved_upper_bound"] == true, "unsupported UNKNOWN chunk representation");
+                let mut skipped = chunk.clone(); skipped["export_status"] = json!("not_exported_source_identity_UNKNOWN"); unknown.push(skipped);
+                host.files[index]["unexported_chunks"] = json!(&unknown);
+                size = next_size; incomplete = true; continue;
+            }
+            let chunk_hash = chunk["sha256"].as_str().context("chunk hash")?; metadata::sha256(chunk_hash)?;
+            ensure!(host.chunks < 500, "combined transport file count exceeded");
             process::check_count(host.total, chunk_size, evidence::RAW_LIMIT)?;
             let bytes = fetch(host, path)?;
-            metadata::check_bytes(&bytes, chunk_size, chunk["sha256"].as_str().context("chunk hash")?)?;
+            metadata::check_bytes(&bytes, chunk_size, chunk_hash)?;
             host.append_chunk_with(index, path, &bytes, &mut hash, |file, bytes| file.write_all(bytes))?;
             size = next_size;
         }
-        ensure!(size == expected_size && hex::encode(hash.finalize()) == expected_hash, "complete raw file hash/size mismatch");
+        ensure!(size == expected_size, "raw file declared chunk size mismatch");
         raw_total = process::check_count(raw_total, size, evidence::RAW_LIMIT)?;
-        host.complete_file(index)?;
-        if entry["capture_status"] == "incomplete" { host.files[index]["capture_status"] = json!("incomplete"); }
+        if let Some(expected_hash) = expected_hash {
+            ensure!(hex::encode(hash.finalize()) == expected_hash, "complete raw file hash mismatch");
+            host.complete_file(index)?;
+        }
+        if entry["capture_status"] == "incomplete" { host.files[index]["capture_status"] = json!("incomplete"); incomplete = true; }
     }
     ensure!(manifest["raw_bytes"].as_u64() == Some(raw_total) && manifest["transport_files"].as_u64() == Some(physical), "raw manifest aggregate mismatch");
+    ensure!(!incomplete, "raw source manifest incomplete; available verified chunks retained, UNKNOWN portions explicitly unexported");
     Ok(())
 }
 
