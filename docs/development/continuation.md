@@ -10,33 +10,41 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## November 13 current candidate and hosted boundary
 
-[CI289](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43459116857),
-source `617d9b4fef258d63865e09d8a64d3b4d0669334e`, is terminal: nine passing
-jobs and four failures, with no skips or cancellations. Gitleaks 153 passes.
-All four desktop builds, platform/service suites and lints pass; both macOS
-native checks pass completely. The exact hosted eframe 0.37 lock also passes,
-and the shared browser application compiles to WASM.
+[CI291](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43474222550),
+source `0df538deadc573fd3d463f758c688a59175d304c`, is terminal: ten passing
+jobs and three failures, with no skips or cancellations. Gitleaks 156 passes.
+All four desktop builds, ordinary/platform/service suites and lints pass,
+including Windows and both macOS architectures. WASM, dependency lock, actual
+media/SDK/batch and HTTP gates pass. The [scoped census](evidence/egui037-native-builds-ci291.json)
+records that source and its limits; it does not qualify later changes or full v1.
 
-Chrome and native human-input journeys fail at Selection report: the original
-runner screenshots place the button below the old pointer. Narrow harness
-corrections preserve genuine input, correlation, assertions and deadlines;
-the corrected journeys still need exact source hosted execution. Linux metadata
-capture authenticates all 16 index paths, then rejects APT’s escaped plus/tilde
-package URLs. The reviewed representation correction preserves the raw URL
-and correlates its narrowly decoded identity and size exactly with signed
-Packages Filename metadata; corrected hosted capture remains pending.
+Both genuine human-input journeys now complete Selection report with actual
+nonlocal request correlation and retained original PNGs. They then fail at
+Review cleanup plan: each runner's own images show the old pointer focusing the
+output field above the button. The reviewed browser/native harness corrections
+preserve actual input, assertions, authentication and deadlines; their complete
+journeys still require exact latest-source hosted execution. The entire CI291
+formatter artifact was applied with its source semantics checked. That later
+correction does not turn the historical formatting failure into a pass.
 
-Windows ordinary compatibility fails after completed restoration and genuine
-old-package business, when the current owner reopens the original source.
-The newly retained existing canonical frame reports
-`post_log_activation` / `FILESYSTEM_ERROR`. It identifies an error class; the
-failing filesystem operation remains unknown.
-A bounded harness projection now retains only recognized existing stage/operation
-and numeric OS observations from already captured stderr. It preserves the
-original stdout frame, raw-log privacy, failure, identity and restoration rules.
-Its source/security review is complete; current source hosted qualification
-is required;
-no specific redb cause is established. Full version 1 remains unfinished.
+Linux metadata capture now passes: four signed releases, sixteen selected index
+paths, ninety-two retained base packages and eighty transaction packages produce
+a complete 172-package metadata inventory, with no unresolved reasons and observed
+owned-container cleanup. All retained raw file/chunk identities were checked.
+Independent semantic qualification remains separate; packages were not downloaded
+or installed, and neither a compiler bootstrap nor a standard FFmpeg profile
+is qualified by metadata capture.
+
+Windows ordinary compatibility and lint pass in CI291. The historical CI289
+`post_log_activation` / `FILESYSTEM_ERROR` remains an observed failure with unknown
+concrete filesystem cause. A bounded harness projection retains only recognized
+existing stage/operation and numeric OS observations from captured stderr; this
+does not establish a redb, sharing, DACL, path or restoration repair.
+
+Full version 1 remains unfinished. The next owned two-input transport and
+independent media-process supervision checkpoint is a prerequisite to genuine
+registered mixed A/V/still export and continuous decoded preview, not a substitute
+for those required features.
 
 Spec Kit and feature specifications remain local only. Upstream executable source
 snapshots are external; schema-2 research metadata records the separation. Current
