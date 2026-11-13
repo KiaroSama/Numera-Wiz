@@ -500,12 +500,14 @@ pub fn require_download_matches(
     transaction: &[Value],
 ) -> Result<()> {
     let matches = |download: &Value, package: &Value| {
-        download["snapshot_filename"].as_str().is_some_and(|filename| {
-            package["filename"].as_str() == Some(filename)
-                && download["size"]
-                    .as_u64()
-                    .is_some_and(|size| package["size"].as_u64() == Some(size))
-        })
+        download["snapshot_filename"]
+            .as_str()
+            .is_some_and(|filename| {
+                package["filename"].as_str() == Some(filename)
+                    && download["size"]
+                        .as_u64()
+                        .is_some_and(|size| package["size"].as_u64() == Some(size))
+            })
     };
     for download in downloads {
         ensure!(

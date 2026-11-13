@@ -792,7 +792,9 @@ fn owner_stderr_timestamp(timestamp: &str) -> bool {
     let month = pair(5);
     let days = match month {
         4 | 6 | 9 | 11 => 30,
-        2 if year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400)) => 29,
+        2 if year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400)) => {
+            29
+        }
         2 => 28,
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         _ => return false,
@@ -866,11 +868,13 @@ fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStd
             }
             Some(integer.parse::<i32>().map_err(|_| Malformed)?)
         };
-        return Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::Filesystem {
-            operation,
-            os_error_present: os_error.is_some(),
-            os_error,
-        })));
+        return Ok(Some(OwnerStderrRecord::Error(
+            OwnerStderrError::Filesystem {
+                operation,
+                os_error_present: os_error.is_some(),
+                os_error,
+            },
+        )));
     }
     let fields = fields.strip_prefix(" code=").ok_or(Malformed)?;
     let (code, stage) = fields.split_once(" stage=").ok_or(Malformed)?;
@@ -891,10 +895,9 @@ fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStd
         "owner_record_publish" => OwnerFailureStage::OwnerRecordPublish,
         _ => return Err(Unrecognized),
     };
-    Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::OwnerStartup {
-        stage,
-        code,
-    })))
+    Ok(Some(OwnerStderrRecord::Error(
+        OwnerStderrError::OwnerStartup { stage, code },
+    )))
 }
 // Pure projection of the existing bounded capture, called after the existing
 // failure drain. No IO, wait, parser text, raw label or new failure is returned.
@@ -1051,7 +1054,10 @@ fn owner_stderr_diagnostic_cases() {
     );
     assert!(initialization_sequence.error_observations.is_empty());
     let eligibility_then_error = project(b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n[2026-11-13T16:44:01.008Z] [INFO] Application startup stage ended elapsed_ms=1 stage=Check compatible genesis eligibility\n[2026-11-13T16:44:01.009Z] [ERROR] Filesystem operation failed operation=private_write.persist os_error=5 os_error_present=true\n");
-    assert_eq!(eligibility_then_error.observation, OwnerStderrStatus::Observed);
+    assert_eq!(
+        eligibility_then_error.observation,
+        OwnerStderrStatus::Observed
+    );
     assert_eq!(eligibility_then_error.recognized_records, 2);
     assert_eq!(eligibility_then_error.unrecognized_candidates, 0);
     assert_eq!(
@@ -1224,12 +1230,23 @@ fn owner_stderr_diagnostic_cases() {
     );
     let unrelated = project(b"[2026-11-13T16:44:01.007Z] [ERROR] Other message path=C:\\private\\fixture bearer=private-token error=private-error\n[2026-11-13T16:44:01.007Z] [INFO] Other message request=\\n[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=5 os_error_present=true\n");
     assert_eq!(unrelated.observation, OwnerStderrStatus::Missing);
-    let serialized = serde_json::to_string(&unrelated).expect("Serialize finite stderr observation");
-    for private in ["C:", "private", "bearer", "token", "request", "identity.read"] {
+    let serialized =
+        serde_json::to_string(&unrelated).expect("Serialize finite stderr observation");
+    for private in [
+        "C:",
+        "private",
+        "bearer",
+        "token",
+        "request",
+        "identity.read",
+    ] {
         assert!(!serialized.contains(private));
     }
     assert_eq!(project(b"").observation, OwnerStderrStatus::Missing);
-    assert_eq!(project(b"\xff\n").observation, OwnerStderrStatus::InvalidUtf8);
+    assert_eq!(
+        project(b"\xff\n").observation,
+        OwnerStderrStatus::InvalidUtf8
+    );
     let invalid_utf8 = project(&[filesystem[0].0, b"\xff\n"].concat());
     assert_eq!(invalid_utf8.observation, OwnerStderrStatus::InvalidUtf8);
     assert!(invalid_utf8.error_observations.is_empty());
