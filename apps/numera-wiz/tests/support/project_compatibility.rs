@@ -7,7 +7,7 @@ use nw_store::{
     versions::GenerationFacts,
 };
 use redb::{ReadableDatabase, ReadableTable};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -298,6 +298,284 @@ async fn drain(mut input: impl AsyncRead + Unpin) -> Result<Captured> {
     }
     Ok(Captured { bytes, total })
 }
+const OWNER_STARTUP_FRAME_LIMIT: usize = 512;
+
+// Integration tests cannot import the binary-private client decoder. Keep this
+// consumer limited to the existing failure-only __owner wire schema.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum OwnerStartupStage {
+    OwnerLogActivation,
+    PostLogActivation,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum OwnerStartupCode {
+    OwnerBusy,
+    LogFileUnowned,
+    OwnerIdentityConflict,
+    FilesystemError,
+    LogStorageError,
+    InsecureDataRoot,
+    OtherDomain,
+    AdapterError,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OwnerStartupDiagnostic {
+    schema_version: u8,
+    stage: OwnerStartupStage,
+    code: OwnerStartupCode,
+}
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "observation", content = "frame", rename_all = "snake_case")]
+enum OwnerStartupObservation {
+    Missing,
+    Overflow,
+    Malformed,
+    Incomplete,
+    ReadError,
+    CountOverflow,
+    Timeout,
+    JoinError,
+    Record(OwnerStartupDiagnostic),
+}
+impl OwnerStartupObservation {
+    // Live capture calls this only after EOF and reaping the retained child.
+    fn from_frame(bytes: &[u8], total: u64) -> Self {
+        if total > OWNER_STARTUP_FRAME_LIMIT as u64 || bytes.len() > OWNER_STARTUP_FRAME_LIMIT {
+            return Self::Overflow;
+        }
+        if total != bytes.len() as u64 {
+            return Self::Incomplete;
+        }
+        if bytes.is_empty() {
+            return Self::Missing;
+        }
+        let Ok(record) = serde_json::from_slice::<OwnerStartupDiagnostic>(bytes) else {
+            return Self::Malformed;
+        };
+        if record.schema_version != 1 {
+            return Self::Malformed;
+        }
+        let Ok(mut canonical) = serde_json::to_vec(&record) else {
+            return Self::Malformed;
+        };
+        canonical.push(b'\n');
+        if canonical != bytes {
+            return Self::Malformed;
+        }
+        Self::Record(record)
+    }
+}
+async fn drain_owner_stdout(
+    mut input: impl AsyncRead + Unpin,
+) -> Result<Captured, OwnerStartupObservation> {
+    let mut bytes = Vec::with_capacity(OWNER_STARTUP_FRAME_LIMIT + 1);
+    let mut total = Some(0u64);
+    let mut buffer = [0u8; 8192];
+    loop {
+        let count = input
+            .read(&mut buffer)
+            .await
+            .map_err(|_| OwnerStartupObservation::ReadError)?;
+        if count == 0 {
+            break;
+        }
+        total = total.and_then(|total| total.checked_add(count as u64));
+        let keep = count.min((OWNER_STARTUP_FRAME_LIMIT + 1).saturating_sub(bytes.len()));
+        bytes.extend_from_slice(&buffer[..keep]);
+        // Continue draining even after retention/count overflow to avoid blocking
+        // this child. No allocation or retained prefix grows past 513 bytes.
+    }
+    let total = total.ok_or(OwnerStartupObservation::CountOverflow)?;
+    Ok(Captured { bytes, total })
+}
+struct OwnerStdout(tokio::task::JoinHandle<Result<Captured, OwnerStartupObservation>>);
+impl OwnerStdout {
+    async fn collect(
+        &mut self,
+        deadline: tokio::time::Instant,
+        reaped: bool,
+    ) -> OwnerStartupObservation {
+        if !reaped {
+            self.0.abort();
+            return OwnerStartupObservation::Incomplete;
+        }
+        match tokio::time::timeout_at(deadline, &mut self.0).await {
+            Ok(Ok(Ok(captured))) => {
+                OwnerStartupObservation::from_frame(&captured.bytes, captured.total)
+            }
+            Ok(Ok(Err(observation))) => observation,
+            Ok(Err(_)) => OwnerStartupObservation::JoinError,
+            Err(_) => {
+                self.0.abort();
+                OwnerStartupObservation::Timeout
+            }
+        }
+    }
+}
+impl Drop for OwnerStdout {
+    fn drop(&mut self) {
+        // JoinHandle alone detaches on drop. Cancellation/early return must only
+        // abort this owned pipe reader, alongside the child's kill-on-drop.
+        self.0.abort();
+    }
+}
+// Literal wire records exercise the actual consumer, independently of its serializer.
+// These cases share the existing package test identity and run before live journeys.
+fn owner_startup_decoder_cases() {
+    use OwnerStartupCode as Code;
+    use OwnerStartupStage as Stage;
+    let valid: &[(&[u8], Stage, Code)] = &[
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            Stage::OwnerLogActivation,
+            Code::OwnerBusy,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"LOG_FILE_UNOWNED\"}\n",
+            Stage::OwnerLogActivation,
+            Code::LogFileUnowned,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_IDENTITY_CONFLICT\"}\n",
+            Stage::OwnerLogActivation,
+            Code::OwnerIdentityConflict,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"FILESYSTEM_ERROR\"}\n",
+            Stage::OwnerLogActivation,
+            Code::FilesystemError,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"LOG_STORAGE_ERROR\"}\n",
+            Stage::OwnerLogActivation,
+            Code::LogStorageError,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"INSECURE_DATA_ROOT\"}\n",
+            Stage::OwnerLogActivation,
+            Code::InsecureDataRoot,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OTHER_DOMAIN\"}\n",
+            Stage::OwnerLogActivation,
+            Code::OtherDomain,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"ADAPTER_ERROR\"}\n",
+            Stage::OwnerLogActivation,
+            Code::AdapterError,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+            Stage::PostLogActivation,
+            Code::OwnerBusy,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"LOG_FILE_UNOWNED\"}\n",
+            Stage::PostLogActivation,
+            Code::LogFileUnowned,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"OWNER_IDENTITY_CONFLICT\"}\n",
+            Stage::PostLogActivation,
+            Code::OwnerIdentityConflict,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"FILESYSTEM_ERROR\"}\n",
+            Stage::PostLogActivation,
+            Code::FilesystemError,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"LOG_STORAGE_ERROR\"}\n",
+            Stage::PostLogActivation,
+            Code::LogStorageError,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"INSECURE_DATA_ROOT\"}\n",
+            Stage::PostLogActivation,
+            Code::InsecureDataRoot,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"OTHER_DOMAIN\"}\n",
+            Stage::PostLogActivation,
+            Code::OtherDomain,
+        ),
+        (
+            b"{\"schema_version\":1,\"stage\":\"post_log_activation\",\"code\":\"ADAPTER_ERROR\"}\n",
+            Stage::PostLogActivation,
+            Code::AdapterError,
+        ),
+    ];
+    for &(bytes, stage, code) in valid {
+        assert_eq!(
+            OwnerStartupObservation::from_frame(bytes, bytes.len() as u64),
+            OwnerStartupObservation::Record(OwnerStartupDiagnostic {
+                schema_version: 1,
+                stage,
+                code,
+            })
+        );
+    }
+    assert_eq!(
+        OwnerStartupObservation::from_frame(b"", 0),
+        OwnerStartupObservation::Missing
+    );
+    let malformed: &[&[u8]] = &[
+        b"{\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\"}\n",
+        b"{\"schema_version\":2,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"unknown\",\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"unknown\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\",\"extra\":1}\n",
+        b"{\"schema_version\":1,\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}",
+        b"{\"schema_version\":1, \"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"stage\":\"owner_log_activation\",\"schema_version\":1,\"code\":\"OWNER_BUSY\"}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\ntrailing",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\n{}\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"}\r\n",
+        b"{\"schema_version\":1,\"stage\":\"owner_log_activation\",\"code\":\"OWNER_BUSY\"",
+        b"not JSON\n",
+        b"\xff\n",
+    ];
+    for &bytes in malformed {
+        assert_eq!(
+            OwnerStartupObservation::from_frame(bytes, bytes.len() as u64),
+            OwnerStartupObservation::Malformed
+        );
+    }
+    let bytes = valid[0].0;
+    let repeated = [bytes, bytes].concat();
+    assert_eq!(
+        OwnerStartupObservation::from_frame(&repeated, repeated.len() as u64),
+        OwnerStartupObservation::Malformed
+    );
+    assert_eq!(
+        OwnerStartupObservation::from_frame(&[b' '; 512], 512),
+        OwnerStartupObservation::Malformed
+    );
+    assert_eq!(
+        OwnerStartupObservation::from_frame(&[b' '; 513], 513),
+        OwnerStartupObservation::Overflow
+    );
+    assert_eq!(
+        OwnerStartupObservation::from_frame(bytes, 513),
+        OwnerStartupObservation::Overflow
+    );
+    assert_eq!(
+        OwnerStartupObservation::from_frame(&[b' '; 513], u64::MAX),
+        OwnerStartupObservation::Overflow
+    );
+    assert_eq!(
+        OwnerStartupObservation::from_frame(bytes, bytes.len() as u64 + 1),
+        OwnerStartupObservation::Incomplete
+    );
+}
 async fn response_bytes(mut response: reqwest::Response) -> Result<Value> {
     ensure!(
         response.status().is_success(),
@@ -322,6 +600,7 @@ async fn response_bytes(mut response: reqwest::Response) -> Result<Value> {
 struct Owner {
     child: Child,
     stderr: tokio::task::JoinHandle<Result<Captured>>,
+    stdout: OwnerStdout,
     record: OwnerRecord,
     http: reqwest::Client,
     lease: String,
@@ -343,10 +622,13 @@ impl Owner {
             .arg(root)
             .arg("__owner")
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()?;
+        let mut stdout = OwnerStdout(tokio::spawn(drain_owner_stdout(
+            child.stdout.take().context("Owner stdout")?,
+        )));
         let mut stderr = tokio::spawn(drain(child.stderr.take().context("Owner stderr")?));
         let http = reqwest::Client::builder()
             .no_proxy()
@@ -380,15 +662,23 @@ impl Owner {
             Ok(Ok(record)) => record,
             failure => {
                 let observed = child.try_wait()?;
-                if observed.is_none() {
+                let reaped = if observed.is_none() {
                     // Cleanup is restricted to this retained child; a killed generation
                     // is never reopened or counted as preservation evidence.
                     let _ = child.start_kill();
-                    let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
-                }
-                if let Ok(Ok(Ok(captured))) =
-                    tokio::time::timeout(Duration::from_secs(5), &mut stderr).await
-                {
+                    matches!(
+                        tokio::time::timeout(Duration::from_secs(5), child.wait()).await,
+                        Ok(Ok(_))
+                    )
+                } else {
+                    true
+                };
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+                let (captured, startup_stdout) = tokio::join!(
+                    tokio::time::timeout_at(deadline, &mut stderr),
+                    stdout.collect(deadline, reaped),
+                );
+                if let Ok(Ok(Ok(captured))) = captured {
                     let diagnostics = String::from_utf8_lossy(&captured.bytes);
                     let codes = [
                         "STORE_VERSION_UNSUPPORTED",
@@ -399,7 +689,7 @@ impl Owner {
                     .into_iter()
                     .filter(|code| diagnostics.contains(*code))
                     .collect::<Vec<_>>();
-                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes}))?;
+                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes,"startup_stdout":startup_stdout}))?;
                 }
                 return Err(match failure {
                     Ok(Err(error)) => error,
@@ -418,6 +708,7 @@ impl Owner {
         let mut owner = Self {
             child,
             stderr,
+            stdout,
             record: ready,
             http,
             lease: uuid::Uuid::new_v4().to_string(),
@@ -564,9 +855,12 @@ impl Owner {
             .await
             .context("Owner did not gracefully drain after lease release")??;
         ensure!(status.success(), "Owned owner did not exit cleanly");
-        let stderr = tokio::time::timeout(Duration::from_secs(5), self.stderr)
-            .await
-            .context("Owner stderr drain deadline")???;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let (stderr, _) = tokio::join!(
+            tokio::time::timeout_at(deadline, self.stderr),
+            self.stdout.collect(deadline, true),
+        );
+        let stderr = stderr.context("Owner stderr drain deadline")???;
         evidence.record(json!({"phase":"owner-stopped","binary":self.binary.label,"epoch":self.record.epoch,"exit_code":status.code(),"stderr_bytes":stderr.total,"retained_stderr_sha256":sha(&stderr.bytes)}))?;
         Ok(())
     }
@@ -1840,6 +2134,7 @@ pub async fn run() {
     if std::env::var("NW_COMPAT_REQUIRED").as_deref() != Ok("1") {
         return;
     }
+    owner_startup_decoder_cases();
     // This fixed fallback preserves a failure record even if preparation/configuration
     // failed before it could create files. Required=1 is set by the workflow itself.
     let directory =
