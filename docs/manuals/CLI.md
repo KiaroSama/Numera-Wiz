@@ -526,3 +526,33 @@ canonical JSON terminal response and preserves the job failure category. Failed,
 interrupted, cancelled and skipped jobs are not reported as verified success.
 Ctrl+C or an observation deadline stops this frontend; the owner retains the
 accepted job. To cancel that job, issue the separate durable `jobs cancel` command.
+
+## Finite timeline review in development
+
+```console
+numera-wiz timeline render --project <project-uuid> --revision 3 --sequence <sequence-uuid> --start 0 --end 5/2
+```
+
+This command reviews the exact current project revision and returns a separate
+`media_v1` plan. It reads the complete bounded track/clip/semantic closure and
+checks actual installed FFmpeg components. It does not produce a media file or
+receipt. Media job acceptance, rendering, exact stills and safe media-generation
+initialization/restoration remain under construction; this review is not a
+cleanup plan to submit through the existing legacy job shape.
+
+The initial route supports one enabled video track with opaque solid corner
+colors: each RGB channel is exactly 0 or 1, alpha is 1. Gaps are explicitly black;
+the output intent requests silence and lossless FFV1/PCM Matroska download.
+Registered sources, enabled audio tracks, effects, transparency and overlapping
+layers are rejected. The current finite profile admits even dimensions through
+1920x1080, rates through 120fps and ranges through 60 seconds. Boundaries must lie
+on the exact frame and sample grids. No range is silently rounded or truncated.
+
+The wire query is `timeline.render` with `project:{"id":"<project-uuid>"}` and
+required `sequence_id`, canonical decimal `revision`, exact `range` and explicit
+`output` in `params`. New media range rationals require canonical reduced strings;
+the human CLI normalizes its `numerator/denominator` input. Installed component,
+project/schema, source, quota and current authority checks can reject a review.
+Delegated callers need explicit `timeline.render` permission and Project Read;
+Project Edit does not follow from this command. A returned frame/sample count is
+a declared contract, not evidence that a file has been rendered or decoded.

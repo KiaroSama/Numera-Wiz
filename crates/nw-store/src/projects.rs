@@ -5,6 +5,7 @@ use redb::ReadableTableMetadata;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 mod catalog;
+mod render;
 
 const HISTORY_OPERATIONS: usize = 256;
 const HISTORY_BYTES: usize = 32 * 1024 * 1024;

@@ -4,6 +4,7 @@ mod budget;
 mod output_profile;
 mod preservation;
 mod progress;
+mod media;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -48,6 +49,12 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'sta
         .map_err(|e| DomainError::new("WORKER_FAILED", e.to_string()))?
 }
 impl Engine {
+    pub async fn qualify_media_compiler(
+        &self,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::media::MediaTools> {
+        media::qualify(self, cancel).await
+    }
     pub async fn new(ffmpeg: PathBuf, ffprobe: PathBuf) -> Result<Self> {
         let pair = blocking(move || {
             Ok((

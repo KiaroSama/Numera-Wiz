@@ -200,7 +200,7 @@ impl ProjectContextRule {
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
-        "projects.inspect" | "sequences.inspect" => ProjectContextRule::RequiredRead,
+        "projects.inspect" | "sequences.inspect" | "timeline.render" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
@@ -214,6 +214,9 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
+        "timeline.render" => Some(
+            serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"),
+        ),
         "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
         "projects.create" => Some(
             serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
@@ -340,6 +343,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Create a sequence and explicit tracks",
             DurableMutation,
             crate::projects::SequenceInput
+        ),
+        row!(
+            "timeline.render",
+            "Compile a finite opaque project review; media acceptance requires a qualified generation",
+            Query,
+            crate::media::RenderInput
         ),
         row!(
             "clips.place",
@@ -1261,6 +1270,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "projects.inspect",
     "sequences.inspect",
     "sequences.create",
+    "timeline.render",
     "clips.place",
     "clips.move",
     "clips.link",

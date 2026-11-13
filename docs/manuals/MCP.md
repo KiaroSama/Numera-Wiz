@@ -238,5 +238,32 @@ Use this input for `clips.move`; creation has no project context. Queries omit
 expected_revision entirely. Keep the original context on retry, even if the head
 has advanced. Project Read/Edit, command permission and source-byte rights remain
 separate. Existing profiles require an explicit owner policy update for the new
-commands; these adapters never widen grants. GUI project controls, checkpoint
-files and general decoded render/preview are still unfinished.
+commands; these adapters never widen grants. Existing native/Chrome project-edit
+journeys have their own qualification; mixed A/V controls, checkpoint files and
+general decoded render/preview remain unfinished.
+
+The development `timeline.render` tool uses a read context containing only the
+project ID, with required exact revision in `params`:
+
+```json
+{
+  "params": {
+    "sequence_id": "<sequence-uuid>",
+    "revision": "3",
+    "range": {"start":{"num":"0","den":"1"},"end":{"num":"5","den":"2"}},
+    "output": {
+      "container":"matroska", "video_codec":"ffv1", "audio_codec":"pcm_s16le",
+      "audio":"silence", "destination":{"kind":"download"}
+    }
+  },
+  "context": {"project":{"id":"<project-uuid>"},"request_id":"finite-review-1"}
+}
+```
+
+It requires explicit command permission and Project Read. Its static requirements
+are published with the tool; the existing version1 runtime authorization
+observation retains its original closed 13-command projection. The new result is
+a self-contained `media_v1` review, not a rendered artifact or a legacy retained
+cleanup plan. It produces no receipt. Actual media job acceptance, preview and
+export remain under construction. See the [finite CLI profile](CLI.md#finite-timeline-review-in-development)
+for supported source/range limits and current qualification boundaries.

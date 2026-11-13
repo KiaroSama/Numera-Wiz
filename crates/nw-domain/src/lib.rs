@@ -3,6 +3,7 @@ pub mod commands;
 pub mod execution;
 pub mod mux;
 pub mod time;
+pub mod media;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,13 @@ impl DomainError {
             | "OWNER_VERSION_CONFLICT" => 4,
             "LOG_FILE_UNOWNED" => 4,
             "CAPABILITY_UNAVAILABLE"
+            | "UNSUPPORTED_MEDIA_SETTINGS"
+            | "UNSUPPORTED_AUDIO_LAYOUT"
+            | "UNSUPPORTED_AUDIO_TRACK"
+            | "UNSUPPORTED_REGISTERED_INPUT"
+            | "UNSUPPORTED_COLOR_PRECISION"
+            | "UNSUPPORTED_LAYERING"
+            | "UNSUPPORTED_OVERLAP"
             | "COMPONENT_UNAVAILABLE"
             | "CONTAINER_UNQUALIFIED"
             | "INPUT_ROUTE_REQUIRED"

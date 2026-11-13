@@ -2,6 +2,7 @@
 mod artifacts;
 mod batches;
 mod maintenance;
+mod media;
 pub use artifacts::ArtifactTransfer;
 mod clock;
 mod folders;
@@ -943,6 +944,7 @@ impl Service {
         let runtime = tokio::runtime::Handle::current();
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
+            "timeline.render" => return self.media_review(&context, &request, &cancellation),
             "projects.list" => self.inventory_page(
                 &context,
                 commands::parse(params)?,

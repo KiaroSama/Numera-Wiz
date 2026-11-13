@@ -33,7 +33,7 @@ impl WriteContext {
         Ok(request)
     }
 }
-fn rational(value: &str) -> Result<Rational> {
+pub(super) fn rational(value: &str) -> Result<Rational> {
     let (num, den) = value.split_once('/').unwrap_or((value, "1"));
     Ok(Rational::new(num.parse::<i64>()?, den.parse::<i64>()?)?)
 }

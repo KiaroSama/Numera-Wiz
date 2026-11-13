@@ -1,6 +1,7 @@
 //! Ordinary composable CLI commands lower to the existing canonical request port.
 use crate::{client::NativeClient, print_response};
 mod projects;
+mod timeline;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use nw_domain::{
@@ -9,6 +10,7 @@ use nw_domain::{
     mux::{CleanIntent, Stream},
 };
 pub use projects::{Clips, History, Projects, Sequences};
+pub use timeline::Timeline;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -269,6 +271,7 @@ pub enum Discovery {
 pub enum Command {
     Projects(Projects),
     Sequences(Sequences),
+    Timeline(Timeline),
     Clips(Clips),
     History(History),
     Media(Media),
@@ -307,6 +310,7 @@ pub fn prepare(command: Command) -> Result<Request> {
     let request = match command {
         Command::Projects(command) => command.prepare()?,
         Command::Sequences(command) => command.prepare()?,
+        Command::Timeline(command) => command.prepare()?,
         Command::Clips(command) => command.prepare()?,
         Command::History(command) => command.prepare()?,
         Command::Media(Media::Probe { path, probe }) => {

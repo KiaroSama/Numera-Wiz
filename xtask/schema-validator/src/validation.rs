@@ -46,7 +46,7 @@ fn build(schema: &Value) -> Result<jsonschema::Validator, ()> {
 pub fn run(batch: Batch, summary: &mut Summary) -> Result<(), ()> {
     summary.suite = batch.suite;
     if batch.protocol != 1
-        || ![1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17].contains(&batch.suite)
+        || ![1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18].contains(&batch.suite)
         || batch.schemas.is_empty()
         || batch.schemas.len() + batch.schema_controls.len() > 64
         || batch.cases.len() > 128

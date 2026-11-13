@@ -4,7 +4,7 @@ use super::owner::Cli;
 #[path = "project_topology/output_contracts.rs"]
 mod output_contracts;
 #[path = "../../../../test-support/schema_validation.rs"]
-mod schema_validation;
+pub(super) mod schema_validation;
 use nw_domain::commands::{MAX_RESULT_BYTES, ProjectRef, Request};
 use rmcp::{
     ClientLifecycleMode, ClientServiceExt, RoleClient, ServiceExt,

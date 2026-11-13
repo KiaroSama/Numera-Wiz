@@ -53,6 +53,10 @@ enum Mode {
         #[command(subcommand)]
         command: human::Sequences,
     },
+    Timeline {
+        #[command(subcommand)]
+        command: human::Timeline,
+    },
     Clips {
         #[command(subcommand)]
         command: human::Clips,
@@ -276,6 +280,9 @@ async fn run() -> Result<()> {
                 }
                 Some(Mode::Sequences { command }) => {
                     human::run(&client, human::Command::Sequences(command)).await
+                }
+                Some(Mode::Timeline { command }) => {
+                    human::run(&client, human::Command::Timeline(command)).await
                 }
                 Some(Mode::Clips { command }) => human::run(&client, human::Command::Clips(command)).await,
                 Some(Mode::History { command }) => {

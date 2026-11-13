@@ -14,6 +14,20 @@ async fn independent_pipe_draining_stays_bounded_under_flood() {
     )
     .await;
     assert_eq!(result.unwrap_err().code, "RESOURCE_LIMIT");
+    let result = nw_platform::process::run_with_output_limits(
+        fixture(),
+        &["flood".into()],
+        Duration::from_secs(10),
+        2 * 1024 * 1024,
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.stdout.len(), 2 * 1024 * 1024);
+    assert!(result.stdout.iter().all(|value| *value == b'x'));
+    assert_eq!(result.stderr_tail.as_bytes(), &[b'x'; 4096]);
+    assert!(result.diagnostic_bytes >= 2 * 1024 * 1024);
 }
 #[tokio::test]
 async fn cancellation_waits_for_termination_and_reaping() {

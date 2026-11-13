@@ -136,6 +136,12 @@ impl Service {
             let actions = commands::active_registry()
                 .into_iter()
                 .filter_map(|descriptor| descriptor.authorization_requirements)
+                // Version1 observations retain their original closed project command set.
+                // Other tools can publish static requirements without changing this codec.
+                .filter(|requirement| {
+                    PROJECT_TARGET_COMMANDS.contains(&requirement.command_id.as_str())
+                        || ["projects.create", "projects.list"].contains(&requirement.command_id.as_str())
+                })
                 .map(|requirement| {
                     let reasons = if policy
                         .is_some_and(|profile| !profile.allows_command(&requirement.command_id))

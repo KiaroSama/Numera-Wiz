@@ -23,6 +23,15 @@ pub struct RunOutput {
     pub exit_code: Option<i32>,
     pub diagnostic_bytes: u64,
 }
+struct CaptureLimits {
+    stdout: usize,
+    stderr: usize,
+}
+impl CaptureLimits {
+    fn standard(stdout: usize) -> Self {
+        Self { stdout, stderr: 64 * 1024 }
+    }
+}
 async fn capture<R: AsyncRead + Unpin>(
     mut reader: R,
     limit: usize,
@@ -70,7 +79,29 @@ pub async fn run(
         program,
         args,
         Some(deadline),
-        stdout_limit,
+        CaptureLimits::standard(stdout_limit),
+        Stdio::null(),
+        None,
+        cancel,
+    )
+    .await
+}
+
+/// Lower the retained raw stderr budget while preserving the shared supervisor.
+/// UTF-8 replacement may expand the diagnostic text; raw captured bytes obey this limit.
+pub async fn run_with_output_limits(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    stdout_limit: usize,
+    stderr_limit: usize,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    run_with_stdin(
+        program,
+        args,
+        Some(deadline),
+        CaptureLimits { stdout: stdout_limit, stderr: stderr_limit },
         Stdio::null(),
         None,
         cancel,
@@ -97,7 +128,7 @@ pub async fn run_readonly(
         program,
         args,
         Some(deadline),
-        stdout_limit,
+        CaptureLimits::standard(stdout_limit),
         Stdio::from(input),
         None,
         cancel,
@@ -124,7 +155,7 @@ pub async fn run_readonly_with_policy(
         program,
         args,
         deadline.duration()?,
-        stdout_limit,
+        CaptureLimits::standard(stdout_limit),
         Stdio::from(input),
         None,
         cancel,
@@ -153,7 +184,7 @@ pub async fn stream_readonly(
         program,
         args,
         Some(deadline),
-        0,
+        CaptureLimits::standard(0),
         Stdio::from(input),
         Some(consumer),
         cancel,
@@ -180,7 +211,7 @@ pub async fn stream_readonly_with_policy(
         program,
         args,
         deadline.duration()?,
-        0,
+        CaptureLimits::standard(0),
         Stdio::from(input),
         Some(consumer),
         cancel,
@@ -219,11 +250,12 @@ async fn run_with_stdin(
     program: &Path,
     args: &[String],
     deadline: Option<Duration>,
-    stdout_limit: usize,
+    limits: CaptureLimits,
     input: Stdio,
     consumer: Option<ChunkConsumer>,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
+    let CaptureLimits { stdout: stdout_limit, stderr: stderr_limit } = limits;
     if deadline.is_some_and(|value| value.is_zero() || value > Duration::from_secs(604800))
         || stdout_limit > 8 * 1024 * 1024
     {
@@ -231,6 +263,9 @@ async fn run_with_stdin(
             "RESOURCE_LIMIT",
             "Invalid process deadline or stdout budget",
         ));
+    }
+    if !(1..=64 * 1024).contains(&stderr_limit) {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Invalid process stderr budget"));
     }
     if !program.is_absolute() {
         return Err(DomainError::new(
@@ -298,7 +333,7 @@ async fn run_with_stdin(
         }
         result
     });
-    let mut err_task = tokio::spawn(capture(stderr, 64 * 1024, true));
+    let mut err_task = tokio::spawn(capture(stderr, stderr_limit, true));
     let result = tokio::select! {
         status=child.wait()=>status.map_err(|e|DomainError::new("PROCESS_WAIT_FAILED",e.to_string())),
         _=cancel.cancelled()=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("CANCELLED","Owned process was cancelled and reaped")),Err(error)=>Err(error)}},
