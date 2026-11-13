@@ -228,6 +228,7 @@ pub fn run() -> Result<()> {
         super::process::signal_target(42)? == 42,
         "owned numeric group framing"
     );
+    index_target_cases()?;
     filesystem_cases()?;
     tracing::info!(
         "Linux capture synthetic self-check passed; no APT, signature, container or runtime truth is inferred"
@@ -787,6 +788,102 @@ fn unknown_handoff_case(owned: &Path, deadline: Instant) -> Result<()> {
         );
         audit_files(&directory, &checked.files, retained, retained as usize)?;
     }
+    Ok(())
+}
+
+fn index_target_cases() -> Result<()> {
+    // Literal independent identities, not a generated successful signature fixture.
+    let empty_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    let abc_hash = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    let release = metadata::fields(&format!(
+        "SHA256:\n {empty_hash} 0 restricted/binary-amd64/Packages\n 0040f94d11d0039505328a90b2ff48968db873e9e7967307631bf40ef5679275 32 restricted/binary-amd64/Packages.xz\n"
+    ))?;
+    let select = |fields: &metadata::Fields, targets: &[metadata::Fields]| {
+        metadata::selected_index_cache(fields, targets, "noble-backports", "restricted")
+            .map(|path| path.map(Path::to_path_buf))
+    };
+    ensure!(
+        select(&release, &[])?.is_none(),
+        "signed-empty selection permits observed target absence without inventing a path"
+    );
+    let target = metadata::fields(
+        "MetaKey: restricted/binary-amd64/Packages\nCodename: noble\nSuite: noble-backports\nTrusted: yes\nFilename: /capture/lists/fixture_Packages.lz4\n",
+    )?;
+    ensure!(
+        select(&release, std::slice::from_ref(&target))?
+            == Some(PathBuf::from("/capture/lists/fixture_Packages.lz4")),
+        "existing empty-index cache keeps its actual target path and normal validation"
+    );
+    ensure!(
+        select(&release, &[target.clone(), target.clone()]).is_err(),
+        "duplicate target refused even for an empty index"
+    );
+    let nonempty = metadata::fields(&format!(
+        "SHA256:\n {abc_hash} 3 restricted/binary-amd64/Packages\n"
+    ))?;
+    ensure!(
+        select(&nonempty, &[]).is_err(),
+        "missing nonempty target refused"
+    );
+    ensure!(
+        select(&nonempty, std::slice::from_ref(&target))?.is_some(),
+        "existing nonempty target retains the normal cache path"
+    );
+    let contradictory = metadata::fields(&format!(
+        "SHA256:\n {abc_hash} 0 restricted/binary-amd64/Packages\n"
+    ))?;
+    ensure!(
+        select(&contradictory, &[]).is_err(),
+        "false empty hash refused"
+    );
+    ensure!(
+        select(&metadata::fields("SHA256:\n")?, &[]).is_err(),
+        "missing plain Release checksum refused"
+    );
+    let duplicate = metadata::fields(&format!(
+        "SHA256:\n {empty_hash} 0 restricted/binary-amd64/Packages\n {empty_hash} 0 restricted/binary-amd64/Packages\n"
+    ))?;
+    ensure!(
+        select(&duplicate, &[]).is_err(),
+        "duplicate plain Release entry refused"
+    );
+    for (key, value) in [
+        ("Trusted", "no"),
+        ("Filename", "/capture/lists/../outside"),
+        ("Filename", "https://untrusted.invalid/Packages"),
+    ] {
+        let mut invalid = target.clone();
+        invalid.insert(key.into(), value.into());
+        ensure!(
+            select(&release, &[invalid]).is_err(),
+            "invalid existing target refused"
+        );
+    }
+    ensure!(
+        metadata::selected_index_cache(&release, &[], "../noble-backports", "restricted")
+            .is_err(),
+        "unsafe source URL input refused"
+    );
+    // Exercise the independent byte validator and actual streaming parser with
+    // fixed data: selection never turns nonempty/corrupt plain data into an index.
+    metadata::check_bytes(b"", 0, empty_hash)?;
+    ensure!(
+        metadata::check_bytes(b"x", 0, empty_hash).is_err(),
+        "nonempty decoded data refused"
+    );
+    ensure!(
+        metadata::check_bytes(b"", 0, abc_hash).is_err(),
+        "corrupt plain digest refused"
+    );
+    let mut packages = 0;
+    metadata::stanzas(Cursor::new(b""), |_| {
+        packages += 1;
+        Ok(())
+    })?;
+    ensure!(
+        packages == 0,
+        "empty source contributes zero packages without a fake stanza"
+    );
     Ok(())
 }
 

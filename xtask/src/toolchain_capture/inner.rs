@@ -325,30 +325,10 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
         report["releases"].as_array_mut().context("releases array")?.push(json!({"pocket":pocket,"requested_url":format!("{}/dists/{pocket}/InRelease",metadata::SNAPSHOT),"final_url":format!("{}/dists/{pocket}/InRelease",metadata::SNAPSHOT),"redirects":"refused_by_policy","signed_raw":signed,"release_raw":release_raw,"signature_verified":true,"signer_fingerprints":signers,"fields":fields}));
         for component in ["main", "restricted", "universe", "multiverse"] {
             let meta_key = format!("{component}/binary-amd64/Packages");
-            let selected: Vec<_> = targets
-                .iter()
-                .filter(|target| {
-                    target.get("MetaKey") == Some(&meta_key)
-                        && target.get("Codename").map(String::as_str) == Some("noble")
-                        && target.get("Suite").map(String::as_str) == Some(pocket)
-                })
-                .collect();
-            ensure!(
-                selected.len() == 1,
-                "missing/ambiguous selected APT index target {pocket}/{component}"
-            );
-            let target = selected[0];
-            ensure!(
-                target.get("Trusted").map(String::as_str) == Some("yes"),
-                "APT target is not authenticated"
-            );
-            let cached = Path::new(target.get("Filename").context("index target filename")?);
-            ensure!(
-                cached.parent() == Some(Path::new("/capture/lists")),
-                "index target escaped owned lists"
-            );
-            let cached_ref =
-                raw.copy(&format!("metadata/{pocket}/{component}/apt-cache"), cached)?;
+            let cached = metadata::selected_index_cache(&fields, &targets, pocket, component)?;
+            let cached_ref = cached
+                .map(|path| raw.copy(&format!("metadata/{pocket}/{component}/apt-cache"), path))
+                .transpose()?;
             let index_path = format!("{meta_key}.xz");
             let (size, hash) = metadata::release_index(&fields, &index_path)?;
             ensure!(
@@ -404,20 +384,22 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
                     && decoded_ref["sha256"].as_str() == Some(uncompressed_hash.as_str()),
                 "decoded index differs from authenticated uncompressed Release entry"
             );
-            // Also bind APT's recompressed cache to the very same plain index.
-            let cached_plain = Path::new(WORK).join("cached-plain");
-            let mut cat = apt("/usr/lib/apt/apt-helper", &["cat-file"]);
-            cat.arg(cached);
-            let cached_result = process::run(&mut cat, deadline, 20, Some(&cached_plain))?;
-            cached_result.success()?;
-            let cached_hash = evidence::hash_file(&cached_plain, process::FILE_LIMIT)?;
-            ensure!(
-                cached_hash == (uncompressed_size, uncompressed_hash.clone()),
-                "APT cache representation does not match selected authenticated index"
-            );
-            fs::remove_file(cached_plain)?;
+            // Existing APT caches still bind to the very same authenticated plain index.
+            if let Some(cached) = cached {
+                let cached_plain = Path::new(WORK).join("cached-plain");
+                let mut cat = apt("/usr/lib/apt/apt-helper", &["cat-file"]);
+                cat.arg(cached);
+                let cached_result = process::run(&mut cat, deadline, 20, Some(&cached_plain))?;
+                cached_result.success()?;
+                let cached_hash = evidence::hash_file(&cached_plain, process::FILE_LIMIT)?;
+                ensure!(
+                    cached_hash == (uncompressed_size, uncompressed_hash.clone()),
+                    "APT cache representation does not match selected authenticated index"
+                );
+                fs::remove_file(cached_plain)?;
+            }
             let index_ref = format!("{pocket}/{component}/amd64");
-            report["indices"].as_array_mut().context("indices array")?.push(json!({"id":index_ref,"pocket":pocket,"component":component,"architecture":"amd64","requested_url":url,"final_url":url,"redirects":"refused_by_policy","release_path":index_path,"published_bytes":size,"published_sha256":hash,"metadata_hash_match":true,"signature_verified":true,"compressed_raw":compressed,"decoded_raw":decoded_ref,"apt_cache_raw":cached_ref,"apt_cache_original_path":cached,"cache_matches_authenticated_plain_index":true}));
+            report["indices"].as_array_mut().context("indices array")?.push(json!({"id":index_ref,"pocket":pocket,"component":component,"architecture":"amd64","requested_url":url,"final_url":url,"redirects":"refused_by_policy","release_path":index_path,"published_bytes":size,"published_sha256":hash,"metadata_hash_match":true,"signature_verified":true,"compressed_raw":compressed,"decoded_raw":decoded_ref,"apt_cache_raw":cached_ref,"apt_cache_original_path":cached,"cache_matches_authenticated_plain_index":cached.map(|_| true),"apt_target_observation":if cached.is_some() { "present_in_indextargets" } else { "absent_in_indextargets_authenticated_empty_plain_index" },"published_plain_bytes":uncompressed_size,"published_plain_sha256":uncompressed_hash}));
             index_sources.push((index_ref, raw.source(&decoded_ref)?));
         }
     }
@@ -570,19 +552,19 @@ fn join_inventory(
                 "aggregate package stanza count exceeded"
             );
             ensure!(Instant::now() < deadline, "index parser deadline exceeded");
-            if let Some(expected) = fields.get("Package").and_then(|name| expected.get(name)) {
-                if metadata::selected_identity(&fields, expected) {
-                    let name = fields
-                        .get("Package")
-                        .context("selected package name")?
-                        .clone();
-                    let rows = matches.entry(name).or_default();
-                    ensure!(
-                        !rows.iter().any(|row| row["index_ref"] == index.as_str()),
-                        "duplicate exact package identity inside one index"
-                    );
-                    rows.push(package_row(&fields, index)?);
-                }
+            if let Some(expected) = fields.get("Package").and_then(|name| expected.get(name))
+                && metadata::selected_identity(&fields, expected)
+            {
+                let name = fields
+                    .get("Package")
+                    .context("selected package name")?
+                    .clone();
+                let rows = matches.entry(name).or_default();
+                ensure!(
+                    !rows.iter().any(|row| row["index_ref"] == index.as_str()),
+                    "duplicate exact package identity inside one index"
+                );
+                rows.push(package_row(&fields, index)?);
             }
             Ok(())
         })?;

@@ -217,10 +217,11 @@ impl Raw {
             self.entries.push(entry.clone());
             Ok(entry)
         })();
-        if result.is_err() && self.pending.contains_key(file) {
-            if let Err(cleanup) = self.cancel(file) {
-                return result.with_context(|| format!("pending cancellation failed: {cleanup:#}"));
-            }
+        if result.is_err()
+            && self.pending.contains_key(file)
+            && let Err(cleanup) = self.cancel(file)
+        {
+            return result.with_context(|| format!("pending cancellation failed: {cleanup:#}"));
         }
         result
     }
@@ -480,10 +481,10 @@ pub fn write_small(directory: &Path, report: &Value, manifest: &Value) -> Result
         if let Err(error) = write_new(&directory.join(name), bytes, SMALL_LIMIT) {
             let mut failures = Vec::new();
             for owned in attempted {
-                if let Err(cleanup) = fs::remove_file(directory.join(owned)) {
-                    if cleanup.kind() != std::io::ErrorKind::NotFound {
-                        failures.push(cleanup.to_string());
-                    }
+                if let Err(cleanup) = fs::remove_file(directory.join(owned))
+                    && cleanup.kind() != std::io::ErrorKind::NotFound
+                {
+                    failures.push(cleanup.to_string());
                 }
             }
             return Err(error)

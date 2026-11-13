@@ -170,6 +170,57 @@ pub fn release_index(fields: &Fields, path: &str) -> Result<(u64, String)> {
     found.context("required compressed index missing from authenticated Release")
 }
 
+// The caller must authenticate Release before using this selection policy.
+// An absent APT target is evidence of absence in indextargets, not a cache path.
+pub fn selected_index_cache<'a>(
+    release: &Fields,
+    targets: &'a [Fields],
+    pocket: &str,
+    component: &str,
+) -> Result<Option<&'a Path>> {
+    ensure!(
+        matches!(
+            pocket,
+            "noble" | "noble-updates" | "noble-security" | "noble-backports"
+        )
+            && matches!(component, "main" | "restricted" | "universe" | "multiverse"),
+        "unexpected selected index source"
+    );
+    let meta_key = format!("{component}/binary-amd64/Packages");
+    let (plain_size, plain_hash) = release_index(release, &meta_key)?;
+    let selected: Vec<_> = targets
+        .iter()
+        .filter(|target| {
+            target.get("MetaKey") == Some(&meta_key)
+                && target.get("Codename").map(String::as_str) == Some("noble")
+                && target.get("Suite").map(String::as_str) == Some(pocket)
+        })
+        .collect();
+    ensure!(
+        selected.len() <= 1,
+        "ambiguous selected APT index target {pocket}/{component}"
+    );
+    let Some(target) = selected.first().copied() else {
+        ensure!(
+            plain_size == 0
+                && plain_hash
+                    == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "missing selected APT index target without authenticated empty index {pocket}/{component}"
+        );
+        return Ok(None);
+    };
+    ensure!(
+        target.get("Trusted").map(String::as_str) == Some("yes"),
+        "APT target is not authenticated"
+    );
+    let cached = Path::new(target.get("Filename").context("index target filename")?);
+    ensure!(
+        cached.parent() == Some(Path::new("/capture/lists")),
+        "index target escaped owned lists"
+    );
+    Ok(Some(cached))
+}
+
 pub fn release(fields: &Fields, pocket: &str) -> Result<()> {
     ensure!(
         fields.get("Suite").map(String::as_str) == Some(pocket),
