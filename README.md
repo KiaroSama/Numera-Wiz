@@ -91,6 +91,8 @@ comes from actual shared command descriptors. The default `agent` profile can
 discover capabilities; the owner must explicitly grant operation, object and
 filesystem rights before an agent changes media. The skill explains how to probe,
 review, submit, observe, cancel/retry and read authorized results.
+For deliberate local owner automation, the [stdio owner option](docs/manuals/MCP.md#stdio)
+uses the same owner authority as the native CLI; shipped client defaults stay scoped.
 
 ## Source policy and contributing
 

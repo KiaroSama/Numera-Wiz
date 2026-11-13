@@ -116,6 +116,9 @@ enum Mode {
         port: u16,
         #[arg(long)]
         token_file: Option<PathBuf>,
+        /// Use local native-owner authority explicitly; stdio only.
+        #[arg(long, conflicts_with_all = ["access_profile", "token_file"])]
+        native_owner: bool,
     },
     /// Start a loopback development application API and direct HTTP MCP.
     Serve {
@@ -157,6 +160,14 @@ async fn main() -> std::process::ExitCode {
 }
 async fn run() -> Result<()> {
     let args = Args::parse();
+    if let Some(Mode::Bridge { transport, native_owner: true, .. }) = &args.command
+        && transport != "stdio"
+    {
+        return Err(nw_domain::DomainError::new(
+            "VALIDATION_ERROR",
+            "Native owner access is available only for local stdio bridges",
+        ).into());
+    }
     tracing::info!("Numera Wiz entry point started");
     let root = args.data_dir.unwrap_or_else(|| {
         std::env::current_exe()
@@ -198,11 +209,13 @@ async fn run() -> Result<()> {
         return result;
     }
     let profile = match &args.command {
-        Some(Mode::Bridge { transport, .. }) if transport == "stdio" => Some(
-            args.access_profile
-                .clone()
-                .unwrap_or_else(|| "agent".into()),
-        ),
+        Some(Mode::Bridge { transport, native_owner, .. }) if transport == "stdio" => {
+            if *native_owner {
+                None
+            } else {
+                Some(args.access_profile.clone().unwrap_or_else(|| "agent".into()))
+            }
+        }
         Some(Mode::Bridge { .. } | Mode::Serve { .. }) => None,
         _ => args.access_profile.clone(),
     };
@@ -221,6 +234,7 @@ async fn run() -> Result<()> {
             transport,
             port,
             token_file,
+            ..
         }) => match transport.as_str() {
             "stdio" => {
                 use rmcp::ServiceExt;

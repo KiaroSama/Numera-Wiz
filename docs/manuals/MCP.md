@@ -19,7 +19,7 @@ A conventional client configuration, when that client supports `mcpServers`, is:
 
 The default `agent` is discovery-only, apart from own replay-scope bootstrap. The
 owner creates explicit operating profiles with `access profiles create` before
-using them. The stdio launcher obtains a scoped private credential; it never
+using them. A profile-based stdio launcher obtains a scoped private credential; it never
 forwards its native owner credential to the agent. Rotation/restart preserves the
 stored profile's principal. An idle bridge alone does not retain the worker.
 Use `access profiles inspect --name operator --grants-out <new-file> --json`
@@ -27,6 +27,25 @@ and revision-checked `access profiles update --grants-file <file>` to replace it
 complete policy while preserving existing path/operation grants. Plan read/submit
 and job read/control are separate rights. Lists use authorization-bound 30-second
 summary snapshots; they do not return every full record or infer access from IDs.
+
+For deliberately authorized local owner automation, launch
+`numera-wiz --data-dir <absolute-root> bridge --native-owner`. This explicit mode
+uses the same protected native-owner connection as the owner CLI, including
+implemented access administration and generation-maintenance commands. It uses
+the same canonical requests, reviews, receipts and resource limits. It is stdio
+only and rejects `--access-profile`, `--token-file` and HTTP combinations before
+initializing a data root. Tool parameters cannot enable it or change authority.
+The shipped agent configurations continue to select their scoped profile.
+
+An owner can set this argument array in a private local client configuration:
+
+```json
+["--data-dir","<absolute-root>","bridge","--native-owner"]
+```
+
+Select that mode in the client configuration deliberately; a permission refusal
+does not authorize an agent to replace its scoped connection with an owner one.
+Actual named-client loading remains separate from hosted official-SDK evidence.
 
 ## Typed calls and retries
 

@@ -125,6 +125,14 @@ executable directly with this argument array:
 ["--access-profile","agent","bridge","--transport","stdio"]
 ```
 
+An owner who delegates local owner operations can instead configure
+`["--data-dir","<absolute-root>","bridge","--native-owner"]` in a private
+client configuration. This explicit stdio mode uses existing native-owner CLI
+authority, including implemented access administration and maintenance. It cannot
+be combined with a profile, token file or HTTP transport. The shipped plugin and
+standalone defaults remain scoped; a denied tool call does not select this mode.
+See the [MCP manual](../manuals/MCP.md#stdio) for its binding and retry rules.
+
 | Client | Checked-in configuration / supported destination |
 | --- | --- |
 | Claude Code without plugin | Merge `integrations/templates/claude-mcp.json` into a requested project `.mcp.json`, preserving existing servers. |

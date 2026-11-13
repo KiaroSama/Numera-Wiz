@@ -93,7 +93,61 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     );
     project_mcp_output_contract(&first_page);
     project_mcp_wire_page(data.path(), &first_page).await;
+    let owner_profiles = native_owner_mcp_query(data.path(), "access.profiles.list", serde_json::json!({})).await;
+    assert_eq!(owner_profiles["ok"], true);
+    assert!(owner_profiles["result"].as_array().unwrap().len() >= 2);
+    let still_scoped = client
+        .call_tool(
+            CallToolRequestParams::new("access.profiles.list")
+                .with_arguments(rmcp::object!({"params":{}})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(still_scoped).unwrap()["structuredContent"]["error"]["code"],
+        "PERMISSION_DENIED",
+        "Explicit owner access on another bridge must not change the original scoped session"
+    );
+    reject_ambiguous_owner_bridge().await;
     client.cancel().await.unwrap();
+}
+
+async fn native_owner_mcp_query(
+    root: &std::path::Path,
+    id: &str,
+    params: serde_json::Value,
+) -> serde_json::Value {
+    tokio::time::timeout(std::time::Duration::from_secs(40), async {
+        let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
+        command.arg("--data-dir").arg(root).args(["bridge", "--native-owner"]).kill_on_drop(true);
+        let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
+        let result = client.call_tool(
+            CallToolRequestParams::new(id.to_owned()).with_arguments(rmcp::object!({"params":params})),
+        ).await.unwrap();
+        let result = serde_json::to_value(result).unwrap()["structuredContent"].clone();
+        assert!(result.is_object(), "Native owner MCP must return a canonical Response");
+        client.cancel().await.unwrap();
+        result
+    }).await.expect("Native owner SDK query exceeded its40-second fixture bound")
+}
+
+async fn reject_ambiguous_owner_bridge() {
+    for args in [
+        vec!["bridge", "--native-owner", "--transport", "http"],
+        vec!["--access-profile", "agent", "bridge", "--native-owner"],
+        vec!["bridge", "--native-owner", "--access-profile", "agent"],
+        vec!["bridge", "--native-owner", "--token-file", "must-not-use-a-token"],
+    ] {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("must-not-bootstrap");
+        let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
+        command.arg("--data-dir").arg(&root).args(args).kill_on_drop(true);
+        let output = tokio::time::timeout(std::time::Duration::from_secs(5), command.output())
+            .await.unwrap().unwrap();
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty(), "Rejected bridge configuration polluted protocol stdout");
+        assert!(!root.exists(), "Rejected bridge configuration must not initialize or attach an owner");
+    }
 }
 
 fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
@@ -661,6 +715,15 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
         assert_eq!(plan.target_generation, 5);
         assert_eq!(plan.source_guard.migration_id, id);
         assert_eq!(plan.source_guard.revision, "1");
+        let mcp = native_owner_mcp_query(data.path(), "maintenance.promotion.plan", json!({})).await;
+        assert_eq!(mcp["ok"], true);
+        assert!(mcp["receipt_id"].is_null());
+        let mcp_plan: nw_domain::maintenance::promotion::GenerationPromotionPlan =
+            serde_json::from_value(mcp["result"].clone()).unwrap();
+        mcp_plan.validate_hash().unwrap();
+        assert_eq!(mcp_plan.source_guard, plan.source_guard);
+        assert_eq!(mcp_plan.source_records_sha256, plan.source_records_sha256);
+        assert_eq!(mcp_plan.hash, plan.hash, "Native CLI and explicit owner MCP must review the same actual source");
         let media_started = std::time::Instant::now();
         let promotion_file = input.join("promotion-review.json");
         nw_platform::security::write_private(&promotion_file, &serde_json::to_vec(&reviewed["result"]).unwrap(), false).unwrap();
