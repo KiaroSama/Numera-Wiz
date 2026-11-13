@@ -23,7 +23,10 @@ pub fn verify(root: &Path) -> Result<()> {
             bail!("Local-only planning material is tracked: {name}");
         }
         let path = Path::new(name);
-        let filename = path.file_name().and_then(|value| value.to_str()).unwrap_or("");
+        let filename = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
         let build_name = filename.to_ascii_lowercase();
         if ["configure", "makefile", "gnumakefile", "cmakelists.txt"].contains(&build_name.as_str())
             || build_name.ends_with("_makefile")

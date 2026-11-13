@@ -13,9 +13,16 @@ fn compatible(snapshot: &Snapshot) -> Result<()> {
         snapshot.facts.store_version == 3
             && snapshot.facts.required_capabilities.len()
                 == nw_store::generations::CURRENT_CAPABILITIES.len()
-            && snapshot.facts.required_capabilities.iter().map(String::as_str)
+            && snapshot
+                .facts
+                .required_capabilities
+                .iter()
+                .map(String::as_str)
                 .collect::<BTreeSet<_>>()
-                == nw_store::generations::CURRENT_CAPABILITIES.iter().copied().collect(),
+                == nw_store::generations::CURRENT_CAPABILITIES
+                    .iter()
+                    .copied()
+                    .collect(),
         "Origin source must have the actual legacy-compatible schema3 floor"
     );
     Ok(())
@@ -33,8 +40,15 @@ fn unchanged_baseline(before: &Snapshot, after: &Snapshot) -> Result<()> {
 
 fn one_initialization(snapshot: &Snapshot, id: &str) -> Result<()> {
     ensure!(
-        snapshot.rows.keys().filter(|key| key.starts_with("generation-initialization/")).count() == 1
-            && snapshot.rows.contains_key(&format!("generation-initialization/{id}"))
+        snapshot
+            .rows
+            .keys()
+            .filter(|key| key.starts_with("generation-initialization/"))
+            .count()
+            == 1
+            && snapshot
+                .rows
+                .contains_key(&format!("generation-initialization/{id}"))
             && !snapshot.rows.contains_key("meta/pending-initialization")
             && !snapshot.rows.contains_key("meta/pending-restoration"),
         "Startup repeated initialization or retained pending maintenance"
@@ -43,7 +57,10 @@ fn one_initialization(snapshot: &Snapshot, id: &str) -> Result<()> {
 }
 
 fn raw_receipt(snapshot: &Snapshot, record: &MediaInitializationRecord) -> Result<Value> {
-    let raw = snapshot.rows.get(&record.receipt_key).context("Actual initialization receipt")?;
+    let raw = snapshot
+        .rows
+        .get(&record.receipt_key)
+        .context("Actual initialization receipt")?;
     let receipt: Value = serde_json::from_slice(raw)?;
     let response = &receipt["response"];
     ensure!(
@@ -154,7 +171,15 @@ async fn inspect_initialization(
     phase: &str,
     evidence: &Evidence,
 ) -> Result<()> {
-    let inspected = owner.command(&query("maintenance.initialization.inspect", json!({"id":record.id})), evidence).await?;
+    let inspected = owner
+        .command(
+            &query(
+                "maintenance.initialization.inspect",
+                json!({"id":record.id}),
+            ),
+            evidence,
+        )
+        .await?;
     let observed: MediaInitializationRecord = serde_json::from_value(inspected["result"].clone())?;
     observed.plan.validate_hash()?;
     ensure!(
@@ -171,11 +196,17 @@ async fn inspect_initialization(
 }
 
 async fn issue_scope(owner: &mut Owner, evidence: &Evidence) -> Result<String> {
-    let issued = owner.command(&query("access.replay_scope.create", json!({})), evidence).await?;
+    let issued = owner
+        .command(&query("access.replay_scope.create", json!({})), evidence)
+        .await?;
     text(&issued["result"], "replay_scope")
 }
 
-async fn replay_pair(owner: &mut Owner, pair: &Option<(Value, Value)>, evidence: &Evidence) -> Result<()> {
+async fn replay_pair(
+    owner: &mut Owner,
+    pair: &Option<(Value, Value)>,
+    evidence: &Evidence,
+) -> Result<()> {
     if let Some((request, response)) = pair {
         same_receipt(response, &owner.command(request, evidence).await?)?;
     }
@@ -186,11 +217,25 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
     let started = Instant::now();
     let configuration = configuration(evidence)?;
     let temporary = tempfile::tempdir()?;
-    let root = fs::canonicalize(security::private_directory(&temporary.path().join("origin-root"))?)?;
+    let root = fs::canonicalize(security::private_directory(
+        &temporary.path().join("origin-root"),
+    )?)?;
     ensure!(
         fs::read_dir(&root)?.next().is_none()
-            && !root.starts_with(configuration.old.path.parent().context("Old executable parent")?)
-            && !root.starts_with(configuration.new.path.parent().context("Current executable parent")?),
+            && !root.starts_with(
+                configuration
+                    .old
+                    .path
+                    .parent()
+                    .context("Old executable parent")?
+            )
+            && !root.starts_with(
+                configuration
+                    .new
+                    .path
+                    .parent()
+                    .context("Current executable parent")?
+            ),
         "Origin journey must begin with genuinely absent application state outside packages"
     );
     let origin_name = if fresh { "fresh" } else { "migrated-r0" };
@@ -206,11 +251,20 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
     let mut initialization = None;
 
     if !fresh {
-        let mut owner = Owner::start(&configuration.old, &root, &mut epochs, &mut root_id, evidence).await?;
+        let mut owner = Owner::start(
+            &configuration.old,
+            &root,
+            &mut epochs,
+            &mut root_id,
+            evidence,
+        )
+        .await?;
         let scope = issue_scope(&mut owner, evidence).await?;
         // The unchanged old canonical producer is the only source of ancestry.
         // Issuing this scope before review avoids changing the reviewed raw hash.
-        let review = owner.command(&query("maintenance.plan", json!({})), evidence).await?;
+        let review = owner
+            .command(&query("maintenance.plan", json!({})), evidence)
+            .await?;
         ensure!(
             review["receipt_id"].is_null()
                 && review["result"]["source_store_version"] == 2
@@ -219,21 +273,39 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
                 && review["result"]["root_id"].as_str() == root_id.as_deref(),
             "Old package must genuinely review its own schema2-to3 migration"
         );
-        let request = durable(&scope, "origin-old-migration", "maintenance.migrate", json!({"plan":review["result"]}), None);
+        let request = durable(
+            &scope,
+            "origin-old-migration",
+            "maintenance.migrate",
+            json!({"plan":review["result"]}),
+            None,
+        );
         let accepted = owner.command(&request, evidence).await?;
         same_receipt(&accepted, &owner.command(&request, evidence).await?)?;
         let id = text(&accepted["result"], "migration_id")?;
-        ensure!(review["result"]["id"] == id && accepted["result"]["state"] == "accepted", "Old migration acceptance identity differs");
-        let inspected = owner.command(&query("maintenance.inspect", json!({"id":id})), evidence).await?;
-        ensure!(inspected["result"]["id"] == id && inspected["result"]["phase"] == "succeeded"
-            && inspected["receipt_id"].is_null(), "Actual old migration did not succeed");
+        ensure!(
+            review["result"]["id"] == id && accepted["result"]["state"] == "accepted",
+            "Old migration acceptance identity differs"
+        );
+        let inspected = owner
+            .command(&query("maintenance.inspect", json!({"id":id})), evidence)
+            .await?;
+        ensure!(
+            inspected["result"]["id"] == id
+                && inspected["result"]["phase"] == "succeeded"
+                && inspected["receipt_id"].is_null(),
+            "Actual old migration did not succeed"
+        );
         owner.stop(evidence).await?;
         let snapshot = closed(&root, "origin-old-migrated-r0", evidence)?;
         compatible(&snapshot)?;
         guard(&snapshot, &id, "0")?;
         ensure!(
             !snapshot.rows.contains_key("meta/genesis-origin")
-                && !snapshot.rows.keys().any(|key| key.starts_with("generation-initialization/")),
+                && !snapshot
+                    .rows
+                    .keys()
+                    .any(|key| key.starts_with("generation-initialization/")),
             "Migrated origin must not contain manufactured fresh initialization"
         );
         migrated_source = Some(selected_object(&root)?);
@@ -243,15 +315,34 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
 
     let requests = if fresh {
         // Nothing, including a requests directory, is seeded before startup.
-        let owner = Owner::start(&configuration.new, &root, &mut epochs, &mut root_id, evidence).await?;
+        let owner = Owner::start(
+            &configuration.new,
+            &root,
+            &mut epochs,
+            &mut root_id,
+            evidence,
+        )
+        .await?;
         owner.stop(evidence).await?;
         security::private_directory(&root.join("requests"))?
     } else {
         let requests = security::private_directory(&root.join("requests"))?;
-        let mut owner = Owner::start(&configuration.new, &root, &mut epochs, &mut root_id, evidence).await?;
+        let mut owner = Owner::start(
+            &configuration.new,
+            &root,
+            &mut epochs,
+            &mut root_id,
+            evidence,
+        )
+        .await?;
         replay_pair(&mut owner, &migration, evidence).await?;
         let scope = issue_scope(&mut owner, evidence).await?;
-        let review = owner.command(&query("maintenance.initialization.plan", json!({})), evidence).await?;
+        let review = owner
+            .command(
+                &query("maintenance.initialization.plan", json!({})),
+                evidence,
+            )
+            .await?;
         let plan: MediaInitializationPlan = serde_json::from_value(review["result"].clone())?;
         plan.validate_hash()?;
         let source = migrated_source.as_ref().context("Migrated native source")?;
@@ -259,19 +350,38 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
             review["receipt_id"].is_null()
                 && plan.origin == InitializationOrigin::MigratedZeroRevision
                 && plan.source_guard_revision == "0"
-                && Some(plan.source_activation_id.as_str()) == source.selection.activation_id.as_deref()
+                && Some(plan.source_activation_id.as_str())
+                    == source.selection.activation_id.as_deref()
                 && plan.source_generation == source.selection.generation
-                && plan.source_operation_id == text(&migration.as_ref().context("Old migration")?.1["result"], "migration_id")?,
+                && plan.source_operation_id
+                    == text(
+                        &migration.as_ref().context("Old migration")?.1["result"],
+                        "migration_id"
+                    )?,
             "Current startup auto-initialized or changed genuine unadopted migration ancestry"
         );
-        let request = durable(&scope, "origin-explicit-initialization", "maintenance.initialization.accept", json!({"plan":review["result"]}), None);
+        let request = durable(
+            &scope,
+            "origin-explicit-initialization",
+            "maintenance.initialization.accept",
+            json!({"plan":review["result"]}),
+            None,
+        );
         retain_request(&requests, &request)?;
         let accepted = owner.command(&request, evidence).await?;
         retain_response(&requests, &accepted)?;
-        let inspected = owner.command(&query("maintenance.initialization.inspect", json!({"id":plan.id})), evidence).await?;
-        ensure!(inspected["result"]["id"] == plan.id
-            && inspected["result"]["phase"] == "succeeded"
-            && inspected["receipt_id"].is_null(), "Explicit initialization did not complete before old-floor refusal");
+        let inspected = owner
+            .command(
+                &query("maintenance.initialization.inspect", json!({"id":plan.id})),
+                evidence,
+            )
+            .await?;
+        ensure!(
+            inspected["result"]["id"] == plan.id
+                && inspected["result"]["phase"] == "succeeded"
+                && inspected["receipt_id"].is_null(),
+            "Explicit initialization did not complete before old-floor refusal"
+        );
         same_receipt(&accepted, &owner.command(&request, evidence).await?)?;
         initialization = Some((request, accepted));
         owner.stop(evidence).await?;
@@ -283,11 +393,19 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
     }
     let initialized = closed(&root, "origin-initialized-target-F", evidence)?;
     let selected = selected_object(&root)?;
-    let GenerationLocation::Workspace { operation_id: initialization_id, role: GenerationRole::Target } = &selected.selection.location else {
+    let GenerationLocation::Workspace {
+        operation_id: initialization_id,
+        role: GenerationRole::Target,
+    } = &selected.selection.location
+    else {
         anyhow::bail!("Genuine initialization must select its actual workspace target");
     };
-    let record: MediaInitializationRecord = serde_json::from_slice(initialized.rows
-        .get(&format!("generation-initialization/{initialization_id}")).context("Actual initialization row")?)?;
+    let record: MediaInitializationRecord = serde_json::from_slice(
+        initialized
+            .rows
+            .get(&format!("generation-initialization/{initialization_id}"))
+            .context("Actual initialization row")?,
+    )?;
     record.plan.validate_hash()?;
     let expected_origin = if fresh {
         InitializationOrigin::CompatibleGenesisV1
@@ -295,14 +413,20 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
         InitializationOrigin::MigratedZeroRevision
     };
     ensure!(
-        record.id == *initialization_id && record.plan.id == record.id
+        record.id == *initialization_id
+            && record.plan.id == record.id
             && record.plan.root_id == initialized.facts.root_id
             && record.phase == EnablementPhase::Succeeded
             && record.completed_at.is_some()
             && record.plan.application_build == configuration.new.hash()?
             && record.plan.source_guard_revision == "0"
             && record.plan.origin == expected_origin
-            && initialized.facts.required_capabilities.iter().map(String::as_str).collect::<BTreeSet<_>>()
+            && initialized
+                .facts
+                .required_capabilities
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>()
                 == MEDIA_V1_CAPABILITIES.iter().copied().collect(),
         "Actual automatic/explicit initialization did not establish its genuine record and floor"
     );
@@ -316,18 +440,43 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
         // Request or opaque internal bootstrap Scope can be recovered from it.
         retain_response(&requests, &accepted_initialization)?;
     }
-    let receipt_bytes = initialized.rows.get(&record.receipt_key).context("Initialization raw receipt")?;
-    security::write_private(&requests.join("initialization-raw-receipt.json"), receipt_bytes, false)?;
+    let receipt_bytes = initialized
+        .rows
+        .get(&record.receipt_key)
+        .context("Initialization raw receipt")?;
+    security::write_private(
+        &requests.join("initialization-raw-receipt.json"),
+        receipt_bytes,
+        false,
+    )?;
     let (original_source, baseline, fenced_source) = retained_origin(&root, &record, evidence)?;
     if let Some(source) = &migrated_source {
-        ensure!(*source == original_source, "Initialization replaced migrated original S identity");
-        unchanged_baseline(migrated_baseline.as_ref().context("Migrated raw baseline")?, &baseline)?;
+        ensure!(
+            *source == original_source,
+            "Initialization replaced migrated original S identity"
+        );
+        unchanged_baseline(
+            migrated_baseline
+                .as_ref()
+                .context("Migrated raw baseline")?,
+            &baseline,
+        )?;
     } else {
         ensure!(
-            record.plan.source_generation == 1 && record.plan.source_activation_sequence == 1
-                && matches!(&original_source.selection.location, GenerationLocation::LegacyOne {})
-                && baseline.rows.get("meta/genesis-origin").is_some_and(|id| id == record.plan.source_operation_id.as_bytes())
-                && baseline.rows.contains_key(&format!("generation-genesis/{}", record.plan.source_operation_id)),
+            record.plan.source_generation == 1
+                && record.plan.source_activation_sequence == 1
+                && matches!(
+                    &original_source.selection.location,
+                    GenerationLocation::LegacyOne {}
+                )
+                && baseline
+                    .rows
+                    .get("meta/genesis-origin")
+                    .is_some_and(|id| id == record.plan.source_operation_id.as_bytes())
+                && baseline.rows.contains_key(&format!(
+                    "generation-genesis/{}",
+                    record.plan.source_operation_id
+                )),
             "Fresh root lacks its actual compatible genesis S identity"
         );
     }
@@ -339,26 +488,50 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
 
     let physical_before = physical_state(&root)?;
     let refused = old_floor_refusal(&configuration.old, &root, evidence).await?;
-    ensure!(refused["exit_code"] == 3, "Old floor refusal must be actual exit3");
+    ensure!(
+        refused["exit_code"] == 3,
+        "Old floor refusal must be actual exit3"
+    );
     // First operation after the refused child exits: direct physical/native
     // observation, with no RootLease, writable database or recovery in between.
     let physical_after = physical_state(&root)?;
-    ensure!(physical_before == physical_after, "Old refusal mutated physical origin state");
-    evidence.record(json!({"phase":"origin-old-floor-no-mutation","origin":origin_name,
-        "before_current_recovery":true,"old_refusal":refused,"physical":physical_after}))?;
+    ensure!(
+        physical_before == physical_after,
+        "Old refusal mutated physical origin state"
+    );
+    evidence.record(
+        json!({"phase":"origin-old-floor-no-mutation","origin":origin_name,
+        "before_current_recovery":true,"old_refusal":refused,"physical":physical_after}),
+    )?;
 
-    let mut owner = Owner::start(&configuration.new, &root, &mut epochs, &mut root_id, evidence).await?;
+    let mut owner = Owner::start(
+        &configuration.new,
+        &root,
+        &mut epochs,
+        &mut root_id,
+        evidence,
+    )
+    .await?;
     inspect_initialization(&mut owner, &record, "succeeded", evidence).await?;
     replay_pair(&mut owner, &initialization, evidence).await?;
     replay_pair(&mut owner, &migration, evidence).await?;
     // A genuinely caller-issued Scope must precede the stopped restoration
     // review. It never substitutes for startup's accepted bootstrap Scope.
     let restoration_scope = issue_scope(&mut owner, evidence).await?;
-    let review = owner.command(&query("maintenance.initialization.restore.plan", json!({"id":record.id})), evidence).await?;
+    let review = owner
+        .command(
+            &query(
+                "maintenance.initialization.restore.plan",
+                json!({"id":record.id}),
+            ),
+            evidence,
+        )
+        .await?;
     let restore: GenerationRestorationPlan = serde_json::from_value(review["result"].clone())?;
     restore.validate_hash()?;
     ensure!(
-        review["receipt_id"].is_null() && restore.kind == RestorationKind::InitializationRestorationV1
+        review["receipt_id"].is_null()
+            && restore.kind == RestorationKind::InitializationRestorationV1
             && restore.enablement_id == record.id
             && restore.source_operation_id == record.plan.source_operation_id
             && restore.source_activation_id == record.plan.source_activation_id
@@ -367,37 +540,88 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
             && restore.fenced_activation_id == record.activation_id,
         "Stopped r0 restoration lost the genuine origin ancestry"
     );
-    let restoration = durable(&restoration_scope, "origin-stopped-restoration", "maintenance.initialization.restore.accept", json!({"plan":review["result"]}), None);
+    let restoration = durable(
+        &restoration_scope,
+        "origin-stopped-restoration",
+        "maintenance.initialization.restore.accept",
+        json!({"plan":review["result"]}),
+        None,
+    );
     retain_request(&requests, &restoration)?;
     let restored_receipt = owner.command(&restoration, evidence).await?;
     retain_response(&requests, &restored_receipt)?;
-    ensure!(restored_receipt["result"]["restoration_id"] == restore.id, "Restoration acceptance identity differs");
-    same_receipt(&restored_receipt, &owner.command(&restoration, evidence).await?)?;
+    ensure!(
+        restored_receipt["result"]["restoration_id"] == restore.id,
+        "Restoration acceptance identity differs"
+    );
+    same_receipt(
+        &restored_receipt,
+        &owner.command(&restoration, evidence).await?,
+    )?;
     inspect_initialization(&mut owner, &record, "restored", evidence).await?;
-    let inspected = owner.command(&query("maintenance.initialization.restore.inspect", json!({"id":restore.id})), evidence).await?;
-    ensure!(inspected["receipt_id"].is_null() && inspected["result"]["id"] == restore.id
-        && inspected["result"]["status"] == "armed", "Actual restoration barrier was not inspected");
+    let inspected = owner
+        .command(
+            &query(
+                "maintenance.initialization.restore.inspect",
+                json!({"id":restore.id}),
+            ),
+            evidence,
+        )
+        .await?;
+    ensure!(
+        inspected["receipt_id"].is_null()
+            && inspected["result"]["id"] == restore.id
+            && inspected["result"]["status"] == "armed",
+        "Actual restoration barrier was not inspected"
+    );
     owner.stop(evidence).await?;
     let restored = closed(&root, "origin-restored-original-S", evidence)?;
-    same_selected_source(&root, &original_source, "origin-after-restoration", evidence)?;
+    same_selected_source(
+        &root,
+        &original_source,
+        "origin-after-restoration",
+        evidence,
+    )?;
     compatible(&restored)?;
     one_initialization(&restored, &record.id)?;
-    ensure!(guard(&restored, &record.plan.source_operation_id, "0")?
-        == guard(&baseline, &record.plan.source_operation_id, "0")?, "Restoration reset original guard bytes");
+    ensure!(
+        guard(&restored, &record.plan.source_operation_id, "0")?
+            == guard(&baseline, &record.plan.source_operation_id, "0")?,
+        "Restoration reset original guard bytes"
+    );
     unchanged_baseline(&baseline, &restored)?;
     preserved(&initialized, &restored, |key| key.starts_with("receipt/"))?;
     // S retains its genuine accepted journal bytes. F separately records
     // completion; inspect derives "restored" from the real exposure barrier.
     // Restoration does not rewrite S's original acceptance into F's record.
-    preserved(&fenced_source, &restored, |key| key.starts_with("generation-initialization/"))?;
-    ensure!(restored.rows.contains_key(&format!("generation-restoration/{}", restore.id)), "Newer restoration row was lost");
+    preserved(&fenced_source, &restored, |key| {
+        key.starts_with("generation-initialization/")
+    })?;
+    ensure!(
+        restored
+            .rows
+            .contains_key(&format!("generation-restoration/{}", restore.id)),
+        "Newer restoration row was lost"
+    );
     same_receipt(&accepted_initialization, &raw_receipt(&restored, &record)?)?;
 
-    let mut owner = Owner::start(&configuration.old, &root, &mut epochs, &mut root_id, evidence).await?;
+    let mut owner = Owner::start(
+        &configuration.old,
+        &root,
+        &mut epochs,
+        &mut root_id,
+        evidence,
+    )
+    .await?;
     replay_pair(&mut owner, &migration, evidence).await?;
     let old_scope = issue_scope(&mut owner, evidence).await?;
-    let old_write = durable(&old_scope, "origin-old-business", "access.profiles.create",
-        json!({"name":"origin-after-restoration","read_roots":[],"write_roots":[]}), None);
+    let old_write = durable(
+        &old_scope,
+        "origin-old-business",
+        "access.profiles.create",
+        json!({"name":"origin-after-restoration","read_roots":[],"write_roots":[]}),
+        None,
+    );
     retain_request(&requests, &old_write)?;
     let written = owner.command(&old_write, evidence).await?;
     retain_response(&requests, &written)?;
@@ -410,20 +634,44 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
     same_receipt(&written, &owner.command(&old_write, evidence).await?)?;
     owner.stop(evidence).await?;
     let after_old = closed(&root, "origin-old-business-r1", evidence)?;
-    same_selected_source(&root, &original_source, "origin-after-old-business", evidence)?;
+    same_selected_source(
+        &root,
+        &original_source,
+        "origin-after-old-business",
+        evidence,
+    )?;
     guard(&after_old, &record.plan.source_operation_id, "1")?;
     compatible(&after_old)?;
-    ensure!(after_old.rows.contains_key("profile/origin-after-restoration"), "Old business profile was not retained");
-    preserved(&restored, &after_old, |key| !["meta/clock", "meta/rollback-guard"].contains(&key) && !key.starts_with("scope-rate/"))?;
+    ensure!(
+        after_old
+            .rows
+            .contains_key("profile/origin-after-restoration"),
+        "Old business profile was not retained"
+    );
+    preserved(&restored, &after_old, |key| {
+        !["meta/clock", "meta/rollback-guard"].contains(&key) && !key.starts_with("scope-rate/")
+    })?;
     one_initialization(&after_old, &record.id)?;
 
-    let mut owner = Owner::start(&configuration.new, &root, &mut epochs, &mut root_id, evidence).await?;
+    let mut owner = Owner::start(
+        &configuration.new,
+        &root,
+        &mut epochs,
+        &mut root_id,
+        evidence,
+    )
+    .await?;
     inspect_initialization(&mut owner, &record, "restored", evidence).await?;
     replay_pair(&mut owner, &migration, evidence).await?;
     replay_pair(&mut owner, &initialization, evidence).await?;
     same_receipt(&written, &owner.command(&old_write, evidence).await?)?;
-    same_receipt(&restored_receipt, &owner.command(&restoration, evidence).await?)?;
-    let next = owner.command(&query("maintenance.promotion.plan", json!({})), evidence).await?;
+    same_receipt(
+        &restored_receipt,
+        &owner.command(&restoration, evidence).await?,
+    )?;
+    let next = owner
+        .command(&query("maintenance.promotion.plan", json!({})), evidence)
+        .await?;
     let next: GenerationPromotionPlan = serde_json::from_value(next["result"].clone())?;
     next.validate_hash()?;
     ensure!(
@@ -437,15 +685,29 @@ async fn scenario(fresh: bool, evidence: &Evidence) -> Result<Value> {
     );
     owner.stop(evidence).await?;
     let final_raw = closed(&root, "origin-final-current-replays", evidence)?;
-    same_selected_source(&root, &original_source, "origin-after-final-current-reopen", evidence)?;
+    same_selected_source(
+        &root,
+        &original_source,
+        "origin-after-final-current-reopen",
+        evidence,
+    )?;
     compatible(&final_raw)?;
     one_initialization(&final_raw, &record.id)?;
-    ensure!(guard(&final_raw, &record.plan.source_operation_id, "1")?
-        == guard(&after_old, &record.plan.source_operation_id, "1")?, "Final replay changed original guard1");
+    ensure!(
+        guard(&final_raw, &record.plan.source_operation_id, "1")?
+            == guard(&after_old, &record.plan.source_operation_id, "1")?,
+        "Final replay changed original guard1"
+    );
     preserved(&after_old, &final_raw, |key| key != "meta/clock")?;
-    ensure!(final_raw.rows.get(&record.receipt_key) == Some(receipt_bytes), "Actual initialization raw receipt changed across all owners");
+    ensure!(
+        final_raw.rows.get(&record.receipt_key) == Some(receipt_bytes),
+        "Actual initialization raw receipt changed across all owners"
+    );
     let expected_epochs = if fresh { 4 } else { 5 };
-    ensure!(epochs.len() == expected_epochs, "Origin owners must each establish an independent genuine epoch");
+    ensure!(
+        epochs.len() == expected_epochs,
+        "Origin owners must each establish an independent genuine epoch"
+    );
     let completion = json!({"phase":"origin-package-complete","status":"passed","origin":origin_name,
         "root_id":root_id,"owner_epochs":epochs.len(),"epochs":epochs,
         "elapsed_journey_ms":u64::try_from(started.elapsed().as_millis())?,
