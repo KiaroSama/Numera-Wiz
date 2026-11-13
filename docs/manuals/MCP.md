@@ -203,6 +203,16 @@ schemas to all three transport validation batches. Later source changes and new
 tools require fresh checks; this scoped evidence is not whole-current-CI or full-v1
 qualification. See the [project contract guide](PROJECTS.md#command-contracts-and-qualification).
 
+Source `256a98d` in [run 43336702019](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43336702019)
+retained identical actual 53-tool stdio lines on all four native targets:
+149128 bytes including the newline, and 149084 bytes for the standard result.
+The additional tool is the native-owner read-only `maintenance.promotion.plan`.
+Its emitted Result schema matches the generated schema that passed 21 checks
+per target. The 13 project schemas again match all three transport batches.
+Discovery does not grant owner authority; acceptance/restoration and media
+execution remain unfinished. This source's formatting/unused-import failures
+have follow-up corrections, so these facts do not claim complete current CI.
+
 A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside
 its retained `request_id`, `replay_scope` and `idempotency_key` in context:

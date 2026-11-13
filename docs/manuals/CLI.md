@@ -465,7 +465,12 @@ source/prefix/guard facts, current build, bounded target profile, hash and
 sizes plus a 64MiB margin, covering two independent copies and conservative COW
 headroom. The available-space check does not reserve that space. The review
 preserves logical source records and issues no receipt.
-Its newly added implementation still requires current-source hosted qualification.
+At source `256a98d`, shared-service tests on all four native targets passed the
+actual review, literal/hash/privacy controls, browser denial and genuine
+legacy/zero-adoption rejection; each target passed all 21 independent schema
+checks. The current typed-CLI continuation and complete latest-source gates
+still require qualification. That source's remaining native failure was an
+unused import, with a separate prepared correction.
 Promotion acceptance, stopped restoration and fresh/zero-adoption initialization
 remain in development; this query does not enable media persistence or replace
 the legacy migration below.
