@@ -1792,9 +1792,9 @@ mod tests {
             assert!(updated.read_roots.contains(&granted_root));
             fixture.observed_reports.lock().await.clear();
             browser_key(&client, &base, &route, "\u{E00C}").await;
-            // Hosted captures place the launcher at 276,659. The dedicated
+            // Hosted captures place the launcher at 276,699. The dedicated
             // dialog explicitly focuses its path; no hidden-widget Tab search.
-            browser_click(&client, &base, &route, 276, 659).await;
+            browser_click(&client, &base, &route, 276, 699).await;
             tokio::time::sleep(Duration::from_millis(300)).await;
             let png = driver(
                 &client,

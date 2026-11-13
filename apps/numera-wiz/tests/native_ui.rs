@@ -690,9 +690,9 @@ async fn journey() {
         .unwrap()
         .lines()
         .count();
-    // Hosted captures place the bottom launcher at 276,659. The dedicated
+    // Hosted captures place the bottom launcher at 276,699. The dedicated
     // dialog explicitly focuses its visible path field; no hidden Tab search.
-    click(&window, "276", "659").await;
+    click(&window, "276", "699").await;
     tokio::time::sleep(Duration::from_millis(300)).await;
     screenshot(&window, &evidence.join("native-folder-expanded.png")).await;
     input(&["key", "--clearmodifiers", "ctrl+a"]).await;
