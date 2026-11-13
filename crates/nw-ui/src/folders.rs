@@ -279,7 +279,7 @@ impl WizApp {
         }
         let mut open = true;
         egui::Window::new("Folder intake")
-            .id(egui::Id::new("folder-intake-window"))
+            .id(egui::Id::unique("folder-intake-window"))
             .order(egui::Order::Foreground)
             .default_pos(egui::pos2(280.0, 70.0))
             .default_width(860.0)
@@ -360,7 +360,7 @@ impl WizApp {
         ui.add_enabled_ui(idle, |ui| {
             let path = ui.add(
                 egui::TextEdit::singleline(&mut self.folder.path)
-                    .id(egui::Id::new("folder-intake-path"))
+                    .id(egui::Id::unique("folder-intake-path"))
                     .char_limit(4096)
                     .desired_width(f32::INFINITY)
                     .hint_text("Absolute owner-granted engine folder path"),
@@ -396,7 +396,7 @@ impl WizApp {
         let snapshot_id = ui.add_enabled(
             idle,
             egui::TextEdit::singleline(&mut self.folder.snapshot_id)
-                .id(egui::Id::new("folder-intake-snapshot-id"))
+                .id(egui::Id::unique("folder-intake-snapshot-id"))
                 .char_limit(128)
                 .desired_width(f32::INFINITY)
                 .hint_text("Retained folder snapshot ID"),

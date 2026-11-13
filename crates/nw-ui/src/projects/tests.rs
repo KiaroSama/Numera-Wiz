@@ -395,7 +395,7 @@ fn key_events(key: egui::Key) -> Vec<egui::Event> {
 fn text_frame(ctx: &egui::Context, text: &mut String, events: Vec<egui::Event>, focus: bool) {
     widget_frame(ctx, events, |ui| {
         let response =
-            ui.add(egui::TextEdit::singleline(text).id(egui::Id::new("project-regression-text")));
+            ui.add(egui::TextEdit::singleline(text).id(egui::Id::unique("project-regression-text")));
         if focus {
             response.request_focus();
         }
@@ -598,7 +598,7 @@ fn focused_folder_scan() {
     app.scope = Some(scope());
     app.folder.open = true;
     folder_frame(&mut app, &ctx, Vec::new());
-    let path_id = egui::Id::new("folder-intake-path");
+    let path_id = egui::Id::unique("folder-intake-path");
     assert!(
         egui::TextEdit::load_state(&ctx, path_id).is_some(),
         "Focus must target the real rendered folder path"

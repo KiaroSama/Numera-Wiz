@@ -114,7 +114,7 @@ impl WizApp {
                 ui.label("Project name");
                 let name = ui.add(
                     egui::TextEdit::singleline(&mut self.projects.forms.project_name)
-                        .id(egui::Id::new("project-name"))
+                        .id(egui::Id::unique("project-name"))
                         .char_limit(128)
                         .desired_width(320.0),
                 );
@@ -439,7 +439,7 @@ impl WizApp {
                     );
                     let hit = ui.interact(
                         rect,
-                        ui.id().with(("project-clip", clip.id.as_str())),
+                        ui.scope_id().with(("project-clip", clip.id.as_str())),
                         egui::Sense::click(),
                     );
                     if ready && hit.clicked() {
@@ -605,7 +605,7 @@ impl WizApp {
                             ui.label("Sequence name");
                             let name = ui.add(
                                 egui::TextEdit::singleline(&mut self.projects.forms.sequence_name)
-                                    .id(egui::Id::new("project-sequence-name"))
+                                    .id(egui::Id::unique("project-sequence-name"))
                                     .char_limit(128)
                                     .desired_width(f32::INFINITY),
                             );

@@ -728,7 +728,7 @@ impl WizApp {
                     {
                         self.save_destination.clear();
                         ctx.memory_mut(|memory| {
-                            memory.request_focus(egui::Id::new("artifact-save-destination"))
+                            memory.request_focus(egui::Id::unique("artifact-save-destination"))
                         });
                     }
                 }
@@ -1004,7 +1004,7 @@ impl WizApp {
                 {
                     ui.label("Client destination");
                     ui.add(egui::TextEdit::singleline(&mut self.save_destination)
-                        .id(egui::Id::new("artifact-save-destination"))
+                        .id(egui::Id::unique("artifact-save-destination"))
                         .hint_text("Absolute new file path; leave blank for the Save As dialog")
                         .desired_width(f32::INFINITY));
                     ui.small("An existing native destination is preserved.");
