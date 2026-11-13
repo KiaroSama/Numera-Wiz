@@ -278,7 +278,7 @@ async fn journey() {
     std::fs::write(evidence.join("native-selection-report.json"), serde_json::to_vec_pretty(&json!({"ui_completion_event":report_event,"independent_report":report,"scope":"Actual Selection report pointer input completed before the harness query, retained window PNG, Escape closes the report"})).unwrap()).unwrap();
     input(&["key", "--clearmodifiers", "Escape"]).await;
     tokio::time::sleep(Duration::from_millis(150)).await;
-    click(&window, "331", "570").await;
+    click(&window, "331", "602").await;
     tokio::time::sleep(Duration::from_secs(1)).await;
     screenshot(&window, &evidence.join("native-reviewed-workspace.png")).await;
     input(&["windowactivate", "--sync", &window]).await;
