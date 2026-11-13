@@ -22,8 +22,8 @@ No specific redb, filesystem or lock cause is established by that exit.
 Later source corrections retain the authenticated empty index with explicit
 absent-cache evidence and preserve all compressed/plain checks. The candidate
 also selects released eframe0.37.0 with reviewed ID/scope aliases and native
-clipboard restoration. Its new lock must come from the hosted resolver; an old
-lock is not treated as a valid new dependency closure. A bounded test-harness
+clipboard restoration. CI287 supplies its new lock, reviewed and applied in full; the next
+locked build must qualify that exact dependency closure. A bounded test-harness
 consumer retains the existing finite owner failure frame without publishing raw
 logs, credentials or paths. These later changes still need their own hosted
 qualification; CI285 does not qualify them. Full version1 remains unfinished.
