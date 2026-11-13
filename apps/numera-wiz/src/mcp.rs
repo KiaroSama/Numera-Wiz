@@ -28,6 +28,11 @@ impl Bridge {
         canonical: Request,
         context: &RequestContext<RoleServer>,
     ) -> Result<commands::Response, ErrorData> {
+        if crate::access::credential_file::is_issue(&canonical.command.id) {
+            return Ok(commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
+                "VALIDATION_ERROR", "Credential issuance requires protected credential_file delivery",
+            )));
+        }
         match &self.backend {
             Backend::Native(client) => {
                 tokio::select! {
@@ -82,6 +87,13 @@ fn tool(name: &str) -> Option<Tool> {
     }
     if let Some(definitions) = definitions {
         schema.as_object_mut()?.insert("$defs".into(), definitions);
+    }
+    if crate::access::credential_file::is_issue(name) {
+        schema["properties"]["credential_file"] = serde_json::json!({
+            "type":"string","minLength":1,"maxLength":32767,
+            "description":"Absolute local protected output file; explicit native-owner stdio only; no overwrite"
+        });
+        schema["required"].as_array_mut()?.push(serde_json::json!("credential_file"));
     }
     let mut tool = Tool::new(
         descriptor.id,
@@ -235,6 +247,7 @@ impl ServerHandler for Bridge {
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
         let mut args = request.arguments.unwrap_or_default();
+        let credential_file = args.remove("credential_file");
         let metadata = args
             .remove("context")
             .unwrap_or_else(|| serde_json::json!({}));
@@ -261,7 +274,33 @@ impl ServerHandler for Bridge {
         canonical.project = metadata.project;
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
-        let response = self.execute(canonical, &context).await?;
+        let issuance = crate::access::credential_file::is_issue(&canonical.command.id);
+        if credential_file.is_some() && !issuance {
+            return Err(ErrorData::invalid_params("credential_file is only valid for credential issuance", None));
+        }
+        let response = if issuance {
+            match &self.backend {
+                Backend::Native(client) if client.profile.is_none() => {
+                    let path = credential_file.as_ref().and_then(serde_json::Value::as_str)
+                        .filter(|path| !path.is_empty() && path.chars().count() <= 32767)
+                        .map(std::path::Path::new)
+                        .filter(|path| path.is_absolute());
+                    if let Some(path) = path {
+                        crate::access::credential_file::deliver(client, &canonical, path).await
+                            .map_err(|_| ErrorData::internal_error("Protected credential file delivery failed; no credential value returned", None))?
+                    } else {
+                        commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
+                            "VALIDATION_ERROR", "Choose an explicit absolute credential_file; raw credentials are never returned",
+                        ))
+                    }
+                }
+                _ => commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
+                    "PERMISSION_DENIED", "Credential file delivery requires explicit native-owner stdio",
+                )),
+            }
+        } else {
+            self.execute(canonical, &context).await?
+        };
         let value = serde_json::to_value(&response)
             .map_err(|_| ErrorData::internal_error("Response serialization failed", None))?;
         let mut result = if response.ok {

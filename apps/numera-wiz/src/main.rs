@@ -376,10 +376,7 @@ async fn finish_one_shot<T>(
 }
 
 async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
-    if matches!(
-        request.command.id.as_str(),
-        "access.tokens.issue" | "access.credentials.issue"
-    ) {
+    if access::credential_file::is_issue(&request.command.id) {
         let error = nw_domain::DomainError::new(
             "VALIDATION_ERROR",
             "Use access tokens issue --for-access-profile NAME --out FILE; raw credential responses are never printed",

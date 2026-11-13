@@ -132,6 +132,8 @@ authority, including implemented access administration and maintenance. It canno
 be combined with a profile, token file or HTTP transport. The shipped plugin and
 standalone defaults remain scoped; a denied tool call does not select this mode.
 See the [MCP manual](../manuals/MCP.md#stdio) for its binding and retry rules.
+Credential issuance requires its explicit `credential_file` argument and returns
+only protected-file metadata; the agent never receives the bearer in a tool result.
 
 | Client | Checked-in configuration / supported destination |
 | --- | --- |

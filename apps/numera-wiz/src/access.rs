@@ -8,6 +8,7 @@ use nw_domain::{
 };
 use serde_json::{Value, json};
 use std::{io::Read, path::PathBuf};
+pub(crate) mod credential_file;
 
 #[derive(Subcommand)]
 pub enum AccessCommand {
@@ -199,57 +200,19 @@ pub async fn run(client: &NativeClient, command: AccessCommand) -> Result<()> {
                 out,
                 port,
             } => {
-                if out.try_exists()? {
-                    return print_checked(Response::error(
-                        "token-file",
-                        DomainError::new(
-                            "OUTPUT_COLLISION",
-                            "Token file already exists; no credential was issued",
-                        ),
-                    ));
-                }
-                let issued = client
-                    .request(&Request::query(
+                let issued = credential_file::deliver(client, &Request::query(
                         "access.tokens.issue",
                         json!({"for_access_profile":for_access_profile,"port":port}),
-                    ))
-                    .await?;
+                    ), &out).await?;
                 if !issued.ok {
                     return print_checked(issued);
                 }
                 let result = issued
                     .result
                     .context("Issued credential metadata is missing")?;
-                let bearer = result["bearer"]
-                    .as_str()
-                    .context("Issued credential omitted its value")?;
-                let token_id = result["token_id"]
-                    .as_str()
-                    .context("Issued credential omitted its identifier")?;
-                if let Err(error) =
-                    nw_platform::security::write_private(&out, bearer.as_bytes(), false)
-                {
-                    let revoked =
-                        durable(client, "access.tokens.revoke", json!({"token_id":token_id})).await;
-                    let revoked = revoked.as_ref().is_ok_and(|response| response.ok);
-                    tracing::error!(token_id, revoked, code=%error.code, "Credential file delivery failed; no bearer was printed");
-                    return print_checked(Response::error(
-                        "token-file",
-                        DomainError::new(
-                            "CREDENTIAL_DELIVERY_FAILED",
-                            if revoked {
-                                "Token file publication failed; the issued token was revoked"
-                            } else {
-                                "Token file publication failed; issued-token revocation could not be confirmed"
-                            },
-                        ),
-                    ));
-                }
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(
-                        &json!({"token_id":token_id,"principal":result["principal"],"expires_at":result["expires_at"],"file":nw_platform::files::path_text(&out)?})
-                    )?
+                    serde_json::to_string_pretty(&result)?
                 );
                 Ok(())
             }

@@ -47,6 +47,22 @@ Select that mode in the client configuration deliberately; a permission refusal
 does not authorize an agent to replace its scoped connection with an owner one.
 Actual named-client loading remains separate from hosted official-SDK evidence.
 
+`access.tokens.issue` and `access.credentials.issue` additionally require an
+absolute `credential_file` beside `params` in the MCP tool arguments:
+
+```json
+{"params":{"for_access_profile":"operator","port":1578},"credential_file":"<absolute-private-output-file>"}
+```
+
+Only explicit native-owner stdio performs this delivery. Scoped and HTTP bridges
+refuse before filesystem or issuance effects. The shared CLI delivery path writes
+a protected file without replacement; the result contains its path, token ID and
+non-secret metadata. Credential values never appear in MCP results or text.
+Publication failure attempts revocation of the issued credential. After a lost
+response or cancellation, inspect the original output before retrying; an existing
+file is a collision and is never overwritten. Canonical issuance parameters and
+the credential's original profile/audience rules remain unchanged.
+
 ## Typed calls and retries
 
 `tools/list` is generated from the active shared registry. Tool input uses
