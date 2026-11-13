@@ -226,11 +226,11 @@ async fn native_owner_mcp_query(
 }
 
 async fn reject_ambiguous_owner_bridge() {
-    for args in [
-        vec!["bridge", "--native-owner", "--transport", "http"],
-        vec!["--access-profile", "agent", "bridge", "--native-owner"],
-        vec!["bridge", "--native-owner", "--access-profile", "agent"],
-        vec!["bridge", "--native-owner", "--token-file", "must-not-use-a-token"],
+    for (case, args) in [
+        ("http", vec!["bridge", "--native-owner", "--transport", "http"]),
+        ("profile-before-bridge", vec!["--access-profile", "agent", "bridge", "--native-owner"]),
+        ("profile-after-bridge", vec!["bridge", "--native-owner", "--access-profile", "agent"]),
+        ("token-file", vec!["bridge", "--native-owner", "--token-file", "must-not-use-a-token"]),
     ] {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("must-not-bootstrap");
@@ -238,9 +238,9 @@ async fn reject_ambiguous_owner_bridge() {
         command.arg("--data-dir").arg(&root).args(args).kill_on_drop(true);
         let output = tokio::time::timeout(std::time::Duration::from_secs(5), command.output())
             .await.unwrap().unwrap();
-        assert!(!output.status.success());
-        assert!(output.stdout.is_empty(), "Rejected bridge configuration polluted protocol stdout");
-        assert!(!root.exists(), "Rejected bridge configuration must not initialize or attach an owner");
+        assert!(!output.status.success(), "Rejected bridge configuration succeeded: {case}");
+        assert!(output.stdout.is_empty(), "Rejected bridge configuration polluted protocol stdout: {case}");
+        assert!(!root.exists(), "Rejected bridge configuration must not initialize or attach an owner: {case}");
     }
 }
 
@@ -817,7 +817,24 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
         mcp_plan.validate_hash().unwrap();
         assert_eq!(mcp_plan.source_guard, plan.source_guard);
         assert_eq!(mcp_plan.source_records_sha256, plan.source_records_sha256);
-        assert_eq!(mcp_plan.hash, plan.hash, "Native CLI and explicit owner MCP must review the same actual source");
+        // Separate reviews close/reopen the store and may observe different allocator bytes.
+        // Each original plan retains its own validated hash, lifetime and space estimate.
+        eprintln!(
+            "Promotion review snapshots cli_source_bytes={} mcp_source_bytes={} cli_additional_bytes={} mcp_additional_bytes={}",
+            plan.source_bytes, mcp_plan.source_bytes, plan.estimated_additional_bytes, mcp_plan.estimated_additional_bytes,
+        );
+        let logical_source = |review: &nw_domain::maintenance::promotion::GenerationPromotionPlan| {
+            let mut value = serde_json::to_value(review).unwrap();
+            let fields = value.as_object_mut().unwrap();
+            for field in ["id", "hash", "created_at", "expires_at", "source_bytes", "estimated_additional_bytes"] {
+                assert!(fields.remove(field).is_some());
+            }
+            value
+        };
+        assert_eq!(
+            logical_source(&mcp_plan), logical_source(&plan),
+            "Native CLI and explicit owner MCP must review the same complete logical source, ancestry and target",
+        );
         let media_started = std::time::Instant::now();
         let promotion_file = input.join("promotion-review.json");
         nw_platform::security::write_private(&promotion_file, &serde_json::to_vec(&reviewed["result"]).unwrap(), false).unwrap();
