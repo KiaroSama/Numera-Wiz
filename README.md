@@ -97,6 +97,10 @@ filesystem rights before an agent changes media. The skill explains how to probe
 review, submit, observe, cancel/retry and read authorized results.
 For deliberate local owner automation, the [stdio owner option](docs/manuals/MCP.md#stdio)
 uses the same owner authority as the native CLI; shipped client defaults stay scoped.
+[Four-native MCP checks](docs/development/evidence/native-owner-mcp-ci269.json)
+passed protected credential-file delivery, actual authentication/revocation and
+known pre-issuance cancellation. Later SDK and package-origin changes require
+their own current-source checks.
 
 ## Source policy and contributing
 

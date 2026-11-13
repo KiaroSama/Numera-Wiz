@@ -71,8 +71,17 @@ delivery path and returns only non-secret metadata. Default/scoped/HTTP calls
 cannot select this authority through tool parameters. Actual CI267 exposed
 invalid-option filesystem effects and an over-strict comparison of independent
 review hashes; corrections and cancellation admission still require their own
-current-head hosted checks. Named-client loading and full agent parity remain
-unfinished.
+current-head hosted checks. [CI269](evidence/native-owner-mcp-ci269.json) now
+passes all four native build/test/lint jobs, including protected credential-file
+delivery, actual private/public authentication and revocation, known pre-issuance
+cancellation, invalid-option no-root effects and complete logical review
+correspondence. All four actual65-tool frames are184764 bytes with the same hash;
+all65 input/authorization contracts and18 typed results correspond to generated
+descriptors. Its whole thirteen-job census is twelve passes and one formatting
+failure; that entire patch is applied later with all six Rust ASTs preserved.
+It exercises SDK3.9. Later SDK3.10, genuine fresh/r0 package origins and source
+guard corrections remain unqualified by this run. Named-client loading and full
+agent parity remain unfinished.
 
 The full first version remains unfinished: accepted general multi-source/stage/
 output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
