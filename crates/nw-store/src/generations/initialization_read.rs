@@ -5,7 +5,7 @@ use nw_domain::maintenance::{
     media_lifecycle::{EnablementPhase, MediaInitializationRecord},
     promotion::MEDIA_V1_CAPABILITIES,
 };
-use redb::{ReadableDatabase, ReadableTable};
+use redb::ReadableDatabase;
 
 /// All paths, selections and the record are observed under one lease registry
 /// guard. This value is never accepted as input or used to authorize a writer.
