@@ -1822,7 +1822,67 @@ async fn metadata_sequence(
     assert!(result["revision"].is_string());
 }
 
+fn metadata_busy(response: &Response) -> bool {
+    !response.ok
+        && response.result.is_none()
+        && response.receipt_id.is_none()
+        && response.error.as_ref().is_some_and(|error| {
+            error.code == "RESOURCE_LIMIT"
+                && error.message == "Snapshot service is busy; retry the query"
+        })
+}
+
+// Only this concurrent metadata consumer retries the query's explicit mutex-busy
+// refusal. Capacity, expiry, cancellation and policy failures are never retried.
+// Eight attempts add at most seven10ms delays inside the unchanged race deadlines.
+async fn metadata_available(
+    service: &Arc<Service>,
+    context: Context,
+    request: Request,
+    cancellation: CancellationToken,
+) -> Response {
+    assert_eq!(request.command.id, "projects.inspect");
+    for attempt in 0..8 {
+        let response = service
+            .dispatch_cancel(context.clone(), request.clone(), cancellation.clone())
+            .await;
+        if !metadata_busy(&response) || cancellation.is_cancelled() || attempt == 7 {
+            return response;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    unreachable!("The last bounded attempt returns its actual response")
+}
+
 async fn metadata_publication_races() {
+    // Establish the precise retryable condition using the actual retained mutex;
+    // a refused query must not allocate a ticket or mutate retained bindings.
+    {
+        let f = Fixture::new().await;
+        let owner = f.service.owner();
+        let project = f.project(&owner, "Snapshot busy consumer").await;
+        let request = metadata_query(&project, json!({"projection":"summary"}));
+        let response = {
+            let held = f.service.snapshots.lock().unwrap();
+            let before = held.count();
+            let error = f
+                .service
+                .project_query(&owner, &request, &CancellationToken::new())
+                .unwrap_err();
+            let response = Response::error(&request.request_id, error);
+            assert!(metadata_busy(&response), "{response:?}");
+            assert_eq!(held.count(), before);
+            response
+        };
+        view(
+            metadata_available(&f.service, owner, request, CancellationToken::new()).await,
+        );
+        let mut unrelated = response;
+        unrelated.error.as_mut().unwrap().message = "Snapshot capacity exhausted".into();
+        assert!(!metadata_busy(&unrelated));
+        unrelated.error.as_mut().unwrap().code = "SNAPSHOT_EXPIRED".into();
+        assert!(!metadata_busy(&unrelated));
+    }
     for phase in [
         CatalogPhase::ProjectFresh,
         CatalogPhase::ProjectReused,
@@ -1834,7 +1894,16 @@ async fn metadata_publication_races() {
             let project = f.project(&owner, "Coherent metadata").await;
             metadata_sequence(&f, &owner, &project, "0", "A").await;
             metadata_sequence(&f, &owner, &project, "1", "B").await;
-            let bin = view(metadata_detail(&f, &owner, &project).await)["root_bin_id"].clone();
+            let bin = view(
+                metadata_available(
+                    &f.service,
+                    owner.clone(),
+                    metadata_query(&project, json!({"projection":"summary"})),
+                    CancellationToken::new(),
+                )
+                .await,
+            )["root_bin_id"]
+                .clone();
             let reader = f
                 .profile("r2-publication", std::slice::from_ref(&project))
                 .await;
@@ -1849,18 +1918,29 @@ async fn metadata_publication_races() {
             let (ticket, params) = if phase == CatalogPhase::ProjectFresh {
                 (None, json!({"projection":"summary"}))
             } else if phase == CatalogPhase::ProjectReused {
-                let ticket = f.ticket(&reader, &project, None).await;
+                let summary = view(
+                    metadata_available(
+                        &f.service,
+                        reader.clone(),
+                        metadata_query(&project, json!({"projection":"summary","replace_snapshot":null})),
+                        CancellationToken::new(),
+                    )
+                    .await,
+                );
+                let ticket = summary["snapshot_id"].as_str().unwrap().to_owned();
+                assert!(f.service.snapshots.lock().unwrap().projects.contains_key(&ticket));
                 metadata_sequence(&f, &owner, &project, "2", "C").await;
                 let pinned = view(
-                    f.service
-                        .dispatch(
-                            reader.clone(),
-                            metadata_query(
-                                &project,
-                                json!({"projection":"entity","entity_id":bin,"revision":"2"}),
-                            ),
-                        )
-                        .await,
+                    metadata_available(
+                        &f.service,
+                        reader.clone(),
+                        metadata_query(
+                            &project,
+                            json!({"projection":"entity","entity_id":bin,"revision":"2"}),
+                        ),
+                        CancellationToken::new(),
+                    )
+                    .await,
                 );
                 assert_eq!(pinned["project_revision"], "2");
                 assert_eq!(pinned["authorization"]["observed_project_revision"], "3");
@@ -1871,23 +1951,28 @@ async fn metadata_publication_races() {
                 )
             } else {
                 let first = view(
-                    f.service
-                        .dispatch(
-                            reader.clone(),
-                            metadata_query(
-                                &project,
-                                json!({"projection":"bin_page","bin_id":bin,"limit":1}),
-                            ),
-                        )
-                        .await,
+                    metadata_available(
+                        &f.service,
+                        reader.clone(),
+                        metadata_query(
+                            &project,
+                            json!({"projection":"bin_page","bin_id":bin,"limit":1}),
+                        ),
+                        CancellationToken::new(),
+                    )
+                    .await,
                 );
                 assert!(first["next_cursor"].is_string());
                 metadata_sequence(&f, &owner, &project, "2", "C").await;
                 let params = json!({"projection":"bin_page","bin_id":bin,"limit":1,"cursor":first["next_cursor"]});
                 let pinned = view(
-                    f.service
-                        .dispatch(reader.clone(), metadata_query(&project, params.clone()))
-                        .await,
+                    metadata_available(
+                        &f.service,
+                        reader.clone(),
+                        metadata_query(&project, params.clone()),
+                        CancellationToken::new(),
+                    )
+                    .await,
                 );
                 assert_eq!(pinned["project_revision"], "2");
                 assert_eq!(pinned["authorization"]["observed_project_revision"], "3");
@@ -1907,8 +1992,9 @@ async fn metadata_publication_races() {
             let service = f.service.clone();
             let context = reader.clone();
             let request = metadata_query(&project, params);
-            let task =
-                tokio::spawn(async move { service.dispatch_cancel(context, request, token).await });
+            let task = tokio::spawn(async move {
+                metadata_available(&service, context, request, token).await
+            });
             reached(ready).await;
             match change {
                 "cancel" => cancellation.cancel(),

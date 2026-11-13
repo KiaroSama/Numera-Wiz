@@ -440,7 +440,18 @@ async fn concurrent_native_frontends_boot_one_owner_for_the_same_root() {
 
 async fn migration_cli(root: &std::path::Path, args: &[&str]) -> serde_json::Value {
     let started = std::time::Instant::now();
-    let label = args.iter().take(2).copied().collect::<Vec<_>>().join(" ");
+    let label = args
+        .iter()
+        .copied()
+        .take_while(|arg| {
+            matches!(
+                *arg,
+                "maintenance" | "promotion" | "initialization" | "restore" | "plan"
+                    | "accept" | "inspect" | "migrate" | "access" | "replay-scope" | "create"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
     eprintln!("NW_MIGRATION_CLI_STEP_START:{label}");
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
     command
@@ -450,7 +461,7 @@ async fn migration_cli(root: &std::path::Path, args: &[&str]) -> serde_json::Val
         .kill_on_drop(true);
     let output = tokio::time::timeout(std::time::Duration::from_secs(60), command.output())
         .await
-        .unwrap()
+        .unwrap_or_else(|_| panic!("Native CLI step {label} exceeded its 60-second deadline"))
         .unwrap();
     assert!(
         output.stdout.len() <= nw_domain::commands::MAX_RESULT_BYTES,

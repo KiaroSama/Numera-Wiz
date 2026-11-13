@@ -20,6 +20,40 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 
+/// Fixed maintenance call sites only: no per-row events or caller-provided text.
+/// An ended interval includes error unwinding and does not assert success.
+pub(crate) struct LifecycleTiming {
+    stage: &'static str,
+    started: std::time::Instant,
+}
+impl LifecycleTiming {
+    pub(crate) fn start(stage: &'static str) -> Self {
+        tracing::info!(stage, "Generation lifecycle stage started");
+        Self {
+            stage,
+            started: std::time::Instant::now(),
+        }
+    }
+    pub(crate) fn advance(&mut self, stage: &'static str) {
+        self.end();
+        self.stage = stage;
+        self.started = std::time::Instant::now();
+        tracing::info!(stage, "Generation lifecycle stage started");
+    }
+    fn end(&self) {
+        tracing::info!(
+            stage = self.stage,
+            elapsed_ms = self.started.elapsed().as_millis() as u64,
+            "Generation lifecycle stage ended"
+        );
+    }
+}
+impl Drop for LifecycleTiming {
+    fn drop(&mut self) {
+        self.end();
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Enablement {
@@ -241,7 +275,9 @@ impl Store {
         let input: PromotionSubmitInput = nw_domain::commands::parse(request.params.clone())?;
         let plan = input.plan;
         plan.validate_hash()?;
+        let mut timing = LifecycleTiming::start("Revalidate promotion and prepare rollback");
         self.prepare_enablement_acceptance(lease, &plan, build, clock()?, cancel)?;
+        timing.advance("Commit promotion floor and receipt");
         let activation = uuid::Uuid::new_v4().to_string();
         let (receipt_key, _) = self.replay_key(principal, request, clock()?)?;
         let predecessor = self.terminal_restoration_predecessor()?;
@@ -275,6 +311,7 @@ impl Store {
             table.insert(key.as_str(), encode(&record)?.as_slice()).map_err(storage)?;
             Ok(serde_json::json!({"promotion_id":plan.id,"target_generation":plan.target_generation,"state":"accepted"}))
         })?;
+        timing.advance("Recover accepted promotion");
         if let Err(error) = self.recover_media_enablement(lease, &clock) {
             tracing_error(&error);
         }
@@ -288,6 +325,7 @@ impl Store {
         now: u64,
         cancel: &CancellationToken,
     ) -> Result<()> {
+        let mut timing = LifecycleTiming::start("Validate promotion ancestry and workspace");
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
             return Err(DomainError::new(
                 "OWNER_BUSY",
@@ -328,6 +366,7 @@ impl Store {
         }
         copies::reserve_restoration_slot(lease, &plan.id)?;
         self.validate_migration_records()?;
+        timing.advance("Close and inspect promotion source");
         self.close_generation(lease)?;
         let preparation = (|| {
             let facts = lease.inspect_selected()?;
@@ -352,6 +391,7 @@ impl Store {
             )?;
             // Qualification precedes acceptance; unsupported local filesystems cannot acquire a floor.
             nw_platform::generation_restoration::QualifiedDirectory::open(lease.state())?;
+            timing.advance("Copy promotion rollback source");
             let copy = copies::copy_locked(
                 lease,
                 &plan.id,
@@ -359,9 +399,11 @@ impl Store {
                 &self.generation_path()?,
                 cancel,
             )?;
+            timing.advance("Flush promotion rollback copy");
             flush_copy(&copy.path)?;
             Ok(())
         })();
+        timing.advance("Reattach promotion source");
         let reopened = self.reopen_current_generation(lease);
         preparation?;
         reopened?;
@@ -401,6 +443,7 @@ impl Store {
         let Some((id, initialization)) = pending else {
             return Ok(());
         };
+        let mut timing = LifecycleTiming::start("Read accepted enablement and selection");
         let operation = self.enablement(&id, initialization)?;
         if operation.phase == EnablementPhase::Restored {
             return Err(invalid("A historical restored operation cannot rerun"));
@@ -414,7 +457,9 @@ impl Store {
             }
             self.close_generation(lease)?;
             let switched = (|| {
+                timing.advance("Prepare accepted media target");
                 self.prepare_media_target(lease, &operation)?;
+                timing.advance("Publish media activation and attach target");
                 lease.append_activation(Activation {
                     schema_version: 1,
                     sequence: 0,
@@ -446,6 +491,7 @@ impl Store {
                 return Err(error);
             }
         }
+        timing.advance("Flush media activation and commit completion");
         flush_activation(lease)?;
         let write = self.db.begin_control_write().map_err(storage)?;
         {
@@ -481,6 +527,7 @@ impl Store {
         write.commit().map_err(storage)
     }
     fn prepare_media_target(&self, lease: &RootLease, operation: &Enablement) -> Result<()> {
+        let mut timing = LifecycleTiming::start("Copy accepted media target");
         let source = self.generation_path()?;
         let target = copies::workspace(lease, &operation.id)?.join("target");
         let marker = format!("generation-transform/{}", operation.id);
@@ -493,6 +540,7 @@ impl Store {
                 &CancellationToken::new(),
             )?;
         }
+        timing.advance("Validate target provenance and closed raw state");
         let manifest: copies::CopyManifest = decode(&nw_platform::security::read_private(
             &target.join("copy.json"),
             65536,
@@ -526,6 +574,7 @@ impl Store {
             ));
         }
         let identity = nw_platform::files::source_object(&target.join("store.redb"))?;
+        timing.advance("Open qualified target and commit transformation");
         let database = self.open_retained_control(lease, &target, &identity)?;
         if !transformed {
             let mut write = database.begin_write().map_err(storage)?;
@@ -564,6 +613,7 @@ impl Store {
             write.commit().map_err(storage)?;
         }
         drop(database);
+        timing.advance("Verify exact transformed target rows");
         // A transformed target is proved against immutable copied source bytes; it is never recopied.
         let source_db = redb::Database::builder()
             .open_read_only(source.join("store.redb"))
@@ -614,6 +664,7 @@ impl Store {
         drop(source_read);
         drop(target_db);
         drop(source_db);
+        timing.advance("Flush verified media target");
         flush_copy(&target)
     }
     pub(crate) fn attach_media_selection(&self, lease: &RootLease) -> Result<()> {

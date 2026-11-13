@@ -731,23 +731,40 @@ mod tests {
         );
         reopened.close_generation(&f.lease).unwrap();
         let source_file = source_path.join("store.redb");
-        let database = redb::Database::builder().open(&source_file).unwrap();
-        let write = database.begin_write().unwrap();
-        write
-            .open_table(RECORDS)
-            .unwrap()
-            .insert(
-                "unit/opaque-baseline",
-                br#"{"contradiction":true}"#.as_slice(),
+        let authority: crate::restorations::Authority = decode(
+            &std::fs::read(
+                observation_path
+                    .parent()
+                    .unwrap()
+                    .join("restoration-authority.json"),
             )
-            .unwrap();
-        write.commit().unwrap();
+            .unwrap(),
+        )
+        .unwrap();
         // Retain the actual open-writer recovery header, then restore those same
-        // fault bytes through the existing file handle after clean close.
+        // fault bytes through the existing file handle after clean close. Capture
+        // through the actual backend so Windows does not independently reopen a
+        // file whose byte ranges are still exclusively locked by our writer.
         let dirty = f._directory.path().join("dirty-source-capture.redb");
         assert!(std::fs::metadata(&source_file).unwrap().len() <= 32 * 1024 * 1024);
-        std::fs::copy(&source_file, &dirty).unwrap();
-        drop(database);
+        reopened.capture_dirty_restoration_source(
+            &f.lease,
+            &source_path,
+            &authority,
+            &dirty,
+            |database| {
+                let write = database.begin_write().unwrap();
+                write
+                    .open_table(RECORDS)
+                    .unwrap()
+                    .insert(
+                        "unit/opaque-baseline",
+                        br#"{"contradiction":true}"#.as_slice(),
+                    )
+                    .unwrap();
+                write.commit().unwrap();
+            },
+        );
         let mut original_file = std::fs::OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -766,16 +783,6 @@ mod tests {
         let before =
             nw_platform::files::identity(&source_file, &tokio_util::sync::CancellationToken::new())
                 .unwrap();
-        let authority: crate::restorations::Authority = decode(
-            &std::fs::read(
-                observation_path
-                    .parent()
-                    .unwrap()
-                    .join("restoration-authority.json"),
-            )
-            .unwrap(),
-        )
-        .unwrap();
         assert!(
             reopened
                 .open_restoration_control(&f.lease, &source_path, &source_object, &authority)

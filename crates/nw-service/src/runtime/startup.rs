@@ -2,7 +2,8 @@
 //! Direct Service::open retains the legacy factory behavior used by existing callers.
 use super::*;
 
-/// Fixed startup call sites emit at most40 small diagnostic events per constructor.
+/// These Service wrapper call sites emit at most40 events per constructor.
+/// Store lifecycle stages emit additional, separately bounded diagnostics.
 /// Ending a stage records elapsed time only; it does not assert success or readiness.
 pub(super) struct StageTiming {
     stage: &'static str,

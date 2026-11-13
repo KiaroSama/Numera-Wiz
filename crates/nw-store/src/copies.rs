@@ -504,6 +504,8 @@ mod tests {
                 &serde_json::json!({"ticks":"9007199254740993","unknown":{"keep":true}}),
             )
             .unwrap();
+        let large_payload = "v".repeat(65537);
+        store.put("exact/large-payload", &large_payload).unwrap();
         let scope = store.issue_scope("alice", 100).unwrap();
         let mut request = nw_domain::commands::Request::query(
             "assets.register",
@@ -556,6 +558,10 @@ mod tests {
                 .unwrap()
                 .receipt_id,
             accepted.receipt_id
+        );
+        assert_eq!(
+            copy.get::<String>("exact/large-payload").unwrap().unwrap(),
+            large_payload
         );
         drop(copy);
         let database = copied.path.join("store.redb");

@@ -4,7 +4,7 @@ use crate::{
     adoption::Guard,
     copies, decode, encode,
     generations::{Activation, CURRENT_CAPABILITIES, GenerationLocation, RootLease},
-    media_generations::{flush_copy, guard, raw_hash},
+    media_generations::{LifecycleTiming, flush_copy, guard, raw_hash},
     records::record_quota,
     storage,
 };
@@ -114,6 +114,7 @@ impl Store {
         clock: impl Fn() -> Result<u64>,
         reserved: Option<&str>,
     ) -> Result<MediaInitializationPlan> {
+        let mut timing = LifecycleTiming::start("Validate initialization ancestry and workspace");
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
             return Err(DomainError::new(
                 "OWNER_BUSY",
@@ -175,8 +176,10 @@ impl Store {
             copies::workspace_headroom(lease, 2)?;
         }
         self.validate_migration_records()?;
+        timing.advance("Close initialization source");
         self.close_generation(lease)?;
         let result = (|| {
+            timing.advance("Inspect closed initialization source");
             let facts = lease.inspect_selected()?;
             if facts.required_capabilities.len() != CURRENT_CAPABILITIES.len()
                 || facts
@@ -243,6 +246,7 @@ impl Store {
             plan.hash = plan.digest()?;
             Ok(plan)
         })();
+        timing.advance("Reattach initialization source");
         let reopened = self.reopen_current_generation(lease);
         match (result, reopened) {
             (Ok(plan), Ok(())) => Ok(plan),
@@ -277,6 +281,7 @@ impl Store {
         {
             return Err(invalid("Initialization review root/build/lifetime differs"));
         }
+        let mut timing = LifecycleTiming::start("Revalidate initialization review");
         let mut current =
             self.prepare_initialization_with_reservation(lease, build, &clock, Some(&plan.id))?;
         current.source_bytes = plan.source_bytes.clone();
@@ -284,10 +289,12 @@ impl Store {
         if current.digest()? != plan.hash {
             return Err(invalid("Initialization baseline changed after review"));
         }
+        timing.advance("Reserve initialization workspace and close source");
         copies::reserve_restoration_slot(lease, &plan.id)?;
         self.close_generation(lease)?;
         let prepared = (|| {
             QualifiedDirectory::open(lease.state())?;
+            timing.advance("Copy initialization rollback source");
             let copy = copies::copy_locked(
                 lease,
                 &plan.id,
@@ -295,8 +302,10 @@ impl Store {
                 &self.generation_path()?,
                 cancel,
             )?;
+            timing.advance("Flush initialization rollback copy");
             flush_copy(&copy.path)
         })();
+        timing.advance("Reattach prepared initialization source");
         let reopened = self.reopen_current_generation(lease);
         prepared?;
         reopened?;
@@ -309,6 +318,7 @@ impl Store {
         let activation_id = uuid::Uuid::new_v4().to_string();
         let (receipt_key, _) = self.replay_key(principal, request, clock()?)?;
         let predecessor = self.terminal_restoration_predecessor()?;
+        timing.advance("Commit initialization floor and receipt");
         let response = self.commit_composed_with_clock(principal, request, &clock, |table, now| {
             copies::restoration_slot(lease, &plan.id)?;
             if raw_hash(table)? != (plan.source_records, plan.source_records_sha256.clone())
@@ -336,6 +346,7 @@ impl Store {
             table.insert(key.as_str(), encode(&record)?.as_slice()).map_err(storage)?;
             Ok(serde_json::json!({"initialization_id":plan.id,"target_generation":plan.target_generation,"state":"accepted"}))
         })?;
+        timing.advance("Recover accepted initialization");
         if let Err(error) = self.recover_media_enablement(lease, &clock) {
             tracing::warn!(code=%error.code, "Accepted initialization remains in maintenance mode");
         }

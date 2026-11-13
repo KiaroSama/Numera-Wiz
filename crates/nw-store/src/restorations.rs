@@ -2,7 +2,7 @@
 use crate::{
     RECORDS, Store, copies, decode, encode,
     generations::{self, Activation, GenerationLocation, RootLease},
-    media_generations::{Enablement, flush_copy, prefix_digest, raw_hash},
+    media_generations::{Enablement, LifecycleTiming, flush_copy, prefix_digest, raw_hash},
     records::record_quota,
     restoration_control::{self as control, ExposureBarrier},
     storage, versions,
@@ -51,9 +51,11 @@ fn operation_path(lease: &RootLease, id: &str) -> Result<PathBuf> {
     Ok(lease.state().join("generation-workspaces").join(id))
 }
 fn verify_copy(path: &Path) -> Result<versions::GenerationFacts> {
+    let mut timing = LifecycleTiming::start("Read immutable archive proof and physical hash");
     let manifest: copies::CopyManifest =
         decode(&security::read_private(&path.join("copy.json"), 65536)?)?;
     let identity = files::identity(&path.join("store.redb"), &CancellationToken::new())?;
+    timing.advance("Inspect immutable archive raw records");
     let facts = versions::inspect_closed(path)?;
     if identity.sha256 != manifest.source_file_sha256
         || identity.bytes != manifest.source_file_bytes
@@ -111,6 +113,7 @@ impl Store {
         build: &str,
         clock: impl Fn() -> Result<u64>,
     ) -> Result<GenerationRestorationPlan> {
+        let mut timing = LifecycleTiming::start("Validate restoration lineage and workspace");
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
             return Err(DomainError::new(
                 "OWNER_BUSY",
@@ -145,6 +148,7 @@ impl Store {
             ));
         }
         self.validate_migration_records_for_media()?;
+        timing.advance("Close restoration target and qualify source");
         self.close_generation(lease)?;
         let result = (|| {
             let source = operation.source_path(lease)?;
@@ -152,6 +156,7 @@ impl Store {
             QualifiedDirectory::open(&source)?;
             QualifiedDirectory::open(&lease.state().join("activations"))?;
             let baseline = operation_path(lease, &operation.id)?.join("rollback");
+            timing.advance("Verify restoration baseline archive");
             let baseline_facts = verify_copy(&baseline)?;
             if baseline_facts.records_sha256 != operation.source_records_sha256
                 || baseline_facts.record_count != operation.source_records
@@ -160,8 +165,10 @@ impl Store {
                     "Original rollback snapshot differs from accepted enablement",
                 ));
             }
+            timing.advance("Inspect restoration source and promoted raw records");
             let source_facts = versions::inspect_closed(&source)?;
             let promoted_facts = versions::inspect_closed(&self.generation_path()?)?;
+            timing.advance("Validate restoration prestate and space admission");
             let baseline_db = open_closed(&baseline)?;
             let source_db = open_closed(&source)?;
             let promoted_db = open_closed(&self.generation_path()?)?;
@@ -216,6 +223,7 @@ impl Store {
             plan.hash = plan.digest()?;
             Ok(plan)
         })();
+        timing.advance("Reattach reviewed restoration target");
         let reopened = self.reopen_current_generation(lease);
         match (result, reopened) {
             (Ok(plan), Ok(())) => Ok(plan),
@@ -258,6 +266,7 @@ impl Store {
                 "Restoration review kind, root, build or lifetime differs",
             ));
         }
+        let mut timing = LifecycleTiming::start("Revalidate restoration review");
         let mut current = self.prepare_media_restoration(
             lease,
             &plan.enablement_id,
@@ -274,6 +283,7 @@ impl Store {
             return Err(refused("Reviewed restoration source/history changed"));
         }
         let (receipt_key, _) = self.replay_key(principal, request, clock()?)?;
+        timing.advance("Commit restoration receipt and pending record");
         let response = self.commit_composed_with_clock(principal, request, &clock, |table, now| {
             if copies::restoration_slot(lease, &plan.enablement_id)? != plan.id { return Err(refused("Restoration reservation changed")); }
             if !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, now)?
@@ -293,6 +303,7 @@ impl Store {
             table.insert("meta/pending-restoration", plan.id.as_bytes()).map_err(storage)?;
             Ok(serde_json::json!({"restoration_id":plan.id,"source_generation":plan.source_generation,"state":"accepted"}))
         })?;
+        timing.advance("Recover accepted restoration");
         if let Err(error) = self.recover_media_restoration(lease) {
             tracing::warn!(code=%error.code, "Accepted restoration remains pending; no source rewind is permitted after B");
         }
@@ -347,6 +358,7 @@ impl Store {
         let Some(id) = id else {
             return Ok(());
         };
+        let mut timing = LifecycleTiming::start("Read accepted restoration and close target");
         let record = self.inspect_media_restoration(&id)?;
         let operation = self.enablement(
             &record.plan.enablement_id,
@@ -357,10 +369,14 @@ impl Store {
         )?;
         self.close_generation(lease)?;
         let recovered = (|| {
+            timing.advance("Prepare independent restoration authority");
             let authority = self.prepare_restoration_authority(lease, &record, &operation)?;
+            timing.advance("Install and classify restoration exposure barrier");
             self.install_restoration_overlay(lease, &authority)?;
+            timing.advance("Expose compatible prefix and retain observation");
             expose_prefix(lease, &authority)?;
             complete_observation(lease, &authority)?;
+            timing.advance("Attach restored source selection");
             self.attach_media_selection(lease)
         })();
         if let Err(error) = recovered {
@@ -376,6 +392,7 @@ impl Store {
         record: &GenerationRestorationRecord,
         operation: &Enablement,
     ) -> Result<Authority> {
+        let mut timing = LifecycleTiming::start("Validate retained restoration workspace");
         let workspace = copies::workspace(lease, &record.id)?;
         let authority_path = workspace.join("restoration-authority.json");
         if authority_path.try_exists().map_err(storage)? {
@@ -394,6 +411,7 @@ impl Store {
                 "Accepted activation history changed before archival",
             ));
         }
+        timing.advance("Copy restoration source preimage");
         let source_copy = copies::copy_locked(
             lease,
             &record.id,
@@ -401,6 +419,7 @@ impl Store {
             &source,
             &CancellationToken::new(),
         )?;
+        timing.advance("Copy restoration promoted archive");
         let promoted_copy = copies::copy_locked(
             lease,
             &record.id,
@@ -408,6 +427,7 @@ impl Store {
             &self.generation_path()?,
             &CancellationToken::new(),
         )?;
+        timing.advance("Copy restoration overlay workspace");
         copies::copy_locked(
             lease,
             &record.id,
@@ -415,9 +435,11 @@ impl Store {
             &source,
             &CancellationToken::new(),
         )?;
+        timing.advance("Flush independent restoration copies");
         flush_copy(&source_copy.path)?;
         flush_copy(&promoted_copy.path)?;
         flush_copy(&workspace.join("restoration"))?;
+        timing.advance("Validate archived receipts and build exposure barrier");
         let baseline = operation_path(lease, &operation.id)?.join("rollback");
         let baseline_facts = verify_copy(&baseline)?;
         let source_db = open_closed(&source_copy.path)?;
@@ -467,6 +489,7 @@ impl Store {
             predecessor_restoration: operation.predecessor_restoration.clone(),
         };
         let history_directory = security::private_directory(&workspace.join("history"))?;
+        timing.advance("Archive and flush activation history");
         let held_archive = QualifiedDirectory::open(&history_directory)?;
         let mut archived = Vec::with_capacity(history.len());
         for (activation, sha256) in history {
@@ -514,11 +537,13 @@ impl Store {
             barrier,
             history: archived,
         };
+        timing.advance("Publish and verify restoration authority");
         write_fact(&workspace, "restoration-authority.json", &authority)?;
         verify_authority(lease, &authority)?;
         Ok(authority)
     }
     fn install_restoration_overlay(&self, lease: &RootLease, authority: &Authority) -> Result<()> {
+        let mut timing = LifecycleTiming::start("Verify authority and open immutable restoration inputs");
         verify_authority(lease, authority)?;
         let workspace = operation_path(lease, &authority.record.id)?;
         let source = generations::location_path(lease.root(), &authority.source_location)?;
@@ -534,6 +559,7 @@ impl Store {
         let preimage = preimage_read.open_table(RECORDS).map_err(storage)?;
         // B on S is authoritative. A missing external completion or reappearing F
         // cannot authorize copying, applying the overlay again, or resetting clocks.
+        timing.advance("Validate original source before writable repair");
         let repaired = self.open_restoration_control(
             lease,
             &source,
@@ -551,6 +577,7 @@ impl Store {
             return validate_continuity(lease, authority);
         }
         for path in [workspace.join("restoration"), source.clone()] {
+            timing.advance("Validate restoration candidate before writable repair");
             let identity = files::source_object(&path.join("store.redb"))?;
             if path == source && identity != authority.barrier.source_object {
                 return Err(refused("Original source file identity changed"));
@@ -583,6 +610,7 @@ impl Store {
                 drop(database);
                 continue;
             }
+            timing.advance("Commit exact restoration overlay and barrier");
             let result = control::install(
                 &database,
                 &baseline,
@@ -592,6 +620,7 @@ impl Store {
                 &authority.barrier,
             );
             drop(database);
+            timing.advance("Classify restoration commit from retained source facts");
             // A commit error can mean all or none. Never infer rollback from Err.
             let repaired = self.open_restoration_control(lease, &path, &identity, authority)?;
             drop(repaired);
@@ -633,6 +662,7 @@ impl Store {
                 )));
             }
         }
+        timing.advance("Validate final original source continuity");
         validate_continuity(lease, authority)
     }
     fn validate_migration_records_for_media(&self) -> Result<()> {
@@ -680,6 +710,7 @@ fn write_fact(directory: &Path, name: &str, value: &impl Serialize) -> Result<()
     )
 }
 pub(crate) fn verify_authority(lease: &RootLease, authority: &Authority) -> Result<()> {
+    let _timing = LifecycleTiming::start("Verify genuine restoration authority and immutable archives");
     authority.record.plan.validate_hash()?;
     let record = &authority.record;
     let plan = &record.plan;
@@ -846,6 +877,7 @@ pub(crate) fn validate_source_snapshot(
     }
 }
 pub(crate) fn validate_continuity(lease: &RootLease, authority: &Authority) -> Result<()> {
+    let _timing = LifecycleTiming::start("Validate current source barrier and old business continuity");
     let source = generations::location_path(lease.root(), &authority.source_location)?;
     if files::source_object(&source.join("store.redb"))? != authority.barrier.source_object {
         return Err(refused(
@@ -879,6 +911,7 @@ pub(crate) fn validate_continuity(lease: &RootLease, authority: &Authority) -> R
     )
 }
 pub(crate) fn expose_prefix(lease: &RootLease, authority: &Authority) -> Result<()> {
+    let _timing = LifecycleTiming::start("Verify and remove owned suffix with fence last");
     verify_authority(lease, authority)?;
     validate_continuity(lease, authority)?;
     observe_installed_source(lease, authority)?;

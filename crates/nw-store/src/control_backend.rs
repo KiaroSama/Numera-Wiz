@@ -158,6 +158,9 @@ fn open_validated_backend(
     root_id: &str,
     validate: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<redb::Database> {
+    let mut timing = crate::media_generations::LifecycleTiming::start(
+        "Capture existing control source identity and bounded snapshot",
+    );
     let stamp = nw_platform::files::SourceStamp::capture_resolved(&path.join("store.redb"))?;
     if nw_platform::files::source_object(&path.join("store.redb"))? != *expected {
         return Err(DomainError::new(
@@ -174,10 +177,136 @@ fn open_validated_backend(
     }
     // A dirty file is repaired only in the independently copied probe above.
     // Full logical eligibility precedes any writable open of the original object.
+    timing.advance("Validate exact control source eligibility");
     validate(&snapshot)?;
+    timing.advance("Revalidate held source and open bounded control backend");
     stamp.revalidate()?;
     open_backend(path, expected)
 }
+
+/// Test fault capture uses the very backend that owns redb's byte-range locks.
+/// A separately opened Windows handle cannot read those exclusively locked bytes.
+#[cfg(test)]
+#[derive(Debug)]
+struct CaptureBackend(std::sync::Arc<BoundedBackend>);
+#[cfg(test)]
+impl StorageBackend for CaptureBackend {
+    fn len(&self) -> io::Result<u64> {
+        self.0.len()
+    }
+    fn read(&self, offset: u64, out: &mut [u8]) -> io::Result<()> {
+        self.0.read(offset, out)
+    }
+    fn set_len(&self, length: u64) -> io::Result<()> {
+        self.0.set_len(length)
+    }
+    fn sync_data(&self) -> io::Result<()> {
+        self.0.sync_data()
+    }
+    fn write(&self, offset: u64, data: &[u8]) -> io::Result<()> {
+        self.0.write(offset, data)
+    }
+    fn close(&self) -> io::Result<()> {
+        self.0.close()
+    }
+    fn try_lock_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<bool, BackendError> {
+        self.0.try_lock_range(start, end)
+    }
+    fn try_lock_shared_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<bool, BackendError> {
+        self.0.try_lock_shared_range(start, end)
+    }
+    fn lock_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<(), BackendError> {
+        self.0.lock_range(start, end)
+    }
+    fn lock_shared_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<(), BackendError> {
+        self.0.lock_shared_range(start, end)
+    }
+    fn unlock_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<(), BackendError> {
+        self.0.unlock_range(start, end)
+    }
+    fn query_lock_range(
+        &self,
+        start: Bound<u64>,
+        end: Bound<u64>,
+    ) -> std::result::Result<bool, BackendError> {
+        self.0.query_lock_range(start, end)
+    }
+}
+
+#[cfg(test)]
+impl Store {
+    pub(crate) fn capture_dirty_restoration_source(
+        &self,
+        lease: &RootLease,
+        path: &Path,
+        authority: &crate::restorations::Authority,
+        destination: &Path,
+        mutate: impl FnOnce(&redb::Database),
+    ) {
+        use std::io::Write;
+        let expected = &authority.barrier.source_object;
+        // Establish the real accepted B/continuity and held-generation authority
+        // through the production seam before opening this test-only adapter.
+        let validated = self
+            .open_restoration_control(lease, path, expected, authority)
+            .unwrap();
+        drop(validated);
+        let file = nw_platform::generation_restoration::open_existing_control_file(
+            &path.join("store.redb"),
+            expected,
+        )
+        .unwrap();
+        let backend = std::sync::Arc::new(BoundedBackend {
+            inner: redb::backends::FileBackend::new(file).unwrap(),
+            maximum: 32 * 1024 * 1024,
+        });
+        assert!(backend.len().unwrap() > 0, "Empty initialization is unreachable");
+        let database = redb::Database::builder()
+            .create_with_backend(CaptureBackend(backend.clone()))
+            .unwrap();
+        mutate(&database);
+        backend.sync_data().unwrap();
+        let length = backend.len().unwrap();
+        let mut output = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(destination)
+            .unwrap();
+        let mut buffer = [0u8; 8192];
+        let mut offset = 0;
+        while offset < length {
+            let count = (length - offset).min(buffer.len() as u64) as usize;
+            backend.read(offset, &mut buffer[..count]).unwrap();
+            output.write_all(&buffer[..count]).unwrap();
+            offset += count as u64;
+        }
+        output.sync_all().unwrap();
+        drop(output);
+        drop(database);
+        drop(backend);
+    }
+}
+
 pub(crate) fn repair_accepted_source(
     lease: &RootLease,
     path: &Path,
