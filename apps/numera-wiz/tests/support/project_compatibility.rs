@@ -601,9 +601,15 @@ enum ApplicationStartStage {
     InitializeEngineComponents,
     ConstructOwnerRuntimeState,
     RecoverDurableDispatcher,
+    CheckCompatibleGenesisEligibility,
+    IssueCanonicalGenesisReplayScope,
+    ReviewCanonicalMediaInitialization,
+    AcceptCanonicalMediaInitialization,
+    ConfirmInitializationIsNoLongerPending,
 }
 impl ApplicationStartStage {
-    // Only literal Service StageTiming::start sites in runtime.rs at SOURCEGO.
+    // Only literal Service StageTiming::start sites in runtime.rs and its
+    // runtime/startup.rs initialization path at SOURCEGO.
     fn from_label(label: &str) -> Option<Self> {
         Some(match label {
             "Open application service" => Self::OpenApplicationService,
@@ -623,6 +629,13 @@ impl ApplicationStartStage {
             "Initialize engine components" => Self::InitializeEngineComponents,
             "Construct owner runtime state" => Self::ConstructOwnerRuntimeState,
             "Recover durable dispatcher" => Self::RecoverDurableDispatcher,
+            "Check compatible genesis eligibility" => Self::CheckCompatibleGenesisEligibility,
+            "Issue canonical genesis replay scope" => Self::IssueCanonicalGenesisReplayScope,
+            "Review canonical media initialization" => Self::ReviewCanonicalMediaInitialization,
+            "Accept canonical media initialization" => Self::AcceptCanonicalMediaInitialization,
+            "Confirm initialization is no longer pending" => {
+                Self::ConfirmInitializationIsNoLongerPending
+            }
             _ => return None,
         })
     }
@@ -986,6 +999,73 @@ fn owner_stderr_diagnostic_cases() {
         Some(ApplicationStartStage::RecoverAcceptedMediaRestoration)
     );
     assert!(stages.error_observations.is_empty());
+    let initialization: &[(&[u8], ApplicationStartStage)] = &[
+        (
+            b"[2026-11-13T16:44:01.001Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n",
+            ApplicationStartStage::CheckCompatibleGenesisEligibility,
+        ),
+        (
+            b"[2026-11-13T16:44:01.002Z] [INFO] Application startup stage started stage=Issue canonical genesis replay scope\n",
+            ApplicationStartStage::IssueCanonicalGenesisReplayScope,
+        ),
+        (
+            b"[2026-11-13T16:44:01.003Z] [INFO] Application startup stage started stage=Review canonical media initialization\n",
+            ApplicationStartStage::ReviewCanonicalMediaInitialization,
+        ),
+        (
+            b"[2026-11-13T16:44:01.004Z] [INFO] Application startup stage started stage=Accept canonical media initialization\n",
+            ApplicationStartStage::AcceptCanonicalMediaInitialization,
+        ),
+        (
+            b"[2026-11-13T16:44:01.005Z] [INFO] Application startup stage started stage=Confirm initialization is no longer pending\n",
+            ApplicationStartStage::ConfirmInitializationIsNoLongerPending,
+        ),
+    ];
+    for &(bytes, stage) in initialization {
+        let diagnostic = project(bytes);
+        assert_eq!(diagnostic.observation, OwnerStderrStatus::Observed);
+        assert_eq!(diagnostic.last_started_application_stage, Some(stage));
+        assert_eq!(diagnostic.recognized_records, 1);
+        assert_eq!(diagnostic.unrecognized_candidates, 0);
+        assert!(diagnostic.error_observations.is_empty());
+    }
+    let initialization_sequence = initialization
+        .iter()
+        .flat_map(|(bytes, _)| bytes.iter().copied())
+        .collect::<Vec<_>>();
+    let initialization_sequence = project(
+        &[
+            initialization_sequence.as_slice(),
+            b"[2026-11-13T16:44:01.006Z] [INFO] Application startup stage ended elapsed_ms=1 stage=Confirm initialization is no longer pending\n",
+        ]
+        .concat(),
+    );
+    assert_eq!(
+        initialization_sequence.observation,
+        OwnerStderrStatus::Observed
+    );
+    assert_eq!(initialization_sequence.recognized_records, 5);
+    assert_eq!(
+        initialization_sequence.last_started_application_stage,
+        Some(ApplicationStartStage::ConfirmInitializationIsNoLongerPending)
+    );
+    assert!(initialization_sequence.error_observations.is_empty());
+    let eligibility_then_error = project(b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n[2026-11-13T16:44:01.008Z] [INFO] Application startup stage ended elapsed_ms=1 stage=Check compatible genesis eligibility\n[2026-11-13T16:44:01.009Z] [ERROR] Filesystem operation failed operation=private_write.persist os_error=5 os_error_present=true\n");
+    assert_eq!(eligibility_then_error.observation, OwnerStderrStatus::Observed);
+    assert_eq!(eligibility_then_error.recognized_records, 2);
+    assert_eq!(eligibility_then_error.unrecognized_candidates, 0);
+    assert_eq!(
+        eligibility_then_error.last_started_application_stage,
+        Some(ApplicationStartStage::CheckCompatibleGenesisEligibility)
+    );
+    assert_eq!(
+        eligibility_then_error.error_observations,
+        vec![OwnerStderrError::Filesystem {
+            operation: FilesystemOperation::PrivateWritePersist,
+            os_error_present: true,
+            os_error: Some(5),
+        }]
+    );
     let filesystem: &[(&[u8], FilesystemOperation, Option<i32>)] = &[
         (
             b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=0 os_error_present=true\n",
@@ -1231,7 +1311,7 @@ fn owner_stderr_diagnostic_cases() {
         b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\\n[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory\n",
         b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read\n[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory\n",
         b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=unknown\n",
-        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Check unknown genesis eligibility\n",
         b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Open application service stage=Open application service\n",
         b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Open application service\\q\n",
         b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=unknown stage=runtime_directory\n",
