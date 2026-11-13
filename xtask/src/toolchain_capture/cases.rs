@@ -228,11 +228,215 @@ pub fn run() -> Result<()> {
         super::process::signal_target(42)? == 42,
         "owned numeric group framing"
     );
+    uri_identity_cases()?;
     index_target_cases()?;
     filesystem_cases()?;
     tracing::info!(
         "Linux capture synthetic self-check passed; no APT, signature, container or runtime truth is inferred"
     );
+    Ok(())
+}
+
+fn uri_identity_cases() -> Result<()> {
+    // Literal HOST289 observations, with mixed hex case in the third URL to
+    // exercise both spellings. These fixtures do not assert signature validity.
+    let observations = [
+        "'https://snapshot.ubuntu.com/ubuntu/20261101T000000Z/pool/main/x/xz-utils/xz-utils_5.6.1%2breally5.4.5-1ubuntu0.4_amd64.deb' xz-utils_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb 267426 MD5Sum:4a1d8d9cf1eafa53acb076ed9deaacc7\n",
+        "'https://snapshot.ubuntu.com/ubuntu/20261101T000000Z/pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2%7e24.04.1_amd64.deb' gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb 51616 MD5Sum:f2e3cd036355db5350d4336e3f928090\n",
+        "'https://snapshot.ubuntu.com/ubuntu/20261101T000000Z/pool/main/g/gcc-13/libstdc%2B%2b-13-dev_13.3.0-6ubuntu2%7E24.04.1_amd64.deb' libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb 2419834 MD5Sum:d4c7bf2ddf49cb3f973620bf04f750ca\n",
+        "'https://snapshot.ubuntu.com/ubuntu/20261101T000000Z/pool/main/g/gawk/gawk_5.2.1-2ubuntu0.1_amd64.deb' gawk_1%3a5.2.1-2ubuntu0.1_amd64.deb 463234 MD5Sum:e5bf55c51dc13d481f98603dcc1efd33\n",
+    ];
+    // Independent literal Packages-side Filename/Size oracles. No filename is
+    // derived from either the transport URL or the epoch-bearing local name.
+    let authenticated = std::collections::BTreeMap::from([
+        (
+            "xz-utils".to_string(),
+            json!({"filename":"pool/main/x/xz-utils/xz-utils_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb","size":267426}),
+        ),
+        (
+            "gcc-13-base".to_string(),
+            json!({"filename":"pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb","size":51616}),
+        ),
+        (
+            "libstdc++-13-dev".to_string(),
+            json!({"filename":"pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb","size":2419834}),
+        ),
+        (
+            "gawk".to_string(),
+            json!({"filename":"pool/main/g/gawk/gawk_5.2.1-2ubuntu0.1_amd64.deb","size":463234}),
+        ),
+    ]);
+    let transaction = [
+        json!({"name":"xz-utils"}),
+        json!({"name":"gcc-13-base"}),
+        json!({"name":"libstdc++-13-dev"}),
+        json!({"name":"gawk"}),
+    ];
+    let downloads = metadata::uris(&observations.concat())?;
+    ensure!(downloads.len() == 4, "literal URI observation count");
+    for (download, observation) in downloads.iter().zip(observations) {
+        ensure!(
+            download["url"].as_str() == observation.split('\'').nth(1)
+                && download.get("sha256").is_none(),
+            "raw transport URL retained without promoting MD5"
+        );
+    }
+    ensure!(
+        downloads[2]["snapshot_filename"]
+            == "pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+            && downloads[3]["apt_local_filename"] == "gawk_1%3a5.2.1-2ubuntu0.1_amd64.deb"
+            && downloads[0]["apt_reported_checksum"] == "MD5Sum:4a1d8d9cf1eafa53acb076ed9deaacc7",
+        "decoded identity and distinct raw local filename/checksum retained"
+    );
+    metadata::require_download_matches(&downloads, &authenticated, &transaction)?;
+    let literal_urls = observations
+        .concat()
+        .replace("%2b", "+")
+        .replace("%2B", "+")
+        .replace("%7e", "~")
+        .replace("%7E", "~");
+    metadata::require_download_matches(
+        &metadata::uris(&literal_urls)?,
+        &authenticated,
+        &transaction,
+    )?;
+    let mut altered = authenticated.clone();
+    altered.get_mut("xz-utils").context("fixture package")?["filename"] =
+        json!("pool/main/x/xz-utils/other.deb");
+    ensure!(
+        metadata::require_download_matches(&downloads, &altered, &transaction).is_err(),
+        "altered authenticated Filename refused"
+    );
+    let mut altered = authenticated.clone();
+    altered.get_mut("xz-utils").context("fixture package")?["size"] = json!(267427);
+    ensure!(
+        metadata::require_download_matches(&downloads, &altered, &transaction).is_err(),
+        "altered authenticated size refused"
+    );
+    let mut altered = authenticated.clone();
+    altered.remove("xz-utils");
+    ensure!(
+        metadata::require_download_matches(&downloads, &altered, &[]).is_err(),
+        "download without authenticated stanza refused independently of transaction"
+    );
+    ensure!(
+        metadata::require_download_matches(&downloads[1..], &authenticated, &transaction).is_err(),
+        "transaction without URI refused independently of download-to-stanza join"
+    );
+    ensure!(
+        metadata::require_download_matches(
+            &downloads,
+            &authenticated,
+            &[json!({"name":"unauthenticated"})],
+        )
+        .is_err(),
+        "transaction without authenticated package refused"
+    );
+    let mut altered = authenticated.clone();
+    altered.insert("ambiguous".into(), authenticated["xz-utils"].clone());
+    ensure!(
+        metadata::require_download_matches(&downloads, &altered, &transaction).is_err(),
+        "multiple authenticated matches refused"
+    );
+    let mut duplicated = downloads.clone();
+    duplicated.push(downloads[0].clone());
+    ensure!(
+        metadata::require_download_matches(&duplicated, &authenticated, &transaction).is_err(),
+        "multiple URI matches for transaction refused"
+    );
+    for alias in [
+        observations[0].to_string(),
+        observations[0].replace("%2b", "%2B"),
+        observations[0].replace("%2b", "+"),
+    ] {
+        ensure!(
+            metadata::uris(&format!("{}{alias}", observations[0])).is_err(),
+            "duplicate raw or decoded URI identity refused"
+        );
+    }
+    for alias in ["%7E", "~"] {
+        ensure!(
+            metadata::uris(&format!(
+                "{}{}",
+                observations[1],
+                observations[1].replace("%7e", alias)
+            ))
+            .is_err(),
+            "duplicate tilde identity refused"
+        );
+    }
+    for path in [
+        "pool/x%",
+        "pool/x%2",
+        "pool/x%GG",
+        "pool/x%2fdeb",
+        "pool/x%2Fdeb",
+        "pool/x%5cdeb",
+        "pool/%2e%2e/x.deb",
+        "pool/x%00.deb",
+        "pool/x%0a.deb",
+        "pool/x%7f.deb",
+        "pool/x%3a.deb",
+        "pool/x%3f.deb",
+        "pool/x%23.deb",
+        "pool/x%40.deb",
+        "pool/x%25.deb",
+        "pool/x%252b.deb",
+        "pool/x%257e.deb",
+        "pool/x%c3%a9.deb",
+        "pool/x%20.deb",
+        "pool/x%41.deb",
+        "pool/xé.deb",
+        "pool/x\\y.deb",
+        "pool/x:y.deb",
+        "pool/x?y.deb",
+        "pool/x#y.deb",
+        "pool/x@y.deb",
+        "pool/x\0.deb",
+        "pool/x\t.deb",
+        "pool//x.deb",
+        "pool/./x.deb",
+        "pool/../x.deb",
+        "pool/x/",
+        "/pool/x.deb",
+        "pool/",
+        "",
+        "dists/x.deb",
+    ] {
+        ensure!(
+            metadata::uris(&format!(
+                "'{}/{path}' x.deb 3 MD5Sum:observed\n",
+                metadata::SNAPSHOT
+            ))
+            .is_err(),
+            "unsafe URI path refused: {path:?}"
+        );
+    }
+    for url in [
+        "http://snapshot.ubuntu.com/ubuntu/20261101T000000Z/pool/x.deb",
+        "https://snapshot.ubuntu.com.evil/ubuntu/20261101T000000Z/pool/x.deb",
+        "https://snapshot.ubuntu.com@evil/ubuntu/20261101T000000Z/pool/x.deb",
+        "https://snapshot.ubuntu.com:443/ubuntu/20261101T000000Z/pool/x.deb",
+        "https://snapshot.ubuntu.com/ubuntu/20261101T000000Zevil/pool/x.deb",
+    ] {
+        ensure!(
+            metadata::uris(&format!("'{url}' x.deb 3 MD5Sum:observed\n")).is_err(),
+            "nonexact snapshot origin refused"
+        );
+    }
+    for path in [
+        format!("pool/{}", "a".repeat(256)),
+        format!("pool/{}x.deb", "a/".repeat(2048)),
+    ] {
+        ensure!(
+            metadata::uris(&format!(
+                "'{}/{path}' x.deb 3 MD5Sum:observed\n",
+                metadata::SNAPSHOT
+            ))
+            .is_err(),
+            "URI component or path bound enforced"
+        );
+    }
     Ok(())
 }
 

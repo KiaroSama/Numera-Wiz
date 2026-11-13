@@ -437,6 +437,36 @@ pub fn transaction(text: &str) -> Result<Vec<Value>> {
     Ok(result.into_values().collect())
 }
 
+// APT escapes literal '+' and '~' in package URLs. Decode only those bytes,
+// once, after checking the exact transport origin; never normalize a URL.
+fn snapshot_filename(url: &str) -> Result<String> {
+    let path = url
+        .strip_prefix(&format!("{SNAPSHOT}/"))
+        .context("non-snapshot package URI")?;
+    ensure!(path.len() <= 4096, "oversized package URI path");
+    let mut decoded = String::with_capacity(path.len());
+    let mut bytes = path.bytes();
+    while let Some(byte) = bytes.next() {
+        let byte = if byte == b'%' {
+            match (bytes.next(), bytes.next()) {
+                (Some(b'2'), Some(b'b' | b'B')) => b'+',
+                (Some(b'7'), Some(b'e' | b'E')) => b'~',
+                _ => anyhow::bail!("unsupported or malformed package URI escape"),
+            }
+        } else {
+            byte
+        };
+        ensure!(
+            byte.is_ascii_alphanumeric() || b"/._+~-".contains(&byte),
+            "unsupported or unsafe package URI byte"
+        );
+        decoded.push(char::from(byte));
+    }
+    safe_path(&decoded)?;
+    ensure!(decoded.starts_with("pool/"), "non-pool package URI");
+    Ok(decoded)
+}
+
 pub fn uris(text: &str) -> Result<Vec<Value>> {
     ensure!(text.ends_with('\n'), "truncated APT URI output");
     let mut result = Vec::new();
@@ -447,22 +477,61 @@ pub fn uris(text: &str) -> Result<Vec<Value>> {
             .context("URI quote")?
             .split_once('\'')
             .context("URI quote terminator")?;
-        let path = url
-            .strip_prefix(&format!("{SNAPSHOT}/"))
-            .context("non-snapshot package URI")?;
-        safe_path(path)?;
-        ensure!(
-            path.starts_with("pool/") && !path.contains(['%', '?', '#', '@']),
-            "unsupported or unsafe package URI"
-        );
+        let filename = snapshot_filename(url)?;
         let parts: Vec<_> = tail.split_whitespace().collect();
         ensure!(parts.len() == 3, "malformed APT URI record");
         safe_path(parts[0])?;
         let size = decimal(parts[1])?;
-        ensure!(seen.insert(url.to_string()), "duplicate download URI");
-        result.push(json!({"url":url,"apt_local_filename":parts[0],"size":size,"apt_reported_checksum":parts[2]}));
+        ensure!(
+            seen.insert(filename.clone()),
+            "duplicate decoded download identity"
+        );
+        result.push(json!({"url":url,"snapshot_filename":filename,"apt_local_filename":parts[0],"size":size,"apt_reported_checksum":parts[2]}));
     }
     Ok(result)
+}
+
+// Only pass rows obtained from authenticated indices and require_match here.
+// URI observations retain their raw URL; correlation uses the separately
+// validated snapshot filename and exact published size in both directions.
+pub fn require_download_matches(
+    downloads: &[Value],
+    authenticated: &BTreeMap<String, Value>,
+    transaction: &[Value],
+) -> Result<()> {
+    let matches = |download: &Value, package: &Value| {
+        download["snapshot_filename"].as_str().is_some_and(|filename| {
+            package["filename"].as_str() == Some(filename)
+                && download["size"]
+                    .as_u64()
+                    .is_some_and(|size| package["size"].as_u64() == Some(size))
+        })
+    };
+    for download in downloads {
+        ensure!(
+            authenticated
+                .values()
+                .filter(|package| matches(download, package))
+                .count()
+                == 1,
+            "URI does not uniquely join exact authenticated Filename/Size"
+        );
+    }
+    for row in transaction {
+        let name = row["name"].as_str().context("transaction name")?;
+        let package = authenticated
+            .get(name)
+            .context("APT transaction package has no authenticated stanza")?;
+        ensure!(
+            downloads
+                .iter()
+                .filter(|download| matches(download, package))
+                .count()
+                == 1,
+            "APT Inst lacks a unique corresponding URI"
+        );
+    }
+    Ok(())
 }
 
 pub fn require_match(rows: &[Value], identity: &str) -> Result<Value> {

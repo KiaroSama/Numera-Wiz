@@ -613,40 +613,7 @@ fn join_inventory(
         }
     }
     report["final_inventory"] = json!(final_rows);
-    for download in downloads {
-        let selected: Vec<_> = authenticated
-            .values()
-            .filter(|row| {
-                download["url"].as_str()
-                    == Some(&format!(
-                        "{}/{}",
-                        metadata::SNAPSHOT,
-                        row["filename"].as_str().unwrap_or("")
-                    ))
-                    && row["size"] == download["size"]
-            })
-            .collect();
-        ensure!(
-            selected.len() == 1,
-            "URI does not uniquely join exact authenticated Filename/Size"
-        );
-    }
-    for row in transaction {
-        let name = row["name"].as_str().context("transaction name")?;
-        let package = authenticated
-            .get(name)
-            .context("APT transaction package has no authenticated stanza")?;
-        ensure!(
-            downloads.iter().any(|download| download["url"].as_str()
-                == Some(&format!(
-                    "{}/{}",
-                    metadata::SNAPSHOT,
-                    package["filename"].as_str().unwrap_or("")
-                ))
-                && download["size"] == package["size"]),
-            "APT Inst lacks a corresponding URI"
-        );
-    }
+    metadata::require_download_matches(downloads, &authenticated, transaction)?;
     dependencies(raw, report, &authenticated, deadline)?;
     Ok(())
 }
