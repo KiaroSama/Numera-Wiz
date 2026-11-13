@@ -29,7 +29,10 @@ struct CaptureLimits {
 }
 impl CaptureLimits {
     fn standard(stdout: usize) -> Self {
-        Self { stdout, stderr: 64 * 1024 }
+        Self {
+            stdout,
+            stderr: 64 * 1024,
+        }
     }
 }
 async fn capture<R: AsyncRead + Unpin>(
@@ -101,7 +104,10 @@ pub async fn run_with_output_limits(
         program,
         args,
         Some(deadline),
-        CaptureLimits { stdout: stdout_limit, stderr: stderr_limit },
+        CaptureLimits {
+            stdout: stdout_limit,
+            stderr: stderr_limit,
+        },
         Stdio::null(),
         None,
         cancel,
@@ -255,7 +261,10 @@ async fn run_with_stdin(
     consumer: Option<ChunkConsumer>,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
-    let CaptureLimits { stdout: stdout_limit, stderr: stderr_limit } = limits;
+    let CaptureLimits {
+        stdout: stdout_limit,
+        stderr: stderr_limit,
+    } = limits;
     if deadline.is_some_and(|value| value.is_zero() || value > Duration::from_secs(604800))
         || stdout_limit > 8 * 1024 * 1024
     {
@@ -265,7 +274,10 @@ async fn run_with_stdin(
         ));
     }
     if !(1..=64 * 1024).contains(&stderr_limit) {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Invalid process stderr budget"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Invalid process stderr budget",
+        ));
     }
     if !program.is_absolute() {
         return Err(DomainError::new(

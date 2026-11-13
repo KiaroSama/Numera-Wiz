@@ -140,7 +140,8 @@ impl Service {
                 // Other tools can publish static requirements without changing this codec.
                 .filter(|requirement| {
                     PROJECT_TARGET_COMMANDS.contains(&requirement.command_id.as_str())
-                        || ["projects.create", "projects.list"].contains(&requirement.command_id.as_str())
+                        || ["projects.create", "projects.list"]
+                            .contains(&requirement.command_id.as_str())
                 })
                 .map(|requirement| {
                     let reasons = if policy

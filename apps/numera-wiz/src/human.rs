@@ -10,13 +10,13 @@ use nw_domain::{
     mux::{CleanIntent, Stream},
 };
 pub use projects::{Clips, History, Projects, Sequences};
-pub use timeline::Timeline;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     io::Read,
     path::{Path, PathBuf},
 };
+pub use timeline::Timeline;
 
 #[derive(Args)]
 pub struct MutationIdentity {

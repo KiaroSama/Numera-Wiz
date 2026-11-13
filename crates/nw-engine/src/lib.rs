@@ -1,10 +1,10 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
 mod budget;
+mod media;
 mod output_profile;
 mod preservation;
 mod progress;
-mod media;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -1256,6 +1256,7 @@ mod tag_tests {
                 .windows(2)
                 .any(|args| args == ["-map_metadata:s:0", "0:s:0"])
         );
+        media::assert_listing_admission();
     }
     #[test]
     fn movie_track_name_is_an_exact_title_projection_with_raw_metadata_retained() {

@@ -24,7 +24,13 @@ pub enum Timeline {
 impl Timeline {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::Render { project, revision, sequence, start, end } => {
+            Self::Render {
+                project,
+                revision,
+                sequence,
+                start,
+                end,
+            } => {
                 model::validate_id(&project)?;
                 model::validate_id(&sequence)?;
                 model::Revision::parse(&revision)?;
@@ -38,7 +44,10 @@ impl Timeline {
                         "audio":"silence","destination":{"kind":"download"}}});
                 let input: nw_domain::media::RenderInput = commands::parse(params)?;
                 let mut request = query("timeline.render", serde_json::to_value(input)?);
-                request.project = Some(commands::ProjectRef { id: project, expected_revision: None });
+                request.project = Some(commands::ProjectRef {
+                    id: project,
+                    expected_revision: None,
+                });
                 Ok(request)
             }
         }

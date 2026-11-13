@@ -692,6 +692,31 @@ impl ProjectReadSnapshot {
         limit: usize,
     ) -> Result<(Vec<(String, ClipSummary)>, bool)> {
         let track: Track = self.entity(track_id)?.payload("track")?;
+        self.clip_rows_with_track(sequence, track_id, &track, nw_domain::time::TimeRange { start, end }, (after, limit), None)
+    }
+    // The legacy wrapper keeps its exact admission behavior. Compiler callers already
+    // hold a budget-admitted Track and bound raw index bytes before summary decoding.
+    fn clip_rows_with_track(
+        &self,
+        sequence: &EntityId,
+        track_id: &EntityId,
+        track: &Track,
+        range: nw_domain::time::TimeRange,
+        page: (Option<&str>, usize),
+        summary_budget: Option<usize>,
+    ) -> Result<(Vec<(String, ClipSummary)>, bool)> {
+        let nw_domain::time::TimeRange { start, end } = range;
+        let (after, limit) = page;
+        let mut summary_bytes = 0;
+        let mut admit_summary = |bytes: usize| -> Result<()> {
+            if let Some(budget) = summary_budget {
+                if bytes > 1024 || bytes > budget.saturating_sub(summary_bytes) {
+                    return Err(domain::limit("Compiler clip index exceeds summary admission"));
+                }
+                summary_bytes += bytes;
+            }
+            Ok(())
+        };
         if track.sequence_id != *sequence {
             return Err(domain::invalid("Viewport track is not in this sequence"));
         }
@@ -716,6 +741,7 @@ impl ProjectReadSnapshot {
                 .next_back()
         {
             let (key, data) = row.map_err(storage)?;
+            admit_summary(data.value().len())?;
             let clip: ClipSummary = decode(data.value())?;
             if clip.sequence_start.checked_add(clip.duration)? > start {
                 rows.push((key.value().to_owned(), clip));
@@ -734,6 +760,7 @@ impl ProjectReadSnapshot {
             if after == Some(key.value()) {
                 continue;
             }
+            admit_summary(data.value().len())?;
             let clip: ClipSummary = decode(data.value())?;
             if clip.sequence_start >= end {
                 break;
@@ -1196,6 +1223,7 @@ pub(super) fn exercise_atomic_projects() {
     drop(lease);
     let _reacquired = nw_platform::project_lease::ProjectWriterLease::acquire(&project).unwrap();
     regressions::run();
+    render::exercise_compiler_admission();
 }
 
 #[cfg(test)]

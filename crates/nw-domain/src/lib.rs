@@ -1,9 +1,9 @@
 //! Shared, display-independent command and media contracts.
 pub mod commands;
 pub mod execution;
+pub mod media;
 pub mod mux;
 pub mod time;
-pub mod media;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

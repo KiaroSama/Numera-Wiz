@@ -130,14 +130,17 @@ pub async fn review(cli: &Cli, scope: &str) {
     let mut changed = plan.clone();
     changed["payload"]["output"]["video_frames"] = json!("11");
     let changed: nw_domain::media::MediaPlanV1 = serde_json::from_value(changed).unwrap();
-    assert!(changed.digest().is_err(), "Declared frame count must match the exact graph range");
-    let schema = nw_domain::commands::descriptor("timeline.render").unwrap().result_schema.unwrap();
-    let expected: Vec<u16> = (1..=14).collect();
-    let mut batch = super::project_topology::schema_validation::Batch::for_schemas(
-        18,
-        &expected,
-        vec![schema],
+    assert!(
+        changed.digest().is_err(),
+        "Declared frame count must match the exact graph range"
     );
+    let schema = nw_domain::commands::descriptor("timeline.render")
+        .unwrap()
+        .result_schema
+        .unwrap();
+    let expected: Vec<u16> = (1..=14).collect();
+    let mut batch =
+        super::project_topology::schema_validation::Batch::for_schemas(18, &expected, vec![schema]);
     batch.whole(1, 0, encoded, true);
     for id in 2..=14 {
         let mut copy = plan.clone();
@@ -150,21 +153,41 @@ pub async fn review(cli: &Cli, scope: &str) {
             7 => copy["payload"]["capture"]["project_revision"] = json!("01"),
             8 => copy["payload"]["output"]["video_frames"] = json!("01"),
             9 => copy["payload"]["output"]["audio_samples"] = json!("-1"),
-            10 => { copy.as_object_mut().unwrap().remove("payload"); }
+            10 => {
+                copy.as_object_mut().unwrap().remove("payload");
+            }
             11 => copy["payload_kind"] = Value::Null,
             12 => copy["payload"]["output"] = json!("unsupported"),
             13 => copy["created_at"] = json!("01"),
-            14 => { copy.as_object_mut().unwrap().remove("expires_at"); }
+            14 => {
+                copy.as_object_mut().unwrap().remove("expires_at");
+            }
             _ => unreachable!(),
         }
         batch.whole(id, 0, serde_json::to_string(&copy).unwrap(), false);
     }
     batch.finish().await;
-    let (typed, exit) = cli.human(&[
-        "timeline", "render", "--project", project, "--revision", "3", "--sequence", sequence_id,
-        "--start", "0", "--end", "5/2",
-    ]).await;
-    assert_eq!(exit, 0, "Typed finite media review failed: {}", typed["error"]["code"]);
+    let (typed, exit) = cli
+        .human(&[
+            "timeline",
+            "render",
+            "--project",
+            project,
+            "--revision",
+            "3",
+            "--sequence",
+            sequence_id,
+            "--start",
+            "0",
+            "--end",
+            "5/2",
+        ])
+        .await;
+    assert_eq!(
+        exit, 0,
+        "Typed finite media review failed: {}",
+        typed["error"]["code"]
+    );
     assert_eq!(typed["ok"], true);
     assert_eq!(typed["result"]["hash"], plan["hash"]);
     assert!(typed["receipt_id"].is_null());
@@ -173,7 +196,14 @@ pub async fn review(cli: &Cli, scope: &str) {
         invalid.params[field] = value;
         let failed = cli.raw(&invalid).await;
         assert_eq!(failed["ok"], false);
-        assert_eq!(failed["error"]["code"], if field == "revision" { "STALE_REVISION" } else { "VALIDATION_ERROR" });
+        assert_eq!(
+            failed["error"]["code"],
+            if field == "revision" {
+                "STALE_REVISION"
+            } else {
+                "VALIDATION_ERROR"
+            }
+        );
         assert!(failed["receipt_id"].is_null());
         assert!(failed["result"].is_null());
     }

@@ -1498,13 +1498,18 @@ async fn metadata_runtime_discovery(f: &Fixture, reader: &Context, project: &str
         results[1]["authorization"]["policy_revision"].as_str() == Some(expected_revision.as_str())
     );
     let rows = results[0]["commands"].as_array().unwrap();
-    let family: Vec<_> = rows
-        .iter()
-        .filter(|row| row.get("authorization_requirements").is_some())
-        .collect();
-    assert_eq!(family.len(), 13);
     let expected: std::collections::BTreeSet<_> =
         crate::schema_validation::COMMANDS.into_iter().collect();
+    let family: Vec<_> = rows
+        .iter()
+        // The version1 runtime observation retains its closed13-command family.
+        // Additional tools publish static requirements without widening this codec.
+        .filter(|row| row["id"].as_str().is_some_and(|id| expected.contains(id)))
+        .collect();
+    assert_eq!(family.len(), 13);
+    for result in &results {
+        assert_eq!(result["authorization"]["actions"].as_array().unwrap().len(), 13);
+    }
     assert_eq!(
         family
             .iter()

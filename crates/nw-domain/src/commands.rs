@@ -200,7 +200,9 @@ impl ProjectContextRule {
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
-        "projects.inspect" | "sequences.inspect" | "timeline.render" => ProjectContextRule::RequiredRead,
+        "projects.inspect" | "sequences.inspect" | "timeline.render" => {
+            ProjectContextRule::RequiredRead
+        }
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
@@ -214,9 +216,9 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
-        "timeline.render" => Some(
-            serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"),
-        ),
+        "timeline.render" => {
+            Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
+        }
         "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
         "projects.create" => Some(
             serde_json::to_value(schema_for!(crate::projects::views::ProjectCreateResult))
