@@ -53,6 +53,3 @@ strip = "debuginfo"
 
 [profile.dev.package."sha2:0.10.9"]
 opt-level = 3
-
-[profile.dev.package."redb:4.4.0"]
-opt-level = 3

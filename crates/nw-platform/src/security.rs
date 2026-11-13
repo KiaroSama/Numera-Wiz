@@ -5,12 +5,17 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::Command,
 };
+#[cfg(all(test, windows))]
+use std::process::Command;
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows::protect as protect_windows;
 
-/// Prefix of owned Windows ACL evidence files created inside protected directories.
-/// This name participates in directory-reader protocols, so producer and reader
-/// regression fixtures share it.
+/// Prefix of legacy Windows ACL evidence files in protected directories.
+/// Native checks no longer create these files; old retained names remain part of
+/// directory-reader protocols and their regression fixtures.
 pub const ACL_EVIDENCE_PREFIX: &str = ".credential-acl-check-";
 
 fn denied(message: impl Into<String>) -> DomainError {
@@ -44,17 +49,8 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        let output = Command::new("/usr/bin/id")
-            .arg("-u")
-            .output()
-            .map_err(io_error)?;
-        let uid = String::from_utf8(output.stdout)
-            .map_err(io_error)?
-            .trim()
-            .parse::<u32>()
-            .map_err(io_error)?;
-        if !output.status.success()
-            || metadata.uid() != uid
+        let uid = rustix::process::geteuid().as_raw();
+        if metadata.uid() != uid
             || metadata.permissions().mode() & 0o077 != 0
         {
             return Err(denied(
@@ -66,101 +62,11 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
     protect_windows(&canonical, !existed)?;
     Ok(canonical)
 }
-#[cfg(windows)]
+#[cfg(all(test, windows))]
 fn system_tool(name: &str) -> Result<PathBuf> {
     let root =
         std::env::var_os("SystemRoot").ok_or_else(|| denied("Windows SystemRoot unavailable"))?;
     Ok(PathBuf::from(root).join("System32").join(name))
-}
-#[cfg(windows)]
-fn diagnostic_decode_error(operation: &'static str, error: impl std::fmt::Display) -> DomainError {
-    tracing::error!(
-        operation,
-        os_error_present = false,
-        "Protected text decoding failed"
-    );
-    io_error(error)
-}
-#[cfg(windows)]
-fn protect_windows(path: &Path, fresh: bool) -> Result<()> {
-    let output = Command::new(system_tool("whoami.exe")?)
-        .args(["/user", "/fo", "csv", "/nh"])
-        .output()
-        .map_err(|error| diagnostic_io_error("acl.whoami_execute", error))?;
-    if !output.status.success() {
-        return Err(denied("Cannot establish the current Windows SID"));
-    }
-    let text = String::from_utf8(output.stdout)
-        .map_err(|error| diagnostic_decode_error("acl.whoami_decode", error))?;
-    let sid = text
-        .split([',', '"', '\r', '\n'])
-        .find(|part| part.starts_with("S-1-5-"))
-        .ok_or_else(|| denied("Windows SID unavailable"))?;
-    if fresh {
-        let status = Command::new(system_tool("icacls.exe")?)
-            .arg(path)
-            .args(["/inheritance:r", "/grant:r"])
-            .arg(format!("*{sid}:(OI)(CI)F"))
-            .arg("/q")
-            .output()
-            .map_err(|error| diagnostic_io_error("acl.grant_execute", error))?;
-        if !status.status.success() {
-            return Err(denied(
-                "User-only Windows ACL could not be established; use NTFS with ACL support",
-            ));
-        }
-    }
-    let scratch_parent = if path.is_dir() {
-        path
-    } else {
-        path.parent()
-            .ok_or_else(|| denied("Protected file parent is required"))?
-    };
-    let scratch = tempfile::Builder::new()
-        .prefix(ACL_EVIDENCE_PREFIX)
-        .tempfile_in(scratch_parent)
-        .map_err(|error| diagnostic_io_error("acl.scratch_create", error))?;
-    let check = scratch.path().to_owned();
-    scratch
-        .close()
-        .map_err(|error| diagnostic_io_error("acl.scratch_close", error))?;
-    let output = Command::new(system_tool("icacls.exe")?)
-        .arg(path)
-        .arg("/save")
-        .arg(&check)
-        .arg("/q")
-        .output()
-        .map_err(|error| diagnostic_io_error("acl.save_execute", error))?;
-    let bytes = fs::read(&check);
-    let _ = fs::remove_file(&check);
-    if !output.status.success() {
-        return Err(denied("Cannot verify the Windows DACL"));
-    }
-    // Only report the read failure when it is the selected return error.
-    let bytes = bytes.map_err(|error| diagnostic_io_error("acl.evidence_read", error))?;
-    let utf16 = bytes.starts_with(&[0xff, 0xfe]) || bytes.get(1) == Some(&0);
-    let offset = if bytes.starts_with(&[0xff, 0xfe]) {
-        2
-    } else {
-        0
-    };
-    let text = if utf16 {
-        let (words, remainder) = bytes[offset..].as_chunks::<2>();
-        if !remainder.is_empty() {
-            return Err(denied("Invalid odd-byte UTF-16 ACL evidence"));
-        }
-        String::from_utf16(
-            &words
-                .iter()
-                .map(|word| u16::from_le_bytes(*word))
-                .collect::<Vec<_>>(),
-        )
-        .map_err(|error| diagnostic_decode_error("acl.evidence_decode_utf16", error))?
-    } else {
-        String::from_utf8(bytes)
-            .map_err(|error| diagnostic_decode_error("acl.evidence_decode_utf8", error))?
-    };
-    check_dacl(&text, sid)
 }
 #[cfg(any(windows, test))]
 fn check_dacl(text: &str, sid: &str) -> Result<()> {
@@ -287,6 +193,20 @@ mod tests {
             read_private(&path, 128).unwrap_err().code,
             "INSECURE_DATA_ROOT"
         );
+        let directory = private_directory(&root.path().join("existing-directory")).unwrap();
+        let changed = Command::new(system_tool("icacls.exe").unwrap())
+            .arg(&directory)
+            .args(["/grant", "*S-1-1-0:(OI)(CI)R", "/q"])
+            .output()
+            .unwrap();
+        assert!(changed.status.success());
+        for _ in 0..2 {
+            assert_eq!(
+                private_directory(&directory).unwrap_err().code,
+                "INSECURE_DATA_ROOT",
+                "An existing broad DACL must be refused without repairing it"
+            );
+        }
     }
     #[test]
     fn local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user() {
