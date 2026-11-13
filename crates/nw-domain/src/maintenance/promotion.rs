@@ -70,6 +70,9 @@ pub struct GenerationPromotionPlan {
     pub source_records: u32,
     #[schemars(length(min = 1, max = 20), extend("pattern" = "^[1-9][0-9]*$"))]
     pub source_bytes: String,
+    /// Additional space estimate for two copies, COW headroom and margin; not a reservation.
+    #[schemars(length(min = 1, max = 20), extend("pattern" = "^[1-9][0-9]*$"))]
+    pub estimated_additional_bytes: String,
     pub source_guard: SourceGuard,
     pub rollback_generation: u32,
     pub target_generation: u32,
@@ -133,6 +136,14 @@ impl GenerationPromotionPlan {
             || !exact_u64(&self.source_bytes)
             || self.source_bytes.parse::<u64>().unwrap_or(u64::MAX) == 0
             || self.source_bytes.parse::<u64>().unwrap_or(u64::MAX) > MAX_MIGRATION_BYTES
+            || !exact_u64(&self.estimated_additional_bytes)
+            || self
+                .source_bytes
+                .parse::<u64>()
+                .ok()
+                .and_then(|bytes| bytes.checked_mul(3))
+                .and_then(|bytes| bytes.checked_add(64 * 1024 * 1024))
+                != self.estimated_additional_bytes.parse::<u64>().ok()
             || !(1..=49000).contains(&self.source_records)
             || source_caps.len() != self.source_capabilities.len()
             || !source_caps.contains("adoption_guard.v1")

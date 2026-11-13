@@ -327,6 +327,12 @@ mod tests {
         let plan: nw_domain::maintenance::promotion::GenerationPromotionPlan =
             commands::parse(raw.clone()).unwrap();
         plan.validate_hash().unwrap();
+        let source_bytes = plan.source_bytes.parse::<u64>().unwrap();
+        let additional_bytes = plan.estimated_additional_bytes.parse::<u64>().unwrap();
+        assert_eq!(additional_bytes, source_bytes * 3 + 67_108_864);
+        let mut wrong_estimate = plan.clone();
+        wrong_estimate.estimated_additional_bytes = (additional_bytes + 1).to_string();
+        assert!(wrong_estimate.digest().is_err());
         service.store.close_generation(&service.root_lease).unwrap();
         let facts = service.root_lease.inspect_selected().unwrap();
         service
@@ -371,10 +377,10 @@ mod tests {
         let descriptor = commands::descriptor("maintenance.promotion.plan").unwrap();
         assert!(!nw_domain::access::ordinary_commands().contains("maintenance.promotion.plan"));
         let schema = descriptor.result_schema.unwrap();
-        let expected: Vec<u16> = (1..=18).collect();
+        let expected: Vec<u16> = (1..=20).collect();
         let mut batch = crate::schema_validation::Batch::for_schemas(17, &expected, vec![schema]);
         batch.whole(1, 0, encoded, true);
-        for id in 2..=18 {
+        for id in 2..=20 {
             let mut copy = raw.clone();
             match id {
                 2 => copy["schema_version"] = json!(2),
@@ -401,6 +407,10 @@ mod tests {
                     .as_array_mut()
                     .unwrap()
                     .push(json!("media_execution.v1")),
+                19 => copy["estimated_additional_bytes"] = json!("01"),
+                20 => {
+                    copy.as_object_mut().unwrap().remove("estimated_additional_bytes");
+                }
                 _ => unreachable!(),
             }
             batch.whole(id, 0, serde_json::to_string(&copy).unwrap(), false);

@@ -103,11 +103,12 @@ impl Store {
                 ));
             }
             // Two independent copies plus conservative COW headroom; no space is reserved.
-            copies::require_copy_space(
-                lease.state(),
-                facts.store_bytes.parse().map_err(storage)?,
-                3,
-            )?;
+            let source_bytes: u64 = facts.store_bytes.parse().map_err(storage)?;
+            let estimated_additional_bytes = source_bytes
+                .checked_mul(3)
+                .and_then(|bytes| bytes.checked_add(64 * 1024 * 1024))
+                .ok_or_else(|| invalid("Generation space estimate overflow"))?;
+            copies::require_copy_space(lease.state(), source_bytes, 3)?;
             let now = clock()?;
             let mut plan = GenerationPromotionPlan {
                 schema_version: 1,
@@ -124,6 +125,7 @@ impl Store {
                 source_records_sha256: facts.records_sha256,
                 source_records: facts.record_count,
                 source_bytes: facts.store_bytes,
+                estimated_additional_bytes: estimated_additional_bytes.to_string(),
                 source_guard: SourceGuard {
                     migration_id: guard.migration_id,
                     activation_id: guard.activation_id,

@@ -461,7 +461,10 @@ opaque managed inputs; this field confers no path or object authority.
 `maintenance promotion plan` is a development native-owner query that reviews an
 already-adopted, compatible schema3 source for MediaV1. It returns the actual
 source/prefix/guard facts, current build, bounded target profile, hash and
-300-second expiry. It preserves logical source records and issues no receipt.
+300-second expiry. The canonical `estimated_additional_bytes` is three source-file
+sizes plus a 64MiB margin, covering two independent copies and conservative COW
+headroom. The available-space check does not reserve that space. The review
+preserves logical source records and issues no receipt.
 Its newly added implementation still requires current-source hosted qualification.
 Promotion acceptance, stopped restoration and fresh/zero-adoption initialization
 remain in development; this query does not enable media persistence or replace
