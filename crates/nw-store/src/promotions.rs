@@ -1,5 +1,5 @@
 //! Genuine compatible-source review; no journal, floor, guard or receipt is written.
-use crate::{Store, adoption::Guard, copies, generations::RootLease, storage};
+use crate::{RECORDS, Store, adoption::Guard, copies, decode, generations::RootLease, storage};
 use nw_domain::{
     DomainError, Result,
     maintenance::{
@@ -10,6 +10,7 @@ use nw_domain::{
         },
     },
 };
+use redb::ReadableTable;
 
 fn invalid(message: &'static str) -> DomainError {
     DomainError::new("PROMOTION_UNQUALIFIED", message)
@@ -36,9 +37,15 @@ impl Store {
         }
         let selection = lease.selection()?;
         let prefix = lease.compatible_prefix()?;
-        let guard: Guard = self
-            .get("meta/rollback-guard")?
-            .ok_or_else(|| invalid("A missing adoption guard is unknown, never zero"))?;
+        let guard: Guard = {
+            let read = self.db.begin_read().map_err(storage)?;
+            let table = read.open_table(RECORDS).map_err(storage)?;
+            let value = table
+                .get("meta/rollback-guard")
+                .map_err(storage)?
+                .ok_or_else(|| invalid("A missing adoption guard is unknown, never zero"))?;
+            decode(value.value())?
+        };
         if guard.validate()? == 0 {
             return Err(invalid(
                 "This review requires prior adoption; zero-adoption initialization remains in development",
