@@ -10,23 +10,33 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## November 13 current candidate and hosted boundary
 
-[CI285](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43447686067),
-source `f938b0918b7647fb7e10490f6aad9206e7d747de`, is terminal: nine passing
-jobs and four failing native jobs. All four desktop builds, platform and service
-suites pass. The four native lints reject three nested conditions; Linux metadata
-capture also rejects a signed empty index without an APT target. Windows ordinary
-compatibility fails when its current owner exits before readiness after correct
-old-floor refusal. Successful fresh and migrated-r0 roots are separate evidence.
-No specific redb, filesystem or lock cause is established by that exit.
+[CI289](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43459116857),
+source `617d9b4fef258d63865e09d8a64d3b4d0669334e`, is terminal: nine passing
+jobs and four failures, with no skips or cancellations. Gitleaks 153 passes.
+All four desktop builds, platform/service suites and lints pass; both macOS
+native checks pass completely. The exact hosted eframe 0.37 lock also passes,
+and the shared browser application compiles to WASM.
 
-Later source corrections retain the authenticated empty index with explicit
-absent-cache evidence and preserve all compressed/plain checks. The candidate
-also selects released eframe0.37.0 with reviewed ID/scope aliases and native
-clipboard restoration. CI287 supplies its new lock, reviewed and applied in full; the next
-locked build must qualify that exact dependency closure. A bounded test-harness
-consumer retains the existing finite owner failure frame without publishing raw
-logs, credentials or paths. These later changes still need their own hosted
-qualification; CI285 does not qualify them. Full version1 remains unfinished.
+Chrome and native human-input journeys fail at Selection report: the original
+runner screenshots place the button below the old pointer. Narrow harness
+corrections preserve genuine input, correlation, assertions and deadlines;
+the corrected journeys still need exact source hosted execution. Linux metadata
+capture authenticates all 16 index paths, then rejects APT’s escaped plus/tilde
+package URLs. The reviewed representation correction preserves the raw URL
+and correlates its narrowly decoded identity and size exactly with signed
+Packages Filename metadata; corrected hosted capture remains pending.
+
+Windows ordinary compatibility fails after completed restoration and genuine
+old-package business, when the current owner reopens the original source.
+The newly retained existing canonical frame reports
+`post_log_activation` / `FILESYSTEM_ERROR`. It identifies an error class; the
+failing filesystem operation remains unknown.
+A bounded harness projection now retains only recognized existing stage/operation
+and numeric OS observations from already captured stderr. It preserves the
+original stdout frame, raw-log privacy, failure, identity and restoration rules.
+Its source/security review is complete; current source hosted qualification
+is required;
+no specific redb cause is established. Full version 1 remains unfinished.
 
 Spec Kit and feature specifications remain local only. Upstream executable source
 snapshots are external; schema-2 research metadata records the separation. Current
