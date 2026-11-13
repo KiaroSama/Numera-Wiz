@@ -757,7 +757,10 @@ async fn group_clip<D: Driver>(
         .iter()
         .position(|item| item["id"] == clip["id"])
         .expect("The exact placed clip remains in the captured viewport");
-    assert_eq!(captured_row, row, "Fixed fixture member ordering is unchanged");
+    assert_eq!(
+        captured_row, row,
+        "Fixed fixture member ordering is unchanged"
+    );
     // Actual inspection retires/reloads through the normal UI path. Independent
     // reads then reuse that member's clip/source bindings within the same eight.
     select_clip(driver, captured_row).await;
