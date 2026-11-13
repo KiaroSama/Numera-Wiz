@@ -31,10 +31,12 @@ pub fn verify(root: &Path) -> Result<()> {
             bail!("Non-Rust build program is tracked: {name}");
         }
         let extension = path.extension().and_then(|value| value.to_str());
+        let normalized_extension = extension.map(str::to_ascii_lowercase);
+        let extension = normalized_extension.as_deref();
         if extension.is_some_and(|extension| {
             [
                 "py", "pyc", "c", "h", "cc", "cpp", "cxx", "hpp", "go", "sh", "ps1", "bat", "cmd",
-                "js", "ts", "tsx", "jsx", "html", "wasm", "mk", "cmake", "m4",
+                "js", "ts", "tsx", "jsx", "html", "wasm", "mk", "mak", "cmake", "m4",
             ]
             .contains(&extension)
                 || [
