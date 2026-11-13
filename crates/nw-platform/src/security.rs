@@ -26,16 +26,21 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
         .try_exists()
         .map_err(|error| diagnostic_io_error("private_directory.exists", error))?;
     if !existed {
-        let mut builder = fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)]
+        #[cfg(windows)]
+        windows::create_directory(path)?;
+        #[cfg(not(windows))]
         {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
+            let mut builder = fs::DirBuilder::new();
+            builder.recursive(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            builder
+                .create(path)
+                .map_err(|error| diagnostic_io_error("private_directory.create", error))?;
         }
-        builder
-            .create(path)
-            .map_err(|error| diagnostic_io_error("private_directory.create", error))?;
     }
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| diagnostic_io_error("private_directory.metadata", error))?;
@@ -59,7 +64,7 @@ pub fn private_directory(path: &Path) -> Result<PathBuf> {
         }
     }
     #[cfg(windows)]
-    protect_windows(&canonical, !existed)?;
+    protect_windows(&canonical)?;
     Ok(canonical)
 }
 #[cfg(all(test, windows))]
@@ -138,7 +143,7 @@ pub fn verify_private_file(path: &Path, limit: u64) -> Result<()> {
         }
     }
     #[cfg(windows)]
-    protect_windows(path, false)?;
+    protect_windows(path)?;
     Ok(())
 }
 pub fn read_private(path: &Path, limit: u64) -> Result<Vec<u8>> {
@@ -202,6 +207,11 @@ mod tests {
         assert!(changed.status.success());
         for _ in 0..2 {
             assert_eq!(
+                windows::create_directory(&directory).unwrap_err().code,
+                "INSECURE_DATA_ROOT",
+                "A creator racing with an existing broad DACL must not repair it"
+            );
+            assert_eq!(
                 private_directory(&directory).unwrap_err().code,
                 "INSECURE_DATA_ROOT",
                 "An existing broad DACL must be refused without repairing it"
@@ -225,6 +235,9 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let secure = root.path().join("owned-auth");
         private_directory(&secure).unwrap();
+        let nested = secure.join("new-parent/new-child");
+        private_directory(&nested).unwrap();
+        private_directory(nested.parent().unwrap()).unwrap();
         let path = secure.join("token");
         write_private(&path, b"first", false).unwrap();
         assert_eq!(read_private(&path, 64).unwrap(), b"first");

@@ -4,8 +4,9 @@ use crate::files::{diagnostic_io_error, native_object};
 use nw_domain::Result;
 use std::{
     ffi::c_void,
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     os::windows::{
+        ffi::OsStrExt,
         fs::{MetadataExt, OpenOptionsExt},
         io::{AsRawHandle, FromRawHandle, OwnedHandle},
     },
@@ -13,20 +14,20 @@ use std::{
     ptr,
 };
 use windows_sys::Win32::{
-    Foundation::{ERROR_INSUFFICIENT_BUFFER, LocalFree},
+    Foundation::{ERROR_ALREADY_EXISTS, ERROR_INSUFFICIENT_BUFFER, LocalFree},
     Security::{
         Authorization::{
             ConvertSecurityDescriptorToStringSecurityDescriptorW,
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-            GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT, SetSecurityInfo,
+            GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT,
         },
-        DACL_SECURITY_INFORMATION, GetSecurityDescriptorDacl, GetTokenInformation,
-        PROTECTED_DACL_SECURITY_INFORMATION, TOKEN_QUERY, TOKEN_USER, TokenUser,
+        DACL_SECURITY_INFORMATION, GetTokenInformation, SECURITY_ATTRIBUTES,
+        TOKEN_QUERY, TOKEN_USER, TokenUser,
     },
     Storage::FileSystem::{
-        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
+        CreateDirectoryW, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
         FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
-        FILE_SHARE_READ, FILE_SHARE_WRITE, READ_CONTROL, WRITE_DAC,
+        FILE_SHARE_READ, FILE_SHARE_WRITE, READ_CONTROL,
     },
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
@@ -48,6 +49,9 @@ fn last_error(operation: &'static str) -> nw_domain::DomainError {
 }
 fn status_error(operation: &'static str, status: u32) -> nw_domain::DomainError {
     diagnostic_io_error(operation, std::io::Error::from_raw_os_error(status as i32))
+}
+fn decode_error(operation: &'static str, error: std::string::FromUtf16Error) -> nw_domain::DomainError {
+    diagnostic_io_error(operation, std::io::Error::new(std::io::ErrorKind::InvalidData, error))
 }
 
 #[expect(unsafe_code, reason = "Read bounded TokenUser data and own the returned process token/SID text")]
@@ -91,15 +95,15 @@ fn current_sid() -> Result<String> {
         if unsafe { *text.add(length) } == 0 {
             // SAFETY: This is the initialized prefix preceding its terminator.
             let units = unsafe { std::slice::from_raw_parts(text, length) };
-            return String::from_utf16(units).map_err(|error| diagnostic_io_error("acl.sid_decode", error));
+            return String::from_utf16(units).map_err(|error| decode_error("acl.sid_decode", error));
         }
     }
     Err(denied("Windows SID text exceeds its bound"))
 }
 
-fn open_object(path: &Path, fresh: bool) -> Result<File> {
+fn open_object(path: &Path) -> Result<File> {
     let file = OpenOptions::new()
-        .access_mode(READ_CONTROL | FILE_READ_ATTRIBUTES | if fresh { WRITE_DAC } else { 0 })
+        .access_mode(READ_CONTROL | FILE_READ_ATTRIBUTES)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
         .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
         .open(path)
@@ -111,8 +115,8 @@ fn open_object(path: &Path, fresh: bool) -> Result<File> {
     Ok(file)
 }
 
-#[expect(unsafe_code, reason = "Install a protected current-user DACL only on a newly created object")]
-fn protect_new(file: &File, sid: &str) -> Result<()> {
+#[expect(unsafe_code, reason = "Build an owned descriptor from the actual current process SID")]
+fn new_directory_descriptor(sid: &str) -> Result<LocalMemory> {
     let text = format!("D:P(A;OICI;FA;;;{sid})").encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
     let mut descriptor = ptr::null_mut();
     // SAFETY: Valid NUL-terminated trusted SID descriptor and initialized output.
@@ -122,22 +126,57 @@ fn protect_new(file: &File, sid: &str) -> Result<()> {
     if okay == 0 { return Err(last_error("acl.descriptor_create")); }
     let allocation = LocalMemory(descriptor);
     if allocation.0.is_null() { return Err(denied("Protected security descriptor is absent")); }
-    let mut present = 0;
-    let mut defaulted = 0;
-    let mut dacl = ptr::null_mut();
-    // SAFETY: Descriptor allocation remains live; output ACL is borrowed from it.
-    if unsafe { GetSecurityDescriptorDacl(allocation.0, &mut present, &mut dacl, &mut defaulted) } == 0 {
-        return Err(last_error("acl.descriptor_dacl"));
+    Ok(allocation)
+}
+
+/// Supply the protected DACL at creation. Never change an existing object's ACL,
+/// including one that appears after an absence observation.
+#[expect(unsafe_code, reason = "Create missing directories with a live trusted security descriptor")]
+pub(super) fn create_directory(path: &Path) -> Result<()> {
+    let absolute = std::path::absolute(path)
+        .map_err(|error| diagnostic_io_error("acl.create_absolute", error))?;
+    let mut missing = Vec::new();
+    for candidate in absolute.ancestors() {
+        if candidate.try_exists().map_err(|error| diagnostic_io_error("acl.create_exists", error))? {
+            break;
+        }
+        missing.push(candidate);
     }
-    if present == 0 || dacl.is_null() { return Err(denied("Protected DACL is absent")); }
-    // SAFETY: Held file has WRITE_DAC; Windows copies the borrowed ACL synchronously.
-    let status = unsafe {
-        SetSecurityInfo(file.as_raw_handle(), SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-            ptr::null_mut(), ptr::null_mut(), dacl, ptr::null())
+    let sid = current_sid()?;
+    if missing.is_empty() { return verify_directory(&absolute, &sid); }
+    let descriptor = new_directory_descriptor(&sid)?;
+    let attributes = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: descriptor.0,
+        bInheritHandle: 0,
     };
-    if status != 0 { return Err(status_error("acl.dacl_install", status)); }
-    Ok(())
+    // Borrowed ancestor slices avoid recursive stack growth or cloning every
+    // path prefix. Protect each newly created missing component, not just leaf.
+    for candidate in missing.into_iter().rev() {
+        let parent = fs::canonicalize(candidate.parent().ok_or_else(|| denied("Protected directory parent is absent"))?)
+            .map_err(|error| diagnostic_io_error("acl.create_parent", error))?;
+        let name = candidate.file_name().ok_or_else(|| denied("Protected directory name is absent"))?;
+        // canonicalize supplies Windows' extended absolute parent path, including
+        // long-path/UNC support. The leaf is never resolved as creation authority.
+        let target = parent.join(name);
+        let mut wide = target.as_os_str().encode_wide().collect::<Vec<_>>();
+        if wide.contains(&0) || wide.len() >= 32767 {
+            return Err(denied("Protected directory path exceeds the native path bound"));
+        }
+        wide.push(0);
+        // SAFETY: Valid NUL-terminated path and initialized attributes whose
+        // descriptor stays live. Windows copies security on successful creation.
+        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0 {
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() != Some(ERROR_ALREADY_EXISTS as i32) {
+                return Err(diagnostic_io_error("acl.directory_create", error));
+            }
+        }
+        // ERROR_ALREADY_EXISTS supplies no ownership/creation authority. This
+        // path only reads the actual DACL and refuses a raced-in broad object.
+        verify_directory(&target, &sid)?;
+    }
+    verify_directory(&absolute, &sid)
 }
 
 #[expect(unsafe_code, reason = "Inspect the held object's actual DACL and copy its bounded native SDDL")]
@@ -167,18 +206,28 @@ fn descriptor_text(file: &File) -> Result<String> {
     let units = unsafe { std::slice::from_raw_parts(text, length as usize) };
     if units.last() != Some(&0) { return Err(denied("Windows ACL text is unterminated")); }
     String::from_utf16(&units[..units.len() - 1])
-        .map_err(|error| diagnostic_io_error("acl.dacl_decode", error))
+        .map_err(|error| decode_error("acl.dacl_decode", error))
 }
 
-pub(super) fn protect(path: &Path, fresh: bool) -> Result<()> {
-    let sid = current_sid()?;
-    let file = open_object(path, fresh)?;
-    if fresh { protect_new(&file, &sid)?; }
-    check_dacl(&descriptor_text(&file)?, &sid)?;
+fn verify(path: &Path, sid: &str) -> Result<File> {
+    let file = open_object(path)?;
+    check_dacl(&descriptor_text(&file)?, sid)?;
     // The checked handle must still be the object named by the caller's path.
-    let current = open_object(path, false)?;
+    let current = open_object(path)?;
     if native_object(&file)? != native_object(&current)? {
         return Err(denied("Protected ACL object changed during verification"));
     }
+    Ok(file)
+}
+
+fn verify_directory(path: &Path, sid: &str) -> Result<()> {
+    let file = verify(path, sid)?;
+    if !file.metadata().map_err(|error| diagnostic_io_error("acl.directory_metadata", error))?.is_dir() {
+        return Err(denied("Protected directory must be an ordinary directory"));
+    }
     Ok(())
+}
+
+pub(super) fn protect(path: &Path) -> Result<()> {
+    verify(path, &current_sid()?).map(|_| ())
 }
