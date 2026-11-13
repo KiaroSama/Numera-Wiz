@@ -18,8 +18,10 @@ pub(super) async fn qualify(engine: &Engine, cancel: CancellationToken) -> Resul
             phase.cancel();
             // Drive the same supervisor to confirmed reap; dropping it would quarantine capacity.
             let result = work.await;
-            if let Err(error) = result {
-                if matches!(error.code.as_str(), "TREE_TERMINATION_UNCERTAIN" | "PROCESS_WAIT_FAILED" | "PROCESS_CAPTURE_FAILED" | "PROCESS_LAUNCH_FAILED") { return Err(error); }
+            if let Err(error) = result
+                && matches!(error.code.as_str(), "TREE_TERMINATION_UNCERTAIN" | "PROCESS_WAIT_FAILED" | "PROCESS_CAPTURE_FAILED" | "PROCESS_LAUNCH_FAILED")
+            {
+                return Err(error);
             }
             Err(DomainError::new("PROCESS_TIMEOUT", "Media qualification exceeded its15-second total deadline"))
         }
