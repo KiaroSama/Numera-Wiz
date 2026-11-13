@@ -8,6 +8,26 @@ and no-close policies below are historical and superseded by the owner's explici
 request to consolidate other branches/PRs and remove local-only planning/source
 files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
+## November 13 current candidate and hosted boundary
+
+[CI285](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43447686067),
+source `f938b0918b7647fb7e10490f6aad9206e7d747de`, is terminal: nine passing
+jobs and four failing native jobs. All four desktop builds, platform and service
+suites pass. The four native lints reject three nested conditions; Linux metadata
+capture also rejects a signed empty index without an APT target. Windows ordinary
+compatibility fails when its current owner exits before readiness after correct
+old-floor refusal. Successful fresh and migrated-r0 roots are separate evidence.
+No specific redb, filesystem or lock cause is established by that exit.
+
+Later source corrections retain the authenticated empty index with explicit
+absent-cache evidence and preserve all compressed/plain checks. The candidate
+also selects released eframe0.37.0 with reviewed ID/scope aliases and native
+clipboard restoration. Its new lock must come from the hosted resolver; an old
+lock is not treated as a valid new dependency closure. A bounded test-harness
+consumer retains the existing finite owner failure frame without publishing raw
+logs, credentials or paths. These later changes still need their own hosted
+qualification; CI285 does not qualify them. Full version1 remains unfinished.
+
 Spec Kit and feature specifications remain local only. Upstream executable source
 snapshots are external; schema-2 research metadata records the separation. Current
 changes add bounded folder registration/inspection and shared controls, CLI job
