@@ -1508,7 +1508,10 @@ async fn metadata_runtime_discovery(f: &Fixture, reader: &Context, project: &str
         .collect();
     assert_eq!(family.len(), 13);
     for result in &results {
-        assert_eq!(result["authorization"]["actions"].as_array().unwrap().len(), 13);
+        assert_eq!(
+            result["authorization"]["actions"].as_array().unwrap().len(),
+            13
+        );
     }
     assert_eq!(
         family

@@ -144,11 +144,23 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
 pub(super) fn assert_listing_admission() {
     // Two flag columns follow the pinned FFmpeg9 show_filters output, including
     // sources and dynamic input counts. Header/description text is never a name.
-    let filters = names("Filters:\n  T.. = Timeline support\n  .S. = Slice threading\n  ------\n .. color             |->V       Provide an opaque color input.\n TS trim              V->V       Pick a finite range.\n .. concat            N->N       Concatenate inputs.\n ... setpts           V->V       Legacy three-flag listing.\n .. made_up           invalid    color trim asetpts\n color appears only in prose\n", Listing::Filters);
-    assert_eq!(filters, BTreeSet::from(["color", "trim", "concat", "setpts"]));
+    let filters = names(
+        "Filters:\n  T.. = Timeline support\n  .S. = Slice threading\n  ------\n .. color             |->V       Provide an opaque color input.\n TS trim              V->V       Pick a finite range.\n .. concat            N->N       Concatenate inputs.\n ... setpts           V->V       Legacy three-flag listing.\n .. made_up           invalid    color trim asetpts\n color appears only in prose\n",
+        Listing::Filters,
+    );
+    assert_eq!(
+        filters,
+        BTreeSet::from(["color", "trim", "concat", "setpts"])
+    );
     assert!(!filters.contains("asetpts"));
-    let encoders = names("Encoders:\n V..... = Video\n VF.... ffv1                 FFmpeg video codec #1\n A....D pcm_s16le            PCM signed 16-bit little-endian\n ...... invented             ffv1\n", Listing::Encoders);
+    let encoders = names(
+        "Encoders:\n V..... = Video\n VF.... ffv1                 FFmpeg video codec #1\n A....D pcm_s16le            PCM signed 16-bit little-endian\n ...... invented             ffv1\n",
+        Listing::Encoders,
+    );
     assert_eq!(encoders, BTreeSet::from(["ffv1", "pcm_s16le"]));
-    let muxers = names("Muxers:\n .E = Muxing supported\n  E  matroska        Matroska\n D   input_only      Matroska\n", Listing::Muxers);
+    let muxers = names(
+        "Muxers:\n .E = Muxing supported\n  E  matroska        Matroska\n D   input_only      Matroska\n",
+        Listing::Muxers,
+    );
     assert_eq!(muxers, BTreeSet::from(["matroska"]));
 }

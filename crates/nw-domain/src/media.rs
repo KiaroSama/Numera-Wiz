@@ -24,9 +24,25 @@ pub const ENCODERS: &[&str] = &["ffv1", "pcm_s16le"];
 pub const MUXERS: &[&str] = &["matroska"];
 
 pub trait RenderRead: projects::edit::ProjectRead {
-    fn track_ids_for_render(&self, sequence: &EntityId, declared_tracks: usize, limit: usize) -> Result<Vec<EntityId>>;
-    fn clip_ids_for_render(&self, sequence: &EntityId, track_id: &EntityId, track: &projects::Track, range: TimeRange, limit: usize) -> Result<Vec<EntityId>>;
-    fn render_raw_entity(&self, id: &EntityId, remaining_raw_bytes: usize) -> Result<Option<String>>;
+    fn track_ids_for_render(
+        &self,
+        sequence: &EntityId,
+        declared_tracks: usize,
+        limit: usize,
+    ) -> Result<Vec<EntityId>>;
+    fn clip_ids_for_render(
+        &self,
+        sequence: &EntityId,
+        track_id: &EntityId,
+        track: &projects::Track,
+        range: TimeRange,
+        limit: usize,
+    ) -> Result<Vec<EntityId>>;
+    fn render_raw_entity(
+        &self,
+        id: &EntityId,
+        remaining_raw_bytes: usize,
+    ) -> Result<Option<String>>;
     fn render_header_raw(&self) -> &str;
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

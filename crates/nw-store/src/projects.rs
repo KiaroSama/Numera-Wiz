@@ -692,7 +692,14 @@ impl ProjectReadSnapshot {
         limit: usize,
     ) -> Result<(Vec<(String, ClipSummary)>, bool)> {
         let track: Track = self.entity(track_id)?.payload("track")?;
-        self.clip_rows_with_track(sequence, track_id, &track, nw_domain::time::TimeRange { start, end }, (after, limit), None)
+        self.clip_rows_with_track(
+            sequence,
+            track_id,
+            &track,
+            nw_domain::time::TimeRange { start, end },
+            (after, limit),
+            None,
+        )
     }
     // The legacy wrapper keeps its exact admission behavior. Compiler callers already
     // hold a budget-admitted Track and bound raw index bytes before summary decoding.
@@ -711,7 +718,9 @@ impl ProjectReadSnapshot {
         let mut admit_summary = |bytes: usize| -> Result<()> {
             if let Some(budget) = summary_budget {
                 if bytes > 1024 || bytes > budget.saturating_sub(summary_bytes) {
-                    return Err(domain::limit("Compiler clip index exceeds summary admission"));
+                    return Err(domain::limit(
+                        "Compiler clip index exceeds summary admission",
+                    ));
                 }
                 summary_bytes += bytes;
             }
