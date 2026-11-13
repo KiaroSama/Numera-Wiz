@@ -16,6 +16,9 @@ use std::{
     sync::Arc,
 };
 
+mod initialization_read;
+pub use initialization_read::InitializationRead;
+
 const MAX_ACTIVATIONS: usize = 64;
 const MAX_DIRECTORY_ENTRIES: usize = 256;
 const MAX_ACTIVATION_BYTES: u64 = 65536;
@@ -102,6 +105,12 @@ pub struct RootLease {
 }
 fn invalid(message: &'static str) -> DomainError {
     DomainError::new("STORE_ACTIVATION_INVALID", message)
+}
+fn retain_read_guard(guards: &mut Vec<(PathBuf, RootLock)>, path: &Path) -> Result<()> {
+    if !guards.iter().any(|(held, _)| held == path) {
+        guards.push((path.to_owned(), RootLock::acquire(path)?));
+    }
+    Ok(())
 }
 fn uuid(value: &str) -> Result<()> {
     let parsed =
@@ -421,9 +430,7 @@ impl RootLease {
         let directory = DirectoryStamp::capture_resolved(&path)?;
         let source = files::SourceStamp::capture_resolved(&path.join("store.redb"))?;
         let mut guards = self.historical_guards.lock().map_err(storage)?;
-        if !guards.iter().any(|(held, _)| held == &path) {
-            guards.push((path.clone(), RootLock::acquire(&path)?));
-        }
+        retain_read_guard(&mut guards, &path)?;
         // Keep the registry mutex and original selected guard throughout the
         // observation; concurrent attachment cannot transfer it out underneath us.
         directory.revalidate()?;
@@ -851,6 +858,120 @@ mod tests {
                 .unwrap()["value"],
             "9007199254740993"
         );
+        drop(reopened);
+        let mut observed_non_initialization = false;
+        let refused = lease.with_selected_initialization_read(|_| {
+            observed_non_initialization = true;
+            Ok(())
+        });
+        assert_eq!(refused.unwrap_err().code, "STORE_ACTIVATION_INVALID");
+        assert!(!observed_non_initialization);
+        drop(lease);
+        exercise_initialization_read_ownership();
+    }
+
+    fn exercise_initialization_read_ownership() {
+        use nw_domain::{
+            access::{AccessProfile, ProfileMode},
+            commands::Request,
+            maintenance::media_lifecycle::EnablementPhase,
+        };
+        let temporary = tempfile::tempdir().unwrap();
+        let root = security::private_directory(&temporary.path().join("initialization-root")).unwrap();
+        let assets = security::private_directory(&root.join("assets")).unwrap();
+        let exports = security::private_directory(&root.join("exports")).unwrap();
+        let profiles = ["agent", "browser"].map(|id| {
+            let discovery = id == "agent";
+            AccessProfile {
+                schema_version: 2, id: id.into(), name: id.into(),
+                principal: uuid::Uuid::new_v4().to_string(), revision: 1, enabled: true,
+                client_sessions: !discovery,
+                mode: if discovery { ProfileMode::Discovery } else { ProfileMode::Operate },
+                owned_object_access: !discovery,
+                allowed_command_ids: if discovery {
+                    nw_domain::access::DISCOVERY_COMMANDS.iter().map(|id| (*id).into()).collect()
+                } else { nw_domain::access::ordinary_commands() },
+                object_grants: Vec::new(),
+                read_roots: if discovery { Vec::new() } else { vec![files::path_text(&assets).unwrap()] },
+                write_roots: if discovery { Vec::new() } else { vec![files::path_text(&exports).unwrap()] },
+            }
+        });
+        let lease = RootLease::acquire(&root).unwrap();
+        let store = Store::initialize_fresh_legacy_prefix(&lease, &profiles).unwrap();
+        let generation = store.generation_path().unwrap();
+        let original_native = files::source_object(&generation.join("store.redb")).unwrap();
+        let principal = format!("owner-{}", store.root_id());
+        let scope = store.issue_scope(&principal, 100).unwrap();
+        let build = "ab".repeat(32);
+        let plan = store.prepare_media_initialization(&lease, &build, || Ok(101)).unwrap();
+        let initialization_id = plan.id.clone();
+        let source_activation_id = plan.source_activation_id.clone();
+        let mut request = Request::query("maintenance.initialization.accept", serde_json::json!({"plan":plan}));
+        request.replay_scope = Some(scope);
+        request.idempotency_key = Some("real-initialization-read-control".into());
+        let accepted = store.accept_media_initialization(&lease, &principal, &request, &build,
+            || Ok(102), &tokio_util::sync::CancellationToken::new()).unwrap();
+        assert!(accepted.ok);
+        assert_eq!(store.inspect_media_initialization(&initialization_id).unwrap().phase, EnablementPhase::Succeeded);
+        drop(store);
+        drop(lease);
+
+        // Reacquisition follows the actual HOST271 path: F is selected in a
+        // workspace and acquire already retains the original LegacyOne S guard.
+        let lease = RootLease::acquire(&root).unwrap();
+        assert_eq!(RootLock::acquire(&generation).err().unwrap().code, "OWNER_BUSY");
+        let mut paths = Vec::new();
+        for _ in 0..2 {
+            lease.with_selected_initialization_read(|observed| {
+                assert_eq!(observed.record.id, initialization_id);
+                assert_eq!(observed.source_path, generation);
+                assert_eq!(observed.source_selection.activation_id.as_deref(), Some(source_activation_id.as_str()));
+                assert_eq!(files::source_object(&observed.source_path.join("store.redb"))?, original_native);
+                for path in [observed.target_path, observed.source_path, observed.baseline_path] {
+                    assert_eq!(RootLock::acquire(path).err().unwrap().code, "OWNER_BUSY");
+                    assert_eq!(Store::open(path).err().unwrap().code, "OWNER_BUSY");
+                }
+                paths = [observed.target_path, observed.source_path, observed.baseline_path]
+                    .map(Path::to_owned).to_vec();
+                Ok(())
+            }).unwrap();
+        }
+        // Attachment takes all retained guards from the same registry. It must
+        // neither duplicate them nor leave H/S available to an outside writer.
+        let reopened = Store::open_selected(&lease).unwrap();
+        for path in &paths {
+            assert_eq!(RootLock::acquire(path).err().unwrap().code, "OWNER_BUSY");
+        }
+        assert_eq!(reopened.replay(&principal, &request, 103).unwrap().unwrap().receipt_id,
+            accepted.receipt_id);
+        let mut observed_live = false;
+        let refused = lease.with_selected_initialization_read(|_| { observed_live = true; Ok(()) });
+        assert_eq!(refused.unwrap_err().code, "OWNER_BUSY");
+        assert!(!observed_live);
+        drop(reopened);
+        drop(lease);
+
+        // A real hardlink alias cannot substitute S's file for independent H.
+        // Preserve the genuine H object by rename and restore it afterward.
+        let baseline = &paths[2];
+        let retained = baseline.with_file_name("retained-baseline-alias-control");
+        std::fs::rename(baseline, &retained).unwrap();
+        security::private_directory(baseline).unwrap();
+        std::fs::hard_link(generation.join("store.redb"), baseline.join("store.redb")).unwrap();
+        let lease = RootLease::acquire(&root).unwrap();
+        let mut observed_alias = false;
+        let refused = lease.with_selected_initialization_read(|_| { observed_alias = true; Ok(()) });
+        assert_eq!(refused.unwrap_err().code, "STORE_ACTIVATION_INVALID");
+        assert!(!observed_alias);
+        drop(lease);
+        std::fs::remove_dir_all(baseline).unwrap();
+        std::fs::rename(&retained, baseline).unwrap();
+        let lease = RootLease::acquire(&root).unwrap();
+        lease.with_selected_initialization_read(|observed| {
+            assert_eq!(observed.baseline_path, baseline);
+            assert_eq!(observed.record.id, initialization_id);
+            Ok(())
+        }).unwrap();
     }
     #[test]
     fn a_copy_with_the_same_root_uuid_but_another_replay_key_cannot_activate() {

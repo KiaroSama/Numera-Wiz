@@ -6,7 +6,7 @@ use nw_domain::maintenance::media_lifecycle::{
     EnablementPhase, InitializationOrigin, MediaInitializationPlan, MediaInitializationRecord,
     RestorationKind,
 };
-use nw_store::generations::{Activation, GenerationRole, Selection};
+use nw_store::generations::GenerationRole;
 
 fn compatible(snapshot: &Snapshot) -> Result<()> {
     ensure!(
@@ -75,10 +75,9 @@ fn raw_receipt(snapshot: &Snapshot, record: &MediaInitializationRecord) -> Resul
     Ok(response.clone())
 }
 
-/// Observe genuine H and S while the real selected F remains guarded by the
-/// production selected-read seam. The source selection is only a projection of
-/// an actual immutable activation already validated in the full history by that
-/// seam; this helper never publishes activation, opens a writer or recovers.
+/// Independently verify genuine H/S facts inside the initialization-specific
+/// lease observer. F/S/H guards share the production registry, including the
+/// LegacyOne guard already retained when RootLease acquired a workspace target.
 fn retained_origin(
     root: &Path,
     record: &MediaInitializationRecord,
@@ -86,8 +85,11 @@ fn retained_origin(
 ) -> Result<(SelectedObject, Snapshot, Snapshot)> {
     let plan = &record.plan;
     let lease = RootLease::acquire(root)?;
-    lease.with_selected_generation_read(|_, selected| {
+    lease.with_selected_initialization_read(|observed| {
         let observe = || -> Result<(SelectedObject, Snapshot, Snapshot)> {
+            let selected = observed.target_selection;
+            ensure!(serde_json::to_value(observed.record)? == serde_json::to_value(record)?,
+                "Lease initialization record differs from independently retained F record");
             ensure!(
                 selected.activation_id.as_deref() == Some(record.activation_id.as_str())
                     && selected.generation == plan.target_generation
@@ -96,11 +98,7 @@ fn retained_origin(
                     } if operation_id == &plan.id),
                 "Initialization did not select its actual target activation"
             );
-            let activation_path = lease.state().join("activations")
-                .join(format!("{:010}.json", plan.source_activation_sequence));
-            let activation: Activation = serde_json::from_slice(
-                &security::read_private(&activation_path, 65536)?
-            )?;
+            let activation = observed.source_activation;
             ensure!(
                 activation.id == plan.source_activation_id
                     && activation.sequence == plan.source_activation_sequence
@@ -111,18 +109,12 @@ fn retained_origin(
                     && activation.required_capabilities == plan.source_capabilities,
                 "Actual compatible activation differs from initialization ancestry"
             );
-            let selection = Selection {
-                generation: activation.generation,
-                store_version: Some(activation.store_version),
-                root_id: Some(activation.root_id),
-                location: activation.location,
-                activation_id: Some(activation.id),
-            };
+            let selection = observed.source_selection.clone();
             let source_expected = lease.path(&selection)?;
             let source_path = fs::canonicalize(&source_expected)?;
-            ensure!(source_path == source_expected && source_path.starts_with(lease.state()), "Source escaped its actual activation path");
+            ensure!(source_path == source_expected && source_path == observed.source_path
+                && source_path.starts_with(lease.state()), "Source escaped its actual activation path");
             let source_directory = DirectoryStamp::capture_resolved(&source_path)?;
-            let _source_lock = RootLock::acquire(&source_path)?;
             let source_stamp = SourceStamp::capture_resolved(&source_path.join("store.redb"))?;
             let source = raw_locked(&source_path, selection.activation_id.clone())?;
             guard(&source, &plan.source_operation_id, "0")?;
@@ -134,9 +126,9 @@ fn retained_origin(
             let baseline_expected = lease.state().join("generation-workspaces")
                 .join(&plan.id).join("rollback");
             let baseline_path = fs::canonicalize(&baseline_expected)?;
-            ensure!(baseline_path == baseline_expected && baseline_path.starts_with(lease.state()), "Baseline escaped its retained operation path");
+            ensure!(baseline_path == baseline_expected && baseline_path == observed.baseline_path
+                && baseline_path.starts_with(lease.state()), "Baseline escaped its retained operation path");
             let baseline_directory = DirectoryStamp::capture_resolved(&baseline_path)?;
-            let _baseline_lock = RootLock::acquire(&baseline_path)?;
             let baseline_stamp = SourceStamp::capture_resolved(&baseline_path.join("store.redb"))?;
             let baseline = raw_locked(&baseline_path, Some(plan.source_activation_id.clone()))?;
             compatible(&baseline)?;
