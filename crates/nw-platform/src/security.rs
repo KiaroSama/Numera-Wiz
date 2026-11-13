@@ -205,9 +205,12 @@ mod tests {
         assert!(changed.status.success());
         for _ in 0..2 {
             assert_eq!(
-                windows::create_directory(&directory).unwrap_err().code,
+                windows::creation_collision(&directory)
+                    .unwrap()
+                    .unwrap_err()
+                    .code,
                 "INSECURE_DATA_ROOT",
-                "A creator racing with an existing broad DACL must not repair it"
+                "A native creation collision must refuse an existing broad DACL without repair"
             );
             assert_eq!(
                 private_directory(&directory).unwrap_err().code,

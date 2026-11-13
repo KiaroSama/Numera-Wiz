@@ -187,10 +187,6 @@ fn new_directory_descriptor(sid: &str) -> Result<LocalMemory> {
 
 /// Supply the protected DACL at creation. Never change an existing object's ACL,
 /// including one that appears after an absence observation.
-#[expect(
-    unsafe_code,
-    reason = "Create missing directories with a live trusted security descriptor"
-)]
 pub(super) fn create_directory(path: &Path) -> Result<()> {
     let absolute = std::path::absolute(path)
         .map_err(|error| diagnostic_io_error("acl.create_absolute", error))?;
@@ -209,11 +205,6 @@ pub(super) fn create_directory(path: &Path) -> Result<()> {
         return verify_directory(&absolute, &sid);
     }
     let descriptor = new_directory_descriptor(&sid)?;
-    let attributes = SECURITY_ATTRIBUTES {
-        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: descriptor.0,
-        bInheritHandle: 0,
-    };
     // Borrowed ancestor slices avoid recursive stack growth or cloning every
     // path prefix. Protect each newly created missing component, not just leaf.
     for candidate in missing.into_iter().rev() {
@@ -229,26 +220,58 @@ pub(super) fn create_directory(path: &Path) -> Result<()> {
         // canonicalize supplies Windows' extended absolute parent path, including
         // long-path/UNC support. The leaf is never resolved as creation authority.
         let target = parent.join(name);
-        let mut wide = target.as_os_str().encode_wide().collect::<Vec<_>>();
-        if wide.contains(&0) || wide.len() >= 32767 {
-            return Err(denied(
-                "Protected directory path exceeds the native path bound",
-            ));
-        }
-        wide.push(0);
-        // SAFETY: Valid NUL-terminated path and initialized attributes whose
-        // descriptor stays live. Windows copies security on successful creation.
-        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0 {
-            let error = std::io::Error::last_os_error();
-            if error.raw_os_error() != Some(ERROR_ALREADY_EXISTS as i32) {
-                return Err(diagnostic_io_error("acl.directory_create", error));
-            }
-        }
+        create_component(&target, &descriptor)?;
         // ERROR_ALREADY_EXISTS supplies no ownership/creation authority. This
         // path only reads the actual DACL and refuses a raced-in broad object.
         verify_directory(&target, &sid)?;
     }
     verify_directory(&absolute, &sid)
+}
+
+/// Returns whether this call created the component. Existing objects are never
+/// modified; the caller must verify them independently before proceeding.
+#[expect(
+    unsafe_code,
+    reason = "Create a directory with a live trusted security descriptor"
+)]
+fn create_component(path: &Path, descriptor: &LocalMemory) -> Result<bool> {
+    let attributes = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: descriptor.0,
+        bInheritHandle: 0,
+    };
+    let mut wide = path.as_os_str().encode_wide().collect::<Vec<_>>();
+    if wide.contains(&0) || wide.len() >= 32767 {
+        return Err(denied(
+            "Protected directory path exceeds the native path bound",
+        ));
+    }
+    wide.push(0);
+    // SAFETY: Valid NUL-terminated path and initialized attributes whose borrowed
+    // descriptor stays live. Windows copies security on successful creation.
+    if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } != 0 {
+        return Ok(true);
+    }
+    let error = std::io::Error::last_os_error();
+    if error.raw_os_error() == Some(ERROR_ALREADY_EXISTS as i32) {
+        return Ok(false);
+    }
+    Err(diagnostic_io_error("acl.directory_create", error))
+}
+
+/// Invoke the actual creation collision even though the fixture already knows
+/// the directory exists. The outer result proves the native collision occurred;
+/// the inner result is the same actual-DACL verification used in production.
+#[cfg(test)]
+pub(super) fn creation_collision(path: &Path) -> Result<Result<()>> {
+    let sid = current_sid()?;
+    let descriptor = new_directory_descriptor(&sid)?;
+    if create_component(path, &descriptor)? {
+        return Err(denied(
+            "Native collision fixture unexpectedly created a directory",
+        ));
+    }
+    Ok(verify_directory(path, &sid))
 }
 
 #[expect(
