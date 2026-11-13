@@ -2127,3 +2127,16 @@ checkpoints, mixed audio/video linked variants, general compiler/decoded preview
 export, remaining utility/effect domains, standard offline FFmpeg packaging and
 owner hardware qualification remain mandatory. No on-open repair of defective
 pre-fix development project records or complete-version 1 claim is made.
+
+
+## redb 4.5.0 source adoption (HOST qualification pending)
+
+The workspace now pins released `redb` 4.5.0. The store's new-file path keeps its
+exclusive `create_new`-opened native file and 8 MiB cache, passing that held file
+through the stable `FileBackend` builder API. The lockfile records the registry
+checksum supplied by the retained crates.io index evidence. No local Cargo
+resolution, compiler, format, lint, test, package, or runtime command was run for
+this source change. The published crate payload was not independently downloaded
+or compared with the Git tag. Hosted resolver, four-target Clippy/format and the
+existing store, platform, service, interface, package, raw-byte, GUI and all-13-job
+gates remain pending; the current redb adoption is not qualified or release-ready.

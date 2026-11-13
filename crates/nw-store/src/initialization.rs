@@ -437,7 +437,10 @@ impl Store {
             .map_err(storage)?;
         let database = redb::Database::builder()
             .set_cache_size(8 * 1024 * 1024)
-            .create_file(fresh_file)
+            .create_with_backend(
+                redb::backends::FileBackend::new(fresh_file)
+                    .map_err(crate::versions::database_error)?,
+            )
             .map_err(crate::versions::database_error)?;
         let mut write = database.begin_write().map_err(storage)?;
         write
