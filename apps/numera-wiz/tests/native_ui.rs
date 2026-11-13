@@ -1071,6 +1071,8 @@ impl project_workbench::Driver for NativeProjects<'_> {
                             | "clips.move"
                             | "clips.split"
                             | "clips.remove"
+                            | "clips.link"
+                            | "clips.unlink"
                             | "history.undo"
                             | "history.redo"
                     )
@@ -1188,6 +1190,12 @@ impl project_workbench::Driver for NativeProjects<'_> {
     }
     async fn reopen(&mut self) -> Value {
         let before = self.owner();
+        let stderr_path = self.evidence.join("native-project-reopen-stderr.log");
+        let stderr_path = if stderr_path.exists() {
+            self.evidence.join("native-project-group-reopen-stderr.log")
+        } else {
+            stderr_path
+        };
         input(&["windowactivate", "--sync", self.window]).await;
         input(&["key", "--clearmodifiers", "alt+F4"]).await;
         assert!(
@@ -1209,10 +1217,7 @@ impl project_workbench::Driver for NativeProjects<'_> {
             .env("WINIT_X11_SCALE_FACTOR", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(
-                std::fs::File::create(self.evidence.join("native-project-reopen-stderr.log"))
-                    .unwrap(),
-            )
+            .stderr(std::fs::File::create(stderr_path).unwrap())
             .kill_on_drop(true)
             .spawn()
             .unwrap();

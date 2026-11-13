@@ -319,13 +319,20 @@ impl shared::Driver for BrowserProjects<'_> {
         let label = match phase {
             shared::Policy::OlderCommands => {
                 for command in shared::project_commands() {
-                    assert!(intended.allowed_command_ids.remove(*command));
+                    if matches!(*command, "clips.link" | "clips.unlink") {
+                        intended.allowed_command_ids.remove(*command);
+                    } else {
+                        assert!(intended.allowed_command_ids.remove(*command));
+                    }
                 }
                 "explicit older-allowlist fixture"
             }
             shared::Policy::UpgradeCommands => {
                 intended.allowed_command_ids = self.original.allowed_command_ids.clone();
-                "explicit owner-reviewed command upgrade"
+                // Explicit owner fixture, never production profile self-elevation.
+                intended.allowed_command_ids.insert("clips.link".into());
+                intended.allowed_command_ids.insert("clips.unlink".into());
+                "explicit owner-reviewed command upgrade including Link/Unlink"
             }
             shared::Policy::ReadOnlyProject | shared::Policy::EditProject => {
                 intended.owned_object_access = false;

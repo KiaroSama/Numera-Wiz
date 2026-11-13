@@ -5,7 +5,7 @@ use std::{future::Future, time::Instant};
 
 pub const OBSERVER_PREFIX: &str = "project-observer-";
 const PAGE: usize = 128;
-const PROJECT_COMMANDS: [&str; 11] = [
+const PROJECT_COMMANDS: [&str; 13] = [
     "projects.list",
     "projects.create",
     "projects.inspect",
@@ -15,6 +15,8 @@ const PROJECT_COMMANDS: [&str; 11] = [
     "clips.move",
     "clips.split",
     "clips.remove",
+    "clips.link",
+    "clips.unlink",
     "history.undo",
     "history.redo",
 ];
@@ -30,6 +32,8 @@ pub fn project_mutation(command: &str) -> bool {
             | "clips.move"
             | "clips.split"
             | "clips.remove"
+            | "clips.link"
+            | "clips.unlink"
             | "history.undo"
             | "history.redo"
     )
@@ -708,6 +712,9 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     evidence.push(json!({"initial_solid":initial,"split_right_restored_by_undo":right,"final_solid":final_solid,"final_history":final_summary["history"]}));
     assert!(evidence.len() <= 64);
     driver.write("journey",&json!({"schema_version":1,"identity":driver.metadata(),"elapsed_ms":started.elapsed().as_millis().to_string(),"project_id":graph.project,"revision":graph.revision,"sequence_id":graph.sequence,"solid_track":graph.solid_track,"source_track":graph.source_track,"left_clip":graph.left,"right_clip":graph.right,"registered_clip":registered_id,"asset_id":asset,"physical_stream":physical,"assets":assets,"jobs":jobs,"producer_job_count":3,"observations":evidence,"oracle":"Actual pointer/keyboard controls; independent canonical queries reuse the selected UI bindings; external editor and owner policy updates are explicitly labeled fixture setup","not_qualified":["transport-loss replay","OS IME","Windows/macOS human input","GPU","decoded preview/export","full v1"]}));
+    // Append topology qualification only after every original journey assertion
+    // and its original evidence write. The aggregate HOST deadline is unchanged.
+    clip_group_journey(driver, &mut graph, name).await;
 }
 async fn select_source_track_after_reopen<D: Driver>(driver: &mut D) {
     // Same three-bin-row fixture; ROOT must verify this later capture.
@@ -718,4 +725,170 @@ async fn select_source_track_after_reopen<D: Driver>(driver: &mut D) {
     driver.click(55, 353).await;
     driver.observed("projects.list").await;
     driver.loaded(8).await;
+}
+
+async fn place_group_solid<D: Driver>(driver: &mut D, start: &str) -> Observation {
+    driver.click(318, 100).await;
+    driver.click(325, 134).await; // Explicit Finite solid source variant.
+    driver.click(450, 176).await;
+    driver.replace("0.7, 0.3, 0.2, 1").await;
+    for value in ["1", "1", "0", "1", "1", "1", start, "1"] {
+        field(driver, value).await;
+    }
+    driver.mark().await;
+    driver.key(Key::Tab).await;
+    driver.key(Key::Space).await;
+    let placed = driver.observed("clips.place").await;
+    driver.loaded(8).await;
+    placed
+}
+async fn group_clip<D: Driver>(
+    driver: &mut D,
+    graph: &Graph,
+    clip: &Value,
+    group: Option<&str>,
+) -> Value {
+    let actual = entity(driver, graph, &id(&clip["id"])).await;
+    let mut expected = clip.clone();
+    expected["link_group_id"] = json!(group);
+    assert_eq!(
+        actual, expected,
+        "Topology must preserve exact identity, geometry and source binding"
+    );
+    actual
+}
+async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: &str) {
+    let started = Instant::now();
+    let mut evidence = Vec::new();
+    driver.screenshot("group-before-solid-track").await;
+    driver.mark().await;
+    driver.click(55, 319).await;
+    driver.observed("projects.list").await;
+    driver.loaded(8).await;
+    let original = ids(&viewport(driver, graph, &graph.solid_track).await);
+    assert_eq!(original, vec![graph.left.clone()]);
+    let mut clips = Vec::new();
+    let mut bindings = Vec::new();
+    let mut known = original;
+    for (start, end) in [(0, 1), (2, 3)] {
+        let placed = place_group_solid(driver, &start.to_string()).await;
+        assert_eq!(
+            placed.expected_revision.as_deref(),
+            Some(graph.revision.as_str())
+        );
+        graph.accept(&placed);
+        evidence.push(placed.evidence("clips.place"));
+        let current = ids(&viewport(driver, graph, &graph.solid_track).await);
+        let added: Vec<_> = current.iter().filter(|id| !known.contains(id)).collect();
+        assert_eq!(added.len(), 1);
+        let clip = entity(driver, graph, added[0]).await;
+        clip_at(&clip, start, end, 0, 1);
+        assert_eq!(clip["sequence_id"], graph.sequence);
+        assert_eq!(clip["track_id"], graph.solid_track);
+        assert!(clip["link_group_id"].is_null());
+        let binding = entity(driver, graph, &id(&clip["source_id"])).await;
+        assert_eq!(binding["source_kind"], "solid_color");
+        clips.push(clip);
+        bindings.push(binding);
+        known = current;
+    }
+    assert_eq!(known.len(), 3);
+    let page = viewport(driver, graph, &graph.solid_track).await;
+    assert_eq!(page["items"][0]["id"], clips[0]["id"]);
+    assert_eq!(page["items"][1]["id"], clips[1]["id"]);
+    driver.screenshot("group-two-ui-placed-solids").await;
+    // Right-aligned Select controls occupy the original clip-button row. These
+    // are actual OS/WebDriver clicks, with no selection or topology fixture write.
+    driver.click(1048, 184).await;
+    driver.click(1048, 278).await;
+    driver.screenshot("group-two-seeds-selected").await;
+    // Start at the existing split numerator; Tab crosses denominator, Split,
+    // Lift, Clear selection and Link. No old control is relocated.
+    driver.click(1298, 283).await;
+    tab(driver, 5).await;
+    driver.mark().await;
+    driver.key(Key::Space).await;
+    let linked = driver.observed("clips.link").await;
+    assert_eq!(
+        linked.expected_revision.as_deref(),
+        Some(graph.revision.as_str())
+    );
+    graph.accept(&linked);
+    evidence.push(linked.evidence("clips.link"));
+    driver.loaded(8).await;
+    let first = entity(driver, graph, &id(&clips[0]["id"])).await;
+    let group = id(&first["link_group_id"]);
+    nw_domain::projects::validate_id(&group).unwrap();
+    for clip in &clips {
+        group_clip(driver, graph, clip, Some(&group)).await;
+    }
+    driver.screenshot("group-linked").await;
+    // Accepted revision cleared seeds. The inspected linked clip remains; Unlink
+    // must expand its component. Clear and Link are disabled and skipped by Tab.
+    driver.click(1298, 283).await;
+    tab(driver, 4).await;
+    driver.mark().await;
+    driver.key(Key::Space).await;
+    let unlinked = driver.observed("clips.unlink").await;
+    assert_eq!(
+        unlinked.expected_revision.as_deref(),
+        Some(graph.revision.as_str())
+    );
+    graph.accept(&unlinked);
+    evidence.push(unlinked.evidence("clips.unlink"));
+    driver.loaded(8).await;
+    for clip in &clips {
+        group_clip(driver, graph, clip, None).await;
+    }
+    driver.screenshot("group-unlinked").await;
+    let undo = activate(driver, 390, 100, "history.undo", 8).await;
+    assert_eq!(
+        undo.expected_revision.as_deref(),
+        Some(graph.revision.as_str())
+    );
+    graph.accept(&undo);
+    evidence.push(undo.evidence("history.undo"));
+    for clip in &clips {
+        group_clip(driver, graph, clip, Some(&group)).await;
+    }
+    driver.screenshot("group-undo-same-identity").await;
+    let redo = activate(driver, 435, 100, "history.redo", 8).await;
+    assert_eq!(
+        redo.expected_revision.as_deref(),
+        Some(graph.revision.as_str())
+    );
+    graph.accept(&redo);
+    evidence.push(redo.evidence("history.redo"));
+    for clip in &clips {
+        group_clip(driver, graph, clip, None).await;
+    }
+    driver.screenshot("group-redo-unlinked").await;
+    // Retire the capture, then really restart the native application / Chrome
+    // page. The normal catalog opens Solid C as the first authoritative track.
+    activate(driver, 70, 80, "projects.list", 0).await;
+    evidence.push(driver.reopen().await);
+    driver.mark().await;
+    driver.click(358, 13).await;
+    assert_eq!(driver.observed("projects.list").await.code, "OK");
+    let catalog = read(driver, "projects.list", json!({"limit":64}), None).await;
+    assert_eq!(catalog["items"].as_array().unwrap().len(), 1);
+    assert_eq!(catalog["items"][0]["name"], name);
+    assert_eq!(catalog["items"][0]["id"], graph.project);
+    driver.screenshot("group-reopened-catalog").await;
+    driver.mark().await;
+    tab(driver, 3).await;
+    driver.key(Key::Space).await;
+    driver.observed("projects.list").await;
+    driver.loaded(8).await;
+    assert_eq!(
+        ids(&viewport(driver, graph, &graph.solid_track).await),
+        known
+    );
+    for (clip, binding) in clips.iter().zip(&bindings) {
+        group_clip(driver, graph, clip, None).await;
+        assert_eq!(entity(driver, graph, &id(&binding["id"])).await, *binding);
+    }
+    driver.screenshot("group-reopened-unlinked").await;
+    assert!(evidence.len() <= 8);
+    driver.write("link-unlink", &json!({"schema_version":1,"identity":driver.metadata(),"elapsed_ms":started.elapsed().as_millis().to_string(),"project_id":graph.project,"revision":graph.revision,"sequence_id":graph.sequence,"track_id":graph.solid_track,"clips_before":clips,"source_bindings":bindings,"group_id_restored_exactly_by_undo":group,"observations":evidence,"input_targets":{"selection_rows":[[1048,184],[1048,278]],"link":"split numerator then five Tabs and Space","unlink":"split numerator then four Tabs and Space"},"oracle":"Actual OS/WebDriver placements, selection, Link, Unlink, Undo and Redo; independent canonical entity/source queries; actual application/page reopen","source_variant":"two finite solid_color bindings on one video track","not_qualified":["mixed registered audio/video","direct-link components","cross-track selection input","full C_M1","decoded preview","full editor","full v1"]}));
 }

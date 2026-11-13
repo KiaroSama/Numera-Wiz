@@ -130,6 +130,7 @@ pub(crate) fn controller_cases() {
     later_page_selection_keeps_exact_target();
     sequence_history_and_external_removal_recover();
     selection_recovery_rejects_other_failures();
+    clip_group_selection_and_requests();
 }
 fn creation_and_terminal_denial() {
     let (mut app, port, ctx) = boot();
@@ -1563,4 +1564,211 @@ fn selected_track_and_clip_recovery() {
         app.pending.is_none() && port.empty(),
         "A source failure is not proof that the selected clip is absent"
     );
+}
+
+// These controller cases use captured projections and the same handlers as the
+// visible controls. They do not claim OS/browser interaction qualification.
+fn group_selection_ready(count: usize) -> (WizApp, Arc<MockJsonClient>, egui::Context) {
+    let (mut app, port, ctx) = ready();
+    app.scope = Some(scope());
+    app.project_refresh(&ctx);
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        SELECT_TICKET,
+        "1",
+        &[SELECT_SEQUENCE],
+        false,
+    );
+    selected_tracks(&mut app, &port, &ctx, SELECT_TICKET, "1", count);
+    port.complete(selected_page(
+        SELECT_TICKET,
+        "1",
+        0,
+        count.min(PAGE),
+        (count > PAGE).then_some("selection-next-page"),
+    ));
+    app.receive(&ctx);
+    selected_detail(&mut app, &port, &ctx, SELECT_TICKET, "1", 0);
+    (app, port, ctx)
+}
+fn clip_group_selection_and_requests() {
+    let (mut app, port, ctx) = group_selection_ready(129);
+    app.project_toggle_clip_seed(BIN);
+    assert!(app.projects.clip_selection.is_none());
+    app.project_toggle_clip_seed(&selected_clip_id(0));
+    assert!(app.project_link_params(false).is_none());
+    app.project_toggle_clip_seed(&selected_clip_id(1));
+    let expected = json!({"clip_ids":[selected_clip_id(0),selected_clip_id(1)],"link_policy":"expand"});
+    assert_eq!(app.project_link_params(false), Some(expected.clone()));
+    assert_eq!(app.project_link_params(true), Some(expected.clone()));
+    let captured = app.projects.clip_selection.clone();
+    app.projects.clip_selection.as_mut().unwrap().sequence = BIN.into();
+    assert!(app.project_link_params(false).is_none());
+    assert!(app.project_link_params(true).is_none());
+    app.project_link_selection(false, &ctx);
+    assert!(port.empty(), "Mismatched selection context cannot submit");
+    app.projects.clip_selection = captured;
+    assert_eq!(
+        app.projects.group.as_ref().unwrap().view.clip.as_deref(),
+        Some(selected_clip_id(0).as_str())
+    );
+    app.project_toggle_clip_seed(&selected_clip_id(1));
+    assert!(app.project_link_params(false).is_none());
+    for index in 1..PAGE {
+        app.project_toggle_clip_seed(&selected_clip_id(index));
+    }
+    assert_eq!(
+        app.projects.clip_selection.as_ref().unwrap().seeds.len(),
+        PAGE
+    );
+    app.project_next_page(Phase::NextViewport, &ctx);
+    assert!(
+        app.project_link_params(false).is_none(),
+        "In-flight reads cannot submit topology"
+    );
+    port.complete(selected_page(SELECT_TICKET, "1", PAGE, 1, None));
+    app.receive(&ctx);
+    app.project_toggle_clip_seed(&selected_clip_id(PAGE));
+    assert_eq!(
+        app.projects.clip_selection.as_ref().unwrap().seeds.len(),
+        PAGE
+    );
+    assert!(
+        !app.projects.clip_selection.as_ref().unwrap().seeds.contains(&selected_clip_id(PAGE))
+    );
+    assert!(app.error.as_ref().unwrap().contains("128"));
+    assert!(app.projects.group.as_ref().unwrap().clip.is_none());
+    assert_eq!(
+        app.project_link_params(false).unwrap()["clip_ids"].as_array().unwrap().len(),
+        PAGE
+    );
+    let mut view = app.projects.group.as_ref().unwrap().view.clone();
+    view.track = Some(TRACK.into());
+    app.project_reselect(view, &ctx);
+    assert_eq!(
+        app.projects.clip_selection.as_ref().unwrap().seeds.len(),
+        PAGE,
+        "Same revision track navigation retains only captured seeds"
+    );
+    assert!(app.project_link_params(false).is_none());
+
+    let (mut app, port, ctx) = group_selection_ready(2);
+    app.project_toggle_clip_seed(&selected_clip_id(0));
+    app.project_toggle_clip_seed(&selected_clip_id(1));
+    app.project_link_selection(false, &ctx);
+    assert!(app.projects.stale);
+    app.project_link_selection(false, &ctx);
+    app.project_toggle_clip_seed(&selected_clip_id(0));
+    assert_eq!(
+        app.projects.clip_selection.as_ref().unwrap().seeds.len(),
+        2
+    );
+    let (request, reply) = port.pop();
+    assert!(port.empty());
+    assert_eq!(request.command.id, "clips.link");
+    assert_eq!(request.params, expected);
+    assert_eq!(request.project.as_ref().unwrap().id, PROJECT);
+    assert_eq!(
+        request.project.as_ref().unwrap().expected_revision.as_deref(),
+        Some("1")
+    );
+    assert_eq!(request.replay_scope.as_deref(), Some(scope().as_str()));
+    assert_eq!(
+        request.idempotency_key.as_deref(),
+        Some(request.request_id.as_str())
+    );
+    reply(Ok(Response::error(
+        &request.request_id,
+        nw_domain::DomainError::new("STALE_REVISION", "Canonical competitor"),
+    )));
+    app.receive(&ctx);
+    assert!(app.projects.stale && app.projects.terminal_failure);
+    assert!(
+        app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_none()
+    );
+    app.project_link_selection(true, &ctx);
+    assert!(port.empty());
+    app.project_refresh(&ctx);
+    assert!(
+        app.projects.clip_selection.is_none(),
+        "Explicit Refresh discards stale selection"
+    );
+
+    let (mut app, port, ctx) = group_selection_ready(2);
+    app.project_toggle_clip_seed(&selected_clip_id(0));
+    app.project_toggle_clip_seed(&selected_clip_id(1));
+    app.project_link_selection(false, &ctx);
+    port.accept(json!({"project_id":PROJECT,"revision":"2","created":{"link_group_id":BIN,"clip_ids":[selected_clip_id(1),selected_clip_id(0)]}}));
+    app.receive(&ctx);
+    assert!(
+        app.projects.clip_selection.is_none(),
+        "Accepted revision clears seeds before reload"
+    );
+    assert!(
+        app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_none(),
+        "Receipt never edits displayed topology optimistically"
+    );
+    selected_prefix(
+        &mut app,
+        &port,
+        &ctx,
+        RELOAD_TICKET,
+        "2",
+        &[SELECT_SEQUENCE],
+        false,
+    );
+    assert_eq!(
+        app.projects.staging.as_ref().unwrap().group.as_ref().unwrap().view.clip.as_deref(),
+        Some(selected_clip_id(0).as_str()),
+        "Expanded member order must not replace the inspected clip"
+    );
+    selected_tracks(&mut app, &port, &ctx, RELOAD_TICKET, "2", 2);
+    port.complete(selected_page(RELOAD_TICKET, "2", 0, 2, None));
+    app.receive(&ctx);
+    let mut linked = selected_clip(RELOAD_TICKET, "2", 0);
+    linked["entity"]["link_group_id"] = json!(BIN);
+    port.complete(linked);
+    app.receive(&ctx);
+    port.complete(projection(RELOAD_TICKET, "2", "entity", json!({"entity":{"id":SELECT_SOURCE,"kind":"source_binding","source_kind":"solid_color"}})));
+    app.receive(&ctx);
+    assert!(app.project_ready());
+    app.project_link_selection(true, &ctx);
+    let unlink = selected_failure(&mut app, &port, &ctx, "PERMISSION_DENIED");
+    assert_eq!(unlink.command.id, "clips.unlink");
+    assert_eq!(
+        unlink.params,
+        json!({"clip_ids":[selected_clip_id(0)],"link_policy":"expand"})
+    );
+    assert_eq!(
+        unlink.project.as_ref().unwrap().expected_revision.as_deref(),
+        Some("2")
+    );
+    assert!(
+        app.projects.stale
+            && app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_some()
+    );
+    assert!(port.empty());
+
+    for context in ["project", "sequence", "revision", "leave"] {
+        let (mut app, _, ctx) = group_selection_ready(2);
+        app.project_toggle_clip_seed(&selected_clip_id(0));
+        let mut view = app.projects.group.as_ref().unwrap().view.clone();
+        match context {
+            "project" => view.project = BIN.into(),
+            "sequence" => view.sequence = Some(BIN.into()),
+            "revision" => view.revision = Some("2".into()),
+            _ => {}
+        }
+        if context == "leave" {
+            app.leave_projects(&ctx);
+        } else {
+            app.project_navigate(Navigation::Open(view), &ctx);
+        }
+        assert!(
+            app.projects.clip_selection.is_none(),
+            "Selection must clear on {context}"
+        );
+    }
 }

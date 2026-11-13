@@ -157,3 +157,32 @@ per-file outcomes. Open a successfully registered asset or include it in the
 existing cleanup batch; review and submit that batch separately. Companion
 inventory does not create copied companion outputs. Current folder controls
 require their own hosted interaction evidence before claiming GUI qualification.
+
+
+## Project clip groups
+
+Open Projects and a sequence to use the shared native/browser timeline. Select
+beside a visible clip row adds or removes that clip from a group selection without
+changing the inspected clip. Select at most 128 clips from the same captured
+project, sequence and revision. The details panel shows the count and Clear
+selection after Move/Split/Lift. Same-revision paging and track changes can retain
+selections; revision/context changes, Refresh and leaving clear them.
+
+Link requires two selected clips. Unlink uses selected clips, or the inspected
+clip when it has a recorded group. Existing linked companions are included even
+on other pages and tracks. The displayed group identity comes from the inspected
+clip; no member count is inferred from a partial viewport. Current owner policy,
+locks, source facts and revision still decide whether the edit is accepted.
+
+The controls share the existing canonical mutation and durable retry path. While
+loading or stale they cannot submit. Accepted receipt/revision details accompany
+the normal projection reload. After a denied or stale request, explicitly Refresh
+and review before another edit. An existing browser profile needs owner-reviewed
+`clips.link` and `clips.unlink` allowlist entries; the workspace never adds them.
+
+The new controls and appended real native/Chrome pointer/keyboard journey await
+hosted qualification for this source. The journey places two finite solid-color
+clips and independently checks Link/Unlink, exact-group Undo/Redo, unchanged
+geometry/source bindings and reopening. It does not qualify mixed registered
+video/audio, full C_M1, decoded preview or the full editor. Broader project editing,
+playback, resources/fault coverage and full version 1 remain required.

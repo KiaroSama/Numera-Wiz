@@ -148,6 +148,22 @@ struct Handle {
     first_seen: Instant,
     bindings: BTreeSet<String>,
 }
+// Only identities captured from a real viewport are retained; no page payloads or
+// inferred group members. The owner expands topology when admitting the edit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ClipSelection {
+    project: String,
+    sequence: String,
+    revision: String,
+    seeds: BTreeSet<String>,
+}
+impl ClipSelection {
+    fn matches(&self, group: &Group) -> bool {
+        self.project == group.key.project
+            && Some(self.sequence.as_str()) == group.view.sequence.as_deref()
+            && self.revision == group.key.revision
+    }
+}
 #[derive(Default)]
 pub(super) struct ProjectsUi {
     pub(super) active: bool,
@@ -171,6 +187,7 @@ pub(super) struct ProjectsUi {
     source_form: bool,
     acceptance: Option<String>,
     focus_catalog: bool,
+    clip_selection: Option<ClipSelection>,
 }
 impl ProjectsUi {
     fn restored_view(&self, group: &Group) -> View {
@@ -333,6 +350,17 @@ impl WizApp {
             return;
         }
         self.projects.prune_handles();
+        let retain_seeds = match (&target, &self.projects.clip_selection) {
+            (Navigation::Open(view), Some(selection)) => {
+                selection.project == view.project
+                    && Some(selection.sequence.as_str()) == view.sequence.as_deref()
+                    && Some(selection.revision.as_str()) == view.revision.as_deref()
+            }
+            _ => false,
+        };
+        if !retain_seeds {
+            self.projects.clip_selection = None;
+        }
         if matches!(target, Navigation::Cleanup) && self.projects.terminal_failure {
             self.projects.active = false;
             self.projects.navigation = None;
@@ -403,6 +431,76 @@ impl WizApp {
             && self.projects.staging.is_none()
             && !self.projects.stale
             && self.projects.group.is_some()
+    }
+    fn project_toggle_clip_seed(&mut self, id: &str) {
+        if !self.project_ready() {
+            return;
+        }
+        let group = self.projects.group.as_ref().expect("Ready group");
+        let Some(sequence) = &group.view.sequence else {
+            return;
+        };
+        if !group.viewport.items.iter().any(|row| row.id.as_str() == id) {
+            return;
+        }
+        if self
+            .projects
+            .clip_selection
+            .as_ref()
+            .is_none_or(|selection| !selection.matches(group))
+        {
+            self.projects.clip_selection = Some(ClipSelection {
+                project: group.key.project.clone(),
+                sequence: sequence.clone(),
+                revision: group.key.revision.clone(),
+                seeds: BTreeSet::new(),
+            });
+        }
+        let selection = self
+            .projects
+            .clip_selection
+            .as_mut()
+            .expect("Captured selection");
+        if selection.seeds.remove(id) {
+            return;
+        }
+        if selection.seeds.len() >= PAGE {
+            self.error = Some("Select at most 128 clips; clear or deselect a clip first.".into());
+            return;
+        }
+        selection.seeds.insert(id.into());
+    }
+    fn project_link_params(&self, unlink: bool) -> Option<Value> {
+        if !self.project_ready() {
+            return None;
+        }
+        let group = self.projects.group.as_ref()?;
+        let mut seeds: Vec<String> = match &self.projects.clip_selection {
+            Some(selection) if !selection.matches(group) => return None,
+            Some(selection) => selection.seeds.iter().cloned().collect(),
+            None => Vec::new(),
+        };
+        if unlink && seeds.is_empty() {
+            let clip = group
+                .clip
+                .as_ref()
+                .filter(|clip| clip.link_group_id.is_some())?;
+            seeds.push(clip.id.to_string());
+        }
+        let minimum = if unlink { 1 } else { 2 };
+        if seeds.len() < minimum || seeds.len() > PAGE {
+            return None;
+        }
+        Some(json!({"clip_ids":seeds,"link_policy":"expand"}))
+    }
+    fn project_link_selection(&mut self, unlink: bool, ctx: &egui::Context) {
+        if let Some(params) = self.project_link_params(unlink) {
+            self.mutate_project(
+                if unlink { "clips.unlink" } else { "clips.link" },
+                params,
+                ctx,
+            );
+        }
     }
     fn mutate_project(&mut self, command: &str, params: Value, ctx: &egui::Context) {
         if !self.project_ready() {
@@ -591,6 +689,14 @@ impl WizApp {
         if !unavailable {
             self.projects.restoration = None;
         }
+        if self
+            .projects
+            .clip_selection
+            .as_ref()
+            .is_some_and(|selection| !selection.matches(&group))
+        {
+            self.projects.clip_selection = None;
+        }
         self.projects.group = Some(Arc::new(group));
         self.projects.stale = false;
         self.projects.terminal_failure = false;
@@ -748,10 +854,13 @@ impl WizApp {
                     view.track = None;
                     view.clip = None;
                 }
-                if let Some(clip) = result["created"]["clip_ids"]
-                    .as_array()
-                    .and_then(|items| items.first())
-                    .and_then(Value::as_str)
+                // Topology results list expanded members, which may be on a
+                // different track. Keep primary inspection separate from seeds.
+                if !matches!(request.command.id.as_str(), "clips.link" | "clips.unlink")
+                    && let Some(clip) = result["created"]["clip_ids"]
+                        .as_array()
+                        .and_then(|items| items.first())
+                        .and_then(Value::as_str)
                 {
                     nw_domain::projects::validate_id(clip).map_err(|e| e.message)?;
                     view.clip = Some(clip.into());

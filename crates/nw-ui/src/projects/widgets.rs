@@ -380,12 +380,33 @@ impl WizApp {
                         exact(clip.sequence_start),
                         exact(clip_end)
                     );
-                    if ui
-                        .add_enabled(ready, egui::Button::new(&label).selected(active))
-                        .clicked()
-                    {
-                        selected = Some(clip.id.to_string());
-                    }
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(ready, egui::Button::new(&label).selected(active))
+                            .clicked()
+                        {
+                            selected = Some(clip.id.to_string());
+                        }
+                        // Keep the original row height and inspection target. The
+                        // compact seed control is separate from primary inspection.
+                        ui.with_layout(
+                            egui::Layout::right_to_left(egui::Align::Center),
+                            |ui| {
+                                let mut seed = self.projects.clip_selection.as_ref().is_some_and(
+                                    |selection| {
+                                        selection.matches(&group)
+                                            && selection.seeds.contains(clip.id.as_str())
+                                    },
+                                );
+                                if ui
+                                    .add_enabled(ready, egui::Checkbox::new(&mut seed, "Select"))
+                                    .changed()
+                                {
+                                    self.project_toggle_clip_seed(clip.id.as_str());
+                                }
+                            },
+                        );
+                    });
                     ui.small(clip.id.as_str());
                     let (response, painter) = ui.allocate_painter(
                         egui::vec2(ui.available_width(), 34.0),
@@ -468,6 +489,7 @@ impl WizApp {
         ui.separator();
         let Some(clip) = &group.clip else {
             ui.label("Select a visible clip to inspect exact time and source details.");
+            self.project_link_controls(ui, &group);
             return;
         };
         ui.monospace(group.view.clip.as_deref().unwrap_or(""));
@@ -515,6 +537,54 @@ impl WizApp {
             }
             if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
         });
+        self.project_link_controls(ui, &group);
+    }
+    fn project_link_controls(&mut self, ui: &mut egui::Ui, group: &Group) {
+        ui.separator();
+        let count = self
+            .projects
+            .clip_selection
+            .as_ref()
+            .filter(|selection| selection.matches(group))
+            .map_or(0, |selection| selection.seeds.len());
+        ui.label(format!("Group selection: {count} / 128 clips"));
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(
+                    self.project_ready() && count != 0,
+                    egui::Button::new("Clear selection"),
+                )
+                .clicked()
+            {
+                self.projects.clip_selection = None;
+            }
+            if ui
+                .add_enabled(
+                    self.project_link_params(false).is_some(),
+                    egui::Button::new("Link"),
+                )
+                .clicked()
+            {
+                self.project_link_selection(false, ui.ctx());
+            }
+            if ui
+                .add_enabled(
+                    self.project_link_params(true).is_some(),
+                    egui::Button::new("Unlink"),
+                )
+                .clicked()
+            {
+                self.project_link_selection(true, ui.ctx());
+            }
+        });
+        ui.small("Select clips beside their rows. Link needs two selections. Unlink uses selections or the inspected linked clip. Existing linked companions are included, even on other pages or tracks.");
+        if let Some(clip) = &group.clip {
+            if let Some(id) = &clip.link_group_id {
+                ui.small(format!("Inspected group: {id}"));
+            } else {
+                ui.small("Inspected clip has no group recorded.");
+            }
+        }
     }
     fn project_sequence_window(&mut self, ctx: &egui::Context) {
         if !self.projects.sequence_form {

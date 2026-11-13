@@ -4,9 +4,10 @@ The implemented project commands store acknowledged edits in the application
 database and share one service across CLI, MCP and the shared native/browser
 workspace. Human controls provide authorized catalog discovery, project and
 sequence creation, solid-color and registered-source placement, move/split/lift,
-Undo/Redo, explicit stale-view Refresh and catalog reopen. Link/unlink currently
-have CLI/MCP commands; their GUI controls, portable project files, full checkpoints,
-decoded preview, export and the complete editor remain required work. Creating a
+bounded clip selection, Link/Unlink, Undo/Redo, explicit stale-view Refresh and
+catalog reopen. The new Link/Unlink controls await hosted native/Chrome input
+qualification. Portable project files, full checkpoints, decoded preview, export
+and the complete editor remain required work. Creating a
 solid-color binding here does not produce a video file.
 
 ## Commands and identity
@@ -104,8 +105,26 @@ entity bytes, history or redo. Locks, grids and compatibility still apply.
 
 ## Link and unlink topology
 
-`clips.link` and `clips.unlink` use the same canonical service through typed CLI
-and MCP. Both accept 1–128 distinct seed `clip_ids` and require
+The native and browser workspaces share the same Rust Link/Unlink controls.
+Use Select beside visible clip rows to build a separate group selection, up to
+128 distinct clips. Inspecting a clip still opens its own details and Move/Split/
+Lift controls. The group-selection count, Clear selection, Link and Unlink follow
+those controls. Link needs at least two selected clips. Unlink uses the selected
+clips, or the inspected clip when it has a recorded group. The inspected group's
+actual identity is displayed; the current page does not establish its membership.
+
+Selections belong to one captured project, sequence and revision. Same-revision
+paging and track changes retain captured selections; changing context or revision,
+explicit Refresh, or leaving clears them. Existing linked companions are included
+across pages and tracks. The owner validates that expansion, locks, access and
+binding facts. While loading, stale or awaiting a response, the controls cannot
+submit. Accepted results reload the normal captured projections and show the
+actual receipt/revision. A denied or stale edit leaves the displayed topology
+unchanged and requires explicit Refresh before another edit. Stored profiles must
+explicitly allow both command IDs; the UI does not grant itself those rights.
+
+`clips.link` and `clips.unlink` use the same canonical service through the shared
+GUI, typed CLI and MCP. Both accept 1–128 distinct seed `clip_ids` and require
 `link_policy:"expand"`; the typed CLI supplies that policy. Repeated `--clip`
 flags select seeds. Duplicate seeds reject. Expansion includes complete group
 membership and both incoming and outgoing direct clip links, up to 128 resolved
@@ -361,7 +380,12 @@ assertions on all four native targets before a separate later Split failure;
 [run 43237451380](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43237451380)
 subsequently exercised the complete focused Split model on all four targets.
 These are scoped observations, not claims that those whole runs or current CI
-are green. Linked GUI journeys, mixed audio/video and media variants,
-portable project files/full checkpoints,
+are green. The newly appended shared native/Chrome journey uses actual pointer/
+keyboard input to place two finite solid-color clips, select them, Link, Unlink,
+Undo/Redo and reopen, with independent entity and source-binding observations.
+It has not yet executed on HOST for this source. Earlier GUI runs do not qualify
+these new controls. Its solid pair does not qualify mixed registered audio/video,
+full C_M1, or the complete editor. Linked GUI HOST qualification, mixed audio/video
+and media variants, portable project files/full checkpoints,
 decoded preview/export, named external agent runtimes and the complete
 media/editor release remain open.

@@ -39,9 +39,11 @@ Current work and required gaps are recorded in the
   authorized catalog discovery, exact sequence grids, place/move/split/lift,
   link/unlink, atomic history/receipts and bounded revision snapshots. Shared
   native/browser controls implement catalog discovery, project/sequence creation,
-  solid-color/registered-source placement, move/split/lift, Undo/Redo, explicit
-  stale-view Refresh and catalog reopen. GUI link/unlink controls, decoded preview
-  and the complete editor remain unfinished.
+  solid-color/registered-source placement, move/split/lift, bounded clip selection,
+  Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen. New
+  Link/Unlink controls and their actual native/Chrome input journey await hosted
+  qualification. Mixed audio/video, decoded preview and the complete editor
+  remain unfinished.
 - Shared finite project input/result schemas and captured Read/Edit/command
   observations; discovery keeps static requirements separate from live policy
   facts. Validation and pending MCP wire evidence are recorded in the
