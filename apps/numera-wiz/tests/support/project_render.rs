@@ -372,7 +372,8 @@ async fn physical_output(cli: &Cli, plan: &nw_domain::media::MediaPlanV1) {
         for pixel in frame.chunks_exact(4) {
             // bgr0's unused fourth byte has no signal meaning.
             assert_eq!(
-                &pixel[..3], &expected,
+                &pixel[..3],
+                &expected,
                 "Unexpected decoded color at frame{index}"
             );
         }
@@ -419,10 +420,11 @@ async fn physical_output(cli: &Cli, plan: &nw_domain::media::MediaPlanV1) {
         "coverage":"Hosted finite compiler graph only; no durable media job, receipt or publication"});
     let encoded = serde_json::to_vec_pretty(&evidence).unwrap();
     assert!(encoded.len() <= 16 * 1024);
-    let evidence_root = std::path::PathBuf::from(
-        std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR").unwrap(),
-    );
+    let evidence_root =
+        std::path::PathBuf::from(std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR").unwrap());
     std::fs::create_dir_all(&evidence_root).unwrap();
     std::fs::write(evidence_root.join("finite-compiler-media.json"), encoded).unwrap();
-    println!("FINITE_COMPILER_PHYSICAL_OUTPUT: videoFrames=10 exactQuarterSecondPTS red4black2blue4 allPixelsChecked audioSamples=120000 stereo48000 allPcmZero; outputBytes={bytes}");
+    println!(
+        "FINITE_COMPILER_PHYSICAL_OUTPUT: videoFrames=10 exactQuarterSecondPTS red4black2blue4 allPixelsChecked audioSamples=120000 stereo48000 allPcmZero; outputBytes={bytes}"
+    );
 }

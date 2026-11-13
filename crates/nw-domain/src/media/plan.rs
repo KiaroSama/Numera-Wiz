@@ -320,7 +320,7 @@ fn lower(capture: &Capture, graph: &MediaGraph, output: &OutputManifest) -> Vec<
             "-color_trc",
             "iec61966-2-1",
             "-fps_mode",
-            "passthrough",
+            "cfr",
             "-r:v",
         ]
         .map(String::from),
