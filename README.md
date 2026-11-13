@@ -119,7 +119,9 @@ research companion is kept outside this repository. Offline FFmpeg manuals and
 licenses remain in `docs/vendor/ffmpeg/n9.0.2`.
 
 The [upstream review](docs/research/upstream-review-2026-11-11.md) identifies
-actual source changes and compatibility gates. `xtask verify-research` checks
+actual source changes and compatibility gates. The [November13 follow-up](docs/research/upstream-semantic-status-2026-11-13.md)
+separates source reading, selected releases and pending hosted qualification.
+`xtask verify-research` checks
 retained document hashes, the tracked Pure Rust boundary and the original Rust
 test inventory. [Contributing](CONTRIBUTING.md) describes review and validation.
 
