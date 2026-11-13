@@ -218,7 +218,7 @@ fn signal_unreaped_group(pid: u32) -> Result<()> {
             io::Errno,
             process::{Signal, kill_process_group},
         };
-        match kill_process_group(owned_pid(pid)?, Signal::Kill) {
+        match kill_process_group(owned_pid(pid)?, Signal::KILL) {
             Ok(()) | Err(Errno::SRCH) => Ok(()),
             Err(error) => Err(error.into()),
         }
