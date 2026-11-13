@@ -10,41 +10,40 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## November 13 current candidate and hosted boundary
 
-[CI291](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43474222550),
-source `0df538deadc573fd3d463f758c688a59175d304c`, is terminal: ten passing
-jobs and three failures, with no skips or cancellations. Gitleaks 156 passes.
-All four desktop builds, ordinary/platform/service suites and lints pass,
-including Windows and both macOS architectures. WASM, dependency lock, actual
-media/SDK/batch and HTTP gates pass. The [scoped census](evidence/egui037-native-builds-ci291.json)
-records that source and its limits; it does not qualify later changes or full v1.
+[CI293](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43481292992),
+source `89e6e7e2ca1a7872b42c5d49753bd08b631e8f7b`, is terminal: ten passing
+jobs and three failures, with no skips or cancellations. Gitleaks 159 passes.
+All four desktop builds, ordinary/platform/service suites and lints pass. The
+Linux job fails only at the separate metadata capture. Formatting, WASM,
+dependency lock, actual media/SDK/batch and HTTP gates pass.
 
-Both genuine human-input journeys now complete Selection report with actual
-nonlocal request correlation and retained original PNGs. They then fail at
-Review cleanup plan: each runner's own images show the old pointer focusing the
-output field above the button. The reviewed browser/native harness corrections
-preserve actual input, assertions, authentication and deadlines; their complete
-journeys still require exact latest-source hosted execution. The entire CI291
-formatter artifact was applied with its source semantics checked. That later
-correction does not turn the historical formatting failure into a pass.
+Both genuine GUI journeys now complete Selection report, cleanup-plan review,
+Run, verified output, client saving and a two-source batch; native input also
+completes its real OS Save picker. They then fail at the Folder intake launcher:
+each runner's own original images show the old pointer on the status label above
+the button. The reviewed narrow launcher corrections preserve actual input,
+request correlation, retained source/receipt oracles, assertions and deadlines.
+Their corrected complete journeys still require exact latest-source hosted
+execution. These finite cleanup/batch successes do not qualify general MediaV2.
 
-Linux metadata capture now passes: four signed releases, sixteen selected index
-paths, ninety-two retained base packages and eighty transaction packages produce
-a complete 172-package metadata inventory, with no unresolved reasons and observed
-owned-container cleanup. All retained raw file/chunk identities were checked.
-Independent semantic qualification remains separate; packages were not downloaded
-or installed, and neither a compiler bootstrap nor a standard FFmpeg profile
-is qualified by metadata capture.
+The new strict APT update is stopped by its existing capture supervision bound:
+the report records SIGKILL, 110.246 seconds overall and owned-container removal
+with absence observed. No stale, insecure, live-source or enlarged-timeout
+fallback is accepted. The precise external cause remains unknown. The earlier
+complete [CI291 metadata capture](evidence/egui037-native-builds-ci291.json)
+remains a source-pinned prerequisite: 172 package metadata identities, complete
+retained byte/chunk verification and independent structural/selected semantic
+review, with both actual awk satisfiers preserved. No package payload or compiler
+bootstrap is qualified by those metadata records.
 
-Windows ordinary compatibility and lint pass in CI291. The historical CI289
-`post_log_activation` / `FILESYSTEM_ERROR` remains an observed failure with unknown
-concrete filesystem cause. A bounded harness projection retains only recognized
-existing stage/operation and numeric OS observations from captured stderr; this
-does not establish a redb, sharing, DACL, path or restoration repair.
+Windows ordinary compatibility and lint pass again. The historical CI289
+`post_log_activation` / `FILESYSTEM_ERROR` retains an unknown concrete filesystem
+cause; no redb, sharing, DACL, path or restoration repair is inferred.
 
-Full version 1 remains unfinished. The next owned two-input transport and
-independent media-process supervision checkpoint is a prerequisite to genuine
-registered mixed A/V/still export and continuous decoded preview, not a substitute
-for those required features.
+Full version 1 remains unfinished. Owned two-input transport, independent media
+process supervision and a locked offline compiler bootstrap remain prerequisites
+to genuine registered mixed A/V/still export and continuous decoded preview.
+Their in-progress source and private plans are not release qualification.
 
 Spec Kit and feature specifications remain local only. Upstream executable source
 snapshots are external; schema-2 research metadata records the separation. Current
