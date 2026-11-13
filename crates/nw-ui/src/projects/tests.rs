@@ -1765,6 +1765,7 @@ fn clip_group_selection_and_requests() {
     app.receive(&ctx);
     let mut linked = selected_clip(RELOAD_TICKET, "2", 0);
     linked["entity"]["link_group_id"] = json!(BIN);
+    linked["entity"]["occurrence_id"] = json!(selected_clip_id(99));
     port.complete(linked);
     app.receive(&ctx);
     port.complete(projection(
@@ -1775,6 +1776,30 @@ fn clip_group_selection_and_requests() {
     ));
     app.receive(&ctx);
     assert!(app.project_ready());
+    let group = app.projects.group.as_ref().unwrap();
+    let clip = group.clip.as_ref().unwrap();
+    let inspected = group.view.clip.as_deref().unwrap();
+    assert_ne!(inspected, clip.occurrence_id.as_str());
+    assert_ne!(inspected, clip.source_id.as_str());
+    assert_ne!(Some(inspected), clip.link_group_id.as_deref());
+    // Invalid controller captures must never guess another payload identity or
+    // send a request. Production capture publication already checks correlation.
+    for invalid in ["missing id", "invalid id", "missing payload", "sequence", "track"] {
+        let captured = app.projects.group.as_ref().unwrap().clone();
+        let group = Arc::make_mut(app.projects.group.as_mut().unwrap());
+        match invalid {
+            "missing id" => group.view.clip = None,
+            "invalid id" => group.view.clip = Some("invalid-entity-id".into()),
+            "missing payload" => group.clip = None,
+            "sequence" => group.clip.as_mut().unwrap().sequence_id = BIN.into(),
+            "track" => group.clip.as_mut().unwrap().track_id = BIN.into(),
+            _ => unreachable!(),
+        }
+        assert!(app.project_link_params(true).is_none(), "Refuse {invalid}");
+        app.project_link_selection(true, &ctx);
+        assert!(port.empty(), "No dispatch for {invalid}");
+        app.projects.group = Some(captured);
+    }
     app.project_link_selection(true, &ctx);
     let unlink = selected_failure(&mut app, &port, &ctx, "PERMISSION_DENIED");
     assert_eq!(unlink.command.id, "clips.unlink");

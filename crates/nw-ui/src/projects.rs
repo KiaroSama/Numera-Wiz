@@ -481,11 +481,18 @@ impl WizApp {
             None => Vec::new(),
         };
         if unlink && seeds.is_empty() {
-            let clip = group
-                .clip
-                .as_ref()
-                .filter(|clip| clip.link_group_id.is_some())?;
-            seeds.push(clip.id.to_string());
+            let clip = group.clip.as_ref()?;
+            if clip.link_group_id.is_none()
+                || Some(clip.sequence_id.as_str()) != group.view.sequence.as_deref()
+                || Some(clip.track_id.as_str()) != group.view.track.as_deref()
+            {
+                return None;
+            }
+            // The canonical entity read correlated this captured ID with the
+            // inspected payload. Clip itself has no entity identity field.
+            let id = group.view.clip.as_deref()?;
+            nw_domain::projects::validate_id(id).ok()?;
+            seeds.push(id.to_owned());
         }
         let minimum = if unlink { 1 } else { 2 };
         if seeds.len() < minimum || seeds.len() > PAGE {
