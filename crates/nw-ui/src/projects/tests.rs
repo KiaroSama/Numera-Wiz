@@ -1600,7 +1600,8 @@ fn clip_group_selection_and_requests() {
     app.project_toggle_clip_seed(&selected_clip_id(0));
     assert!(app.project_link_params(false).is_none());
     app.project_toggle_clip_seed(&selected_clip_id(1));
-    let expected = json!({"clip_ids":[selected_clip_id(0),selected_clip_id(1)],"link_policy":"expand"});
+    let expected =
+        json!({"clip_ids":[selected_clip_id(0),selected_clip_id(1)],"link_policy":"expand"});
     assert_eq!(app.project_link_params(false), Some(expected.clone()));
     assert_eq!(app.project_link_params(true), Some(expected.clone()));
     let captured = app.projects.clip_selection.clone();
@@ -1636,12 +1637,20 @@ fn clip_group_selection_and_requests() {
         PAGE
     );
     assert!(
-        !app.projects.clip_selection.as_ref().unwrap().seeds.contains(&selected_clip_id(PAGE))
+        !app.projects
+            .clip_selection
+            .as_ref()
+            .unwrap()
+            .seeds
+            .contains(&selected_clip_id(PAGE))
     );
     assert!(app.error.as_ref().unwrap().contains("128"));
     assert!(app.projects.group.as_ref().unwrap().clip.is_none());
     assert_eq!(
-        app.project_link_params(false).unwrap()["clip_ids"].as_array().unwrap().len(),
+        app.project_link_params(false).unwrap()["clip_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
         PAGE
     );
     let mut view = app.projects.group.as_ref().unwrap().view.clone();
@@ -1661,17 +1670,19 @@ fn clip_group_selection_and_requests() {
     assert!(app.projects.stale);
     app.project_link_selection(false, &ctx);
     app.project_toggle_clip_seed(&selected_clip_id(0));
-    assert_eq!(
-        app.projects.clip_selection.as_ref().unwrap().seeds.len(),
-        2
-    );
+    assert_eq!(app.projects.clip_selection.as_ref().unwrap().seeds.len(), 2);
     let (request, reply) = port.pop();
     assert!(port.empty());
     assert_eq!(request.command.id, "clips.link");
     assert_eq!(request.params, expected);
     assert_eq!(request.project.as_ref().unwrap().id, PROJECT);
     assert_eq!(
-        request.project.as_ref().unwrap().expected_revision.as_deref(),
+        request
+            .project
+            .as_ref()
+            .unwrap()
+            .expected_revision
+            .as_deref(),
         Some("1")
     );
     assert_eq!(request.replay_scope.as_deref(), Some(scope().as_str()));
@@ -1686,7 +1697,15 @@ fn clip_group_selection_and_requests() {
     app.receive(&ctx);
     assert!(app.projects.stale && app.projects.terminal_failure);
     assert!(
-        app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_none()
+        app.projects
+            .group
+            .as_ref()
+            .unwrap()
+            .clip
+            .as_ref()
+            .unwrap()
+            .link_group_id
+            .is_none()
     );
     app.project_link_selection(true, &ctx);
     assert!(port.empty());
@@ -1707,7 +1726,15 @@ fn clip_group_selection_and_requests() {
         "Accepted revision clears seeds before reload"
     );
     assert!(
-        app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_none(),
+        app.projects
+            .group
+            .as_ref()
+            .unwrap()
+            .clip
+            .as_ref()
+            .unwrap()
+            .link_group_id
+            .is_none(),
         "Receipt never edits displayed topology optimistically"
     );
     selected_prefix(
@@ -1720,7 +1747,16 @@ fn clip_group_selection_and_requests() {
         false,
     );
     assert_eq!(
-        app.projects.staging.as_ref().unwrap().group.as_ref().unwrap().view.clip.as_deref(),
+        app.projects
+            .staging
+            .as_ref()
+            .unwrap()
+            .group
+            .as_ref()
+            .unwrap()
+            .view
+            .clip
+            .as_deref(),
         Some(selected_clip_id(0).as_str()),
         "Expanded member order must not replace the inspected clip"
     );
@@ -1731,7 +1767,12 @@ fn clip_group_selection_and_requests() {
     linked["entity"]["link_group_id"] = json!(BIN);
     port.complete(linked);
     app.receive(&ctx);
-    port.complete(projection(RELOAD_TICKET, "2", "entity", json!({"entity":{"id":SELECT_SOURCE,"kind":"source_binding","source_kind":"solid_color"}})));
+    port.complete(projection(
+        RELOAD_TICKET,
+        "2",
+        "entity",
+        json!({"entity":{"id":SELECT_SOURCE,"kind":"source_binding","source_kind":"solid_color"}}),
+    ));
     app.receive(&ctx);
     assert!(app.project_ready());
     app.project_link_selection(true, &ctx);
@@ -1742,12 +1783,26 @@ fn clip_group_selection_and_requests() {
         json!({"clip_ids":[selected_clip_id(0)],"link_policy":"expand"})
     );
     assert_eq!(
-        unlink.project.as_ref().unwrap().expected_revision.as_deref(),
+        unlink
+            .project
+            .as_ref()
+            .unwrap()
+            .expected_revision
+            .as_deref(),
         Some("2")
     );
     assert!(
         app.projects.stale
-            && app.projects.group.as_ref().unwrap().clip.as_ref().unwrap().link_group_id.is_some()
+            && app
+                .projects
+                .group
+                .as_ref()
+                .unwrap()
+                .clip
+                .as_ref()
+                .unwrap()
+                .link_group_id
+                .is_some()
     );
     assert!(port.empty());
 

@@ -389,23 +389,22 @@ impl WizApp {
                         }
                         // Keep the original row height and inspection target. The
                         // compact seed control is separate from primary inspection.
-                        ui.with_layout(
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                let mut seed = self.projects.clip_selection.as_ref().is_some_and(
-                                    |selection| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let mut seed =
+                                self.projects
+                                    .clip_selection
+                                    .as_ref()
+                                    .is_some_and(|selection| {
                                         selection.matches(&group)
                                             && selection.seeds.contains(clip.id.as_str())
-                                    },
-                                );
-                                if ui
-                                    .add_enabled(ready, egui::Checkbox::new(&mut seed, "Select"))
-                                    .changed()
-                                {
-                                    self.project_toggle_clip_seed(clip.id.as_str());
-                                }
-                            },
-                        );
+                                    });
+                            if ui
+                                .add_enabled(ready, egui::Checkbox::new(&mut seed, "Select"))
+                                .changed()
+                            {
+                                self.project_toggle_clip_seed(clip.id.as_str());
+                            }
+                        });
                     });
                     ui.small(clip.id.as_str());
                     let (response, painter) = ui.allocate_painter(
