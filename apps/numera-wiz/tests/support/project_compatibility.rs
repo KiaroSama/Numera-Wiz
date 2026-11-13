@@ -1825,6 +1825,8 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         old_profile: (&original, &accepted),
         migration: (&migration_request, &migration_accepted),
         before: &final_raw,
+        project: &project,
+        linked_project: &linked_project,
     }).await?;
     Ok(())
 }

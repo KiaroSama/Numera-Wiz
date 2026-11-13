@@ -5,6 +5,7 @@ use nw_domain::maintenance::{
     media_lifecycle::GenerationRestorationPlan,
     promotion::{GenerationPromotionPlan, MEDIA_V1_CAPABILITIES},
 };
+use nw_domain::records::NativeObjectIdentity;
 use nw_platform::files::{DirectoryStamp, SourceStamp};
 use tokio_util::sync::CancellationToken;
 
@@ -18,6 +19,34 @@ pub(super) struct Journey<'a> {
     pub old_profile: (&'a Value, &'a Value),
     pub migration: (&'a Value, &'a Value),
     pub before: &'a Snapshot,
+    pub project: &'a Project,
+    pub linked_project: &'a linked::LinkedProject,
+}
+
+#[derive(PartialEq, Eq)]
+struct SelectedObject {
+    path: PathBuf,
+    selection: nw_store::generations::Selection,
+    object: NativeObjectIdentity,
+}
+
+fn selected_object(root: &Path) -> Result<SelectedObject> {
+    let lease = RootLease::acquire(root)?;
+    lease.with_selected_generation_read(|path, selection| {
+        Ok(SelectedObject {
+            path: path.to_owned(),
+            selection: selection.clone(),
+            object: nw_platform::files::source_object(&path.join("store.redb"))?,
+        })
+    }).map_err(anyhow::Error::from)
+}
+
+fn same_selected_source(root: &Path, expected: &SelectedObject, checkpoint: &str, evidence: &Evidence) -> Result<()> {
+    let actual = selected_object(root)?;
+    ensure!(actual == *expected, "Selected original S path, activation or native object was replaced");
+    evidence.record(json!({"phase":"media-original-source-native","checkpoint":checkpoint,
+        "selected_path":actual.path,"generation":actual.selection.generation,
+        "activation_id":actual.selection.activation_id,"native_store":actual.object}))
 }
 
 /// Read physical state directly, without a RootLease, database open or recovery.
@@ -34,10 +63,11 @@ fn physical_state(root: &Path) -> Result<Value> {
         ensure!(depth <= 8, "Physical fixture depth exceeds bound");
         let directory = DirectoryStamp::capture_resolved(&path)?;
         let relative = path.strip_prefix(&state)?;
-        objects.insert(
-            relative.to_str().context("Physical relative directory encoding")?.replace('\\', "/"),
+        let previous = objects.insert(
+            relative.to_str().context("Physical relative directory encoding")?.to_owned(),
             json!({"kind":"directory","native":directory.object_identity()?}),
         );
+        ensure!(previous.is_none(), "Physical inventory repeats a directory key");
         directory.for_each_entry(|path| {
             let observe = || -> Result<()> {
                 entries += 1;
@@ -55,10 +85,11 @@ fn physical_state(root: &Path) -> Result<Value> {
                     let identity = source.identity_with_limit(&cancel, remaining)?;
                     let length = identity.bytes.parse::<u64>()?;
                     bytes = bytes.checked_add(length).context("Physical fixture bytes")?;
-                    objects.insert(
-                        path.strip_prefix(&state)?.to_str().context("Physical relative file encoding")?.replace('\\', "/"),
+                    let previous = objects.insert(
+                        path.strip_prefix(&state)?.to_str().context("Physical relative file encoding")?.to_owned(),
                         json!({"kind":"file","native":native,"bytes":identity.bytes,"sha256":identity.sha256}),
                     );
+                    ensure!(previous.is_none(), "Physical inventory repeats a file key");
                 }
                 Ok(())
             };
@@ -68,6 +99,25 @@ fn physical_state(root: &Path) -> Result<Value> {
     }
     ensure!(!objects.is_empty() && bytes > 0, "Physical fixture must contain genuine data");
     Ok(json!({"entries":entries,"bytes":bytes,"objects":objects}))
+}
+
+/// A real Unix rename can retain native identity/content/count while changing a
+/// path separator into a literal backslash byte. The independent oracle must
+/// distinguish the two namespaces, then recover its exact original observation.
+#[cfg(unix)]
+fn physical_path_control() -> Result<()> {
+    let root = tempfile::tempdir()?;
+    let directory = security::private_directory(&root.path().join("state/a"))?;
+    let original = directory.join("b");
+    fs::write(&original, b"physical namespace mutation control")?;
+    let before = physical_state(root.path())?;
+    let renamed = root.path().join("state/a\\b");
+    fs::rename(&original, &renamed)?;
+    let changed = physical_state(root.path())?;
+    ensure!(before != changed, "Physical oracle hid a literal-backslash pathname mutation");
+    fs::rename(&renamed, &original)?;
+    ensure!(before == physical_state(root.path())?, "Physical path control did not restore its exact observation");
+    Ok(())
 }
 
 async fn old_floor_refusal(binary: &Binary, root: &Path, evidence: &Evidence) -> Result<Value> {
@@ -114,10 +164,16 @@ async fn old_replays(owner: &mut Owner, journey: &Journey<'_>) -> Result<()> {
 
 pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     let started = Instant::now();
+    #[cfg(unix)]
+    physical_path_control()?;
     let original_epochs = journey.epochs.len();
     ensure!(original_epochs == 7, "Media package journey must follow all original seven epochs");
     let migration_id = text(&journey.migration.1["result"], "migration_id")?;
     let source_guard = guard(journey.before, &migration_id, "1")?;
+    let original_source = selected_object(journey.root)?;
+    journey.evidence.record(json!({"phase":"media-original-source-native","checkpoint":"before-promotion",
+        "selected_path":original_source.path,"generation":original_source.selection.generation,
+        "activation_id":original_source.selection.activation_id,"native_store":original_source.object}))?;
     let mut owner = Owner::start(&journey.configuration.new, journey.root,
         journey.epochs, journey.root_id, journey.evidence).await?;
     let review = owner.command(&query("maintenance.promotion.plan", json!({})), journey.evidence).await?;
@@ -136,6 +192,8 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     ensure!(inspected["result"]["phase"] == "succeeded", "Package promotion did not complete");
     owner.stop(journey.evidence).await?;
     let promoted = closed(journey.root, "media-package-promoted", journey.evidence)?;
+    ensure!(nw_platform::files::source_object(&original_source.path.join("store.redb"))? == original_source.object,
+        "Promotion replaced the original source S native object");
     ensure!(promoted.facts.required_capabilities.iter().map(String::as_str).collect::<BTreeSet<_>>()
         == MEDIA_V1_CAPABILITIES.iter().copied().collect::<BTreeSet<_>>(), "Media reader floor is not actual");
     projects_identical(journey.before, &promoted)?;
@@ -167,6 +225,7 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     ensure!(inspected["result"]["phase"] == "restored", "Package restoration did not expose compatible source");
     owner.stop(journey.evidence).await?;
     let restored = closed(journey.root, "media-package-restored-source", journey.evidence)?;
+    same_selected_source(journey.root, &original_source, "after-restoration", journey.evidence)?;
     ensure!(guard(&restored, &migration_id, "1")? == source_guard,
         "Restoration changed the source adoption provenance");
     projects_identical(journey.before, &restored)?;
@@ -186,6 +245,7 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     same_receipt(&written, &owner.command(&old_write, journey.evidence).await?)?;
     owner.stop(journey.evidence).await?;
     let after_old = closed(journey.root, "media-package-old-business-preserved", journey.evidence)?;
+    same_selected_source(journey.root, &original_source, "after-old-business", journey.evidence)?;
     guard(&after_old, &migration_id, "2")?;
     // Every existing row, including newer unknown control/receipt rows, must stay
     // exact except the two metadata cells changed by this genuine old mutation.
@@ -198,6 +258,8 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     same_receipt(&written, &owner.command(&old_write, journey.evidence).await?)?;
     same_receipt(&promoted_receipt, &owner.command(&promotion, journey.evidence).await?)?;
     same_receipt(&restored_receipt, &owner.command(&restoration, journey.evidence).await?)?;
+    replay_project(&mut owner, journey.project, journey.evidence).await?;
+    journey.linked_project.replay(&mut owner, journey.evidence).await?;
     let next = owner.command(&query("maintenance.promotion.plan", json!({})), journey.evidence).await?;
     let next: GenerationPromotionPlan = serde_json::from_value(next["result"].clone())?;
     next.validate_hash()?;
@@ -206,6 +268,7 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
         "Current restart did not retain genuine old post-restoration work");
     owner.stop(journey.evidence).await?;
     let final_raw = closed(journey.root, "media-package-final-replay-preserved", journey.evidence)?;
+    same_selected_source(journey.root, &original_source, "after-final-current-reopen", journey.evidence)?;
     guard(&final_raw, &migration_id, "2")?;
     preserved(&after_old, &final_raw, |key| key != "meta/clock")?;
     ensure!(journey.epochs.len() == original_epochs + 4, "Added package owners must establish four genuine epochs");
@@ -216,6 +279,7 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
         "promotion_id":plan.id,"restoration_id":restore.id,"promotion_receipt":promoted_receipt["receipt_id"],
         "restoration_receipt":restored_receipt["receipt_id"],"old_business_receipt":written["receipt_id"],
         "old_floor_refusal_before_current_recovery":true,"old_newer_rows_preserved":true,
+        "original_source_native_identity_preserved":true,"original_current_project_receipts_replayed":true,
         "scope":"Actual adopted-r1 package promotion/refusal/restoration/old-write/current-replay; fresh/r0/cut-point/RSS/general-media/full-v1 remain unqualified"}))?;
     Ok(())
 }
