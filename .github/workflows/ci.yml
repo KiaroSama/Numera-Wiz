@@ -333,6 +333,29 @@ jobs:
       - name: Lint independent schema validator
         if: ${{ !cancelled() }}
         run: cargo clippy --locked --manifest-path xtask/schema-validator/Cargo.toml --target-dir target/schema-validator --all-targets -- -D warnings
+      - name: Self-check the Linux metadata capture parsers and bounds
+        id: linux-toolchain-self-check
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: cargo run --locked -p xtask -- capture-linux-toolchain --self-check
+      - name: Capture authenticated frozen Linux toolchain metadata without installation
+        id: linux-toolchain-capture
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.linux-toolchain-self-check.outcome == 'success' }}
+        run: cargo run --locked -p xtask -- capture-linux-toolchain
+      - name: Save the bounded Linux metadata report and digest manifests
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-toolchain-capture-report
+          path: target/toolchain-capture/report/
+          if-no-files-found: error
+      - name: Save the separate Linux raw metadata evidence
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-toolchain-capture-raw
+          path: target/toolchain-capture/raw/
+          if-no-files-found: error
+          compression-level: 0
       - name: Check shared browser UI dependency closure
         if: runner.os == 'Linux'
         run: cargo check --locked -p nw-ui --target wasm32-unknown-unknown

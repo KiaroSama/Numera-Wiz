@@ -4897,6 +4897,7 @@ dependencies = [
  "hex",
  "nw-domain",
  "nw-platform",
+ "rustix 1.1.6",
  "schemars",
  "serde_json",
  "sha2 0.10.9",

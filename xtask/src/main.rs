@@ -4,6 +4,7 @@ mod ci_host;
 mod hygiene;
 mod package;
 mod project_compatibility;
+mod toolchain_capture;
 mod web;
 use sha2::{Digest, Sha256};
 use std::{
@@ -40,9 +41,10 @@ fn run() -> Result<()> {
         "record-ci-evidence" => package::evidence(root),
         "prepare-project-compatibility" => project_compatibility::prepare(root),
         "ci-linux-dependencies" => ci_host::linux_dependencies(),
+        "capture-linux-toolchain" => toolchain_capture::run(root),
         "help" => {
             println!(
-                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | prepare-project-compatibility | record-ci-evidence | ci-linux-dependencies <desktop|browser|native>"
+                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | prepare-project-compatibility | record-ci-evidence | ci-linux-dependencies <desktop|browser|native> | capture-linux-toolchain [--self-check]"
             );
             Ok(())
         }

@@ -107,6 +107,15 @@ child test-module lookup failure in that pressure change; the one-line source
 correction is prepared separately. These failures remain visible, and no later
 source or full-v1 success is inferred from CI277.
 
+Linux standard-toolchain preparation now has a hosted metadata-only capture and
+plain synthetic self-check. It uses the fixed Ubuntu image and timestamped APT
+snapshot, retains signed metadata and exact package/provider identities, and
+fails on incomplete inherited-package hashes or other unresolved evidence.
+Neither command has been executed for this source. Transport, base-version
+compatibility, actual signature/solver output and the copied executable's base
+ABI remain unproven. A reviewed capture must precede any separate bootstrap;
+the standard offline FFmpeg profile and full version 1 remain unfinished.
+
 The full first version remains unfinished: accepted general multi-source/stage/
 output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
 and complete editor controls, preview/audio transport, checkpoints/interchange,
