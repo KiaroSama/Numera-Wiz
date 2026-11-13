@@ -203,7 +203,7 @@ pub async fn run(client: &NativeClient, command: AccessCommand) -> Result<()> {
                 let issued = credential_file::deliver(client, &Request::query(
                         "access.tokens.issue",
                         json!({"for_access_profile":for_access_profile,"port":port}),
-                    ), &out).await?;
+                    ), &out, &tokio_util::sync::CancellationToken::new()).await?;
                 if !issued.ok {
                     return print_checked(issued);
                 }

@@ -280,13 +280,18 @@ impl ServerHandler for Bridge {
         }
         let response = if issuance {
             match &self.backend {
+                Backend::Native(client) if client.profile.is_none() && context.ct.is_cancelled() => {
+                    commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(
+                        "CANCELLED", "Credential delivery cancelled before issuance",
+                    ))
+                }
                 Backend::Native(client) if client.profile.is_none() => {
                     let path = credential_file.as_ref().and_then(serde_json::Value::as_str)
-                        .filter(|path| !path.is_empty() && path.chars().count() <= 32767)
+                        .filter(|path| !path.is_empty() && path.chars().take(32768).count() <= 32767)
                         .map(std::path::Path::new)
                         .filter(|path| path.is_absolute());
                     if let Some(path) = path {
-                        crate::access::credential_file::deliver(client, &canonical, path).await
+                        crate::access::credential_file::deliver(client, &canonical, path, &context.ct).await
                             .map_err(|_| ErrorData::internal_error("Protected credential file delivery failed; no credential value returned", None))?
                     } else {
                         commands::Response::error(&canonical.request_id, nw_domain::DomainError::new(

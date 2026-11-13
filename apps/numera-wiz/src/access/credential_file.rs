@@ -5,12 +5,13 @@ use nw_domain::{DomainError, commands::{Request, Response}};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::path::Path;
+use tokio_util::sync::CancellationToken;
 
 pub(crate) fn is_issue(id: &str) -> bool {
     matches!(id, "access.tokens.issue" | "access.credentials.issue")
 }
 
-pub(crate) async fn deliver(client: &NativeClient, request: &Request, out: &Path) -> Result<Response> {
+pub(crate) async fn deliver(client: &NativeClient, request: &Request, out: &Path, cancel: &CancellationToken) -> Result<Response> {
     if client.profile.is_some() {
         return Ok(Response::error(&request.request_id, DomainError::new(
             "PERMISSION_DENIED", "Credential file delivery requires explicit native owner authority",
@@ -21,6 +22,11 @@ pub(crate) async fn deliver(client: &NativeClient, request: &Request, out: &Path
             "VALIDATION_ERROR", "Credential file delivery requires an issuance command",
         )));
     }
+    if cancel.is_cancelled() {
+        return Ok(Response::error(&request.request_id, DomainError::new(
+            "CANCELLED", "Credential delivery cancelled before issuance",
+        )));
+    }
     if out.try_exists()? {
         return Ok(Response::error(&request.request_id, DomainError::new(
             "OUTPUT_COLLISION", "Token file already exists; no credential was issued",
@@ -28,6 +34,13 @@ pub(crate) async fn deliver(client: &NativeClient, request: &Request, out: &Path
     }
     // Establish a representable metadata path before any credential is issued.
     let file = nw_platform::files::path_text(out)?;
+    if cancel.is_cancelled() {
+        return Ok(Response::error(&request.request_id, DomainError::new(
+            "CANCELLED", "Credential delivery cancelled before issuance",
+        )));
+    }
+    // After the issuance request starts, retain its result through publication
+    // or compensation; dropping it on cancellation could strand an issued secret.
     let mut issued = client.request(request).await?;
     if !issued.ok { return Ok(issued); }
     let result = issued.result.take().context("Issued credential metadata is missing")?;

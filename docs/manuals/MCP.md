@@ -62,6 +62,9 @@ Publication failure attempts revocation of the issued credential. After a lost
 response or cancellation, inspect the original output before retrying; an existing
 file is a collision and is never overwritten. Canonical issuance parameters and
 the credential's original profile/audience rules remain unchanged.
+Cancellation already observed before the issuance request prevents delivery.
+After that request starts, the adapter keeps processing its result for protected
+publication or compensation. Forced disconnects still leave outcome uncertainty.
 
 ## Typed calls and retries
 

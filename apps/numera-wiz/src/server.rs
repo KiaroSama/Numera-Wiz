@@ -1045,6 +1045,7 @@ mod tests {
     #[derive(Default)]
     struct LifecycleProbe {
         bootstraps: AtomicUsize,
+        commands: AtomicUsize,
         releases: AtomicUsize,
         reject_commands: AtomicUsize,
         acknowledgement: AtomicUsize,
@@ -1059,6 +1060,9 @@ mod tests {
         let path = request.uri().path();
         let release = path == "/internal/credential/release";
         let command = path == "/api/v1/commands";
+        if command {
+            probe.commands.fetch_add(1, Ordering::AcqRel);
+        }
         if path == "/internal/credential" {
             probe.bootstraps.fetch_add(1, Ordering::AcqRel);
         }
@@ -1322,6 +1326,21 @@ mod tests {
             "VALIDATION_ERROR"
         );
         let unscoped = NativeClient::for_test_owner(record, None, true).unwrap();
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        let commands_before = probe.commands.load(Ordering::Acquire);
+        let credentials_before = owner.service.store.rows::<serde_json::Value>("credential/", 10000).unwrap().len();
+        let forbidden = root.join("cancelled-delivery-must-not-exist/token");
+        let result = crate::access::credential_file::deliver(
+            &unscoped,
+            &commands::Request::query("access.credentials.issue", json!({"profile":"agent"})),
+            &forbidden,
+            &cancelled,
+        ).await.unwrap();
+        assert_eq!(result.error.unwrap().code, "CANCELLED");
+        assert!(!forbidden.parent().unwrap().exists());
+        assert_eq!(probe.commands.load(Ordering::Acquire), commands_before);
+        assert_eq!(owner.service.store.rows::<serde_json::Value>("credential/", 10000).unwrap().len(), credentials_before);
         assert!(
             crate::finish_one_shot(&unscoped, unscoped.request(&query))
                 .await
