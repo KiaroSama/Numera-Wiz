@@ -315,7 +315,12 @@ impl Service {
         if projects && cancellation.is_cancelled() {
             return Err(DomainError::new("CANCELLED", "Snapshot query cancelled"));
         }
-        let mut cache = self.snapshots.try_lock().map_err(|_| {
+        let mut cache = self.snapshots.try_lock().map_err(|error| {
+            let busy_category = match error {
+                std::sync::TryLockError::WouldBlock => "would_block",
+                std::sync::TryLockError::Poisoned(_) => "poisoned",
+            };
+            tracing::debug!(busy_category, "Snapshot inventory admission unavailable");
             DomainError::new(
                 "RESOURCE_LIMIT",
                 "Snapshot service is busy; retry the same query",

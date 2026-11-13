@@ -8,6 +8,8 @@ use nw_domain::projects::{
 };
 use nw_store::projects::ProjectReadSnapshot;
 use std::collections::BTreeMap;
+#[path = "queries/pressure.rs"]
+mod pressure;
 
 pub(super) struct ProjectTicket {
     principal: String,
@@ -568,35 +570,6 @@ impl Service {
         }
         Ok(())
     }
-    pub(in crate::runtime) fn project_snapshot_pressure(
-        &self,
-        projected_write_bytes: usize,
-    ) -> Result<()> {
-        let mut cache = self.snapshots.lock().map_err(|_| lock_error())?;
-        cache.expire();
-        if cache.projects.is_empty() {
-            cache.project_write_estimate = 0;
-            return Ok(());
-        }
-        // This conservative software estimate and observed growth are not a hard instantaneous filesystem cap.
-        if projected_write_bytes > 0 {
-            cache.project_write_estimate = cache
-                .project_write_estimate
-                .saturating_add(projected_write_bytes.saturating_mul(8) + 64 * 1024);
-        }
-        let growth = self.store.project_generation_bytes()?.saturating_sub(
-            cache
-                .projects
-                .values()
-                .map(|p| p.generation_bytes)
-                .min()
-                .unwrap_or(0),
-        );
-        if cache.project_write_estimate > 32 * 1024 * 1024 || growth > 32 * 1024 * 1024 {
-            cache.clear_project_reads();
-        }
-        Ok(())
-    }
     pub(in crate::runtime) fn start_snapshot_reaper(service: &Arc<Self>) {
         let weak = Arc::downgrade(service);
         tokio::spawn(async move {
@@ -832,4 +805,5 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
         .dispatch(context, page_request(Some(fresh["next_cursor"].clone())))
         .await;
     assert_eq!(stale.error.unwrap().code, "SNAPSHOT_EXPIRED");
+    pressure::exercise_pressure_scheduling().await;
 }
