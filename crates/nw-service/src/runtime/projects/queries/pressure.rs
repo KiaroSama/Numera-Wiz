@@ -53,6 +53,7 @@ impl Service {
 }
 
 #[cfg(test)]
+#[path = "pressure/tests.rs"]
 mod tests;
 
 #[cfg(test)]
