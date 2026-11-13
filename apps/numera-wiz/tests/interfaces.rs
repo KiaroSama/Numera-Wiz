@@ -612,6 +612,27 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
                 .len(),
             1
         );
+        drop(store);
+        drop(lease);
+        // Bootstrap a real native owner, adopt once, then use the actual typed review CLI.
+        let issued = migration_cli(data.path(), &["access", "replay-scope", "create"]).await;
+        let mut business = Request::query(
+            "access.profiles.create",
+            json!({"name":"native-promotion-review","read_roots":[],"write_roots":[]}),
+        );
+        business.replay_scope = Some(issued["result"]["replay_scope"].as_str().unwrap().into());
+        business.idempotency_key = Some("native-promotion-review-adoption".into());
+        let accepted = migration_owner_http(data.path(), &business).await;
+        assert!(accepted["receipt_id"].is_string());
+        let reviewed = migration_cli(data.path(), &["maintenance", "promotion", "plan"]).await;
+        assert!(reviewed["receipt_id"].is_null());
+        let plan: nw_domain::maintenance::promotion::GenerationPromotionPlan =
+            serde_json::from_value(reviewed["result"].clone()).unwrap();
+        plan.validate_hash().unwrap();
+        assert_eq!(plan.source_generation, 3);
+        assert_eq!(plan.target_generation, 5);
+        assert_eq!(plan.source_guard.migration_id, id);
+        assert_eq!(plan.source_guard.revision, "1");
     })
     .await
     .expect("Actual CLI migration/restart deadline");
