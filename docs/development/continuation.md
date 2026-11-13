@@ -41,7 +41,15 @@ fault controls. Its terminal census is eleven passing jobs and two failures:
 formatting and Windows interface deadlines. Windows core suites and lint pass;
 three fresh-owner starts exceed20 seconds and restoration exceeds the existing
 180-second aggregate. The next native identity/DACL transport correction remains
-unqualified; no timeout or acceptance rule is relaxed. Initial execution
+unqualified by that run; no timeout or acceptance rule is relaxed.
+[CI263](evidence/media-v1-native-ci263.json) then passed all four native
+build/test/lint jobs with native identity/DACL checks. Its actual current CLI
+promotion/restoration helper took3.340 seconds on Windows; the original seven-epoch
+prior/current package proof and identical65-tool/184390-byte discovery frames
+passed on all four targets. This run does not qualify the later native collision
+fixture or new MediaV1 old-floor/restoration package journey. Its complete
+thirteen-job census is twelve passing and one formatting failure; the entire
+hosted formatting patch is applied in a later commit. Initial execution
 has the documented decoded-byte and container-clock admission limits in the CLI
 guide. Those limits do not waive the required general editor/media routes.
 
