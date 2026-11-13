@@ -261,6 +261,17 @@ mod tests {
         activation: &str,
     ) {
         // The original public migration/replay/business journey supplies real P and r=1.
+        let bootstrap = service
+            .dispatch(
+                service.owner(),
+                Request::query("access.replay_scope.create", json!({})),
+            )
+            .await;
+        assert!(bootstrap.ok);
+        let scope = bootstrap.result.unwrap()["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         let request = Request::query("maintenance.promotion.plan", json!({}));
         let request_id = request.request_id.clone();
         let response = service.dispatch(service.owner(), request).await;
@@ -436,6 +447,28 @@ mod tests {
         );
         assert!(service.store.pending_migration().unwrap().is_none());
         promotion_rejects_legacy_and_unadopted_sources().await;
+        let mut accept = Request::query("maintenance.promotion.accept", json!({"plan":raw}));
+        accept.replay_scope = Some(scope);
+        accept.idempotency_key = Some("actual-media-promotion".into());
+        let accepted = service.dispatch(service.owner(), accept).await;
+        assert!(
+            accepted.ok,
+            "MEDIA_PROMOTION_PUBLIC_ACCEPT_MISSING code={:?}",
+            accepted.error.as_ref().map(|error| error.code.as_str())
+        );
+        assert!(accepted.receipt_id.is_some());
+        assert_eq!(accepted.result.unwrap()["promotion_id"], plan.id);
+        let selected = service.root_lease.selection().unwrap();
+        assert_eq!(selected.generation, 5);
+        let activation = selected.activation_id.unwrap();
+        assert_eq!(
+            service
+                .store
+                .adoption_revision(&plan.id, &activation)
+                .unwrap(),
+            "0",
+            "A promoted target starts its own guard without resetting original source adoption"
+        );
     }
 
     async fn promotion_rejects_legacy_and_unadopted_sources() {
