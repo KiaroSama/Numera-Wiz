@@ -1052,16 +1052,15 @@ pub(crate) fn repair_owned_suffix(lease: &RootLease) -> Result<()> {
     }
     let mut predecessors = std::collections::BTreeSet::new();
     for node in &nodes {
-        if let Some(previous) = &node.operation.predecessor_restoration {
-            if !nodes
+        if let Some(previous) = &node.operation.predecessor_restoration
+            && (!nodes
                 .iter()
                 .any(|candidate| candidate.record.id == *previous)
-                || !predecessors.insert(previous.clone())
-            {
-                return Err(refused(
-                    "Accepted restoration successor lineage is missing or branches",
-                ));
-            }
+                || !predecessors.insert(previous.clone()))
+        {
+            return Err(refused(
+                "Accepted restoration successor lineage is missing or branches",
+            ));
         }
     }
     let leaves: Vec<_> = nodes

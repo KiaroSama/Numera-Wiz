@@ -31,9 +31,12 @@ it does not qualify decoded output or the complete CI run.
 
 The connected initial media job implementation now includes canonical acceptance,
 immutable raw payloads, shared execution/publication and explicit generation
-promotion/initialization/restoration paths. This cohort is undergoing integrated
-review and hosted qualification. Its new tests cover actual job bytes and native
-maintenance/replay; those tests are not yet passing evidence. Initial execution
+promotion/initialization/restoration paths. The scoped source rereview closed
+seven Important and two Minor findings. [CI257](evidence/media-v1-first-output-ci257.json)
+passed the actual Linux full-signal/common-job/publication/replay controls;
+the whole run remains red with four native check failures and formatting.
+Generation maintenance, Windows startup and native replay still require fixes
+and fresh hosted qualification. Initial execution
 has the documented decoded-byte and container-clock admission limits in the CLI
 guide. Those limits do not waive the required general editor/media routes.
 

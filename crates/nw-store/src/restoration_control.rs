@@ -243,8 +243,10 @@ pub(crate) fn validate_prestate(
         if source.get(key).map_err(storage)?.is_some() {
             continue;
         }
-        if key == "meta/pending-restoration" && restoration.is_some() {
-            if value.value() != restoration.expect("present restoration").id.as_bytes() {
+        if key == "meta/pending-restoration"
+            && let Some(record) = restoration
+        {
+            if value.value() != record.id.as_bytes() {
                 return Err(invalid("Pending restoration identity differs"));
             }
         } else if key == transformed_key {

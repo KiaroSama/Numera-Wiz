@@ -2,6 +2,33 @@
 //! Direct Service::open retains the legacy factory behavior used by existing callers.
 use super::*;
 
+/// Fixed startup call sites emit at most40 small diagnostic events per constructor.
+/// Ending a stage records elapsed time only; it does not assert success or readiness.
+pub(super) struct StageTiming {
+    stage: &'static str,
+    started: Option<std::time::Instant>,
+}
+impl StageTiming {
+    pub(super) fn start(enabled: bool, stage: &'static str) -> Self {
+        let started = enabled.then(std::time::Instant::now);
+        if enabled {
+            tracing::info!(stage, "Application startup stage started");
+        }
+        Self { stage, started }
+    }
+}
+impl Drop for StageTiming {
+    fn drop(&mut self) {
+        if let Some(started) = self.started {
+            tracing::info!(
+                stage = self.stage,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "Application startup stage ended"
+            );
+        }
+    }
+}
+
 impl Service {
     pub async fn open_application(
         root: PathBuf,
@@ -50,16 +77,22 @@ impl Service {
         ])
     }
     pub(super) async fn initialize_application_media(self: &Arc<Self>) -> Result<()> {
-        if !self.store.fresh_initialization_origin()? {
+        let eligible = {
+            let _stage = StageTiming::start(true, "Check compatible genesis eligibility");
+            self.store.fresh_initialization_origin()?
+        };
+        if !eligible {
             return Ok(());
         }
         let owner = self.owner();
+        let scope_stage = StageTiming::start(true, "Issue canonical genesis replay scope");
         let scope = self
             .dispatch(
                 owner.clone(),
                 Request::query("access.replay_scope.create", json!({})),
             )
             .await;
+        drop(scope_stage);
         if !scope.ok {
             return Err(scope.error.unwrap_or_else(|| {
                 DomainError::new(
@@ -76,12 +109,14 @@ impl Service {
                 DomainError::new("INITIALIZATION_UNQUALIFIED", "Genesis scope was absent")
             })?
             .to_owned();
+        let review_stage = StageTiming::start(true, "Review canonical media initialization");
         let review = self
             .dispatch(
                 owner.clone(),
                 Request::query("maintenance.initialization.plan", json!({})),
             )
             .await;
+        drop(review_stage);
         if !review.ok {
             return Err(review.error.unwrap_or_else(|| {
                 DomainError::new(
@@ -97,7 +132,9 @@ impl Service {
         accept.request_id = format!("genesis-{}", self.store.root_id());
         accept.replay_scope = Some(token);
         accept.idempotency_key = Some(format!("genesis-initialization-{}", self.store.root_id()));
+        let accept_stage = StageTiming::start(true, "Accept canonical media initialization");
         let accepted = self.dispatch(owner, accept).await;
+        drop(accept_stage);
         if !accepted.ok {
             return Err(accepted.error.unwrap_or_else(|| {
                 DomainError::new(
@@ -106,7 +143,11 @@ impl Service {
                 )
             }));
         }
-        if self.store.pending_media_maintenance()? {
+        let pending = {
+            let _stage = StageTiming::start(true, "Confirm initialization is no longer pending");
+            self.store.pending_media_maintenance()?
+        };
+        if pending {
             return Err(DomainError::new(
                 "STORE_RECOVERY_REQUIRED",
                 "Accepted initialization remains pending before ordinary application startup",

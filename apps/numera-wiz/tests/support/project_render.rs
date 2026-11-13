@@ -220,6 +220,7 @@ async fn accepted_output(
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use sha2::{Digest, Sha256};
 
+    let added_started = std::time::Instant::now();
     let raw = format!("\n{}\n", serde_json::to_string_pretty(plan).unwrap());
     let raw_sha = hex::encode(Sha256::digest(raw.as_bytes()));
     let review_file = cli.data.join("finite-media-review.json");
@@ -384,6 +385,7 @@ async fn accepted_output(
             "actual_bytes":actual.bytes,"actual_sha256":actual.sha256,
             "accepted_replay_after_project_drift":true,"changed_raw_bytes_conflict":true,
             "fresh_stale_acceptance_refused":true,
+            "added_elapsed_ms":u64::try_from(added_started.elapsed().as_millis()).unwrap(),
         });
         let encoded = serde_json::to_vec_pretty(&evidence).unwrap();
         assert!(encoded.len() <= 16 * 1024);
@@ -402,6 +404,7 @@ async fn physical_output(cli: &Cli, plan: &nw_domain::media::MediaPlanV1) {
     use std::time::Duration;
     use tokio_util::sync::CancellationToken;
 
+    let added_started = std::time::Instant::now();
     plan.validate_hash().unwrap();
     let ffmpeg = cli.components.join("ffmpeg");
     let ffprobe = cli.components.join("ffprobe");
@@ -602,6 +605,7 @@ async fn physical_output(cli: &Cli, plan: &nw_domain::media::MediaPlanV1) {
         "video_frames":video_frames.len(),"video_pts":video_pts,"decoded_bgr0_bytes":pixels.len(),
         "decoded_bgr0_sha256":format!("{:x}", Sha256::digest(&pixels)),"audio_samples":samples,
         "decoded_pcm_s16le_bytes":pcm.len(),"decoded_pcm_s16le_sha256":format!("{:x}", Sha256::digest(&pcm)),
+        "added_elapsed_ms":u64::try_from(added_started.elapsed().as_millis()).unwrap(),
         "coverage":"Hosted finite compiler graph only; no durable media job, receipt or publication"});
     let encoded = serde_json::to_vec_pretty(&evidence).unwrap();
     assert!(encoded.len() <= 16 * 1024);

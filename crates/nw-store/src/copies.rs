@@ -113,6 +113,8 @@ pub(crate) fn workspace_headroom(
         let mut pending = vec![(entry.path(), 0usize)];
         let mut entries = 0usize;
         let mut metadata_bytes = 0u64;
+        let mut directory_bytes = std::collections::BTreeMap::<PathBuf, u64>::new();
+        let mut database_directories = std::collections::BTreeSet::new();
         while let Some((path, depth)) = pending.pop() {
             let metadata = std::fs::symlink_metadata(&path).map_err(files::io_error)?;
             entries += 1;
@@ -129,10 +131,25 @@ pub(crate) fn workspace_headroom(
                     pending.push((child.map_err(files::io_error)?.path(), depth + 1));
                 }
             } else if metadata.is_file() {
-                if path.file_name().is_some_and(|name| name == "store.redb") {
+                let directory = path
+                    .parent()
+                    .ok_or_else(|| conflict("Workspace parent is missing"))?;
+                let retained = directory_bytes.entry(directory.to_owned()).or_default();
+                *retained = retained
+                    .checked_add(metadata.len())
+                    .ok_or_else(|| conflict("Workspace payload byte count overflow"))?;
+                let database = path.with_file_name("store.redb");
+                // The common verified-copy publisher retains its original staging
+                // name as a hard link. Its name is not authority: only held native
+                // identity with the actual sibling database classifies that payload.
+                let database_payload = path == database
+                    || (database.try_exists().map_err(files::io_error)?
+                        && files::same_object(&path, &database)?);
+                if database_payload {
                     if metadata.len() == 0 || metadata.len() > versions::MAX_GENERATION_BYTES {
                         return Err(conflict("Retained generation length exceeds its bound"));
                     }
+                    database_directories.insert(directory.to_owned());
                 } else {
                     if metadata.len() > 65536 {
                         return Err(conflict("Retained workspace metadata exceeds64KiB"));
@@ -146,6 +163,14 @@ pub(crate) fn workspace_headroom(
                 }
             } else {
                 return Err(conflict("Unexpected workspace member was preserved"));
+            }
+        }
+        for directory in database_directories {
+            if directory_bytes[&directory] > 2 * versions::MAX_GENERATION_BYTES {
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Retained copy workspace bytes exceed their finite quota; nothing was evicted",
+                ));
             }
         }
     }
@@ -532,6 +557,24 @@ mod tests {
                 .receipt_id,
             accepted.receipt_id
         );
+        drop(copy);
+        let database = copied.path.join("store.redb");
+        let alias = std::fs::read_dir(&copied.path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| path != &database && files::same_object(path, &database).unwrap())
+            .expect("The actual common copy producer retains its native payload alias");
+        assert!(std::fs::metadata(&alias).unwrap().len() > 65536);
+        workspace_headroom(&lease, 0).unwrap();
+        // An unrelated large file cannot acquire database treatment by its name.
+        let unrelated = copied.path.join(".tmp-unrelated-proof");
+        std::fs::write(&unrelated, vec![7u8; 65537]).unwrap();
+        assert!(!files::same_object(&unrelated, &database).unwrap());
+        assert_eq!(
+            workspace_headroom(&lease, 0).unwrap_err().message,
+            "Retained workspace metadata exceeds64KiB"
+        );
+        assert_eq!(std::fs::read(&unrelated).unwrap(), vec![7u8; 65537]);
     }
     #[test]
     fn live_source_and_unproven_existing_destination_are_preserved() {

@@ -357,7 +357,7 @@ impl Engine {
         let artifact = publish_output(
             VerifiedOutput {
                 file: PublicationStaging::Linked {
-                    file: staging,
+                    file: Box::new(staging),
                     proof,
                 },
                 identity,

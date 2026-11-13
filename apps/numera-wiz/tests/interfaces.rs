@@ -300,6 +300,10 @@ async fn wait_for_idle_owner_unlock(root: &std::path::Path) {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 }
+fn initialize_legacy_owner_fixture(root: &std::path::Path) {
+    let lease = nw_store::generations::RootLease::acquire(root).unwrap();
+    drop(nw_store::Store::open_selected(&lease).unwrap());
+}
 #[tokio::test]
 async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
     let _case = OWNER_CASE.lock().await;
@@ -307,6 +311,7 @@ async fn official_stdio_reconnects_after_idle_without_changing_its_principal() {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         use serde_json::Value;
         let data = tempfile::tempdir().unwrap();
+        initialize_legacy_owner_fixture(data.path());
         let _logs = retain_owner_logs(data.path(), "reattach");
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
         command.arg("--data-dir").arg(data.path()).arg("bridge");
@@ -522,7 +527,7 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
         let data = tempfile::tempdir().unwrap();
         // This journey migrates a genuine legacy factory store. True absent
         // application roots now use the separately exercised MediaV1 genesis path.
-        drop(nw_store::Store::open(data.path()).unwrap());
+        initialize_legacy_owner_fixture(data.path());
         let _logs = retain_owner_logs(data.path(), "migration-cli");
         let input =
             nw_platform::security::private_directory(&data.path().join("requests")).unwrap();

@@ -452,7 +452,7 @@ pub(super) fn exercise_known_corruption(store: &Store, project: &ProjectId) {
     };
     validate().unwrap();
     let rows = store
-        .rows::<EntityEnvelope>(&format!("project-entity/{project}/"), MAX_ENTITIES)
+        .rows::<EntityEnvelope>(&format!("project-entity/{project}/"), 10000)
         .unwrap();
     let (entity_key, mut sequence) = rows
         .into_iter()

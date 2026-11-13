@@ -145,45 +145,104 @@ impl Service {
         application_startup: bool,
         defer_dispatcher: bool,
     ) -> Result<Arc<Self>> {
+        let _startup = startup::StageTiming::start(
+            application_startup,
+            "Open application service",
+        );
+        let root_stage = startup::StageTiming::start(
+            application_startup,
+            "Resolve protected root path",
+        );
         std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
+        drop(root_stage);
+        let store_stage = startup::StageTiming::start(
+            application_startup,
+            "Attach and recover selected store",
+        );
         let (store, root_lease) = tokio::task::spawn_blocking(move || {
+            let selection_stage = startup::StageTiming::start(
+                application_startup,
+                "Acquire root ownership and select generation",
+            );
             let lease = nw_store::generations::RootLease::acquire(&root)?;
             let selection = lease.selection()?;
             let path = lease.path(&selection)?;
             if selection.activation_id.is_some() && !path.join("store.redb").try_exists().map_err(files::io_error)? {
                 return Err(DomainError::new("STORE_ACTIVATION_INVALID", "Selected complete generation is missing; no empty store was initialized"));
             }
+            drop(selection_stage);
             let store = if application_startup && selection.activation_id.is_none()
                 && !path.join("store.redb").try_exists().map_err(files::io_error)? {
-                Store::initialize_fresh_legacy_prefix(&lease, &Self::genesis_profiles(&root)?)?
+                let profiles = {
+                    let _stage = startup::StageTiming::start(
+                        application_startup,
+                        "Prepare compatible genesis profiles",
+                    );
+                    Self::genesis_profiles(&root)?
+                };
+                let _stage = startup::StageTiming::start(
+                    application_startup,
+                    "Create and publish compatible genesis",
+                );
+                Store::initialize_fresh_legacy_prefix(&lease, &profiles)?
             } else {
+                let _stage = startup::StageTiming::start(
+                    application_startup,
+                    "Open selected generation",
+                );
                 Store::open_selected(&lease)?
             };
             if application_startup {
+                let _stage = startup::StageTiming::start(
+                    true,
+                    "Recover compatible genesis prefix",
+                );
                 store.recover_genesis_prefix(&lease)?;
             }
             if selection.root_id.as_deref().is_some_and(|expected| expected != store.root_id()) {
                 return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Selected store and activation root differ"));
             }
+            let migration_stage = startup::StageTiming::start(
+                application_startup,
+                "Recover accepted legacy migration",
+            );
             let recovery = store.recover_migration(&lease, || {
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                     .map(|duration|duration.as_secs()).map_err(|_|DomainError::new("CLOCK_ROLLBACK","Wall clock predates Unix epoch"))
             });
+            drop(migration_stage);
             if let Err(error) = recovery {
                 tracing::warn!(code=%error.code, "Accepted migration remains in maintenance mode; retained copies were preserved");
             }
-            if let Err(error) = store.recover_media_enablement(&lease, || {
+            let enablement_stage = startup::StageTiming::start(
+                application_startup,
+                "Recover accepted media enablement",
+            );
+            let media_recovery = store.recover_media_enablement(&lease, || {
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                     .map(|duration| duration.as_secs()).map_err(|_| DomainError::new("CLOCK_ROLLBACK", "Wall clock predates Unix epoch"))
-            }).and_then(|()| store.recover_media_restoration(&lease)) {
+            });
+            drop(enablement_stage);
+            if let Err(error) = media_recovery.and_then(|()| {
+                let _stage = startup::StageTiming::start(
+                    application_startup,
+                    "Recover accepted media restoration",
+                );
+                store.recover_media_restoration(&lease)
+            }) {
                 tracing::warn!(code=%error.code, "Accepted media generation recovery remains pending before ordinary admission");
             }
             Ok((store, lease))
         })
         .await
         .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
+        drop(store_stage);
+        let profiles_stage = startup::StageTiming::start(
+            application_startup,
+            "Check default profile availability",
+        );
         let maintenance_pending =
             store.pending_migration()?.is_some() || store.pending_media_maintenance()?;
         if !maintenance_pending && store.get::<AccessProfile>("profile/agent")?.is_none() {
@@ -232,10 +291,20 @@ impl Service {
                 },
             )?;
         }
+        drop(profiles_stage);
+        let engine_stage = startup::StageTiming::start(
+            application_startup,
+            "Initialize engine components",
+        );
         let engine = match components {
             Some((ffmpeg, ffprobe)) => Some(Engine::new(ffmpeg, ffprobe).await?),
             None => None,
         };
+        drop(engine_stage);
+        let state_stage = startup::StageTiming::start(
+            application_startup,
+            "Construct owner runtime state",
+        );
         let executable = std::env::current_exe().map_err(files::io_error)?;
         let mut code_roots = vec![
             std::fs::canonicalize(executable.parent().ok_or_else(|| {
@@ -292,6 +361,7 @@ impl Service {
             #[cfg(test)]
             catalog_hook: Mutex::new(None),
         });
+        drop(state_stage);
         Self::start_snapshot_reaper(&service);
         if service.store.pending_migration()?.is_some()
             || service.store.pending_media_maintenance()?
@@ -305,11 +375,16 @@ impl Service {
         if defer_dispatcher {
             return Ok(service);
         }
+        let dispatcher_stage = startup::StageTiming::start(
+            application_startup,
+            "Recover durable dispatcher",
+        );
         service.dispatcher_ready.store(true, Ordering::Release);
         let starting = service.clone();
         tokio::task::spawn_blocking(move || starting.resume_dispatcher())
             .await
             .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
+        drop(dispatcher_stage);
         Ok(service)
     }
     pub fn owner(&self) -> Context {

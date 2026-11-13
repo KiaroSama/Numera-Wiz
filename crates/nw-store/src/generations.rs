@@ -323,7 +323,7 @@ impl RootLease {
         // before the ordinary strict selector sees a possible reappearance gap.
         crate::restorations::repair_owned_suffix(&lease)?;
         let root = &lease.root;
-        let history = activations(&root)?;
+        let history = activations(root)?;
         if history.last().is_some_and(|(record, _)| {
             matches!(&record.location, GenerationLocation::Workspace { .. })
         }) {

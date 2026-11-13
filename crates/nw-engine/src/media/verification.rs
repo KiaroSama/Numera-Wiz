@@ -206,6 +206,7 @@ pub(super) fn metadata(plan: &MediaPlanV1, probe: &Value) -> Result<()> {
         nw_domain::media::AudioLayout::Mono => 1,
         nw_domain::media::AudioLayout::Stereo => 2,
     };
+    let expected_sample_rate = settings.sample_rate.to_string();
     if video["index"] != 0
         || video["codec_type"] != "video"
         || video["codec_name"] != "ffv1"
@@ -220,7 +221,7 @@ pub(super) fn metadata(plan: &MediaPlanV1, probe: &Value) -> Result<()> {
         || audio["codec_type"] != "audio"
         || audio["codec_name"] != "pcm_s16le"
         || audio["sample_fmt"] != "s16"
-        || audio["sample_rate"] != settings.sample_rate.to_string()
+        || audio["sample_rate"].as_str() != Some(expected_sample_rate.as_str())
         || audio["channels"] != channels
     {
         return Err(failed("Encoded stream format/color/audio contract differs"));
