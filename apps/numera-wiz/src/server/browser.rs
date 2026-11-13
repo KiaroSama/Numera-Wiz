@@ -1203,7 +1203,7 @@ mod tests {
             }
             driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E00C}"},{"type":"keyUp","value":"\u{E00C}"}]}]})).await;
             tokio::time::sleep(Duration::from_millis(150)).await;
-            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":570},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
+            driver(&client,&base,reqwest::Method::POST,&format!("{route}/actions"),json!({"actions":[{"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[{"type":"pointerMove","duration":150,"origin":"viewport","x":331,"y":602},{"type":"pointerDown","button":0},{"type":"pause","duration":150},{"type":"pointerUp","button":0}]}]})).await;
             let start = Instant::now();
             loop {
                 if !fixture
