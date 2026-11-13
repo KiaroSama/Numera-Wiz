@@ -1874,9 +1874,7 @@ async fn metadata_publication_races() {
             assert_eq!(held.count(), before);
             response
         };
-        view(
-            metadata_available(&f.service, owner, request, CancellationToken::new()).await,
-        );
+        view(metadata_available(&f.service, owner, request, CancellationToken::new()).await);
         let mut unrelated = response;
         unrelated.error.as_mut().unwrap().message = "Snapshot capacity exhausted".into();
         assert!(!metadata_busy(&unrelated));
@@ -1922,13 +1920,23 @@ async fn metadata_publication_races() {
                     metadata_available(
                         &f.service,
                         reader.clone(),
-                        metadata_query(&project, json!({"projection":"summary","replace_snapshot":null})),
+                        metadata_query(
+                            &project,
+                            json!({"projection":"summary","replace_snapshot":null}),
+                        ),
                         CancellationToken::new(),
                     )
                     .await,
                 );
                 let ticket = summary["snapshot_id"].as_str().unwrap().to_owned();
-                assert!(f.service.snapshots.lock().unwrap().projects.contains_key(&ticket));
+                assert!(
+                    f.service
+                        .snapshots
+                        .lock()
+                        .unwrap()
+                        .projects
+                        .contains_key(&ticket)
+                );
                 metadata_sequence(&f, &owner, &project, "2", "C").await;
                 let pinned = view(
                     metadata_available(
@@ -1992,9 +2000,10 @@ async fn metadata_publication_races() {
             let service = f.service.clone();
             let context = reader.clone();
             let request = metadata_query(&project, params);
-            let task = tokio::spawn(async move {
-                metadata_available(&service, context, request, token).await
-            });
+            let task =
+                tokio::spawn(
+                    async move { metadata_available(&service, context, request, token).await },
+                );
             reached(ready).await;
             match change {
                 "cancel" => cancellation.cancel(),

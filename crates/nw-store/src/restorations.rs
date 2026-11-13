@@ -543,7 +543,8 @@ impl Store {
         Ok(authority)
     }
     fn install_restoration_overlay(&self, lease: &RootLease, authority: &Authority) -> Result<()> {
-        let mut timing = LifecycleTiming::start("Verify authority and open immutable restoration inputs");
+        let mut timing =
+            LifecycleTiming::start("Verify authority and open immutable restoration inputs");
         verify_authority(lease, authority)?;
         let workspace = operation_path(lease, &authority.record.id)?;
         let source = generations::location_path(lease.root(), &authority.source_location)?;
@@ -710,7 +711,8 @@ fn write_fact(directory: &Path, name: &str, value: &impl Serialize) -> Result<()
     )
 }
 pub(crate) fn verify_authority(lease: &RootLease, authority: &Authority) -> Result<()> {
-    let _timing = LifecycleTiming::start("Verify genuine restoration authority and immutable archives");
+    let _timing =
+        LifecycleTiming::start("Verify genuine restoration authority and immutable archives");
     authority.record.plan.validate_hash()?;
     let record = &authority.record;
     let plan = &record.plan;
@@ -877,7 +879,8 @@ pub(crate) fn validate_source_snapshot(
     }
 }
 pub(crate) fn validate_continuity(lease: &RootLease, authority: &Authority) -> Result<()> {
-    let _timing = LifecycleTiming::start("Validate current source barrier and old business continuity");
+    let _timing =
+        LifecycleTiming::start("Validate current source barrier and old business continuity");
     let source = generations::location_path(lease.root(), &authority.source_location)?;
     if files::source_object(&source.join("store.redb"))? != authority.barrier.source_object {
         return Err(refused(

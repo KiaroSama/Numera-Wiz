@@ -280,7 +280,10 @@ impl Store {
             inner: redb::backends::FileBackend::new(file).unwrap(),
             maximum: 32 * 1024 * 1024,
         });
-        assert!(backend.len().unwrap() > 0, "Empty initialization is unreachable");
+        assert!(
+            backend.len().unwrap() > 0,
+            "Empty initialization is unreachable"
+        );
         let database = redb::Database::builder()
             .create_with_backend(CaptureBackend(backend.clone()))
             .unwrap();

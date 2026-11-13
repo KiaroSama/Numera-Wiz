@@ -446,8 +446,17 @@ async fn migration_cli(root: &std::path::Path, args: &[&str]) -> serde_json::Val
         .take_while(|arg| {
             matches!(
                 *arg,
-                "maintenance" | "promotion" | "initialization" | "restore" | "plan"
-                    | "accept" | "inspect" | "migrate" | "access" | "replay-scope" | "create"
+                "maintenance"
+                    | "promotion"
+                    | "initialization"
+                    | "restore"
+                    | "plan"
+                    | "accept"
+                    | "inspect"
+                    | "migrate"
+                    | "access"
+                    | "replay-scope"
+                    | "create"
             )
         })
         .collect::<Vec<_>>()
