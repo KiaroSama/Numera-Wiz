@@ -745,16 +745,43 @@ async fn place_group_solid<D: Driver>(driver: &mut D, start: &str) -> Observatio
 async fn group_clip<D: Driver>(
     driver: &mut D,
     graph: &Graph,
+    row: usize,
     clip: &Value,
+    binding: &Value,
     group: Option<&str>,
 ) -> Value {
+    let page = viewport(driver, graph, &graph.solid_track).await;
+    let captured_row = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|item| item["id"] == clip["id"])
+        .expect("The exact placed clip remains in the captured viewport");
+    assert_eq!(captured_row, row, "Fixed fixture member ordering is unchanged");
+    // Actual inspection retires/reloads through the normal UI path. Independent
+    // reads then reuse that member's clip/source bindings within the same eight.
+    select_clip(driver, captured_row).await;
     let actual = entity(driver, graph, &id(&clip["id"])).await;
     let mut expected = clip.clone();
     expected["link_group_id"] = json!(group);
+    // These fresh UI-placed clips have only the known Clip payload fields.
+    // Canonical update sorts top-level raw fields, retaining typed nested JSON.
+    // Derive the intended payload digest from the pre-edit fields, never actual.
+    let payload: nw_domain::projects::Clip = serde_json::from_value(expected.clone()).unwrap();
+    let encoded = serde_json::to_string(&payload).unwrap();
+    let fields: std::collections::BTreeMap<String, Box<serde_json::value::RawValue>> =
+        serde_json::from_str(&encoded).unwrap();
+    let canonical_payload = serde_json::to_string(&fields).unwrap();
+    expected["payload_sha256"] = json!(nw_domain::projects::hash(canonical_payload.as_bytes()));
+    assert_eq!(
+        actual["payload_sha256"], expected["payload_sha256"],
+        "Canonical digest must match the independently expected clip payload"
+    );
     assert_eq!(
         actual, expected,
         "Topology must preserve exact identity, geometry and source binding"
     );
+    assert_eq!(entity(driver, graph, &id(&binding["id"])).await, *binding);
     actual
 }
 async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: &str) {
@@ -816,11 +843,13 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
     graph.accept(&linked);
     evidence.push(linked.evidence("clips.link"));
     driver.loaded(8).await;
-    let first = entity(driver, graph, &id(&clips[0]["id"])).await;
-    let group = id(&first["link_group_id"]);
+    // Link preserves the primary inspection of the second placed clip. Reading
+    // that member reuses its loaded binding before real per-member inspection.
+    let inspected = entity(driver, graph, &id(&clips[1]["id"])).await;
+    let group = id(&inspected["link_group_id"]);
     nw_domain::projects::validate_id(&group).unwrap();
-    for clip in &clips {
-        group_clip(driver, graph, clip, Some(&group)).await;
+    for (row, (clip, binding)) in clips.iter().zip(&bindings).enumerate() {
+        group_clip(driver, graph, row, clip, binding, Some(&group)).await;
     }
     driver.screenshot("group-linked").await;
     // Accepted revision cleared seeds. The inspected linked clip remains; Unlink
@@ -837,8 +866,8 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
     graph.accept(&unlinked);
     evidence.push(unlinked.evidence("clips.unlink"));
     driver.loaded(8).await;
-    for clip in &clips {
-        group_clip(driver, graph, clip, None).await;
+    for (row, (clip, binding)) in clips.iter().zip(&bindings).enumerate() {
+        group_clip(driver, graph, row, clip, binding, None).await;
     }
     driver.screenshot("group-unlinked").await;
     let undo = activate(driver, 390, 100, "history.undo", 8).await;
@@ -848,8 +877,8 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
     );
     graph.accept(&undo);
     evidence.push(undo.evidence("history.undo"));
-    for clip in &clips {
-        group_clip(driver, graph, clip, Some(&group)).await;
+    for (row, (clip, binding)) in clips.iter().zip(&bindings).enumerate() {
+        group_clip(driver, graph, row, clip, binding, Some(&group)).await;
     }
     driver.screenshot("group-undo-same-identity").await;
     let redo = activate(driver, 435, 100, "history.redo", 8).await;
@@ -859,8 +888,8 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
     );
     graph.accept(&redo);
     evidence.push(redo.evidence("history.redo"));
-    for clip in &clips {
-        group_clip(driver, graph, clip, None).await;
+    for (row, (clip, binding)) in clips.iter().zip(&bindings).enumerate() {
+        group_clip(driver, graph, row, clip, binding, None).await;
     }
     driver.screenshot("group-redo-unlinked").await;
     // Retire the capture, then really restart the native application / Chrome
@@ -884,9 +913,8 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
         ids(&viewport(driver, graph, &graph.solid_track).await),
         known
     );
-    for (clip, binding) in clips.iter().zip(&bindings) {
-        group_clip(driver, graph, clip, None).await;
-        assert_eq!(entity(driver, graph, &id(&binding["id"])).await, *binding);
+    for (row, (clip, binding)) in clips.iter().zip(&bindings).enumerate() {
+        group_clip(driver, graph, row, clip, binding, None).await;
     }
     driver.screenshot("group-reopened-unlinked").await;
     assert!(evidence.len() <= 8);
