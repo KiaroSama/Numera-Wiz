@@ -53,6 +53,27 @@ hosted formatting patch is applied in a later commit. Initial execution
 has the documented decoded-byte and container-clock admission limits in the CLI
 guide. Those limits do not waive the required general editor/media routes.
 
+[CI265](evidence/media-v1-package-ci265.json) subsequently passed the genuine
+adopted-r1 MediaV1 prior/current package lifecycle on all four native targets.
+The original seven epochs and added four epochs complete within the unchanged
+600-second aggregate (319.481–445.641 seconds). The actual pinned old executable
+refuses the promoted floor; direct physical/native equality is checked before
+any recovery. Restoration retains the original source path, activation and
+native object. One real old-package edit advances the adoption guard from1 to2,
+then current accepted project and maintenance requests replay with newer raw
+rows preserved. All twelve non-formatting jobs pass; formatting alone fails,
+and its entire hosted patch is applied in a later commit. This source-pinned
+evidence does not qualify later MCP changes or fresh/unadopted package cases.
+
+Explicit local stdio MCP owner access now has source changes alongside the
+default scoped adapter. Credential issuance uses the shared protected-file
+delivery path and returns only non-secret metadata. Default/scoped/HTTP calls
+cannot select this authority through tool parameters. Actual CI267 exposed
+invalid-option filesystem effects and an over-strict comparison of independent
+review hashes; corrections and cancellation admission still require their own
+current-head hosted checks. Named-client loading and full agent parity remain
+unfinished.
+
 The full first version remains unfinished: accepted general multi-source/stage/
 output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
 and complete editor controls, preview/audio transport, checkpoints/interchange,

@@ -53,6 +53,10 @@ Current work and required gaps are recorded in the
   [Four-native checks](docs/development/evidence/media-v1-native-ci263.json) passed
   the current CLI lifecycle and original prior/current package journey, including
   the existing Windows startup/restoration deadlines. Later changes need their own CI.
+  The [adopted-r1 package lifecycle](docs/development/evidence/media-v1-package-ci265.json)
+  also passed on all four targets: actual old-package refusal, restoration,
+  one old-package edit and current-package receipt replay preserved the original source.
+  Fresh-root and unadopted-source package cases remain under qualification.
   Preview, general export and the complete editor remain under construction.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
