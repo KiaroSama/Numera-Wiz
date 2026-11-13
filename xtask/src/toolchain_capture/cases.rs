@@ -1,7 +1,8 @@
 //! Plain synthetic checks; these never authenticate an archive or launch a process.
-use super::metadata;
-use anyhow::{Result, ensure};
-use std::io::Cursor;
+use super::{evidence, metadata};
+use anyhow::{Context, Result, ensure};
+use serde_json::{Value, json};
+use std::{fs, io::{Cursor, Write}, path::{Path, PathBuf}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 
 pub fn run() -> Result<()> {
     let release = "Suite: noble\nCodename: noble\nArchitectures: amd64\nComponents: main restricted universe multiverse\nDate: Sun, 01 Nov 2026 00:00:00 UTC\nSHA256:\n ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad 3 main/binary-amd64/Packages.xz\n";
@@ -69,8 +70,120 @@ pub fn run() -> Result<()> {
     super::process::check_count(16 * 1024 * 1024, 1, 16 * 1024 * 1024).expect_err("output overflow must fail");
     ensure!(super::process::signal_target(0).is_err() && super::process::signal_target(1).is_err() && super::process::signal_target(u32::MAX).is_err(), "unsafe group identifiers refused without signalling");
     ensure!(super::process::signal_target(42)? == 42, "owned numeric group framing");
+    filesystem_cases()?;
     tracing::info!("Linux capture synthetic self-check passed; no APT, signature, container or runtime truth is inferred");
     Ok(())
+}
+
+struct OwnedFixture { path: PathBuf, active: bool }
+impl OwnedFixture {
+    fn create() -> Result<Self> {
+        ensure!(std::env::consts::OS == "linux", "owned filesystem capture fixtures require the Linux HOST");
+        let name = format!("nw-capture-selfcheck-{}-{}", std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos());
+        let path = std::env::temp_dir().join(name); let mut builder = fs::DirBuilder::new(); builder.recursive(false);
+        #[cfg(unix)] { use std::os::unix::fs::DirBuilderExt; builder.mode(0o700); }
+        builder.create(&path)?; Ok(Self { path, active: true })
+    }
+    fn cleanup(&mut self) -> Result<()> { fs::remove_dir_all(&self.path)?; self.active = false; Ok(()) }
+}
+impl Drop for OwnedFixture { fn drop(&mut self) { if self.active { let _ = fs::remove_dir_all(&self.path); } } }
+
+fn fixture_hash(bytes: &[u8]) -> Result<&'static str> {
+    match bytes {
+        b"a" => Ok("ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"),
+        b"b" => Ok("3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"),
+        b"c" => Ok("2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6"),
+        b"bc" => Ok("1e0bbd6c686ba050b8eb03ffeedc64fdc9d80947fce821abbe5d6dc8d252c5ac"),
+        b"abc" => Ok("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+        _ => anyhow::bail!("unexpected fixture bytes"),
+    }
+}
+
+// Filesystem inventory and fixed payload digests are independent of Host/Raw's
+// counters and production hashing. Fixtures total tiny literal bytes, no tools.
+fn audit_files(output: &Path, files: &[Value], expected_bytes: u64, expected_count: usize) -> Result<()> {
+    let directory = output.join("raw"); let mut observed_bytes = 0; let mut paths = std::collections::BTreeSet::new();
+    for entry in fs::read_dir(&directory)? {
+        let entry = entry?; ensure!(entry.file_type()?.is_file(), "fixture physical entry must be regular");
+        observed_bytes += entry.metadata()?.len(); paths.insert(format!("raw/{}", entry.file_name().to_str().context("fixture filename")?));
+    }
+    ensure!(observed_bytes == expected_bytes && paths.len() == expected_count, "independent physical byte/file inventory");
+    let mut declared = std::collections::BTreeSet::new(); let mut declared_bytes = 0;
+    for file in files {
+        for chunk in file["chunks"].as_array().context("fixture chunks")? {
+            let path = chunk["path"].as_str().context("fixture chunk path")?;
+            ensure!(declared.insert(path.to_string()), "fixture duplicate physical path");
+            let bytes = fs::read(output.join(path))?;
+            ensure!(bytes.len() <= 16 && chunk["bytes"].as_u64() == Some(bytes.len() as u64) && chunk["sha256"].as_str() == Some(fixture_hash(&bytes)?), "literal physical prefix/hash oracle");
+            declared_bytes += bytes.len() as u64;
+        }
+    }
+    ensure!(declared == paths && declared_bytes == expected_bytes, "manifest covers every physical retained file exactly"); Ok(())
+}
+
+fn filesystem_cases() -> Result<()> {
+    let mut owned = OwnedFixture::create()?; let deadline = Instant::now() + Duration::from_secs(5);
+    let result = (|| -> Result<()> {
+        let host_path = owned.path.join("host"); fs::create_dir(&host_path)?; fs::create_dir(host_path.join("raw"))?;
+        let mut host = super::Host { output: host_path.clone(), files: Vec::new(), total: 0, chunks: 0, deadline, diagnostic_failures: Vec::new(), sequence: 0 };
+        let chunk = |path: &str, bytes: &[u8]| -> Result<Value> { Ok(json!({"path":path,"bytes":bytes.len(),"sha256":fixture_hash(bytes)?})) };
+        let manifest = json!({"schema_version":1,"raw_files":2,"raw_bytes":3,"transport_files":3,"files":[
+            {"logical_path":"first","bytes":1,"sha256":fixture_hash(b"a")?,"chunks":[chunk("raw/chunk-0000",b"a")?]},
+            {"logical_path":"second","bytes":2,"sha256":fixture_hash(b"bc")?,"chunks":[chunk("raw/chunk-0001",b"b")?,chunk("raw/chunk-0002",b"c")?]}
+        ]});
+        let transfer = super::transfer_raw_with(&mut host, &manifest, |_, path| match path { "raw/chunk-0000" => Ok(b"a".to_vec()), "raw/chunk-0001" => Ok(b"b".to_vec()), _ => anyhow::bail!("synthetic later fetch failure") });
+        ensure!(transfer.is_err() && host.chunks == 2 && host.total == 2 && host.files[0]["capture_status"] == "complete" && host.files[1]["capture_status"] == "incomplete", "completed and partial transfers remain immediately charged");
+        host.record("later-diagnostic", b"c")?;
+        ensure!(host.total == 3 && host.chunks == 3, "later diagnostic cannot forget transferred physical files");
+        audit_files(&host_path, &host.files, 3, 3)?;
+
+        let partial_path = owned.path.join("partial"); fs::create_dir(&partial_path)?; fs::create_dir(partial_path.join("raw"))?;
+        let mut partial = super::Host { output: partial_path.clone(), files: Vec::new(), total: 0, chunks: 0, deadline, diagnostic_failures: Vec::new(), sequence: 0 };
+        let failure = partial.record_with("short-write", b"abc", |file, bytes| { file.write_all(&bytes[..1])?; Err(std::io::Error::other("synthetic partial write")) });
+        ensure!(failure.is_err() && partial.total == 1 && partial.chunks == 1 && partial.files[0]["sha256"] == fixture_hash(b"a")?, "partial Host write retains a hashed actual prefix");
+        partial.record("after-short-write", b"bc")?; audit_files(&partial_path, &partial.files, 3, 2)?;
+
+        let mut pending = evidence::Raw::new(&owned.path.join("pending"))?;
+        let mut reservations = Vec::new();
+        for index in 0..4 { reservations.push(pending.reserve(&format!("reserved-{index}"), super::process::FILE_LIMIT)?); }
+        ensure!(pending.bytes("rejected-before-write", b"a").is_err() && fs::read_dir(owned.path.join("pending"))?.count() == 0, "aggregate rejection creates no unowned pending file");
+        for path in reservations { pending.cancel(&path)?; }
+        let path = pending.reserve("wrong-adoption", 1)?; evidence::write_new(&path, b"a", 1)?;
+        ensure!(pending.adopt("different-logical", &path).is_err() && !path.try_exists()?, "rejected adoption cancels its actual owned pending file");
+        let path = pending.reserve("decoder", super::process::FILE_LIMIT)?; evidence::write_new(&path, b"a", 1)?;
+        ensure!(pending.settle::<()>("decoder", &path, Err(anyhow::anyhow!("synthetic decoder failure"))).is_err() && !path.try_exists()?, "actual decoder-error settlement removes the pending file");
+        pending.bytes("retained", b"abc")?;
+        let pending_output = owned.path.join("pending-out"); fs::create_dir(&pending_output)?;
+        let finalized = pending.finish(&pending_output);
+        ensure!(finalized.errors.is_empty() && finalized.manifest["raw_bytes"] == 3 && finalized.manifest["transport_files"] == 1, "pending refusals preserve later finalization");
+        audit_files(&pending_output, finalized.manifest["files"].as_array().context("pending files")?, 3, 1)?;
+
+        let mut growing = evidence::Raw::new(&owned.path.join("growing"))?;
+        let original = growing.bytes("changed-input", b"a")?;
+        fs::write(growing.source(&original)?, b"abc")?;
+        let grown_output = owned.path.join("growing-out"); fs::create_dir(&grown_output)?;
+        let finalized = growing.finish(&grown_output);
+        ensure!(!finalized.errors.is_empty() && finalized.manifest["raw_bytes"] == 0 && finalized.manifest["transport_files"] == 0, "grown input is refused before exporting bytes beyond its admitted logical size");
+        audit_files(&grown_output, finalized.manifest["files"].as_array().context("grown files")?, 0, 0)?;
+
+        let mut failing = evidence::Raw::new(&owned.path.join("finalizing"))?;
+        failing.bytes("first", b"abc")?; failing.bytes("second", b"abc")?;
+        let output = owned.path.join("failed-out"); fs::create_dir(&output)?;
+        let mut writes = 0;
+        let finalized = failing.finish_with(&output, |file, bytes| { writes += 1; if writes == 2 { file.write_all(&bytes[..1])?; Err(std::io::Error::other("synthetic finalization write failure")) } else { file.write_all(bytes) } });
+        ensure!(!finalized.errors.is_empty() && finalized.manifest["complete"] == false && finalized.manifest["raw_bytes"] == 4 && finalized.manifest["transport_files"] == 2, "finalization failure preserves earlier chunk and actual later prefix");
+        audit_files(&output, finalized.manifest["files"].as_array().context("failed files")?, 4, 2)?;
+        let mut report = json!({"schema_version":1,"initial_inventory":["synthetic-base-row"],"trust":{"fixture":"retained"},"unresolved_reasons":[]});
+        ensure!(super::inner::finish_capture(&output, &mut report, Err(anyhow::anyhow!("synthetic original capture failure")), finalized).is_err(), "failed capture remains nonzero after report publication");
+        let written = evidence::parse_canonical(&fs::read(output.join("report.json"))?)?;
+        let reasons = written["unresolved_reasons"].to_string();
+        ensure!(written["complete_snapshot_lock"] == false && written["initial_inventory"][0] == "synthetic-base-row" && reasons.contains("synthetic original capture failure") && reasons.contains("synthetic finalization write failure"), "actual failed report preserves original context and finalization error");
+        let available = evidence::parse_canonical(&fs::read(output.join("raw-manifest.json"))?)?;
+        ensure!(available["raw_bytes"] == 4 && available["transport_files"] == 2, "published available manifest remains truthful after failure");
+        ensure!(Instant::now() < deadline, "tiny filesystem fixtures exceeded their HOST budget"); Ok(())
+    })();
+    let cleanup = owned.cleanup();
+    result.with_context(|| format!("owned filesystem fixture cleanup: {cleanup:?}"))?; cleanup
 }
 
 fn tar_fixture() -> Vec<u8> {

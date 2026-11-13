@@ -37,15 +37,29 @@ pub fn worker(config: &Value, seconds: u64) -> Result<()> {
     let mut report = json!({"schema_version":1,"complete_snapshot_lock":false,"abi_execution":"copied_host_executable_actually_started_in_selected_base","initial_inventory":[],"transaction":[],"final_inventory":[],"releases":[],"indices":[],"provider_and_dependency_records":[],"unresolved_reasons":[],"execution":{"install":false,"compiler":false,"ffmpeg":false,"source_bootstrap":false,"package_payloads":"not_downloaded"}});
     let deadline = Instant::now() + Duration::from_secs(seconds.saturating_sub(5));
     let result = capture(config, &mut raw, &mut report, deadline);
-    if let Err(error) = &result { report["unresolved_reasons"].as_array_mut().context("unresolved array")?.push(json!(format!("{error:#}"))); }
     let (scratch_bytes, scratch_files) = process::scratch_observation();
     report["resource_observations"] = json!({"worker_inherited_RLIMIT_FSIZE_bytes":native_file_limit,"native_scratch_max_observed_bytes":scratch_bytes,"native_scratch_max_observed_files":scratch_files,"native_scratch_peak":"UNKNOWN_between_samples","sampling_scope":"private_lists_cache_and_download_index_temporary_files_only","sampling_interval_ms":50,"sampling_walk_cap_ms":50,"hard_aggregate_container_disk_quota":false,"retained_raw_limits":"separate_512MiB_500_files_128MiB_per_file","scope_exclusions":"base_rootfs_copied_executable_and_temporary_representations_are_not_claimed_bounded_by_the_retention_aggregate"});
-    let manifest = raw.finish(Path::new("/capture/out"))?;
-    let manifest_bytes = evidence::canonical(&manifest)?;
+    let finalized = raw.finish(Path::new("/capture/out"));
+    finish_capture(Path::new("/capture/out"), &mut report, result, finalized)
+}
+
+pub(super) fn finish_capture(output: &Path, report: &mut Value, result: Result<()>, finalized: evidence::Finalized) -> Result<()> {
+    let complete = result.is_ok() && finalized.errors.is_empty() && finalized.manifest["complete"] == true;
+    if let Err(error) = &result { report["unresolved_reasons"].as_array_mut().context("unresolved array")?.push(json!(format!("{error:#}"))); }
+    for error in finalized.errors { report["unresolved_reasons"].as_array_mut().context("unresolved array")?.push(json!(format!("evidence finalization: {error}"))); }
+    let manifest_bytes = evidence::canonical(&finalized.manifest)?;
     report["raw_manifest"] = json!({"path":"raw-manifest.json","bytes":manifest_bytes.len(),"sha256":metadata::digest(&manifest_bytes)});
-    report["complete_snapshot_lock"] = json!(result.is_ok());
-    evidence::write_small(Path::new("/capture/out"), &report, &manifest)?;
-    result
+    report["complete_snapshot_lock"] = json!(complete);
+    if let Err(error) = evidence::write_small(output, report, &finalized.manifest) {
+        let mut summary = json!({"schema_version":1,"complete_snapshot_lock":false,"initial_inventory":report["initial_inventory"],"trust":report["trust"],"raw_manifest":report["raw_manifest"],"unresolved_reasons":report["unresolved_reasons"],"full_report_sha256":metadata::digest(&evidence::canonical(report)?)});
+        summary["unresolved_reasons"].as_array_mut().context("summary unresolved array")?.push(json!(format!("write full report: {error:#}")));
+        if evidence::canonical(&summary)?.len().checked_add(manifest_bytes.len()).and_then(|n| n.checked_add(512)).context("failed summary size overflow")? as u64 > evidence::SMALL_LIMIT {
+            summary["initial_inventory"] = json!({"status":"omitted_from_failed_summary_due_to_report_bound","raw_evidence":"commands/base-inventory.stdout","full_report_sha256":summary["full_report_sha256"]});
+        }
+        evidence::write_small(output, &summary, &finalized.manifest).context("failed to write full report or unsuccessful fallback; filesystem status UNKNOWN")?;
+        *report = summary; anyhow::bail!("capture/report finalization unresolved; failed summary retained");
+    }
+    ensure!(complete, "capture/evidence finalization unresolved; original and finalization failures retained"); Ok(())
 }
 
 fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant) -> Result<()> {
@@ -154,10 +168,11 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
             output.success()?;
             let compressed = compressed.context("successful helper download produced no raw index")?;
             ensure!(compressed["bytes"].as_u64() == Some(size) && compressed["sha256"].as_str() == Some(hash.as_str()), "authenticated compressed index size/hash mismatch");
-            let decoded = raw.fresh();
+            let decoded_logical = format!("metadata/{pocket}/{component}/Packages");
+            let decoded = raw.reserve(&decoded_logical, process::FILE_LIMIT)?;
             let mut decode = apt("/usr/lib/apt/apt-helper", &["cat-file"]); decode.arg(&destination);
-            let decoded_result = process::run(&mut decode, deadline, 20, Some(&decoded))?;
-            let decoded_ref = raw.adopt(&format!("metadata/{pocket}/{component}/Packages"), &decoded)?;
+            let decoded_result = process::run(&mut decode, deadline, 20, Some(&decoded));
+            let (decoded_result, decoded_ref) = raw.settle(&decoded_logical, &decoded, decoded_result)?;
             fs::remove_file(&destination)?;
             raw.bytes(&format!("commands/decode-{pocket}-{component}.stderr"), &decoded_result.stderr)?;
             decoded_result.success()?;

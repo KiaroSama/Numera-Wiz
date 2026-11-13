@@ -8,7 +8,7 @@ mod process;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, fs, io::Read, path::{Path, PathBuf}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
+use std::{collections::BTreeSet, fs, io::{Read, Write}, path::{Path, PathBuf}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 
 const CONFIG: &str = include_str!("../../components/linux-toolchain-capture.json");
 const IMAGE: &str = "docker.io/library/ubuntu@sha256:78d4744ead1f5b19b04d0df558ab182a5300903900755e515b2ca4d10eb2044d";
@@ -52,26 +52,60 @@ struct Host {
     chunks: usize,
     deadline: Instant,
     diagnostic_failures: Vec<String>,
+    sequence: usize,
 }
 
 impl Host {
-    fn record(&mut self, logical: &str, bytes: &[u8]) -> Result<()> {
+    fn begin_file(&mut self, logical: &str, size: u64, hash: &str) -> Result<usize> {
         ensure!(self.files.len() < 500, "host evidence file count exceeded");
         metadata::safe_path(logical)?;
         ensure!(!self.files.iter().any(|file| file["logical_path"].as_str().is_some_and(|path| path.eq_ignore_ascii_case(logical))), "duplicate host evidence path");
-        ensure!(bytes.len() as u64 <= process::FILE_LIMIT, "host evidence file exceeds limit");
-        let next_total = process::check_count(self.total, bytes.len() as u64, evidence::RAW_LIMIT)?;
-        let additional = bytes.len().div_ceil(evidence::CHUNK_LIMIT as usize);
-        ensure!(self.chunks.checked_add(additional).context("transport count overflow")? <= 500, "host transport file count exceeded");
-        let mut chunks = Vec::new();
-        for bytes in bytes.chunks(evidence::CHUNK_LIMIT as usize) {
-            ensure!(self.chunks < 500, "host evidence transport file count exceeded");
-            let path = format!("raw/host-{:04}", self.chunks); self.chunks += 1;
-            evidence::write_new(&self.output.join(&path), bytes, evidence::CHUNK_LIMIT)?;
-            chunks.push(json!({"path":path,"bytes":bytes.len(),"sha256":metadata::digest(bytes)}));
+        ensure!(size <= process::FILE_LIMIT, "host evidence file exceeds limit");
+        process::check_count(self.total, size, evidence::RAW_LIMIT)?;
+        let index = self.files.len();
+        self.files.push(json!({"logical_path":logical,"bytes":0,"sha256":metadata::digest(b""),"expected_bytes":size,"expected_sha256":hash,"capture_status":"incomplete","chunks":[]}));
+        Ok(index)
+    }
+    fn append_chunk_with(&mut self, index: usize, path: &str, bytes: &[u8], hash: &mut Sha256, writer: impl FnOnce(&mut fs::File, &[u8]) -> std::io::Result<()>) -> Result<()> {
+        ensure!(self.chunks < 500 && bytes.len() as u64 <= evidence::CHUNK_LIMIT, "host transport file bound exceeded");
+        process::check_count(self.files[index]["bytes"].as_u64().context("prefix size")?, bytes.len() as u64, self.files[index]["expected_bytes"].as_u64().context("expected size")?)?;
+        self.total = process::check_count(self.total, bytes.len() as u64, evidence::RAW_LIMIT)?;
+        self.chunks += 1;
+        // The full physical reservation is live before any create/write. The
+        // logical row already exists and remains visible on every error exit.
+        let outcome = evidence::write_chunk_with(&self.output.join(path), path, bytes, writer);
+        match outcome.chunk {
+            Some(chunk) => {
+                let size = chunk["bytes"].as_u64().context("owned chunk size")?;
+                self.total = self.total.checked_sub(bytes.len() as u64 - size).context("host chunk reservation reconciliation")?;
+                let row = &mut self.files[index];
+                row["bytes"] = json!(process::check_count(row["bytes"].as_u64().context("retained prefix bytes")?, size, process::FILE_LIMIT)?);
+                if row["sha256"].is_string() && chunk["sha256"].as_str() == Some(metadata::digest(&bytes[..size as usize]).as_str()) {
+                    hash.update(&bytes[..size as usize]); row["sha256"] = json!(hex::encode(hash.clone().finalize()));
+                } else { row["sha256"] = Value::Null; row["integrity"] = json!("UNKNOWN_reserved_upper_bound"); }
+                row["chunks"].as_array_mut().context("owned prefix chunks")?.push(chunk);
+            },
+            None => { self.total = self.total.checked_sub(bytes.len() as u64).context("absent host chunk bytes")?; self.chunks -= 1; },
         }
-        self.total = next_total;
-        self.files.push(json!({"logical_path":logical,"bytes":bytes.len(),"sha256":metadata::digest(bytes),"chunks":chunks})); Ok(())
+        if let Some(error) = outcome.error { bail!("{error}"); }
+        Ok(())
+    }
+    fn complete_file(&mut self, index: usize) -> Result<()> {
+        let row = &mut self.files[index];
+        ensure!(row["bytes"] == row["expected_bytes"] && row["sha256"] == row["expected_sha256"], "whole retained file identity mismatch");
+        row["capture_status"] = json!("complete"); Ok(())
+    }
+    fn record_with(&mut self, logical: &str, bytes: &[u8], mut writer: impl FnMut(&mut fs::File, &[u8]) -> std::io::Result<()>) -> Result<()> {
+        let index = self.begin_file(logical, bytes.len() as u64, &metadata::digest(bytes))?;
+        let mut hash = Sha256::new();
+        for bytes in bytes.chunks(evidence::CHUNK_LIMIT as usize) {
+            let path = format!("raw/host-{:04}", self.sequence); self.sequence = self.sequence.checked_add(1).context("host filename sequence overflow")?;
+            self.append_chunk_with(index, &path, bytes, &mut hash, &mut writer)?;
+        }
+        self.complete_file(index)
+    }
+    fn record(&mut self, logical: &str, bytes: &[u8]) -> Result<()> {
+        self.record_with(logical, bytes, |file, bytes| file.write_all(bytes))
     }
     fn docker(&mut self, label: &str, arguments: &[&str], seconds: u64) -> Result<process::Output> {
         let mut command = process::command("/usr/bin/docker"); command.args(arguments);
@@ -112,12 +146,11 @@ fn capture_host(root: &Path) -> Result<()> {
     let output = target.join("toolchain-capture"); fs::create_dir(&output).context("capture requires a fresh target/toolchain-capture directory")?;
     fs::create_dir(output.join("report"))?; fs::create_dir(output.join("raw"))?;
     let config: Value = serde_json::from_str(CONFIG)?;
-    let mut host = Host { output: output.clone(), files: Vec::new(), total: 0, chunks: 0, deadline: end - Duration::from_secs(22), diagnostic_failures: Vec::new() };
+    let mut host = Host { output: output.clone(), files: Vec::new(), total: 0, chunks: 0, deadline: end - Duration::from_secs(22), diagnostic_failures: Vec::new(), sequence: 0 };
     let mut report = json!({"schema_version":1,"complete_snapshot_lock":false,"lock_scope":"snapshot_package_metadata_only_not_external_runtime_or_standard_profile","source_head":null,"snapshot":metadata::SNAPSHOT,"base":IMAGE,"platform":"linux/amd64","roots":config["roots"],"policy":config["policy"],"limits":config["limits"],"external_build_tool_inputs":config["external_build_tool_inputs"],"runner":{"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"github_actions":true},"unresolved_reasons":[],"cleanup":{"status":"not_created"},"execution":{"install":false,"compiler":false,"ffmpeg":false,"source_bootstrap":false,"package_payloads":"not_downloaded"}});
     for name in ["RUNNER_NAME", "RUNNER_OS", "RUNNER_ARCH", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB"] {
         if let Ok(value) = std::env::var(name) { ensure!(value.len() <= 1024, "oversized runner identity"); report["runner"][name] = json!(value); }
     }
-    host.record("host/capture-started.json", b"{\"metadata_only\":true,\"container_evidence\":\"pending\"}\n")?;
     let nonce = format!("nw-toolchain-{}-{}", std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos());
     let mut cleanup_target = None;
     let result = capture(&root, &config, &nonce, &mut host, &mut report, &mut cleanup_target);
@@ -161,7 +194,7 @@ fn capture_host(root: &Path) -> Result<()> {
         report["metadata_capture"] = json!({"complete_snapshot_lock":false,"status":"combined_report_8MiB_limit_exceeded","full_failed_report_sha256":metadata::digest(&oversized),"retained_as_raw":retained});
         report["complete_snapshot_lock"] = json!(false); complete = false;
     }
-    let manifest = json!({"schema_version":1,"encoding":"ordered_concatenation_of_sha256_checked_chunks","raw_bytes":host.total,"raw_files":host.files.len(),"transport_files":host.chunks,"files":host.files});
+    let manifest = json!({"schema_version":1,"encoding":"ordered_concatenation_of_sha256_checked_chunks","complete":host.files.iter().all(|row| row["capture_status"] == "complete"),"accounting":"UNKNOWN chunks retain their full reserved upper bound","raw_bytes":host.total,"raw_files":host.files.len(),"transport_files":host.chunks,"files":host.files});
     let manifest_bytes = evidence::canonical(&manifest)?;
     report["raw_manifest"] = json!({"path":"raw-manifest.json","bytes":manifest_bytes.len(),"sha256":metadata::digest(&manifest_bytes)});
     if (evidence::canonical(&report)?.len() as u64).checked_add(manifest_bytes.len() as u64).and_then(|n| n.checked_add(512)).context("final small report overflow")? > evidence::SMALL_LIMIT {
@@ -173,6 +206,7 @@ fn capture_host(root: &Path) -> Result<()> {
 }
 
 fn capture(root: &Path, _config: &Value, nonce: &str, host: &mut Host, report: &mut Value, cleanup_target: &mut Option<String>) -> Result<()> {
+    host.record("host/capture-started.json", b"{\"metadata_only\":true,\"container_evidence\":\"pending\"}\n")?;
     ensure!(fs::read(root.join("components/linux-toolchain-capture.json"))? == CONFIG.as_bytes(), "source and compiled capture config differ");
     let mut git = process::command("/usr/bin/git"); git.current_dir(root).args(["rev-parse", "HEAD"]);
     let source = process::run(&mut git, host.deadline, 3, None)?; source.success()?;
@@ -243,6 +277,7 @@ fn capture(root: &Path, _config: &Value, nonce: &str, host: &mut Host, report: &
     let manifest = evidence::parse_canonical(&manifest_bytes)?;
     ensure!(inner_report["schema_version"] == 1 && inner_report["raw_manifest"]["sha256"].as_str() == Some(metadata::digest(&manifest_bytes).as_str()) && inner_report["raw_manifest"]["bytes"].as_u64() == Some(manifest_bytes.len() as u64), "inner raw manifest identity mismatch");
     report["metadata_capture"] = inner_report;
+    host.record("host/container-raw-manifest.json", &manifest_bytes)?;
     transfer_raw(host, container, &manifest)?;
     let run = run?; run.success()?;
     ensure!(report["metadata_capture"]["complete_snapshot_lock"] == true && report["metadata_capture"]["unresolved_reasons"].as_array().is_some_and(Vec::is_empty), "container capture has unresolved required evidence");
@@ -255,6 +290,10 @@ fn capture(root: &Path, _config: &Value, nonce: &str, host: &mut Host, report: &
 }
 
 fn transfer_raw(host: &mut Host, container: &str, manifest: &Value) -> Result<()> {
+    transfer_raw_with(host, manifest, |host, path| host.copy_out(container, path, evidence::CHUNK_LIMIT))
+}
+
+fn transfer_raw_with(host: &mut Host, manifest: &Value, mut fetch: impl FnMut(&mut Host, &str) -> Result<Vec<u8>>) -> Result<()> {
     ensure!(manifest["schema_version"] == 1, "unsupported raw manifest");
     let files = manifest["files"].as_array().context("raw files")?; ensure!(files.len() <= 500 && manifest["raw_files"].as_u64() == Some(files.len() as u64), "raw file count mismatch");
     let mut seen = BTreeSet::new();
@@ -266,29 +305,32 @@ fn transfer_raw(host: &mut Host, container: &str, manifest: &Value) -> Result<()
         let expected_size = entry["bytes"].as_u64().context("raw size")?; ensure!(expected_size <= process::FILE_LIMIT, "raw file exceeds 128MiB");
         process::check_count(host.total, expected_size, evidence::RAW_LIMIT)?;
         let expected_hash = entry["sha256"].as_str().context("raw SHA256")?; metadata::sha256(expected_hash)?;
+        let index = host.begin_file(logical, expected_size, expected_hash)?;
+        host.files[index]["source_expected_bytes"] = entry.get("expected_bytes").unwrap_or(&entry["bytes"]).clone();
+        host.files[index]["source_expected_sha256"] = entry.get("expected_sha256").unwrap_or(&entry["sha256"]).clone();
         let mut hash = Sha256::new(); let mut size = 0;
         for chunk in entry["chunks"].as_array().context("raw chunks")? {
             let path = chunk["path"].as_str().context("raw chunk path")?; metadata::unique_path(&mut chunks_seen, path)?;
             let tail = path.strip_prefix("raw/chunk-").context("unexpected raw chunk namespace")?;
             ensure!(tail.len() == 4 && tail.bytes().all(|b| b.is_ascii_digit()), "unexpected raw chunk name");
             physical = physical.checked_add(1).context("chunk count overflow")?; ensure!(physical <= 500, "raw transport file count exceeded");
-            ensure!((host.chunks as u64).checked_add(physical).context("combined transport count overflow")? <= 500, "combined transport file count exceeded");
+            ensure!(host.chunks < 500, "combined transport file count exceeded");
             let chunk_size = chunk["bytes"].as_u64().context("chunk size")?;
-            ensure!(chunk_size > 0 && chunk_size <= evidence::CHUNK_LIMIT, "invalid chunk byte bound");
+            ensure!(chunk_size <= evidence::CHUNK_LIMIT, "invalid chunk byte bound");
             let next_size = process::check_count(size, chunk_size, expected_size)?;
-            process::check_count(host.total, next_size, evidence::RAW_LIMIT)?;
-            let bytes = host.copy_out(container, path, evidence::CHUNK_LIMIT)?;
+            process::check_count(host.total, chunk_size, evidence::RAW_LIMIT)?;
+            let bytes = fetch(host, path)?;
             metadata::check_bytes(&bytes, chunk_size, chunk["sha256"].as_str().context("chunk hash")?)?;
-            size = next_size; hash.update(&bytes);
-            evidence::write_new(&host.output.join(path), &bytes, evidence::CHUNK_LIMIT)?;
+            host.append_chunk_with(index, path, &bytes, &mut hash, |file, bytes| file.write_all(bytes))?;
+            size = next_size;
         }
         ensure!(size == expected_size && hex::encode(hash.finalize()) == expected_hash, "complete raw file hash/size mismatch");
         raw_total = process::check_count(raw_total, size, evidence::RAW_LIMIT)?;
-        host.total = process::check_count(host.total, size, evidence::RAW_LIMIT)?;
-        ensure!(host.files.len() < 500, "combined raw file count exceeded"); host.files.push(entry.clone());
+        host.complete_file(index)?;
+        if entry["capture_status"] == "incomplete" { host.files[index]["capture_status"] = json!("incomplete"); }
     }
     ensure!(manifest["raw_bytes"].as_u64() == Some(raw_total) && manifest["transport_files"].as_u64() == Some(physical), "raw manifest aggregate mismatch");
-    host.chunks = host.chunks.checked_add(physical as usize).context("combined transport count overflow")?; ensure!(host.chunks <= 500, "combined transport file count exceeded"); Ok(())
+    Ok(())
 }
 
 fn cleanup_command(host: &mut Host, label: &str, arguments: &[&str], seconds: u64) -> Result<process::Output> {
