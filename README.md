@@ -50,8 +50,9 @@ Current work and required gaps are recorded in the
   capture a committed revision and check actual FFmpeg components. The initial
   solid-color/silence route returns a separate media plan. Its first generated
   media job passed [full signal/publication checks on Linux](docs/development/evidence/media-v1-first-output-ci257.json).
-  Generation lifecycle and complete native checks are undergoing qualification;
-  preview, general export and the complete editor remain under construction.
+  [Native lifecycle checks](docs/development/evidence/media-v1-native-ci261.json)
+  are undergoing qualification; Windows startup/restoration deadlines remain open.
+  Preview, general export and the complete editor remain under construction.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
 

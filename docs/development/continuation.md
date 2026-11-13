@@ -35,8 +35,13 @@ promotion/initialization/restoration paths. The scoped source rereview closed
 seven Important and two Minor findings. [CI257](evidence/media-v1-first-output-ci257.json)
 passed the actual Linux full-signal/common-job/publication/replay controls;
 the whole run remains red with four native check failures and formatting.
-Generation maintenance, Windows startup and native replay still require fixes
-and fresh hosted qualification. Initial execution
+[CI261](evidence/media-v1-native-ci261.json) subsequently passed Linux and both
+macOS native checks, all media/transport/UI jobs and the real Windows storage
+fault controls. Its terminal census is eleven passing jobs and two failures:
+formatting and Windows interface deadlines. Windows core suites and lint pass;
+three fresh-owner starts exceed20 seconds and restoration exceeds the existing
+180-second aggregate. The next native identity/DACL transport correction remains
+unqualified; no timeout or acceptance rule is relaxed. Initial execution
 has the documented decoded-byte and container-clock admission limits in the CLI
 guide. Those limits do not waive the required general editor/media routes.
 
