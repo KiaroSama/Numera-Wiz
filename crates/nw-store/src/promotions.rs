@@ -10,7 +10,6 @@ use nw_domain::{
         },
     },
 };
-use redb::ReadableTable;
 
 fn invalid(message: &'static str) -> DomainError {
     DomainError::new("PROMOTION_UNQUALIFIED", message)
