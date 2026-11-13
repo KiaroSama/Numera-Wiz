@@ -182,8 +182,7 @@ pub fn selected_index_cache<'a>(
         matches!(
             pocket,
             "noble" | "noble-updates" | "noble-security" | "noble-backports"
-        )
-            && matches!(component, "main" | "restricted" | "universe" | "multiverse"),
+        ) && matches!(component, "main" | "restricted" | "universe" | "multiverse"),
         "unexpected selected index source"
     );
     let meta_key = format!("{component}/binary-amd64/Packages");
@@ -203,8 +202,7 @@ pub fn selected_index_cache<'a>(
     let Some(target) = selected.first().copied() else {
         ensure!(
             plain_size == 0
-                && plain_hash
-                    == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                && plain_hash == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "missing selected APT index target without authenticated empty index {pocket}/{component}"
         );
         return Ok(None);

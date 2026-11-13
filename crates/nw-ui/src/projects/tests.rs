@@ -394,8 +394,8 @@ fn key_events(key: egui::Key) -> Vec<egui::Event> {
 }
 fn text_frame(ctx: &egui::Context, text: &mut String, events: Vec<egui::Event>, focus: bool) {
     widget_frame(ctx, events, |ui| {
-        let response =
-            ui.add(egui::TextEdit::singleline(text).id(egui::Id::unique("project-regression-text")));
+        let response = ui
+            .add(egui::TextEdit::singleline(text).id(egui::Id::unique("project-regression-text")));
         if focus {
             response.request_focus();
         }

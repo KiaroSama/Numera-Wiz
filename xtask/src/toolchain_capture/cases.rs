@@ -860,8 +860,7 @@ fn index_target_cases() -> Result<()> {
         );
     }
     ensure!(
-        metadata::selected_index_cache(&release, &[], "../noble-backports", "restricted")
-            .is_err(),
+        metadata::selected_index_cache(&release, &[], "../noble-backports", "restricted").is_err(),
         "unsafe source URL input refused"
     );
     // Exercise the independent byte validator and actual streaming parser with
