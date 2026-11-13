@@ -81,7 +81,7 @@ fn media_job(
     match read_job(table, id)? {
         StoredJob::MediaV1(job) => {
             validate_queue(table, &job)?;
-            Ok(job)
+            Ok(*job)
         }
         StoredJob::Legacy(_) => Err(DomainError::new(
             "INVALID_RECORD",
@@ -301,7 +301,7 @@ impl Store {
             if domain::exact(&job.resources.estimated_memory_bytes)? > domain::MEDIA_RESERVATION_POOL_BYTES {
                 return Err(DomainError::new("RESOURCE_LIMIT", "Worker and bounded queue reservations exceed the fixed admission pool"));
             }
-            if domain::exact(&plan.expires_at)? <= now {
+            if !domain::review_current(&plan.created_at, &plan.expires_at, now)? {
                 return Err(DomainError::new("PLAN_EXPIRED", "Media review expired before acceptance"));
             }
             let header = table.get(format!("project/{}", plan.payload.capture.project_id).as_str()).map_err(storage)?

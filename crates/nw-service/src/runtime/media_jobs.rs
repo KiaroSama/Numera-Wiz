@@ -59,7 +59,7 @@ impl Service {
                 "Media review belongs to another creator or data root",
             ));
         }
-        if domain::exact(&plan.expires_at)? <= self.clock.now()? {
+        if !domain::review_current(&plan.created_at, &plan.expires_at, self.clock.now()?)? {
             return Err(DomainError::new(
                 "PLAN_EXPIRED",
                 "Media review expired before submission",
@@ -124,7 +124,7 @@ impl Service {
         prepared?;
         self.store.require_media_floor()?;
         self.recompile_media(&context, &plan)?;
-        if domain::exact(&plan.expires_at)? <= self.clock.now()? {
+        if !domain::review_current(&plan.created_at, &plan.expires_at, self.clock.now()?)? {
             return Err(DomainError::new(
                 "PLAN_EXPIRED",
                 "Media review expired during preflight",

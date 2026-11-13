@@ -146,6 +146,32 @@ fn bounded_range(
     }
     Ok((rows, false))
 }
+fn validate_checkpoint(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    header: &ProjectHeader,
+) -> Result<()> {
+    if header.revision.0 > 0 {
+                let journal: Value = table_value(
+                    table,
+                    &format!("project-op/{}/{:020}", header.id, header.revision.0),
+                )?
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "PROJECT_CORRUPT",
+                        "Latest committed change journal is missing",
+                    )
+                })?;
+                if journal["after_revision"] != header.revision.to_string()
+                    || journal["change_digest"] != header.change_digest
+                {
+                    return Err(DomainError::new(
+                        "PROJECT_CORRUPT",
+                        "Latest committed change facts differ",
+                    ));
+                }
+            }
+    Ok(())
+}
 impl Store {
     pub fn project_creator(&self, id: &str) -> Result<String> {
         validate_id(id)?;
@@ -192,26 +218,7 @@ impl Store {
                     "Project identity/checkpoint mismatch",
                 ));
             }
-            if header.revision.0 > 0 {
-                let journal: Value = table_value(
-                    &table,
-                    &format!("project-op/{id}/{:020}", header.revision.0),
-                )?
-                .ok_or_else(|| {
-                    DomainError::new(
-                        "PROJECT_CORRUPT",
-                        "Latest committed change journal is missing",
-                    )
-                })?;
-                if journal["after_revision"] != header.revision.to_string()
-                    || journal["change_digest"] != header.change_digest
-                {
-                    return Err(DomainError::new(
-                        "PROJECT_CORRUPT",
-                        "Latest committed change facts differ",
-                    ));
-                }
-            }
+            validate_checkpoint(&table, &header)?;
             (raw, header)
         };
         Ok(ProjectReadSnapshot {
@@ -1237,6 +1244,8 @@ pub(super) fn exercise_atomic_projects() {
     let _reacquired = nw_platform::project_lease::ProjectWriterLease::acquire(&project).unwrap();
     regressions::run();
     render::exercise_compiler_admission();
+    drop(snapshot);
+    restoration::exercise_known_corruption(&store, &project);
 }
 
 #[cfg(test)]

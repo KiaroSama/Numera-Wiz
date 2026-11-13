@@ -358,8 +358,8 @@ pub(crate) fn finish_stages(state: MediaJobState, stages: &mut [MediaStage]) {
 
 #[derive(Debug, Clone)]
 pub enum StoredJob {
-    Legacy(Job),
-    MediaV1(MediaJobV1),
+    Legacy(Box<Job>),
+    MediaV1(Box<MediaJobV1>),
 }
 impl StoredJob {
     pub fn id(&self) -> &str {
@@ -408,16 +408,16 @@ pub fn decode_job(raw: Value) -> Result<StoredJob> {
         }
         let job: MediaJobV1 = serde_json::from_value(raw).map_err(codec)?;
         job.validate()?;
-        Ok(StoredJob::MediaV1(job))
+        Ok(StoredJob::MediaV1(Box::new(job)))
     } else {
         crate::plans::decode(
             raw.get("plan")
                 .cloned()
                 .ok_or_else(|| invalid("Stored legacy job has no plan"))?,
         )?;
-        Ok(StoredJob::Legacy(
+        Ok(StoredJob::Legacy(Box::new(
             serde_json::from_value(raw).map_err(codec)?,
-        ))
+        )))
     }
 }
 pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
@@ -432,6 +432,13 @@ pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
     plan.validate_hash()?;
     Ok(plan)
 }
+/// Fresh acceptance uses the sampled owner clock; retained replay bypasses this check.
+pub fn review_current(created_at: &str, expires_at: &str, now: u64) -> Result<bool> {
+    let created = exact(created_at)?;
+    let expires = exact(expires_at)?;
+    Ok(created.checked_add(300) == Some(expires) && created <= now && now < expires)
+}
+
 pub fn exact(value: &str) -> Result<u64> {
     let number = value
         .parse::<u64>()

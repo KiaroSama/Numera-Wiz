@@ -31,28 +31,66 @@ struct GenesisOrigin {
 fn invalid(message: impl Into<String>) -> DomainError {
     DomainError::new("INITIALIZATION_UNQUALIFIED", message)
 }
-impl Store {
-    pub(crate) fn trusted_genesis_guard(&self, original: &Guard, generation: u32) -> Result<bool> {
-        let Some(origin) =
-            self.get::<GenesisOrigin>(&format!("generation-genesis/{}", original.migration_id))?
-        else {
-            return Ok(false);
-        };
-        if generation != 1
-            || origin.schema_version != 1
-            || origin.operation_id != original.migration_id
-            || origin.activation_id != original.activation_id
-            || origin.root_id != self.root_id()
-        {
-            return Err(invalid("Original compatible genesis provenance differs"));
-        }
-        Ok(true)
+pub(crate) fn source_ancestry(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    root_id: &str,
+    selection: &crate::generations::Selection,
+    prefix: &crate::generations::CompatiblePrefix,
+) -> Result<(Guard, InitializationOrigin)> {
+    let refused = || DomainError::new("GENERATION_ANCESTRY_INVALID", "Current source lacks the selected genuine migration or genesis ancestry");
+    let original = guard(table)?;
+    let root = table.get("meta/root").map_err(storage)?.ok_or_else(refused)?;
+    if root.value() != root_id.as_bytes() || prefix.root_id != root_id
+        || selection.root_id.as_deref() != Some(root_id)
+        || selection.activation_id.as_deref() != Some(prefix.activation_id.as_str())
+        || original.activation_id != prefix.activation_id
+        || original.migration_id != prefix.operation_id
+    {
+        return Err(refused());
     }
+    let genesis = table.get(format!("generation-genesis/{}", original.migration_id).as_str()).map_err(storage)?;
+    if let Some(row) = genesis {
+        let origin: GenesisOrigin = decode(row.value())?;
+        let marker = table.get("meta/genesis-origin").map_err(storage)?.ok_or_else(refused)?;
+        if selection.generation != 1 || !matches!(&selection.location, GenerationLocation::LegacyOne {})
+            || origin.schema_version != 1 || origin.operation_id != original.migration_id
+            || origin.activation_id != original.activation_id || origin.root_id != root_id
+            || marker.value() != original.migration_id.as_bytes()
+        {
+            return Err(refused());
+        }
+        nw_domain::media_execution::hash(&origin.profiles_sha256)?;
+        return Ok((original, InitializationOrigin::CompatibleGenesisV1));
+    }
+    let row = table.get(format!("generation-migration/{}", original.migration_id).as_str())
+        .map_err(storage)?.ok_or_else(refused)?;
+    let migration: nw_domain::maintenance::MigrationRecord = decode(row.value())?;
+    migration.plan.validate_hash()?;
+    if migration.schema_version != 1 || migration.id != original.migration_id
+        || migration.plan.id != original.migration_id || migration.phase != MigrationPhase::Succeeded
+        || migration.plan.root_id != root_id || migration.plan.target_generation != selection.generation
+        || migration.activation_id.as_deref() != Some(original.activation_id.as_str())
+    {
+        return Err(refused());
+    }
+    Ok((original, InitializationOrigin::MigratedZeroRevision))
+}
+
+impl Store {
     pub fn prepare_media_initialization(
         &self,
         lease: &RootLease,
         build: &str,
         clock: impl Fn() -> Result<u64>,
+    ) -> Result<MediaInitializationPlan> {
+        self.prepare_initialization_with_reservation(lease, build, clock, None)
+    }
+    fn prepare_initialization_with_reservation(
+        &self,
+        lease: &RootLease,
+        build: &str,
+        clock: impl Fn() -> Result<u64>,
+        reserved: Option<&str>,
     ) -> Result<MediaInitializationPlan> {
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
             return Err(DomainError::new(
@@ -67,9 +105,9 @@ impl Store {
         }
         let prefix = lease.compatible_prefix()?;
         let selection = lease.selection()?;
-        let original = {
+        let (original, origin) = {
             let read = self.db.begin_read().map_err(storage)?;
-            guard(&read.open_table(RECORDS).map_err(storage)?)?
+            source_ancestry(&read.open_table(RECORDS).map_err(storage)?, self.root_id(), &selection, &prefix)?
         };
         if original.validate()? != 0
             || original.activation_id != prefix.activation_id
@@ -89,29 +127,15 @@ impl Store {
                 ));
             }
         }
-        let origin = if let Some(origin) =
-            self.get::<GenesisOrigin>(&format!("generation-genesis/{}", original.migration_id))?
-        {
-            if origin.schema_version != 1
-                || origin.operation_id != original.migration_id
-                || origin.activation_id != original.activation_id
-                || origin.root_id != self.root_id()
-            {
-                return Err(invalid("Compatible genesis provenance differs"));
-            }
-            InitializationOrigin::CompatibleGenesisV1
+        let existing_reservation = reserved.map(|id| {
+            lease.state().join("generation-workspaces").join(id).join("restoration-slot.json")
+                .try_exists().map_err(storage)
+        }).transpose()?.unwrap_or(false);
+        if existing_reservation {
+            copies::restoration_slot(lease, reserved.expect("existing reservation has an identity"))?;
         } else {
-            let migration = self.inspect_migration(&original.migration_id)?;
-            if migration.phase != MigrationPhase::Succeeded
-                || migration.plan.target_generation != selection.generation
-                || migration.activation_id.as_deref() != Some(original.activation_id.as_str())
-            {
-                return Err(invalid(
-                    "Zero guard is not a completed genuine migrated ancestor",
-                ));
-            }
-            InitializationOrigin::MigratedZeroRevision
-        };
+            copies::workspace_headroom(lease, 2)?;
+        }
         self.validate_migration_records()?;
         self.close_generation(lease)?;
         let result = (|| {
@@ -207,16 +231,17 @@ impl Store {
         plan.validate_hash()?;
         if plan.root_id != self.root_id()
             || plan.application_build != build
-            || plan.expires_at.parse::<u64>().map_err(storage)? <= clock()?
+            || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, clock()?)?
         {
             return Err(invalid("Initialization review root/build/lifetime differs"));
         }
-        let mut current = self.prepare_media_initialization(lease, build, &clock)?;
+        let mut current = self.prepare_initialization_with_reservation(lease, build, &clock, Some(&plan.id))?;
         current.source_bytes = plan.source_bytes.clone();
         current.estimated_additional_bytes = plan.estimated_additional_bytes.clone();
         if current.digest()? != plan.hash {
             return Err(invalid("Initialization baseline changed after review"));
         }
+        copies::reserve_restoration_slot(lease, &plan.id)?;
         self.close_generation(lease)?;
         let prepared = (|| {
             QualifiedDirectory::open(lease.state())?;
@@ -242,11 +267,16 @@ impl Store {
         let (receipt_key, _) = self.replay_key(principal, request, clock()?)?;
         let predecessor = self.terminal_restoration_predecessor()?;
         let response = self.commit_composed_with_clock(principal, request, &clock, |table, now| {
+            copies::restoration_slot(lease, &plan.id)?;
             if raw_hash(table)? != (plan.source_records, plan.source_records_sha256.clone())
-                || now >= plan.expires_at.parse::<u64>().map_err(storage)?
+                || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, now)?
             { return Err(invalid("Initialization baseline changed or expired before atomic acceptance")); }
-            let original = guard(table)?;
-            if original.migration_id != plan.source_operation_id || original.activation_id != plan.source_activation_id
+            let selection = lease.selection()?;
+            let prefix = lease.compatible_prefix()?;
+            let (original, origin) = source_ancestry(table, self.root_id(), &selection, &prefix)?;
+            if origin != plan.origin || selection.generation != plan.source_generation
+                || prefix.sha256 != plan.source_prefix_sha256 || prefix.sequence != plan.source_activation_sequence
+                || original.migration_id != plan.source_operation_id || original.activation_id != plan.source_activation_id
                 || original.validate()? != 0
             { return Err(invalid("Original zero guard provenance changed")); }
             let record = MediaInitializationRecord {
@@ -299,6 +329,18 @@ impl Store {
                 ));
             }
         }
+        let generations = security::private_directory(&lease.state().join("generations"))?;
+        let parent_stamp = files::DirectoryStamp::capture_resolved(&generations)?;
+        for (count, entry) in std::fs::read_dir(&generations).map_err(storage)?.enumerate() {
+            let entry = entry.map_err(storage)?;
+            let metadata = std::fs::symlink_metadata(entry.path()).map_err(storage)?;
+            if count >= 256 || entry.file_name() != "1" || !metadata.is_dir()
+                || metadata.file_type().is_symlink()
+            {
+                return Err(invalid("Retained generation siblings are not empty bootstrap scaffolding"));
+            }
+        }
+        parent_stamp.revalidate()?;
         let path = security::private_directory(&lease.state().join("generations/1"))?;
         let lock = files::RootLock::acquire(&path)?;
         let file = path.join("store.redb");

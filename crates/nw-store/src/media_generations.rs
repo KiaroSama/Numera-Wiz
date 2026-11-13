@@ -15,7 +15,7 @@ use nw_domain::{
         promotion::{GenerationPromotionPlan, MEDIA_V1_CAPABILITIES},
     },
 };
-use redb::{ReadableDatabase, ReadableTable};
+use redb::{ReadableDatabase, ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
@@ -246,12 +246,17 @@ impl Store {
         let (receipt_key, _) = self.replay_key(principal, request, clock()?)?;
         let predecessor = self.terminal_restoration_predecessor()?;
         let response = self.commit_composed_with_clock(principal, request, &clock, |table, now| {
-            if now >= plan.expires_at.parse::<u64>().map_err(storage)? { return Err(invalid("Promotion review expired")); }
+            copies::restoration_slot(lease, &plan.id)?;
+            if !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, now)? { return Err(invalid("Promotion review expired")); }
             if raw_hash(table)? != (plan.source_records, plan.source_records_sha256.clone()) {
                 return Err(invalid("Full source raw facts changed before atomic promotion acceptance"));
             }
-            let original = guard(table)?;
-            if original.migration_id != plan.source_guard.migration_id || original.activation_id != plan.source_guard.activation_id
+            let selection = lease.selection()?;
+            let prefix = lease.compatible_prefix()?;
+            let (original, _) = crate::initialization::source_ancestry(table, self.root_id(), &selection, &prefix)?;
+            if selection.generation != plan.source_generation || prefix.sha256 != plan.source_prefix_sha256
+                || prefix.sequence != plan.source_activation_sequence || prefix.activation_id != plan.source_activation_id
+                || original.migration_id != plan.source_guard.migration_id || original.activation_id != plan.source_guard.activation_id
                 || original.revision != plan.source_guard.revision || original.validate()? == 0 {
                 return Err(invalid("Original source adoption provenance changed"));
             }
@@ -291,7 +296,7 @@ impl Store {
         }
         if plan.root_id != self.root_id()
             || plan.application_build != build
-            || plan.expires_at.parse::<u64>().map_err(storage)? <= now
+            || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, now)?
         {
             return Err(invalid("Promotion review root/build/lifetime differs"));
         }
@@ -304,6 +309,18 @@ impl Store {
         {
             return Err(invalid("Reviewed compatible prefix changed"));
         }
+        {
+            let read = self.db.begin_read().map_err(storage)?;
+            let table = read.open_table(RECORDS).map_err(storage)?;
+            let (original, _) = crate::initialization::source_ancestry(&table, self.root_id(), &selection, &prefix)?;
+            if original.migration_id != plan.source_guard.migration_id
+                || original.activation_id != plan.source_guard.activation_id
+                || original.revision != plan.source_guard.revision || original.validate()? == 0
+            {
+                return Err(invalid("Original source adoption provenance changed"));
+            }
+        }
+        copies::reserve_restoration_slot(lease, &plan.id)?;
         self.validate_migration_records()?;
         self.close_generation(lease)?;
         let preparation = (|| {

@@ -1,9 +1,8 @@
 //! Genuine compatible-source review; no journal, floor, guard or receipt is written.
-use crate::{RECORDS, Store, adoption::Guard, copies, decode, generations::RootLease, storage};
+use crate::{RECORDS, Store, copies, generations::RootLease, storage};
 use nw_domain::{
     DomainError, Result,
     maintenance::{
-        MigrationPhase,
         promotion::{
             GenerationPromotionPlan, MEDIA_V1_CAPABILITIES, PromotionKind, RollbackCondition,
             SourceGuard, TargetProfile,
@@ -36,45 +35,15 @@ impl Store {
         }
         let selection = lease.selection()?;
         let prefix = lease.compatible_prefix()?;
-        let guard: Guard = {
+        let (guard, _) = {
             let read = self.db.begin_read().map_err(storage)?;
             let table = read.open_table(RECORDS).map_err(storage)?;
-            let value = table
-                .get("meta/rollback-guard")
-                .map_err(storage)?
-                .ok_or_else(|| invalid("A missing adoption guard is unknown, never zero"))?;
-            decode(value.value())?
+            crate::initialization::source_ancestry(&table, self.root_id(), &selection, &prefix)?
         };
         if guard.validate()? == 0 {
-            return Err(invalid(
-                "This review requires prior adoption; zero-adoption initialization remains in development",
-            ));
+            return Err(invalid("This review requires prior adoption"));
         }
-        if selection.activation_id.as_deref() != Some(prefix.activation_id.as_str())
-            || prefix.root_id != self.root_id()
-            || guard.activation_id != prefix.activation_id
-            || guard.migration_id != prefix.operation_id
-        {
-            return Err(invalid(
-                "Source guard and selected compatible prefix provenance differ",
-            ));
-        }
-        if !self.trusted_genesis_guard(&guard, selection.generation)? {
-            let migration = self.inspect_migration(&guard.migration_id)?;
-            migration.plan.validate_hash()?;
-            if migration.schema_version != 1
-                || migration.id != guard.migration_id
-                || migration.plan.id != guard.migration_id
-                || !matches!(migration.phase, MigrationPhase::Succeeded)
-                || migration.plan.root_id != self.root_id()
-                || migration.plan.target_generation != selection.generation
-                || migration.activation_id.as_deref() != Some(prefix.activation_id.as_str())
-            {
-                return Err(invalid(
-                    "The original compatible migration is not a completed trusted ancestor",
-                ));
-            }
-        }
+        copies::workspace_headroom(lease, 2)?;
         self.validate_migration_records()?;
         self.close_generation(lease)?;
         let result = (|| {

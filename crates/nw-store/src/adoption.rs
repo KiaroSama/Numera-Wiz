@@ -316,6 +316,8 @@ mod tests {
             "A required missing guard must block fresh writes"
         );
         exercise_restoration_overlay();
+        exercise_ancestry_refusal();
+        exercise_reserved_workspace_boundary();
     }
     fn raw_rows(store: &Store, prefix: &str) -> Vec<(String, Vec<u8>)> {
         let read = store.db.begin_read().unwrap();
@@ -329,6 +331,114 @@ mod tests {
             })
             .take_while(|(key, _)| key.starts_with(prefix))
             .collect()
+    }
+    fn replace_raw(store: &Store, key: &str, raw: &[u8]) {
+        let write = store.db.begin_control_write().unwrap();
+        write.open_table(RECORDS).unwrap().insert(key, raw).unwrap();
+        write.commit().unwrap();
+    }
+    fn exercise_ancestry_refusal() {
+        let f = fixture();
+        let key = format!("generation-migration/{}", f.migration_id);
+        let original = raw_rows(&f.store, &key)[0].1.clone();
+        for field in ["schema_version", "id", "plan_id", "plan_root", "plan_hash"] {
+            let mut corrupted: serde_json::Value = decode(&original).unwrap();
+            match field {
+                "schema_version" => corrupted["schema_version"] = serde_json::json!(999),
+                "id" => corrupted["id"] = serde_json::json!(uuid::Uuid::new_v4().to_string()),
+                "plan_id" => corrupted["plan"]["id"] = serde_json::json!(uuid::Uuid::new_v4().to_string()),
+                "plan_root" => corrupted["plan"]["root_id"] = serde_json::json!(uuid::Uuid::new_v4().to_string()),
+                "plan_hash" => corrupted["plan"]["hash"] = serde_json::json!("00".repeat(32)),
+                _ => unreachable!(),
+            }
+            replace_raw(&f.store, &key, &encode(&corrupted).unwrap());
+            let read = f.store.db.begin_read().unwrap();
+            let table = read.open_table(RECORDS).unwrap();
+            assert!(crate::initialization::source_ancestry(
+                &table, f.store.root_id(), &f.lease.selection().unwrap(), &f.lease.compatible_prefix().unwrap(),
+            ).is_err(), "Malformed migrated-r0 ancestry must be refused: {field}");
+            drop(table);
+            drop(read);
+            replace_raw(&f.store, &key, &original);
+        }
+        let write = f.store.db.begin_control_write().unwrap();
+        write.open_table(RECORDS).unwrap().remove(key.as_str()).unwrap();
+        write.commit().unwrap();
+        let read = f.store.db.begin_read().unwrap();
+        assert!(crate::initialization::source_ancestry(
+            &read.open_table(RECORDS).unwrap(), f.store.root_id(), &f.lease.selection().unwrap(), &f.lease.compatible_prefix().unwrap(),
+        ).is_err(), "Missing original migration is unknown, never trusted r0");
+        drop(read);
+        replace_raw(&f.store, &key, &original);
+        f.store.put("unit/genuine-adoption", &true).unwrap();
+        let mut plan = f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(105)).unwrap();
+        let before = raw_rows(&f.store, "");
+        let mut future = plan.clone();
+        future.created_at = "1000".into();
+        future.expires_at = "1300".into();
+        future.hash = future.digest().unwrap();
+        let mut request = Request::query("maintenance.promotion.accept", serde_json::json!({"plan":future}));
+        request.replay_scope = Some(f.scope.clone());
+        request.idempotency_key = Some("future-promotion-refused".into());
+        assert!(f.store.accept_media_promotion(&f.lease, &f.principal, &request, &"ab".repeat(32), || Ok(106), &tokio_util::sync::CancellationToken::new()).is_err());
+        assert_eq!(raw_rows(&f.store, ""), before);
+        let mut forged: Guard = decode(&raw_rows(&f.store, "meta/rollback-guard")[0].1).unwrap();
+        forged.migration_id = uuid::Uuid::new_v4().to_string();
+        replace_raw(&f.store, "meta/rollback-guard", &encode(&forged).unwrap());
+        plan.source_guard.migration_id = forged.migration_id;
+        let read = f.store.db.begin_read().unwrap();
+        let (count, hash) = crate::media_generations::raw_hash(&read.open_table(RECORDS).unwrap()).unwrap();
+        drop(read);
+        plan.source_records = count;
+        plan.source_records_sha256 = hash;
+        plan.hash = plan.digest().unwrap();
+        assert!(f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(106)).is_err());
+        request.params = serde_json::json!({"plan":plan});
+        request.idempotency_key = Some("self-hashed-untrusted-promotion".into());
+        let before = raw_rows(&f.store, "");
+        assert!(f.store.accept_media_promotion(&f.lease, &f.principal, &request, &"ab".repeat(32), || Ok(107), &tokio_util::sync::CancellationToken::new()).is_err());
+        assert_eq!(raw_rows(&f.store, ""), before, "No floor, receipt or journal may follow caller-computable forged ancestry");
+        assert!(!f.store.pending_media_maintenance().unwrap());
+        assert!(f.store.replay(&f.principal, &request, 108).unwrap().is_none());
+        assert!(!nw_domain::media_execution::review_current("1000", "1300", 999).unwrap());
+        assert!(nw_domain::media_execution::review_current("1000", "1300", 1000).unwrap());
+        assert!(nw_domain::media_execution::review_current("1000", "1300", 1299).unwrap());
+        assert!(!nw_domain::media_execution::review_current("1000", "1300", 1300).unwrap());
+        assert!(!nw_domain::media_execution::review_current("1000", "1301", 1100).unwrap());
+    }
+    fn exercise_reserved_workspace_boundary() {
+        let f = fixture();
+        f.store.put("unit/genuine-adoption", &true).unwrap();
+        // Real cancelled enablement preflights retain their bounded allocation;
+        // no successful floor, journal or receipt is fabricated for this pressure.
+        for ordinal in 0..6 {
+            let plan = f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(105)).unwrap();
+            let mut request = Request::query("maintenance.promotion.accept", serde_json::json!({"plan":plan}));
+            request.replay_scope = Some(f.scope.clone());
+            request.idempotency_key = Some(format!("cancelled-workspace-{ordinal}"));
+            let cancel = tokio_util::sync::CancellationToken::new();
+            cancel.cancel();
+            assert!(f.store.accept_media_promotion(&f.lease, &f.principal, &request, &"ab".repeat(32), || Ok(106), &cancel).is_err());
+            assert!(!f.store.pending_media_maintenance().unwrap());
+        }
+        let plan = f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(107)).unwrap();
+        let mut request = Request::query("maintenance.promotion.accept", serde_json::json!({"plan":plan}));
+        request.replay_scope = Some(f.scope.clone());
+        request.idempotency_key = Some("last-restorable-enablement".into());
+        assert!(f.store.accept_media_promotion(&f.lease, &f.principal, &request, &"ab".repeat(32), || Ok(108), &tokio_util::sync::CancellationToken::new()).unwrap().ok);
+        f.store.close_generation(&f.lease).unwrap();
+        crate::copies::copy_locked(&f.lease, &uuid::Uuid::new_v4().to_string(), "rollback", &f.store.generation_path().unwrap(), &tokio_util::sync::CancellationToken::new()).unwrap();
+        f.store.reopen_current_generation(&f.lease).unwrap();
+        assert_eq!(std::fs::read_dir(f.lease.state().join("generation-workspaces")).unwrap().count(), 16);
+        assert!(crate::copies::workspace(&f.lease, &uuid::Uuid::new_v4().to_string()).is_err());
+        let restored = f.store.prepare_media_restoration(&f.lease, &plan.id, false, &"ab".repeat(32), || Ok(109)).unwrap();
+        request.command.id = "maintenance.promotion.restore.accept".into();
+        request.params = serde_json::json!({"plan":restored});
+        request.idempotency_key = Some("reserved-restoration-at-cap".into());
+        assert!(f.store.accept_media_restoration(&f.lease, &f.principal, &request, false, &"ab".repeat(32), || Ok(110)).unwrap().ok);
+        assert!(!f.store.pending_media_maintenance().unwrap());
+        assert_eq!(f.lease.selection().unwrap().generation, 3);
+        assert_eq!(f.store.prepare_media_promotion(&f.lease, &"ab".repeat(32), || Ok(111)).unwrap_err().code, "RESOURCE_LIMIT");
     }
     fn exercise_restoration_overlay() {
         let f = fixture();
@@ -451,16 +561,47 @@ mod tests {
             replay.receipt_id, accepted.receipt_id,
             "Expired review still replays the genuine raw receipt"
         );
-        f.store.close_generation(&f.lease).unwrap();
+        let observation_path = f.lease.state().join("generation-workspaces").join(&restoration.id).join("restoration-installed.json");
+        let captured = std::fs::read(&observation_path).unwrap();
+        let observation: serde_json::Value = decode(&captured).unwrap();
+        assert_eq!(observation["source_object"], serde_json::to_value(&source_object).unwrap());
+        assert!(observation["file_sha256"].as_str().is_some_and(|hash| hash.len() == 64));
+        // Real old control traffic may change allocator bytes after exposure.
+        f.store.issue_scope(&f.principal, 109).unwrap();
+        drop(f.store);
         crate::restorations::repair_owned_suffix(&f.lease).unwrap();
-        f.store.attach_media_selection(&f.lease).unwrap();
-        assert_eq!(raw_rows(&f.store, "restoration-control/"), barrier);
-        assert_eq!(
-            f.store
-                .get::<serde_json::Value>("unit/opaque-baseline")
-                .unwrap()
-                .unwrap(),
-            serde_json::json!({"unknown":[1,2,3]})
-        );
+        let reopened = Store::open_selected(&f.lease).unwrap();
+        assert_eq!(raw_rows(&reopened, "restoration-control/"), barrier);
+        assert_eq!(std::fs::read(&observation_path).unwrap(), captured, "Post-exposure observations are immutable, never rewritten against later physical bytes");
+        assert_eq!(reopened.get::<serde_json::Value>("unit/opaque-baseline").unwrap().unwrap(), serde_json::json!({"unknown":[1,2,3]}));
+        reopened.close_generation(&f.lease).unwrap();
+        let source_file = source_path.join("store.redb");
+        let database = redb::Database::builder().open(&source_file).unwrap();
+        let write = database.begin_write().unwrap();
+        write.open_table(RECORDS).unwrap().insert("unit/opaque-baseline", br#"{"contradiction":true}"#.as_slice()).unwrap();
+        write.commit().unwrap();
+        // Retain the actual open-writer recovery header, then restore those same
+        // fault bytes through the existing file handle after clean close.
+        let dirty = f._directory.path().join("dirty-source-capture.redb");
+        assert!(std::fs::metadata(&source_file).unwrap().len() <= 32 * 1024 * 1024);
+        std::fs::copy(&source_file, &dirty).unwrap();
+        drop(database);
+        let mut original_file = std::fs::OpenOptions::new().write(true).truncate(true).open(&source_file).unwrap();
+        let mut dirty_file = std::fs::File::open(&dirty).unwrap();
+        std::io::copy(&mut dirty_file, &mut original_file).unwrap();
+        original_file.sync_all().unwrap();
+        drop(original_file);
+        assert_eq!(crate::versions::inspect_closed(&source_path).unwrap_err().code, "STORE_RECOVERY_REQUIRED");
+        let before = nw_platform::files::identity(&source_file, &tokio_util::sync::CancellationToken::new()).unwrap();
+        let authority: crate::restorations::Authority = decode(&std::fs::read(observation_path.parent().unwrap().join("restoration-authority.json")).unwrap()).unwrap();
+        assert!(reopened.open_restoration_control(&f.lease, &source_path, &source_object, &authority).is_err());
+        let after = nw_platform::files::identity(&source_file, &tokio_util::sync::CancellationToken::new()).unwrap();
+        assert_eq!((after.bytes, after.sha256), (before.bytes.clone(), before.sha256.clone()), "Contradictory dirty S must not be repaired before full continuity validation");
+        drop(reopened);
+        assert!(crate::restorations::repair_owned_suffix(&f.lease).is_err());
+        let after = nw_platform::files::identity(&source_file, &tokio_util::sync::CancellationToken::new()).unwrap();
+        assert_eq!((after.bytes, after.sha256), (before.bytes, before.sha256));
+        assert_eq!(nw_platform::files::source_object(&source_file).unwrap(), source_object);
+
     }
 }

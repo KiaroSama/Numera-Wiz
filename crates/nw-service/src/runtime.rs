@@ -85,6 +85,7 @@ pub struct Service {
     dispatcher: tokio::sync::mpsc::Sender<String>,
     dispatcher_receiver: Mutex<Option<tokio::sync::mpsc::Receiver<String>>>,
     dispatcher_ready: std::sync::atomic::AtomicBool,
+    execution_quarantined: std::sync::atomic::AtomicBool,
     cancellations: Mutex<HashMap<String, CancellationToken>>,
     events: broadcast::Sender<String>,
     #[cfg(test)]
@@ -283,6 +284,7 @@ impl Service {
             dispatcher,
             dispatcher_receiver: Mutex::new(Some(receiver)),
             dispatcher_ready: std::sync::atomic::AtomicBool::new(false),
+            execution_quarantined: std::sync::atomic::AtomicBool::new(false),
             cancellations: Mutex::new(HashMap::new()),
             events,
             #[cfg(test)]
@@ -970,13 +972,16 @@ impl Service {
                 self.store
                     .replay_with_clock(&context.principal, &request, || self.clock.now())?
         {
-            if request.command.id == "maintenance.migrate" && policy.is_none() {
+            if request.command.id == "maintenance.migrate" && policy.is_none()
+                && !self.execution_quarantined.load(Ordering::Acquire)
+            {
                 self.store
                     .recover_migration(&self.root_lease, || self.clock.now())?;
             }
             if policy.is_none()
                 && request.command.id.starts_with("maintenance.")
                 && request.command.id.ends_with(".accept")
+                && !self.execution_quarantined.load(Ordering::Acquire)
             {
                 self.store
                     .recover_media_enablement(&self.root_lease, || self.clock.now())?;
@@ -1002,6 +1007,16 @@ impl Service {
             return Err(DomainError::new(
                 "CANCELLED",
                 "Request cancelled before new acceptance",
+            ));
+        }
+        if self.execution_quarantined.load(Ordering::Acquire)
+            && ["jobs.submit", "batches.submit", "timeline.render", "media.probe",
+                "assets.register", "assets.register_folder", "streams.clean", "streams.clean.batch_plan"]
+                .contains(&request.command.id.as_str())
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Execution capacity remains quarantined until owned-process reconciliation confirms termination",
             ));
         }
         let runtime = tokio::runtime::Handle::current();
@@ -2417,12 +2432,22 @@ impl Service {
                 }
                 nw_domain::media_execution::StoredJob::MediaV1(job) => {
                     use nw_domain::media_execution::MediaJobState;
-                    if job.state == MediaJobState::Publishing {
+                    if job.error.as_ref().is_some_and(scheduler::process_lifetime_uncertain) {
+                        self.quarantine_execution();
+                    } else if job.state == MediaJobState::Publishing {
                         self.reconcile_media(&job)?;
                     } else if !job.state.terminal() && job.state != MediaJobState::Queued {
+                        let uncertain = job.stages.iter().any(|stage| !stage.invocations.is_empty());
+                        if uncertain {
+                            self.quarantine_execution();
+                        }
                         self.store.update_media_job(&job.id, |job| {
                             job.state = MediaJobState::Interrupted;
-                            job.error = Some(DomainError::new("OWNER_INTERRUPTED", "Owner stopped before verified media publication"));
+                            job.error = Some(if uncertain {
+                                DomainError::new("TREE_TERMINATION_UNCERTAIN", "Owner stopped after a media invocation without retained confirmation of process reap")
+                            } else {
+                                DomainError::new("OWNER_INTERRUPTED", "Owner stopped before a media invocation was launched")
+                            });
                             Ok(())
                         })?;
                     }

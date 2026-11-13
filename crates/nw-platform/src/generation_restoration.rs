@@ -378,7 +378,7 @@ fn remove_windows(path: &Path, expected: &NativeObjectIdentity, sha256: &str) ->
         .open(path)
         .map_err(files::io_error)?;
     verify(&mut file, expected, sha256, 65536)?;
-    let information = FILE_DISPOSITION_INFO { DeleteFile: 1 };
+    let information = FILE_DISPOSITION_INFO { DeleteFile: true };
     // SAFETY: File retains the verified DELETE handle. The input is the exact
     // initialized repr(C) disposition structure and is borrowed only for this call.
     let okay = unsafe {
@@ -399,7 +399,8 @@ fn remove_windows(path: &Path, expected: &NativeObjectIdentity, sha256: &str) ->
 #[cfg(test)]
 pub(crate) fn exercise_restoration_primitives() {
     let temporary = tempfile::tempdir().unwrap();
-    let directory = crate::security::private_directory(temporary.path()).unwrap();
+    let directory =
+        crate::security::private_directory(&temporary.path().join("restoration")).unwrap();
     let held = QualifiedDirectory::open(&directory).unwrap();
     let original = directory.join("0000000002.json");
     std::fs::write(&original, b"independent archived activation").unwrap();

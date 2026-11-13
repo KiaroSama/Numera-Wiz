@@ -98,7 +98,6 @@ pub struct RootLease {
     state: PathBuf,
     stamp: DirectoryStamp,
     _guard: RootLock,
-    _legacy_guard: std::sync::Mutex<Option<RootLock>>,
     historical_guards: std::sync::Mutex<Vec<(PathBuf, RootLock)>>,
 }
 fn invalid(message: &'static str) -> DomainError {
@@ -318,7 +317,6 @@ impl RootLease {
             state,
             stamp,
             _guard: guard,
-            _legacy_guard: std::sync::Mutex::new(None),
             historical_guards: std::sync::Mutex::new(Vec::new()),
         });
         // Only verified accepted restoration may repair a bounded owned suffix
@@ -326,7 +324,7 @@ impl RootLease {
         crate::restorations::repair_owned_suffix(&lease)?;
         let root = &lease.root;
         let history = activations(&root)?;
-        let legacy_guard = if history.last().is_some_and(|(record, _)| {
+        if history.last().is_some_and(|(record, _)| {
             matches!(&record.location, GenerationLocation::Workspace { .. })
         }) {
             let legacy = root.join("state/generations/1");
@@ -340,11 +338,10 @@ impl RootLease {
                 ));
             }
             let legacy = security::private_directory(&legacy)?;
-            Some(RootLock::acquire(&legacy)?)
-        } else {
-            None
-        };
-        *lease._legacy_guard.lock().map_err(storage)? = legacy_guard;
+            // Preselection recovery may already own this exact LegacyOne lock.
+            // Keep it in the same registry transferred into the Store attachment.
+            lease.retain_existing_generation(&legacy)?;
+        }
         Ok(lease)
     }
     pub(crate) fn retain_existing_generation(&self, path: &Path) -> Result<()> {

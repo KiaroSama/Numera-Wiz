@@ -493,7 +493,7 @@ impl Service {
             self.store.visit_executions(|execution| {
                 check_cancel()?;
                 let job = match execution {
-                    nw_domain::media_execution::StoredJob::Legacy(job) => job,
+                    nw_domain::media_execution::StoredJob::Legacy(job) => *job,
                     nw_domain::media_execution::StoredJob::MediaV1(job) => {
                         if policy.as_ref().is_some_and(|profile| !profile.allows_object(ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)) {
                             return Ok(());

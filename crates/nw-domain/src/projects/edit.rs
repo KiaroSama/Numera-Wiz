@@ -172,7 +172,7 @@ fn change_count(value: usize, delta: i32) -> Result<usize> {
         .checked_add_signed(delta as isize)
         .ok_or_else(|| DomainError::new("PROJECT_CORRUPT", "Container count overflow/underflow"))
 }
-fn source_valid(source: &SourceBinding, span: &SourceSpan, kind: TrackKind) -> Result<()> {
+pub fn source_valid(source: &SourceBinding, span: &SourceSpan, kind: TrackKind) -> Result<()> {
     span.duration()?;
     match source {
         SourceBinding::SolidColor { rgba, duration } => {

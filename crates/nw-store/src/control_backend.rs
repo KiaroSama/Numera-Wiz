@@ -105,14 +105,27 @@ impl Store {
             ));
         }
         self.db.retain_existing_lock(path)?;
-        let facts = versions::preflight_existing_facts(path)?;
-        if facts.root_id != self.root_id() {
-            return Err(DomainError::new(
-                "OWNER_IDENTITY_CONFLICT",
-                "Historical control generation has another identity",
-            ));
+        open_validated_backend(path, expected, self.root_id(), |_| Ok(()))
+    }
+    pub(crate) fn open_restoration_control(
+        &self,
+        lease: &RootLease,
+        path: &Path,
+        expected: &NativeObjectIdentity,
+        authority: &crate::restorations::Authority,
+    ) -> Result<redb::Database> {
+        lease.revalidate()?;
+        let source = crate::generations::location_path(lease.root(), &authority.source_location)?;
+        let overlay = lease.state().join("generation-workspaces").join(&authority.record.id).join("restoration");
+        if (path != source && path != overlay)
+            || (path == source && *expected != authority.barrier.source_object)
+        {
+            return Err(DomainError::new("RESTORATION_REFUSED", "Control attachment differs from the accepted source or overlay"));
         }
-        open_backend(path, expected)
+        self.db.retain_existing_lock(path)?;
+        open_validated_backend(path, expected, self.root_id(), |snapshot| {
+            crate::restorations::validate_source_snapshot(lease, authority, snapshot)
+        })
     }
 }
 fn open_backend(path: &Path, expected: &NativeObjectIdentity) -> Result<redb::Database> {
@@ -132,21 +145,38 @@ fn open_backend(path: &Path, expected: &NativeObjectIdentity) -> Result<redb::Da
         .create_with_backend(backend)
         .map_err(versions::database_error)
 }
-pub(crate) fn repair_accepted_source(
-    lease: &RootLease,
+fn open_validated_backend(
     path: &Path,
     expected: &NativeObjectIdentity,
     root_id: &str,
+    validate: impl FnOnce(&Path) -> Result<()>,
+) -> Result<redb::Database> {
+    let stamp = nw_platform::files::SourceStamp::capture_resolved(&path.join("store.redb"))?;
+    if nw_platform::files::source_object(&path.join("store.redb"))? != *expected {
+        return Err(DomainError::new("SOURCE_CHANGED", "Accepted source native identity changed"));
+    }
+    let (facts, snapshot) = versions::existing_snapshot(path)?;
+    if facts.root_id != root_id {
+        return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Accepted generation has another root"));
+    }
+    // A dirty file is repaired only in the independently copied probe above.
+    // Full logical eligibility precedes any writable open of the original object.
+    validate(&snapshot)?;
+    stamp.revalidate()?;
+    open_backend(path, expected)
+}
+pub(crate) fn repair_accepted_source(
+    lease: &RootLease,
+    path: &Path,
+    authority: &crate::restorations::Authority,
 ) -> Result<()> {
     lease.retain_existing_generation(path)?;
-    let facts = versions::preflight_existing_facts(path)?;
-    if facts.root_id != root_id {
-        return Err(DomainError::new(
-            "OWNER_IDENTITY_CONFLICT",
-            "Accepted restoration source has another root",
-        ));
-    }
-    let database = open_backend(path, expected)?;
+    let database = open_validated_backend(
+        path,
+        &authority.barrier.source_object,
+        &authority.record.plan.root_id,
+        |snapshot| crate::restorations::validate_source_snapshot(lease, authority, snapshot),
+    )?;
     drop(database);
     lease.revalidate()
 }
