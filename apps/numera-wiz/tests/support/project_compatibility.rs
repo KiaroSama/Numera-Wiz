@@ -576,6 +576,723 @@ fn owner_startup_decoder_cases() {
         OwnerStartupObservation::Incomplete
     );
 }
+// Source-scoped human stderr observations, never startup/recovery authority.
+// Exact-looking standalone lines are not authenticated by this projection.
+// PrimaryFormatter sorts fields and escape_debug-escapes them. The pinned
+// tracing-core Option<Value> records Some's value and omits None entirely.
+const OWNER_STDERR_LINE_LIMIT: usize = 4096;
+const OWNER_STDERR_ERROR_LIMIT: usize = 4;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ApplicationStartStage {
+    OpenApplicationService,
+    ResolveProtectedRootPath,
+    AttachAndRecoverSelectedStore,
+    AcquireRootOwnershipAndSelectGeneration,
+    PrepareCompatibleGenesisProfiles,
+    CreateAndPublishCompatibleGenesis,
+    OpenSelectedGeneration,
+    RecoverCompatibleGenesisPrefix,
+    RecoverAcceptedLegacyMigration,
+    RecoverAcceptedMediaEnablement,
+    RecoverAcceptedMediaRestoration,
+    CheckDefaultProfileAvailability,
+    InitializeEngineComponents,
+    ConstructOwnerRuntimeState,
+    RecoverDurableDispatcher,
+}
+impl ApplicationStartStage {
+    // Only literal Service StageTiming::start sites in runtime.rs at SOURCEGO.
+    fn from_label(label: &str) -> Option<Self> {
+        Some(match label {
+            "Open application service" => Self::OpenApplicationService,
+            "Resolve protected root path" => Self::ResolveProtectedRootPath,
+            "Attach and recover selected store" => Self::AttachAndRecoverSelectedStore,
+            "Acquire root ownership and select generation" => {
+                Self::AcquireRootOwnershipAndSelectGeneration
+            }
+            "Prepare compatible genesis profiles" => Self::PrepareCompatibleGenesisProfiles,
+            "Create and publish compatible genesis" => Self::CreateAndPublishCompatibleGenesis,
+            "Open selected generation" => Self::OpenSelectedGeneration,
+            "Recover compatible genesis prefix" => Self::RecoverCompatibleGenesisPrefix,
+            "Recover accepted legacy migration" => Self::RecoverAcceptedLegacyMigration,
+            "Recover accepted media enablement" => Self::RecoverAcceptedMediaEnablement,
+            "Recover accepted media restoration" => Self::RecoverAcceptedMediaRestoration,
+            "Check default profile availability" => Self::CheckDefaultProfileAvailability,
+            "Initialize engine components" => Self::InitializeEngineComponents,
+            "Construct owner runtime state" => Self::ConstructOwnerRuntimeState,
+            "Recover durable dispatcher" => Self::RecoverDurableDispatcher,
+            _ => return None,
+        })
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FilesystemOperation {
+    SourcePathMetadata,
+    SourcePathCanonicalize,
+    RegularFileOpen,
+    RegularFileMetadata,
+    IdentitySeek,
+    IdentityMetadataBefore,
+    IdentityRead,
+    IdentityMetadataAfter,
+    PrivateDirectoryExists,
+    PrivateDirectoryCreate,
+    PrivateDirectoryMetadata,
+    PrivateDirectoryCanonicalize,
+    PrivateWriteCreate,
+    PrivateWriteWrite,
+    PrivateWriteSync,
+    PrivateWritePersist,
+    AclTokenOpen,
+    AclTokenRead,
+    AclSidText,
+    AclSidDecode,
+    AclObjectOpen,
+    AclObjectMetadata,
+    AclDescriptorCreate,
+    AclCreateAbsolute,
+    AclCreateExists,
+    AclCreateParent,
+    AclDirectoryCreate,
+    AclDaclRead,
+    AclDaclText,
+    AclDaclDecode,
+    AclDirectoryMetadata,
+}
+impl FilesystemOperation {
+    // All static diagnostic_io_error and Windows wrapper arguments in the
+    // pinned files.rs, security.rs and security/windows.rs, with no fallback.
+    fn from_label(label: &str) -> Option<Self> {
+        Some(match label {
+            "source_path.metadata" => Self::SourcePathMetadata,
+            "source_path.canonicalize" => Self::SourcePathCanonicalize,
+            "regular_file.open" => Self::RegularFileOpen,
+            "regular_file.metadata" => Self::RegularFileMetadata,
+            "identity.seek" => Self::IdentitySeek,
+            "identity.metadata_before" => Self::IdentityMetadataBefore,
+            "identity.read" => Self::IdentityRead,
+            "identity.metadata_after" => Self::IdentityMetadataAfter,
+            "private_directory.exists" => Self::PrivateDirectoryExists,
+            "private_directory.create" => Self::PrivateDirectoryCreate,
+            "private_directory.metadata" => Self::PrivateDirectoryMetadata,
+            "private_directory.canonicalize" => Self::PrivateDirectoryCanonicalize,
+            "private_write.create" => Self::PrivateWriteCreate,
+            "private_write.write" => Self::PrivateWriteWrite,
+            "private_write.sync" => Self::PrivateWriteSync,
+            "private_write.persist" => Self::PrivateWritePersist,
+            "acl.token_open" => Self::AclTokenOpen,
+            "acl.token_read" => Self::AclTokenRead,
+            "acl.sid_text" => Self::AclSidText,
+            "acl.sid_decode" => Self::AclSidDecode,
+            "acl.object_open" => Self::AclObjectOpen,
+            "acl.object_metadata" => Self::AclObjectMetadata,
+            "acl.descriptor_create" => Self::AclDescriptorCreate,
+            "acl.create_absolute" => Self::AclCreateAbsolute,
+            "acl.create_exists" => Self::AclCreateExists,
+            "acl.create_parent" => Self::AclCreateParent,
+            "acl.directory_create" => Self::AclDirectoryCreate,
+            "acl.dacl_read" => Self::AclDaclRead,
+            "acl.dacl_text" => Self::AclDaclText,
+            "acl.dacl_decode" => Self::AclDaclDecode,
+            "acl.directory_metadata" => Self::AclDirectoryMetadata,
+            _ => return None,
+        })
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum OwnerFailureStage {
+    ExecutableIdentity,
+    RuntimeDirectory,
+    OwnerRecordPublish,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "record_class", rename_all = "snake_case")]
+enum OwnerStderrError {
+    Filesystem {
+        operation: FilesystemOperation,
+        os_error_present: bool,
+        os_error: Option<i32>,
+    },
+    OwnerStartup {
+        stage: OwnerFailureStage,
+        code: OwnerStartupCode,
+    },
+}
+enum OwnerStderrRecord {
+    Started(ApplicationStartStage),
+    Error(OwnerStderrError),
+}
+#[derive(Clone, Copy)]
+enum OwnerStderrFault {
+    Malformed,
+    Unrecognized,
+    Oversized,
+}
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum OwnerStderrStatus {
+    Missing,
+    Observed,
+    Incomplete,
+    Rejected,
+    InvalidUtf8,
+    CountMismatch,
+    NotReaped,
+}
+#[derive(Debug, Serialize)]
+struct OwnerStderrDiagnostic {
+    schema_version: u8,
+    observation: OwnerStderrStatus,
+    // A recognized start only: neither the failed stage nor completion proof.
+    last_started_application_stage: Option<ApplicationStartStage>,
+    error_observations: Vec<OwnerStderrError>,
+    recognized_records: u32,
+    error_observations_seen: u32,
+    malformed_candidates: u32,
+    unrecognized_candidates: u32,
+    oversized_candidates: u32,
+    retained_prefix_truncated: bool,
+    partial_final_line: bool,
+}
+// UTC millisecond shape emitted by PrimaryFormatter, including calendar bounds.
+// Timestamps are discarded; they authenticate nothing and never order evidence.
+fn owner_stderr_timestamp(timestamp: &str) -> bool {
+    let bytes = timestamp.as_bytes();
+    if bytes.len() != 24
+        || !bytes.iter().enumerate().all(|(index, byte)| match index {
+            4 | 7 => *byte == b'-',
+            10 => *byte == b'T',
+            13 | 16 => *byte == b':',
+            19 => *byte == b'.',
+            23 => *byte == b'Z',
+            _ => byte.is_ascii_digit(),
+        })
+    {
+        return false;
+    }
+    let pair = |at| (bytes[at] - b'0') as u32 * 10 + (bytes[at + 1] - b'0') as u32;
+    let year = pair(0) * 100 + pair(2);
+    let month = pair(5);
+    let days = match month {
+        4 | 6 | 9 | 11 => 30,
+        2 if year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400)) => 29,
+        2 => 28,
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        _ => return false,
+    };
+    (1..=days).contains(&pair(8)) && pair(11) < 24 && pair(14) < 60 && pair(17) < 60
+}
+fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStderrFault> {
+    use OwnerStderrFault::{Malformed, Oversized, Unrecognized};
+    let Some((timestamp, rest)) = line
+        .strip_prefix('[')
+        .and_then(|line| line.split_once("] ["))
+    else {
+        return Ok(None);
+    };
+    let Some((level, body)) = rest.split_once("] ") else {
+        return Ok(None);
+    };
+    let candidate = [
+        "Application startup stage started",
+        "Filesystem operation failed",
+        "Owner startup stage failed",
+    ]
+    .into_iter()
+    .find(|message| {
+        body.strip_prefix(*message)
+            .is_some_and(|tail| tail.is_empty() || tail.starts_with(' '))
+    });
+    let Some(message) = candidate else {
+        return Ok(None);
+    };
+    // The caller removed LF; include that framing byte in the candidate cap.
+    if line.len().saturating_add(1) > OWNER_STDERR_LINE_LIMIT {
+        return Err(Oversized);
+    }
+    if !owner_stderr_timestamp(timestamp)
+        || !line.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+        || level
+            != if message == "Application startup stage started" {
+                "INFO"
+            } else {
+                "ERROR"
+            }
+    {
+        return Err(Malformed);
+    }
+    let fields = body.strip_prefix(message).ok_or(Malformed)?;
+    if message == "Application startup stage started" {
+        let label = fields.strip_prefix(" stage=").ok_or(Malformed)?;
+        return ApplicationStartStage::from_label(label)
+            .map(|stage| Some(OwnerStderrRecord::Started(stage)))
+            .ok_or(Unrecognized);
+    }
+    if message == "Filesystem operation failed" {
+        let fields = fields.strip_prefix(" operation=").ok_or(Malformed)?;
+        let (operation, fields) = fields.split_once(' ').ok_or(Malformed)?;
+        let operation = FilesystemOperation::from_label(operation).ok_or(Unrecognized)?;
+        let os_error = if fields == "os_error_present=false" {
+            None
+        } else {
+            let integer = fields
+                .strip_prefix("os_error=")
+                .and_then(|fields| fields.strip_suffix(" os_error_present=true"))
+                .ok_or(Malformed)?;
+            let digits = integer.strip_prefix('-').unwrap_or(integer);
+            if digits.is_empty()
+                || !digits.bytes().all(|byte| byte.is_ascii_digit())
+                || (digits.len() > 1 && digits.starts_with('0'))
+                || integer == "-0"
+            {
+                return Err(Malformed);
+            }
+            Some(integer.parse::<i32>().map_err(|_| Malformed)?)
+        };
+        return Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::Filesystem {
+            operation,
+            os_error_present: os_error.is_some(),
+            os_error,
+        })));
+    }
+    let fields = fields.strip_prefix(" code=").ok_or(Malformed)?;
+    let (code, stage) = fields.split_once(" stage=").ok_or(Malformed)?;
+    let code = match code {
+        "OWNER_BUSY" => OwnerStartupCode::OwnerBusy,
+        "LOG_FILE_UNOWNED" => OwnerStartupCode::LogFileUnowned,
+        "OWNER_IDENTITY_CONFLICT" => OwnerStartupCode::OwnerIdentityConflict,
+        "FILESYSTEM_ERROR" => OwnerStartupCode::FilesystemError,
+        "LOG_STORAGE_ERROR" => OwnerStartupCode::LogStorageError,
+        "INSECURE_DATA_ROOT" => OwnerStartupCode::InsecureDataRoot,
+        "OTHER_DOMAIN" => OwnerStartupCode::OtherDomain,
+        "ADAPTER_ERROR" => OwnerStartupCode::AdapterError,
+        _ => return Err(Unrecognized),
+    };
+    let stage = match stage {
+        "executable_identity" => OwnerFailureStage::ExecutableIdentity,
+        "runtime_directory" => OwnerFailureStage::RuntimeDirectory,
+        "owner_record_publish" => OwnerFailureStage::OwnerRecordPublish,
+        _ => return Err(Unrecognized),
+    };
+    Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::OwnerStartup {
+        stage,
+        code,
+    })))
+}
+// Pure projection of the existing bounded capture, called after the existing
+// failure drain. No IO, wait, parser text, raw label or new failure is returned.
+fn owner_stderr_diagnostic(captured: &Captured, reaped: bool) -> OwnerStderrDiagnostic {
+    let mut diagnostic = OwnerStderrDiagnostic {
+        schema_version: 1,
+        observation: OwnerStderrStatus::Missing,
+        last_started_application_stage: None,
+        error_observations: Vec::with_capacity(OWNER_STDERR_ERROR_LIMIT),
+        recognized_records: 0,
+        error_observations_seen: 0,
+        malformed_candidates: 0,
+        unrecognized_candidates: 0,
+        oversized_candidates: 0,
+        retained_prefix_truncated: captured.total > captured.bytes.len() as u64,
+        partial_final_line: !captured.bytes.is_empty() && !captured.bytes.ends_with(b"\n"),
+    };
+    if !reaped {
+        diagnostic.observation = OwnerStderrStatus::NotReaped;
+        return diagnostic;
+    }
+    if captured.total < captured.bytes.len() as u64 || captured.bytes.len() > MAX_BODY {
+        diagnostic.observation = OwnerStderrStatus::CountMismatch;
+        return diagnostic;
+    }
+    let Ok(text) = std::str::from_utf8(&captured.bytes) else {
+        diagnostic.observation = OwnerStderrStatus::InvalidUtf8;
+        return diagnostic;
+    };
+    // split_inclusive preserves whether the final line actually reached LF.
+    // Even an apparently complete record in a partial final line is not parsed.
+    for line in text.split_inclusive('\n') {
+        let Some(line) = line.strip_suffix('\n') else {
+            break;
+        };
+        match owner_stderr_record(line) {
+            Ok(Some(record)) => {
+                diagnostic.recognized_records = diagnostic.recognized_records.saturating_add(1);
+                match record {
+                    OwnerStderrRecord::Started(stage) => {
+                        diagnostic.last_started_application_stage = Some(stage);
+                    }
+                    OwnerStderrRecord::Error(error) => {
+                        diagnostic.error_observations_seen =
+                            diagnostic.error_observations_seen.saturating_add(1);
+                        if diagnostic.error_observations.len() == OWNER_STDERR_ERROR_LIMIT {
+                            diagnostic.error_observations.remove(0);
+                        }
+                        diagnostic.error_observations.push(error);
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(OwnerStderrFault::Malformed) => {
+                diagnostic.malformed_candidates = diagnostic.malformed_candidates.saturating_add(1);
+            }
+            Err(OwnerStderrFault::Unrecognized) => {
+                diagnostic.unrecognized_candidates =
+                    diagnostic.unrecognized_candidates.saturating_add(1);
+            }
+            Err(OwnerStderrFault::Oversized) => {
+                diagnostic.oversized_candidates = diagnostic.oversized_candidates.saturating_add(1);
+            }
+        }
+    }
+    diagnostic.observation = if diagnostic.malformed_candidates != 0
+        || diagnostic.unrecognized_candidates != 0
+        || diagnostic.oversized_candidates != 0
+    {
+        diagnostic.last_started_application_stage = None;
+        diagnostic.error_observations.clear();
+        OwnerStderrStatus::Rejected
+    } else if diagnostic.retained_prefix_truncated || diagnostic.partial_final_line {
+        OwnerStderrStatus::Incomplete
+    } else if diagnostic.recognized_records != 0 {
+        OwnerStderrStatus::Observed
+    } else {
+        OwnerStderrStatus::Missing
+    };
+    // Every serialized member is a fixed enum/scalar, and the sole variable
+    // collection holds <=4 fixed-size records: even pretty JSON is <4096 bytes.
+    diagnostic
+}
+
+// Independent literal formatter records exercise the same pure helper used by
+// Owner::start. These are part of the existing package entry, never new tests.
+fn owner_stderr_diagnostic_cases() {
+    let project = |bytes: &[u8]| {
+        owner_stderr_diagnostic(
+            &Captured {
+                bytes: bytes.to_vec(),
+                total: bytes.len() as u64,
+            },
+            true,
+        )
+    };
+    let stages = project(b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Open application service\n[2026-11-13T16:44:01.008Z] [INFO] Application startup stage started stage=Acquire root ownership and select generation\n[2026-11-13T16:44:01.009Z] [INFO] Application startup stage ended elapsed_ms=1 stage=Acquire root ownership and select generation\n[2026-11-13T16:44:01.010Z] [INFO] Application startup stage started stage=Recover accepted media restoration\n[2026-11-13T16:44:01.011Z] [INFO] Application startup stage ended elapsed_ms=2 stage=Open application service\n");
+    assert_eq!(stages.observation, OwnerStderrStatus::Observed);
+    assert_eq!(stages.recognized_records, 3);
+    assert_eq!(
+        stages.last_started_application_stage,
+        Some(ApplicationStartStage::RecoverAcceptedMediaRestoration)
+    );
+    assert!(stages.error_observations.is_empty());
+    let filesystem: &[(&[u8], FilesystemOperation, Option<i32>)] = &[
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=0 os_error_present=true\n",
+            FilesystemOperation::IdentityRead,
+            Some(0),
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=private_write.sync os_error=-1 os_error_present=true\n",
+            FilesystemOperation::PrivateWriteSync,
+            Some(-1),
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=acl.dacl_read os_error=-2147483648 os_error_present=true\n",
+            FilesystemOperation::AclDaclRead,
+            Some(i32::MIN),
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=regular_file.open os_error=2147483647 os_error_present=true\n",
+            FilesystemOperation::RegularFileOpen,
+            Some(i32::MAX),
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=acl.sid_decode os_error_present=false\n",
+            FilesystemOperation::AclSidDecode,
+            None,
+        ),
+    ];
+    for &(bytes, operation, os_error) in filesystem {
+        let diagnostic = project(bytes);
+        assert_eq!(diagnostic.observation, OwnerStderrStatus::Observed);
+        assert_eq!(
+            diagnostic.error_observations,
+            vec![OwnerStderrError::Filesystem {
+                operation,
+                os_error_present: os_error.is_some(),
+                os_error,
+            }]
+        );
+    }
+    let owner: &[(&[u8], OwnerFailureStage, OwnerStartupCode)] = &[
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=executable_identity\n",
+            OwnerFailureStage::ExecutableIdentity,
+            OwnerStartupCode::OwnerBusy,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=LOG_FILE_UNOWNED stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::LogFileUnowned,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_IDENTITY_CONFLICT stage=owner_record_publish\n",
+            OwnerFailureStage::OwnerRecordPublish,
+            OwnerStartupCode::OwnerIdentityConflict,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=FILESYSTEM_ERROR stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::FilesystemError,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=LOG_STORAGE_ERROR stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::LogStorageError,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=INSECURE_DATA_ROOT stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::InsecureDataRoot,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OTHER_DOMAIN stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::OtherDomain,
+        ),
+        (
+            b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=ADAPTER_ERROR stage=runtime_directory\n",
+            OwnerFailureStage::RuntimeDirectory,
+            OwnerStartupCode::AdapterError,
+        ),
+    ];
+    for &(bytes, stage, code) in owner {
+        assert_eq!(
+            project(bytes).error_observations,
+            vec![OwnerStderrError::OwnerStartup { stage, code }]
+        );
+    }
+    let last_four = project(
+        &filesystem
+            .iter()
+            .flat_map(|(bytes, _, _)| bytes.iter().copied())
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(last_four.error_observations_seen, 5);
+    assert_eq!(
+        last_four.error_observations,
+        vec![
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::PrivateWriteSync,
+                os_error_present: true,
+                os_error: Some(-1),
+            },
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::AclDaclRead,
+                os_error_present: true,
+                os_error: Some(i32::MIN),
+            },
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::RegularFileOpen,
+                os_error_present: true,
+                os_error: Some(i32::MAX),
+            },
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::AclSidDecode,
+                os_error_present: false,
+                os_error: None,
+            },
+        ]
+    );
+    let repeated = project(&[owner[0].0, owner[0].0].concat());
+    assert_eq!(repeated.error_observations_seen, 2);
+    assert_eq!(repeated.error_observations.len(), 2);
+    let mixed = project(
+        &[
+            filesystem[0].0,
+            owner[0].0,
+            filesystem[1].0,
+            owner[1].0,
+            filesystem[2].0,
+        ]
+        .concat(),
+    );
+    assert_eq!(mixed.error_observations_seen, 5);
+    assert_eq!(
+        mixed.error_observations,
+        vec![
+            OwnerStderrError::OwnerStartup {
+                stage: OwnerFailureStage::ExecutableIdentity,
+                code: OwnerStartupCode::OwnerBusy,
+            },
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::PrivateWriteSync,
+                os_error_present: true,
+                os_error: Some(-1),
+            },
+            OwnerStderrError::OwnerStartup {
+                stage: OwnerFailureStage::RuntimeDirectory,
+                code: OwnerStartupCode::LogFileUnowned,
+            },
+            OwnerStderrError::Filesystem {
+                operation: FilesystemOperation::AclDaclRead,
+                os_error_present: true,
+                os_error: Some(i32::MIN),
+            },
+        ]
+    );
+    let unrelated = project(b"[2026-11-13T16:44:01.007Z] [ERROR] Other message path=C:\\private\\fixture bearer=private-token error=private-error\n[2026-11-13T16:44:01.007Z] [INFO] Other message request=\\n[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=5 os_error_present=true\n");
+    assert_eq!(unrelated.observation, OwnerStderrStatus::Missing);
+    let serialized = serde_json::to_string(&unrelated).expect("Serialize finite stderr observation");
+    for private in ["C:", "private", "bearer", "token", "request", "identity.read"] {
+        assert!(!serialized.contains(private));
+    }
+    assert_eq!(project(b"").observation, OwnerStderrStatus::Missing);
+    assert_eq!(project(b"\xff\n").observation, OwnerStderrStatus::InvalidUtf8);
+    let invalid_utf8 = project(&[filesystem[0].0, b"\xff\n"].concat());
+    assert_eq!(invalid_utf8.observation, OwnerStderrStatus::InvalidUtf8);
+    assert!(invalid_utf8.error_observations.is_empty());
+    let partial = project(b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=0 os_error_present=true");
+    assert_eq!(partial.observation, OwnerStderrStatus::Incomplete);
+    assert!(partial.partial_final_line);
+    assert!(partial.error_observations.is_empty());
+    let bytes = filesystem[0].0;
+    let prefix = owner_stderr_diagnostic(
+        &Captured {
+            bytes: bytes.to_vec(),
+            total: bytes.len() as u64 + 1,
+        },
+        true,
+    );
+    assert_eq!(prefix.observation, OwnerStderrStatus::Incomplete);
+    assert!(prefix.retained_prefix_truncated);
+    assert_eq!(prefix.error_observations_seen, 1);
+    let truncated_partial = owner_stderr_diagnostic(
+        &Captured {
+            bytes: bytes[..bytes.len() - 1].to_vec(),
+            total: u64::MAX,
+        },
+        true,
+    );
+    assert_eq!(truncated_partial.observation, OwnerStderrStatus::Incomplete);
+    assert!(truncated_partial.retained_prefix_truncated && truncated_partial.partial_final_line);
+    assert!(truncated_partial.error_observations.is_empty());
+    let not_reaped = owner_stderr_diagnostic(
+        &Captured {
+            bytes: bytes.to_vec(),
+            total: bytes.len() as u64,
+        },
+        false,
+    );
+    assert_eq!(not_reaped.observation, OwnerStderrStatus::NotReaped);
+    assert!(not_reaped.error_observations.is_empty());
+    assert_eq!(
+        owner_stderr_diagnostic(
+            &Captured {
+                bytes: bytes.to_vec(),
+                total: 0,
+            },
+            true,
+        )
+        .observation,
+        OwnerStderrStatus::CountMismatch
+    );
+    let rejected: &[&[u8]] = &[
+        b"[2026-11-13T16:44:01.007Z] [INFO] Filesystem operation failed operation=identity.read os_error=5 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Application startup stage started stage=Open application service\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory\n",
+        b"[2026-13-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\n",
+        b"[2026-02-29T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\n",
+        b"[2026-11-13T24:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007+00:00] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\n",
+        b"[2026-11-13 16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read operation=identity.read os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=unknown os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=2147483648 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=-2147483649 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=+5 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=05 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=-0 os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=Some(5) os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=None os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=true\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error=5 os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=False\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed os_error_present=false\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false extra=private-error\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed os_error_present=false operation=identity.read\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\r\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\0\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\t\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\x7f\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=false\\n[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read\n[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=unknown\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Open application service stage=Open application service\n",
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=Open application service\\q\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=unknown stage=runtime_directory\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed stage=runtime_directory\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=unknown\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY code=OWNER_BUSY stage=runtime_directory\n",
+        b"[2026-11-13T16:44:01.007Z] [ERROR] Owner startup stage failed code=OWNER_BUSY stage=runtime_directory extra=private-error\n",
+    ];
+    for &bytes in rejected {
+        let diagnostic = project(&[filesystem[0].0, bytes].concat());
+        assert_eq!(diagnostic.observation, OwnerStderrStatus::Rejected);
+        assert!(diagnostic.last_started_application_stage.is_none());
+        assert!(diagnostic.error_observations.is_empty());
+        let serialized = serde_json::to_string(&diagnostic).expect("Serialize finite rejection");
+        assert!(!serialized.contains("private-error") && !serialized.contains("unknown"));
+    }
+    let faults = project(b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=unknown\n[2026-11-13T16:44:01.007Z] [ERROR] Filesystem operation failed operation=identity.read os_error_present=true\n");
+    assert_eq!(faults.unrecognized_candidates, 1);
+    assert_eq!(faults.malformed_candidates, 1);
+    let mut oversized =
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=".to_vec();
+    oversized.resize(OWNER_STDERR_LINE_LIMIT, b'x');
+    oversized.push(b'\n');
+    let oversized = project(&oversized);
+    assert_eq!(oversized.observation, OwnerStderrStatus::Rejected);
+    assert_eq!(oversized.oversized_candidates, 1);
+    let mut boundary =
+        b"[2026-11-13T16:44:01.007Z] [INFO] Application startup stage started stage=".to_vec();
+    boundary.resize(OWNER_STDERR_LINE_LIMIT - 1, b'x');
+    boundary.push(b'\n');
+    let boundary = project(&boundary);
+    assert_eq!(boundary.observation, OwnerStderrStatus::Rejected);
+    assert_eq!(boundary.oversized_candidates, 0);
+    assert_eq!(boundary.unrecognized_candidates, 1);
+    assert!(owner_stderr_timestamp("2024-02-29T23:59:59.999Z"));
+    assert!(!owner_stderr_timestamp("2100-02-29T23:59:59.999Z"));
+    let mut maximum = project(&[filesystem[2].0; OWNER_STDERR_ERROR_LIMIT].concat());
+    maximum.last_started_application_stage =
+        Some(ApplicationStartStage::AcquireRootOwnershipAndSelectGeneration);
+    maximum.error_observations = vec![
+        OwnerStderrError::Filesystem {
+            operation: FilesystemOperation::PrivateDirectoryCanonicalize,
+            os_error_present: true,
+            os_error: Some(i32::MIN),
+        };
+        OWNER_STDERR_ERROR_LIMIT
+    ];
+    maximum.recognized_records = u32::MAX;
+    maximum.error_observations_seen = u32::MAX;
+    maximum.malformed_candidates = u32::MAX;
+    maximum.unrecognized_candidates = u32::MAX;
+    maximum.oversized_candidates = u32::MAX;
+    assert!(
+        serde_json::to_vec_pretty(&maximum)
+            .expect("Serialize bounded typed stderr shape")
+            .len()
+            <= 4096
+    );
+}
+
 async fn response_bytes(mut response: reqwest::Response) -> Result<Value> {
     ensure!(
         response.status().is_success(),
@@ -689,7 +1406,7 @@ impl Owner {
                     .into_iter()
                     .filter(|code| diagnostics.contains(*code))
                     .collect::<Vec<_>>();
-                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes,"startup_stdout":startup_stdout}))?;
+                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes,"startup_stdout":startup_stdout,"startup_stderr":owner_stderr_diagnostic(&captured, reaped)}))?;
                 }
                 return Err(match failure {
                     Ok(Err(error)) => error,
@@ -2135,6 +2852,7 @@ pub async fn run() {
         return;
     }
     owner_startup_decoder_cases();
+    owner_stderr_diagnostic_cases();
     // This fixed fallback preserves a failure record even if preparation/configuration
     // failed before it could create files. Required=1 is set by the workflow itself.
     let directory =
