@@ -1568,6 +1568,7 @@ fn selected_track_and_clip_recovery() {
 
 // These controller cases use captured projections and the same handlers as the
 // visible controls. They do not claim OS/browser interaction qualification.
+const GROUP_OTHER_TRACK: &str = "70000000-0000-4000-8000-000000000005";
 fn group_selection_ready(count: usize) -> (WizApp, Arc<MockJsonClient>, egui::Context) {
     let (mut app, port, ctx) = ready();
     app.scope = Some(scope());
@@ -1581,7 +1582,20 @@ fn group_selection_ready(count: usize) -> (WizApp, Arc<MockJsonClient>, egui::Co
         &[SELECT_SEQUENCE],
         false,
     );
-    selected_tracks(&mut app, &port, &ctx, SELECT_TICKET, "1", count);
+    if count > PAGE {
+        // Both navigation targets come from this canonical captured track page.
+        let settings = app.projects.forms.sequence().unwrap()["settings"].clone();
+        let request = port.complete(projection(SELECT_TICKET, "1", "entity", json!({"entity":{"id":SELECT_SEQUENCE,"kind":"sequence","settings":settings,"track_count":2,"locked":false}})));
+        assert_eq!(request.params["sequence_id"], SELECT_SEQUENCE);
+        app.receive(&ctx);
+        port.complete(projection(SELECT_TICKET, "1", "track_page", json!({"items":[{"id":SELECT_TRACK,"kind":"video","name":"Video","order":0,"clip_count":count},{"id":GROUP_OTHER_TRACK,"kind":"video","name":"Other video","order":1,"clip_count":0}],"next_cursor":null,"total_count":2,"count_accuracy":"exact"})));
+        app.receive(&ctx);
+        let request = port.complete(projection(SELECT_TICKET, "1", "entity", json!({"entity":{"id":SELECT_TRACK,"kind":"video","sequence_id":SELECT_SEQUENCE,"order":0,"grid":{"num":"25","den":"1"},"clip_count":count,"locked":false}})));
+        assert_eq!(request.params["entity_id"], SELECT_TRACK);
+        app.receive(&ctx);
+    } else {
+        selected_tracks(&mut app, &port, &ctx, SELECT_TICKET, "1", count);
+    }
     port.complete(selected_page(
         SELECT_TICKET,
         "1",
@@ -1654,7 +1668,21 @@ fn clip_group_selection_and_requests() {
         PAGE
     );
     let mut view = app.projects.group.as_ref().unwrap().view.clone();
-    view.track = Some(TRACK.into());
+    view.track = Some(
+        app.projects
+            .group
+            .as_ref()
+            .unwrap()
+            .tracks
+            .items
+            .iter()
+            .find(|track| Some(track.id.as_str()) != view.track.as_deref())
+            .expect("A different track captured in the same sequence")
+            .id
+            .to_string(),
+    );
+    assert_eq!(view.track.as_deref(), Some(GROUP_OTHER_TRACK));
+    assert_ne!(view.track.as_deref(), Some(SELECT_TRACK));
     app.project_reselect(view, &ctx);
     assert_eq!(
         app.projects.clip_selection.as_ref().unwrap().seeds.len(),
@@ -1781,7 +1809,10 @@ fn clip_group_selection_and_requests() {
     let inspected = group.view.clip.as_deref().unwrap();
     assert_ne!(inspected, clip.occurrence_id.as_str());
     assert_ne!(inspected, clip.source_id.as_str());
-    assert_ne!(Some(inspected), clip.link_group_id.as_deref());
+    assert_ne!(
+        Some(inspected),
+        clip.link_group_id.as_ref().map(|id| id.as_str())
+    );
     // Invalid controller captures must never guess another payload identity or
     // send a request. Production capture publication already checks correlation.
     for invalid in [
@@ -1797,8 +1828,14 @@ fn clip_group_selection_and_requests() {
             "missing id" => group.view.clip = None,
             "invalid id" => group.view.clip = Some("invalid-entity-id".into()),
             "missing payload" => group.clip = None,
-            "sequence" => group.clip.as_mut().unwrap().sequence_id = BIN.into(),
-            "track" => group.clip.as_mut().unwrap().track_id = BIN.into(),
+            "sequence" => {
+                group.clip.as_mut().unwrap().sequence_id =
+                    nw_domain::projects::EntityId::parse(BIN).unwrap();
+            }
+            "track" => {
+                group.clip.as_mut().unwrap().track_id =
+                    nw_domain::projects::EntityId::parse(BIN).unwrap();
+            }
             _ => unreachable!(),
         }
         assert!(app.project_link_params(true).is_none(), "Refuse {invalid}");
