@@ -3,6 +3,7 @@ mod batches;
 mod cleanup;
 pub mod client;
 mod folders;
+mod jobs;
 mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
@@ -10,7 +11,7 @@ use nw_domain::{
     commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
-    views::{AssetSummary, JobSummary, PlanReview, SnapshotPage},
+    views::{AssetSummary, PlanReview, SnapshotPage},
 };
 use serde_json::{Value, json};
 use std::{
@@ -115,7 +116,7 @@ pub struct WizApp {
     subtitle_order: String,
     generation: u64,
     plan: Option<Arc<PlanReview>>,
-    jobs: Vec<JobSummary>,
+    jobs: Vec<jobs::JobRow>,
     jobs_cursor: Option<String>,
     jobs_snapshot: Option<String>,
     last_jobs: Instant,
@@ -699,9 +700,9 @@ impl WizApp {
                     self.last_jobs = Instant::now() - Duration::from_secs(2);
                 }
                 Action::Jobs => {
-                    let page: SnapshotPage<JobSummary> =
+                    let page: SnapshotPage<Value> =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
-                    self.jobs = page.items;
+                    self.jobs = page.items.into_iter().map(jobs::JobRow::decode).collect::<Result<_, _>>()?;
                     self.jobs_cursor = page.next_cursor;
                     self.jobs_snapshot = Some(page.snapshot_id);
                     self.last_jobs = Instant::now();
@@ -897,7 +898,7 @@ impl WizApp {
                 for job in &self.jobs {
                     ui.horizontal(|ui| {
                         ui.monospace(job.id.chars().take(8).collect::<String>());
-                        ui.label(format!("{:?}", job.state));
+                        ui.label(job.state.label());
                         ui.label(&job.output_name);
                         if !job.state.terminal()
                             && let Some(progress) = &job.remux_progress
@@ -928,7 +929,7 @@ impl WizApp {
                                 progress.completed_bytes, progress.total_bytes
                             ));
                         }
-                        if job.state == nw_domain::records::JobState::Succeeded
+                        if job.state.succeeded()
                             && ui
                                 .add_enabled(
                                     !self.waiting && self.pending.is_none(),
@@ -936,7 +937,7 @@ impl WizApp {
                                 )
                                 .clicked()
                         {
-                            artifact = Some(format!("job-{}", job.id));
+                            artifact = Some(job.artifact_id.clone());
                         }
                         if !job.state.terminal()
                             && ui
@@ -1338,5 +1339,6 @@ mod tests {
         assert_eq!(app.output, "/controller-unit/manually-selected.mkv");
         assert!(app.plan.is_none());
         crate::projects::tests::controller_cases();
+        crate::jobs::exercise();
     }
 }

@@ -184,5 +184,28 @@ mod tests {
             CleanupLimits::default().operation.duration().unwrap(),
             Some(Duration::from_secs(10800))
         );
+        for raw in [
+            serde_json::json!({"envelope_version":1}),
+            serde_json::json!({"payload_kind":"media_job_v1"}),
+            serde_json::json!({"envelope_version":2,"payload_kind":"media_job_v1"}),
+            serde_json::json!({"envelope_version":1,"payload_kind":"future_job"}),
+        ] {
+            assert!(crate::media_execution::decode_job(raw).is_err());
+        }
+        assert!(crate::media_execution::decode_plan("{}").is_err());
+        assert!(crate::media_execution::exact("00").is_err());
+        assert_eq!(crate::media_execution::exact("0").unwrap(), 0);
+        use crate::media_execution::{MediaJobState as State, MediaStage, finish_stages};
+        for terminal in [State::Failed, State::Cancelled, State::Interrupted] {
+            let mut stages = [
+                MediaStage { id: "render".into(), state: State::Succeeded, invocations: vec![] },
+                MediaStage { id: "verify".into(), state: State::Verifying, invocations: vec![] },
+                MediaStage { id: "publish".into(), state: State::Queued, invocations: vec![] },
+            ];
+            finish_stages(terminal, &mut stages);
+            assert_eq!(stages[0].state, State::Succeeded);
+            assert_eq!(stages[1].state, terminal);
+            assert_eq!(stages[2].state, State::Queued, "Never-run publication cannot become success or imply output");
+        }
     }
 }

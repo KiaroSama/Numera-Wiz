@@ -260,6 +260,7 @@ mod tests {
             "OUTPUT_COLLISION"
         );
         assert!(directory.is_dir());
+        crate::generation_restoration::exercise_restoration_primitives();
     }
     #[test]
     fn proof_names_cannot_escape_the_owned_directory() {

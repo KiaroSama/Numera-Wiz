@@ -1,5 +1,6 @@
 //! Published bytes use a current job-read purpose, independently of output roots.
 use super::*;
+use nw_domain::media_execution::{MediaArtifactState, StoredJob};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use nw_domain::artifacts::{ARTIFACT_CHUNK_BYTES, ArtifactChunk, ArtifactManifest, ChunkInput};
 use nw_platform::artifacts::ArtifactReader;
@@ -50,7 +51,7 @@ impl Service {
         context: &Context,
         artifact_id: &str,
         command: &str,
-    ) -> Result<(Job, Publication)> {
+    ) -> Result<(StoredJob, Publication)> {
         let policy = self.policy(context)?;
         if policy.as_ref().is_some_and(|p| !p.allows_command(command)) {
             return Err(DomainError::new(
@@ -58,41 +59,34 @@ impl Service {
                 "Artifact command is outside the current profile allowlist",
             ));
         }
-        let id = artifact_id
-            .strip_prefix("job-")
-            .ok_or_else(DomainError::object_not_found)?;
-        let key = named("job", id).map_err(|_| DomainError::object_not_found())?;
-        let job: Job = self
-            .store
-            .get(&key)?
-            .ok_or_else(DomainError::object_not_found)?;
-        self.object_action(
-            context,
-            ObjectKind::Job,
-            &job.id,
-            &job.creator,
-            ObjectAction::Read,
-        )?;
-        if job.state != JobState::Succeeded {
-            return Err(DomainError::new(
-                "ARTIFACT_UNAVAILABLE",
-                "This job has no successful published artifact",
-            ));
+        let (id, media) = if let Some(id) = artifact_id.strip_prefix("job-") {
+            (id, false)
+        } else if let Some(id) = artifact_id.strip_prefix("media-").and_then(|id| id.strip_suffix("-output")) {
+            (id, true)
+        } else {
+            return Err(DomainError::object_not_found());
+        };
+        let job = self.store.inspect_execution(id)?;
+        self.object_action(context, ObjectKind::Job, job.id(), job.creator(), ObjectAction::Read)?;
+        let (intent, identity, available) = match &job {
+            StoredJob::Legacy(job) if !media => (job.owned_staging.as_ref(), job.artifact.as_ref(), job.state == JobState::Succeeded),
+            StoredJob::MediaV1(job) if media => (job.owned_staging.as_ref(), job.artifact.identity.as_ref(), job.artifact.state == MediaArtifactState::Published),
+            _ => return Err(DomainError::object_not_found()),
+        };
+        if !available {
+            return Err(DomainError::new("ARTIFACT_UNAVAILABLE", "This artifact has no verified published bytes"));
         }
-        let publication: Publication =
-            self.store.get(&named("publication", id)?)?.ok_or_else(|| {
-                DomainError::new(
-                    "ARTIFACT_UNAVAILABLE",
-                    "Retained physical publication proof is unavailable",
-                )
-            })?;
+        let publication_key = if media { format!("publication/{id}/output") } else { named("publication", id)? };
+        let publication: Publication = self.store.get(&publication_key)?.ok_or_else(|| {
+            DomainError::new("ARTIFACT_UNAVAILABLE", "Retained physical publication proof is unavailable")
+        })?;
         if publication.read_purpose_version != 1 {
             return Err(DomainError::new(
                 "ARTIFACT_UNAVAILABLE",
                 "A supported retained publication byte-read purpose is unavailable",
             ));
         }
-        let intent = job.owned_staging.as_ref().ok_or_else(|| {
+        let intent = intent.ok_or_else(|| {
             DomainError::new(
                 "ARTIFACT_UNAVAILABLE",
                 "Retained owned workspace identity is unavailable",
@@ -105,11 +99,11 @@ impl Service {
             .and_then(|n| n.strip_prefix(".numera-proof-"))
             .is_some_and(|n| Uuid::parse_str(n).is_ok());
         if !publication.published
-            || publication.job_id != job.id
-            || intent.job_id != job.id
-            || job.artifact.as_ref() != Some(&publication.identity)
+            || publication.job_id != job.id()
+            || intent.job_id != job.id()
+            || identity != Some(&publication.identity)
             || publication.output != publication.identity.path
-            || publication.output != job.plan.output
+            || publication.output != job.output()
             || proof.parent() != Some(Path::new(&intent.directory))
             || !valid_proof_name
         {
@@ -208,14 +202,14 @@ impl Service {
             .is_none_or(|p| p.allows_command("artifacts.read_chunk"));
         Ok(ArtifactManifest {
             schema_version: 1,
-            suggested_name: Path::new(&job.plan.output)
+            suggested_name: Path::new(job.output())
                 .file_name()
                 .and_then(|name| name.to_str())
                 .map(str::to_owned),
             artifact_id: id.into(),
             manifest_uri: format!("numera://artifact/{id}/manifest"),
-            job_id: job.id,
-            plan_id: job.plan.id,
+            job_id: job.id().to_owned(),
+            plan_id: job.plan_id().to_owned(),
             mime_type: "application/octet-stream".into(),
             encoded_byte_count: transfer.bytes().to_string(),
             sha256: transfer.sha256().into(),

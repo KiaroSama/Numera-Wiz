@@ -59,19 +59,21 @@ impl Store {
                 "Source guard and selected compatible prefix provenance differ",
             ));
         }
-        let migration = self.inspect_migration(&guard.migration_id)?;
-        migration.plan.validate_hash()?;
-        if migration.schema_version != 1
-            || migration.id != guard.migration_id
-            || migration.plan.id != guard.migration_id
-            || !matches!(migration.phase, MigrationPhase::Succeeded)
-            || migration.plan.root_id != self.root_id()
-            || migration.plan.target_generation != selection.generation
-            || migration.activation_id.as_deref() != Some(prefix.activation_id.as_str())
-        {
-            return Err(invalid(
-                "The original compatible migration is not a completed trusted ancestor",
-            ));
+        if !self.trusted_genesis_guard(&guard, selection.generation)? {
+            let migration = self.inspect_migration(&guard.migration_id)?;
+            migration.plan.validate_hash()?;
+            if migration.schema_version != 1
+                || migration.id != guard.migration_id
+                || migration.plan.id != guard.migration_id
+                || !matches!(migration.phase, MigrationPhase::Succeeded)
+                || migration.plan.root_id != self.root_id()
+                || migration.plan.target_generation != selection.generation
+                || migration.activation_id.as_deref() != Some(prefix.activation_id.as_str())
+            {
+                return Err(invalid(
+                    "The original compatible migration is not a completed trusted ancestor",
+                ));
+            }
         }
         self.validate_migration_records()?;
         self.close_generation(lease)?;
@@ -80,6 +82,7 @@ impl Store {
             if facts.store_version != 3
                 || facts.root_id != self.root_id()
                 || facts.record_count > 49000
+                || facts.required_capabilities.len() != crate::generations::CURRENT_CAPABILITIES.len()
                 || facts.required_capabilities.iter().any(|capability| {
                     !crate::generations::CURRENT_CAPABILITIES.contains(&capability.as_str())
                 })

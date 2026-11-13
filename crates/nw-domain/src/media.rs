@@ -18,7 +18,7 @@ pub const MAX_RAW_BYTES: usize = 1024 * 1024;
 pub const MAX_PLAN_BYTES: usize = 128 * 1024;
 pub const FILTERS: &[&str] = &[
     "color", "trim", "setpts", "settb", "concat", "anullsrc", "atrim", "asetpts", "format",
-    "aformat",
+    "aformat", "setparams",
 ];
 pub const ENCODERS: &[&str] = &["ffv1", "pcm_s16le"];
 pub const MUXERS: &[&str] = &["matroska"];
@@ -333,7 +333,7 @@ fn range_schema(generator: &mut SchemaGenerator) -> Schema {
     generator.subschema_for::<RangeWire>()
 }
 fn filter_schema(_: &mut SchemaGenerator) -> Schema {
-    schemars::json_schema!({"type":"array", "minItems":10, "maxItems":10, "uniqueItems":true, "items":{"type":"string", "enum":FILTERS}})
+    schemars::json_schema!({"type":"array", "minItems":11, "maxItems":11, "uniqueItems":true, "items":{"type":"string", "enum":FILTERS}})
 }
 fn encoder_schema(_: &mut SchemaGenerator) -> Schema {
     schemars::json_schema!({"type":"array", "minItems":2, "maxItems":2, "uniqueItems":true, "items":{"type":"string", "enum":ENCODERS}})

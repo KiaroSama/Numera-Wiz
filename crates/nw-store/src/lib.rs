@@ -18,14 +18,21 @@ const STORE_SCHEMA: &[u8] = b"2";
 const MAX_RECORD: usize = 8 * 1024 * 1024;
 const SCOPE_TTL: u64 = 7 * 24 * 3600;
 mod adoption;
+mod control_backend;
 pub mod copies;
 pub mod generations;
 mod live;
+mod initialization;
+mod media_execution;
+mod media_generations;
 pub mod migrations;
 mod profiles;
 pub mod projects;
 mod promotions;
 mod records;
+mod restoration_control;
+mod restoration_legacy;
+mod restorations;
 pub mod versions;
 fn storage(error: impl std::fmt::Display) -> DomainError {
     DomainError::new("STORAGE_ERROR", error.to_string())
@@ -75,6 +82,27 @@ impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         let root = private_root(path)?;
         let lock = RootLock::acquire(&root)?;
+        Self::open_owned(root, lock)
+    }
+    pub fn open_selected(lease: &generations::RootLease) -> Result<Self> {
+        let selection = lease.selection()?;
+        let path = lease.path(&selection)?;
+        if selection.activation_id.is_some() && !path.join("store.redb").try_exists().map_err(storage)? {
+            return Err(DomainError::new("STORE_RECOVERY_REQUIRED", "Selected generation is missing; no file was initialized"));
+        }
+        let root = private_root(&path)?;
+        let lock = match lease.take_generation_guard(&root)? {
+            Some(lock) => lock,
+            None => RootLock::acquire(&root)?,
+        };
+        let store = Self::open_owned(root, lock)?;
+        store.db.retain_transferred_guards(lease.take_historical_guards()?)?;
+        if selection.root_id.as_deref().is_some_and(|id| id != store.root_id()) {
+            return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Selected generation root differs"));
+        }
+        Ok(store)
+    }
+    fn open_owned(root: std::path::PathBuf, lock: RootLock) -> Result<Self> {
         let file = root.join("store.redb");
         let fresh = !file.try_exists().map_err(storage)?;
         if !fresh {
@@ -137,6 +165,9 @@ impl Store {
             .ok_or_else(|| storage("Scope signing key missing"))?
             .value()
             .to_vec();
+        let capabilities: Vec<String> = table.get("meta/required-capabilities").map_err(storage)?
+            .map(|row| decode(row.value())).transpose()?.unwrap_or_default();
+        let media_floor = capabilities.iter().any(|capability| capability == "media_execution.v1");
         drop(table);
         drop(read);
         if signing_key.len() != 32 {
@@ -150,7 +181,16 @@ impl Store {
             #[cfg(test)]
             project_fail_after_rows: std::sync::atomic::AtomicBool::new(false),
         };
-        store.upgrade_access_profiles()?;
+        if media_floor {
+            store.visit::<nw_domain::access::AccessProfile>("profile/", |profile| {
+                if profile.schema_version != 2 || profile.revision == 0 || profile.principal.is_empty() {
+                    return Err(DomainError::new("STORE_RECOVERY_REQUIRED", "Media floor profile baseline requires explicit recovery before any profile write"));
+                }
+                Ok(())
+            })?;
+        } else {
+            store.upgrade_access_profiles()?;
+        }
         Ok(store)
     }
     pub fn root_id(&self) -> &str {

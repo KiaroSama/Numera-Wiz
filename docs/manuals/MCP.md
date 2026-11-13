@@ -213,6 +213,15 @@ Discovery does not grant owner authority; acceptance/restoration and media
 execution remain unfinished. This source's formatting/unused-import failures
 have follow-up corrections, so these facts do not claim complete current CI.
 
+Source `08bff799` in [run 43352287979](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43352287979)
+retained identical actual 54-tool stdio lines on all four native targets:
+161759 bytes including the newline, within the unchanged 262144-byte limit.
+The additional `timeline.render` Result schema matches the generated schema and
+the actual public CLI validation batch. The [CI249 evidence](../development/evidence/finite-compiler-review-ci249.json)
+records the four artifact hashes and schema comparison. This qualifies that
+source's discovery and finite review contracts; accepted media execution and
+later source changes require their own checks.
+
 A project inspection supplies `context.project:{"id":"<project-uuid>"}`. A durable edit
 also supplies the captured decimal-string `expected_revision` there, alongside
 its retained `request_id`, `replay_scope` and `idempotency_key` in context:
@@ -264,6 +273,12 @@ It requires explicit command permission and Project Read. Its static requirement
 are published with the tool; the existing version1 runtime authorization
 observation retains its original closed 13-command projection. The new result is
 a self-contained `media_v1` review, not a rendered artifact or a legacy retained
-cleanup plan. It produces no receipt. Actual media job acceptance, preview and
-export remain under construction. See the [finite CLI profile](CLI.md#finite-timeline-review-in-development)
-for supported source/range limits and current qualification boundaries.
+cleanup plan. It produces no receipt. The connected development acceptance
+uses the common `jobs.submit` tool with `params.media_plan_json` containing the
+exact UTF-8 review string, plus the retained mutation identity in `context`.
+It independently recaptures the current project before accepting immutable work.
+Use ordinary job inspection/cancellation and the published media artifact's
+existing manifest/chunk routes afterward. This new path still needs integrated
+hosted qualification; preview and the general editor pipeline remain unfinished.
+See the [finite CLI profile](CLI.md#finite-timeline-review-in-development) for
+execution limits and the historical review-only qualification boundary.

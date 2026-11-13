@@ -28,6 +28,44 @@ async fn independent_pipe_draining_stays_bounded_under_flood() {
     assert!(result.stdout.iter().all(|value| *value == b'x'));
     assert_eq!(result.stderr_tail.as_bytes(), &[b'x'; 4096]);
     assert!(result.diagnostic_bytes >= 2 * 1024 * 1024);
+    for readonly in [false, true] {
+        let total = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = total.clone();
+        let consumer: nw_platform::process::ChunkConsumer = Box::new(move |bytes| {
+            assert!(bytes.len() <= 8192);
+            assert!(bytes.iter().all(|byte| *byte == b'x'));
+            observed.fetch_add(bytes.len(), std::sync::atomic::Ordering::Relaxed);
+            Ok(())
+        });
+        let result = if readonly {
+            let source = tempfile::NamedTempFile::new().unwrap();
+            nw_platform::process::stream_readonly_with_output_limits(
+                fixture(),
+                &["flood".into()],
+                Duration::from_secs(10),
+                source.reopen().unwrap(),
+                4096,
+                consumer,
+                CancellationToken::new(),
+            )
+            .await
+        } else {
+            nw_platform::process::stream_with_output_limits(
+                fixture(),
+                &["flood".into()],
+                Duration::from_secs(10),
+                4096,
+                consumer,
+                CancellationToken::new(),
+            )
+            .await
+        }
+        .unwrap();
+        assert!(result.stdout.is_empty());
+        assert_eq!(total.load(std::sync::atomic::Ordering::Relaxed), 2 * 1024 * 1024);
+        assert_eq!(result.stderr_tail.as_bytes(), &[b'x'; 4096]);
+        assert!(result.diagnostic_bytes >= 2 * 1024 * 1024);
+    }
 }
 #[tokio::test]
 async fn cancellation_waits_for_termination_and_reaping() {

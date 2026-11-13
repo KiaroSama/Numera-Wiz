@@ -630,7 +630,7 @@ pub async fn run_owner(
             }),
         )
     });
-    let service = Service::open(root.clone(), binaries).await?;
+    let service = Service::open_application(root.clone(), binaries).await?;
     if !logging_binding.bind_keepalive(service.clone()) {
         return Err(nw_domain::DomainError::new(
             "LOG_STORAGE_ERROR",

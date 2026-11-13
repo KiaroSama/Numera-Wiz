@@ -3,6 +3,9 @@ mod artifacts;
 mod batches;
 mod maintenance;
 mod media;
+mod media_jobs;
+mod scheduler;
+mod startup;
 pub use artifacts::ArtifactTransfer;
 mod clock;
 mod folders;
@@ -79,6 +82,9 @@ pub struct Service {
     batch_preflights: Arc<Semaphore>,
     transfers: Arc<Semaphore>,
     pending: Arc<AtomicUsize>,
+    dispatcher: tokio::sync::mpsc::Sender<String>,
+    dispatcher_receiver: Mutex<Option<tokio::sync::mpsc::Receiver<String>>>,
+    dispatcher_ready: std::sync::atomic::AtomicBool,
     cancellations: Mutex<HashMap<String, CancellationToken>>,
     events: broadcast::Sender<String>,
     #[cfg(test)]
@@ -123,6 +129,12 @@ fn named(prefix: &str, id: &str) -> Result<String> {
 }
 impl Service {
     pub async fn open(root: PathBuf, components: Option<(PathBuf, PathBuf)>) -> Result<Arc<Self>> {
+        Self::open_internal(root, components, false).await
+    }
+    async fn open_internal(root: PathBuf, components: Option<(PathBuf, PathBuf)>, application_startup: bool) -> Result<Arc<Self>> {
+        Self::open_runtime(root, components, application_startup, false).await
+    }
+    async fn open_runtime(root: PathBuf, components: Option<(PathBuf, PathBuf)>, application_startup: bool, defer_dispatcher: bool) -> Result<Arc<Self>> {
         std::fs::create_dir_all(&root).map_err(files::io_error)?;
         let root = std::fs::canonicalize(root).map_err(files::io_error)?;
         let selected_root = root.clone();
@@ -133,8 +145,15 @@ impl Service {
             if selection.activation_id.is_some() && !path.join("store.redb").try_exists().map_err(files::io_error)? {
                 return Err(DomainError::new("STORE_ACTIVATION_INVALID", "Selected complete generation is missing; no empty store was initialized"));
             }
-            let protected = nw_platform::security::private_directory(&path)?;
-            let store = Store::open(&protected)?;
+            let store = if application_startup && selection.activation_id.is_none()
+                && !path.join("store.redb").try_exists().map_err(files::io_error)? {
+                Store::initialize_fresh_legacy_prefix(&lease, &Self::genesis_profiles(&root)?)?
+            } else {
+                Store::open_selected(&lease)?
+            };
+            if application_startup {
+                store.recover_genesis_prefix(&lease)?;
+            }
             if selection.root_id.as_deref().is_some_and(|expected| expected != store.root_id()) {
                 return Err(DomainError::new("OWNER_IDENTITY_CONFLICT", "Selected store and activation root differ"));
             }
@@ -145,11 +164,18 @@ impl Service {
             if let Err(error) = recovery {
                 tracing::warn!(code=%error.code, "Accepted migration remains in maintenance mode; retained copies were preserved");
             }
+            if let Err(error) = store.recover_media_enablement(&lease, || {
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .map(|duration| duration.as_secs()).map_err(|_| DomainError::new("CLOCK_ROLLBACK", "Wall clock predates Unix epoch"))
+            }).and_then(|()| store.recover_media_restoration(&lease)) {
+                tracing::warn!(code=%error.code, "Accepted media generation recovery remains pending before ordinary admission");
+            }
             Ok((store, lease))
         })
         .await
         .map_err(|error| DomainError::new("WORKER_FAILED", error.to_string()))??;
-        if store.get::<AccessProfile>("profile/agent")?.is_none() {
+        let maintenance_pending = store.pending_migration()?.is_some() || store.pending_media_maintenance()?;
+        if !maintenance_pending && store.get::<AccessProfile>("profile/agent")?.is_none() {
             store.put(
                 "profile/agent",
                 &AccessProfile {
@@ -173,7 +199,7 @@ impl Service {
                 },
             )?;
         }
-        if store.get::<AccessProfile>("profile/browser")?.is_none() {
+        if !maintenance_pending && store.get::<AccessProfile>("profile/browser")?.is_none() {
             let assets = nw_platform::security::private_directory(&selected_root.join("assets"))?;
             let exports = nw_platform::security::private_directory(&selected_root.join("exports"))?;
             store.put(
@@ -224,6 +250,7 @@ impl Service {
         code_roots.sort();
         code_roots.dedup();
         let (events, _) = broadcast::channel(128);
+        let (dispatcher, receiver) = tokio::sync::mpsc::channel(128);
         let service = Arc::new(Self {
             store: Arc::new(store),
             root: selected_root,
@@ -243,6 +270,9 @@ impl Service {
             batch_preflights: Arc::new(Semaphore::new(2)),
             transfers: Arc::new(Semaphore::new(2)),
             pending: Arc::new(AtomicUsize::new(0)),
+            dispatcher,
+            dispatcher_receiver: Mutex::new(Some(receiver)),
+            dispatcher_ready: std::sync::atomic::AtomicBool::new(false),
             cancellations: Mutex::new(HashMap::new()),
             events,
             #[cfg(test)]
@@ -251,21 +281,18 @@ impl Service {
             catalog_hook: Mutex::new(None),
         });
         Self::start_snapshot_reaper(&service);
-        if service.store.pending_migration()?.is_some() {
+        if service.store.pending_migration()?.is_some() || service.store.pending_media_maintenance()? {
+            service.dispatcher_ready.store(true, Ordering::Release);
             return Ok(service);
         }
-        let recovering = service.clone();
-        tokio::task::spawn_blocking(move || {
-            recovering.recover_uploads()?;
-            recovering.recover()
-        })
-        .await
-        .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
-        for job in service.store.list::<Job>("job/", 10000)? {
-            if job.state == JobState::Queued {
-                service.schedule(job.id)?;
-            }
+        if application_startup {
+            service.initialize_application_media().await?;
         }
+        if defer_dispatcher { return Ok(service); }
+        service.dispatcher_ready.store(true, Ordering::Release);
+        let starting = service.clone();
+        tokio::task::spawn_blocking(move || starting.resume_dispatcher()).await
+            .map_err(|error| DomainError::new("RECOVERY_FAILED", error.to_string()))??;
         Ok(service)
     }
     pub fn owner(&self) -> Context {
@@ -870,9 +897,22 @@ impl Service {
         };
         let _cancel_on_disconnect = cancellation.clone().drop_guard();
         let service = self.clone();
+        let resumes_maintenance = operation.starts_with("maintenance.");
         let response = match tokio::task::spawn_blocking(move || {
             let _work_permit = permit;
-            service.dispatch_sync(context, request, cancellation)
+            let result = service.dispatch_sync(context, request, cancellation);
+            #[cfg(test)]
+            if resumes_maintenance && result.as_ref().is_ok_and(|response| response.ok) {
+                service.preflight_started();
+            }
+            // This owner work continues if its caller disconnects. dispatch_sync
+            // has released its admission/mutation guards before recovery starts.
+            if resumes_maintenance && result.as_ref().is_ok_and(|response| response.ok)
+                && let Err(error) = service.resume_dispatcher()
+            {
+                tracing::error!(code=%error.code, "Accepted maintenance retains deferred dispatcher recovery");
+            }
+            result
         })
         .await
         {
@@ -919,6 +959,11 @@ impl Service {
                 self.store
                     .recover_migration(&self.root_lease, || self.clock.now())?;
             }
+            if policy.is_none() && request.command.id.starts_with("maintenance.")
+                && request.command.id.ends_with(".accept") {
+                self.store.recover_media_enablement(&self.root_lease, || self.clock.now())?;
+                self.store.recover_media_restoration(&self.root_lease)?;
+            }
             return self.replay_view(&context, &request, response);
         }
         if let Some(profile) = &policy
@@ -961,10 +1006,7 @@ impl Service {
                 drop(guard);
                 return self.folder_command(&context, &request, &cancellation);
             }
-            "maintenance.plan"
-            | "maintenance.migrate"
-            | "maintenance.inspect"
-            | "maintenance.promotion.plan" => {
+            command if command.starts_with("maintenance.") => {
                 return self.maintenance_command(&context, &request, &cancellation);
             }
             "artifacts.list" => self.inventory_page(
@@ -1643,10 +1685,21 @@ impl Service {
             }
             "plans.inspect" => {
                 let input: IdInput = commands::parse(params)?;
+                let raw: Value = self.store.get(&named("plan", &input.id)?)?.ok_or_else(DomainError::object_not_found)?;
+                self.object_action(&context, ObjectKind::Plan, &input.id, raw.get("creator").and_then(Value::as_str).unwrap_or_default(), ObjectAction::Read)?;
+                if raw.get("envelope_version").is_some() || raw.get("payload_kind").is_some() {
+                    let plan = nw_domain::media_execution::decode_plan(&serde_json::to_string(&raw).map_err(|error| DomainError::new("INVALID_PLAN", error.to_string()))?)?;
+                    if plan.id != input.id { return Err(DomainError::new("INVALID_PLAN", "Media plan key differs")); }
+                    self.read_project(&context, plan.payload.capture.project_id.as_str(), ObjectAction::Read)?;
+                    return Ok(Response::success(&request.request_id, plan));
+                }
                 let plan = self.read_plan(&context, &input.id, ObjectAction::Read)?;
                 value(&self.plan_review(&context, &plan)?)?
             }
             "jobs.submit" => {
+                if params.get("media_plan_json").is_some() {
+                    return self.submit_media(context, request, cancellation, guard);
+                }
                 let input: SubmitInput = commands::parse(params)?;
                 let plan = self.read_plan(&context, &input.plan_id, ObjectAction::Submit)?;
                 self.admit_execution_limits(
@@ -1796,15 +1849,14 @@ impl Service {
             }
             "jobs.inspect" => {
                 let input: IdInput = commands::parse(params)?;
-                let job = self.store.inspect_job(&input.id)?;
+                let job = self.store.inspect_execution(&input.id)?;
                 self.object_action(
-                    &context,
-                    ObjectKind::Job,
-                    &job.id,
-                    &job.creator,
-                    ObjectAction::Read,
+                    &context, ObjectKind::Job, job.id(), job.creator(), ObjectAction::Read,
                 )?;
-                value(&self.job_view(&context, &job)?)?
+                match job {
+                    nw_domain::media_execution::StoredJob::Legacy(job) => value(&self.job_view(&context, &job)?)?,
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => self.media_job_view(&job),
+                }
             }
             "jobs.list" => self.inventory_page(
                 &context,
@@ -1814,6 +1866,15 @@ impl Service {
             )?,
             "jobs.cancel" => {
                 let input: IdInput = commands::parse(params)?;
+                let execution = self.store.inspect_execution(&input.id)?;
+                self.object_action(&context, ObjectKind::Job, execution.id(), execution.creator(), ObjectAction::Control)?;
+                if let nw_domain::media_execution::StoredJob::MediaV1(job) = execution {
+                    let response = self.store.cancel_media_with_clock(&context.principal, &request, &job.id, || self.clock.now())?;
+                    if let Some(token) = self.cancellations.lock().map_err(|_| lock_error())?.get(&job.id) {
+                        token.cancel();
+                    }
+                    return Ok(response);
+                }
                 let mut job = self.store.inspect_job(&input.id)?;
                 self.object_action(
                     &context,
@@ -1853,102 +1914,103 @@ impl Service {
     }
     fn schedule(self: &Arc<Self>, id: String) -> Result<()> {
         let token = CancellationToken::new();
-        self.cancellations
-            .lock()
-            .map_err(|_| lock_error())?
-            .insert(id.clone(), token.clone());
+        let mut tokens = self.cancellations.lock().map_err(|_| lock_error())?;
+        if tokens.contains_key(&id) {
+            return Ok(());
+        }
+        tokens.insert(id.clone(), token);
         self.pending.fetch_add(1, Ordering::AcqRel);
-        let service = self.clone();
-        tokio::spawn(async move {
-            let _pending = Pending(service.pending.clone());
-            let _permit = match service.heavy.clone().acquire_owned().await {
-                Ok(permit) => permit,
-                Err(_) => return,
-            };
-            let start = service.clone();
-            let job_id = id.clone();
-            let started = tokio::task::spawn_blocking(move || {
-                let _guard = start.mutation.lock().map_err(|_| lock_error())?;
-                let job = start.store.inspect_job(&job_id)?;
-                if job.state.terminal() {
-                    return Ok(None);
-                }
-                start.store.execution_allowed(&job_id)?;
-                start.validate_job_paths(&job)?;
-                start
-                    .store
-                    .transition_job(&job_id, JobState::Queued, JobState::Running)
-                    .map(Some)
-            })
-            .await;
-            let outcome = match started {
-                Ok(Ok(Some(job))) => {
-                    let observer_service = service.clone();
-                    let observer_id = id.clone();
-                    let observer: Observer = Arc::new(move |event| {
-                        let service = observer_service.clone();
-                        let id = observer_id.clone();
-                        Box::pin(async move {
-                            tokio::task::spawn_blocking(move || service.execution_event(&id, event))
-                                .await
-                                .map_err(|error| {
-                                    DomainError::new("WORKER_FAILED", error.to_string())
-                                })?
-                        })
-                    });
-                    match service.engine() {
-                        Ok(engine) => engine
-                            .execute_observed(&job.plan, token, &id, observer)
-                            .await
-                            .map(|_| ()),
-                        Err(error) => Err(error),
-                    }
-                }
-                Ok(Ok(None)) => Ok(()),
-                Ok(Err(error)) => Err(error),
-                Err(error) => Err(DomainError::new("WORKER_FAILED", error.to_string())),
-            };
-            let finish = service.clone();
-            let finish_id = id.clone();
-            let _ = tokio::task::spawn_blocking(move || {
-                let _guard = finish.mutation.lock().map_err(|_| lock_error())?;
-                let job = finish.store.inspect_job(&finish_id)?;
-                if !job.state.terminal() {
-                    if job.state == JobState::Publishing {
-                        finish.reconcile(&job)?;
-                    } else {
-                        finish.store.update_job(&finish_id, |job| {
-                            match outcome {
-                                Ok(()) => {
-                                    job.state = JobState::Skipped;
-                                    job.verification = Some(
-                                        "Explicit no-match policy produced no artifact".into(),
-                                    );
-                                }
-                                Err(error) => {
-                                    job.state = if error.code == "CANCELLED" {
-                                        JobState::Cancelled
-                                    } else {
-                                        JobState::Failed
-                                    };
-                                    job.error = Some(error);
-                                }
-                            }
-                            Ok(())
-                        })?;
-                    }
-                }
-                finish
-                    .cancellations
-                    .lock()
-                    .map_err(|_| lock_error())?
-                    .remove(&finish_id);
-                let _ = finish.events.send(finish_id);
-                Ok::<_, DomainError>(())
-            })
-            .await;
-        });
+        if self.dispatcher.try_send(id.clone()).is_err() {
+            tokens.remove(&id);
+            self.pending.fetch_sub(1, Ordering::AcqRel);
+            return Err(DomainError::new("RESOURCE_LIMIT", "Fixed job dispatcher is at capacity"));
+        }
         Ok(())
+    }
+    async fn run_legacy_scheduled(self: &Arc<Self>, id: String, token: CancellationToken) {
+        let service = self.clone();
+        let start = service.clone();
+        let job_id = id.clone();
+        let started = tokio::task::spawn_blocking(move || {
+            let _guard = start.mutation.lock().map_err(|_| lock_error())?;
+            let job = start.store.inspect_job(&job_id)?;
+            if job.state.terminal() {
+                return Ok(None);
+            }
+            start.store.execution_allowed(&job_id)?;
+            start.validate_job_paths(&job)?;
+            start
+                .store
+                .transition_job(&job_id, JobState::Queued, JobState::Running)
+                .map(Some)
+        })
+        .await;
+        let outcome = match started {
+            Ok(Ok(Some(job))) => {
+                let observer_service = service.clone();
+                let observer_id = id.clone();
+                let observer: Observer = Arc::new(move |event| {
+                    let service = observer_service.clone();
+                    let id = observer_id.clone();
+                    Box::pin(async move {
+                        tokio::task::spawn_blocking(move || service.execution_event(&id, event))
+                            .await
+                            .map_err(|error| {
+                                DomainError::new("WORKER_FAILED", error.to_string())
+                            })?
+                    })
+                });
+                match service.engine() {
+                    Ok(engine) => engine
+                        .execute_observed(&job.plan, token, &id, observer)
+                        .await
+                        .map(|_| ()),
+                    Err(error) => Err(error),
+                }
+            }
+            Ok(Ok(None)) => Ok(()),
+            Ok(Err(error)) => Err(error),
+            Err(error) => Err(DomainError::new("WORKER_FAILED", error.to_string())),
+        };
+        let finish = service.clone();
+        let finish_id = id.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            let _guard = finish.mutation.lock().map_err(|_| lock_error())?;
+            let job = finish.store.inspect_job(&finish_id)?;
+            if !job.state.terminal() {
+                if job.state == JobState::Publishing {
+                    finish.reconcile(&job)?;
+                } else {
+                    finish.store.update_job(&finish_id, |job| {
+                        match outcome {
+                            Ok(()) => {
+                                job.state = JobState::Skipped;
+                                job.verification = Some(
+                                    "Explicit no-match policy produced no artifact".into(),
+                                );
+                            }
+                            Err(error) => {
+                                job.state = if error.code == "CANCELLED" {
+                                    JobState::Cancelled
+                                } else {
+                                    JobState::Failed
+                                };
+                                job.error = Some(error);
+                            }
+                        }
+                        Ok(())
+                    })?;
+                }
+            }
+            finish
+                .cancellations
+                .lock()
+                .map_err(|_| lock_error())?
+                .remove(&finish_id);
+            let _ = finish.events.send(finish_id);
+            Ok::<_, DomainError>(())
+        })
+        .await;
     }
     fn cancel_revoked(&self) -> Result<()> {
         let tokens = self
@@ -1960,8 +2022,12 @@ impl Service {
             .collect::<Vec<_>>();
         for (id, token) in tokens {
             if self.store.execution_allowed(&id).is_err() {
-                let job = self.store.inspect_job(&id)?;
-                if job.state != JobState::Publishing && !job.state.terminal() {
+                let job = self.store.inspect_execution(&id)?;
+                let publishing = match &job {
+                    nw_domain::media_execution::StoredJob::Legacy(job) => job.state == JobState::Publishing,
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => job.state == nw_domain::media_execution::MediaJobState::Publishing,
+                };
+                if !publishing && !job.terminal() {
                     token.cancel();
                 }
             }
@@ -2270,14 +2336,34 @@ impl Service {
         Ok(())
     }
     fn recover(&self) -> Result<()> {
-        for job in self.store.list::<Job>("job/", 10000)? {
-            if job.state == JobState::Publishing {
-                self.reconcile(&job)?;
-            } else if !job.state.terminal() && job.state != JobState::Queued {
-                self.store.update_job(&job.id, |job| { job.state = JobState::Interrupted; job.error = Some(DomainError::new("OWNER_INTERRUPTED", "Owner stopped during execution; no PID was reused and no filename was assumed to be an artifact")); Ok(()) })?;
+        self.store.visit_executions(|execution| {
+            match execution {
+                nw_domain::media_execution::StoredJob::Legacy(job) => {
+                    if job.state == JobState::Publishing {
+                        self.reconcile(&job)?;
+                    } else if !job.state.terminal() && job.state != JobState::Queued {
+                        self.store.update_job(&job.id, |job| {
+                            job.state = JobState::Interrupted;
+                            job.error = Some(DomainError::new("OWNER_INTERRUPTED", "Owner stopped during execution; no PID was reused and no filename was assumed to be an artifact"));
+                            Ok(())
+                        })?;
+                    }
+                }
+                nw_domain::media_execution::StoredJob::MediaV1(job) => {
+                    use nw_domain::media_execution::MediaJobState;
+                    if job.state == MediaJobState::Publishing {
+                        self.reconcile_media(&job)?;
+                    } else if !job.state.terminal() && job.state != MediaJobState::Queued {
+                        self.store.update_media_job(&job.id, |job| {
+                            job.state = MediaJobState::Interrupted;
+                            job.error = Some(DomainError::new("OWNER_INTERRUPTED", "Owner stopped before verified media publication"));
+                            Ok(())
+                        })?;
+                    }
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 }
 impl Drop for Service {

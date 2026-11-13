@@ -490,8 +490,34 @@ impl Service {
                     Ok(())
                 })?;
         } else if matches!(kind, InventoryKind::Jobs | InventoryKind::Artifacts) {
-            self.store.visit("job/", |job: Job| {
+            self.store.visit_executions(|execution| {
                 check_cancel()?;
+                let job = match execution {
+                    nw_domain::media_execution::StoredJob::Legacy(job) => job,
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => {
+                        if policy.as_ref().is_some_and(|profile| !profile.allows_object(ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)) {
+                            return Ok(());
+                        }
+                        if kind == InventoryKind::Artifacts {
+                            if job.artifact.state == nw_domain::media_execution::MediaArtifactState::Published
+                                && let Some(identity) = &job.artifact.identity {
+                                let publication: Option<Publication> = self.store.get(&format!("publication/{}/output", job.id))?;
+                                if publication.as_ref().is_some_and(|p| p.read_purpose_version == 1 && p.published && p.identity == *identity) {
+                                    let id = format!("media-{}-output", job.id);
+                                    snapshot.push(&nw_domain::artifacts::ArtifactSummary {
+                                        artifact_id: id.clone(), manifest_uri: format!("numera://artifact/{id}/manifest"),
+                                        job_id: job.id.clone(), encoded_byte_count: identity.bytes.clone(), sha256: identity.sha256.clone(),
+                                    })?;
+                                }
+                            }
+                        } else {
+                            snapshot.push(&json!({"envelope_version":1,"payload_kind":"media_job_v1",
+                                "id":job.id,"state":job.state,"revision":job.revision,"output_name":format!("media-{}.mkv",job.id),
+                                "progress":job.progress,"error_code":job.error.as_ref().map(|e|&e.code)}))?;
+                        }
+                        return Ok(());
+                    }
+                };
                 if policy.as_ref().is_none_or(|profile| {
                     profile.allows_object(
                         ObjectKind::Job,

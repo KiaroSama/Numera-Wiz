@@ -6,6 +6,10 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 mod catalog;
 mod render;
+mod restoration;
+
+pub(crate) use restoration::validate as validate_restored_record;
+pub(crate) use restoration::validate_project as validate_restored_project;
 
 const HISTORY_OPERATIONS: usize = 256;
 const HISTORY_BYTES: usize = 32 * 1024 * 1024;

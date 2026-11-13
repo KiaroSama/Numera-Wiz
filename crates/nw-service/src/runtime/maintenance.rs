@@ -17,13 +17,14 @@ fn busy() -> DomainError {
 impl Service {
     pub(super) fn ordinary_admission(&self) -> Result<Admission<'_>> {
         let lease = self.maintenance.try_read().map_err(|_| busy())?;
-        if self.store.pending_migration()?.is_some() {
+        if self.store.pending_migration()?.is_some() || self.store.pending_media_maintenance()? {
             return Err(busy());
         }
         Ok(Admission::Ordinary { _lease: lease })
     }
     pub(super) fn command_admission(&self, id: &str) -> Result<Admission<'_>> {
-        if [
+        if (id.starts_with("maintenance.promotion.") || id.starts_with("maintenance.initialization."))
+            && !id.ends_with(".inspect") || [
             "maintenance.plan",
             "maintenance.migrate",
             "maintenance.promotion.plan",
@@ -34,7 +35,8 @@ impl Service {
                 .try_write()
                 .map(|lease| Admission::Maintenance { _lease: lease })
                 .map_err(|_| busy())
-        } else if ["maintenance.inspect", "commands.list", "commands.schema"].contains(&id) {
+        } else if (id.starts_with("maintenance.") && id.ends_with(".inspect"))
+            || ["commands.list", "commands.schema"].contains(&id) {
             self.maintenance
                 .try_read()
                 .map(|lease| Admission::Ordinary { _lease: lease })
@@ -66,12 +68,27 @@ impl Service {
                 self.store.inspect_migration(&input.id)?,
             ));
         }
+        if request.command.id.ends_with(".inspect") {
+            let input: IdInput = commands::parse(request.params.clone())?;
+            let result = match request.command.id.as_str() {
+                "maintenance.promotion.inspect" => value(&self.store.inspect_media_promotion(&input.id)?)?,
+                "maintenance.initialization.inspect" => value(&self.store.inspect_media_initialization(&input.id)?)?,
+                "maintenance.promotion.restore.inspect" | "maintenance.initialization.restore.inspect" => {
+                    let mut record = value(&self.store.inspect_media_restoration(&input.id)?)?;
+                    record["status"] = json!(self.store.media_restoration_status(&input.id)?);
+                    record
+                }
+                _ => return Err(DomainError::new("UNKNOWN_COMMAND", "No maintenance inspection handler")),
+            };
+            return Ok(Response::success(&request.request_id, result));
+        }
         // The admission write guard excludes new work. Work already accepted by
         // the sole scheduler must finish, or be explicitly cancelled, before review.
         if self.pending.load(Ordering::Acquire) != 0 || self.transfers.available_permits() != 2 {
             return Err(busy());
         }
         let build = self.maintenance_build(cancel)?;
+        self.snapshots.lock().map_err(|_| lock_error())?.clear_project_reads();
         match request.command.id.as_str() {
             "maintenance.plan" => {
                 let _: Empty = commands::parse(request.params.clone())?;
@@ -105,6 +122,29 @@ impl Service {
                 || self.clock.now(),
                 cancel,
             ),
+            "maintenance.promotion.accept" => self.store.accept_media_promotion(
+                &self.root_lease, &context.principal, request, &build, || self.clock.now(), cancel,
+            ),
+            "maintenance.initialization.plan" => {
+                let _: Empty = commands::parse(request.params.clone())?;
+                Ok(Response::success(&request.request_id, self.store.prepare_media_initialization(
+                    &self.root_lease, &build, || self.clock.now(),
+                )?))
+            }
+            "maintenance.initialization.accept" => self.store.accept_media_initialization(
+                &self.root_lease, &context.principal, request, &build, || self.clock.now(), cancel,
+            ),
+            "maintenance.promotion.restore.plan" | "maintenance.initialization.restore.plan" => {
+                let input: IdInput = commands::parse(request.params.clone())?;
+                Ok(Response::success(&request.request_id, self.store.prepare_media_restoration(
+                    &self.root_lease, &input.id, request.command.id.starts_with("maintenance.initialization."),
+                    &build, || self.clock.now(),
+                )?))
+            }
+            "maintenance.promotion.restore.accept" | "maintenance.initialization.restore.accept" => {
+                self.store.accept_media_restoration(&self.root_lease, &context.principal, request,
+                    request.command.id.starts_with("maintenance.initialization."), &build, || self.clock.now())
+            }
             _ => Err(DomainError::new(
                 "UNKNOWN_COMMAND",
                 "No maintenance handler",
@@ -469,6 +509,13 @@ mod tests {
             "0",
             "A promoted target starts its own guard without resetting original source adoption"
         );
+        exercise_public_restoration(service, &plan.id, false).await;
+        assert_eq!(service.store.adoption_revision(migration_id, &plan.source_activation_id).unwrap(), "1");
+        let inspected = service.dispatch(service.owner(), Request::query(
+            "maintenance.promotion.inspect", json!({"id":plan.id}),
+        )).await;
+        assert!(inspected.ok, "{:?}", inspected.error);
+        assert_eq!(inspected.result.unwrap()["phase"], "restored");
     }
 
     async fn promotion_rejects_legacy_and_unadopted_sources() {
@@ -543,5 +590,156 @@ mod tests {
         );
         assert_eq!(service.store.store_version().unwrap(), 3);
         assert!(service.store.pending_migration().unwrap().is_none());
+        let scope = issue_owner_scope(&service).await;
+        let review = service.dispatch(service.owner(), Request::query("maintenance.initialization.plan", json!({}))).await;
+        assert!(review.ok, "{:?}", review.error);
+        let reviewed = review.result.unwrap();
+        assert_eq!(reviewed["origin"], "migrated_zero_revision");
+        assert_eq!(reviewed["source_guard_revision"], "0");
+        let id = reviewed["id"].as_str().unwrap().to_owned();
+        let mut request = Request::query("maintenance.initialization.accept", json!({"plan":reviewed}));
+        request.replay_scope = Some(scope);
+        request.idempotency_key = Some("actual-r0-initialization".into());
+        let accepted = service.dispatch(service.owner(), request.clone()).await;
+        assert!(accepted.ok, "{:?}", accepted.error);
+        assert_eq!(accepted.result.as_ref().unwrap()["initialization_id"], id);
+        service.store.require_media_floor().unwrap();
+        exercise_public_restoration(&service, &id, true).await;
+        assert_eq!(service.store.adoption_revision(&migration, &activation).unwrap(), "0");
+        let replay = service.dispatch(service.owner(), request).await;
+        assert!(replay.ok, "{:?}", replay.error);
+        assert_eq!(replay.receipt_id, accepted.receipt_id);
+        assert_eq!(service.root_lease.selection().unwrap().generation, 3);
+        assert!(service.store.require_media_floor().is_err());
+        drop(service);
+        let restarted = Service::open_application(temporary.path().to_owned(), None).await.unwrap();
+        assert_eq!(restarted.root_lease.selection().unwrap().generation, 3);
+        assert_eq!(restarted.store.adoption_revision(&migration, &activation).unwrap(), "0");
+        drop(restarted);
+        exercise_true_fresh_and_disconnected_resume().await;
     }
+    async fn issue_owner_scope(service: &Arc<Service>) -> String {
+        let issued = service.dispatch(service.owner(), Request::query("access.replay_scope.create", json!({}))).await;
+        assert!(issued.ok, "{:?}", issued.error);
+        issued.result.unwrap()["replay_scope"].as_str().unwrap().to_owned()
+    }
+    async fn exercise_public_restoration(service: &Arc<Service>, id: &str, initialization: bool) -> Request {
+        let namespace = if initialization { "maintenance.initialization" } else { "maintenance.promotion" };
+        let scope = issue_owner_scope(service).await;
+        let reviewed = service.dispatch(service.owner(), Request::query(
+            &format!("{namespace}.restore.plan"), json!({"id":id}),
+        )).await;
+        assert!(reviewed.ok, "{:?}", reviewed.error);
+        let plan = reviewed.result.unwrap();
+        let restoration = plan["id"].as_str().unwrap().to_owned();
+        let mut request = Request::query(&format!("{namespace}.restore.accept"), json!({"plan":plan}));
+        request.replay_scope = Some(scope);
+        request.idempotency_key = Some("actual-stopped-restoration".into());
+        let accepted = service.dispatch(service.owner(), request.clone()).await;
+        assert!(accepted.ok, "{:?}", accepted.error);
+        assert!(accepted.receipt_id.is_some());
+        assert_eq!(accepted.result.as_ref().unwrap()["restoration_id"], restoration);
+        assert!(!service.store.pending_media_maintenance().unwrap());
+        let inspected = service.dispatch(service.owner(), Request::query(
+            &format!("{namespace}.restore.inspect"), json!({"id":restoration}),
+        )).await;
+        assert!(inspected.ok, "{:?}", inspected.error);
+        assert_eq!(inspected.result.unwrap()["id"], restoration);
+        let replay = service.dispatch(service.owner(), request.clone()).await;
+        assert!(replay.ok, "{:?}", replay.error);
+        assert_eq!(replay.receipt_id, accepted.receipt_id);
+        assert!(service.store.require_media_floor().is_err());
+        request
+    }
+    async fn exercise_true_fresh_and_disconnected_resume() {
+        let temporary = tempfile::tempdir().unwrap();
+        // The private startup gate models the real retained receiver before owner
+        // recovery starts; every generation and receipt is canonically produced.
+        let service = Service::open_runtime(temporary.path().to_owned(), None, true, true).await.unwrap();
+        service.store.require_media_floor().unwrap();
+        let selected = service.root_lease.selection().unwrap();
+        assert_eq!(selected.generation, 3);
+        let nw_store::generations::GenerationLocation::Workspace { operation_id: initialization, .. } = selected.location else {
+            panic!("Fresh media initialization must select its real workspace target");
+        };
+        let initialized = service.store.inspect_media_initialization(&initialization).unwrap();
+        assert_eq!(initialized.plan.origin, nw_domain::maintenance::media_lifecycle::InitializationOrigin::CompatibleGenesisV1);
+        assert_eq!(initialized.plan.source_generation, 1);
+        let principal = service.owner().principal;
+        let restoration_replay = exercise_public_restoration(&service, &initialization, true).await;
+        assert_eq!(service.root_lease.selection().unwrap().generation, 1);
+        assert_eq!(service.store.adoption_revision(&initialized.plan.source_operation_id,
+            &initialized.plan.source_activation_id).unwrap(), "0");
+        assert!(!service.store.fresh_initialization_origin().unwrap());
+        assert!(service.dispatcher_receiver.lock().unwrap().is_some());
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let entered = Mutex::new(Some(entered_tx));
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let release = Mutex::new(release_rx);
+        *service.preflight_hook.lock().unwrap() = Some(Arc::new(move || {
+            if let Some(entered) = entered.lock().unwrap().take() { entered.send(()).unwrap(); }
+            release.lock().unwrap().recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        }));
+        service.dispatcher_ready.store(true, Ordering::Release);
+        let retained_receipt = service.store.replay_with_clock(&service.owner().principal,
+            &restoration_replay, || service.clock.now()).unwrap().unwrap().receipt_id;
+        let caller = service.clone();
+        let lost_request = restoration_replay.clone();
+        let lost = tokio::spawn(async move {
+            caller.dispatch(caller.owner(), lost_request).await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(5), entered_rx).await.unwrap().unwrap();
+        lost.abort();
+        assert!(lost.await.unwrap_err().is_cancelled());
+        release_tx.send(()).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while service.dispatcher_receiver.lock().unwrap().is_some()
+                || service.requests.available_permits() != 16 {
+                tokio::task::yield_now().await;
+            }
+        }).await.unwrap();
+        *service.preflight_hook.lock().unwrap() = None;
+        assert!(!service.dispatcher.is_closed(), "Caller loss must not drop the retained receiver");
+        let replay = service.dispatch(service.owner(), restoration_replay).await;
+        assert!(replay.ok, "{:?}", replay.error);
+        assert_eq!(replay.receipt_id, retained_receipt);
+        assert_eq!(service.owner().principal, principal);
+        drop(service);
+        let restarted = Service::open_application(temporary.path().to_owned(), None).await.unwrap();
+        assert_eq!(restarted.root_lease.selection().unwrap().generation, 1);
+        assert!(!restarted.store.fresh_initialization_origin().unwrap());
+        assert!(restarted.store.require_media_floor().is_err());
+        let scope = issue_owner_scope(&restarted).await;
+        let mut business = Request::query("access.profiles.create", json!({
+            "name":"after-restored-genesis", "read_roots":[], "write_roots":[],
+        }));
+        business.replay_scope = Some(scope.clone());
+        business.idempotency_key = Some("old-business-after-genesis-restoration".into());
+        let business = restarted.dispatch(restarted.owner(), business).await;
+        assert!(business.ok, "{:?}", business.error);
+        assert_eq!(restarted.store.adoption_revision(&initialized.plan.source_operation_id,
+            &initialized.plan.source_activation_id).unwrap(), "1");
+        let review = restarted.dispatch(restarted.owner(), Request::query("maintenance.promotion.plan", json!({}))).await;
+        assert!(review.ok, "{:?}", review.error);
+        let plan = review.result.unwrap();
+        assert_eq!(plan["source_generation"], 1);
+        assert_eq!(plan["source_guard"]["revision"], "1");
+        let promotion = plan["id"].as_str().unwrap().to_owned();
+        let mut accept = Request::query("maintenance.promotion.accept", json!({"plan":plan}));
+        accept.replay_scope = Some(scope);
+        accept.idempotency_key = Some("successor-after-restored-genesis".into());
+        let accepted = restarted.dispatch(restarted.owner(), accept).await;
+        assert!(accepted.ok, "{:?}", accepted.error);
+        assert!(restarted.store.inspect_media_promotion(&promotion).unwrap().predecessor_restoration.is_some());
+        drop(restarted);
+        let successor = Service::open_application(temporary.path().to_owned(), None).await.unwrap();
+        successor.store.require_media_floor().unwrap();
+        assert_eq!(successor.root_lease.selection().unwrap().generation, 3,
+            "A historical restoration must not capture a genuinely accepted successor");
+        exercise_public_restoration(&successor, &promotion, false).await;
+        assert_eq!(successor.store.adoption_revision(&initialized.plan.source_operation_id,
+            &initialized.plan.source_activation_id).unwrap(), "1");
+        assert!(successor.store.get::<AccessProfile>("profile/after-restored-genesis").unwrap().is_some());
+    }
+
 }

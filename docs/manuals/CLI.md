@@ -471,9 +471,15 @@ legacy/zero-adoption rejection; each target passed all 21 independent schema
 checks. The current typed-CLI continuation and complete latest-source gates
 still require qualification. That source's remaining native failure was an
 unused import, with a separate prepared correction.
-Promotion acceptance, stopped restoration and fresh/zero-adoption initialization
-remain in development; this query does not enable media persistence or replace
-the legacy migration below.
+The connected development implementation also exposes explicit reviewed
+`maintenance promotion accept --plan-file <file>`, `maintenance promotion inspect <id>`
+and `maintenance promotion restore plan|accept|inspect` commands. The separate
+`maintenance initialization` family handles eligible zero-adoption sources;
+truly absent application roots use its genuine genesis path. Accept commands
+require the retained `--replay-scope` and `--idempotency-key`; `--request-id` may
+also be retained explicitly. Restoration plans take the accepted enablement ID.
+These routes are undergoing integrated qualification. Review alone changes no
+floor, and the legacy migration below retains its separate contract.
 
 The owner-only commands `maintenance plan`, `maintenance migrate --plan-file
 <raw-plan.json> --replay-scope <retained-scope> --idempotency-key <retained-key>`
@@ -536,9 +542,9 @@ numera-wiz timeline render --project <project-uuid> --revision 3 --sequence <seq
 This command reviews the exact current project revision and returns a separate
 `media_v1` plan. It reads the complete bounded track/clip/semantic closure and
 checks actual installed FFmpeg components. It does not produce a media file or
-receipt. Media job acceptance, rendering, exact stills and safe media-generation
-initialization/restoration remain under construction; this review is not a
-cleanup plan to submit through the existing legacy job shape.
+receipt. The connected initial media job route is undergoing integrated
+qualification; exact stills and the general editor pipeline remain unfinished.
+This review is separate from a retained cleanup plan.
 
 The initial route supports one enabled video track with opaque solid corner
 colors: each RGB channel is exactly 0 or 1, alpha is 1. Gaps are explicitly black;
@@ -556,6 +562,30 @@ project/schema, source, quota and current authority checks can reject a review.
 Delegated callers need explicit `timeline.render` permission and Project Read;
 Project Edit does not follow from this command. A returned frame/sample count is
 a declared contract, not evidence that a file has been rendered or decoded.
+
+To request execution in the development media generation, retain the exact
+review JSON in a UTF-8 file of at most 128KiB, then use:
+
+```console
+numera-wiz jobs submit-media --plan-file review.json --replay-scope <issued-scope> --idempotency-key render-1 --request-id render-1
+numera-wiz jobs wait <accepted-job-uuid> --timeout-seconds 300
+```
+
+The common `jobs.submit` request carries `media_plan_json` as the exact file
+string. Keep those bytes, scope and key unchanged on retry. Acceptance checks the
+current project again and freezes the reviewed payload; a later edit does not
+reinterpret accepted work. Original cleanup submission keeps its existing
+`plan_id`/`plan_hash` shape. Job inspection reports render, verification and
+publication stages. Retrieve a published `media-<job-uuid>-output` through the
+existing artifact manifest/chunk or Save As commands.
+
+Initial execution is narrower than review: each raw decoded stream must fit
+the existing 4GiB verifier bound, and video frame intervals must fit Matroska's
+millisecond clock exactly. Consequently 24fps and 120fps execution are currently
+rejected before acceptance. The fixed worker uses a conservative 1GiB admission
+estimate; this is not an OS memory limit or measured peak. Wider clock/resource
+routes remain required. These new job and generation paths have pending hosted
+qualification; the historical report below covers reviews only.
 
 The [CI249 review evidence](../development/evidence/finite-compiler-review-ci249.json)
 records an actual component-backed public review, typed CLI parity and finite

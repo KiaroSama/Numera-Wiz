@@ -1,4 +1,6 @@
 //! Observe actual identified components through the shared supervised process budget.
+pub(super) mod execution;
+mod verification;
 use super::{Engine, blocking};
 use nw_domain::{
     DomainError, Result,
@@ -165,4 +167,5 @@ pub(super) fn assert_listing_admission() {
         Listing::Muxers,
     );
     assert_eq!(muxers, BTreeSet::from(["matroska"]));
+    verification::exercise();
 }

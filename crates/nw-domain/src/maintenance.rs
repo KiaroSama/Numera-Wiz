@@ -1,5 +1,6 @@
 //! Explicit data-root generation migration contracts. Native owner authority is required.
 pub mod promotion;
+pub mod media_lifecycle;
 use crate::{DomainError, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

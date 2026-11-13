@@ -28,6 +28,16 @@ pub const CURRENT_CAPABILITIES: &[&str] = &[
     "migration.v1",
     "adoption_guard.v1",
 ];
+/// Reader support is separate from the frozen seven-capability migration producer.
+pub(crate) fn supports_capabilities(capabilities: &[String]) -> bool {
+    if capabilities.is_empty() { return false; }
+    if capabilities.iter().all(|value| CURRENT_CAPABILITIES.contains(&value.as_str())) {
+        return true;
+    }
+    capabilities.len() == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.len()
+        && capabilities.iter().map(String::as_str).collect::<std::collections::BTreeSet<_>>()
+            == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.iter().copied().collect()
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GenerationRole {
@@ -78,6 +88,7 @@ pub struct RootLease {
     stamp: DirectoryStamp,
     _guard: RootLock,
     _legacy_guard: std::sync::Mutex<Option<RootLock>>,
+    historical_guards: std::sync::Mutex<Vec<(PathBuf, RootLock)>>,
 }
 fn invalid(message: &'static str) -> DomainError {
     DomainError::new("STORE_ACTIVATION_INVALID", message)
@@ -90,7 +101,7 @@ fn uuid(value: &str) -> Result<()> {
     }
     Ok(())
 }
-fn location_path(root: &Path, location: &GenerationLocation) -> Result<PathBuf> {
+pub(crate) fn location_path(root: &Path, location: &GenerationLocation) -> Result<PathBuf> {
     Ok(match location {
         GenerationLocation::LegacyOne {} => root.join("state/generations/1"),
         GenerationLocation::Workspace { operation_id, role } => {
@@ -187,7 +198,7 @@ fn validate_activation(activation: &Activation) -> Result<()> {
     }
     let mut capabilities = std::collections::BTreeSet::new();
     for capability in &activation.required_capabilities {
-        if !CURRENT_CAPABILITIES.contains(&capability.as_str()) {
+        if !supports_capabilities(&activation.required_capabilities) {
             return Err(DomainError::new(
                 "STORE_VERSION_UNSUPPORTED",
                 "This generation requires an unsupported record capability",
@@ -202,7 +213,7 @@ fn validate_activation(activation: &Activation) -> Result<()> {
     }
     Ok(())
 }
-fn activations(root: &Path) -> Result<Vec<(Activation, String)>> {
+pub(crate) fn activations(root: &Path) -> Result<Vec<(Activation, String)>> {
     let directory = root.join("state/activations");
     if !directory.try_exists().map_err(files::io_error)? {
         return Ok(Vec::new());
@@ -291,6 +302,15 @@ impl RootLease {
         let state = security::private_directory(&root.join("state"))?;
         let guard = RootLock::acquire(&state)?;
         let stamp = DirectoryStamp::capture_resolved(&state)?;
+        let lease = Arc::new(Self {
+            root, state, stamp, _guard: guard,
+            _legacy_guard: std::sync::Mutex::new(None),
+            historical_guards: std::sync::Mutex::new(Vec::new()),
+        });
+        // Only verified accepted restoration may repair a bounded owned suffix
+        // before the ordinary strict selector sees a possible reappearance gap.
+        crate::restorations::repair_owned_suffix(&lease)?;
+        let root = &lease.root;
         let history = activations(&root)?;
         let legacy_guard = if history.last().is_some_and(|(record, _)| {
             matches!(&record.location, GenerationLocation::Workspace { .. })
@@ -310,13 +330,26 @@ impl RootLease {
         } else {
             None
         };
-        Ok(Arc::new(Self {
-            root,
-            state,
-            stamp,
-            _guard: guard,
-            _legacy_guard: std::sync::Mutex::new(legacy_guard),
-        }))
+        *lease._legacy_guard.lock().map_err(storage)? = legacy_guard;
+        Ok(lease)
+    }
+    pub(crate) fn retain_existing_generation(&self, path: &Path) -> Result<()> {
+        self.revalidate()?;
+        if !path.starts_with(&self.state) || !path.join("store.redb").try_exists().map_err(storage)? {
+            return Err(invalid("Accepted historical source is missing or outside the stable root"));
+        }
+        let mut guards = self.historical_guards.lock().map_err(storage)?;
+        if !guards.iter().any(|(held, _)| held == path) {
+            guards.push((path.to_owned(), RootLock::acquire(path)?));
+        }
+        Ok(())
+    }
+    pub(crate) fn take_generation_guard(&self, path: &Path) -> Result<Option<RootLock>> {
+        let mut guards = self.historical_guards.lock().map_err(storage)?;
+        Ok(guards.iter().position(|(held, _)| held == path).map(|index| guards.remove(index).1))
+    }
+    pub(crate) fn take_historical_guards(&self) -> Result<Vec<(PathBuf, RootLock)>> {
+        Ok(std::mem::take(&mut *self.historical_guards.lock().map_err(storage)?))
     }
     pub fn root(&self) -> &Path {
         &self.root

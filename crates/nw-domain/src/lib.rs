@@ -2,6 +2,7 @@
 pub mod commands;
 pub mod execution;
 pub mod media;
+pub mod media_execution;
 pub mod mux;
 pub mod time;
 

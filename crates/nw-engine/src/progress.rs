@@ -3,6 +3,7 @@ use crate::{ExecutionEvent, Observer};
 use nw_domain::{DomainError, Result, execution::RemuxProgress};
 use std::{
     collections::BTreeSet,
+    future::Future,
     path::Path,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -203,6 +204,45 @@ pub async fn run(
         }),
         owned_cancel.clone(),
     );
+    observe_process(parser, owned_cancel, process, observer).await
+}
+
+/// A generated graph has no inherited media input; progress uses the same parser.
+pub(super) async fn run_generated(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    cancel: CancellationToken,
+    observer: &Observer,
+) -> Result<nw_platform::process::RunOutput> {
+    let parser = Arc::new(Mutex::new(Parser::new()));
+    let consumer = parser.clone();
+    let owned_cancel = cancel.child_token();
+    let process = nw_platform::process::stream_with_output_limits(
+        program,
+        args,
+        deadline,
+        4096,
+        Box::new(move |bytes| {
+            consumer
+                .lock()
+                .map_err(|_| invalid("Progress parser lock poisoned"))?
+                .feed(bytes)
+        }),
+        owned_cancel.clone(),
+    );
+    observe_process(parser, owned_cancel, process, observer).await
+}
+
+async fn observe_process<F>(
+    parser: Arc<Mutex<Parser>>,
+    owned_cancel: CancellationToken,
+    process: F,
+    observer: &Observer,
+) -> Result<nw_platform::process::RunOutput>
+where
+    F: Future<Output = Result<nw_platform::process::RunOutput>>,
+{
     tokio::pin!(process);
     let mut interval = tokio::time::interval(Duration::from_millis(
         nw_domain::execution::PROGRESS_INTERVAL_MS,

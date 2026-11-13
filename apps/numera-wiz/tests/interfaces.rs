@@ -520,6 +520,9 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
         use nw_domain::commands::Request;
         use serde_json::json;
         let data = tempfile::tempdir().unwrap();
+        // This journey migrates a genuine legacy factory store. True absent
+        // application roots now use the separately exercised MediaV1 genesis path.
+        drop(nw_store::Store::open(data.path()).unwrap());
         let _logs = retain_owner_logs(data.path(), "migration-cli");
         let input =
             nw_platform::security::private_directory(&data.path().join("requests")).unwrap();
@@ -633,6 +636,88 @@ async fn actual_typed_migration_cli_replays_before_and_after_real_owner_restart(
         assert_eq!(plan.target_generation, 5);
         assert_eq!(plan.source_guard.migration_id, id);
         assert_eq!(plan.source_guard.revision, "1");
+        let media_started = std::time::Instant::now();
+        let promotion_file = input.join("promotion-review.json");
+        nw_platform::security::write_private(&promotion_file, &serde_json::to_vec(&reviewed["result"]).unwrap(), false).unwrap();
+        let native_scope = issued["result"]["replay_scope"].as_str().unwrap();
+        let promote = [
+            "maintenance", "promotion", "accept", "--plan-file", promotion_file.to_str().unwrap(),
+            "--replay-scope", native_scope, "--idempotency-key", "native-media-promotion",
+            "--request-id", "native-media-promotion-request",
+        ];
+        let promoted = migration_cli(data.path(), &promote).await;
+        let promotion_id = promoted["result"]["promotion_id"].as_str().unwrap();
+        assert_eq!(promotion_id, plan.id);
+        let promotion_state = migration_cli(data.path(), &["maintenance", "promotion", "inspect", promotion_id]).await;
+        assert_eq!(promotion_state["result"]["phase"], "succeeded");
+        let retry = migration_cli(data.path(), &promote).await;
+        assert_eq!(retry["receipt_id"], promoted["receipt_id"]);
+        assert_eq!(retry["result"], promoted["result"]);
+        let reviewed_restore = migration_cli(data.path(), &["maintenance", "promotion", "restore", "plan", promotion_id]).await;
+        let restore_plan: nw_domain::maintenance::media_lifecycle::GenerationRestorationPlan =
+            serde_json::from_value(reviewed_restore["result"].clone()).unwrap();
+        restore_plan.validate_hash().unwrap();
+        assert_eq!(restore_plan.source_generation, plan.source_generation);
+        assert_eq!(restore_plan.source_activation_id, plan.source_activation_id);
+        assert_eq!(restore_plan.source_operation_id, id);
+        assert_eq!(restore_plan.source_guard_revision, "1");
+        let restore_file = input.join("restoration-review.json");
+        nw_platform::security::write_private(&restore_file, &serde_json::to_vec(&reviewed_restore["result"]).unwrap(), false).unwrap();
+        let restore = [
+            "maintenance", "promotion", "restore", "accept", "--plan-file", restore_file.to_str().unwrap(),
+            "--replay-scope", native_scope, "--idempotency-key", "native-media-restoration",
+            "--request-id", "native-media-restoration-request",
+        ];
+        let restored = migration_cli(data.path(), &restore).await;
+        let restoration_id = restored["result"]["restoration_id"].as_str().unwrap();
+        assert_eq!(restoration_id, restore_plan.id);
+        let restoration_state = migration_cli(data.path(), &["maintenance", "promotion", "restore", "inspect", restoration_id]).await;
+        assert_eq!(restoration_state["result"]["id"], restoration_id);
+        let promotion_state = migration_cli(data.path(), &["maintenance", "promotion", "inspect", promotion_id]).await;
+        assert_eq!(promotion_state["result"]["phase"], "restored");
+        let retry = migration_cli(data.path(), &restore).await;
+        assert_eq!(retry["receipt_id"], restored["receipt_id"]);
+        assert_eq!(retry["result"], restored["result"]);
+        let old_accepted = migration_cli(data.path(), &promote).await;
+        assert_eq!(old_accepted["receipt_id"], promoted["receipt_id"]);
+        assert_eq!(old_accepted["result"], promoted["result"]);
+        let original_replay = migration_owner_http(data.path(), &original).await;
+        assert_eq!(original_replay["receipt_id"], before["receipt_id"]);
+        assert_eq!(original_replay["result"], before["result"]);
+        let mut after_restore = Request::query("access.profiles.create", json!({
+            "name":"after-media-restoration","read_roots":[],"write_roots":[],
+        }));
+        after_restore.replay_scope = Some(native_scope.into());
+        after_restore.idempotency_key = Some("native-old-business-after-restoration".into());
+        let written = migration_owner_http(data.path(), &after_restore).await;
+        assert!(written["receipt_id"].is_string());
+        let next = migration_cli(data.path(), &["maintenance", "promotion", "plan"]).await;
+        let next_plan: nw_domain::maintenance::promotion::GenerationPromotionPlan =
+            serde_json::from_value(next["result"].clone()).unwrap();
+        assert_eq!(next_plan.source_generation, plan.source_generation);
+        assert_eq!(next_plan.source_activation_id, plan.source_activation_id);
+        assert_eq!(next_plan.source_guard.migration_id, id);
+        assert_eq!(next_plan.source_guard.revision, "2");
+        if let Some(directory) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
+            let evidence = json!({
+                "schema_version":1,"status":"passed",
+                "scope":"Actual current native CLI promotion/restoration/replay and one post-restoration business adoption; not pinned-old executable or fault/power-loss qualification",
+                "source_commit":std::env::var("NW_SCHEMA_VALIDATOR_SOURCE").ok(),
+                "target":std::env::var("NW_SCHEMA_VALIDATOR_TARGET").ok(),
+                "added_elapsed_ms":media_started.elapsed().as_millis(),
+                "source_generation":plan.source_generation,"source_activation_id":plan.source_activation_id,
+                "original_operation_id":id,"source_guard_before":"1","source_guard_after_old_business":"2",
+                "promotion_id":promotion_id,"restoration_id":restoration_id,
+                "promotion_receipt":promoted["receipt_id"],"restoration_receipt":restored["receipt_id"],
+                "promotion_replayed_without_reactivation":true,"restoration_replayed_without_reoverlay":true,
+                "pre_migration_receipt_unchanged":true,
+            });
+            let bytes = serde_json::to_vec_pretty(&evidence).unwrap();
+            assert!(bytes.len() <= 4096);
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(directory.join("native-media-lifecycle.json"), bytes).unwrap();
+        }
     })
     .await
     .expect("Actual CLI migration/restart deadline");

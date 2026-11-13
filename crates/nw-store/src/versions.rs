@@ -106,10 +106,7 @@ pub fn inspect_closed(generation: &Path) -> Result<GenerationFacts> {
     }
     let known_json = store_version == 2
         || (store_version == 3
-            && !required_capabilities.is_empty()
-            && required_capabilities
-                .iter()
-                .all(|value| crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str())));
+            && crate::generations::supports_capabilities(&required_capabilities));
     if store_version == 3
         && known_json
         && required_capabilities
@@ -203,8 +200,14 @@ pub fn inspect_closed(generation: &Path) -> Result<GenerationFacts> {
 /// A dirty legacy file is repaired only in a separately owned verified probe;
 /// an unknown source remains byte-for-byte untouched, including its dirty header.
 pub(crate) fn preflight_existing(generation: &Path) -> Result<()> {
-    let facts = match inspect_closed(generation) {
-        Ok(facts) => facts,
+    preflight_existing_facts(generation).map(|_| ())
+}
+pub(crate) fn preflight_existing_facts(generation: &Path) -> Result<GenerationFacts> {
+    existing_snapshot(generation).map(|(facts, _)| facts)
+}
+pub(crate) fn existing_snapshot(generation: &Path) -> Result<(GenerationFacts, std::path::PathBuf)> {
+    let (facts, snapshot) = match inspect_closed(generation) {
+        Ok(facts) => (facts, generation.to_owned()),
         Err(error) if error.code == "STORE_RECOVERY_REQUIRED" => {
             let file = generation.join("store.redb");
             let cancel = tokio_util::sync::CancellationToken::new();
@@ -250,23 +253,20 @@ pub(crate) fn preflight_existing(generation: &Path) -> Result<()> {
                     "Original store changed during owned recovery inspection",
                 ));
             }
-            facts
+            (facts, probe)
         }
         Err(error) => return Err(error),
     };
     if ![2, 3].contains(&facts.store_version)
         || (facts.store_version == 3
-            && (facts.required_capabilities.is_empty()
-                || facts.required_capabilities.iter().any(|value| {
-                    !crate::generations::CURRENT_CAPABILITIES.contains(&value.as_str())
-                })))
+            && !crate::generations::supports_capabilities(&facts.required_capabilities))
     {
         return Err(DomainError::new(
             "STORE_VERSION_UNSUPPORTED",
             "The existing application store version is unsupported; original bytes were not opened writable",
         ));
     }
-    Ok(())
+    Ok((facts, snapshot))
 }
 
 #[cfg(test)]

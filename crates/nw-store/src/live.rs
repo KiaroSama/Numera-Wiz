@@ -57,7 +57,7 @@ impl Write {
 }
 struct Attachment {
     database: Option<Database>,
-    _guards: Vec<nw_platform::files::RootLock>,
+    _guards: Vec<(PathBuf, nw_platform::files::RootLock)>,
     path: PathBuf,
     track_adoption: bool,
 }
@@ -75,9 +75,9 @@ impl DatabaseSlot {
         Self {
             database: RwLock::new(Attachment {
                 database: Some(database),
-                path,
+                path: path.clone(),
                 track_adoption,
-                _guards: vec![guard],
+                _guards: vec![(path, guard)],
             }),
             active: Arc::new(AtomicUsize::new(0)),
         }
@@ -91,6 +91,18 @@ impl DatabaseSlot {
             })?
             .path
             .clone())
+    }
+    pub(super) fn retain_transferred_guards(&self, guards: Vec<(PathBuf, nw_platform::files::RootLock)>) -> Result<()> {
+        let mut state = self.database.write().map_err(|_| {
+            DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
+        })?;
+        for (path, guard) in guards {
+            if state._guards.iter().any(|(held, _)| held == &path) {
+                return Err(DomainError::new("OWNER_BUSY", "Duplicate historical generation lease transfer"));
+            }
+            state._guards.push((path, guard));
+        }
+        Ok(())
     }
     fn lease(&self) -> Lease {
         self.active.fetch_add(1, Ordering::AcqRel);
@@ -186,7 +198,39 @@ impl DatabaseSlot {
         // Historical owners lock generation1 rather than the state directory. Keep
         // every prior generation lease until this Store is dropped, including during
         // a closed cutover; selecting another generation must not release that fence.
-        state._guards.push(guard);
+        state._guards.push((path.to_owned(), guard));
+        state.database = Some(database);
+        state.path = path.to_owned();
+        state.track_adoption = track_adoption;
+        Ok(())
+    }
+    /// A private maintenance caller supplies an already verified accepted lineage path.
+    /// Historical locks are retained through close/overlay/attachment and never reacquired.
+    pub(super) fn retain_existing_lock(&self, path: &Path) -> Result<()> {
+        let mut state = self.database.write().map_err(|_| {
+            DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
+        })?;
+        if state.database.is_some() || self.active.load(Ordering::Acquire) != 0 {
+            return Err(DomainError::new("OWNER_BUSY", "Historical control work requires a drained closed attachment"));
+        }
+        if !state._guards.iter().any(|(held, _)| held == path) {
+            if !path.join("store.redb").try_exists().map_err(crate::storage)? {
+                return Err(DomainError::new("STORE_RECOVERY_REQUIRED", "An accepted historical generation is missing; no file was created"));
+            }
+            let guard = nw_platform::files::RootLock::acquire(path)?;
+            state._guards.push((path.to_owned(), guard));
+        }
+        Ok(())
+    }
+    pub(super) fn attach_retained_generation(&self, database: Database, path: &Path, track_adoption: bool) -> Result<()> {
+        let mut state = self.database.write().map_err(|_| {
+            DomainError::new("STORAGE_ERROR", "Database attachment lock is unavailable")
+        })?;
+        if state.database.is_some() || self.active.load(Ordering::Acquire) != 0
+            || !state._guards.iter().any(|(held, _)| held == path)
+        {
+            return Err(DomainError::new("OWNER_BUSY", "Attachment requires the already retained generation lease"));
+        }
         state.database = Some(database);
         state.path = path.to_owned();
         state.track_adoption = track_adoption;
@@ -247,5 +291,6 @@ mod tests {
                 .value(),
             b"retained"
         );
+        crate::control_backend::exercise_bounded_existing_backend();
     }
 }

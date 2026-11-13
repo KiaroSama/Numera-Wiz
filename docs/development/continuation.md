@@ -29,6 +29,14 @@ returns a separate media plan without a receipt. The [CI249 report](evidence/fin
 records the actual public CLI review/schema checks and Store adversarial controls;
 it does not qualify decoded output or the complete CI run.
 
+The connected initial media job implementation now includes canonical acceptance,
+immutable raw payloads, shared execution/publication and explicit generation
+promotion/initialization/restoration paths. This cohort is undergoing integrated
+review and hosted qualification. Its new tests cover actual job bytes and native
+maintenance/replay; those tests are not yet passing evidence. Initial execution
+has the documented decoded-byte and container-clock admission limits in the CLI
+guide. Those limits do not waive the required general editor/media routes.
+
 The full first version remains unfinished: accepted general multi-source/stage/
 output jobs, safe media-generation promotion/initialization/restoration, mixed A/V
 and complete editor controls, preview/audio transport, checkpoints/interchange,

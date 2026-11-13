@@ -278,7 +278,7 @@ fn lower(capture: &Capture, graph: &MediaGraph, output: &OutputManifest) -> Vec<
         labels.push_str(&format!("[v{index}]"));
     }
     chains.push(format!(
-        "{labels}concat=n={}:v=1:a=0,settb=expr={tb},setpts=N[vout]",
+        "{labels}concat=n={}:v=1:a=0,settb=expr={tb},setpts=N,setparams=range=full:color_primaries=bt709:color_trc=iec61966-2-1:colorspace=gbr[vout]",
         graph.segments.len()
     ));
     chains.push(format!("anullsrc=r={}:cl={},atrim=end_sample={},asetpts=N/SR/TB,aformat=sample_fmts=s16:sample_rates={}:channel_layouts={}[aout]", s.sample_rate, s.audio_layout.name(), output.audio_samples, s.sample_rate, s.audio_layout.name()));

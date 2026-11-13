@@ -16,7 +16,7 @@ fn valid_key(key: &str) -> Result<()> {
     }
     Ok(())
 }
-fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &str) -> Result<()> {
+pub(crate) fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &str) -> Result<()> {
     if table.get(key).map_err(storage)?.is_some() {
         return Ok(());
     }
@@ -26,12 +26,35 @@ fn record_quota(table: &impl ReadableTable<&'static str, &'static [u8]>, key: &s
             "Generation record headroom exhausted",
         ));
     }
+    let namespace = key.split('/').next().unwrap_or("");
+    let prefix = format!("{namespace}/");
+    let exists = table.range(prefix.as_str()..).map_err(storage)?.next()
+        .transpose().map_err(storage)?
+        .is_some_and(|(name, _)| name.value().starts_with(&prefix));
+    if !exists {
+        let mut namespaces = std::collections::BTreeSet::new();
+        for row in table.iter().map_err(storage)? {
+            let (name, _) = row.map_err(storage)?;
+            namespaces.insert(name.value().split('/').next().unwrap_or("").to_owned());
+            if namespaces.len() >= 128 {
+                return Err(DomainError::new("RESOURCE_LIMIT", "Generation namespace headroom exhausted"));
+            }
+        }
+    }
     for (prefix, limit) in [
         ("asset/", 4096usize),
         ("batch-plan/", 128),
         ("batch/", 1024),
         ("generation-migration/", 16),
+        ("generation-promotion/", 16),
+        ("generation-initialization/", 16),
+        ("generation-restoration/", 16),
+        ("restoration-control/", 16),
         ("job/", 4096),
+        ("job-payload/", 4096),
+        ("job-queue/", 128),
+        ("job-auth/", 4096),
+        ("publication/", 4096),
         ("profile/", 128),
         ("plan/", 512),
         ("receipt/", 10000),
@@ -234,7 +257,7 @@ impl Store {
         }
         write.commit().map_err(storage)
     }
-    fn replay_key(&self, principal: &str, request: &Request, now: u64) -> Result<(String, Scope)> {
+    pub(super) fn replay_key(&self, principal: &str, request: &Request, now: u64) -> Result<(String, Scope)> {
         let scope = self.verify_scope(
             request.replay_scope.as_deref().ok_or_else(|| {
                 DomainError::new("REPLAY_SCOPE_INVALID", "A server-issued scope is required")
@@ -667,6 +690,9 @@ impl Store {
         Ok(job)
     }
     pub fn execution_allowed(&self, id: &str) -> Result<()> {
+        if matches!(self.inspect_execution(id)?, nw_domain::media_execution::StoredJob::MediaV1(_)) {
+            return self.media_execution_allowed(id);
+        }
         let authorization: ExecutionAuthorization =
             self.get(&format!("job-auth/{id}"))?.ok_or_else(|| {
                 DomainError::new(
@@ -696,6 +722,10 @@ impl Store {
         let write = self.db.begin_write().map_err(storage)?;
         {
             let mut table = write.open_table(RECORDS).map_err(storage)?;
+            if crate::media_execution::publication_fence(&mut table, self.root_id(), publication)? {
+                drop(table);
+                return write.commit().map_err(storage);
+            }
             let id = &publication.job_id;
             let key = format!("job/{id}");
             let mut job: Job = {

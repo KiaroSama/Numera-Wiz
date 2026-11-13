@@ -65,5 +65,43 @@
     "No media-generation promotion/restoration/fresh initialization qualification",
     "No standard offline profile, named-client runtime or owner-hardware qualification",
     "No full version1 completion claim"
-  ]
+  ],
+  "mcp_registry_wire": {
+    "scope": "Actual54-tool standard stdio tools/list line from all four native executables on source08bf; no named-client or current lifecycle-cohort qualification",
+    "tools": 54,
+    "jsonrpc_line_bytes_including_newline": 161759,
+    "jsonrpc_line_sha256": "a11d253ec2f944c4f857dd65018faddfd3d71794a6a996bf8a68d90cb4fd31d5",
+    "maximum_line_bytes": 262144,
+    "all_four_targets_identical": true,
+    "members_rehashed": 164,
+    "timeline_result_schema_sha256": "8f8f1a354856b0ddf4357e3158fcc2f8239f54d89b0d18b74d3eb8e109ee76eb",
+    "result_schema_matches_actual_owner_suite18": true,
+    "schema_comparison": "Undo only schema-position Result namespace and inherit the outer2020-12 dialect; do not rewrite arbitrary JSON data",
+    "artifacts": [
+      {
+        "target": "x86_64-unknown-linux-gnu",
+        "id": 14005126875,
+        "zip_bytes": 182427,
+        "zip_sha256": "81ed10e317223ccd3ef46dc3fce93fdd67ef732005c44534f42bfbbf3559602a"
+      },
+      {
+        "target": "x86_64-pc-windows-msvc",
+        "id": 14004958254,
+        "zip_bytes": 182655,
+        "zip_sha256": "31b98ec764f67a453a060694e92e06e90fd8920db985c2999235dd05ba6c35e4"
+      },
+      {
+        "target": "aarch64-apple-darwin",
+        "id": 14004429985,
+        "zip_bytes": 182896,
+        "zip_sha256": "ff08b1693e3547967bdc88d578b715b900e2ee79814982e6d269b236f50ca492"
+      },
+      {
+        "target": "x86_64-apple-darwin",
+        "id": 14005203536,
+        "zip_bytes": 182856,
+        "zip_sha256": "b755795c83a3a0a0ad1af80934a8802f893dfc401babc723dd9f45386f185fc6"
+      }
+    ]
+  }
 }

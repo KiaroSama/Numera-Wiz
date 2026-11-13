@@ -171,6 +171,61 @@ pub async fn run_readonly_with_policy(
 
 pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
 
+/// Stream a zero-input producer without retaining stdout or inheriting stdin.
+pub async fn stream_with_output_limits(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    stderr_limit: usize,
+    consumer: ChunkConsumer,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    run_with_stdin(
+        program,
+        args,
+        Some(deadline),
+        CaptureLimits {
+            stdout: 0,
+            stderr: stderr_limit,
+        },
+        Stdio::null(),
+        Some(consumer),
+        cancel,
+    )
+    .await
+}
+
+/// Stream an admitted regular input while lowering only the raw stderr budget.
+pub async fn stream_readonly_with_output_limits(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    input: std::fs::File,
+    stderr_limit: usize,
+    consumer: ChunkConsumer,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    if !input.metadata().map_err(crate::files::io_error)?.is_file() {
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "A regular input file is required",
+        ));
+    }
+    run_with_stdin(
+        program,
+        args,
+        Some(deadline),
+        CaptureLimits {
+            stdout: 0,
+            stderr: stderr_limit,
+        },
+        Stdio::from(input),
+        Some(consumer),
+        cancel,
+    )
+    .await
+}
+
 /// Consume stdout incrementally under the same process-tree and cancellation boundary.
 pub async fn stream_readonly(
     program: &Path,
