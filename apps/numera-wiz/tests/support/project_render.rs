@@ -369,7 +369,7 @@ async fn physical_output(cli: &Cli, plan: &nw_domain::media::MediaPlanV1) {
             6..=9 => [255, 0, 0],
             _ => unreachable!(),
         };
-        for pixel in frame.chunks_exact(4) {
+        for pixel in frame.as_chunks::<4>().0 {
             // bgr0's unused fourth byte has no signal meaning.
             assert_eq!(
                 &pixel[..3],
