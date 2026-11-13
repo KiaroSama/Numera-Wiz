@@ -3740,6 +3740,27 @@ mod tests {
         assert_eq!(boundary_viewport["snapshot_id"], viewport["snapshot_id"]);
         assert_eq!(boundary_viewport["items"].as_array().unwrap().len(), 1);
         assert_eq!(boundary_viewport["items"][0]["id"], right_id);
+        // The real edited/restarted project must feed a finite media compiler review.
+        let render = project_request(
+            "timeline.render",
+            json!({"sequence_id":sequence_id,"revision":revision,
+                "range":{"start":{"num":"0","den":"1"},
+                    "end":{"num":"5","den":"2"}},
+                "output":{"container":"matroska","video_codec":"ffv1",
+                    "audio_codec":"pcm_s16le","audio":"silence",
+                    "destination":{"kind":"download"}}}),
+            None,
+        );
+        let render_request_id = render.request_id.clone();
+        let reviewed = service.dispatch(service.owner(), render).await;
+        assert!(
+            reviewed.ok,
+            "TIMELINE_RENDER_PUBLIC_COMPILER_MISSING code={:?}",
+            reviewed.error.as_ref().map(|error| error.code.as_str())
+        );
+        assert_eq!(reviewed.request_id, render_request_id);
+        assert!(reviewed.receipt_id.is_none());
+        assert!(reviewed.result.as_ref().is_some_and(Value::is_object));
     }
     #[tokio::test]
     async fn file_grants_and_object_rights_are_checked_independently() {
