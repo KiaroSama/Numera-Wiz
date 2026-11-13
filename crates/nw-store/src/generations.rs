@@ -429,10 +429,17 @@ impl RootLease {
         directory.revalidate()?;
         source.revalidate()?;
         let facts = versions::inspect_closed(&path)?;
-        if selected.root_id.as_ref().is_some_and(|id| id != &facts.root_id)
-            || selected.store_version.is_some_and(|version| version != facts.store_version)
+        if selected
+            .root_id
+            .as_ref()
+            .is_some_and(|id| id != &facts.root_id)
+            || selected
+                .store_version
+                .is_some_and(|version| version != facts.store_version)
         {
-            return Err(invalid("Observed generation differs from its activation envelope"));
+            return Err(invalid(
+                "Observed generation differs from its activation envelope",
+            ));
         }
         let result = observe(&path, &selected);
         source.revalidate()?;

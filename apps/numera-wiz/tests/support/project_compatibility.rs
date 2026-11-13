@@ -733,24 +733,26 @@ fn record_snapshot(
 }
 fn closed(root: &Path, name: &str, evidence: &Evidence) -> Result<Snapshot> {
     let lease = RootLease::acquire(root)?;
-    lease.with_selected_generation_read(|path, selection| {
-        let observed = || -> Result<Snapshot> {
-            ensure!(
-                path.starts_with(root),
-                "Selected generation escaped fixture root"
-            );
-            let snapshot = raw_locked(path, selection.activation_id.clone())?;
-            if let Some(version) = selection.store_version {
+    lease
+        .with_selected_generation_read(|path, selection| {
+            let observed = || -> Result<Snapshot> {
                 ensure!(
-                    snapshot.facts.store_version == version,
-                    "Selected raw schema differs from activation"
+                    path.starts_with(root),
+                    "Selected generation escaped fixture root"
                 );
-            }
-            record_snapshot(name, &snapshot, path, evidence)?;
-            Ok(snapshot)
-        };
-        observed().map_err(nw_platform::files::io_error)
-    }).map_err(anyhow::Error::from)
+                let snapshot = raw_locked(path, selection.activation_id.clone())?;
+                if let Some(version) = selection.store_version {
+                    ensure!(
+                        snapshot.facts.store_version == version,
+                        "Selected raw schema differs from activation"
+                    );
+                }
+                record_snapshot(name, &snapshot, path, evidence)?;
+                Ok(snapshot)
+            };
+            observed().map_err(nw_platform::files::io_error)
+        })
+        .map_err(anyhow::Error::from)
 }
 fn preserved(
     original: &Snapshot,
@@ -1827,7 +1829,8 @@ async fn scenario(evidence: &Evidence) -> Result<()> {
         before: &final_raw,
         project: &project,
         linked_project: &linked_project,
-    }).await?;
+    })
+    .await?;
     Ok(())
 }
 pub async fn run() {
