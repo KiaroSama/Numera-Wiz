@@ -172,13 +172,18 @@ pub(super) async fn exercise_pressure_scheduling() {
     let retired_baseline = service.snapshots.lock().unwrap().projects[&retired].generation_bytes;
     // Change the real generation size before the pause; replacing the read during the
     // observation must use its new baseline, rather than the retired capture's minimum.
-    service
-        .store
-        .put(
-            "unit/pressure-current-baseline",
-            &"g".repeat(8 * 1024 * 1024),
-        )
-        .unwrap();
+    {
+        // The encoded record includes two JSON string quotes within the 8 MiB quota.
+        let growth_record = "g".repeat(8 * 1024 * 1024 - 2);
+        assert_eq!(
+            serde_json::to_vec(&growth_record).unwrap().len(),
+            8 * 1024 * 1024
+        );
+        service
+            .store
+            .put("unit/pressure-current-baseline", &growth_record)
+            .unwrap();
+    }
     let current_baseline = service.store.project_generation_bytes().unwrap();
     assert!(current_baseline > retired_baseline);
     let (changed, pressure) = while_observing(
