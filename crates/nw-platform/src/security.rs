@@ -12,6 +12,8 @@ use std::{
 mod windows;
 #[cfg(windows)]
 use windows::protect as protect_windows;
+#[cfg(windows)]
+pub(crate) use windows::PipeSecurity;
 
 /// Prefix of legacy Windows ACL evidence files in protected directories.
 /// Native checks no longer create these files; old retained names remain part of
@@ -120,6 +122,26 @@ fn check_dacl(text: &str, sid: &str) -> Result<()> {
     Ok(())
 }
 
+/// Pipe policy is intentionally independent of the older directory policy.
+/// The expected trustee is canonicalized by Windows from an owned descriptor
+/// containing the exact TokenUser SID. A RID suffix is never alias authority.
+#[cfg(any(windows, test))]
+fn check_pipe_dacl(text: &str, expected_trustee: &str) -> Result<()> {
+    if pipe_trustee(text)? != expected_trustee { return Err(denied("Pipe DACL trustee differs from exact current-user policy")); }
+    Ok(())
+}
+#[cfg(any(windows, test))]
+fn pipe_trustee(text: &str) -> Result<&str> {
+    let ace = text.strip_prefix("D:P(").and_then(|value| value.strip_suffix(')')).ok_or_else(|| denied("Pipe DACL must be protected with one allow ACE"))?;
+    if ace.contains(['(', ')', '\n', '\r']) { return Err(denied("Unexpected pipe DACL text")); }
+    let mut fields = ace.split(';');
+    let values = std::array::from_fn::<_, 6, _>(|_| fields.next());
+    let [Some(kind), Some(flags), Some(mask), Some(object), Some(inherited), Some(trustee)] = values else { return Err(denied("Malformed pipe ACE")); };
+    let full = mask == "FA" || mask.strip_prefix("0x").is_some_and(|value| u32::from_str_radix(value, 16) == Ok(0x1f01ff));
+    if fields.next().is_some() || kind != "A" || !flags.is_empty() || !object.is_empty() || !inherited.is_empty() || trustee.is_empty() || !full { return Err(denied("Pipe DACL differs from exact current-user policy")); }
+    Ok(trustee)
+}
+
 pub fn verify_private_file(path: &Path, limit: u64) -> Result<()> {
     let parent = path
         .parent()
@@ -218,6 +240,9 @@ mod tests {
                 "An existing broad DACL must be refused without repairing it"
             );
         }
+        let _relay_guard = crate::process::RELAY_CASE_GATE.lock().expect("Relay test gate poisoned");
+        crate::process::run_native_lifetime_cases();
+        crate::process::direct_cases();
     }
     #[test]
     fn local_admin_sid_alias_does_not_admit_everyone_or_another_normal_user() {
@@ -230,6 +255,12 @@ mod tests {
             )
             .is_err()
         );
+        let sid = "S-1-5-21-1-2-3-1001";
+        for mask in ["FA", "0x1f01ff"] { assert!(check_pipe_dacl(&format!("D:P(A;;{mask};;;{sid})"), sid).is_ok()); }
+        assert!(check_pipe_dacl("D:P(A;;FA;;;LA)", "S-1-5-21-1-2-3-500").is_err());
+        assert!(check_pipe_dacl("D:P(A;;FA;;;LA)", "LA").is_ok());
+        assert!(check_pipe_dacl("D:P(A;;FA;;;S-1-5-21-9-8-7-500)", "S-1-5-21-1-2-3-500").is_err());
+        for bad in ["", "D:", "D:P", "D:NO_ACCESS_CONTROL", "D:(A;;FA;;;S-1-5-21-1-2-3-1001)", "D:P(A;OI;FA;;;S-1-5-21-1-2-3-1001)", "D:P(A;CI;FA;;;S-1-5-21-1-2-3-1001)", "D:P(A;ID;FA;;;S-1-5-21-1-2-3-1001)", "D:P(OA;;FA;;;S-1-5-21-1-2-3-1001)", "D:P(XA;;FA;;;S-1-5-21-1-2-3-1001)", "D:P(A;;FR;;;S-1-5-21-1-2-3-1001)", "D:P(A;;FA;;;LA)", "D:P(A;;FA;;;WD)", "D:P(A;;FA;;;SY)", "D:P(A;;FA;;;BA)", "D:P(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)", "D:P(A;;FA;;;S-1-5-21-1-2-3-1001)tail"] { assert!(check_pipe_dacl(bad, sid).is_err(), "{bad}"); }
     }
     #[test]
     fn credentials_are_protected_and_existing_exports_are_preserved() {
@@ -245,6 +276,8 @@ mod tests {
         assert!(write_private(&path, b"replacement", false).is_err());
         assert_eq!(read_private(&path, 64).unwrap(), b"first");
         assert!(read_private(&path, 2).is_err());
+        let _relay_guard = crate::process::RELAY_CASE_GATE.lock().expect("Relay test gate poisoned");
+        crate::process::foundation_cases();
     }
     #[cfg(unix)]
     #[test]
@@ -256,5 +289,7 @@ mod tests {
             private_directory(root.path()).unwrap_err().code,
             "INSECURE_DATA_ROOT"
         );
+        let _relay_guard = crate::process::RELAY_CASE_GATE.lock().expect("Relay test gate poisoned");
+        crate::process::direct_cases();
     }
 }

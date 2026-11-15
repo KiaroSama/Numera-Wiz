@@ -1,3 +1,5 @@
+#[path = "support/relay.rs"]
+mod relay;
 use std::{path::Path, time::Duration};
 use tokio_util::sync::CancellationToken;
 fn fixture() -> &'static Path {
@@ -69,6 +71,8 @@ async fn independent_pipe_draining_stays_bounded_under_flood() {
         assert_eq!(result.stderr_tail.as_bytes(), &[b'x'; 4096]);
         assert!(result.diagnostic_bytes >= 2 * 1024 * 1024);
     }
+    let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
+    relay::positive(fixture()).await;
 }
 #[tokio::test]
 async fn cancellation_waits_for_termination_and_reaping() {
@@ -87,6 +91,8 @@ async fn cancellation_waits_for_termination_and_reaping() {
     )
     .await;
     assert_eq!(result.unwrap_err().code, "CANCELLED");
+    let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
+    relay::lifecycle(fixture()).await;
 }
 
 #[tokio::test]
@@ -111,6 +117,8 @@ async fn rejected_streamed_stdout_terminates_and_reaps_the_producer() {
     .unwrap_err();
     assert_eq!(result.code, "VERIFICATION_FAILED");
     assert!(start.elapsed() < Duration::from_secs(8));
+    let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
+    relay::sinks(fixture()).await;
 }
 #[tokio::test]
 async fn launch_failure_and_child_failure_remain_distinct() {
@@ -135,6 +143,8 @@ async fn launch_failure_and_child_failure_remain_distinct() {
     .await
     .unwrap_err();
     assert_eq!(launch.code, "PROCESS_LAUNCH_FAILED");
+    let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
+    relay::failures(fixture()).await;
 }
 
 #[tokio::test]
@@ -182,4 +192,6 @@ async fn explicit_finite_policy_times_out_and_disabled_policy_still_cancels() {
             task.await.unwrap();
         }
     }
+    let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
+    relay::deadlines(fixture()).await;
 }

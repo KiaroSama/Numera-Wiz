@@ -1,5 +1,5 @@
 //! Inspect the actual protected object through native Windows security APIs.
-use super::{check_dacl, denied};
+use super::{check_dacl, check_pipe_dacl, denied, pipe_trustee};
 use crate::files::{diagnostic_io_error, native_object};
 use nw_domain::Result;
 use std::{
@@ -8,7 +8,7 @@ use std::{
     os::windows::{
         ffi::OsStrExt,
         fs::{MetadataExt, OpenOptionsExt},
-        io::{AsRawHandle, FromRawHandle, OwnedHandle},
+        io::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, OwnedHandle},
     },
     path::Path,
     ptr,
@@ -19,7 +19,7 @@ use windows_sys::Win32::{
         Authorization::{
             ConvertSecurityDescriptorToStringSecurityDescriptorW, ConvertSidToStringSidW,
             ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo, SDDL_REVISION_1,
-            SE_FILE_OBJECT,
+            SE_FILE_OBJECT, SE_KERNEL_OBJECT, SE_OBJECT_TYPE,
         },
         DACL_SECURITY_INFORMATION, GetTokenInformation, SECURITY_ATTRIBUTES, TOKEN_QUERY,
         TOKEN_USER, TokenUser,
@@ -274,17 +274,18 @@ pub(super) fn creation_collision(path: &Path) -> Result<Result<()>> {
     Ok(verify_directory(path, &sid))
 }
 
-#[expect(
-    unsafe_code,
-    reason = "Inspect the held object's actual DACL and copy its bounded native SDDL"
-)]
 fn descriptor_text(file: &File) -> Result<String> {
+    descriptor_text_for(file.as_handle(), SE_FILE_OBJECT)
+}
+
+#[expect(unsafe_code, reason = "Inspect a live borrowed handle using the selected object type and bounded owned LocalAlloc outputs")]
+fn descriptor_text_for(handle: BorrowedHandle<'_>, object_type: SE_OBJECT_TYPE) -> Result<String> {
     let mut descriptor = ptr::null_mut();
     // SAFETY: The held handle has READ_CONTROL; all unused outputs are null.
     let status = unsafe {
         GetSecurityInfo(
-            file.as_raw_handle(),
-            SE_FILE_OBJECT,
+            handle.as_raw_handle(),
+            object_type,
             DACL_SECURITY_INFORMATION,
             ptr::null_mut(),
             ptr::null_mut(),
@@ -300,12 +301,17 @@ fn descriptor_text(file: &File) -> Result<String> {
     if allocation.0.is_null() {
         return Err(denied("Protected security descriptor is absent"));
     }
+    descriptor_string(&allocation)
+}
+
+#[expect(unsafe_code, reason = "Serialize a live owned native security descriptor with bounded UTF-16 output and separate LocalFree ownership")]
+fn descriptor_string(descriptor: &LocalMemory) -> Result<String> {
     let mut text = ptr::null_mut();
     let mut length = 0;
     // SAFETY: The descriptor remains live and outputs receive a unique LocalAlloc string.
     let okay = unsafe {
         ConvertSecurityDescriptorToStringSecurityDescriptorW(
-            allocation.0,
+            descriptor.0,
             SDDL_REVISION_1,
             DACL_SECURITY_INFORMATION,
             &mut text,
@@ -326,6 +332,32 @@ fn descriptor_text(file: &File) -> Result<String> {
     }
     String::from_utf16(&units[..units.len() - 1])
         .map_err(|error| decode_error("acl.dacl_decode", error))
+}
+
+pub(crate) struct PipeSecurity { expected_trustee: String, descriptor: LocalMemory }
+impl PipeSecurity {
+    #[expect(unsafe_code, reason = "Create an exact current-TokenUser protected pipe descriptor; unique LocalFree ownership")]
+    pub(crate) fn current() -> Result<Self> {
+        let sid = current_sid()?;
+        let text = format!("D:P(A;;FA;;;{sid})").encode_utf16().chain(Some(0)).collect::<Vec<_>>();
+        let mut descriptor = ptr::null_mut();
+        // SAFETY: text is terminated and lives through the call; output is a
+        // unique LocalAlloc descriptor retained independently from text.
+        if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(text.as_ptr(), SDDL_REVISION_1, &mut descriptor, ptr::null_mut()) } == 0 { return Err(last_error("pipe.descriptor_create")); }
+        let descriptor = LocalMemory(descriptor);
+        if descriptor.0.is_null() { return Err(denied("Pipe descriptor absent")); }
+        // Canonicalize the exact owned TokenUser descriptor through the same
+        // selected Windows serializer used for the actual held pipe. Only this
+        // trusted conversion can establish a SID alias such as LA.
+        let canonical = descriptor_string(&descriptor)?;
+        let expected_trustee = pipe_trustee(&canonical)?.to_owned();
+        Ok(Self { expected_trustee, descriptor })
+    }
+    pub(crate) fn with_attributes<T>(&self, create: impl FnOnce(*const SECURITY_ATTRIBUTES) -> Result<T>) -> Result<T> {
+        let attributes = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: self.descriptor.0, bInheritHandle: 0 };
+        create(&attributes)
+    }
+    pub(crate) fn verify_pipe(&self, pipe: BorrowedHandle<'_>) -> Result<()> { check_pipe_dacl(&descriptor_text_for(pipe, SE_KERNEL_OBJECT)?, &self.expected_trustee) }
 }
 
 fn verify(path: &Path, sid: &str) -> Result<File> {

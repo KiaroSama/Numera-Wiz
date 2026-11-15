@@ -267,12 +267,12 @@ pub(super) async fn launch(url: &str) -> anyhow::Result<()> {
     let mut command = tokio::process::Command::new("/usr/bin/open");
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut command = tokio::process::Command::new("xdg-open");
-    let mut child = command
+    command
         .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
+        .stderr(Stdio::null());
+    let mut child = nw_platform::process::with_process_launch(|| command.spawn())
         .map_err(|_| {
             anyhow::anyhow!("BROWSER_LAUNCH_FAILED: open the workspace from a desktop session")
         })?;

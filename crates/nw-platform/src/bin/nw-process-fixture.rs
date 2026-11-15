@@ -1,10 +1,34 @@
 //! Hosted process fault fixture, never part of the ordinary package.
+#[path = "nw-process-fixture/relay.rs"]
+mod relay;
 use std::io::Write;
 fn main() -> std::process::ExitCode {
     nw_platform::init_logging();
     tracing::info!("Hosted process fixture starting");
     let args = std::env::args().collect::<Vec<_>>();
     match args.get(1).map(String::as_str) {
+        Some("relay-descendant") => {
+            // Keep inherited output handles alive after the primary exits.
+            // The session must settle the descendant before reporting closure.
+            let child = std::process::Command::new(std::env::current_exe().unwrap())
+                .arg("sleep")
+                .spawn()
+                .unwrap();
+            drop(child);
+            let mut relay_args = args.clone();
+            relay_args[1] = "relay-two-input".into();
+            relay::run(&relay_args)
+        }
+        Some("relay-roundtrip") => {
+            if args.len() < 4 { return std::process::ExitCode::FAILURE; }
+            for argument in &args[4..] {
+                println!("ARG {}", hex::encode(argument.as_bytes()));
+            }
+            let mut relay_args = args[..4].to_vec();
+            relay_args[1] = "relay-two-input".into();
+            relay::run(&relay_args)
+        }
+        Some("relay-two-input" | "relay-two-input-interleaved" | "relay-slow-tail" | "relay-open-stall" | "relay-read-stall" | "relay-early-exit") => relay::run(&args),
         Some("flood") => {
             tracing::debug!("Producing deterministic bounded fixture output");
             let block = [b'x'; 8192];

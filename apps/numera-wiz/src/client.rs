@@ -539,8 +539,7 @@ impl NativeClient {
                 command.process_group(0);
                 #[cfg(windows)]
                 command.creation_flags(0x00000008 | 0x00000200);
-                let mut child = command
-                    .spawn()
+                let mut child = nw_platform::process::with_process_launch(|| command.spawn())
                     .context("Cannot start the protected owner")?;
                 let stdout = child.stdout.take();
                 tracing::info!(process_id = child.id(), "Protected owner child spawned");

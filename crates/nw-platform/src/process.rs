@@ -1,4 +1,13 @@
 //! Bounded leaf execution; arguments are never executed as shell text.
+mod input_relay;
+mod media_session;
+pub use media_session::{AsyncChunkSink, ByteInput, ClosedSession, InvocationSpec, MediaProcessSession, PreparedRelays, PumpReceipt, RegistryStatus, RelayInputId, SessionArg, SessionCharge, SessionFailure, SessionId, SessionOutput, SessionPolicy, SessionResult, Settlement, SinkFuture, StdoutMode, reconcile_finished_sessions, session_registry_status};
+#[cfg(test)]
+pub(crate) static RELAY_CASE_GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+#[cfg(test)]
+pub(crate) use media_session::{foundation_cases, direct_cases};
+#[cfg(all(test, windows))]
+pub(crate) use input_relay::run_native_lifetime_cases;
 #[cfg(windows)]
 mod windows_stdio;
 use nw_domain::{DomainError, Result};
@@ -15,6 +24,36 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 #[cfg(windows)]
 pub use windows_stdio::prevent_stdio_inheritance;
+
+#[cfg(windows)]
+static PROCESS_LAUNCH_GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+#[cfg(windows)]
+static INHERITANCE_UNCERTAIN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Serialize the short Windows handle-inheritance window across application
+/// launch sites. Process execution and pipe draining never hold this guard.
+pub fn with_process_launch<T>(launch: impl FnOnce() -> std::io::Result<T>) -> std::io::Result<T> {
+    #[cfg(windows)]
+    let _guard = acquire_launch_guard()?;
+    launch()
+}
+#[cfg(windows)]
+fn acquire_launch_guard() -> std::io::Result<std::sync::MutexGuard<'static, ()>> {
+    let stop = std::time::Instant::now() + Duration::from_secs(1);
+    loop {
+        match PROCESS_LAUNCH_GATE.try_lock() {
+            Ok(guard) => {
+                if INHERITANCE_UNCERTAIN.load(std::sync::atomic::Ordering::Acquire) {
+                    return Err(std::io::Error::other("A previous launch retained uncertain inherited handles"));
+                }
+                return Ok(guard);
+            },
+            Err(std::sync::TryLockError::Poisoned(_)) => return Err(std::io::Error::other("Process launch ownership was interrupted")),
+            Err(std::sync::TryLockError::WouldBlock) if std::time::Instant::now() < stop => std::thread::sleep(Duration::from_millis(1)),
+            Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Process launch admission expired")),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct RunOutput {
@@ -340,7 +379,7 @@ async fn run_with_stdin(
             "An explicit absolute executable is required",
         ));
     }
-    let cwd = program.parent().ok_or_else(|| {
+    let _cwd = program.parent().ok_or_else(|| {
         DomainError::new(
             "COMPONENT_UNAVAILABLE",
             "Executable parent directory is required",
@@ -352,30 +391,7 @@ async fn run_with_stdin(
             "Media stage cancelled before process launch",
         ));
     }
-    tracing::info!(program=%program.display(),cwd=%cwd.display(),argv=?args,"stage.prepared");
-    let mut command = Command::new(program);
-    command
-        .current_dir(cwd)
-        .args(args)
-        .stdin(input)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .env_clear();
-    for key in ["SystemRoot", "WINDIR", "TEMP", "TMP", "LANG"] {
-        if let Some(value) = std::env::var_os(key) {
-            command.env(key, value);
-        }
-    }
-    let mut owned = CommandWrap::from(command);
-    #[cfg(unix)]
-    owned.wrap(ProcessGroup::leader());
-    #[cfg(windows)]
-    owned.wrap(JobObject);
-    owned.wrap(KillOnDrop);
-    let mut child = owned
-        .spawn()
-        .map_err(|e| DomainError::new("PROCESS_LAUNCH_FAILED", e.to_string()))?;
+    let mut child = spawn_owned(program, args, input)?;
     let stdout = child
         .stdout()
         .take()
@@ -473,4 +489,31 @@ async fn terminate(child: &mut Box<dyn ChildWrapper>) -> Result<()> {
     .map_err(|_| DomainError::new("TREE_TERMINATION_UNCERTAIN", "Reap deadline exceeded"))?
     .map_err(|e| DomainError::new("TREE_TERMINATION_UNCERTAIN", e.to_string()))?;
     Ok(())
+}
+
+fn spawn_owned(program: &Path, args: &[String], input: Stdio) -> Result<Box<dyn ChildWrapper>> {
+    let cwd = program.parent().ok_or_else(|| DomainError::new("COMPONENT_UNAVAILABLE", "Executable parent directory is required"))?;
+    tracing::info!(program=%program.display(),cwd=%cwd.display(),argv=?args,"stage.prepared");
+    let mut command = Command::new(program);
+    command
+        .current_dir(cwd)
+        .args(args)
+        .stdin(input)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .env_clear();
+    for key in ["SystemRoot", "WINDIR", "TEMP", "TMP", "LANG"] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+    let mut owned = CommandWrap::from(command);
+    #[cfg(unix)]
+    owned.wrap(ProcessGroup::leader());
+    #[cfg(windows)]
+    owned.wrap(JobObject);
+    owned.wrap(KillOnDrop);
+    let result = with_process_launch(|| owned.spawn());
+    result.map_err(|e| DomainError::new("PROCESS_LAUNCH_FAILED", e.to_string()))
 }

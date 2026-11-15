@@ -1,4 +1,4 @@
-# Current owner direction — 2026-11-13
+# Current owner direction — 2026-11-15
 
 The active task is the complete attached version 1 mandate, Pure Rust with
 FFmpeg, plus repository-owned agent skills/plugins and full CLI/MCP access to
@@ -8,7 +8,49 @@ and no-close policies below are historical and superseded by the owner's explici
 request to consolidate other branches/PRs and remove local-only planning/source
 files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
-## November 13 current candidate and hosted boundary
+## Owned two-input session qualification
+
+The current source adds a dedicated two-input process session in `nw-platform`
+and an engine process-budget charge adapter. It keeps input workers, child-tree
+ownership and output consumers in a retained registry that survives a dropped
+caller or caller runtime. Capacity returns after actual resource settlement and
+the coordinator thread has joined; an uncertain native operation retains its
+owner and charge. This source is awaiting hosted qualification.
+
+Unix uses private descriptor-relative FIFOs and a waitable primary process to
+anchor the last process-group termination before reaping. Later group probes
+are read-only. Windows uses private single-instance pipes, a suspended launch,
+an explicit inherited-handle list and a private Job assigned before resume.
+Actual Job accounting supplies the empty-tree observation. Windows output reads
+remain in coordinator-owned overlapped storage rather than a detached blocking
+reader. A bounded launch guard prevents other application launch sites from
+inheriting a session's temporary output writers.
+
+The first byte-transport profile remains limited to two 8 MiB inputs and 256 KiB
+output, with two admitted sessions, three application threads per session and
+a 25 MiB logical reservation per session. These are development admission bounds,
+not measured whole-process RSS guarantees or general media/export support.
+Fixtures cover independent payload/hash/tail/EOF observations, cancellation,
+sink failure, dropped callers, a descendant retaining output handles and actual
+empty/quoted/backslash/Unicode argument round trips. They remain within the
+original test entry points; authored cases are not passing runtime evidence.
+General media integration, continuous preview and the complete mandate remain
+required.
+
+## Latest completed hosted boundary
+
+[CI295](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43489694891),
+source `f335e28c6a3d626b2abff0cb15e9e59533a5518f`, is terminal with nine
+passing jobs, three failures and one cancelled macOS Intel job. All four native
+build steps passed. Linux and macOS ARM full checks, formatting, WASM, dependency
+lock, media, batch, transports and HTTP passed. Both GUI journeys pass folder
+intake and fail later at the shared Projects `streams.clean` input. Windows
+ordinary tests report `OWNER_START_TIMEOUT` where the reconnect test expects
+`PRINCIPAL_CHANGED`. Neither that timeout nor the Intel cancellation establishes
+a precise underlying cause. Gitleaks 161 and 162 passed. This predecessor does
+not qualify the later two-input implementation or the complete product.
+
+## November 13 historical candidate and hosted boundary
 
 [CI293](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43481292992),
 source `89e6e7e2ca1a7872b42c5d49753bd08b631e8f7b`, is terminal: ten passing

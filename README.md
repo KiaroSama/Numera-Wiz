@@ -23,6 +23,9 @@ remain unfinished. A green development CI is evidence for its exercised scope.
 Current work and required gaps are recorded in the
 [continuation record](docs/development/continuation.md) and
 [completion ledger](docs/development/completion.json).
+The [owned two-input session implementation](docs/development/continuation.md#owned-two-input-session-qualification)
+is awaiting hosted native qualification; its byte-transport fixtures do not
+qualify general media export or continuous preview.
 
 ## Implemented workflows
 
