@@ -20,7 +20,9 @@ fn main() -> std::process::ExitCode {
             relay::run(&relay_args)
         }
         Some("relay-roundtrip") => {
-            if args.len() < 4 { return std::process::ExitCode::FAILURE; }
+            if args.len() < 4 {
+                return std::process::ExitCode::FAILURE;
+            }
             for argument in &args[4..] {
                 println!("ARG {}", hex::encode(argument.as_bytes()));
             }
@@ -28,7 +30,14 @@ fn main() -> std::process::ExitCode {
             relay_args[1] = "relay-two-input".into();
             relay::run(&relay_args)
         }
-        Some("relay-two-input" | "relay-two-input-interleaved" | "relay-slow-tail" | "relay-open-stall" | "relay-read-stall" | "relay-early-exit") => relay::run(&args),
+        Some(
+            "relay-two-input"
+            | "relay-two-input-interleaved"
+            | "relay-slow-tail"
+            | "relay-open-stall"
+            | "relay-read-stall"
+            | "relay-early-exit",
+        ) => relay::run(&args),
         Some("flood") => {
             tracing::debug!("Producing deterministic bounded fixture output");
             let block = [b'x'; 8192];

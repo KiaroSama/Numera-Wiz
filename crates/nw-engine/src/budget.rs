@@ -99,8 +99,11 @@ impl Drop for Ticket {
             && let Some(permit) = self.permit.take()
         {
             permit.forget();
-            if !self.retained_relay { self.budget.quarantined.fetch_add(1, Ordering::AcqRel); }
-            let count = self.budget.quarantined.load(Ordering::Acquire) + self.budget.retained_relays.load(Ordering::Acquire);
+            if !self.retained_relay {
+                self.budget.quarantined.fetch_add(1, Ordering::AcqRel);
+            }
+            let count = self.budget.quarantined.load(Ordering::Acquire)
+                + self.budget.retained_relays.load(Ordering::Acquire);
             let forgotten = self.budget.forgotten.fetch_add(1, Ordering::AcqRel) + 1;
             if forgotten >= LIMIT {
                 self.budget.slots.close();
@@ -161,7 +164,13 @@ mod tests {
     }
 
     async fn transferred_relay_charge(mark: bool) {
-        use nw_platform::{files::{DirectoryStamp, SourceStamp}, process::{ByteInput, PreparedRelays, RelayInputId, SessionCharge, SessionPolicy, reconcile_finished_sessions, session_registry_status}};
+        use nw_platform::{
+            files::{DirectoryStamp, SourceStamp},
+            process::{
+                ByteInput, PreparedRelays, RelayInputId, SessionCharge, SessionPolicy,
+                reconcile_finished_sessions, session_registry_status,
+            },
+        };
         use sha2::{Digest, Sha256};
         reconcile_finished_sessions().unwrap();
         assert_eq!(session_registry_status().admitted(), 0);
@@ -169,18 +178,41 @@ mod tests {
         let parent = nw_platform::security::private_directory(&root.path().join("relay")).unwrap();
         let mut inputs = Vec::new();
         for id in 0..2 {
-            let path = std::fs::canonicalize(root.path()).unwrap().join(format!("source-{id}"));
+            let path = std::fs::canonicalize(root.path())
+                .unwrap()
+                .join(format!("source-{id}"));
             std::fs::write(&path, [id]).unwrap();
-            inputs.push(ByteInput::new(RelayInputId(id), SourceStamp::capture_resolved(&path).unwrap(), 1, Sha256::digest([id]).into()).unwrap());
+            inputs.push(
+                ByteInput::new(
+                    RelayInputId(id),
+                    SourceStamp::capture_resolved(&path).unwrap(),
+                    1,
+                    Sha256::digest([id]).into(),
+                )
+                .unwrap(),
+            );
         }
-        let inputs: [ByteInput; 2] = inputs.try_into().unwrap_or_else(|_| panic!("two fixture inputs"));
+        let inputs: [ByteInput; 2] = inputs
+            .try_into()
+            .unwrap_or_else(|_| panic!("two fixture inputs"));
         let budget = ProcessBudget::default();
         let token = CancellationToken::new();
         let mut transferred = budget.acquire(&token).await.unwrap();
         let running = budget.acquire(&token).await.unwrap();
-        if mark { transferred.mark_uncertain(); transferred.mark_uncertain(); }
+        if mark {
+            transferred.mark_uncertain();
+            transferred.mark_uncertain();
+        }
         assert_eq!(budget.status(), (2, 0, usize::from(mark)));
-        let prepared = PreparedRelays::prepare(inputs, DirectoryStamp::capture_resolved(&parent).unwrap(), SessionPolicy::byte_fixture(), Box::new(transferred), token).await.unwrap_or_else(|failure| panic!("{}", failure.cause));
+        let prepared = PreparedRelays::prepare(
+            inputs,
+            DirectoryStamp::capture_resolved(&parent).unwrap(),
+            SessionPolicy::byte_fixture(),
+            Box::new(transferred),
+            token,
+        )
+        .await
+        .unwrap_or_else(|failure| panic!("{}", failure.cause));
         assert_eq!(budget.status(), (2, 0, usize::from(mark)));
         drop(prepared);
         // A dropped facade requests cancellation; it cannot itself release.
@@ -197,39 +229,74 @@ mod tests {
     }
 
     async fn rejected_relay_charge() {
-        use nw_platform::{files::{DirectoryStamp, SourceStamp}, process::{ByteInput, PreparedRelays, RelayInputId, SessionPolicy, Settlement, session_registry_status}};
+        use nw_platform::{
+            files::{DirectoryStamp, SourceStamp},
+            process::{
+                ByteInput, PreparedRelays, RelayInputId, SessionPolicy, Settlement,
+                session_registry_status,
+            },
+        };
         use sha2::{Digest, Sha256};
         for cancelled in [false, true] {
-        let root = tempfile::tempdir().unwrap();
-        let path = std::fs::canonicalize(root.path()).unwrap();
-        let parent = nw_platform::security::private_directory(&path.join("rejected")).unwrap();
-        let source = path.join("one");
-        std::fs::write(&source, b"x").unwrap();
-        // Each input is individually valid; the pair is invalid before any
-        // endpoint/worker allocation. No production fault switch is involved.
-        let inputs = std::array::from_fn(|id| ByteInput::new(RelayInputId(if cancelled { id as u8 } else { 0 }), SourceStamp::capture_resolved(&source).unwrap(), 1, Sha256::digest(b"x").into()).unwrap());
-        let budget = ProcessBudget::default();
-        let token = CancellationToken::new();
-        let ticket = budget.acquire(&token).await.unwrap();
-        assert_eq!(budget.status(), (2, 1, 0));
-        if cancelled { token.cancel(); }
-        let failure = match PreparedRelays::prepare(inputs, DirectoryStamp::capture_resolved(&parent).unwrap(), SessionPolicy::byte_fixture(), Box::new(ticket), token).await {
-            Ok(_) => panic!("duplicate byte inputs were admitted"),
-            Err(failure) => failure,
-        };
-        assert_eq!(failure.cause.code, if cancelled { "CANCELLED" } else { "INPUT_DENIED" });
-        match failure.settlement {
-            Settlement::Closed(closed) => {
-                assert!(closed.coordinator_joined());
-                assert!(!closed.child_spawned());
-                assert!(closed.pumps().iter().all(|pump| !pump.endpoint_created() && !pump.worker_joined()));
-            },
-            Settlement::Retained(_) => panic!("empty preparation must settle"),
-        }
-        assert_eq!(budget.status(), (2, 2, 0));
-        assert_eq!(session_registry_status().admitted(), 0);
-        assert_eq!(std::fs::read_dir(&parent).unwrap().count(), 0);
+            let root = tempfile::tempdir().unwrap();
+            let path = std::fs::canonicalize(root.path()).unwrap();
+            let parent = nw_platform::security::private_directory(&path.join("rejected")).unwrap();
+            let source = path.join("one");
+            std::fs::write(&source, b"x").unwrap();
+            // Each input is individually valid; the pair is invalid before any
+            // endpoint/worker allocation. No production fault switch is involved.
+            let inputs = std::array::from_fn(|id| {
+                ByteInput::new(
+                    RelayInputId(if cancelled { id as u8 } else { 0 }),
+                    SourceStamp::capture_resolved(&source).unwrap(),
+                    1,
+                    Sha256::digest(b"x").into(),
+                )
+                .unwrap()
+            });
+            let budget = ProcessBudget::default();
+            let token = CancellationToken::new();
+            let ticket = budget.acquire(&token).await.unwrap();
+            assert_eq!(budget.status(), (2, 1, 0));
+            if cancelled {
+                token.cancel();
+            }
+            let failure = match PreparedRelays::prepare(
+                inputs,
+                DirectoryStamp::capture_resolved(&parent).unwrap(),
+                SessionPolicy::byte_fixture(),
+                Box::new(ticket),
+                token,
+            )
+            .await
+            {
+                Ok(_) => panic!("duplicate byte inputs were admitted"),
+                Err(failure) => failure,
+            };
+            assert_eq!(
+                failure.cause.code,
+                if cancelled {
+                    "CANCELLED"
+                } else {
+                    "INPUT_DENIED"
+                }
+            );
+            match failure.settlement {
+                Settlement::Closed(closed) => {
+                    assert!(closed.coordinator_joined());
+                    assert!(!closed.child_spawned());
+                    assert!(
+                        closed
+                            .pumps()
+                            .iter()
+                            .all(|pump| !pump.endpoint_created() && !pump.worker_joined())
+                    );
+                }
+                Settlement::Retained(_) => panic!("empty preparation must settle"),
+            }
+            assert_eq!(budget.status(), (2, 2, 0));
+            assert_eq!(session_registry_status().admitted(), 0);
+            assert_eq!(std::fs::read_dir(&parent).unwrap().count(), 0);
         }
     }
-
 }
