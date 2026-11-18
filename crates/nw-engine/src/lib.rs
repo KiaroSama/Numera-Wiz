@@ -260,7 +260,7 @@ impl Engine {
     }
     pub fn clean_plan_with_file_times_at(
         &self,
-        asset: Asset,
+        mut asset: Asset,
         output: &Path,
         intent: &CleanIntent,
         file_times: nw_domain::file_times::FileTimeRequest,
@@ -324,6 +324,10 @@ impl Engine {
         } else {
             Some(nw_platform::file_times::plan(&source_stamp, file_times)?)
         };
+        if resolution.chapter_import.is_none() {
+            // Duration participates in the reviewed contract only for chapter imports.
+            asset.probe.container_duration = None;
+        }
         source_stamp.revalidate()?;
         let mut plan = Plan {
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
