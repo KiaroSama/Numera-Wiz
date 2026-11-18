@@ -7,6 +7,7 @@ mod fixture;
 use fixture::rules;
 
 async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
+    use nw_engine::NormalizedWindow;
     use nw_platform::{
         files::{DirectoryStamp, SourceStamp, source_path},
         process::{ByteInput, RelayInputId},
@@ -52,7 +53,16 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
         "-fps_mode",
         "passthrough",
     ];
-    let audio = ["-map", "0:a:0", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1"];
+    let audio = [
+        "-map",
+        "0:a:0",
+        "-c:a",
+        "pcm_s16le",
+        "-ar",
+        "48000",
+        "-ac",
+        "1",
+    ];
     let mut inputs = Vec::new();
     for (index, options) in [video.as_slice(), audio.as_slice()].into_iter().enumerate() {
         let mut options = options.to_vec();
@@ -119,6 +129,104 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
             "Normalized {format} output differs from source decode"
         );
     }
+
+    let asset = engine
+        .register(media.source.clone(), "fixture".into(), token.clone())
+        .await
+        .unwrap();
+    let source = source_path(&media.source).unwrap();
+    let second_audio = ["-map", "0:2", "-c:a", "pcm_s16le"];
+    let mut registered_inputs = Vec::new();
+    let mut registered_decodes = Vec::new();
+    for (slot, (window, index, options, format, unit, range)) in [
+        (
+            NormalizedWindow::VideoFrames(1..3),
+            0,
+            video.as_slice(),
+            "rawvideo",
+            64 * 48 * 4,
+            1..3,
+        ),
+        (
+            NormalizedWindow::AudioSamples(1_301..5_101),
+            2,
+            second_audio.as_slice(),
+            "s16le",
+            2,
+            1_301..5_101,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let window = engine
+            .normalize_registered_window_candidate(
+                &asset,
+                SourceStamp::capture_resolved(&source).unwrap(),
+                index,
+                window,
+                token.clone(),
+            )
+            .await
+            .unwrap();
+        let window_path = root.join(format!("window-{index}.nut"));
+        std::fs::write(&window_path, &window).unwrap();
+        let mut input_options = options.to_vec();
+        input_options.extend(["-f", format]);
+        let mut output_options = input_options.clone();
+        output_options[1] = "0:0";
+        let expected = collect(ffmpeg, &media.source, &input_options, token).await;
+        let actual = collect(ffmpeg, &window_path, &output_options, token).await;
+        assert!(
+            actual.as_slice() == &expected[range.start * unit..range.end * unit],
+            "Decoded window differs from registered stream {index}"
+        );
+        let probe = fixture::probe(&media.bin, &window_path).await;
+        let streams = probe["streams"].as_array().unwrap();
+        assert_eq!(streams.len(), 1);
+        assert_eq!(streams[0]["start_pts"], 0);
+        registered_inputs.push(
+            ByteInput::new(
+                RelayInputId(slot as u8),
+                SourceStamp::capture_resolved(&source_path(&window_path).unwrap()).unwrap(),
+                window.len() as u64,
+                Sha256::digest(&window).into(),
+            )
+            .unwrap(),
+        );
+        input_options[1] = if slot == 0 { "0:v:0" } else { "0:a:0" };
+        registered_decodes.push((input_options, actual));
+    }
+    let paired = engine
+        .mux_normalized_pair_candidate(
+            registered_inputs
+                .try_into()
+                .unwrap_or_else(|_| panic!("Expected two normalized registered windows")),
+            DirectoryStamp::capture_resolved(&root).unwrap(),
+            token.clone(),
+        )
+        .await
+        .unwrap();
+    let paired_path = root.join("registered-pair.nut");
+    std::fs::write(&paired_path, paired.output.stdout).unwrap();
+    for (options, expected) in registered_decodes {
+        let actual = collect(ffmpeg, &paired_path, &options, token).await;
+        assert!(actual == expected, "Paired registration changed decoded media");
+    }
+    let other_path = root.join("different-physical-source.mkv");
+    std::fs::copy(&source, &other_path).unwrap();
+    let error = engine
+        .normalize_registered_window_candidate(
+            &asset,
+            SourceStamp::capture_resolved(&other_path).unwrap(),
+            0,
+            NormalizedWindow::VideoFrames(0..1),
+            token.clone(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "SOURCE_CHANGED");
+    assert_eq!(engine.media_process_capacity(), (2, 2, 0));
 }
 
 fn observed_tag<'a>(value: &'a serde_json::Value, name: &str) -> Option<&'a str> {

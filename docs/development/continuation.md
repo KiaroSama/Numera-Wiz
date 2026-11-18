@@ -43,7 +43,14 @@ demuxer and private file transport, selects the video and audio streams
 explicitly, and reuses the engine's two-process budget. The existing Linux
 media test prepares inputs from real video and audio, inspects the output
 stream declarations and compares every decoded frame and sample with the
-source. This candidate path awaits hosted testing and remains outside the
+source. The actual Linux media test passed on `2013c3e`. [CI303](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
+
+The next engine stage uses the registered physical stream index and confirmed
+source object to decode a frame or sample window through a held seekable input.
+The source content and FFmpeg identity are checked again after decoding. The
+same media test compares decoded windows against an independent full decode
+and checks rejection of a different physical file with identical bytes. These
+new cases await hosted testing. The candidate paths remain outside the
 persistent project commands and publication path.
 
 The [November 18 upstream check](../research/upstream-check-2026-11-18.md)

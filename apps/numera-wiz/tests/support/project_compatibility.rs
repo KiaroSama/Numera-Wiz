@@ -860,11 +860,13 @@ fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStd
             .ok_or(Malformed)?;
         let (resources_closed, writer_healthy) =
             fields.split_once(" writer_healthy=").ok_or(Malformed)?;
-        return Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::LogHandoff {
-            resources_closed: resources_closed.parse().map_err(|_| Malformed)?,
-            writer_healthy: writer_healthy.parse().map_err(|_| Malformed)?,
-            confirmed_in_time: confirmed_in_time.parse().map_err(|_| Malformed)?,
-        })));
+        return Ok(Some(OwnerStderrRecord::Error(
+            OwnerStderrError::LogHandoff {
+                resources_closed: resources_closed.parse().map_err(|_| Malformed)?,
+                writer_healthy: writer_healthy.parse().map_err(|_| Malformed)?,
+                confirmed_in_time: confirmed_in_time.parse().map_err(|_| Malformed)?,
+            },
+        )));
     }
     if message == "Filesystem operation failed" {
         let fields = fields.strip_prefix(" operation=").ok_or(Malformed)?;

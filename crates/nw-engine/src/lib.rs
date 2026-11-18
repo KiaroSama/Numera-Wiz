@@ -6,6 +6,7 @@ mod output_profile;
 mod preservation;
 mod progress;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
+pub use media::normalized_pair::NormalizedWindow;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
