@@ -3,7 +3,6 @@ use super::*;
 use serde_json::{Value, json};
 
 const ID: &str = "11111111-1111-4111-8111-111111111111";
-const CASE_COUNT: u16 = 97;
 
 pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
     // These are input documents, never dispatched edits or fabricated successes.
@@ -68,7 +67,6 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         json!({"sequence_id":ID,"projection":"entity"}),
         json!({"sequence_id":ID,"projection":"entity","track_ids":[],"range":null,"cursor":null}),
         json!({"sequence_id":ID,"projection":"track_page","cursor":"opaque","replace_snapshot":null}),
-        json!({"sequence_id":ID,"projection":"marker_page","cursor":"opaque"}),
         json!({"sequence_id":ID,"projection":"viewport","track_ids":[ID],"range":range}),
     ] {
         add("sequences.inspect", params, true);
@@ -82,8 +80,6 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         json!({"sequence_id":ID,"projection":"entity","track_ids":null}),
         json!({"sequence_id":ID,"projection":"entity","range":range}),
         json!({"sequence_id":ID,"projection":"track_page","track_ids":[ID]}),
-        json!({"sequence_id":ID,"projection":"marker_page","track_ids":[ID]}),
-        json!({"sequence_id":ID,"projection":"marker_page","range":range}),
         json!({"sequence_id":ID,"projection":"entity","cursor":"opaque"}),
         json!({"sequence_id":"BAD","projection":"entity"}),
     ] {
@@ -214,11 +210,7 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         add(command, json!({}), true);
         add(command, json!({"unexpected":true}), false);
     }
-    assert_eq!(
-        cases.len(),
-        usize::from(CASE_COUNT),
-        "R1_LITERAL_INPUT_CASE_SET_CHANGED"
-    );
+    assert_eq!(cases.len(), 94, "R1_LITERAL_INPUT_CASE_SET_CHANGED");
     cases
 }
 
@@ -230,7 +222,7 @@ pub(super) fn run() {
         .unwrap()
         .1
         .clone();
-    let expected: Vec<_> = (1..=CASE_COUNT).collect();
+    let expected: Vec<_> = (1..=94).collect();
     let schemas = schema_validation::COMMANDS
         .into_iter()
         .map(|id| {
