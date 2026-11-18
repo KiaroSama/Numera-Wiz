@@ -193,10 +193,16 @@ does not prove verified publication. Use actual terminal job/artifact facts.
 ## Validation and remaining qualification
 
 Claude Code 2.1.327 passed strict validation and reported the `numera-wiz`
-stdio server and `numera-wiz:numera-wiz` skill. Codex CLI 0.167.0-alpha.4 listed
+stdio server and `numera-wiz:numera-wiz` skill. `claude mcp list` loaded the local
+plugin and reported its server connected to the CI-built Linux executable from
+source `2013c3e`. [CI executable provenance](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
+
+Codex CLI 0.167.0-alpha.4 listed
 `numera-wiz@numera-wiz-local` version 0.1.0 from the repository's marketplace
-using temporary config overrides. The package includes the official PNG at
-`assets/icon.png`. Rust builds, media and adapter tests run in GitHub Actions.
+using temporary config overrides. The app-server connection test in this
+environment stopped at its read-only Codex installation state. The package
+includes the official PNG at `assets/icon.png`. Rust builds, media and adapter
+tests run in GitHub Actions.
 
 Validate the root portable manifest and MCP config against the published
 [plugin schema](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json) and

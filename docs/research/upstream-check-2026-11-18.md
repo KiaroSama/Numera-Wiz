@@ -29,6 +29,12 @@ Selected changes include reversed audio and shared Opus export. These are
 inputs to the interchange and audio work. Full source coverage and adoption
 remain open. [FilmCraft comparison](https://github.com/storytold/filmcraft/compare/19d46c0748cf5c0ef5b0b2a421b85e8ae6d99db6...688444e75d059c0d2a5c13be75fc3cb210efebd1) · [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/a5ddc932578a94a826b0ee824ad2719a0e6dd3cd...3f1cd00745d41345632b38beece0b09c9e265e69)
 
+Vidonex's head is unchanged. Shotcut's four new commits include a hardware
+encoder default fix and a keyframe-loop change that was reverted. The encoder
+fix applies hardware defaults when loading default presets and preserves
+explicit settings in existing presets. This informs the remaining hardware
+profile work. [Vidonex source](https://github.com/farshidrezaei/vidonex/tree/ae04a3a4e7e455dd3f5f8a954fd2ff0c668fa4c6) · [Shotcut comparison](https://github.com/mltframework/shotcut/compare/f291f3f2531f6861e62cdbf90650ff0a6a072f03...7f7fab384e422e3d01525e50146fdc41be718e06)
+
 The official registry lists rmcp 3.11.0 and redb 4.6.0. The rmcp change set
 includes bounded HTTP responses and stricter capability handling. The registry
 also declares new Unicode and percent-encoding dependencies. redb 4.6.0
