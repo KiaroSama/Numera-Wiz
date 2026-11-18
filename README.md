@@ -23,14 +23,18 @@ remain unfinished. A green development CI is evidence for its exercised scope.
 Current work and required gaps are recorded in the
 [continuation record](docs/development/continuation.md) and
 [completion ledger](docs/development/completion.json).
-The [owned two-input session implementation](docs/development/continuation.md#owned-two-input-session-qualification)
-is awaiting hosted native qualification; its byte-transport fixtures do not
-qualify general media export or continuous preview.
+The [owned two-input media stage](docs/development/continuation.md#owned-two-input-session-qualification)
+has hosted native transport and real FFmpeg fixture evidence. General media
+export and continuous preview remain in development.
 
 ## Implemented workflows
 
 - Native and streamed browser media intake; exact original-index stream selection
   and metadata/tag/order resolution, using the shared MuxCls rules.
+- Remove audio or subtitle tracks by their position within each stream type.
+  Cleanup plans, reports and batches resolve the positions for each file.
+- Inspect FFmpeg component declarations and verify a CPU FFV1 round trip.
+  An explicit native-owner request can check H.264 and HEVC NVENC encoding.
 - Authorized folder intake with deterministic relative paths, retained probe
   failures, explicit bounds/exclusions and companion inventories. Inventory does
   not copy companions or qualify the whole MuxCls utility.

@@ -85,10 +85,10 @@ now schedules that lane on the standard macOS 26 Apple Silicon runner and
 preserves its job name, target triple and previous-package artifact identity.
 [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
-CI309 on `72eddac` passed the Linux native checks, Chrome, owner batch and
-transport tests, media, web and dependency lock. Apple Silicon received a
-macOS 26 runner and built the desktop application. The formatting patch from
-CI309 was applied before the follow-up source changes.
+CI309 on `72eddac` passed the four native build and regression jobs, Chrome,
+owner batch and transport tests, media, web and dependency lock. Apple Silicon
+ran on the standard macOS 26 runner. The formatting patch from CI309 was
+applied before the follow-up source changes.
 [CI309](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44336531084)
 
 ## Hosted results at `2013c3e`
