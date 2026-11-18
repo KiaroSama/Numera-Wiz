@@ -168,6 +168,28 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
         .await
         .unwrap();
     let source = source_path(&media.source).unwrap();
+    let preview = engine
+        .preview_registered_frame(
+            &asset, SourceStamp::capture_resolved(&source).unwrap(), 0, 2, token.clone(),
+        )
+        .await
+        .unwrap();
+    let reference = collect(
+        ffmpeg,
+        &source,
+        &[
+            "-map", "0:v:0", "-vf",
+            "select=eq(n\\,2),setpts=0,scale=120:90,pad=160:90:20:0:black,setsar=1,format=rgba",
+            "-frames:v", "1", "-c:v", "rawvideo", "-pix_fmt", "rgba", "-f", "rawvideo",
+        ],
+        token,
+    ).await;
+    assert_eq!(reference.len(), nw_domain::preview::RGBA_BYTES);
+    assert!(preview == reference, "Preview pixels differ from the independently selected frame");
+    let audio_preview = engine.preview_registered_frame(
+        &asset, SourceStamp::capture_resolved(&source).unwrap(), 2, 2, token.clone(),
+    ).await.unwrap_err();
+    assert_eq!(audio_preview.code, "INPUT_DENIED");
     let second_audio = ["-map", "0:2", "-c:a", "pcm_s16le"];
     let mut registered_inputs = Vec::new();
     let mut registered_decodes = Vec::new();

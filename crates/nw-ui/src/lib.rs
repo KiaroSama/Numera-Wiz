@@ -5,6 +5,7 @@ mod cleanup;
 pub mod client;
 mod folders;
 mod jobs;
+mod preview;
 mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
@@ -36,6 +37,7 @@ enum Action {
     Cancel,
     Inspect,
     Capabilities,
+    SourcePreview,
     ClearCapabilities,
     ArtifactManifest,
     SelectionReport(u64),
@@ -126,6 +128,7 @@ pub struct WizApp {
     stream_page: usize,
     inspect: String,
     capability_report: Option<nw_domain::capabilities::CapabilityReport>,
+    source_preview: preview::SourcePreview,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
     save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
@@ -302,6 +305,7 @@ impl WizApp {
             stream_page: 0,
             inspect: String::new(),
             capability_report: None,
+            source_preview: Default::default(),
             artifact_manifest: None,
             save_control: None,
             save_inbox: Arc::new(Mutex::new(None)),
@@ -328,6 +332,7 @@ impl WizApp {
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
         if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
             self.intent.disposition_patches.clear();
+            self.source_preview = Default::default();
         }
         self.selected = Some(asset.id.clone());
         self.asset_detail = Some(Arc::new(asset.clone()));
@@ -771,6 +776,7 @@ impl WizApp {
                     self.capability_report =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
+                Action::SourcePreview => self.accept_source_preview(result, ctx)?,
                 Action::ClearCapabilities => {
                     let cleared: nw_domain::capabilities::ClearResult =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;

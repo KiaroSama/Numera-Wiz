@@ -1076,6 +1076,7 @@ impl Service {
                 "batches.submit",
                 "timeline.render",
                 "media.probe",
+                "media.preview_frame",
                 "capabilities.refresh",
                 "chapters.remove",
                 "disposition.patch",
@@ -1387,6 +1388,11 @@ impl Service {
                     policy.is_none(),
                     cancellation.clone(),
                 )?,
+            "media.preview_frame" => value(&self.source_preview(
+                &context,
+                commands::parse(params)?,
+                cancellation.clone(),
+            )?)?,
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
                 let deadline = input

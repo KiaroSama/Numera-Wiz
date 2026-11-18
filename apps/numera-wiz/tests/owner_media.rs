@@ -395,6 +395,20 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
+    let (source_preview, exit) = cli.human(&[
+        "media", "preview-frame", "--asset", asset["id"].as_str().unwrap(),
+        "--stream", "0", "--frame", "2",
+    ]).await;
+    assert_eq!(exit, 0, "{}", source_preview["error"]);
+    let source_preview = &source_preview["result"];
+    assert_eq!(source_preview["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(source_preview["width"], nw_domain::preview::WIDTH);
+    assert_eq!(source_preview["height"], nw_domain::preview::HEIGHT);
+    assert_eq!(source_preview["frame"], 2);
+    assert_eq!(
+        STANDARD.decode(source_preview["rgba_base64"].as_str().unwrap()).unwrap().len(),
+        nw_domain::preview::RGBA_BYTES
+    );
     assert_eq!(
         asset["probe"]["probe_timeout"],
         json!({"mode":"finite","seconds":30})
@@ -788,7 +802,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -816,6 +830,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(
         serde_json::to_value(device_denied).unwrap()["structuredContent"]["error"]["code"],
         "PERMISSION_DENIED"
+    );
+    let private_preview = stdio
+        .call_tool(
+            CallToolRequestParams::new("media.preview_frame")
+                .with_arguments(rmcp::object!({"params":{"asset_id":asset["id"],"stream_index":0,"frame":2}})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(private_preview).unwrap()["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
     );
     let observed = call!(
         stdio,
@@ -860,6 +885,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
+    let stdio_preview = call!(
+        stdio,
+        "media.preview_frame",
+        json!({"asset_id":operator_asset["id"],"stream_index":0,"frame":2}),
+        json!({})
+    );
+    assert!(stdio_preview["rgba_base64"] == source_preview["rgba_base64"], "stdio preview pixels differ");
     let stdio_project_semantics = project_sdk!(stdio, operator_scope, operator_asset, "stdio");
     assert_eq!(stdio_project_semantics, cli_project_semantics);
     let report = call!(
@@ -1405,6 +1437,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
         let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));
         assert_eq!(http_project_semantics, cli_project_semantics);
+        let http_preview = call!(
+            http,
+            "media.preview_frame",
+            json!({"asset_id":asset["id"],"stream_index":0,"frame":2}),
+            json!({})
+        );
+        assert!(http_preview["rgba_base64"] == source_preview["rgba_base64"], "HTTP preview pixels differ");
         let report = call!(
             http,
             "streams.clean.report",

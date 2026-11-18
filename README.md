@@ -37,6 +37,8 @@ export and continuous preview remain in development.
   An explicit native-owner request can check H.264 and HEVC NVENC encoding.
 - Inspect exact chapter ranges, export FFmetadata or remove chapters through
   a reviewed stream-copy plan.
+- Decode a single frame from a registered video stream in the shared GUI, CLI
+  and MCP interface.
 - Authorized folder intake with deterministic relative paths, retained probe
   failures, explicit bounds/exclusions and companion inventories. Inventory does
   not copy companions or qualify the whole MuxCls utility.

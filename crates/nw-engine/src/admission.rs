@@ -1,6 +1,11 @@
 //! Ordinary file admission precedes every probe. Extensions never grant a demuxer.
-use nw_domain::{DomainError, Result};
-use nw_platform::files::io_error;
+use nw_domain::{
+    DomainError, Result,
+    mux::StreamKind,
+    records::{Asset, FileIdentity},
+};
+use nw_platform::files::{SourceStamp, io_error};
+use tokio_util::sync::CancellationToken;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
@@ -10,6 +15,61 @@ use std::{
 pub struct Input {
     pub file: File,
     pub demuxer: &'static str,
+}
+
+pub(super) struct RegisteredInput {
+    pub input: Input,
+    pub source: SourceStamp,
+    pub expected: FileIdentity,
+    pub length: u64,
+}
+
+pub(super) async fn registered_stream(
+    asset: &Asset,
+    source: SourceStamp,
+    stream_index: u32,
+    kind: StreamKind,
+    cancel: CancellationToken,
+) -> Result<RegisteredInput> {
+    if !asset.probe.streams.iter().any(|stream| {
+        stream.index == stream_index && stream.kind == kind && !stream.attached_picture()
+    }) {
+        return Err(DomainError::new(
+            "INPUT_DENIED",
+            "Selected stream differs from its registered role",
+        ));
+    }
+    let expected = asset.identity.clone();
+    let object = asset.source_object.clone().ok_or_else(|| {
+        DomainError::new("INPUT_DENIED", "Registered source lacks a native identity")
+    })?;
+    let demuxer = frozen_demuxer(&asset.probe.format)?;
+    let length = expected.bytes.parse::<u64>().map_err(|_| {
+        DomainError::new("INVALID_IDENTITY", "Registered source has an invalid byte count")
+    })?;
+    crate::blocking(move || {
+        source.require_object(&object)?;
+        if source.byte_len()? != length || source.identity_with_limit(&cancel, length)? != expected {
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Registered source content changed",
+            ));
+        }
+        let input = from_file(source.try_clone_file()?, &cancel)?;
+        if input.demuxer != demuxer {
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Registered source format changed",
+            ));
+        }
+        Ok(RegisteredInput {
+            input,
+            source,
+            expected,
+            length,
+        })
+    })
+    .await
 }
 
 pub fn open(path: &Path, cancel: &tokio_util::sync::CancellationToken) -> Result<Input> {

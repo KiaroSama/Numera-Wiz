@@ -1,5 +1,6 @@
 //! Authenticated finite compiler reviews do not persist new media records on old reader floors.
 use super::*;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use nw_domain::{
     capabilities::{CapabilityScope, ClearInput, InspectInput, RefreshInput},
     media::{self as domain, RenderInput},
@@ -7,6 +8,42 @@ use nw_domain::{
 use std::time::{Duration, Instant};
 
 impl Service {
+    pub(super) fn source_preview(
+        &self,
+        context: &Context,
+        input: nw_domain::preview::FrameInput,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::preview::Frame> {
+        use nw_domain::preview;
+        let asset: Asset = self
+            .store
+            .get(&named("asset", &input.asset_id)?)?
+            .ok_or_else(DomainError::object_not_found)?;
+        self.object(context, &asset.id, &asset.creator)?;
+        let path = self.path(context, Path::new(&asset.identity.path), false)?;
+        let source = files::SourceStamp::capture_resolved(&path)?;
+        let pixels = tokio::runtime::Handle::current().block_on(self.engine()?.preview_registered_frame(
+            &asset, source, input.stream_index, input.frame, cancel.clone(),
+        ))?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Preview cancelled before delivery"));
+        }
+        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command("media.preview_frame")) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Source preview grant changed during decoding"));
+        }
+        self.object(context, &asset.id, &asset.creator)?;
+        self.path(context, Path::new(&asset.identity.path), false)?;
+        Ok(preview::Frame {
+            asset_id: asset.id,
+            source_sha256: asset.identity.sha256,
+            stream_index: input.stream_index,
+            frame: input.frame,
+            width: preview::WIDTH,
+            height: preview::HEIGHT,
+            rgba_base64: STANDARD.encode(pixels),
+        })
+    }
+
     pub(super) fn component_capabilities(
         &self,
         command: &str,

@@ -2308,6 +2308,7 @@ dependencies = [
 name = "nw-ui"
 version = "0.1.0-dev"
 dependencies = [
+ "base64 0.22.1",
  "eframe",
  "js-sys",
  "nw-domain",

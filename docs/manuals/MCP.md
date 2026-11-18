@@ -133,6 +133,13 @@ The patch also accepts `add`, `remove` and `clear_all`. `add` and `remove` list
 FFmpeg disposition flag names. Exclusive default changes only the default bit
 on peers of the selected type. Submit the exact reviewed plan via `jobs.submit`.
 
+## Source frame preview
+
+`media.preview_frame` takes `asset_id`, `stream_index` and zero-based `frame`.
+The result contains a 160 × 90 row-major RGBA image in `rgba_base64`, the source
+content digest and the selected stream/frame indices. The profile must have the
+command grant and access to the registered asset and its source path.
+
 ## Cleanup selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI

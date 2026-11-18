@@ -7,6 +7,7 @@ pub mod execution;
 pub mod media;
 pub mod media_execution;
 pub mod mux;
+pub mod preview;
 pub mod time;
 
 use schemars::JsonSchema;
@@ -86,6 +87,7 @@ impl DomainError {
             | "PROFILE_NOT_FOUND"
             | "OBJECT_NOT_FOUND"
             | "ARTIFACT_UNAVAILABLE"
+            | "FRAME_UNAVAILABLE"
             | "INGEST_NOT_FOUND"
             | "INGEST_NOT_READY"
             | "STORE_SCHEMA_UNSUPPORTED"

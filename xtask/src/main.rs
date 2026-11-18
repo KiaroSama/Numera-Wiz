@@ -240,7 +240,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-encoder=ffv1,mpeg4,pcm_s16le,rawvideo",
         "--enable-decoder=ffv1,mpeg4,pcm_s16le,subrip,wrapped_avframe,rawvideo",
         "--enable-indev=lavfi",
-        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams",
+        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams",
         "--enable-swscale",
         "--enable-swresample",
     ];

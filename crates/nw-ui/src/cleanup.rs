@@ -416,6 +416,7 @@ impl WizApp {
             }).body_returned.unwrap_or(false);
             let disposition_changed = dispositions(ui, asset, &mut self.intent.disposition_patches);
             if budget_changed || disposition_changed { self.changed(); }
+            self.preview_source_panel(ui, asset);
         });
     }
     pub(super) fn plan_panel(&mut self, ui: &mut egui::Ui) {

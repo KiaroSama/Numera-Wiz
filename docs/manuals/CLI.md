@@ -54,6 +54,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 |---|---|
 | `commands list` / `commands schema ID` | Inspect the active registry and one parameter schema. |
 | `media probe PATH` | Probe an authorized source. |
+| `media preview-frame --asset ID --stream INDEX --frame N` | Decode the selected video frame into a bounded 160 × 90 RGBA preview. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
@@ -137,6 +138,11 @@ Clear accepts the exact fingerprint from a report and affects only that
 in-memory component entry. Restarting the owner resets the cache.
 
 ## Canonical operations
+
+`media preview-frame` addresses the original stream index and a zero-based
+decoded frame index. The JSON result includes the selected asset and content
+digest, dimensions and `rgba_base64`. The CPU decoder fits the picture to the
+preview area and fills any remaining space with black.
 
 `disposition patch` addresses an original global stream index. Repeat `--add`
 and `--remove` for individual FFmpeg flags such as `comment`, `original` or

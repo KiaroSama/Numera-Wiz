@@ -216,6 +216,9 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
+        "media.preview_frame" => {
+            Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
+        }
         "capabilities.inspect" | "capabilities.refresh" => Some(
             serde_json::to_value(schema_for!(crate::capabilities::CapabilityReport))
                 .expect("schema"),
@@ -688,6 +691,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Inspect the component fingerprint and cached observations",
             Query,
             crate::capabilities::InspectInput
+        ),
+        row!(
+            "media.preview_frame",
+            "Decode one bounded frame from a registered video stream",
+            Query,
+            crate::preview::FrameInput
         ),
         row!(
             "capabilities.refresh",
@@ -1465,6 +1474,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.profiles.list",
     "access.credentials.issue",
     "media.probe",
+    "media.preview_frame",
     "capabilities.inspect",
     "capabilities.refresh",
     "capabilities.clear",

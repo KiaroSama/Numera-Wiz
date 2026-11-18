@@ -85,6 +85,12 @@ time base. **Copy FFmetadata** copies chapter times and tags to the clipboard.
 To remove chapters from an output, clear **Chapters** in **Preservation**
 before reviewing the cleanup plan.
 
+## Source frame preview
+
+Open **Source frame preview** in the Stream Cleanup form. Select an original
+video stream and a zero-based frame index, then choose **Decode frame**. The
+preview loads from the registered source and fits the picture in the display.
+
 ## Dispositions
 
 Open **Disposition changes** in the Stream Cleanup form and select an original

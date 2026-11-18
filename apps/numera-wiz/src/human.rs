@@ -104,6 +104,15 @@ pub enum Media {
     /// Inspect and refresh FFmpeg capabilities.
     #[command(subcommand)]
     Capabilities(Capabilities),
+    /// Return one decoded preview frame from a registered video stream.
+    PreviewFrame {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+        #[arg(long, default_value_t = 0)]
+        frame: u32,
+    },
 }
 #[derive(Subcommand)]
 pub enum Capabilities {
@@ -405,6 +414,10 @@ pub fn prepare(command: Command) -> Result<Request> {
             probe.apply(&mut params)?;
             query("media.probe", params)
         }
+        Command::Media(Media::PreviewFrame { asset, stream, frame }) => query(
+            "media.preview_frame",
+            json!({"asset_id":asset,"stream_index":stream,"frame":frame}),
+        ),
         Command::Media(Media::Capabilities(Capabilities::Inspect)) => {
             query("capabilities.inspect", json!({"scope":"components"}))
         }

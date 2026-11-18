@@ -74,46 +74,12 @@ impl Engine {
                 "Invalid decoded source window",
             ));
         }
-        if !asset.probe.streams.iter().any(|stream| {
-            stream.index == stream_index && stream.kind == kind && !stream.attached_picture()
-        }) {
-            return Err(DomainError::new(
-                "INPUT_DENIED",
-                "Selected stream differs from its registered role",
-            ));
-        }
-        let expected = asset.identity.clone();
-        let object = asset.source_object.clone().ok_or_else(|| {
-            DomainError::new("INPUT_DENIED", "Registered source lacks a native identity")
-        })?;
-        let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
-        let length = expected.bytes.parse::<u64>().map_err(|_| {
-            DomainError::new(
-                "INVALID_IDENTITY",
-                "Registered source has an invalid byte count",
-            )
-        })?;
-        let token = cancel.clone();
-        let (input, source, expected) = blocking(move || {
-            source.require_object(&object)?;
-            if source.byte_len()? != length
-                || source.identity_with_limit(&token, length)? != expected
-            {
-                return Err(DomainError::new(
-                    "SOURCE_CHANGED",
-                    "Registered source content changed",
-                ));
-            }
-            let input = admission::from_file(source.try_clone_file()?, &token)?;
-            if input.demuxer != demuxer {
-                return Err(DomainError::new(
-                    "SOURCE_CHANGED",
-                    "Registered source format changed",
-                ));
-            }
-            Ok((input, source, expected))
-        })
-        .await?;
+        let admission::RegisteredInput {
+            input,
+            source,
+            expected,
+            length,
+        } = admission::registered_stream(asset, source, stream_index, kind, cancel.clone()).await?;
 
         let mut args = [
             "-hide_banner",
