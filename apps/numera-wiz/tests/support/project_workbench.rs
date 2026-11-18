@@ -326,7 +326,10 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
     let inspected = driver.observed("assets.inspect").await;
     assert_eq!(inspected.code, "OK");
     if driver.browser() {
-        assert_eq!(inspected.inspected_asset.as_deref(), Some(asset_id.as_str()));
+        assert_eq!(
+            inspected.inspected_asset.as_deref(),
+            Some(asset_id.as_str())
+        );
     }
     let asset = read(driver, "assets.inspect", json!({"id":asset_id}), None).await;
     let streams = asset["probe"]["streams"].as_array().unwrap();

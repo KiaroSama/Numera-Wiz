@@ -1183,7 +1183,12 @@ mod tests {
         assert_eq!(
             defs["OpaqueEntity"]["not"]["properties"]["kind"]["enum"],
             serde_json::json!([
-                "bin", "sequence", "track", "clip", "source_binding", "sequence_marker"
+                "bin",
+                "sequence",
+                "track",
+                "clip",
+                "source_binding",
+                "sequence_marker"
             ])
         );
         let variants = defs["Entity"]["anyOf"].as_array().unwrap();

@@ -257,7 +257,9 @@ impl shared::Driver for BrowserProjects<'_> {
                         },
                         receipt: response.response["receipt_id"].as_str().map(str::to_owned),
                         inspected_asset: if command == "assets.inspect" {
-                            response.response["result"]["id"].as_str().map(str::to_owned)
+                            response.response["result"]["id"]
+                                .as_str()
+                                .map(str::to_owned)
                         } else {
                             None
                         },
