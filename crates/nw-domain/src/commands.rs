@@ -753,6 +753,12 @@ pub fn registry() -> Vec<Descriptor> {
             crate::chapters::RemoveInput
         ),
         row!(
+            "chapters.import",
+            "Review a chapter replacement from a bounded FFmetadata document",
+            Query,
+            crate::chapters::ImportInput
+        ),
+        row!(
             "disposition.patch",
             "Review a stream-copy plan with explicit audio or subtitle dispositions",
             Query,
@@ -1487,6 +1493,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "chapters.inspect",
     "chapters.export",
     "chapters.remove",
+    "chapters.import",
     "disposition.patch",
     "metadata.patch",
     "assets.register",

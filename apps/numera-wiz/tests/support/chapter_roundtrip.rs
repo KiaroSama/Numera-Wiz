@@ -135,6 +135,48 @@ pub(super) async fn remove(cli: &Cli, media: &fixture::Media, scope: &str, asset
     );
 }
 
+pub(super) async fn import(cli: &Cli, media: &fixture::Media, scope: &str, export: &Value) {
+    let directory = media.directory.path();
+    let registered = cli
+        .mutation(scope, "chapter-import-source", "assets.register", json!({"path":directory.join("no-chapters.mkv")}))
+        .await;
+    assert_eq!(registered["ok"], true, "{registered}");
+    let asset = registered["result"]["id"].as_str().unwrap();
+    let ffmetadata = export["ffmetadata"].as_str().unwrap();
+    let doc = format!(";FFMETADATA1\nartist=Sidecar artist\n{}", ffmetadata.strip_prefix(";FFMETADATA1\n").unwrap());
+    let sidecar = directory.join("chapter-input.ffmetadata");
+    std::fs::write(&sidecar, &doc).unwrap();
+    let output = directory.join("chapters-imported.mkv");
+    let (review, status) = cli
+        .human(&[
+            "chapters", "import", "--asset", asset, "--out", output.to_str().unwrap(),
+            "--ffmetadata", sidecar.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(status, 0, "{review}");
+    submit(cli, scope, "import-registered-chapters", &review["result"]).await;
+    let original = observe(media, &directory.join("chapter.mkv")).await;
+    let observed = observe(media, &output).await;
+    assert_eq!(observed["chapters"], original["chapters"]);
+    assert_eq!(artist(&observed), "Fixture artist");
+
+    let output = directory.join("chapters-with-global-tags.mkv");
+    let plan = cli.query("chapters.import", json!({
+        "asset_id":asset,"output":output,"ffmetadata":doc,"include_global_metadata":true
+    })).await;
+    submit(cli, scope, "import-chapter-tags", &plan).await;
+    let observed = observe(media, &output).await;
+    assert_eq!(observed["chapters"], original["chapters"]);
+    assert_eq!(artist(&observed), "Sidecar artist");
+    assert_eq!(tag(&observed["format"], "title"), tag(&original["format"], "title"));
+
+    let invalid = cli.raw(&nw_domain::commands::Request::query("chapters.import", json!({
+        "asset_id":asset,"output":directory.join("chapters-out-of-range.mkv"),
+        "ffmetadata":";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=99999\ntitle=Invalid\n"
+    }))).await;
+    assert_eq!(invalid["error"]["code"], "INVALID_CHAPTERS");
+}
+
 pub(super) async fn verify_dispositions(
     cli: &Cli,
     media: &fixture::Media,

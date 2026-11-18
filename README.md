@@ -35,8 +35,8 @@ export and continuous preview remain in development.
   Cleanup plans, reports and batches resolve the positions for each file.
 - Inspect FFmpeg component declarations and verify a CPU FFV1 round trip.
   An explicit native-owner request can check H.264 and HEVC NVENC encoding.
-- Inspect exact chapter ranges, export FFmetadata or remove chapters through
-  a reviewed stream-copy plan.
+- Inspect exact chapter ranges, exchange FFmetadata and review chapter
+  replacement or removal in a stream-copy plan.
 - Set or remove selected container and stream tags in a verified Matroska copy.
 - Decode a single frame from a registered video stream in the shared GUI, CLI
   and MCP interface.

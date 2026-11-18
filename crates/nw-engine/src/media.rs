@@ -2,7 +2,7 @@
 pub(super) mod execution;
 pub(super) mod normalized_pair;
 mod preview;
-mod verification;
+pub(super) mod verification;
 use super::{Engine, blocking};
 use nw_domain::{
     DomainError, Result,

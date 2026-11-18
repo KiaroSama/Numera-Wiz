@@ -169,6 +169,8 @@ pub struct CleanIntent {
     pub disposition_patches: Vec<crate::dispositions::Patch>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_patch: Option<crate::metadata::Patch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_import: Option<crate::chapters::Import>,
     pub preservation: Preservation,
 }
 impl CleanIntent {
@@ -185,6 +187,7 @@ impl CleanIntent {
             stream_tag_patches: Vec::new(),
             disposition_patches: Vec::new(),
             metadata_patch: None,
+            chapter_import: None,
             preservation: Preservation::default(),
         }
     }
@@ -212,6 +215,8 @@ pub struct CleanResolution {
     pub preservation: Preservation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_patch: Option<crate::metadata::Patch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_import: Option<crate::chapters::Import>,
 }
 
 pub fn normalize_language(value: &str) -> String {
@@ -376,6 +381,15 @@ pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
     if let Some(patch) = &intent.metadata_patch {
         patch.validate()?;
     }
+    if let Some(import) = &intent.chapter_import {
+        import.validate(None)?;
+        if !intent.preservation.chapters || intent.metadata_patch.is_some() {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Chapter import requires a single chapter and metadata policy",
+            ));
+        }
+    }
     for patch in &intent.stream_tag_patches {
         if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 {
             return Err(DomainError::new(
@@ -533,6 +547,9 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
     if intent.metadata_patch.is_some() {
         reasons.push("Explicit metadata changes requested".into());
     }
+    if intent.chapter_import.is_some() {
+        reasons.push("Explicit chapter replacement requested".into());
+    }
     let action = if skip {
         CleanAction::Skip
     } else if reasons.is_empty() {
@@ -568,6 +585,7 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
         warnings,
         preservation: intent.preservation.clone(),
         metadata_patch: if skip { None } else { intent.metadata_patch.clone() },
+        chapter_import: if skip { None } else { intent.chapter_import.clone() },
     })
 }
 
@@ -620,6 +638,7 @@ mod tests {
             stream_tag_patches: vec![],
             disposition_patches: vec![],
             metadata_patch: None,
+            chapter_import: None,
             preservation: Preservation::default(),
         }
     }

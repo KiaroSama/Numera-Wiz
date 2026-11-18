@@ -277,6 +277,7 @@ mod tests {
             stream_tag_patches: vec![],
             disposition_patches: vec![],
             metadata_patch: None,
+            chapter_import: None,
             preservation: Preservation::default(),
         }
     }

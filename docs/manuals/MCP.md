@@ -120,6 +120,14 @@ and existing access to the asset and its source path.
 It returns the ordinary reviewed cleanup plan with chapter removal enabled.
 Submit that plan through `jobs.submit` to create the output.
 
+`chapters.import` uses `asset_id`, `output` and the UTF-8 `ffmetadata` string.
+It accepts up to 64 KiB and 256 ordered, nonoverlapping chapters with explicit
+`TIMEBASE`, `START` and `END` fields. Use a new `.mkv` destination. Chapters
+must lie inside the registered media extent and fit Matroska's nanosecond grid.
+Set `include_global_metadata` to `true` to apply the document's writable
+container tags and preserve unrelated tags. Review and submit the returned
+plan to apply the chapter and tag changes.
+
 ## Dispositions
 
 `disposition.patch` returns a reviewed cleanup plan. The `stream` is the

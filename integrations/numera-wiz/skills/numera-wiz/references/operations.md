@@ -18,7 +18,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean.resolve` | Pure explicit original-stream inventory resolution. |
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
-| `chapters.inspect`, `chapters.export`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review a chapter-removal plan. |
+| `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
 | `metadata.patch` | Review explicit container or original-stream tag changes for a fresh Matroska file. |
 | `jobs.submit`, `jobs.inspect`, `jobs.list`, `jobs.cancel` | Run, observe/page and control accepted jobs. Submission/cancellation are durable. |
@@ -58,6 +58,10 @@ artifact. Read the current schema for the exact tagged-variant fields.
   `{"params":{"asset_id":"ASSET_ID","include_global_metadata":false}}`.
   Return the `ffmetadata` text and its `sha256`. `chapters.inspect` supplies
   the original ticks and rational time bases for review.
+- To import a chapter document when `chapters.import` is active, pass the text
+  in `ffmetadata`, the registered `asset_id` and a fresh `.mkv` `output`.
+  Set `include_global_metadata` to `true` only to apply the document's listed
+  container tags. Review the exact chapter ranges before submitting the plan.
 - To make original audio stream 2 the sole default of its type, use
   `disposition.patch` with
   `{"params":{"asset_id":"ASSET_ID","output":"ABSOLUTE_NEW_FILE","patch":{"stream":2,"exclusive_default":true}}}`.

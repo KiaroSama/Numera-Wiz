@@ -44,6 +44,16 @@ impl OutputProfile {
         }
     }
     pub fn admit(self, source: &Asset, outcome: &CleanResolution) -> Result<()> {
+        if let Some(import) = &outcome.chapter_import {
+            if self != Self::Matroska || !outcome.preservation.chapters || outcome.metadata_patch.is_some() {
+                return Err(incompatible("Chapter import requires a Matroska output and one metadata policy"));
+            }
+            let extent = source.probe.container_duration.ok_or_else(|| DomainError::new(
+                "INVALID_CHAPTERS",
+                "Register the source with a finite container duration before importing chapters",
+            ))?;
+            import.validate(Some(extent))?;
+        }
         if let Some(patch) = &outcome.metadata_patch {
             patch.validate()?;
             if self != Self::Matroska {
@@ -226,6 +236,7 @@ mod tests {
                 streams: streams.clone(),
                 stream_details: BTreeMap::new(),
                 format: "mov,mp4,m4a,3gp,3g2,mj2".into(),
+                container_duration: None,
                 global_tags: BTreeMap::from([
                     ("major_brand".into(), "isom".into()),
                     ("minor_version".into(), "512".into()),
@@ -243,6 +254,7 @@ mod tests {
             warnings: vec![],
             preservation: Preservation::default(),
             metadata_patch: None,
+            chapter_import: None,
         };
         (source, resolution)
     }

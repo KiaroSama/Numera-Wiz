@@ -642,6 +642,7 @@ mod tests {
                 streams: Vec::new(),
                 stream_details: Default::default(),
                 format: "synthetic-summary-fixture".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "No media process is run by this storage fixture".into(),

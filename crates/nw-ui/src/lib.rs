@@ -114,6 +114,8 @@ pub struct WizApp {
     execution_limits: nw_domain::execution::CleanupLimits,
     patches: Vec<cleanup::PatchForm>,
     metadata: cleanup::MetadataForm,
+    chapter_document: String,
+    chapter_global_tags: bool,
     audio_mode: usize,
     subtitle_mode: usize,
     audio_values: String,
@@ -289,10 +291,13 @@ impl WizApp {
                 stream_tag_patches: vec![],
                 disposition_patches: vec![],
                 metadata_patch: None,
+                chapter_import: None,
                 preservation: Preservation::default(),
             },
             patches: vec![],
             metadata: Default::default(),
+            chapter_document: String::new(),
+            chapter_global_tags: false,
             audio_mode: 0,
             subtitle_mode: 0,
             audio_values: String::new(),
@@ -336,6 +341,8 @@ impl WizApp {
         if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
             self.intent.disposition_patches.clear();
             self.metadata = Default::default();
+            self.chapter_document.clear();
+            self.chapter_global_tags = false;
             self.source_preview = Default::default();
         }
         self.selected = Some(asset.id.clone());
@@ -1336,6 +1343,7 @@ mod tests {
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "synthetic-controller-unit".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "No actual media in this controller test".into(),

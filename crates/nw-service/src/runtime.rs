@@ -1079,6 +1079,7 @@ impl Service {
                 "media.preview_frame",
                 "capabilities.refresh",
                 "chapters.remove",
+                "chapters.import",
                 "disposition.patch",
                 "metadata.patch",
                 "assets.register",
@@ -1629,10 +1630,14 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "chapters.remove" | "disposition.patch" | "metadata.patch" => {
+            "streams.clean" | "chapters.remove" | "chapters.import" | "disposition.patch"
+            | "metadata.patch" => {
                 let input = match request.command.id.as_str() {
                     "chapters.remove" => {
                         commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
+                    }
+                    "chapters.import" => {
+                        commands::parse::<nw_domain::chapters::ImportInput>(params)?.into_cleanup()?
                     }
                     "disposition.patch" => {
                         commands::parse::<nw_domain::dispositions::PatchInput>(params)?
@@ -2702,6 +2707,7 @@ mod tests {
                     },
                 ],
                 format: "synthetic-preflight".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "Synthetic preflight race, not actual media evidence".into(),
@@ -2721,6 +2727,7 @@ mod tests {
             stream_tag_patches: Vec::new(),
             disposition_patches: Vec::new(),
             metadata_patch: None,
+            chapter_import: None,
             preservation: Preservation::default(),
         };
         let output = root.path().join("output.mkv");
@@ -3147,6 +3154,7 @@ mod tests {
                 stream_details: Default::default(),
                 streams: Vec::new(),
                 format: "metadata-view-only".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "Synthetic metadata view, no media execution".into(),
@@ -3173,6 +3181,7 @@ mod tests {
                 warnings: Vec::new(),
                 preservation: Preservation::default(),
                 metadata_patch: None,
+                chapter_import: None,
             },
             argv_template: vec![identity.path.clone()],
             created_at: "1".into(),
@@ -3343,6 +3352,7 @@ mod tests {
                 streams,
                 stream_details: Default::default(),
                 format: "matroska,webm".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "Synthetic planner-only fixture".into(),
@@ -3366,6 +3376,7 @@ mod tests {
             preservation: Preservation::default(),
             disposition_patches: Vec::new(),
             metadata_patch: None,
+            chapter_import: None,
             stream_tag_patches: (1..=64)
                 .map(|index| StreamTagPatch {
                     kind: StreamKind::Audio,
@@ -4076,6 +4087,7 @@ mod tests {
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-only".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: json!([]),
                 verification_scope: "authorization fixture only".into(),
@@ -4115,6 +4127,7 @@ mod tests {
             stream_tag_patches: vec![],
             disposition_patches: vec![],
             metadata_patch: None,
+            chapter_import: None,
             preservation: nw_domain::mux::Preservation::default(),
         };
         let params =

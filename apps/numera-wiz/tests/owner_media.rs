@@ -807,6 +807,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
     chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
+    chapter_roundtrip::import(&cli, &media, &scope, &chapter_export).await;
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 

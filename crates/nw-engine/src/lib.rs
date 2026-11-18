@@ -403,7 +403,9 @@ impl Engine {
                 "Copy/skip plans cannot contain a media subprocess",
             ));
         }
-        if plan.resolution.action != CleanAction::Remux && plan.resolution.metadata_patch.is_some() {
+        if plan.resolution.action != CleanAction::Remux
+            && (plan.resolution.metadata_patch.is_some() || plan.resolution.chapter_import.is_some())
+        {
             return Err(DomainError::new(
                 "INVALID_PLAN",
                 "Metadata changes require a reviewed remux",
@@ -555,20 +557,25 @@ impl Engine {
         .await?;
         let staging = prepare_staging(plan, job_id, &observer).await?;
         let staging_name = files::path_text(staging.path())?;
+        let sidecar = if let Some(import) = &plan.resolution.chapter_import {
+            Some(stage_chapter_sidecar(import, staging.path(), &cancel).await?)
+        } else {
+            None
+        };
         let args = plan
             .argv_template
             .iter()
-            .map(|v| {
-                if v == "@owned_staging@" {
-                    staging_name.clone()
-                } else {
-                    v.clone()
-                }
+            .map(|v| match v.as_str() {
+                "@owned_staging@" => staging_name.clone(),
+                "@chapter_sidecar@" => sidecar.as_ref().expect("Validated chapter invocation").argument.clone(),
+                _ => v.clone(),
             })
             .collect::<Vec<_>>();
         observer(ExecutionEvent::Prepared(args.clone())).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
-        if let Err(error) = source_stamp.revalidate() {
+        if let Err(error) = source_stamp.revalidate().and_then(|_| {
+            sidecar.as_ref().map_or(Ok(()), |sidecar| sidecar.stamp.revalidate())
+        }) {
             return ticket.finish(Err(error));
         }
         let process = progress::run(
@@ -586,6 +593,10 @@ impl Engine {
             return Err(error);
         }
         source_stamp.revalidate()?;
+        if let Some(sidecar) = sidecar {
+            let token = cancel.clone();
+            blocking(move || sidecar.verify(&token)).await?;
+        }
         staging.as_file().sync_all().map_err(io_error)?;
         if staging.as_file().metadata().map_err(io_error)?.len() == 0 {
             return Err(DomainError::new(
@@ -703,6 +714,56 @@ async fn prepare_staging(
 ) -> Result<tempfile::NamedTempFile> {
     let parent_stamp = output_parent_stamp(plan)?;
     prepare_owned_staging(&plan.output, parent_stamp, job_id, observer).await
+}
+
+struct ChapterSidecar {
+    stamp: files::SourceStamp,
+    expected: FileIdentity,
+    argument: String,
+    _temporary: tempfile::NamedTempFile,
+}
+
+impl ChapterSidecar {
+    fn verify(&self, cancel: &CancellationToken) -> Result<()> {
+        if self.stamp.identity_with_limit(cancel, nw_domain::chapters::MAX_TEXT_BYTES as u64)?
+            != self.expected
+        {
+            return Err(DomainError::new("SOURCE_CHANGED", "The owned chapter document changed"));
+        }
+        Ok(())
+    }
+}
+
+async fn stage_chapter_sidecar(
+    import: &nw_domain::chapters::Import,
+    staging: &Path,
+    cancel: &CancellationToken,
+) -> Result<ChapterSidecar> {
+    use std::io::Write;
+
+    let document = import.document()?;
+    let parent = staging.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging parent required"))?.to_owned();
+    let cancel = cancel.clone();
+    blocking(move || {
+        if nw_platform::security::private_directory(&parent)? != parent {
+            return Err(DomainError::new("TARGET_CHANGED", "Chapter staging changed location"));
+        }
+        let mut file = tempfile::Builder::new().prefix("chapters-").suffix(".ffmetadata")
+            .tempfile_in(parent).map_err(io_error)?;
+        file.write_all(document.as_bytes()).map_err(io_error)?;
+        file.as_file().sync_all().map_err(io_error)?;
+        nw_platform::security::verify_private_file(file.path(), nw_domain::chapters::MAX_TEXT_BYTES as u64)?;
+        let path = files::path_text(file.path())?;
+        let stamp = files::SourceStamp::capture_open_resolved(file.path(), file.as_file().try_clone().map_err(io_error)?)?;
+        let sidecar = ChapterSidecar {
+            stamp,
+            expected: FileIdentity { path: path.clone(), bytes: document.len().to_string(), sha256: nw_domain::projects::hash(document.as_bytes()) },
+            argument: format!("file:{path}"),
+            _temporary: file,
+        };
+        sidecar.verify(&cancel)?;
+        Ok(sidecar)
+    }).await
 }
 async fn prepare_owned_staging(
     output_path: &str,
@@ -955,6 +1016,9 @@ pub fn parse_probe(value: Value) -> Result<MediaProbe> {
             .collect(),
         streams,
         format,
+        container_duration: value["format"]["duration"]
+            .as_str()
+            .and_then(|text| media::verification::decimal_time(text).ok()),
         global_tags: parse_tags(&value["format"]["tags"]),
         chapters: value
             .get("chapters")
@@ -1107,6 +1171,9 @@ fn lower_remux(
     .to_vec();
     args.extend(admission::options(demuxer));
     args.extend(["-i".into(), "fd:".into()]);
+    if resolution.chapter_import.is_some() {
+        args.extend(["-protocol_whitelist", "file", "-f", "ffmetadata", "-i", "@chapter_sidecar@"].map(String::from));
+    }
     for stream in &resolution.streams {
         args.extend(["-map".into(), format!("0:{}", stream.index)]);
     }
@@ -1120,12 +1187,19 @@ fn lower_remux(
             "-1".into()
         },
         "-map_chapters".into(),
-        if resolution.preservation.chapters {
+        if resolution.chapter_import.is_some() {
+            "1".into()
+        } else if resolution.preservation.chapters {
             "0".into()
         } else {
             "-1".into()
         },
     ]);
+    if let Some(import) = &resolution.chapter_import {
+        for (key, value) in &import.global_tags {
+            args.extend(["-metadata".into(), format!("{key}={value}")]);
+        }
+    }
     if let Some(patch) = &resolution.metadata_patch
         && matches!(patch.target, nw_domain::metadata::Target::Global {})
     {
@@ -1238,7 +1312,11 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
             "Chapter removal was not honored",
         ));
     }
-    if plan.resolution.preservation.chapters && actual.chapters != plan.source.probe.chapters {
+    if let Some(import) = &plan.resolution.chapter_import {
+        import.match_observed(&nw_domain::chapters::probe_chapters(actual)?).map_err(|error| {
+            DomainError::new("VERIFICATION_FAILED", error.message)
+        })?;
+    } else if plan.resolution.preservation.chapters && actual.chapters != plan.source.probe.chapters {
         return Err(DomainError::new(
             "VERIFICATION_FAILED",
             "Preserved chapters differ from the frozen source snapshot",
@@ -1253,6 +1331,9 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
         && matches!(patch.target, nw_domain::metadata::Target::Global {})
     {
         patch.apply(&mut expected);
+    }
+    if let Some(import) = &plan.resolution.chapter_import {
+        expected.extend(import.global_tags.clone());
     }
     verify_tags(&expected, &actual.global_tags, "Container", true, profile)?;
     Ok(())
@@ -1326,6 +1407,7 @@ mod tag_tests {
             warnings: vec![],
             preservation: nw_domain::mux::Preservation::default(),
             metadata_patch: None,
+            chapter_import: None,
         };
         let current = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
         assert!(

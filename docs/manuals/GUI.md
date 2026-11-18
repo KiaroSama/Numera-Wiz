@@ -82,6 +82,9 @@ The current view shows the outcomes until the next capability request.
 Open **Chapters** below the original stream inventory for a registered asset
 with chapters. The panel shows titles and exact ranges in ticks with their
 time base. **Copy FFmetadata** copies chapter times and tags to the clipboard.
+To replace chapters, enter a fresh `.mkv` destination, expand **Import chapters**
+and paste the FFmetadata document. Enable **Apply document's container tags**
+to update its listed container tags, then choose **Review chapter import**.
 To remove chapters from an output, clear **Chapters** in **Preservation**
 before reviewing the cleanup plan.
 

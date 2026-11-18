@@ -504,6 +504,16 @@ impl WizApp {
                 }
             });
             self.preview_source_panel(ui, asset);
+            ui.collapsing("Import chapters", |ui| {
+                let document_changed = ui.add(egui::TextEdit::multiline(&mut self.chapter_document)
+                    .hint_text("Paste FFmetadata").desired_rows(4)
+                    .char_limit(nw_domain::chapters::MAX_TEXT_BYTES)).changed();
+                let policy_changed = ui.checkbox(&mut self.chapter_global_tags, "Apply document's container tags").changed();
+                if document_changed || policy_changed { self.changed(); }
+                if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty() && !self.chapter_document.trim().is_empty(), egui::Button::new("Review chapter import")).clicked() {
+                    self.query("chapters.import", json!({"asset_id":asset.id,"output":self.output,"ffmetadata":self.chapter_document,"include_global_metadata":self.chapter_global_tags}), Action::Plan(self.generation), ui.ctx());
+                }
+            });
         });
     }
     pub(super) fn plan_panel(&mut self, ui: &mut egui::Ui) {
@@ -560,6 +570,21 @@ impl WizApp {
                         };
                         for (name, value) in &patch.set { ui.label(format!("Set {name} = {value}")); }
                         for name in &patch.remove { ui.label(format!("Remove {name}")); }
+                    });
+                }
+                if let Some(import) = &plan.resolution.chapter_import {
+                    ui.collapsing(format!("Imported chapters ({})", import.chapters.len()), |ui| {
+                        for chapter in &import.chapters {
+                            ui.label(format!("{}–{} ticks ({} / {} seconds per tick)",
+                                chapter.start_ticks, chapter.end_ticks,
+                                chapter.time_base.numerator(), chapter.time_base.denominator()));
+                            for (name, value) in &chapter.tags {
+                                ui.label(format!("{name} = {value}"));
+                            }
+                        }
+                        for (name, value) in &import.global_tags {
+                            ui.label(format!("Container tag {name} = {value}"));
+                        }
                     });
                 }
                 for warning in &plan.resolution.warnings {

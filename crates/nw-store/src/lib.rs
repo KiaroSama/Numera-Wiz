@@ -597,6 +597,7 @@ mod tests {
                 stream_details: Default::default(),
                 streams: vec![],
                 format: "unit-fixture".into(),
+                container_duration: None,
                 global_tags: Default::default(),
                 chapters: serde_json::json!([]),
                 verification_scope: "unit-only".into(),
@@ -610,6 +611,7 @@ mod tests {
             warnings: vec![],
             preservation: Preservation::default(),
             metadata_patch: None,
+            chapter_import: None,
         };
         let plan = Plan {
             execution_limits: None,

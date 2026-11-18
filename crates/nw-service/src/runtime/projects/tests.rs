@@ -624,6 +624,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
             }],
             stream_details: Default::default(),
             format: "model-only-no-decoder".into(),
+            container_duration: None,
             global_tags: Default::default(),
             chapters: json!([]),
             verification_scope:

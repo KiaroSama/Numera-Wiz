@@ -159,7 +159,7 @@ pub(super) fn ratio(text: &str) -> Result<Rational> {
     }
     Ok(value)
 }
-fn decimal_time(text: &str) -> Result<Rational> {
+pub(crate) fn decimal_time(text: &str) -> Result<Rational> {
     if text.len() > 32 {
         return Err(failed("Observed duration exceeds its bound"));
     }

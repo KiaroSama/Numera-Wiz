@@ -34,6 +34,8 @@ pub struct MediaProbe {
     #[serde(default)]
     pub stream_details: BTreeMap<u32, serde_json::Value>,
     pub format: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_duration: Option<crate::time::Rational>,
     pub global_tags: BTreeMap<String, String>,
     pub chapters: serde_json::Value,
     pub verification_scope: String,

@@ -1,11 +1,14 @@
-//! Chapter inspection and lossless FFmetadata text export from a registered probe.
+//! Exact chapter inspection, FFmetadata exchange and cleanup planning.
 use crate::{DomainError, Result, records::Asset, time::Rational};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Write};
 
+mod import;
+pub use import::{Import, ImportInput};
+
 const MAX_CHAPTERS: usize = 256;
-const MAX_TEXT_BYTES: usize = 64 * 1024;
+pub const MAX_TEXT_BYTES: usize = 64 * 1024;
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -44,7 +47,8 @@ pub struct Inventory {
     pub chapters: Vec<Chapter>,
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Chapter {
     pub time_base: Rational,
     pub start_ticks: String,
@@ -78,7 +82,15 @@ fn limit() -> DomainError {
 }
 
 pub fn inspect(asset: &Asset) -> Result<Inventory> {
-    let raw = asset.probe.chapters.as_array().ok_or_else(|| {
+    Ok(Inventory {
+        asset_id: asset.id.clone(),
+        source_sha256: asset.identity.sha256.clone(),
+        chapters: probe_chapters(&asset.probe)?,
+    })
+}
+
+pub fn probe_chapters(probe: &crate::records::MediaProbe) -> Result<Vec<Chapter>> {
+    let raw = probe.chapters.as_array().ok_or_else(|| {
         DomainError::new(
             "INVALID_PROBE",
             "Registered chapter inventory must be an array",
@@ -112,11 +124,7 @@ pub fn inspect(asset: &Asset) -> Result<Inventory> {
             tags: observed.tags,
         });
     }
-    Ok(Inventory {
-        asset_id: asset.id.clone(),
-        source_sha256: asset.identity.sha256.clone(),
-        chapters,
-    })
+    Ok(chapters)
 }
 
 pub fn export(asset: &Asset, include_global_metadata: bool) -> Result<Export> {
@@ -125,7 +133,17 @@ pub fn export(asset: &Asset, include_global_metadata: bool) -> Result<Export> {
     if include_global_metadata {
         write_tags(&mut ffmetadata, &asset.probe.global_tags)?;
     }
-    for chapter in inventory.chapters {
+    write_chapters(&mut ffmetadata, &inventory.chapters)?;
+    Ok(Export {
+        asset_id: inventory.asset_id,
+        source_sha256: inventory.source_sha256,
+        sha256: crate::projects::hash(ffmetadata.as_bytes()),
+        ffmetadata,
+    })
+}
+
+fn write_chapters(ffmetadata: &mut String, chapters: &[Chapter]) -> Result<()> {
+    for chapter in chapters {
         let base = chapter.time_base;
         writeln!(
             ffmetadata,
@@ -136,17 +154,12 @@ pub fn export(asset: &Asset, include_global_metadata: bool) -> Result<Export> {
             chapter.end_ticks,
         )
         .expect("String writes are infallible");
-        write_tags(&mut ffmetadata, &chapter.tags)?;
+        write_tags(ffmetadata, &chapter.tags)?;
     }
     if ffmetadata.len() > MAX_TEXT_BYTES {
         return Err(limit());
     }
-    Ok(Export {
-        asset_id: inventory.asset_id,
-        source_sha256: inventory.source_sha256,
-        sha256: crate::projects::hash(ffmetadata.as_bytes()),
-        ffmetadata,
-    })
+    Ok(())
 }
 
 fn write_tags(out: &mut String, tags: &BTreeMap<String, String>) -> Result<()> {
