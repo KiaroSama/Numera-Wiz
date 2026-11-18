@@ -108,7 +108,10 @@ fn disposition_flags(ui: &mut egui::Ui, label: &str, selected: &mut Vec<String>)
 }
 
 fn dispositions(ui: &mut egui::Ui, asset: &Asset, patches: &mut Vec<DispositionPatch>) -> bool {
-    let targets = asset.probe.streams.iter()
+    let targets = asset
+        .probe
+        .streams
+        .iter()
         .filter(|stream| matches!(stream.kind, StreamKind::Audio | StreamKind::Subtitle))
         .collect::<Vec<_>>();
     let Some(first) = targets.first() else {
@@ -125,11 +128,17 @@ fn dispositions(ui: &mut egui::Ui, asset: &Asset, patches: &mut Vec<DispositionP
                         .show_ui(ui, |ui| {
                             for stream in &targets {
                                 let label = format!("{} {:?}", stream.index, stream.kind);
-                                changed |= ui.selectable_value(&mut patch.stream, stream.index, label).changed();
+                                changed |= ui
+                                    .selectable_value(&mut patch.stream, stream.index, label)
+                                    .changed();
                             }
                         });
-                    changed |= ui.checkbox(&mut patch.exclusive_default, "Only default of this type").changed();
-                    changed |= ui.checkbox(&mut patch.clear_all, "Clear all target flags").changed();
+                    changed |= ui
+                        .checkbox(&mut patch.exclusive_default, "Only default of this type")
+                        .changed();
+                    changed |= ui
+                        .checkbox(&mut patch.clear_all, "Clear all target flags")
+                        .changed();
                     if ui.small_button("Remove change").clicked() {
                         deleted = Some(index);
                     }
@@ -144,7 +153,13 @@ fn dispositions(ui: &mut egui::Ui, asset: &Asset, patches: &mut Vec<DispositionP
             patches.remove(index);
             changed = true;
         }
-        if ui.add_enabled(patches.len() < 256, egui::Button::new("Add disposition change")).clicked() {
+        if ui
+            .add_enabled(
+                patches.len() < 256,
+                egui::Button::new("Add disposition change"),
+            )
+            .clicked()
+        {
             patches.push(DispositionPatch {
                 stream: first.index,
                 add: Vec::new(),
@@ -436,8 +451,15 @@ impl WizApp {
                         for stream in &plan.resolution.streams {
                             if matches!(stream.kind, StreamKind::Audio | StreamKind::Subtitle) {
                                 let flags = stream.dispositions.iter().cloned().collect::<Vec<_>>();
-                                let flags = if flags.is_empty() { "None".into() } else { flags.join(", ") };
-                                ui.label(format!("Source {} {:?} · {flags}", stream.index, stream.kind));
+                                let flags = if flags.is_empty() {
+                                    "None".into()
+                                } else {
+                                    flags.join(", ")
+                                };
+                                ui.label(format!(
+                                    "Source {} {:?} · {flags}",
+                                    stream.index, stream.kind
+                                ));
                             }
                         }
                     });

@@ -706,10 +706,19 @@ mod tests {
             exclusive_default: true,
         }];
         let resolved = resolve(&source, &rules).unwrap();
-        assert_eq!(resolved.streams[1].dispositions, BTreeSet::from(["default".into(), "original".into()]));
-        assert_eq!(resolved.streams[2].dispositions, BTreeSet::from(["comment".into()]));
+        assert_eq!(
+            resolved.streams[1].dispositions,
+            BTreeSet::from(["default".into(), "original".into()])
+        );
+        assert_eq!(
+            resolved.streams[2].dispositions,
+            BTreeSet::from(["comment".into()])
+        );
         rules.disposition_patches[0].remove = vec!["default".into()];
-        assert_eq!(resolve(&source, &rules).unwrap_err().code, "VALIDATION_ERROR");
+        assert_eq!(
+            resolve(&source, &rules).unwrap_err().code,
+            "VALIDATION_ERROR"
+        );
     }
     #[test]
     fn no_match_and_exact_language_are_explicit() {

@@ -90,9 +90,8 @@ pub fn inspect(asset: &Asset) -> Result<Inventory> {
     let mut chapters = Vec::with_capacity(raw.len());
     let mut tag_bytes = 0;
     for row in raw {
-        let invalid = || {
-            DomainError::new("INVALID_PROBE", "Invalid registered chapter extent or tags")
-        };
+        let invalid =
+            || DomainError::new("INVALID_PROBE", "Invalid registered chapter extent or tags");
         let observed = ProbedChapter::deserialize(row).map_err(|_| invalid())?;
         let (num, den) = observed.time_base.split_once('/').ok_or_else(invalid)?;
         let num = num.parse::<i32>().map_err(|_| invalid())?;

@@ -54,7 +54,12 @@ pub(super) async fn verify(cli: &Cli, media: &fixture::Media, scope: &str) -> (S
     .unwrap();
     remux(media, &media.source, &text, &prepared).await;
     let first = cli
-        .mutation(scope, "chapter-source", "assets.register", json!({"path":prepared}))
+        .mutation(
+            scope,
+            "chapter-source",
+            "assets.register",
+            json!({"path":prepared}),
+        )
         .await;
     assert_eq!(first["ok"], true, "{first}");
     let asset = first["result"]["id"].as_str().unwrap();
@@ -75,10 +80,21 @@ pub(super) async fn verify(cli: &Cli, media: &fixture::Media, scope: &str) -> (S
         nw_domain::projects::hash(ffmetadata.as_bytes())
     );
     let (all_tags, status) = cli
-        .human(&["chapters", "export", "--asset", asset, "--include-global-metadata"])
+        .human(&[
+            "chapters",
+            "export",
+            "--asset",
+            asset,
+            "--include-global-metadata",
+        ])
         .await;
     assert_eq!(status, 0, "{all_tags}");
-    assert!(all_tags["result"]["ffmetadata"].as_str().unwrap().contains("artist=Fixture artist\n"));
+    assert!(
+        all_tags["result"]["ffmetadata"]
+            .as_str()
+            .unwrap()
+            .contains("artist=Fixture artist\n")
+    );
     std::fs::write(&text, ffmetadata).unwrap();
     remux(media, &prepared, &text, &remuxed).await;
     let observed = observe(media, &remuxed).await;
@@ -92,7 +108,14 @@ pub(super) async fn verify(cli: &Cli, media: &fixture::Media, scope: &str) -> (S
 pub(super) async fn remove(cli: &Cli, media: &fixture::Media, scope: &str, asset: &str) {
     let output = media.directory.path().join("no-chapters.mkv");
     let (review, status) = cli
-        .human(&["chapters", "remove", "--asset", asset, "--out", output.to_str().unwrap()])
+        .human(&[
+            "chapters",
+            "remove",
+            "--asset",
+            asset,
+            "--out",
+            output.to_str().unwrap(),
+        ])
         .await;
     assert_eq!(status, 0, "{review}");
     let plan = &review["result"];
@@ -103,22 +126,46 @@ pub(super) async fn remove(cli: &Cli, media: &fixture::Media, scope: &str, asset
     let observed = observe(media, &output).await;
     assert_eq!(observed["chapters"], json!([]));
     assert_eq!(artist(&observed), "Fixture artist");
-    assert_eq!(observe(media, &media.directory.path().join("chapter.mkv")).await["chapters"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        observe(media, &media.directory.path().join("chapter.mkv")).await["chapters"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
-pub(super) async fn verify_dispositions(cli: &Cli, media: &fixture::Media, scope: &str, asset: &str) {
+pub(super) async fn verify_dispositions(
+    cli: &Cli,
+    media: &fixture::Media,
+    scope: &str,
+    asset: &str,
+) {
     let output = media.directory.path().join("new-default-audio.mkv");
     let (review, status) = cli
         .human(&[
-            "disposition", "patch", "--asset", asset, "--stream", "2",
-            "--exclusive-default", "--out", output.to_str().unwrap(),
+            "disposition",
+            "patch",
+            "--asset",
+            asset,
+            "--stream",
+            "2",
+            "--exclusive-default",
+            "--out",
+            output.to_str().unwrap(),
         ])
         .await;
     assert_eq!(status, 0, "{review}");
     let plan = &review["result"];
     assert_eq!(plan["resolution"]["action"], "remux");
-    assert_eq!(plan["resolution"]["streams"][1]["dispositions"], json!(["comment"]));
-    assert_eq!(plan["resolution"]["streams"][2]["dispositions"], json!(["default", "original"]));
+    assert_eq!(
+        plan["resolution"]["streams"][1]["dispositions"],
+        json!(["comment"])
+    );
+    assert_eq!(
+        plan["resolution"]["streams"][2]["dispositions"],
+        json!(["default", "original"])
+    );
     submit(cli, scope, "change-default-audio", plan).await;
     let output = observe(media, &output).await;
     let previous = &output["streams"][1]["disposition"];
@@ -147,7 +194,14 @@ async fn submit(cli: &Cli, scope: &str, key: &str, plan: &Value) {
 
 async fn observe(media: &fixture::Media, input: &Path) -> Value {
     let args = [
-        "-v", "error", "-show_chapters", "-show_format", "-show_streams", "-of", "json", input.to_str().unwrap(),
+        "-v",
+        "error",
+        "-show_chapters",
+        "-show_format",
+        "-show_streams",
+        "-of",
+        "json",
+        input.to_str().unwrap(),
     ]
     .map(str::to_owned);
     let observed = nw_platform::process::run(

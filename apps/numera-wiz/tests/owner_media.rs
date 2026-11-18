@@ -80,14 +80,14 @@ macro_rules! project_sdk {
         json!({"start":inspected["entity"]["sequence_start"],"duration":inspected["entity"]["duration"],"source_range":inspected["entity"]["source_range"],"content_sha256":source["entity"]["content_sha256"],"stream_index":source["entity"]["stream_index"],"media_kind":source["entity"]["media_kind"]})
     }};
 }
+#[path = "support/chapter_roundtrip.rs"]
+mod chapter_roundtrip;
 #[path = "support/lost_ack.rs"]
 mod lost_ack;
 #[path = "support/project_render.rs"]
 mod project_render;
 #[path = "support/project_topology.rs"]
 mod project_topology;
-#[path = "support/chapter_roundtrip.rs"]
-mod chapter_roundtrip;
 
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]

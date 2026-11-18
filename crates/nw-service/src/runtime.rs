@@ -1515,9 +1515,10 @@ impl Service {
                 self.path(&context, Path::new(&asset.identity.path), false)?;
                 match request.command.id.as_str() {
                     "chapters.inspect" => value(&nw_domain::chapters::inspect(&asset)?)?,
-                    "chapters.export" => {
-                        value(&nw_domain::chapters::export(&asset, include_global_metadata)?)?
-                    }
+                    "chapters.export" => value(&nw_domain::chapters::export(
+                        &asset,
+                        include_global_metadata,
+                    )?)?,
                     _ => value(&asset)?,
                 }
             }
@@ -1627,7 +1628,8 @@ impl Service {
                         commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
                     }
                     "disposition.patch" => {
-                        commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup()
+                        commands::parse::<nw_domain::dispositions::PatchInput>(params)?
+                            .into_cleanup()
                     }
                     _ => commands::parse::<CleanInput>(params)?,
                 };

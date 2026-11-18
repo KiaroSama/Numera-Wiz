@@ -88,7 +88,10 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     assert!(doctor.status.success());
     let doctor: serde_json::Value = serde_json::from_slice(&doctor.stdout).unwrap();
     assert_eq!(doctor["media_components"]["status"], "unavailable");
-    assert_eq!(doctor["media_components"]["error"]["code"], "COMPONENT_UNAVAILABLE");
+    assert_eq!(
+        doctor["media_components"]["error"]["code"],
+        "COMPONENT_UNAVAILABLE"
+    );
     assert_eq!(doctor["media_gpu_initialized"], false);
 }
 #[tokio::test]

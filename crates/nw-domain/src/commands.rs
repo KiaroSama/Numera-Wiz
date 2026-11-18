@@ -223,12 +223,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "capabilities.clear" => Some(
             serde_json::to_value(schema_for!(crate::capabilities::ClearResult)).expect("schema"),
         ),
-        "chapters.inspect" => Some(
-            serde_json::to_value(schema_for!(crate::chapters::Inventory)).expect("schema"),
-        ),
-        "chapters.export" => Some(
-            serde_json::to_value(schema_for!(crate::chapters::Export)).expect("schema"),
-        ),
+        "chapters.inspect" => {
+            Some(serde_json::to_value(schema_for!(crate::chapters::Inventory)).expect("schema"))
+        }
+        "chapters.export" => {
+            Some(serde_json::to_value(schema_for!(crate::chapters::Export)).expect("schema"))
+        }
         "timeline.render" => {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
         }
