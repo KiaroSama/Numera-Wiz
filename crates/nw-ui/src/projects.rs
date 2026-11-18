@@ -40,6 +40,8 @@ pub(super) enum Phase {
     Assets,
     Asset,
     PreviewFrame,
+    MixedReview,
+    MixedSubmit,
     Create,
     Mutation,
 }
@@ -191,6 +193,7 @@ pub(super) struct ProjectsUi {
     focus_catalog: bool,
     clip_selection: Option<ClipSelection>,
     preview_frame: Option<(Rational, egui::TextureHandle)>,
+    mixed_review: Option<nw_domain::media::MediaPlanV2>,
 }
 impl ProjectsUi {
     fn restored_view(&self, group: &Group) -> View {
@@ -204,6 +207,7 @@ impl ProjectsUi {
     }
     fn advance(&mut self) -> Result<u64, String> {
         self.preview_frame = None;
+        self.mixed_review = None;
         self.generation = self
             .generation
             .checked_add(1)
@@ -621,7 +625,7 @@ impl WizApp {
         if matches!(
             action,
             Action::Project(ProjectAction {
-                phase: Phase::PreviewFrame,
+                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit,
                 ..
             })
         ) {
@@ -971,6 +975,31 @@ impl WizApp {
                     egui::TextureOptions::LINEAR,
                 );
                 self.projects.preview_frame = Some((frame.at, texture));
+                return Ok(());
+            }
+            Phase::MixedReview => {
+                let plan: nw_domain::media::MediaPlanV2 = serde_json::from_value(result)
+                    .map_err(|error| error.to_string())?;
+                plan.validate_hash().map_err(|error| error.message)?;
+                let group = self.projects.group.as_ref().ok_or("No displayed project to export")?;
+                let capture = &plan.payload.capture;
+                if capture.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(capture.sequence_id.as_str())
+                    || capture.project_revision.to_string() != group.key.revision
+                    || request.params["range"] != json!(capture.range)
+                    || capture.range != group.view.range
+                {
+                    return Err("Export plan differs from the displayed sequence and range".into());
+                }
+                self.projects.mixed_review = Some(plan);
+                return Ok(());
+            }
+            Phase::MixedSubmit => {
+                let id = result["job_id"].as_str().ok_or("Accepted export job identity is missing")?;
+                nw_domain::projects::validate_id(id).map_err(|error| error.message)?;
+                self.projects.mixed_review = None;
+                self.status = format!("Export queued: {id}");
+                self.last_jobs = Instant::now() - Duration::from_secs(2);
                 return Ok(());
             }
             _ => {}

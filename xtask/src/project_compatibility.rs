@@ -131,7 +131,7 @@ fn api(endpoint: &str) -> Result<Value> {
     );
     Ok(serde_json::from_slice(&bytes)?)
 }
-fn baseline_metadata(manifest: &Value, target: &Value, evidence: &Path) -> Result<()> {
+fn baseline_metadata(manifest: &Value, target: &Value, evidence_file: &Path) -> Result<()> {
     let repository = manifest["repository"]
         .as_str()
         .context("Baseline repository")?;
@@ -212,7 +212,7 @@ fn baseline_metadata(manifest: &Value, target: &Value, evidence: &Path) -> Resul
         "Immutable native artifact expired or changed identity"
     );
     write(
-        &evidence.join("baseline-run.json"),
+        evidence_file,
         &json!({
             "id":id,"attempt":attempt,"source_sha":source,"event_head_sha":run["head_sha"],"workflow":run["path"],"conclusion":run["conclusion"],
             "jobs":rows.iter().map(|job| json!({"id":job["id"],"name":job["name"],"status":job["status"],"conclusion":job["conclusion"],"head_sha":job["head_sha"]})).collect::<Vec<_>>(),
@@ -266,13 +266,31 @@ fn inner(root: &Path, evidence: &Path) -> Result<Value> {
         .collect::<Vec<_>>();
     ensure!(matches.len() == 1, "Baseline target must be unique");
     let target = matches[0];
-    baseline_metadata(&manifest, target, evidence)?;
+    baseline_metadata(&manifest, target, &evidence.join("baseline-run.json"))?;
     let previous_identity = digest(&previous)?;
     ensure!(
         previous_identity["bytes"] == target["executable_bytes"]
             && previous_identity["sha256"] == target["executable_sha256"],
         "Downloaded prior executable differs from independently frozen identity"
     );
+    let v1_path = configured("NW_COMPAT_MEDIA_V1_EXE", &workspace.join("media-v1").join(executable))?;
+    let v1_manifest_path = root.join("ci/media-v1-compatibility-baseline.json");
+    let v1_bytes = fs::read(&v1_manifest_path)?;
+    let v1_manifest: Value = serde_json::from_slice(&v1_bytes)?;
+    let v1_target = v1_manifest["targets"].as_array().context("MediaV1 targets")?.iter()
+        .find(|target| target["target"] == label).context("MediaV1 target is missing")?;
+    baseline_metadata(&v1_manifest, v1_target, &evidence.join("media-v1-baseline-run.json"))?;
+    let v1_identity = digest(&v1_path)?;
+    ensure!(
+        v1_identity["bytes"] == v1_target["executable_bytes"] && v1_identity["sha256"] == v1_target["executable_sha256"]
+            && v1_path != previous && v1_path != current && v1_identity != previous_identity,
+        "Downloaded MediaV1 package differs from its independently frozen identity"
+    );
+    write(&evidence.join("media-v1-preparation.json"), &json!({
+        "schema_version":1,"status":"prepared","target":label,"source_sha":v1_manifest["source_sha"],
+        "run_id":v1_manifest["run_id"],"manifest_sha256":hex::encode(Sha256::digest(&v1_bytes)),
+        "executable":v1_identity,
+    }))?;
     let name = format!(
         "numera-wiz-{}-{label}-{}-provenance.json",
         env!("CARGO_PKG_VERSION"),
@@ -336,6 +354,7 @@ fn inner(root: &Path, evidence: &Path) -> Result<Value> {
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&previous, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(&v1_path, fs::Permissions::from_mode(0o700))?;
         fs::set_permissions(&current, fs::Permissions::from_mode(0o700))?;
     }
     ensure!(

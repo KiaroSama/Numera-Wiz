@@ -47,6 +47,61 @@ fn manifest_bytes(manifest: &CopyManifest) -> Result<Vec<u8>> {
     }
     Ok(bytes)
 }
+
+fn completion_bytes(manifest: &CopyManifest, records_sha256: &str) -> Result<Vec<u8>> {
+    serde_json::to_vec(&serde_json::json!({
+        "schema_version":1,
+        "manifest_sha256":hex::encode(Sha256::digest(manifest_bytes(manifest)?)),
+        "store_sha256":manifest.source_file_sha256,
+        "store_bytes":manifest.source_file_bytes,
+        "records_sha256":records_sha256,
+    }))
+    .map_err(storage)
+}
+
+pub(crate) fn inspect_completed_copy(
+    directory: &DirectoryStamp,
+    cancel: &CancellationToken,
+) -> Result<CopyManifest> {
+    use std::io::Read;
+
+    let read_evidence = |name: &str| -> Result<Vec<u8>> {
+        let source = directory.open_child_source(name.as_ref())?;
+        let bytes = source.byte_len()?;
+        if bytes > 65536 {
+            return Err(conflict("Copy evidence exceeds its declared byte limit"));
+        }
+        let mut content = Vec::new();
+        source
+            .try_clone_file()?
+            .take(bytes + 1)
+            .read_to_end(&mut content)
+            .map_err(files::io_error)?;
+        source.revalidate()?;
+        if content.len() as u64 != bytes {
+            return Err(conflict("Copy evidence length changed during inspection"));
+        }
+        Ok(content)
+    };
+    let manifest: CopyManifest = serde_json::from_slice(&read_evidence("copy.json")?).map_err(storage)?;
+    if manifest.schema_version != 1 || read_evidence("complete.json")? != completion_bytes(&manifest, &manifest.source.records_sha256)? {
+        return Err(conflict("Copy completion evidence differs from its manifest"));
+    }
+    let source = directory.open_child_source("store.redb".as_ref())?;
+    let identity = source.identity_with_limit(cancel, versions::MAX_GENERATION_BYTES)?;
+    if identity.sha256 != manifest.source_file_sha256 || identity.bytes != manifest.source_file_bytes {
+        return Err(conflict("Completed copy bytes differ from verified copy evidence"));
+    }
+    let mut facts = versions::inspect_closed(directory.path())?;
+    facts.store_bytes = manifest.source.store_bytes.clone();
+    if facts != manifest.source {
+        return Err(conflict("Completed copy records differ from verified copy evidence"));
+    }
+    source.revalidate()?;
+    directory.revalidate()?;
+    Ok(manifest)
+}
+
 /// Reserve one canonical UUID workspace without claiming unrelated files as owned.
 pub fn workspace(lease: &crate::generations::RootLease, operation_id: &str) -> Result<PathBuf> {
     let parsed = uuid::Uuid::parse_str(operation_id)
@@ -465,14 +520,7 @@ pub(crate) fn copy_locked(
     }
     destination_stamp.revalidate()?;
     lease.revalidate()?;
-    let complete = serde_json::to_vec(&serde_json::json!({
-        "schema_version":1,
-        "manifest_sha256":hex::encode(Sha256::digest(manifest_bytes(&manifest)?)),
-        "store_sha256":actual.sha256,
-        "store_bytes":actual.bytes,
-        "records_sha256":copied.records_sha256,
-    }))
-    .map_err(storage)?;
+    let complete = completion_bytes(&manifest, &copied.records_sha256)?;
     let completion = destination.join("complete.json");
     if completion.try_exists().map_err(files::io_error)? {
         if security::read_private(&completion, 65536)? != complete {
@@ -544,6 +592,18 @@ mod tests {
         .unwrap();
         assert_eq!(copied.file_sha256, repeated.file_sha256);
         assert_eq!(copied.facts, repeated.facts);
+        let retained = DirectoryStamp::capture_resolved(&copied.path).unwrap();
+        let cancel = CancellationToken::new();
+        let manifest = inspect_completed_copy(&retained, &cancel).unwrap();
+        assert_eq!(manifest.source_file_sha256, copied.file_sha256);
+        assert_eq!(manifest.source.records_sha256, copied.facts.records_sha256);
+        let marker = copied.path.join("complete.json");
+        let original_marker = std::fs::read(&marker).unwrap();
+        std::fs::write(&marker, b"{}\n").unwrap();
+        assert_eq!(inspect_completed_copy(&retained, &cancel).unwrap_err().code, "STORE_COPY_CONFLICT");
+        assert_eq!(std::fs::read(&marker).unwrap(), b"{}\n");
+        std::fs::write(&marker, original_marker).unwrap();
+        drop(retained);
         let copy = Store::open(&copied.path).unwrap();
         assert_eq!(copy.root_id(), root_id);
         assert_eq!(

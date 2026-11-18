@@ -12,6 +12,7 @@ use nw_domain::{
     commands::{Request, Response},
     maintenance::{
         media_lifecycle::*,
+        media_v2::MEDIA_V2_CAPABILITIES,
         promotion::{GenerationPromotionPlan, MEDIA_V1_CAPABILITIES},
     },
 };
@@ -59,6 +60,8 @@ impl Drop for LifecycleTiming {
 pub(crate) struct Enablement {
     pub id: String,
     pub initialization: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mixed_media: bool,
     pub root_id: String,
     pub receipt_key: String,
     pub request_digest: String,
@@ -79,7 +82,9 @@ pub(crate) struct Enablement {
 }
 impl Enablement {
     pub fn pending_key(&self) -> &'static str {
-        if self.initialization {
+        if self.mixed_media {
+            crate::media_generations_v2::PENDING_MIXED_ENABLEMENT
+        } else if self.initialization {
             "meta/pending-initialization"
         } else {
             "meta/pending-promotion"
@@ -88,13 +93,39 @@ impl Enablement {
     pub fn record_key(&self) -> String {
         format!(
             "{}/{}",
-            if self.initialization {
+            if self.mixed_media {
+                "generation-media-v2"
+            } else if self.initialization {
                 "generation-initialization"
             } else {
                 "generation-promotion"
             },
             self.id
         )
+    }
+    pub fn receipt_field(&self) -> &'static str {
+        if self.mixed_media {
+            "enablement_id"
+        } else if self.initialization {
+            "initialization_id"
+        } else {
+            "promotion_id"
+        }
+    }
+    pub fn target_capabilities(&self) -> &'static [&'static str] {
+        if self.mixed_media {
+            &MEDIA_V2_CAPABILITIES
+        } else {
+            MEDIA_V1_CAPABILITIES
+        }
+    }
+    pub fn restoration_kind(&self) -> RestorationKind {
+        match (self.mixed_media, self.initialization) {
+            (false, false) => RestorationKind::GenerationPromotionRestorationV1,
+            (false, true) => RestorationKind::InitializationRestorationV1,
+            (true, false) => RestorationKind::GenerationPromotionRestorationV2,
+            (true, true) => RestorationKind::InitializationRestorationV2,
+        }
     }
     pub fn source_path(&self, lease: &RootLease) -> Result<std::path::PathBuf> {
         let history = generations::activations(lease.root())?;
@@ -163,6 +194,7 @@ impl Store {
             "meta/pending-promotion",
             "meta/pending-initialization",
             "meta/pending-restoration",
+            crate::media_generations_v2::PENDING_MIXED_ENABLEMENT,
         ] {
             if table.get(key).map_err(storage)?.is_some() {
                 return Ok(true);
@@ -213,6 +245,7 @@ impl Store {
             Ok(Enablement {
                 id: record.id,
                 initialization,
+                mixed_media: false,
                 root_id: p.root_id,
                 receipt_key: record.receipt_key,
                 request_digest: record.request_digest,
@@ -237,6 +270,7 @@ impl Store {
             Ok(Enablement {
                 id: record.id,
                 initialization,
+                mixed_media: false,
                 root_id: p.root_id,
                 receipt_key: record.receipt_key,
                 request_digest: record.request_digest,
@@ -441,7 +475,7 @@ impl Store {
             pending
         };
         let Some((id, initialization)) = pending else {
-            return Ok(());
+            return self.recover_media_v2(lease, clock);
         };
         let mut timing = LifecycleTiming::start("Read accepted enablement and selection");
         let operation = self.enablement(&id, initialization)?;
@@ -526,7 +560,7 @@ impl Store {
         }
         write.commit().map_err(storage)
     }
-    fn prepare_media_target(&self, lease: &RootLease, operation: &Enablement) -> Result<()> {
+    pub(crate) fn prepare_media_target(&self, lease: &RootLease, operation: &Enablement) -> Result<()> {
         let mut timing = LifecycleTiming::start("Copy accepted media target");
         let source = self.generation_path()?;
         let target = copies::workspace(lease, &operation.id)?.join("target");

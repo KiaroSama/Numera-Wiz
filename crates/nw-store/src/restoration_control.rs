@@ -7,7 +7,7 @@ use crate::{
 };
 use nw_domain::{
     DomainError, Result,
-    maintenance::{media_lifecycle::*, promotion::MEDIA_V1_CAPABILITIES},
+    maintenance::media_lifecycle::*,
 };
 use redb::{ReadableDatabase, ReadableTable};
 use serde::{Deserialize, Serialize};
@@ -151,12 +151,12 @@ pub(crate) fn validate_prestate(
     equal(
         source,
         "meta/required-capabilities",
-        &encode(&MEDIA_V1_CAPABILITIES)?,
+        &encode(&operation.target_capabilities())?,
     )?;
     equal(
         promoted,
         "meta/required-capabilities",
-        &encode(&MEDIA_V1_CAPABILITIES)?,
+        &encode(&operation.target_capabilities())?,
     )?;
     equal(source, operation.pending_key(), operation.id.as_bytes())?;
     if bytes(promoted, operation.pending_key())?.is_some() {
@@ -192,17 +192,12 @@ pub(crate) fn validate_prestate(
     let operation_key = operation.record_key();
     let transformed_key = format!("generation-transform/{}", operation.id);
     let restoration_key = restoration.map(|record| format!("generation-restoration/{}", record.id));
-    let promotion_field = if operation.initialization {
-        "initialization_id"
-    } else {
-        "promotion_id"
-    };
     let accepted = receipt(
         source,
         &operation.receipt_key,
         &operation.request_digest,
         &operation.id,
-        promotion_field,
+        operation.receipt_field(),
     )?;
     equal(promoted, &operation.receipt_key, &accepted)?;
     for row in source.iter().map_err(storage)? {

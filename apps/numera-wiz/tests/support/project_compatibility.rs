@@ -3021,17 +3021,24 @@ pub async fn run() {
         started: Instant::now(),
         byte_limit: Some(8 * 1024 * 1024),
     };
+    let mixed = Evidence {
+        path: directory.join("media-v1-to-mixed.json"),
+        events: Mutex::new(Vec::new()),
+        started: Instant::now(),
+        byte_limit: Some(8 * 1024 * 1024),
+    };
     evidence
         .record(json!({"phase":"started","status":"running","deadline_seconds":600}))
         .expect("Write compatibility start evidence");
     // Inline structured futures retain their own roots/owners. An error drops
     // siblings (and their kill-on-drop children); no detached journey can reopen
-    // a root after cancellation. All three share the original aggregate deadline.
+    // a root after cancellation. All journeys share the original aggregate deadline.
     let outcome = tokio::time::timeout(Duration::from_secs(600), async {
-        let (_, fresh_result, migrated_result) = tokio::try_join!(
+        let (_, fresh_result, migrated_result, mixed_result) = tokio::try_join!(
             scenario(&evidence),
             media_lifecycle::origin(true, &fresh),
             media_lifecycle::origin(false, &migrated),
+            media_lifecycle::mixed_origin::run(&mixed),
         )?;
         {
             let events = evidence.events.lock().map_err(|_| anyhow::anyhow!("Evidence lock failed"))?;
@@ -3040,9 +3047,11 @@ pub async fn run() {
             let mut all_epochs = events.iter().filter(|event| event["phase"] == "owner-ready")
                 .map(|event| text(event, "epoch")).collect::<Result<BTreeSet<_>>>()?;
             ensure!(fresh_result["root_id"] != migrated_result["root_id"]
-                && fresh_result["root_id"] != original_root && migrated_result["root_id"] != original_root,
+                && fresh_result["root_id"] != original_root && migrated_result["root_id"] != original_root
+                && mixed_result["root_id"] != original_root && mixed_result["root_id"] != fresh_result["root_id"]
+                && mixed_result["root_id"] != migrated_result["root_id"],
                 "Package journeys must have distinct genuinely produced root identities");
-            for result in [&fresh_result, &migrated_result] {
+            for result in [&fresh_result, &migrated_result, &mixed_result] {
                 for epoch in result["epochs"].as_array().context("Origin completion epochs")? {
                     ensure!(all_epochs.insert(epoch.as_str().context("Origin epoch string")?.to_owned()),
                         "Package journey owner epochs must remain distinct across roots");
@@ -3050,7 +3059,7 @@ pub async fn run() {
             }
         }
         evidence.record(json!({"phase":"media-origins-complete","status":"passed",
-            "same_600_second_aggregate":true,"fresh":fresh_result,"migrated_r0":migrated_result,
+            "same_600_second_aggregate":true,"fresh":fresh_result,"migrated_r0":migrated_result,"media_v1_to_mixed":mixed_result,
             "resource_and_rss_qualification":"unqualified",
             "scope":"Actual adopted-r1, fresh and migrated-r0 package lifecycle only; cut points, RSS, general media, named clients, owner hardware, full D12 and full v1 remain unqualified"}))
     }).await;

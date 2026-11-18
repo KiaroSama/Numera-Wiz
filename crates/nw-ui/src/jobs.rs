@@ -44,7 +44,10 @@ pub(super) struct JobRow {
 impl JobRow {
     pub(super) fn decode(value: Value) -> Result<Self, String> {
         if value.get("envelope_version").is_some() || value.get("payload_kind").is_some() {
-            if value["envelope_version"] != 1 || value["payload_kind"] != "media_job_v1" {
+            if !matches!(
+                (value["envelope_version"].as_u64(), value["payload_kind"].as_str()),
+                (Some(1), Some("media_job_v1")) | (Some(2), Some("media_job_v2"))
+            ) {
                 return Err("Unknown or incomplete media job inventory discriminator".into());
             }
             let id = value["id"]
@@ -123,7 +126,11 @@ pub(super) fn exercise() {
         );
         let mut unknown = value.clone();
         unknown["envelope_version"] = json!(2);
-        assert!(JobRow::decode(unknown).is_err());
+        assert!(JobRow::decode(unknown.clone()).is_err());
+        unknown["payload_kind"] = json!("media_job_v2");
+        let mixed = JobRow::decode(unknown).unwrap();
+        assert_eq!(mixed.artifact_id, row.artifact_id);
+        assert_eq!(mixed.state.terminal(), row.state.terminal());
         let mut partial = value.clone();
         partial.as_object_mut().unwrap().remove("payload_kind");
         assert!(JobRow::decode(partial).is_err());

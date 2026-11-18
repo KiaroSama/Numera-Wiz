@@ -229,6 +229,20 @@ pub async fn run_readonly_with_policy(
 
 pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
 
+const LEGACY_STREAM_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+pub const MAX_VERIFIED_STREAM_BYTES: u64 = 64 * 1024 * 1024 * 1024;
+
+struct StreamedOutput {
+    max_bytes: u64,
+    consumer: ChunkConsumer,
+}
+
+impl StreamedOutput {
+    fn legacy(consumer: ChunkConsumer) -> Self {
+        Self { max_bytes: LEGACY_STREAM_BYTES, consumer }
+    }
+}
+
 /// Stream a zero-input producer without retaining stdout or inheriting stdin.
 pub async fn stream_with_output_limits(
     program: &Path,
@@ -247,7 +261,7 @@ pub async fn stream_with_output_limits(
             stderr: stderr_limit,
         },
         Stdio::null(),
-        Some(consumer),
+        Some(StreamedOutput::legacy(consumer)),
         cancel,
     )
     .await
@@ -263,6 +277,29 @@ pub async fn stream_readonly_with_output_limits(
     consumer: ChunkConsumer,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
+    stream_verified_readonly(program, args, deadline, input, StreamLimits {
+        stdout_bytes: LEGACY_STREAM_BYTES, stderr_bytes: stderr_limit,
+    }, consumer, cancel).await
+}
+
+pub struct StreamLimits {
+    pub stdout_bytes: u64,
+    pub stderr_bytes: usize,
+}
+
+/// Stream the reviewed byte count through the bounded process supervisor.
+pub async fn stream_verified_readonly(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    input: std::fs::File,
+    limits: StreamLimits,
+    consumer: ChunkConsumer,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    if !(1..=MAX_VERIFIED_STREAM_BYTES).contains(&limits.stdout_bytes) {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Reviewed streamed stdout budget is outside its supported range"));
+    }
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
         return Err(DomainError::new(
             "INPUT_DENIED",
@@ -275,10 +312,10 @@ pub async fn stream_readonly_with_output_limits(
         Some(deadline),
         CaptureLimits {
             stdout: 0,
-            stderr: stderr_limit,
+            stderr: limits.stderr_bytes,
         },
         Stdio::from(input),
-        Some(consumer),
+        Some(StreamedOutput { max_bytes: limits.stdout_bytes, consumer }),
         cancel,
     )
     .await
@@ -305,7 +342,7 @@ pub async fn stream_readonly(
         Some(deadline),
         CaptureLimits::standard(0),
         Stdio::from(input),
-        Some(consumer),
+        Some(StreamedOutput::legacy(consumer)),
         cancel,
     )
     .await
@@ -332,7 +369,7 @@ pub async fn stream_readonly_with_policy(
         deadline.duration()?,
         CaptureLimits::standard(0),
         Stdio::from(input),
-        Some(consumer),
+        Some(StreamedOutput::legacy(consumer)),
         cancel,
     )
     .await
@@ -340,7 +377,7 @@ pub async fn stream_readonly_with_policy(
 
 async fn consume<R: AsyncRead + Unpin>(
     mut reader: R,
-    mut consumer: ChunkConsumer,
+    StreamedOutput { max_bytes, mut consumer }: StreamedOutput,
 ) -> Result<(Vec<u8>, u64)> {
     let mut buffer = [0; 8192];
     let mut total = 0u64;
@@ -355,10 +392,10 @@ async fn consume<R: AsyncRead + Unpin>(
         total = total.checked_add(count as u64).ok_or_else(|| {
             DomainError::new("RESOURCE_LIMIT", "Streamed stdout counter overflow")
         })?;
-        if total > 4 * 1024 * 1024 * 1024 {
+        if total > max_bytes {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",
-                "Streamed verification stdout exceeded 4 GiB",
+                "Streamed verification stdout exceeded the reviewed byte budget",
             ));
         }
         consumer(&buffer[..count])?;
@@ -371,7 +408,7 @@ async fn run_with_stdin(
     deadline: Option<Duration>,
     limits: CaptureLimits,
     input: Stdio,
-    consumer: Option<ChunkConsumer>,
+    consumer: Option<StreamedOutput>,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     let CaptureLimits {

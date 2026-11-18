@@ -8,6 +8,7 @@ use nw_domain::{
     maintenance::{
         MigrationPlan,
         media_lifecycle::{GenerationRestorationPlan, MediaInitializationPlan, RestorationKind},
+        media_v2::{EnablementKind, EnablementPlanV2},
         promotion::GenerationPromotionPlan,
     },
 };
@@ -32,6 +33,25 @@ pub enum Maintenance {
     Promotion(Enablement),
     #[command(subcommand)]
     Initialization(Enablement),
+    #[command(subcommand)]
+    MediaV2(MixedEnablement),
+}
+
+#[derive(Subcommand)]
+pub enum MixedEnablement {
+    /// Review a MediaV1 generation that has not been adopted.
+    InitializationPlan,
+    /// Review a MediaV1 generation with committed user work.
+    PromotionPlan,
+    /// Accept the reviewed generation and retain the mutation identity.
+    Accept {
+        #[arg(long)]
+        plan_file: PathBuf,
+        #[command(flatten)]
+        identity: MutationIdentity,
+    },
+    #[command(subcommand)]
+    Restore(Restoration),
 }
 
 #[derive(Subcommand)]
@@ -91,6 +111,22 @@ impl Maintenance {
             }
             Self::Promotion(command) => command.prepare(false),
             Self::Initialization(command) => command.prepare(true),
+            Self::MediaV2(command) => match command {
+                MixedEnablement::InitializationPlan => Ok(query(
+                    "maintenance.media_v2.plan",
+                    json!({"kind":EnablementKind::MediaInitializationV2}),
+                )),
+                MixedEnablement::PromotionPlan => Ok(query(
+                    "maintenance.media_v2.plan",
+                    json!({"kind":EnablementKind::GenerationPromotionV2}),
+                )),
+                MixedEnablement::Accept { plan_file, identity } => {
+                    let plan: EnablementPlanV2 = commands::parse(document(&plan_file)?)?;
+                    plan.validate_hash()?;
+                    accepted("maintenance.media_v2.accept", serde_json::to_value(plan)?, identity)
+                }
+                MixedEnablement::Restore(command) => command.prepare("maintenance.media_v2", None),
+            },
         }
     }
 }
@@ -117,38 +153,34 @@ impl Enablement {
                 }
                 accepted(&format!("{prefix}.accept"), plan, identity)
             }
-            Self::Restore(command) => match command {
-                Restoration::Plan { id } => {
-                    Ok(query(&format!("{prefix}.restore.plan"), json!({"id":id})))
+            Self::Restore(command) => command.prepare(
+                prefix,
+                Some(if initialization {
+                    RestorationKind::InitializationRestorationV1
+                } else {
+                    RestorationKind::GenerationPromotionRestorationV1
+                }),
+            ),
+        }
+    }
+}
+
+impl Restoration {
+    fn prepare(self, prefix: &str, kind: Option<RestorationKind>) -> Result<Request> {
+        match self {
+            Self::Plan { id } => Ok(query(&format!("{prefix}.restore.plan"), json!({"id":id}))),
+            Self::Inspect { id } => Ok(query(&format!("{prefix}.restore.inspect"), json!({"id":id}))),
+            Self::Accept { plan_file, identity } => {
+                let plan: GenerationRestorationPlan = commands::parse(document(&plan_file)?)?;
+                plan.validate_hash()?;
+                if kind.map_or(plan.schema_version != 2, |kind| kind != plan.kind) {
+                    return Err(DomainError::new(
+                        "INVALID_GENERATION_PLAN",
+                        "Restoration kind differs from the chosen maintenance route",
+                    ).into());
                 }
-                Restoration::Inspect { id } => Ok(query(
-                    &format!("{prefix}.restore.inspect"),
-                    json!({"id":id}),
-                )),
-                Restoration::Accept {
-                    plan_file,
-                    identity,
-                } => {
-                    let plan: GenerationRestorationPlan = commands::parse(document(&plan_file)?)?;
-                    plan.validate_hash()?;
-                    if !matches!(
-                        (initialization, plan.kind),
-                        (true, RestorationKind::InitializationRestorationV1)
-                            | (false, RestorationKind::GenerationPromotionRestorationV1)
-                    ) {
-                        return Err(DomainError::new(
-                            "INVALID_GENERATION_PLAN",
-                            "Restoration kind differs from the chosen maintenance route",
-                        )
-                        .into());
-                    }
-                    accepted(
-                        &format!("{prefix}.restore.accept"),
-                        serde_json::to_value(plan)?,
-                        identity,
-                    )
-                }
-            },
+                accepted(&format!("{prefix}.restore.accept"), serde_json::to_value(plan)?, identity)
+            }
         }
     }
 }

@@ -200,7 +200,7 @@ impl ProjectContextRule {
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
-        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" => {
+        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed" => {
             ProjectContextRule::RequiredRead
         }
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
@@ -241,6 +241,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "timeline.render" => {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
         }
+        "timeline.render_mixed" => {
+            Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV2)).expect("schema"))
+        }
+        "maintenance.media_v2.plan" => Some(
+            serde_json::to_value(schema_for!(crate::maintenance::media_v2::EnablementPlanV2)).expect("schema"),
+        ),
         "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
         "maintenance.initialization.plan" => Some(
             serde_json::to_value(schema_for!(
@@ -248,7 +254,9 @@ fn result_schema(id: &str) -> Option<Value> {
             ))
             .expect("schema"),
         ),
-        "maintenance.promotion.restore.plan" | "maintenance.initialization.restore.plan" => Some(
+        "maintenance.promotion.restore.plan"
+        | "maintenance.initialization.restore.plan"
+        | "maintenance.media_v2.restore.plan" => Some(
             serde_json::to_value(schema_for!(
                 crate::maintenance::media_lifecycle::GenerationRestorationPlan
             ))
@@ -405,6 +413,12 @@ pub fn registry() -> Vec<Descriptor> {
             crate::preview::TimelineFrameInput
         ),
         row!(
+            "timeline.render_mixed",
+            "Review opaque layered picture and mixed sound for a committed timeline range",
+            Query,
+            crate::media::RenderContractV2
+        ),
+        row!(
             "clips.place",
             "Place a finite generator or authorized registered stream",
             DurableMutation,
@@ -511,6 +525,36 @@ pub fn registry() -> Vec<Descriptor> {
             "Review a trusted compatible zero-revision baseline",
             Query,
             Empty
+        ),
+        row!(
+            "maintenance.media_v2.plan",
+            "Review the exact current MediaV1 source for mixed-media enablement; native owner only",
+            Query,
+            crate::maintenance::media_v2::EnablementReviewV2
+        ),
+        row!(
+            "maintenance.media_v2.accept",
+            "Accept the reviewed mixed-media enablement; native owner only",
+            DurableMutation,
+            crate::maintenance::media_v2::EnablementSubmitV2
+        ),
+        row!(
+            "maintenance.media_v2.restore.plan",
+            "Review restoration from an unadopted mixed generation to its stopped MediaV1 source",
+            Query,
+            IdInput
+        ),
+        row!(
+            "maintenance.media_v2.restore.accept",
+            "Accept the reviewed stopped MediaV1 restoration; native owner only",
+            DurableMutation,
+            crate::maintenance::media_lifecycle::RestorationSubmitInput
+        ),
+        row!(
+            "maintenance.media_v2.restore.inspect",
+            "Inspect an accepted MediaV1 restoration; native owner only",
+            Query,
+            IdInput
         ),
         row!(
             "maintenance.initialization.accept",
@@ -1458,6 +1502,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "sequences.create",
     "timeline.render",
     "timeline.preview_frame",
+    "timeline.render_mixed",
     "clips.place",
     "clips.move",
     "clips.link",
@@ -1476,6 +1521,11 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "maintenance.promotion.restore.accept",
     "maintenance.promotion.restore.inspect",
     "maintenance.initialization.plan",
+    "maintenance.media_v2.plan",
+    "maintenance.media_v2.accept",
+    "maintenance.media_v2.restore.plan",
+    "maintenance.media_v2.restore.accept",
+    "maintenance.media_v2.restore.inspect",
     "maintenance.initialization.accept",
     "maintenance.initialization.inspect",
     "maintenance.initialization.restore.plan",

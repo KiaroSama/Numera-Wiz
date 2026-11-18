@@ -79,6 +79,11 @@ export and continuous preview remain in development.
   adopted-r1 journeys, under the unchanged shared deadline. Resource/RSS and
   fault-cut qualification remain open. Preview, general export and the complete
   editor remain under construction.
+- [Mixed timeline export](docs/manuals/CLI.md#mixed-timeline-export) is in
+  hosted qualification. It reviews registered picture and audio windows,
+  composites opaque video and mixes overlapping audio to verified FFV1/PCM.
+  Native and browser Projects controls use the same plans and jobs as the
+  CLI and MCP.
 - Rust repository automation; no first-party Python, shell, C, Go or JavaScript
   source. Browser glue is generated during the hosted WASM build.
 

@@ -573,6 +573,37 @@ impl WizApp {
                 ui.image((texture.id(), egui::vec2(width, height)));
             }
         });
+        ui.collapsing("Export timeline range", |ui| {
+            let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
+            ui.label(format!("{}–{} seconds · FFV1 / PCM", exact(group.view.range.start), exact(group.view.range.end)));
+            if ui.add_enabled(idle, egui::Button::new("Review export")).clicked() {
+                self.projects.mixed_review = None;
+                self.query_with_project(
+                    "timeline.render_mixed",
+                    json!({"contract_kind":"media_v2","sequence_id":sequence,
+                        "revision":group.key.revision,"range":group.view.range,
+                        "output":{"container":"matroska","video_codec":"ffv1","audio_codec":"pcm_s16le",
+                            "destination":{"kind":"download"}}}),
+                    Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                    self.project_action(Phase::MixedReview),
+                    ui.ctx(),
+                );
+            }
+            if let Some(plan) = &self.projects.mixed_review {
+                ui.label(format!("{} registered streams", plan.payload.sources.len()));
+                if ui.add_enabled(idle, egui::Button::new("Queue reviewed export")).clicked() {
+                    match serde_json::to_string(plan) {
+                        Ok(raw) => self.mutate(
+                            "jobs.submit",
+                            json!({"media_plan_json":raw}),
+                            self.project_action(Phase::MixedSubmit),
+                            ui.ctx(),
+                        ),
+                        Err(error) => self.error = Some(error.to_string()),
+                    }
+                }
+            }
+        });
     }
 
     fn project_link_controls(&mut self, ui: &mut egui::Ui, group: &Group) {

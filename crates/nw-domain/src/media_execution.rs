@@ -360,42 +360,49 @@ pub(crate) fn finish_stages(state: MediaJobState, stages: &mut [MediaStage]) {
 pub enum StoredJob {
     Legacy(Box<Job>),
     MediaV1(Box<MediaJobV1>),
+    MediaV2(Box<crate::media_v2_execution::MediaJobV2>),
 }
 impl StoredJob {
     pub fn id(&self) -> &str {
         match self {
             Self::Legacy(job) => &job.id,
             Self::MediaV1(job) => &job.id,
+            Self::MediaV2(job) => &job.id,
         }
     }
     pub fn creator(&self) -> &str {
         match self {
             Self::Legacy(job) => &job.creator,
             Self::MediaV1(job) => &job.creator,
+            Self::MediaV2(job) => &job.creator,
         }
     }
     pub fn terminal(&self) -> bool {
         match self {
             Self::Legacy(job) => job.state.terminal(),
             Self::MediaV1(job) => job.state.terminal(),
+            Self::MediaV2(job) => job.state.terminal(),
         }
     }
     pub fn queued(&self) -> bool {
         match self {
             Self::Legacy(job) => job.state == crate::records::JobState::Queued,
             Self::MediaV1(job) => job.state == MediaJobState::Queued,
+            Self::MediaV2(job) => job.state == MediaJobState::Queued,
         }
     }
     pub fn plan_id(&self) -> &str {
         match self {
             Self::Legacy(job) => &job.plan.id,
             Self::MediaV1(job) => &job.plan_id,
+            Self::MediaV2(job) => &job.plan_id,
         }
     }
     pub fn output(&self) -> &str {
         match self {
             Self::Legacy(job) => &job.plan.output,
             Self::MediaV1(job) => &job.output.output,
+            Self::MediaV2(job) => &job.output,
         }
     }
 }
@@ -413,32 +420,40 @@ fn present_marker<'de, D: serde::Deserializer<'de>>(
     Value::deserialize(decoder).map(Some)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum StoredJobKind {
+    Legacy,
+    MediaV1,
+    MediaV2,
+}
+
+pub fn stored_job_kind(bytes: &[u8]) -> Result<StoredJobKind> {
+    let JobDiscriminators { envelope_version, payload_kind } = serde_json::from_slice(bytes).map_err(codec)?;
+    if envelope_version.is_none() && payload_kind.is_none() {
+        return Ok(StoredJobKind::Legacy);
+    }
+    match (envelope_version.as_ref().and_then(Value::as_u64), payload_kind.as_ref().and_then(Value::as_str)) {
+        (Some(1), Some("media_job_v1")) => Ok(StoredJobKind::MediaV1),
+        (Some(2), Some("media_job_v2")) => Ok(StoredJobKind::MediaV2),
+        _ => Err(invalid("Unknown or partial job discriminator")),
+    }
+}
+
 pub fn decode_job(bytes: &[u8]) -> Result<StoredJob> {
     // Read markers from the original bytes so duplicate or explicitly null
     // discriminators cannot select a legacy or differently versioned codec.
-    let JobDiscriminators {
-        envelope_version,
-        payload_kind,
-    } = serde_json::from_slice(bytes).map_err(codec)?;
-    if envelope_version.is_some() || payload_kind.is_some() {
-        if envelope_version.as_ref().and_then(Value::as_u64) != Some(1)
-            || payload_kind.as_ref().and_then(Value::as_str) != Some("media_job_v1")
-        {
-            return Err(invalid("Unknown or partial job discriminator"));
+    match stored_job_kind(bytes)? {
+        StoredJobKind::MediaV1 => {
+            let job: MediaJobV1 = serde_json::from_slice(bytes).map_err(codec)?;
+            job.validate()?;
+            Ok(StoredJob::MediaV1(Box::new(job)))
         }
-        let job: MediaJobV1 = serde_json::from_slice(bytes).map_err(codec)?;
-        job.validate()?;
-        Ok(StoredJob::MediaV1(Box::new(job)))
-    } else {
-        let raw: Value = serde_json::from_slice(bytes).map_err(codec)?;
-        crate::plans::decode(
-            raw.get("plan")
-                .cloned()
-                .ok_or_else(|| invalid("Stored legacy job has no plan"))?,
-        )?;
-        Ok(StoredJob::Legacy(Box::new(
-            serde_json::from_value(raw).map_err(codec)?,
-        )))
+        StoredJobKind::MediaV2 => Ok(StoredJob::MediaV2(Box::new(crate::media_v2_execution::decode_mixed_job(bytes)?))),
+        StoredJobKind::Legacy => {
+            let raw: Value = serde_json::from_slice(bytes).map_err(codec)?;
+            crate::plans::decode(raw.get("plan").cloned().ok_or_else(|| invalid("Stored legacy job has no plan"))?)?;
+            Ok(StoredJob::Legacy(Box::new(serde_json::from_value(raw).map_err(codec)?)))
+        }
     }
 }
 pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
@@ -452,6 +467,37 @@ pub fn decode_plan(raw: &str) -> Result<MediaPlanV1> {
     let plan: MediaPlanV1 = serde_json::from_str(raw).map_err(codec)?;
     plan.validate_hash()?;
     Ok(plan)
+}
+
+pub enum ReviewedMediaPlan {
+    V1(Box<MediaPlanV1>),
+    V2(Box<crate::media::MediaPlanV2>),
+}
+
+/// Dispatch exact original bytes once and retain the established V1 decoder.
+pub fn decode_reviewed_media_plan(raw: &str) -> Result<ReviewedMediaPlan> {
+    if raw.is_empty() || raw.len() > crate::media::MAX_PLAN_BYTES {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Media plan exceeds128KiB",
+        ));
+    }
+    let JobDiscriminators { envelope_version, payload_kind } =
+        serde_json::from_str(raw).map_err(codec)?;
+    match (
+        envelope_version.as_ref().and_then(Value::as_u64),
+        payload_kind.as_ref().and_then(Value::as_str),
+    ) {
+        (Some(1), Some("media_v1")) => Ok(ReviewedMediaPlan::V1(Box::new(decode_plan(raw)?))),
+        (Some(2), Some("media_v2")) => {
+            // The bounded structural pass rejects escaped duplicate keys even in maps.
+            crate::commands::decode_json(raw.as_bytes())?;
+            let plan: crate::media::MediaPlanV2 = serde_json::from_str(raw).map_err(codec)?;
+            plan.validate_hash()?;
+            Ok(ReviewedMediaPlan::V2(Box::new(plan)))
+        }
+        _ => Err(invalid("Unknown or partial media plan discriminator")),
+    }
 }
 /// Fresh acceptance uses the sampled owner clock; retained replay bypasses this check.
 pub fn review_current(created_at: &str, expires_at: &str, now: u64) -> Result<bool> {

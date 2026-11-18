@@ -4,6 +4,8 @@ use nw_engine::Engine;
 use tokio_util::sync::CancellationToken;
 #[path = "../../../test-support/media.rs"]
 mod fixture;
+#[path = "support/mixed_render.rs"]
+mod mixed_render;
 use fixture::rules;
 
 async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
@@ -309,6 +311,7 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
         .unwrap_err();
     assert_eq!(error.code, "SOURCE_CHANGED");
     assert_eq!(engine.media_process_capacity(), (2, 2, 0));
+
 }
 
 fn observed_tag<'a>(value: &'a serde_json::Value, name: &str) -> Option<&'a str> {
@@ -331,6 +334,7 @@ async fn actual_copy_and_order_metadata_remux() {
     let engine = Engine::new(ffmpeg.clone(), ffprobe.clone()).await.unwrap();
     let token = CancellationToken::new();
     check_normalized_pair(&engine, &media, &token).await;
+    mixed_render::exercise(&engine, &media, &token).await;
     let seek_source = directory.path().join("seek-index-é-索引.mp4");
     nw_platform::process::run(
         &ffmpeg,

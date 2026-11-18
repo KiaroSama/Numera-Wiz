@@ -117,6 +117,20 @@ async fn rejected_streamed_stdout_terminates_and_reaps_the_producer() {
     .unwrap_err();
     assert_eq!(result.code, "VERIFICATION_FAILED");
     assert!(start.elapsed() < Duration::from_secs(8));
+    let start = std::time::Instant::now();
+    let result = nw_platform::process::stream_verified_readonly(
+        fixture(),
+        &["stream-sleep".into()],
+        Duration::from_secs(15),
+        source.reopen().unwrap(),
+        nw_platform::process::StreamLimits { stdout_bytes: 1024, stderr_bytes: 4096 },
+        Box::new(|_| Ok(())),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(result.code, "RESOURCE_LIMIT");
+    assert!(start.elapsed() < Duration::from_secs(8));
     let _relay_guard = relay::RELAY_CASE_GATE.lock().await;
     relay::sinks(fixture()).await;
 }

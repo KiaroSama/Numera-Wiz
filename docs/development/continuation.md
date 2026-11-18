@@ -10,6 +10,16 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+The mixed timeline export adds a typed review for opaque video layering and
+overlapping audio windows. The implementation binds the original source asset
+and probe, verifies the captured revision and FFmpeg identities, uses per-job
+staging and decodes every output frame and audio sample before publication.
+The MediaV2 promotion and restoration share generation-copy and control
+transactions with the earlier lifecycle. Restoration requires zero business
+adoption on the mixed target and retains accepted replay records. Hosted
+qualification is required for the implementation, rollback and cross-platform
+compatibility. Broader effect, transition and export profiles remain open.
+
 CI325 passed all thirteen jobs for `ea9c53a`, including the four native
 builds and regressions, Chrome, the native workspace exercise, FFmpeg media,
 the owner transports and the HTTP artifact exercise. Gitleaks passed on the

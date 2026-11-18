@@ -25,10 +25,20 @@ fn validate_queue(
     table: &impl ReadableTable<&'static str, &'static [u8]>,
     job: &MediaJobV1,
 ) -> Result<()> {
+    validate_queue_identity(table, &job.id, &job.queue_ticket, job.state.terminal(), 1)
+}
+
+pub(crate) fn validate_queue_identity(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    id: &str,
+    ticket: &str,
+    terminal: bool,
+    schema: u32,
+) -> Result<()> {
     let row = table
-        .get(format!("job-queue/{}", job.id).as_str())
+        .get(format!("job-queue/{id}").as_str())
         .map_err(storage)?;
-    if job.state.terminal() {
+    if terminal {
         if row.is_some() {
             return Err(DomainError::new(
                 "INVALID_RECORD",
@@ -43,7 +53,7 @@ fn validate_queue(
             )
         })?;
         let queue: QueueFact = decode(row.value())?;
-        if queue.schema_version != 1 || queue.job_id != job.id || queue.ticket != job.queue_ticket {
+        if queue.schema_version != schema || queue.job_id != id || queue.ticket != ticket {
             return Err(DomainError::new(
                 "INVALID_RECORD",
                 "Media queue identity differs from acceptance",
@@ -79,6 +89,41 @@ fn decode_execution(bytes: &[u8]) -> Result<StoredJob> {
     super::check_record_decode_size(bytes)?;
     domain::decode_job(bytes)
 }
+
+pub(crate) fn reserve_queue_room(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    requested: u64,
+) -> Result<()> {
+    let mut pending = 0;
+    let mut retained_bytes = requested;
+    for row in table.range("job/"..).map_err(storage)? {
+        let (key, row) = row.map_err(storage)?;
+        if !key.value().starts_with("job/") {
+            break;
+        }
+        let job = decode_execution(row.value())?;
+        if job.terminal() {
+            continue;
+        }
+        pending += 1;
+        let bytes = match job {
+            StoredJob::MediaV1(job) => domain::exact(&job.resources.estimated_memory_bytes)?,
+            StoredJob::MediaV2(job) => domain::exact(&job.reservation.retained_buffer_bytes)?,
+            StoredJob::Legacy(_) => 0,
+        };
+        retained_bytes = retained_bytes.checked_add(bytes).ok_or_else(|| {
+            DomainError::new("RESOURCE_LIMIT", "Durable queue reservation exceeds its byte counter")
+        })?;
+    }
+    if pending >= domain::MAX_QUEUE || retained_bytes > domain::MEDIA_RESERVATION_POOL_BYTES {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Durable queue or execution reservation budget is full",
+        ));
+    }
+    Ok(())
+}
+
 fn media_job(
     table: &impl ReadableTable<&'static str, &'static [u8]>,
     id: &str,
@@ -88,13 +133,30 @@ fn media_job(
             validate_queue(table, &job)?;
             Ok(*job)
         }
-        StoredJob::Legacy(_) => Err(DomainError::new(
+        StoredJob::Legacy(_) | StoredJob::MediaV2(_) => Err(DomainError::new(
             "INVALID_RECORD",
             "Expected accepted media job",
         )),
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MediaFloor {
+    V1,
+    V2,
+}
+
 pub(crate) fn require_floor(table: &impl ReadableTable<&'static str, &'static [u8]>) -> Result<()> {
+    require_media_floor(table, MediaFloor::V1)
+}
+
+pub(crate) fn require_media_floor(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    required: MediaFloor,
+) -> Result<()> {
+    use nw_domain::maintenance::{
+        media_v2::{MEDIA_V2_CAPABILITIES, exact_capabilities},
+        promotion::MEDIA_V1_CAPABILITIES,
+    };
     let schema = table.get("meta/schema").map_err(storage)?;
     let caps = table.get("meta/required-capabilities").map_err(storage)?;
     let capabilities: Vec<String> = caps
@@ -103,10 +165,8 @@ pub(crate) fn require_floor(table: &impl ReadableTable<&'static str, &'static [u
         .transpose()?
         .unwrap_or_default();
     if schema.as_ref().map(|v| v.value()) != Some(b"3".as_slice())
-        || !nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES
-            .iter()
-            .all(|required| capabilities.iter().any(|cap| cap == required))
-        || capabilities.len() != nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.len()
+        || !(exact_capabilities(&capabilities, &MEDIA_V2_CAPABILITIES)
+            || required == MediaFloor::V1 && exact_capabilities(&capabilities, MEDIA_V1_CAPABILITIES))
     {
         return Err(DomainError::new(
             "STORE_VERSION_UNSUPPORTED",
@@ -117,6 +177,7 @@ pub(crate) fn require_floor(table: &impl ReadableTable<&'static str, &'static [u
         "meta/pending-promotion",
         "meta/pending-initialization",
         "meta/pending-restoration",
+        crate::media_generations_v2::PENDING_MIXED_ENABLEMENT,
     ] {
         if table.get(key).map_err(storage)?.is_some() {
             return Err(DomainError::new(
@@ -238,9 +299,13 @@ impl Store {
         let read = self.db.begin_read().map_err(storage)?;
         let table = read.open_table(RECORDS).map_err(storage)?;
         let job = read_job(&table, id)?;
-        if let StoredJob::MediaV1(media) = &job {
-            media.validate_payload(&payload(&table, id)?)?;
-            validate_queue(&table, media)?;
+        match &job {
+            StoredJob::MediaV1(media) => {
+                media.validate_payload(&payload(&table, id)?)?;
+                validate_queue(&table, media)?;
+            }
+            StoredJob::MediaV2(_) => { crate::media_execution_v2::read_execution(&table, id)?; }
+            StoredJob::Legacy(_) => {}
         }
         Ok(job)
     }
@@ -265,9 +330,13 @@ impl Store {
                     "Stored job key and identity differ",
                 ));
             }
-            if let StoredJob::MediaV1(media) = &job {
-                media.validate_payload(&payload(&table, media.id.as_str())?)?;
-                validate_queue(&table, media)?;
+            match &job {
+                StoredJob::MediaV1(media) => {
+                    media.validate_payload(&payload(&table, media.id.as_str())?)?;
+                    validate_queue(&table, media)?;
+                }
+                StoredJob::MediaV2(media) => { crate::media_execution_v2::read_execution(&table, &media.id)?; }
+                StoredJob::Legacy(_) => {}
             }
             visitor(job)?;
         }
@@ -303,9 +372,6 @@ impl Store {
         }
         self.commit_composed_with_clock(principal, request, clock, |table, now| {
             require_floor(table)?;
-            if domain::exact(&job.resources.estimated_memory_bytes)? > domain::MEDIA_RESERVATION_POOL_BYTES {
-                return Err(DomainError::new("RESOURCE_LIMIT", "Worker and bounded queue reservations exceed the fixed admission pool"));
-            }
             if !domain::review_current(&plan.created_at, &plan.expires_at, now)? {
                 return Err(DomainError::new("PLAN_EXPIRED", "Media review expired before acceptance"));
             }
@@ -322,13 +388,7 @@ impl Store {
                     return Err(DomainError::new("STALE_REVISION", "Captured entity changed before atomic media acceptance"));
                 }
             }
-            let mut pending = 0;
-            for row in table.range("job/"..).map_err(storage)? {
-                let (key, value) = row.map_err(storage)?;
-                if !key.value().starts_with("job/") { break; }
-                if !decode_execution(value.value())?.terminal() { pending += 1; }
-                if pending >= domain::MAX_QUEUE { return Err(DomainError::new("RESOURCE_LIMIT", "Durable job queue budget reached")); }
-            }
+            reserve_queue_room(table, domain::exact(&job.resources.estimated_memory_bytes)?)?;
             let mut accepted_job = job.clone();
             accepted_job.accepted_at = now.to_string();
             accepted_job.queue_ticket = format!("{now:020}/{}", job.id);

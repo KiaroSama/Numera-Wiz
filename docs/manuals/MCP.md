@@ -380,6 +380,16 @@ commands; these adapters never widen grants. Existing native/Chrome project-edit
 journeys have their own qualification; mixed A/V controls, checkpoint files and
 general decoded render/preview remain unfinished.
 
+`timeline.render_mixed` reviews a committed range with `contract_kind:
+"media_v2"`, a sequence ID, revision, range, and explicit
+Matroska/FFV1/PCM download output. Pass the project ID in the tool context.
+The returned plan records the original stream bindings, exact window schedule,
+required reader floor and qualified FFmpeg component identity. Submit the
+exact plan JSON through `jobs.submit` as `media_plan_json` with a retained
+replay scope and idempotency key. The existing `jobs.inspect`,
+`artifacts.manifest` and `artifacts.read_chunk` tools cover the accepted job
+and its authorized output. MediaV2 maintenance requires native owner authority.
+
 The development `timeline.render` tool uses a read context containing only the
 project ID, with required exact revision in `params`:
 

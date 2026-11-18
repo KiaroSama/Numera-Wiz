@@ -42,15 +42,12 @@ pub(crate) fn supports_capabilities(capabilities: &[String]) -> bool {
     {
         return true;
     }
-    capabilities.len() == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES.len()
-        && capabilities
-            .iter()
-            .map(String::as_str)
-            .collect::<std::collections::BTreeSet<_>>()
-            == nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES
-                .iter()
-                .copied()
-                .collect()
+    use nw_domain::maintenance::{
+        media_v2::{MEDIA_V2_CAPABILITIES, exact_capabilities},
+        promotion::MEDIA_V1_CAPABILITIES,
+    };
+    exact_capabilities(capabilities, MEDIA_V1_CAPABILITIES)
+        || exact_capabilities(capabilities, &MEDIA_V2_CAPABILITIES)
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

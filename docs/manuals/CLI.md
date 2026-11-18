@@ -612,6 +612,34 @@ layers are rejected. The current finite profile admits even dimensions through
 1920x1080, rates through 120fps and ranges through 60 seconds. Boundaries must lie
 on the exact frame and sample grids. No range is silently rounded or truncated.
 
+### Mixed timeline export
+
+The mixed export uses the selected sequence's registered streams, opaque video
+layer order, solid colors and audio windows. Picture gaps render black and
+uncovered audio renders silence. Exports are Matroska with FFV1 and PCM s16le.
+The first profile supports fixed-size video, unit-rate clips, mono or stereo
+audio and ranges of up to 600 seconds aligned to the sequence frame and sample
+grid.
+
+Native owners can review this capability with
+`numera-wiz maintenance media-v2 initialization-plan` for an unadopted MediaV1
+store or `numera-wiz maintenance media-v2 promotion-plan` for an adopted one.
+Save the response's `result` object and pass it to `maintenance media-v2 accept
+--plan-file` with a retained replay scope and idempotency key. The reviewed
+source generation remains available for `maintenance media-v2 restore plan
+<enablement-id>` and `restore accept` while the mixed generation remains
+unadopted. Job acceptance adopts the generation.
+
+Run `numera-wiz timeline render --mixed --project <id> --sequence <id>
+--revision <revision> --start 0 --end 2` to review two seconds of a committed
+sequence. Save the `result` object to a JSON file. Submit with
+`numera-wiz jobs submit-media --plan-file <file> --replay-scope <scope>
+--idempotency-key <key>` and retain that file for exact-byte retries.
+The native and browser Projects views can review and queue their displayed
+range using **Export timeline range**.
+
+### Finite generator export
+
 The wire query is `timeline.render` with `project:{"id":"<project-uuid>"}` and
 required `sequence_id`, canonical decimal `revision`, exact `range` and explicit
 `output` in `params`. New media range rationals require canonical reduced strings;

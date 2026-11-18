@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "repository": "KiaroSama/Numera-Wiz",
+  "source_sha": "ea9c53a0a862de3c10a4a913cd3a68f82907b1e4",
+  "run_id": 44376947779,
+  "run_attempt": 1,
+  "workflow_path": ".github/workflows/ci.yml",
+  "required_expanded_jobs": 13,
+  "provenance_origin": "Exact successful hosted run and independently verified executable, package, and retained producer evidence. This is the preceding MediaV1 development package cohort.",
+  "native_features": [
+    "desktop",
+    "embedded-web"
+  ],
+  "targets": [
+    {
+      "runner": "ubuntu-24.04",
+      "target": "linux-x64",
+      "native_artifact": "numera-wiz-development-ubuntu-24.04",
+      "native_artifact_id": 14461479421,
+      "package_provenance_artifact_id": 14460484727,
+      "executable_bytes": 161119112,
+      "executable_sha256": "617258dbb57eef1dd1cd4e2863f19381c5860a2240728c147cf27c1e60d54c69"
+    },
+    {
+      "runner": "windows-2025",
+      "target": "windows-x64",
+      "native_artifact": "numera-wiz-development-windows-2025",
+      "native_artifact_id": 14461434634,
+      "package_provenance_artifact_id": 14460979694,
+      "executable_bytes": 93264896,
+      "executable_sha256": "84bd9e4829e79d9d42204dceb65f5d3d5bc0c93b82f0de835d9178039b74c1ea"
+    },
+    {
+      "runner": "macos-15",
+      "target": "macos-arm64",
+      "native_artifact": "numera-wiz-development-macos-15",
+      "native_artifact_id": 14463470609,
+      "package_provenance_artifact_id": 14463635668,
+      "executable_bytes": 131827184,
+      "executable_sha256": "e37d4f41011a3463fa7067af13f35b90a89b9229e3fb8763124100aab3bca9e6"
+    },
+    {
+      "runner": "macos-15-intel",
+      "target": "macos-x64",
+      "native_artifact": "numera-wiz-development-macos-15-intel",
+      "native_artifact_id": 14464040056,
+      "package_provenance_artifact_id": 14462402590,
+      "executable_bytes": 145567376,
+      "executable_sha256": "e1349f667eb26fa9bf94aa7868a6c01eddfbb526e7eeb6a9e406c7ae20f30ebe"
+    }
+  ],
+  "producer_evidence": [
+    {
+      "runner": "ubuntu-24.04",
+      "producer_evidence_artifact_id": 14463051807,
+      "producer_evidence_zip_sha256": "784ce0b88532308d7695421ab64da82a5a3743f5ad3e9c5127283e35b89aab9f",
+      "producer_journey_sha256": "b42cbb0c811dd1739c38b3a6a853bfb80d2390c737ce6b8f5cb4b55499117a8c",
+      "aggregate_ms": 334898
+    },
+    {
+      "runner": "windows-2025",
+      "producer_evidence_artifact_id": 14462009909,
+      "producer_evidence_zip_sha256": "48fd637836cdb96f2f831405efd73b74421fceb8e7e3bc5097f191d2936d0c7b",
+      "producer_journey_sha256": "a5a48613670689a15178945da959fd7ba047a528c859cb41771c7202e81c4206",
+      "aggregate_ms": 331740
+    },
+    {
+      "runner": "macos-15",
+      "producer_evidence_artifact_id": 14463663168,
+      "producer_evidence_zip_sha256": "c3ad6c4c2da2786c67f75322da204caab3efd70a2684f7c11d0a5b48bcbe686b",
+      "producer_journey_sha256": "c9671c23853854dc5bf62f06fec8d00b6a98a18549dcdd874b0192387a139368",
+      "aggregate_ms": 389763
+    },
+    {
+      "runner": "macos-15-intel",
+      "producer_evidence_artifact_id": 14464431985,
+      "producer_evidence_zip_sha256": "c5e71460eec12c8300348dd842e617800e5033d84c2ec51b6cac943b241ba8af",
+      "producer_journey_sha256": "f3ec7efdd62c60430f6143cf43b30e986418fcc5c92d3f105daeea962da2a942",
+      "aggregate_ms": 402977
+    }
+  ],
+  "security_run_id": 44376947921
+}

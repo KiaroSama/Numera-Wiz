@@ -594,7 +594,7 @@ pub fn prepare(command: Command) -> Result<Request> {
             }
             let raw = String::from_utf8(bytes)
                 .map_err(|_| DomainError::new("VALIDATION_ERROR", "Media review must be UTF-8"))?;
-            nw_domain::media_execution::AcceptedMediaPayload::from_json(raw.clone())?;
+            nw_domain::media_execution::decode_reviewed_media_plan(&raw)?;
             let mut request = query("jobs.submit", json!({"media_plan_json":raw}));
             identity.apply(&mut request)?;
             request

@@ -1,5 +1,7 @@
 //! Finite, authoritative project capture and a separately framed media review contract.
 mod capture;
+mod mixed_graph;
+mod mixed_plan;
 mod mixed_source;
 mod plan;
 use crate::{
@@ -12,6 +14,8 @@ pub use capture::mixed::{
     CapturedOccurrence, CapturedTrack, MixedCapture, OccurrenceSource, capture_mixed,
     capture_mixed_frame, visible_occurrence,
 };
+pub use mixed_graph::{AudioSpan, MixedGraph, OriginalWindow, VideoSpan, compile_mixed_graph};
+pub use mixed_plan::{MediaPlanV2, MixedReview, MixedTools, RenderContractV2};
 pub use mixed_source::{BoundSource, bind_mixed_source};
 pub use plan::{MediaPlanV1, compile};
 use schemars::{JsonSchema, Schema, SchemaGenerator};

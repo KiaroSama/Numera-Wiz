@@ -8,6 +8,7 @@ mod preservation;
 mod progress;
 mod wave_cues;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
+pub use media::mixed_ffmpeg::{MixedProcessLimits, MixedPublishRequest, MixedSignalProof, StagedMixedInput, VerifiedMixedCandidate};
 pub use media::normalized_pair::NormalizedWindow;
 use nw_domain::{
     DomainError, Result,

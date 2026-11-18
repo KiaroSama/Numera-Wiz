@@ -158,6 +158,16 @@ pub struct MediaInitializationRecord {
 pub enum RestorationKind {
     GenerationPromotionRestorationV1,
     InitializationRestorationV1,
+    GenerationPromotionRestorationV2,
+    InitializationRestorationV2,
+}
+impl RestorationKind {
+    pub fn schema_version(self) -> u32 {
+        match self {
+            Self::GenerationPromotionRestorationV1 | Self::InitializationRestorationV1 => 1,
+            Self::GenerationPromotionRestorationV2 | Self::InitializationRestorationV2 => 2,
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -210,7 +220,7 @@ impl GenerationRestorationPlan {
         let revision = exact(&self.source_guard_revision)?;
         let source = exact(&self.source_bytes)?;
         let promoted = exact(&self.promoted_bytes)?;
-        if self.schema_version != 1
+        if self.schema_version != self.kind.schema_version()
             || self.source_generation == 0
             || self.source_generation > MAX_GENERATIONS
             || self.prefix_count == 0
@@ -227,8 +237,10 @@ impl GenerationRestorationPlan {
                 != Some(exact(&self.estimated_additional_bytes)?)
             || exact(&self.created_at)?.checked_add(300) != Some(exact(&self.expires_at)?)
             || match self.kind {
-                RestorationKind::GenerationPromotionRestorationV1 => revision == 0,
-                RestorationKind::InitializationRestorationV1 => revision != 0,
+                RestorationKind::GenerationPromotionRestorationV1
+                | RestorationKind::GenerationPromotionRestorationV2 => revision == 0,
+                RestorationKind::InitializationRestorationV1
+                | RestorationKind::InitializationRestorationV2 => revision != 0,
             }
         {
             return Err(invalid(
@@ -247,6 +259,12 @@ impl GenerationRestorationPlan {
                 }
                 RestorationKind::InitializationRestorationV1 => {
                     b"NumeraWiz.InitializationRestoration.v1\0"
+                }
+                RestorationKind::GenerationPromotionRestorationV2 => {
+                    b"NumeraWiz.GenerationPromotionRestoration.v2\0"
+                }
+                RestorationKind::InitializationRestorationV2 => {
+                    b"NumeraWiz.InitializationRestoration.v2\0"
                 }
             },
             &semantic,

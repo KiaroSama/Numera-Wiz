@@ -522,6 +522,27 @@ impl Service {
                         }
                         return Ok(());
                     }
+                    nw_domain::media_execution::StoredJob::MediaV2(job) => {
+                        if policy.as_ref().is_some_and(|profile| !profile.allows_object(ObjectKind::Job, &job.id, &job.creator, ObjectAction::Read)) {
+                            return Ok(());
+                        }
+                        if kind == InventoryKind::Artifacts {
+                            if let Some(identity) = &job.artifact {
+                                let publication: Option<Publication> = self.store.get(&format!("publication/{}/output", job.id))?;
+                                if publication.as_ref().is_some_and(|value| value.read_purpose_version == 1 && value.published && value.identity == *identity) {
+                                    let id = format!("media-{}-output", job.id);
+                                    snapshot.push(&nw_domain::artifacts::ArtifactSummary {
+                                        artifact_id: id.clone(), manifest_uri: format!("numera://artifact/{id}/manifest"),
+                                        job_id: job.id.clone(), encoded_byte_count: identity.bytes.clone(), sha256: identity.sha256.clone(),
+                                    })?;
+                                }
+                            }
+                        } else {
+                            snapshot.push(&json!({"envelope_version":2,"payload_kind":"media_job_v2", "id":job.id,"state":job.state,
+                                "revision":job.revision,"output_name":format!("media-{}.mkv", job.id),"error_code":job.error.as_ref().map(|error| &error.code)}))?;
+                        }
+                        return Ok(());
+                    }
                 };
                 if policy.as_ref().is_none_or(|profile| {
                     profile.allows_object(

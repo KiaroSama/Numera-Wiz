@@ -50,6 +50,10 @@ impl Service {
         guard: Option<std::sync::MutexGuard<'_, ()>>,
     ) -> Result<Response> {
         let input: commands::MediaSubmitInput = commands::parse(request.params.clone())?;
+        if let nw_domain::media_execution::ReviewedMediaPlan::V2(plan) = domain::decode_reviewed_media_plan(&input.media_plan_json)? {
+            drop(guard);
+            return self.submit_mixed_media(context, request, input.media_plan_json, *plan, cancellation);
+        }
         let accepted = AcceptedMediaPayload::from_json(input.media_plan_json)?;
         let plan = accepted.plan()?;
         self.store.require_media_floor()?;
@@ -461,48 +465,38 @@ impl Service {
         Ok(())
     }
 
+    pub(super) fn confirmed_media_publication(
+        &self,
+        id: &str,
+        output: &str,
+        object: &nw_domain::records::NativeObjectIdentity,
+        finish: impl FnOnce(nw_domain::records::FileIdentity, String) -> Result<()>,
+    ) -> Result<()> {
+        let path = Path::new(output);
+        let parent = files::DirectoryStamp::capture_resolved(path.parent()
+            .ok_or_else(|| DomainError::new("TARGET_CHANGED", "Media parent missing"))?)?;
+        parent.require_object(object)?;
+        let destination = nw_platform::claims::Destination::reviewed(path, object)?;
+        let claims = nw_platform::claims::DestinationClaims::try_acquire(vec![destination])?;
+        let publication: Publication = self.store.get(&format!("publication/{id}/output"))?
+            .ok_or_else(DomainError::object_not_found)?;
+        if publication.output != output || !files::same_object(Path::new(&publication.proof), path)? {
+            return Err(DomainError::new("PUBLICATION_UNCONFIRMED", "Media output is not the retained verified object"));
+        }
+        let actual = files::identity(path, &CancellationToken::new())?;
+        if actual != publication.identity {
+            return Err(DomainError::new("PUBLICATION_UNCONFIRMED", "Media output bytes differ from the durable fence"));
+        }
+        claims.revalidate()?;
+        parent.revalidate()?;
+        finish(actual, publication.verified)
+    }
+
     pub(super) fn reconcile_media(&self, job: &MediaJobV1) -> Result<()> {
-        let confirmed = (|| {
-            let parent = files::DirectoryStamp::capture_resolved(
-                Path::new(&job.output.output)
-                    .parent()
-                    .ok_or_else(|| DomainError::new("TARGET_CHANGED", "Media parent missing"))?,
-            )?;
-            parent.require_object(&job.output.parent)?;
-            let destination = nw_platform::claims::Destination::reviewed(
-                Path::new(&job.output.output),
-                &job.output.parent,
-            )?;
-            let claims = nw_platform::claims::DestinationClaims::try_acquire(vec![destination])?;
-            let publication: Publication = self
-                .store
-                .get(&format!("publication/{}/output", job.id))?
-                .ok_or_else(DomainError::object_not_found)?;
-            if publication.output != job.output.output
-                || !files::same_object(
-                    Path::new(&publication.proof),
-                    Path::new(&publication.output),
-                )?
-            {
-                return Err(DomainError::new(
-                    "PUBLICATION_UNCONFIRMED",
-                    "Media output is not the retained verified object",
-                ));
-            }
-            let actual =
-                files::identity(Path::new(&publication.output), &CancellationToken::new())?;
-            if actual != publication.identity {
-                return Err(DomainError::new(
-                    "PUBLICATION_UNCONFIRMED",
-                    "Media output bytes differ from the durable fence",
-                ));
-            }
-            claims.revalidate()?;
-            parent.revalidate()?;
-            self.store
-                .media_published(&job.id, actual, publication.verified)?;
+        let confirmed = self.confirmed_media_publication(&job.id, &job.output.output, &job.output.parent, |actual, verification| {
+            self.store.media_published(&job.id, actual, verification)?;
             Ok(())
-        })();
+        });
         if let Err(error) = confirmed {
             self.store.update_media_job(&job.id, |job| {
                 job.state = MediaJobState::Interrupted;

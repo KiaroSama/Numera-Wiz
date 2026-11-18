@@ -18,6 +18,28 @@ pub struct BoundSource {
     pub stream_start: Rational,
 }
 
+impl BoundSource {
+    pub fn original_tick(&self, relative: Rational) -> Result<i64> {
+        if self.time_base <= Rational::ZERO || relative < Rational::ZERO {
+            return Err(incompatible("Original time requires a nonnegative offset and positive time base"));
+        }
+        let original = self.asset_origin.checked_add(relative)?;
+        let tick = original.checked_mul(Rational::new(self.time_base.denominator(), self.time_base.numerator())?)?;
+        if original < self.stream_start || tick.denominator() != 1 {
+            return Err(incompatible("Requested offset is outside the original stream or its time grid"));
+        }
+        Ok(tick.numerator())
+    }
+
+    pub fn original_audio_sample(&self, relative: Rational, sample_rate: u32) -> Result<u64> {
+        if self.media_kind != TrackKind::Audio || !(8000..=384000).contains(&sample_rate) || relative < Rational::ZERO {
+            return Err(incompatible("Original audio requires a physical stream and admitted sample grid"));
+        }
+        let time = self.asset_origin.checked_add(relative)?.checked_sub(self.stream_start)?;
+        projects::grid_tick(time, Rational::new(i64::from(sample_rate), 1)?)
+    }
+}
+
 fn incompatible(message: &str) -> DomainError {
     DomainError::new("UNSUPPORTED_SOURCE_CLOCK", message)
 }

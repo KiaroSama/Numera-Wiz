@@ -59,3 +59,17 @@ and sample offset, and inferred a chapter end from the file duration. Numera
 now inspects the original cue and `ltxt` length through the registered source
 handle in the CLI, MCP and shared panels. This covers RIFF and RF64 cue
 metadata. HDR, PSD and XMP workflows remain open. [FilmCraft comparison](https://github.com/storytold/filmcraft/compare/688444e75d059c0d2a5c13be75fc3cb210efebd1...6aa67684948a585ef3f40d81a63bbf228f9f320a) · [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/3f1cd00745d41345632b38beece0b09c9e265e69...f3c28669a243622fde9ee8eb9a23cae6cac7057d)
+
+The later EffectCraft delta moves PSD scalar blocks, section-divider recovery
+and bounded text-layer headers to Craft PSD revision `62f7a7e`. The eight
+changed-file patches include tests for short optional fields, repeated
+blocks and descriptor bounds. Layered PSD import remains outside the current
+FFmpeg render profile. FFmWiz, MuxCls and FilmCraft are still at the revisions
+above. [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/f3c28669a243622fde9ee8eb9a23cae6cac7057d...ad952917628648dc630f3f00fab86227a70a8dba)
+
+FFmpeg Skill 3.12.1 retains bounded diagnostics when the open-GOP multi-range
+test fails. The actual test continues to compare 150 decoded frames, their
+40 ms spacing and content around both joins. Numera's Rust mixed export uses
+bounded subprocess diagnostics and verifies decoded timestamps and samples
+before publishing. The selective open-GOP stream-copy workflow remains open.
+[FFmpeg Skill comparison](https://github.com/kajisho5/ffmpeg-skill/compare/514c354...fe577168f39dd8effdf8c95b91ce16986a511f37)

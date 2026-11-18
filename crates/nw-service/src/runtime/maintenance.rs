@@ -24,7 +24,8 @@ impl Service {
     }
     pub(super) fn command_admission(&self, id: &str) -> Result<Admission<'_>> {
         if (id.starts_with("maintenance.promotion.")
-            || id.starts_with("maintenance.initialization."))
+            || id.starts_with("maintenance.initialization.")
+            || id.starts_with("maintenance.media_v2."))
             && !id.ends_with(".inspect")
             || [
                 "maintenance.plan",
@@ -81,8 +82,13 @@ impl Service {
                     value(&self.store.inspect_media_initialization(&input.id)?)?
                 }
                 "maintenance.promotion.restore.inspect"
-                | "maintenance.initialization.restore.inspect" => {
-                    let mut record = value(&self.store.inspect_media_restoration(&input.id)?)?;
+                | "maintenance.initialization.restore.inspect"
+                | "maintenance.media_v2.restore.inspect" => {
+                    let retained = self.store.inspect_media_restoration(&input.id)?;
+                    if (retained.schema_version == 2) != (request.command.id == "maintenance.media_v2.restore.inspect") {
+                        return Err(DomainError::object_not_found());
+                    }
+                    let mut record = value(&retained)?;
                     record["status"] = json!(self.store.media_restoration_status(&input.id)?);
                     record
                 }
@@ -106,6 +112,20 @@ impl Service {
             .map_err(|_| lock_error())?
             .clear_project_reads();
         match request.command.id.as_str() {
+            "maintenance.media_v2.plan" => {
+                let input: nw_domain::maintenance::media_v2::EnablementReviewV2 = commands::parse(request.params.clone())?;
+                let plan = self.store.review_media_v2(&self.root_lease, input.kind, &build, || self.clock.now(), cancel)?;
+                Ok(Response::success(&request.request_id, plan))
+            }
+            "maintenance.media_v2.accept" => self.store.accept_media_v2(&self.root_lease, &context.principal, request, &build, || self.clock.now(), cancel),
+            "maintenance.media_v2.restore.plan" => {
+                let input: IdInput = commands::parse(request.params.clone())?;
+                let plan = self.store.prepare_mixed_restoration(&self.root_lease, &input.id, &build, || self.clock.now())?;
+                Ok(Response::success(&request.request_id, plan))
+            }
+            "maintenance.media_v2.restore.accept" => self.store.accept_mixed_restoration(
+                &self.root_lease, &context.principal, request, &build, || self.clock.now(),
+            ),
             "maintenance.plan" => {
                 let _: Empty = commands::parse(request.params.clone())?;
                 let plan =

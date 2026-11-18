@@ -59,11 +59,14 @@ pub(crate) fn record_quota(
         ("generation-promotion/", 16),
         ("generation-initialization/", 16),
         ("generation-restoration/", 16),
+        ("generation-media-v2/", 16),
         ("restoration-control/", 16),
         ("job/", 4096),
         ("job-payload/", 4096),
         ("job-queue/", 128),
         ("job-auth/", 4096),
+        ("job-auth-v2/", 4096),
+        ("job-input-v2/", 4096),
         ("publication/", 4096),
         ("profile/", 128),
         ("plan/", 512),
@@ -728,11 +731,10 @@ impl Store {
         Ok(job)
     }
     pub fn execution_allowed(&self, id: &str) -> Result<()> {
-        if matches!(
-            self.inspect_execution(id)?,
-            nw_domain::media_execution::StoredJob::MediaV1(_)
-        ) {
-            return self.media_execution_allowed(id);
+        match self.inspect_execution(id)? {
+            nw_domain::media_execution::StoredJob::MediaV1(_) => return self.media_execution_allowed(id),
+            nw_domain::media_execution::StoredJob::MediaV2(_) => return self.allow_mixed_execution(id).map(|_| ()),
+            nw_domain::media_execution::StoredJob::Legacy(_) => {}
         }
         let authorization: ExecutionAuthorization =
             self.get(&format!("job-auth/{id}"))?.ok_or_else(|| {

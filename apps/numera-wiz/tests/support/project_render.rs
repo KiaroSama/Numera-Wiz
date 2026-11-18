@@ -97,7 +97,7 @@ pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fi
     assert_eq!(project["ok"], true, "{project}");
     let project_id = project["result"]["project_id"].as_str().unwrap();
     let sequence = edit(cli, scope, project_id, "0", "timeline-preview-sequence", "sequences.create", json!({
-        "name":"Three tracks", "settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},
+        "name":"Three tracks", "settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
         "tracks":[{"kind":"video","name":"Background"},{"kind":"audio","name":"Audio"},{"kind":"video","name":"Picture"}]
     })).await;
     let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap();
@@ -192,6 +192,126 @@ pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fi
     assert_eq!(response["structuredContent"]["ok"], true, "{response}");
     assert_eq!(&response["structuredContent"]["result"], frame);
     sdk.cancel().await.unwrap();
+    accepted_mixed_timeline(cli, project_id, sequence_id).await;
+}
+
+async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {
+    let (reviewed, code) = cli.human(&["maintenance", "media-v2", "promotion-plan"]).await;
+    assert_eq!(code, 0, "{}", reviewed["error"]);
+    let reviewed = &reviewed["result"];
+    assert_eq!(reviewed["kind"], "generation_promotion_v2");
+    assert!(reviewed["source"]["guard_revision"].as_str().unwrap().parse::<u64>().unwrap() > 0);
+    let review_file = cli.data.join("mixed-enablement-review.json");
+    std::fs::write(&review_file, serde_json::to_vec(reviewed).unwrap()).unwrap();
+    let accept = [
+        "maintenance", "media-v2", "accept", "--plan-file", review_file.to_str().unwrap(),
+        "--replay-scope", scope, "--idempotency-key", key, "--request-id", key,
+    ];
+    let (accepted, code) = cli.human(&accept).await;
+    assert_eq!(code, 0, "{}", accepted["error"]);
+    assert_eq!(accepted["result"]["enablement_id"], reviewed["id"]);
+    assert!(accepted["receipt_id"].is_string());
+    let (replayed, code) = cli.human(&accept).await;
+    assert_eq!(code, 0, "{}", replayed["error"]);
+    assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
+    reviewed["id"].as_str().unwrap().to_owned()
+}
+
+async fn restore_unadopted_mixed(cli: &Cli, scope: &str, enablement: &str) {
+    let (reviewed, code) = cli.human(&["maintenance", "media-v2", "restore", "plan", enablement]).await;
+    assert_eq!(code, 0, "{}", reviewed["error"]);
+    let review = &reviewed["result"];
+    assert_eq!(review["kind"], "generation_promotion_restoration_v2");
+    let file = cli.data.join("mixed-restoration-review.json");
+    std::fs::write(&file, serde_json::to_vec(review).unwrap()).unwrap();
+    let accept = [
+        "maintenance", "media-v2", "restore", "accept", "--plan-file", file.to_str().unwrap(),
+        "--replay-scope", scope, "--idempotency-key", "mixed-restore-owner", "--request-id", "mixed-restore-owner",
+    ];
+    let (accepted, code) = cli.human(&accept).await;
+    assert_eq!(code, 0, "{}", accepted["error"]);
+    assert_eq!(accepted["result"]["restoration_id"], review["id"]);
+    let id = review["id"].as_str().unwrap();
+    let (inspected, code) = cli.human(&["maintenance", "media-v2", "restore", "inspect", id]).await;
+    assert_eq!(code, 0, "{}", inspected["error"]);
+    assert_eq!(inspected["result"]["status"], "armed");
+    assert_eq!(inspected["result"]["plan"], *review);
+    let (replayed, code) = cli.human(&accept).await;
+    assert_eq!(code, 0, "{}", replayed["error"]);
+    assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
+}
+
+async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
+    use nw_domain::media::MediaPlanV2;
+    use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
+
+    let settings = [ "timeline", "render", "--mixed", "--project", project,
+        "--revision", "4", "--sequence", sequence, "--end", "2" ];
+    let (before, code) = cli.human(&settings).await;
+    assert_ne!(code, 0);
+    assert_eq!(before["error"]["code"], "STORE_VERSION_UNSUPPORTED");
+
+    let (issued, code) = cli.human(&["access", "replay-scope", "create", "--json"]).await;
+    assert_eq!(code, 0);
+    let scope = issued["result"]["replay_scope"].as_str().unwrap();
+    let first = enable_mixed(cli, scope, "mixed-enablement-owner").await;
+    restore_unadopted_mixed(cli, scope, &first).await;
+    let (restored, code) = cli.human(&settings).await;
+    assert_ne!(code, 0);
+    assert_eq!(restored["error"]["code"], "STORE_VERSION_UNSUPPORTED");
+    let second = enable_mixed(cli, scope, "mixed-enablement-successor").await;
+    assert_ne!(second, first);
+
+    let (review, code) = cli.human(&settings).await;
+    assert_eq!(code, 0, "{}", review["error"]);
+    let mixed: MediaPlanV2 = serde_json::from_value(review["result"].clone()).unwrap();
+    mixed.validate_hash().unwrap();
+    assert_eq!(mixed.payload.sources.len(), 2);
+    let mut bridge = cli.command();
+    bridge.args(["bridge", "--native-owner"]);
+    let sdk = ().serve(TokioChildProcess::new(bridge).unwrap()).await.unwrap();
+    let response = sdk.call_tool(CallToolRequestParams::new("timeline.render_mixed").with_arguments(
+        rmcp::object!({"params":{"contract_kind":"media_v2","sequence_id":sequence,"revision":"4",
+            "range":{"start":{"num":"0","den":"1"},"end":{"num":"2","den":"1"}},
+            "output":{"container":"matroska","video_codec":"ffv1","audio_codec":"pcm_s16le","destination":{"kind":"download"}}},
+            "context":{"project":{"id":project}}}),
+    )).await.unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    let body = &response["structuredContent"];
+    assert_eq!(body["ok"], true, "{}", body["error"]);
+    assert_eq!(body["result"]["hash"], mixed.hash);
+    assert_eq!(body["result"]["payload"], review["result"]["payload"]);
+    sdk.cancel().await.unwrap();
+
+    let raw = format!("\n{}\n", serde_json::to_string_pretty(&mixed).unwrap());
+    let review_file = cli.data.join("mixed-render-review.json");
+    std::fs::write(&review_file, &raw).unwrap();
+    let submit = [
+        "jobs", "submit-media", "--plan-file", review_file.to_str().unwrap(),
+        "--replay-scope", scope, "--idempotency-key", "mixed-owner-job", "--request-id", "mixed-owner-job",
+    ];
+    let (accepted, code) = cli.human(&submit).await;
+    assert_eq!(code, 0, "{}", accepted["error"]);
+    let id = accepted["result"]["job_id"].as_str().unwrap();
+    let job = cli.completed(id).await;
+    assert_eq!(job["state"], "succeeded", "{}", job["error"]);
+    assert_eq!(job["payload_kind"], "media_job_v2");
+    assert_eq!(job["payload_sha256"], nw_domain::projects::hash(raw.as_bytes()));
+    let artifact = format!("media-{id}-output");
+    let manifest = cli.query("artifacts.manifest", json!({"artifact_id":artifact})).await;
+    let actual = nw_platform::files::identity(
+        &cli.data.join("exports").join(format!("media-{id}.mkv")),
+        &tokio_util::sync::CancellationToken::new(),
+    ).unwrap();
+    assert_eq!(manifest["sha256"], actual.sha256);
+    assert_eq!(manifest["encoded_byte_count"], actual.bytes);
+    let (replayed, code) = cli.human(&submit).await;
+    assert_eq!(code, 0, "{}", replayed["error"]);
+    assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
+    assert_eq!(replayed["result"]["job_id"], id);
+    let (refused, code) = cli.human(&["maintenance", "media-v2", "restore", "plan", &second]).await;
+    assert_ne!(code, 0);
+    assert_eq!(refused["error"]["code"], "RESTORATION_REFUSED");
 }
 
 pub async fn review(cli: &Cli, scope: &str) {

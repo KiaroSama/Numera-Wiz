@@ -50,6 +50,13 @@ fn operation_path(lease: &RootLease, id: &str) -> Result<PathBuf> {
     nw_domain::projects::validate_id(id)?;
     Ok(lease.state().join("generation-workspaces").join(id))
 }
+
+fn authority_name(kind: RestorationKind) -> &'static str {
+    match kind.schema_version() {
+        1 => "restoration-authority.json",
+        _ => "mixed-restoration-authority.json",
+    }
+}
 fn verify_copy(path: &Path) -> Result<versions::GenerationFacts> {
     let mut timing = LifecycleTiming::start("Read immutable archive proof and physical hash");
     let manifest: copies::CopyManifest =
@@ -113,6 +120,28 @@ impl Store {
         build: &str,
         clock: impl Fn() -> Result<u64>,
     ) -> Result<GenerationRestorationPlan> {
+        let operation = self.enablement(enablement_id, initialization)?;
+        self.prepare_restoration(lease, operation, build, clock)
+    }
+
+    pub fn prepare_mixed_restoration(
+        &self,
+        lease: &RootLease,
+        enablement_id: &str,
+        build: &str,
+        clock: impl Fn() -> Result<u64>,
+    ) -> Result<GenerationRestorationPlan> {
+        let operation = self.mixed_enablement(enablement_id)?;
+        self.prepare_restoration(lease, operation, build, clock)
+    }
+
+    fn prepare_restoration(
+        &self,
+        lease: &RootLease,
+        operation: Enablement,
+        build: &str,
+        clock: impl Fn() -> Result<u64>,
+    ) -> Result<GenerationRestorationPlan> {
         let mut timing = LifecycleTiming::start("Validate restoration lineage and workspace");
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
             return Err(DomainError::new(
@@ -120,8 +149,8 @@ impl Store {
                 "Accepted maintenance must finish before restoration review",
             ));
         }
-        let operation = self.enablement(enablement_id, initialization)?;
-        let restoration_id = copies::restoration_slot(lease, enablement_id)?;
+        let restoration_id = copies::restoration_slot(lease, &operation.id)?;
+        let kind = operation.restoration_kind();
         if operation.phase != EnablementPhase::Succeeded {
             return Err(refused("Restoration requires completed genuine enablement"));
         }
@@ -132,10 +161,12 @@ impl Store {
             || history[prefix].0.id != operation.activation_id
             || prefix_digest(&history[..prefix]) != operation.source_prefix_sha256
             || history[..prefix].iter().any(|(entry, _)| {
-                entry
-                    .required_capabilities
-                    .iter()
-                    .any(|cap| !generations::CURRENT_CAPABILITIES.contains(&cap.as_str()))
+                let capabilities = &entry.required_capabilities;
+                let legacy = capabilities.iter().all(|cap| generations::CURRENT_CAPABILITIES.contains(&cap.as_str()));
+                let media_v1 = operation.mixed_media && nw_domain::maintenance::media_v2::exact_capabilities(
+                    capabilities, nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES,
+                );
+                !(legacy || media_v1)
             })
         {
             return Err(refused(
@@ -189,12 +220,8 @@ impl Store {
             )?;
             let now = clock()?;
             let mut plan = GenerationRestorationPlan {
-                schema_version: 1,
-                kind: if initialization {
-                    RestorationKind::InitializationRestorationV1
-                } else {
-                    RestorationKind::GenerationPromotionRestorationV1
-                },
+                schema_version: kind.schema_version(),
+                kind,
                 id: restoration_id,
                 hash: String::new(),
                 enablement_id: operation.id,
@@ -247,14 +274,54 @@ impl Store {
         if request.command.id != expected {
             return Err(refused("Restoration command identity differs"));
         }
+        let kind = if initialization {
+            RestorationKind::InitializationRestorationV1
+        } else {
+            RestorationKind::GenerationPromotionRestorationV1
+        };
+        self.accept_restoration(lease, principal, request, build, &clock, |plan| {
+            if plan.kind != kind {
+                return Err(refused("Restoration review kind differs"));
+            }
+            self.enablement(&plan.enablement_id, initialization)
+        })
+    }
+
+    pub fn accept_mixed_restoration(
+        &self,
+        lease: &RootLease,
+        principal: &str,
+        request: &Request,
+        build: &str,
+        clock: impl Fn() -> Result<u64>,
+    ) -> Result<Response> {
+        if request.command.id != "maintenance.media_v2.restore.accept" {
+            return Err(refused("Mixed restoration command identity differs"));
+        }
+        self.accept_restoration(lease, principal, request, build, &clock, |plan| {
+            if plan.schema_version != 2 {
+                return Err(refused("Mixed restoration review version differs"));
+            }
+            self.mixed_enablement(&plan.enablement_id)
+        })
+    }
+
+    fn accept_restoration(
+        &self,
+        lease: &RootLease,
+        principal: &str,
+        request: &Request,
+        build: &str,
+        clock: impl Fn() -> Result<u64>,
+        load: impl FnOnce(&GenerationRestorationPlan) -> Result<Enablement>,
+    ) -> Result<Response> {
         if let Some(replay) = self.replay_with_clock(principal, request, &clock)? {
             return Ok(replay);
         }
         let input: RestorationSubmitInput = nw_domain::commands::parse(request.params.clone())?;
         let plan = input.plan;
         plan.validate_hash()?;
-        if matches!(plan.kind, RestorationKind::InitializationRestorationV1) != initialization
-            || plan.application_build != build
+        if plan.application_build != build
             || plan.root_id != self.root_id()
             || !nw_domain::media_execution::review_current(
                 &plan.created_at,
@@ -267,13 +334,7 @@ impl Store {
             ));
         }
         let mut timing = LifecycleTiming::start("Revalidate restoration review");
-        let mut current = self.prepare_media_restoration(
-            lease,
-            &plan.enablement_id,
-            initialization,
-            build,
-            &clock,
-        )?;
+        let mut current = self.prepare_restoration(lease, load(&plan)?, build, &clock)?;
         // Physical allocator length may change on reopen; full raw snapshots and actual
         // current copy-space admission above remain authoritative freshness evidence.
         current.source_bytes = plan.source_bytes.clone();
@@ -292,7 +353,7 @@ impl Store {
                 return Err(refused("Restoration source changed or expired before acceptance"));
             }
             let record = GenerationRestorationRecord {
-                schema_version: 1, id: plan.id.clone(), creator: principal.into(),
+                schema_version: plan.schema_version, id: plan.id.clone(), creator: principal.into(),
                 receipt_key: receipt_key.clone(), request_digest: request.structural_digest(),
                 plan: plan.clone(), accepted_at: now.to_string(),
             };
@@ -315,7 +376,7 @@ impl Store {
             .get(&format!("generation-restoration/{id}"))?
             .ok_or_else(DomainError::object_not_found)?;
         record.plan.validate_hash()?;
-        if record.schema_version != 1
+        if record.schema_version != record.plan.schema_version
             || record.id != id
             || record.plan.id != id
             || record.plan.root_id != self.root_id()
@@ -360,13 +421,17 @@ impl Store {
         };
         let mut timing = LifecycleTiming::start("Read accepted restoration and close target");
         let record = self.inspect_media_restoration(&id)?;
-        let operation = self.enablement(
-            &record.plan.enablement_id,
-            matches!(
-                record.plan.kind,
-                RestorationKind::InitializationRestorationV1
-            ),
-        )?;
+        let operation = if record.plan.schema_version == 2 {
+            self.mixed_enablement(&record.plan.enablement_id)?
+        } else {
+            self.enablement(
+                &record.plan.enablement_id,
+                record.plan.kind == RestorationKind::InitializationRestorationV1,
+            )?
+        };
+        if operation.restoration_kind() != record.plan.kind {
+            return Err(refused("Restoration journal does not match its enablement"));
+        }
         self.close_generation(lease)?;
         let recovered = (|| {
             timing.advance("Prepare independent restoration authority");
@@ -394,7 +459,8 @@ impl Store {
     ) -> Result<Authority> {
         let mut timing = LifecycleTiming::start("Validate retained restoration workspace");
         let workspace = copies::workspace(lease, &record.id)?;
-        let authority_path = workspace.join("restoration-authority.json");
+        let authority_filename = authority_name(record.plan.kind);
+        let authority_path = workspace.join(authority_filename);
         if authority_path.try_exists().map_err(storage)? {
             let authority: Authority = decode(&security::read_private(&authority_path, 65536)?)?;
             verify_authority(lease, &authority)?;
@@ -528,7 +594,7 @@ impl Store {
             .location
             .clone();
         let authority = Authority {
-            schema_version: 1,
+            schema_version: record.plan.schema_version,
             record: record.clone(),
             operation: operation.clone(),
             source_location,
@@ -538,7 +604,7 @@ impl Store {
             history: archived,
         };
         timing.advance("Publish and verify restoration authority");
-        write_fact(&workspace, "restoration-authority.json", &authority)?;
+        write_fact(&workspace, authority_filename, &authority)?;
         verify_authority(lease, &authority)?;
         Ok(authority)
     }
@@ -717,10 +783,11 @@ pub(crate) fn verify_authority(lease: &RootLease, authority: &Authority) -> Resu
     let record = &authority.record;
     let plan = &record.plan;
     let prefix = plan.prefix_count as usize;
-    if authority.schema_version != 1
-        || record.schema_version != 1
+    if authority.schema_version != plan.schema_version
+        || record.schema_version != plan.schema_version
         || record.id != plan.id
         || authority.operation.id != plan.enablement_id
+        || authority.operation.restoration_kind() != plan.kind
         || authority.operation.root_id != plan.root_id
         || authority.history.len() != plan.history_count as usize
         || prefix == 0
@@ -1072,16 +1139,21 @@ pub(crate) fn repair_owned_suffix(lease: &RootLease) -> Result<()> {
         if count >= 16 {
             return Err(refused("Accepted lineage exceeds16 retained workspaces"));
         }
-        let path = member.path().join("restoration-authority.json");
-        if !path.try_exists().map_err(storage)? {
-            continue;
+        for name in ["restoration-authority.json", "mixed-restoration-authority.json"] {
+            let path = member.path().join(name);
+            if !path.try_exists().map_err(storage)? {
+                continue;
+            }
+            let authority: Authority = decode(&security::read_private(&path, 65536)?)?;
+            if member.file_name().to_str() != Some(authority.record.id.as_str())
+                || authority_name(authority.record.plan.kind) != name
+                || nodes.iter().any(|node: &Authority| node.record.id == authority.record.id)
+            {
+                return Err(refused("Accepted restoration workspace identity differs"));
+            }
+            verify_authority(lease, &authority)?;
+            nodes.push(authority);
         }
-        let authority: Authority = decode(&security::read_private(&path, 65536)?)?;
-        if member.file_name().to_str() != Some(authority.record.id.as_str()) {
-            return Err(refused("Accepted restoration workspace identity differs"));
-        }
-        verify_authority(lease, &authority)?;
-        nodes.push(authority);
     }
     if nodes.is_empty() {
         return Ok(());
@@ -1184,6 +1256,11 @@ fn accepted_successor(lease: &RootLease, authority: &Authority) -> Result<bool> 
             "meta/pending-initialization",
             "initialization_id",
         ),
+        (
+            "generation-media-v2",
+            crate::media_generations_v2::PENDING_MIXED_ENABLEMENT,
+            "enablement_id",
+        ),
     ] {
         let pending_id = table
             .get(pending)
@@ -1191,7 +1268,9 @@ fn accepted_successor(lease: &RootLease, authority: &Authority) -> Result<bool> 
             .map(|row| String::from_utf8(row.value().to_vec()).map_err(storage))
             .transpose()?;
         let candidate = pending_id.as_deref().unwrap_or(&selected.operation_id);
-        if candidate == authority.operation.id {
+        if candidate == authority.operation.id
+            || (pending_id.is_none() && candidate == authority.operation.source_operation_id)
+        {
             continue;
         }
         let Some(row) = table
@@ -1214,7 +1293,7 @@ fn accepted_successor(lease: &RootLease, authority: &Authority) -> Result<bool> 
                     record.receipt_key,
                     record.request_digest,
                 )
-            } else {
+            } else if prefix == "generation-initialization" {
                 let record: MediaInitializationRecord = decode(row.value())?;
                 record.plan.validate_hash()?;
                 if record.schema_version != 1 || record.id != record.plan.id {
@@ -1226,6 +1305,17 @@ fn accepted_successor(lease: &RootLease, authority: &Authority) -> Result<bool> 
                     record.plan.root_id,
                     record.receipt_key,
                     record.request_digest,
+                )
+            } else {
+                let record: crate::media_generations_v2::RecordV2 = decode(row.value())?;
+                record.validate(candidate, &facts.root_id)?;
+                let operation = record.operation();
+                (
+                    operation.id,
+                    operation.predecessor_restoration,
+                    operation.root_id,
+                    operation.receipt_key,
+                    operation.request_digest,
                 )
             };
         if id != candidate
@@ -1301,13 +1391,18 @@ fn verify_enablement_journal(
         .get(key.as_str())
         .map_err(storage)?
         .ok_or_else(|| refused("Accepted enablement journal missing"))?;
-    let actual = if expected.initialization {
+    let actual = if expected.mixed_media {
+        let record: crate::media_generations_v2::RecordV2 = decode(raw.value())?;
+        record.validate(&expected.id, &expected.root_id)?;
+        record.operation()
+    } else if expected.initialization {
         let record: MediaInitializationRecord = decode(raw.value())?;
         record.plan.validate_hash()?;
         let plan = record.plan;
         Enablement {
             id: record.id,
             initialization: true,
+            mixed_media: false,
             root_id: plan.root_id,
             receipt_key: record.receipt_key,
             request_digest: record.request_digest,
@@ -1333,6 +1428,7 @@ fn verify_enablement_journal(
         Enablement {
             id: record.id,
             initialization: false,
+            mixed_media: false,
             root_id: plan.root_id,
             receipt_key: record.receipt_key,
             request_digest: record.request_digest,
@@ -1364,11 +1460,7 @@ fn verify_enablement_journal(
         &actual.receipt_key,
         &actual.request_digest,
         &actual.id,
-        if actual.initialization {
-            "initialization_id"
-        } else {
-            "promotion_id"
-        },
+        actual.receipt_field(),
     )?;
     Ok(())
 }

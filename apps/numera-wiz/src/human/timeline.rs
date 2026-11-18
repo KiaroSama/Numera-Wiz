@@ -15,7 +15,7 @@ pub enum Timeline {
         #[arg(long)]
         at: String,
     },
-    /// Review a finite lossless FFV1/PCM export; execution remains in development.
+    /// Review a lossless FFV1/PCM export.
     Render {
         #[arg(long)]
         project: String,
@@ -29,6 +29,9 @@ pub enum Timeline {
         /// Exclusive endpoint, as numerator/denominator.
         #[arg(long)]
         end: String,
+        /// Include registered video and overlapping audio from a mixed-media generation.
+        #[arg(long)]
+        mixed: bool,
     },
 }
 
@@ -61,6 +64,7 @@ impl Timeline {
                 sequence,
                 start,
                 end,
+                mixed,
             } => {
                 model::validate_id(&project)?;
                 model::validate_id(&sequence)?;
@@ -70,11 +74,18 @@ impl Timeline {
                     end: super::projects::rational(&end)?,
                 };
                 range.validate()?;
-                let params = json!({"sequence_id":sequence,"revision":revision,"range":range,
+                let mut params = json!({"sequence_id":sequence,"revision":revision,"range":range,
                     "output":{"container":"matroska","video_codec":"ffv1","audio_codec":"pcm_s16le",
-                        "audio":"silence","destination":{"kind":"download"}}});
-                let input: nw_domain::media::RenderInput = commands::parse(params)?;
-                let mut request = query("timeline.render", serde_json::to_value(input)?);
+                        "destination":{"kind":"download"}}});
+                let mut request = if mixed {
+                    params["contract_kind"] = json!("media_v2");
+                    let input: nw_domain::media::RenderContractV2 = commands::parse(params)?;
+                    query("timeline.render_mixed", serde_json::to_value(input)?)
+                } else {
+                    params["output"]["audio"] = json!("silence");
+                    let input: nw_domain::media::RenderInput = commands::parse(params)?;
+                    query("timeline.render", serde_json::to_value(input)?)
+                };
                 request.project = Some(commands::ProjectRef {
                     id: project,
                     expected_revision: None,
