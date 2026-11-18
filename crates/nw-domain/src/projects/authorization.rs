@@ -87,6 +87,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         "projects.create" | "projects.list" => None,
         "projects.inspect"
         | "sequences.inspect"
+        | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
         | "timeline.render_mixed" => Some(ProjectAction::Read),
@@ -108,6 +109,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     let timeline_query = matches!(
         command,
         "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed"
+            | "markers.wave_projection"
     );
     if write || timeline_query {
         request_gates.push(RequestGate::ExpectedRevision);
@@ -124,6 +126,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     if matches!(
         command,
         "clips.place" | "timeline.preview_frame" | "timeline.render_mixed"
+            | "markers.wave_projection"
     ) {
         request_gates.extend([
             RequestGate::SourceObjectRights,

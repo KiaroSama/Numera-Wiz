@@ -535,6 +535,7 @@ mod tests {
             if matches!(
                 id,
                 "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed"
+                    | "markers.wave_projection"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["schema_version"], 1);
@@ -548,7 +549,10 @@ mod tests {
                     "expected_revision",
                     "affected_scope",
                 ];
-                if matches!(id, "timeline.preview_frame" | "timeline.render_mixed") {
+                if matches!(
+                    id,
+                    "timeline.preview_frame" | "timeline.render_mixed" | "markers.wave_projection"
+                ) {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }
                 assert_eq!(requirement["request_gates"], serde_json::json!(gates));

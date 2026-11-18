@@ -83,7 +83,11 @@ fn inspect(schema: &mut Value, sequence: bool) {
 /// Refine generated schemas only for the implemented project command family.
 pub fn refine(command: &str, mut schema: Value) -> Value {
     if !super::super::authorization::PROJECT_TARGET_COMMANDS.contains(&command)
-        && !matches!(command, "projects.create" | "projects.list")
+        && !matches!(
+            command,
+            "projects.create" | "projects.list" | "markers.place" | "markers.remove"
+                | "markers.wave_projection"
+        )
     {
         return schema;
     }
@@ -103,6 +107,8 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
         "projects.list" => page(&mut schema, false),
         "projects.inspect" => inspect(&mut schema, false),
         "sequences.inspect" => inspect(&mut schema, true),
+        "markers.place" => label(field(&mut schema, "name")),
+        "markers.remove" | "markers.wave_projection" => {}
         "sequences.create" => {
             label(field(&mut schema, "name"));
             bounded_array(&mut schema, "tracks", 1, 64);
