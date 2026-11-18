@@ -525,11 +525,17 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     )
     .await?;
     let issued = owner
-        .command(&query("access.replay_scope.create", json!({})), journey.evidence)
+        .command(
+            &query("access.replay_scope.create", json!({})),
+            journey.evidence,
+        )
         .await?;
     let scope = text(&issued["result"], "replay_scope")?;
     let review = owner
-        .command(&query("maintenance.promotion.plan", json!({})), journey.evidence)
+        .command(
+            &query("maintenance.promotion.plan", json!({})),
+            journey.evidence,
+        )
         .await?;
     let successor = durable(
         &scope,
@@ -541,7 +547,10 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     let successor = owner.command(&successor, journey.evidence).await?;
     let mixed = owner
         .command(
-            &query("maintenance.media_v2.plan", json!({"kind":"media_initialization_v2"})),
+            &query(
+                "maintenance.media_v2.plan",
+                json!({"kind":"media_initialization_v2"}),
+            ),
             journey.evidence,
         )
         .await?;

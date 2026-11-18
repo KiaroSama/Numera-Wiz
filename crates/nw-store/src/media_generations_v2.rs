@@ -517,7 +517,9 @@ impl Store {
                 || barrier.source_operation_id != operation.source_operation_id
                 || barrier.source_activation_id != operation.source_activation_id
             {
-                return Err(unsupported("Origin restoration barrier differs from its predecessor"));
+                return Err(unsupported(
+                    "Origin restoration barrier differs from its predecessor",
+                ));
             }
         }
         let source_sequence = usize::try_from(operation.source_sequence).map_err(storage)?;

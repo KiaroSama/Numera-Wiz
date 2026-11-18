@@ -240,7 +240,7 @@ impl Service {
             let held = inputs
                 .originals
                 .get(&stream.asset_id)
-                .ok_or_else(|| DomainError::object_not_found())?;
+                .ok_or_else(DomainError::object_not_found)?;
             let path = Path::new(&held.asset.identity.path);
             let directory = path.parent().ok_or_else(|| {
                 DomainError::new("PATH_DENIED", "Original source parent is missing")
