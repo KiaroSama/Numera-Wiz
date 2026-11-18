@@ -11,6 +11,7 @@ impl Service {
         &self,
         command: &str,
         params: Value,
+        owner: bool,
         cancel: CancellationToken,
     ) -> Result<Value> {
         let runtime = tokio::runtime::Handle::current();
@@ -23,19 +24,19 @@ impl Service {
             }
             "capabilities.refresh" => {
                 let input: RefreshInput = commands::parse(params)?;
-                if input.devices {
+                if input.devices && !owner {
                     return Err(DomainError::new(
-                        "CAPABILITY_UNAVAILABLE",
-                        "This profile does not admit a device probe",
+                        "PERMISSION_DENIED",
+                        "An explicit NVENC device probe requires owner authority",
                     ));
                 }
-                if !input.components {
+                if !input.components && !input.devices {
                     return Err(DomainError::new(
                         "VALIDATION_ERROR",
                         "Select at least one capability source to refresh",
                     ));
                 }
-                value(&runtime.block_on(self.engine()?.refresh_capabilities(input.force, cancel))?)
+                value(&runtime.block_on(self.engine()?.refresh_capabilities(input, cancel))?)
             }
             "capabilities.clear" => {
                 let ClearInput {

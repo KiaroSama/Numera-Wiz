@@ -61,6 +61,13 @@ pub struct AdvertisedComponents {
     pub hardware_accelerators: Vec<String>,
 }
 
+/// Fresh observations of the fixed NVENC encode and software decode routes.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NvencObservations {
+    pub h264_nvenc: Observation,
+    pub hevc_nvenc: Observation,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CapabilityReport {
     #[schemars(extend("pattern" = "^[0-9a-f]{64}$"))]
@@ -70,6 +77,7 @@ pub struct CapabilityReport {
     pub advertised: Option<AdvertisedComponents>,
     pub cpu_round_trip: Observation,
     pub hardware: Observation,
+    pub nvenc: Option<NvencObservations>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

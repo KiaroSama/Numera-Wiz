@@ -51,6 +51,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media probe PATH` | Probe an authorized source. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
+| `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
 | `media capabilities clear --fingerprint SHA` | Clear the matching component report from owner memory. |
 | `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
 | `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |
@@ -118,9 +119,13 @@ An exercised CPU round trip means one generated frame was encoded to FFV1 in
 Matroska, decoded and compared with the expected samples. A failed check is
 returned without caching its result.
 
-The CPU profile reports hardware as `unknown`. Device refresh requests require
-an admitted device profile. Clear accepts the exact fingerprint from a report
-and affects only that in-memory entry. Restarting the owner resets the cache.
+Ordinary inspection and refresh report hardware as `unknown`. An explicit
+`--devices` refresh tries each advertised NVENC encoder using one generated
+frame and compares the samples returned by software decode. Results distinguish
+an absent encoder, a failed route and a verified round trip. These two results
+cover encoding on the default device and are measured again on every request.
+Clear accepts the exact fingerprint from a report and affects only that
+in-memory component entry. Restarting the owner resets the cache.
 
 ## Canonical operations
 

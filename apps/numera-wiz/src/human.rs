@@ -113,6 +113,7 @@ pub enum Capabilities {
     Refresh {
         #[arg(long)]
         force: bool,
+        /// Also run fresh probes of the default NVIDIA device with owner authority.
         #[arg(long)]
         devices: bool,
     },

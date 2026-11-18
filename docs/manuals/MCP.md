@@ -93,8 +93,12 @@ accepts `{"namespace":"components","fingerprint":"<reported SHA-256>"}`.
 All three commands use the current owner process and omit durable replay fields.
 
 Refresh returns the declared codecs, formats and filters separately from the
-verified CPU FFV1 round trip. Hardware remains `unknown` in the CPU profile.
-Clear removes only the matching in-memory report.
+verified CPU FFV1 round trip. In an explicit `bridge --native-owner` session,
+`{"params":{"devices":true,"components":false}}` returns fresh H.264 and HEVC
+NVENC results for the default device.
+Granting `capabilities.refresh` to an agent profile permits component refresh.
+The ordinary report keeps hardware `unknown`. Clear removes the matching
+in-memory component report.
 
 ## Registered selection reports
 

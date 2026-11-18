@@ -1379,7 +1379,12 @@ impl Service {
                 return Ok(response);
             }
             "capabilities.inspect" | "capabilities.refresh" | "capabilities.clear" => {
-                self.component_capabilities(&request.command.id, params, cancellation.clone())?
+                self.component_capabilities(
+                    &request.command.id,
+                    params,
+                    policy.is_none(),
+                    cancellation.clone(),
+                )?
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;

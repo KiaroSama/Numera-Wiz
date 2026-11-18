@@ -112,6 +112,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let capabilities = &observed["result"];
     assert_eq!(capabilities["cpu_round_trip"], "exercised");
     assert_eq!(capabilities["hardware"], "unknown");
+    assert!(capabilities["nvenc"].is_null());
     assert!(
         capabilities["advertised"]["encoders"]
             .as_array()
@@ -131,6 +132,42 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .contains(&json!("s16"))
     );
     let fingerprint = capabilities["fingerprint"].as_str().unwrap();
+    let devices = cli
+        .query(
+            "capabilities.refresh",
+            json!({"devices":true,"components":false}),
+        )
+        .await;
+    assert_eq!(devices["fingerprint"], fingerprint);
+    assert_eq!(devices["cpu_round_trip"], "exercised");
+    assert_eq!(devices["hardware"], "unavailable");
+    assert_eq!(
+        devices["nvenc"],
+        json!({"h264_nvenc":"unavailable","hevc_nvenc":"unavailable"})
+    );
+    let mut owner_bridge = cli.command();
+    owner_bridge.args(["bridge", "--native-owner"]);
+    let owner_bridge = ()
+        .serve(TokioChildProcess::new(owner_bridge).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "capabilities.refresh",
+            json!({"devices":true,"components":false}),
+            json!({})
+        ),
+        devices
+    );
+    owner_bridge.cancel().await.unwrap();
+    let no_source = cli
+        .raw(&Request::query(
+            "capabilities.refresh",
+            json!({"components":false}),
+        ))
+        .await;
+    assert_eq!(no_source["error"]["code"], "VALIDATION_ERROR");
     let other = "0".repeat(64);
     let (unrelated, exit) = cli
         .human(&["media", "capabilities", "clear", "--fingerprint", &other])
@@ -752,6 +789,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(
         &call!(stdio, "capabilities.refresh", json!({}), json!({})),
         capabilities
+    );
+    let device_denied = stdio
+        .call_tool(
+            CallToolRequestParams::new("capabilities.refresh")
+                .with_arguments(rmcp::object!({"params":{"devices":true}})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(device_denied).unwrap()["structuredContent"]["error"]["code"],
+        "PERMISSION_DENIED"
     );
     let observed = call!(
         stdio,

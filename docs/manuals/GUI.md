@@ -67,6 +67,9 @@ destination is preserved; it is not overwritten by a retry.
 Open **Engine capabilities** in the Stream Cleanup workspace. **Inspect** shows
 the current component fingerprint and cached result. **Refresh** reads the
 declared FFmpeg components and checks a software FFV1 encode/decode round trip.
+**Probe NVENC** requires an owner connection and checks H.264 and HEVC encoding
+on the default NVIDIA device using a generated frame. The current view shows
+the outcomes until the next capability request.
 **Clear cache** removes the selected fingerprint from the owner's memory.
 
 ## Run and inspect

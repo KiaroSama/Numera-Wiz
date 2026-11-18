@@ -1,8 +1,11 @@
-//! Inspect component declarations and verify a fixed software encode/decode path.
+//! Inspect component declarations and exercise fixed encode/decode paths.
 use crate::{Engine, blocking, media};
 use nw_domain::{
     DomainError, Result,
-    capabilities::{AdvertisedComponents, CapabilityReport, ClearResult, Observation},
+    capabilities::{
+        AdvertisedComponents, CapabilityReport, ClearResult, NvencObservations, Observation,
+        RefreshInput,
+    },
     media::ComponentIdentity,
     records::FileIdentity,
 };
@@ -13,6 +16,23 @@ use std::{
     time::Duration,
 };
 use tokio_util::sync::CancellationToken;
+
+#[derive(Clone, Copy)]
+enum VideoProbe {
+    Ffv1,
+    H264Nvenc,
+    HevcNvenc,
+}
+
+impl VideoProbe {
+    fn codecs(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Ffv1 => ("ffv1", "ffv1"),
+            Self::H264Nvenc => ("h264_nvenc", "h264"),
+            Self::HevcNvenc => ("hevc_nvenc", "hevc"),
+        }
+    }
+}
 
 impl Engine {
     pub async fn inspect_capabilities(
@@ -30,6 +50,23 @@ impl Engine {
     }
 
     pub async fn refresh_capabilities(
+        &self,
+        input: RefreshInput,
+        cancel: CancellationToken,
+    ) -> Result<CapabilityReport> {
+        let report = if input.components {
+            self.refresh_components(input.force, cancel.clone()).await?
+        } else {
+            self.inspect_capabilities(cancel.clone()).await?
+        };
+        if input.devices {
+            self.refresh_nvenc(report, cancel).await
+        } else {
+            Ok(report)
+        }
+    }
+
+    async fn refresh_components(
         &self,
         force: bool,
         cancel: CancellationToken,
@@ -81,16 +118,7 @@ impl Engine {
             && muxers.contains("matroska")
             && muxers.contains("rawvideo")
         {
-            match self.exercise_software(cancel.clone()).await {
-                Ok(true) => Observation::Exercised,
-                Ok(false) => Observation::Failed,
-                Err(error)
-                    if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") =>
-                {
-                    Observation::Failed
-                }
-                Err(error) => return Err(error),
-            }
+            self.observe_video(VideoProbe::Ffv1, cancel.clone()).await?
         } else {
             Observation::Unavailable
         };
@@ -108,6 +136,58 @@ impl Engine {
         // A transient failure gives the caller evidence without poisoning later refreshes.
         *cache = (report.cpu_round_trip != Observation::Failed).then(|| report.clone());
         Ok(report)
+    }
+
+    async fn refresh_nvenc(
+        &self,
+        mut report: CapabilityReport,
+        cancel: CancellationToken,
+    ) -> Result<CapabilityReport> {
+        let phase = cancel.child_token();
+        let work = self.observe_nvenc(phase.clone());
+        tokio::pin!(work);
+        let nvenc = tokio::select! {
+            result = &mut work => result?,
+            () = tokio::time::sleep(Duration::from_secs(23)) => {
+                phase.cancel();
+                return match work.await {
+                    Err(error) if error.code != "CANCELLED" => Err(error),
+                    _ if cancel.is_cancelled() => Err(DomainError::new("CANCELLED", "NVENC probe cancelled")),
+                    _ => Err(DomainError::new("PROCESS_TIMEOUT", "NVENC probe exceeded its total budget")),
+                };
+            }
+        };
+        let observations = [nvenc.h264_nvenc, nvenc.hevc_nvenc];
+        report.hardware = if observations.contains(&Observation::Exercised) {
+            Observation::Exercised
+        } else if observations.contains(&Observation::Failed) {
+            Observation::Failed
+        } else {
+            Observation::Unavailable
+        };
+        // Device and driver state can change independently of the executable digests.
+        report.nvenc = Some(nvenc);
+        Ok(report)
+    }
+
+    async fn observe_nvenc(&self, cancel: CancellationToken) -> Result<NvencObservations> {
+        media::identities(self, cancel.clone()).await?;
+        let encoders =
+            media::listing(self, "-encoders", media::Listing::Codecs, cancel.clone()).await?;
+        let mut observations = NvencObservations {
+            h264_nvenc: Observation::Unavailable,
+            hevc_nvenc: Observation::Unavailable,
+        };
+        for (probe, result) in [
+            (VideoProbe::H264Nvenc, &mut observations.h264_nvenc),
+            (VideoProbe::HevcNvenc, &mut observations.hevc_nvenc),
+        ] {
+            if encoders.contains(probe.codecs().0) {
+                *result = self.observe_video(probe, cancel.clone()).await?;
+            }
+        }
+        media::identities(self, cancel).await?;
+        Ok(observations)
     }
 
     pub async fn clear_capabilities(
@@ -147,6 +227,7 @@ impl Engine {
             advertised: None,
             cpu_round_trip: Observation::Unknown,
             hardware: Observation::Unknown,
+            nvenc: None,
         }
     }
 
@@ -161,8 +242,30 @@ impl Engine {
         }
     }
 
-    async fn exercise_software(&self, cancel: CancellationToken) -> Result<bool> {
+    async fn observe_video(
+        &self,
+        probe: VideoProbe,
+        cancel: CancellationToken,
+    ) -> Result<Observation> {
+        match self.exercise_video(probe, cancel).await {
+            Ok(true) => Ok(Observation::Exercised),
+            Ok(false) => Ok(Observation::Failed),
+            Err(error) if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") => {
+                Ok(Observation::Failed)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn exercise_video(&self, probe: VideoProbe, cancel: CancellationToken) -> Result<bool> {
         let ffmpeg = Path::new(&self.ffmpeg.path);
+        let (encoder, decoder) = probe.codecs();
+        let (source, luma_bytes, tolerance, encode_limit, decode_deadline) = match probe {
+            VideoProbe::Ffv1 => ("color=black:s=16x16:r=1:d=1", 16 * 16, 0, 32 * 1024, 5),
+            VideoProbe::H264Nvenc | VideoProbe::HevcNvenc => {
+                ("color=black:s=256x256:r=1:d=1", 256 * 256, 2, 512 * 1024, 3)
+            }
+        };
         let encode = [
             "-hide_banner",
             "-nostdin",
@@ -171,13 +274,13 @@ impl Engine {
             "-f",
             "lavfi",
             "-i",
-            "color=black:s=16x16:r=1:d=1",
+            source,
             "-frames:v",
             "1",
             "-pix_fmt",
             "yuv420p",
             "-c:v",
-            "ffv1",
+            encoder,
             "-threads",
             "1",
             "-f",
@@ -190,7 +293,7 @@ impl Engine {
             ffmpeg,
             &encode,
             Duration::from_secs(5),
-            32 * 1024,
+            encode_limit,
             4096,
             cancel.clone(),
         )
@@ -214,6 +317,8 @@ impl Engine {
             "0",
             "-f",
             "matroska",
+            "-c:v",
+            decoder,
             "-i",
             "fd:",
             "-map",
@@ -232,13 +337,20 @@ impl Engine {
         ]
         .map(String::from);
         let ticket = self.process_budget.acquire(&cancel).await?;
-        let decoded =
-            process::run_readonly(ffmpeg, &decode, Duration::from_secs(5), 1024, input, cancel)
-                .await;
+        let chroma_bytes = luma_bytes / 2;
+        let decoded = process::run_readonly(
+            ffmpeg,
+            &decode,
+            Duration::from_secs(decode_deadline),
+            luma_bytes + chroma_bytes,
+            input,
+            cancel,
+        )
+        .await;
         let planes = ticket.finish(decoded)?.stdout;
-        Ok(matches!(planes.split_at_checked(256), Some((luma, chroma))
-            if chroma.len() == 128
-                && luma.iter().all(|sample| *sample == 16)
-                && chroma.iter().all(|sample| *sample == 128)))
+        Ok(matches!(planes.split_at_checked(luma_bytes), Some((luma, chroma))
+            if chroma.len() == chroma_bytes
+                && luma.iter().all(|sample| sample.abs_diff(16) <= tolerance)
+                && chroma.iter().all(|sample| sample.abs_diff(128) <= tolerance)))
     }
 }

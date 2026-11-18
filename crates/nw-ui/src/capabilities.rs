@@ -24,6 +24,14 @@ impl WizApp {
                         ui.ctx(),
                     );
                 }
+                if ui.add_enabled(idle, egui::Button::new("Probe NVENC")).clicked() {
+                    self.query(
+                        "capabilities.refresh",
+                        json!({"components":false,"devices":true}),
+                        Action::Capabilities,
+                        ui.ctx(),
+                    );
+                }
             });
             let Some(report) = &self.capability_report else {
                 return;
@@ -33,6 +41,10 @@ impl WizApp {
                 label(report.cpu_round_trip)
             ));
             ui.label(format!("Hardware: {}", label(report.hardware)));
+            if let Some(nvenc) = &report.nvenc {
+                ui.label(format!("H.264 NVENC: {}", label(nvenc.h264_nvenc)));
+                ui.label(format!("HEVC NVENC: {}", label(nvenc.hevc_nvenc)));
+            }
             ui.label(format!("Component fingerprint: {}", report.fingerprint));
             if let Some(advertised) = &report.advertised {
                 egui::ScrollArea::vertical()

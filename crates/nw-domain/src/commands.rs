@@ -685,7 +685,7 @@ pub fn registry() -> Vec<Descriptor> {
         ),
         row!(
             "capabilities.refresh",
-            "Observe FFmpeg declarations and exercise a software round trip",
+            "Observe FFmpeg declarations, check a software round trip or explicitly probe NVENC as owner",
             Query,
             crate::capabilities::RefreshInput
         ),
