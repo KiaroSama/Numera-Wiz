@@ -4,6 +4,7 @@ pub mod contracts;
 pub mod edit;
 mod json;
 pub mod views;
+pub mod wave_projection;
 use crate::{DomainError, Result, time::Rational};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};

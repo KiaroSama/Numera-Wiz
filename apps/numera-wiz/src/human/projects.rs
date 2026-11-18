@@ -235,6 +235,14 @@ pub enum Markers {
         #[arg(long)]
         marker: String,
     },
+    WaveProjection {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        clip: String,
+        #[arg(long)]
+        revision: String,
+    },
 }
 impl Markers {
     pub(super) fn prepare(self) -> Result<Request> {
@@ -249,6 +257,14 @@ impl Markers {
                 model::validate_id(&sequence)?;
                 model::validate_id(&marker)?;
                 context.request("markers.remove", json!({"sequence_id":sequence,"marker_id":marker}))
+            }
+            Self::WaveProjection { project, clip, revision } => {
+                model::validate_id(&clip)?;
+                read_request(
+                    ReadContext { project, revision: Some(revision), replace_snapshot: None },
+                    "markers.wave_projection",
+                    json!({"clip_id":clip}),
+                )
             }
         }
     }

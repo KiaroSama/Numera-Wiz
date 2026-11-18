@@ -202,6 +202,7 @@ fn project_context(id: &str) -> ProjectContextRule {
     match id {
         "projects.inspect"
         | "sequences.inspect"
+        | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
@@ -281,6 +282,10 @@ fn result_schema(id: &str) -> Option<Value> {
         "clips.remove" => Some(contracts::edit(EditResult::Remove)),
         "markers.place" => Some(contracts::edit(EditResult::Marker)),
         "markers.remove" => Some(contracts::edit(EditResult::Remove)),
+        "markers.wave_projection" => Some(
+            serde_json::to_value(schema_for!(crate::projects::wave_projection::Projection))
+                .expect("schema"),
+        ),
         "history.undo" | "history.redo" => Some(contracts::edit(EditResult::History)),
         _ => None,
     }
@@ -476,6 +481,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Remove a marker from its owning sequence",
             DurableMutation,
             crate::projects::SequenceMarkerTarget
+        ),
+        row!(
+            "markers.wave_projection",
+            "Project original WAVE cues through a committed audio occurrence",
+            Query,
+            crate::projects::wave_projection::Input
         ),
         row!(
             "history.redo",
@@ -1528,6 +1539,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.remove",
     "markers.place",
     "markers.remove",
+    "markers.wave_projection",
     "history.undo",
     "history.redo",
     "maintenance.plan",

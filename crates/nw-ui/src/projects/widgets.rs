@@ -546,6 +546,38 @@ impl WizApp {
         let Some(sequence) = &group.view.sequence else { return; };
         ui.collapsing("Timeline markers", |ui| {
             let idle = self.request_idle() && !self.projects.stale;
+            if let Some(clip) = &group.view.clip
+                && group.track.as_ref().is_some_and(|track| track.kind == TrackKind::Audio)
+                && group.source.as_ref().is_some_and(|source| source["asset_id"].is_string())
+                && ui.add_enabled(idle, egui::Button::new("Read WAVE cues in selected clip")).clicked()
+            {
+                self.query_with_project(
+                    "markers.wave_projection",
+                    json!({"clip_id":clip,"revision":group.key.revision}),
+                    Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                    self.project_action(Phase::WaveProjection),
+                    ui.ctx(),
+                );
+            }
+            if let Some(projection) = &self.projects.wave_projection {
+                if projection.cues.is_empty() {
+                    ui.label("No WAVE cues in this clip");
+                }
+                egui::ScrollArea::vertical().id_salt("project_wave_cues").max_height(144.0)
+                    .show(ui, |ui| {
+                        for cue in &projection.cues {
+                            let position = if cue.sequence_start == cue.sequence_end {
+                                exact(cue.sequence_start)
+                            } else {
+                                format!("{} to {}", exact(cue.sequence_start), exact(cue.sequence_end))
+                            };
+                            let name = cue.original.label.as_deref()
+                                .map(str::to_owned)
+                                .unwrap_or_else(|| format!("Cue {}", cue.original.id));
+                            ui.label(format!("{position} · {name}"));
+                        }
+                    });
+            }
             let browse = |app: &mut Self, cursor: Option<String>, ctx: &egui::Context| {
                 app.query_with_project(
                     "sequences.inspect",

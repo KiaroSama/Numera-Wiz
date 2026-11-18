@@ -81,6 +81,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `logs status` | Inspect owner log health under current owner authority. |
 | `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
 | `clips place/move/link/unlink/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
+| `markers wave-projection --project ID --clip ID --revision N` | Read original WAVE cues at their exact positions in a committed audio clip. |
 
 See the [project command guide](PROJECTS.md) for exact fractions, expected
 revisions, typed examples, source rights and bounded snapshot/history behavior.

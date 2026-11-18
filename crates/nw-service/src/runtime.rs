@@ -1120,6 +1120,15 @@ impl Service {
                 )?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
             }
+            "markers.wave_projection" => {
+                drop(guard);
+                return self.wave_marker_projection(
+                    &context,
+                    &request,
+                    commands::parse(params)?,
+                    &cancellation,
+                );
+            }
             "projects.list" => self.inventory_page(
                 &context,
                 commands::parse(params)?,

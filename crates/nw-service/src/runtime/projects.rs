@@ -3,7 +3,8 @@ use super::*;
 use nw_domain::projects::{
     self as domain,
     edit::{
-        AllocatedIds, ProjectEditIntent, check_compatibility, resolve_edit, validate_patch_clips,
+        AllocatedIds, ProjectEditIntent, ProjectRead, check_compatibility, resolve_edit,
+        validate_patch_clips,
     },
     *,
 };
@@ -126,6 +127,94 @@ impl Service {
                 record_hash,
             },
         ))
+    }
+
+    pub(super) fn wave_marker_projection(
+        &self,
+        context: &Context,
+        request: &Request,
+        input: wave_projection::Input,
+        cancel: &CancellationToken,
+    ) -> Result<Response> {
+        let project = &request
+            .project
+            .as_ref()
+            .ok_or_else(|| domain::invalid("Wave cue projection requires a project context"))?
+            .id;
+        let read = self.read_project(context, project, ObjectAction::Read)?;
+        let stale = || DomainError::new("STALE_REVISION", "Wave cue projection revision changed");
+        if read.header().revision != input.revision {
+            return Err(stale());
+        }
+        let project_id = read.header().id.clone();
+        let clip: Clip = read.entity(&input.clip_id)?.payload("clip")?;
+        let SourceBinding::Registered {
+            asset_id,
+            content_sha256,
+            probe_sha256,
+            stream_index,
+            media_kind: TrackKind::Audio,
+            ..
+        } = read.entity(&clip.source_id)?.payload("source_binding")?
+        else {
+            return Err(domain::invalid("Choose a registered WAVE audio occurrence"));
+        };
+        drop(read);
+        let _permit = self
+            .batch_preflights
+            .try_acquire()
+            .map_err(|_| domain::limit("Source preflight capacity is busy; retry this request"))?;
+        let (binding, held) = self.registered_project_source(context, &asset_id, stream_index, cancel)?;
+        if !matches!(
+            binding,
+            SourceBinding::Registered {
+                content_sha256: actual_content,
+                probe_sha256: actual_probe,
+                media_kind: TrackKind::Audio,
+                ..
+            } if actual_content == content_sha256 && actual_probe == probe_sha256
+        ) {
+            return Err(DomainError::new("SOURCE_CHANGED", "WAVE occurrence source changed"));
+        }
+        let wave = nw_engine::inspect_wave_cues(&held.asset, &held.stamp, cancel)?;
+        let cues = wave_projection::map_cues(&clip, &wave)?;
+
+        let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Wave cue projection cancelled"));
+        }
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command(&request.command.id))
+        {
+            return Err(DomainError::new("PERMISSION_DENIED", "Wave cue projection grant changed"));
+        }
+        if self.read_project(context, project, ObjectAction::Read)?.header().revision
+            != input.revision
+        {
+            return Err(stale());
+        }
+        self.object(context, &held.asset.id, &held.asset.creator)?;
+        let path = Path::new(&held.asset.identity.path);
+        if self.path(context, path, false)? != path
+            || self.store.project_fact_hash(&named("asset", &held.asset.id)?)? != held.record_hash
+        {
+            return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE authority changed"));
+        }
+        held.stamp.revalidate()?;
+        let result = wave_projection::Projection {
+            project_id,
+            sequence_id: clip.sequence_id,
+            clip_id: input.clip_id,
+            occurrence_id: clip.occurrence_id,
+            revision: input.revision,
+            asset_id: wave.asset_id,
+            source_sha256: wave.source_sha256,
+            sample_rate_hz: wave.sample_rate_hz,
+            cues,
+        };
+        Ok(Response::success(&request.request_id, value(&result)?).bounded())
     }
     pub(super) fn project_command(
         self: &Arc<Self>,

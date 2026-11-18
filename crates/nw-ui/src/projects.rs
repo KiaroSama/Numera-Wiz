@@ -9,7 +9,7 @@ use forms::Forms;
 use nw_domain::{
     commands::ProjectRef,
     projects::{
-        Clip, Revision, Sequence, Track,
+        Clip, Revision, Sequence, Track, TrackKind,
         views::{ClipSummary, MarkerSummary, ProjectItemSummary, ProjectSummary, TrackSummary},
     },
     time::{Rational, TimeRange},
@@ -43,6 +43,7 @@ pub(super) enum Phase {
     MixedReview,
     MixedSubmit,
     Markers,
+    WaveProjection,
     Create,
     Mutation,
 }
@@ -196,6 +197,7 @@ pub(super) struct ProjectsUi {
     preview_frame: Option<(Rational, egui::TextureHandle)>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
+    wave_projection: Option<nw_domain::projects::wave_projection::Projection>,
 }
 impl ProjectsUi {
     fn restored_view(&self, group: &Group) -> View {
@@ -211,6 +213,7 @@ impl ProjectsUi {
         self.preview_frame = None;
         self.mixed_review = None;
         self.marker_page = None;
+        self.wave_projection = None;
         self.generation = self
             .generation
             .checked_add(1)
@@ -628,7 +631,8 @@ impl WizApp {
         if matches!(
             action,
             Action::Project(ProjectAction {
-                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit | Phase::Markers,
+                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit
+                    | Phase::Markers | Phase::WaveProjection,
                 ..
             })
         ) {
@@ -1024,6 +1028,25 @@ impl WizApp {
                     return Err("Marker page does not match the displayed sequence and revision".into());
                 }
                 self.projects.marker_page = Some(Page::parse(page)?);
+                return Ok(());
+            }
+            Phase::WaveProjection => {
+                let group = self.projects.group.as_ref().ok_or("No displayed clip for WAVE cues")?;
+                let projection: nw_domain::projects::wave_projection::Projection =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let asset = group.source.as_ref().and_then(|value| value["asset_id"].as_str());
+                if projection.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(projection.sequence_id.as_str())
+                    || group.view.clip.as_deref() != Some(projection.clip_id.as_str())
+                    || request.params["clip_id"].as_str() != Some(projection.clip_id.as_str())
+                    || projection.revision.to_string() != group.key.revision
+                    || asset != Some(projection.asset_id.as_str())
+                    || projection.sample_rate_hz == 0
+                    || projection.cues.len() > 256
+                {
+                    return Err("WAVE cues differ from the displayed clip and revision".into());
+                }
+                self.projects.wave_projection = Some(projection);
                 return Ok(());
             }
             _ => {}

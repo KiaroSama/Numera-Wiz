@@ -185,6 +185,16 @@ takes the owning sequence and exact marker ID. The `marker_page` projection of
 `sequences.inspect` lists markers in frame order, then by ID. The CLI and MCP
 use the same project authority and replay rules.
 
+Select a registered WAVE audio clip and choose **Read WAVE cues in selected
+clip**. The CLI equivalent is
+`numera-wiz markers wave-projection --project ID --clip ID --revision N`.
+MCP exposes the same query as `markers.wave_projection`. Results retain the
+original sample offset, region length and label, plus exact source and
+sequence intervals. A point at the clip's exclusive out-point is omitted,
+and a region that crosses the in-point or out-point is clipped to the selected
+source span. The query requires project and source access and leaves the
+project's frame-aligned markers unchanged.
+
 ## Sources, time and authorization
 
 Times use exact integer fractions. Video positions must lie on the declared frame

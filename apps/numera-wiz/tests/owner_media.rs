@@ -1823,5 +1823,5 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     )
     .await
     .expect("Whole finite compiler review exceeded 40 seconds");
-    project_render::registered_timeline_frame(&cli, &scope, &media, &finite).await;
+    project_render::registered_timeline_frame(&cli, &scope, &media, &finite, &wave_asset).await;
 }

@@ -39,6 +39,7 @@ pub async fn registered_timeline_frame(
     scope: &str,
     media: &super::fixture::Media,
     finite: &FiniteTimeline,
+    wave_asset: &str,
 ) {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
@@ -204,6 +205,45 @@ pub async fn registered_timeline_frame(
     sdk.cancel().await.unwrap();
     accepted_mixed_timeline(cli, project_id, sequence_id, finite).await;
     sequence_markers(cli, project_id, sequence_id).await;
+    let placed = edit(
+        cli, scope, project_id, "8", "wave-cue-occurrence", "clips.place",
+        json!({
+            "sequence_id":sequence_id, "track_id":sequence["created"]["tracks"][1]["id"],
+            "source":{"kind":"registered","asset_id":wave_asset,"stream_index":0},
+            "source_range":{"start":t(1,4),"end":t(3,4)},
+            "sequence_start":t(3,1),"collision":"reject"
+        }),
+    ).await;
+    let clip = placed["created"]["clip_ids"][0].as_str().unwrap();
+    assert_eq!(placed["revision"], "9");
+    let (response, code) = cli.human(&[
+        "markers", "wave-projection", "--project", project_id, "--clip", clip,
+        "--revision", "9",
+    ]).await;
+    assert_eq!(code, 0, "{}", response["error"]);
+    assert_eq!(response["result"]["asset_id"], wave_asset);
+    assert_eq!(response["result"]["clip_id"], clip);
+    assert_eq!(response["result"]["cues"], json!([{
+        "original":{"id":7,"sample_offset":24000,"sample_count":12000,"label":"نشانهٔ موسیقی"},
+        "source_start":t(1,2), "source_end":t(3,4),
+        "sequence_start":t(13,4), "sequence_end":t(7,2),
+    }]));
+    let (stale, code) = cli.human(&[
+        "markers", "wave-projection", "--project", project_id, "--clip", clip,
+        "--revision", "8",
+    ]).await;
+    assert_ne!(code, 0);
+    assert_eq!(stale["error"]["code"], "STALE_REVISION");
+    let mut bridge = cli.command();
+    bridge.args(["bridge", "--native-owner"]);
+    let sdk = ().serve(TokioChildProcess::new(bridge).unwrap()).await.unwrap();
+    let projected = sdk.call_tool(CallToolRequestParams::new("markers.wave_projection").with_arguments(
+        rmcp::object!({"params":{"clip_id":clip,"revision":"9"},"context":{"project":{"id":project_id}}}),
+    )).await.unwrap();
+    let projected = serde_json::to_value(projected).unwrap();
+    assert_eq!(projected["structuredContent"]["ok"], true, "{projected}");
+    assert_eq!(projected["structuredContent"]["result"], response["result"]);
+    sdk.cancel().await.unwrap();
 }
 
 async fn sequence_markers(cli: &Cli, project: &str, sequence: &str) {
