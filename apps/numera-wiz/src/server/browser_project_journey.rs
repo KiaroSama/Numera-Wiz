@@ -99,6 +99,21 @@ impl BrowserProjects<'_> {
         )
         .unwrap();
     }
+    async fn painted(&self) {
+        let painted = driver(
+            self.client,
+            self.base,
+            reqwest::Method::POST,
+            &format!("{}/execute/async", self.route),
+            json!({"script":"const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done(true)));","args":[]}),
+        )
+        .await;
+        assert_eq!(
+            painted.as_bool(),
+            Some(true),
+            "Chrome must paint the new frame"
+        );
+    }
 }
 impl shared::Driver for BrowserProjects<'_> {
     fn browser(&self) -> bool {
@@ -116,6 +131,20 @@ impl shared::Driver for BrowserProjects<'_> {
     }
     async fn click(&mut self, x: u32, y: u32) {
         browser_click(self.client, self.base, self.route, x, y).await;
+    }
+    async fn reveal_sources(&mut self) {
+        self.painted().await;
+        driver(
+            self.client,
+            self.base,
+            reqwest::Method::POST,
+            &format!("{}/actions", self.route),
+            json!({"actions":[{"type":"wheel","id":"project-source-scroll","actions":[{
+                "type":"scroll","x":600,"y":300,"deltaX":0,"deltaY":-600,"duration":180,"origin":"viewport"
+            }]}]}),
+        )
+        .await;
+        self.painted().await;
     }
     async fn key(&mut self, key: shared::Key) {
         if matches!(key, shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter) {
@@ -305,19 +334,7 @@ impl shared::Driver for BrowserProjects<'_> {
                     // The HTTP response is observable before the canvas applies
                     // its terminal projection. Let Chrome paint that frame before
                     // the next physical pointer or keyboard action.
-                    let painted = driver(
-                        self.client,
-                        self.base,
-                        reqwest::Method::POST,
-                        &format!("{}/execute/async", self.route),
-                        json!({"script":"const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done(true)));","args":[]}),
-                    )
-                    .await;
-                    assert_eq!(
-                        painted.as_bool(),
-                        Some(true),
-                        "Chrome must finish painting the loaded project"
-                    );
+                    self.painted().await;
                     return;
                 }
             }

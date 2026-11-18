@@ -77,6 +77,9 @@ pub trait Driver {
     fn metadata(&self) -> Value;
     fn mark(&mut self) -> impl Future<Output = ()>;
     fn click(&mut self, x: u32, y: u32) -> impl Future<Output = ()>;
+    fn reveal_sources(&mut self) -> impl Future<Output = ()> {
+        async {}
+    }
     fn key(&mut self, key: Key) -> impl Future<Output = ()>;
     fn replace(&mut self, text: &str) -> impl Future<Output = ()>;
     fn screenshot(&mut self, name: &str) -> impl Future<Output = ()>;
@@ -308,6 +311,7 @@ async fn catalog_open<D: Driver>(driver: &mut D, project: &str, name: &str) {
 }
 async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) -> (String, u32) {
     driver.click(318, 100).await;
+    driver.reveal_sources().await;
     driver.click(420, 134).await;
     driver.mark().await;
     driver.click(380, 176).await;
@@ -346,14 +350,15 @@ async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
     let browser = driver.browser();
     let values = ["0", "1", "1", "1", "0", "1"];
     if browser {
+        driver.reveal_sources().await;
         driver.click(330, 323).await;
         for ((x, y), value) in [
-            (445, 369),
-            (545, 369),
-            (442, 392),
-            (542, 392),
-            (481, 415),
-            (580, 415),
+            (445, 392),
+            (545, 392),
+            (442, 415),
+            (542, 415),
+            (481, 438),
+            (580, 438),
         ]
         .into_iter()
         .zip(values)
@@ -371,7 +376,7 @@ async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
     }
     driver.screenshot("registered-source-form").await;
     if browser {
-        driver.click(347, 438).await;
+        driver.click(347, 461).await;
     } else {
         driver.key(Key::Tab).await;
         driver.key(Key::Space).await;
