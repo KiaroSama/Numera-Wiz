@@ -257,7 +257,12 @@ fn check_runtime(binary_dir: &Path, delivery: &Path, deadline: Instant) -> Resul
             "hevc",
             &["-x265-params", "pools=1:frame-threads=1"],
         ),
-        ("libsvtav1", "av1", &["-preset", "12"]),
+        // The locked SVT-AV1 1.7 runtime sizes its own internal worker pool.
+        (
+            "libsvtav1",
+            "av1",
+            &["-preset", "12", "-svtav1-params", "lp=1"],
+        ),
         (
             "libvpx-vp9",
             "vp9",

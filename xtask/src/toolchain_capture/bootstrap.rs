@@ -57,9 +57,16 @@ fn retain_failure(path: &Path, failure: &anyhow::Error) {
         .lines()
         .filter(|line| {
             let line = line.to_ascii_lowercase();
-            !["authorization", "bearer", "secret", "credential", "token=", "signature="]
-                .iter()
-                .any(|term| line.contains(*term))
+            ![
+                "authorization",
+                "bearer",
+                "secret",
+                "credential",
+                "token=",
+                "signature=",
+            ]
+            .iter()
+            .any(|term| line.contains(*term))
         })
         .flat_map(|line| line.chars().chain(['\n']))
         .take(2048)
@@ -502,8 +509,8 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
         )?;
         let output = docker(&["start", "--attach", container], 1335)
             .context("Run the locked compiler worker with networking disabled")?;
-        let guest: Value = serde_json::from_slice(&output.stdout)
-            .context("Decode the offline compiler result")?;
+        let guest: Value =
+            serde_json::from_slice(&output.stdout).context("Decode the offline compiler result")?;
         ensure!(
             guest["final_inventory_sha256"] == lock["final_inventory_sha256"]
                 && guest["package_count"] == lock["final_inventory_count"],
@@ -526,7 +533,10 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
     {
         let retained = parent.join("worker-failure.json");
         if let Some(retained) = retained.to_str() {
-            let _ = docker(&["cp", &format!("{container}:{GUEST_FAILURE}"), retained], 10);
+            let _ = docker(
+                &["cp", &format!("{container}:{GUEST_FAILURE}"), retained],
+                10,
+            );
         }
     }
     let mut cleanup = process::command("/usr/bin/docker");
@@ -884,7 +894,10 @@ fn run_inner(root: &Path) -> Result<()> {
         fs::remove_dir_all(&directory)?;
     }
     result.context("Stage the 200 locked Ubuntu package archives")?;
-    tracing::info!(package_count = packages.len(), "Verified the Linux build package inputs");
+    tracing::info!(
+        package_count = packages.len(),
+        "Verified the Linux build package inputs"
+    );
     download(
         nasm.url,
         &directory.join(nasm.filename),
