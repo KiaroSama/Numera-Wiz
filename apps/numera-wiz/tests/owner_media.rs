@@ -105,6 +105,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{scope}");
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
     let (chapter_asset, chapter_export) = chapter_roundtrip::verify(&cli, &media, &scope).await;
+    let (wave_asset, wave_cues) = chapter_roundtrip::verify_wave_cues(&cli, &media, &scope).await;
     let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
     assert_eq!(exit, 0, "{before}");
     assert!(before["result"]["advertised"].is_null());
@@ -173,6 +174,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({})
         ),
         chapter_export
+    );
+    assert_eq!(
+        call!(owner_bridge, "chapters.wave_cues", json!({"id":wave_asset}), json!({})),
+        wave_cues
     );
     let metadata = json!({"asset_id":chapter_asset,"output":media.directory.path().join("sdk-metadata-review.mkv"),"patch":{
         "target":{"scope":"stream","index":2},"set":{"title":"Reviewed by MCP"}

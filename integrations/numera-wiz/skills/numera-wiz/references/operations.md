@@ -20,6 +20,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
 | `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
+| `chapters.wave_cues` | Read original RIFF or RF64 cue offsets, lengths and labels from an authorized asset. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
 | `metadata.patch` | Review explicit container or original-stream tag changes for a fresh Matroska file. |
 | `jobs.submit`, `jobs.inspect`, `jobs.list`, `jobs.cancel` | Run, observe/page and control accepted jobs. Submission/cancellation are durable. |

@@ -1537,6 +1537,33 @@ impl Service {
                     _ => value(&asset)?,
                 }
             }
+            "chapters.wave_cues" => {
+                let input: IdInput = commands::parse(params)?;
+                let key = named("asset", &input.id)?;
+                let (asset, record_hash) = self.store.registered_asset_record(&key)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(&context, &asset.id, &asset.creator)?;
+                let path = self.path(&context, Path::new(&asset.identity.path), false)?;
+                if path != Path::new(&asset.identity.path) {
+                    return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE path changed"));
+                }
+                drop(guard);
+                let stamp = files::SourceStamp::capture_resolved(&path)?;
+                let cues = nw_engine::inspect_wave_cues(&asset, &stamp, &cancellation)?;
+                let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+                if cancellation.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Wave cue delivery was cancelled"));
+                }
+                if self.policy(&context)?.as_ref().is_some_and(|profile| !profile.allows_command(&request.command.id)) {
+                    return Err(DomainError::new("PERMISSION_DENIED", "Wave cue command grant changed"));
+                }
+                self.object(&context, &asset.id, &asset.creator)?;
+                if self.path(&context, &path, false)? != path || self.store.project_fact_hash(&key)? != record_hash {
+                    return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE authority changed"));
+                }
+                stamp.revalidate()?;
+                return Ok(Response::success(&request.request_id, cues).bounded());
+            }
             "assets.output_suggest" => {
                 let input: IdInput = commands::parse(params)?;
                 let asset: Asset = self

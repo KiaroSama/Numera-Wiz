@@ -37,6 +37,7 @@ export and continuous preview remain in development.
   An explicit native-owner request can check H.264 and HEVC NVENC encoding.
 - Inspect exact chapter ranges, exchange FFmetadata and review chapter
   replacement or removal in a stream-copy plan.
+- Inspect original RIFF and RF64 cue offsets, region lengths and labels.
 - Set or remove selected container and stream tags in a verified Matroska copy.
 - Decode a single frame from a registered video stream in the shared GUI, CLI
   and MCP interface.

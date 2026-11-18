@@ -116,6 +116,12 @@ source content digest. Set `include_global_metadata` to `true` to include
 the registered global tags. Both queries require explicit command authorization
 and existing access to the asset and its source path.
 
+`chapters.wave_cues` takes `{"id":"<asset-id>"}` and reads original RIFF WAVE
+or RF64 cue data from the authorized file. It returns the sample rate and
+each cue's offset, optional region length and optional label with the source
+content digest. The underlying registered probe stays available through
+`chapters.inspect`.
+
 `chapters.remove` takes `{"asset_id":"<asset-id>","output":"<new-path>"}`.
 It returns the ordinary reviewed cleanup plan with chapter removal enabled.
 Submit that plan through `jobs.submit` to create the output.

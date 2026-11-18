@@ -38,6 +38,7 @@ enum Action {
     Inspect,
     Capabilities,
     SourcePreview,
+    WaveCues,
     ClearCapabilities,
     ArtifactManifest,
     SelectionReport(u64),
@@ -132,6 +133,7 @@ pub struct WizApp {
     inspect: String,
     capability_report: Option<nw_domain::capabilities::CapabilityReport>,
     source_preview: preview::SourcePreview,
+    wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
     save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
@@ -314,6 +316,7 @@ impl WizApp {
             inspect: String::new(),
             capability_report: None,
             source_preview: Default::default(),
+            wave_cues: None,
             artifact_manifest: None,
             save_control: None,
             save_inbox: Arc::new(Mutex::new(None)),
@@ -344,6 +347,7 @@ impl WizApp {
             self.chapter_document.clear();
             self.chapter_global_tags = false;
             self.source_preview = Default::default();
+            self.wave_cues = None;
         }
         self.selected = Some(asset.id.clone());
         self.asset_detail = Some(Arc::new(asset.clone()));
@@ -788,6 +792,15 @@ impl WizApp {
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
                 Action::SourcePreview => self.accept_source_preview(result, ctx)?,
+                Action::WaveCues => {
+                    let cues: nw_domain::chapters::WaveCueInventory =
+                        serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    if self.selected_asset().is_some_and(|asset| {
+                        asset.id == cues.asset_id && asset.identity.sha256 == cues.source_sha256
+                    }) {
+                        self.wave_cues = Some(cues);
+                    }
+                }
                 Action::ClearCapabilities => {
                     let cleared: nw_domain::capabilities::ClearResult =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;

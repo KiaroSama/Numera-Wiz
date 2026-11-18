@@ -61,6 +61,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
 | `media capabilities clear --fingerprint SHA` | Clear the matching component report from owner memory. |
 | `chapters inspect --asset ID` | Read exact chapter ticks, time bases and tags from the registered probe. |
+| `chapters wave-cues --asset ID` | Read original RIFF or RF64 cue sample offsets, recorded region lengths and labels. |
 | `chapters export --asset ID` | Return UTF-8 FFmetadata and its SHA-256 digest. |
 | `chapters import --asset ID --out PATH --ffmetadata CHAPTERS.txt` | Review a chapter replacement in a new Matroska file. Add `--include-global-metadata` to apply authored container tags from the document. |
 | `chapters remove --asset ID --out PATH` | Review a stream-copy plan that removes chapters and preserves the retained streams and their metadata. |

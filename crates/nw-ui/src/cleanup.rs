@@ -486,6 +486,29 @@ impl WizApp {
                 if asset.probe.streams.len() > 64 { ui.horizontal(|ui| {if ui.add_enabled(self.stream_page>0,egui::Button::new("Previous streams")).clicked(){self.stream_page-=1;}ui.label(format!("Page {}",self.stream_page+1));if ui.add_enabled(first+64<asset.probe.streams.len(),egui::Button::new("Next streams")).clicked(){self.stream_page+=1;}}); }
             });
             chapters(ui, asset);
+            if asset.probe.format == "wav" {
+                ui.collapsing("WAVE cues", |ui| {
+                    if ui.add_enabled(!self.waiting, egui::Button::new("Read cue metadata")).clicked() {
+                        self.query("chapters.wave_cues", json!({"id":asset.id}), Action::WaveCues, ui.ctx());
+                    }
+                    if let Some(inventory) = &self.wave_cues {
+                        if inventory.cues.is_empty() {
+                            ui.label("No cue points.");
+                        } else {
+                            ui.label(format!("{} Hz", inventory.sample_rate_hz));
+                            for cue in &inventory.cues {
+                                ui.horizontal(|ui| {
+                                    ui.strong(cue.label.as_deref().unwrap_or("Cue"));
+                                    ui.label(format!("Sample {}", cue.sample_offset));
+                                    if let Some(length) = cue.sample_count {
+                                        ui.label(format!("{length} samples"));
+                                    }
+                                });
+                            }
+                        }
+                    }
+                });
+            }
             ui.separator();
             let mut changed = false;
             ui.strong("Audio selection"); changed |= selection(ui,"audio-selection",&mut self.audio_mode,&mut self.audio_values,&mut self.intent.audio_selection.no_match);

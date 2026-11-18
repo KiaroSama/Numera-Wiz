@@ -139,6 +139,11 @@ pub enum Chapters {
         #[arg(long)]
         asset: String,
     },
+    /// Inspect original WAVE cue sample offsets, region lengths and labels.
+    WaveCues {
+        #[arg(long)]
+        asset: String,
+    },
     /// Return an FFmetadata document and its SHA-256 digest.
     Export {
         #[arg(long)]
@@ -400,6 +405,9 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::History(command) => command.prepare()?,
         Command::Chapters(Chapters::Inspect { asset }) => {
             query("chapters.inspect", json!({"id":asset}))
+        }
+        Command::Chapters(Chapters::WaveCues { asset }) => {
+            query("chapters.wave_cues", json!({"id":asset}))
         }
         Command::Chapters(Chapters::Export {
             asset,

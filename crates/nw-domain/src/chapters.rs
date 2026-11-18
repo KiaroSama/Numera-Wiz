@@ -49,6 +49,25 @@ pub struct Inventory {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct WaveCueInventory {
+    pub asset_id: String,
+    pub source_sha256: String,
+    pub sample_rate_hz: u32,
+    #[schemars(length(max = 256))]
+    pub cues: Vec<WaveCue>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WaveCue {
+    pub id: u32,
+    pub sample_offset: u32,
+    pub sample_count: Option<u32>,
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Chapter {
     pub time_base: Rational,
     pub start_ticks: String,

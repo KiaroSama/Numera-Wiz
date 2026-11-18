@@ -232,6 +232,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "chapters.inspect" => {
             Some(serde_json::to_value(schema_for!(crate::chapters::Inventory)).expect("schema"))
         }
+        "chapters.wave_cues" => Some(
+            serde_json::to_value(schema_for!(crate::chapters::WaveCueInventory)).expect("schema"),
+        ),
         "chapters.export" => {
             Some(serde_json::to_value(schema_for!(crate::chapters::Export)).expect("schema"))
         }
@@ -746,6 +749,12 @@ pub fn registry() -> Vec<Descriptor> {
         row!(
             "chapters.inspect",
             "Inspect exact chapter times and tags from a registered probe",
+            Query,
+            IdInput
+        ),
+        row!(
+            "chapters.wave_cues",
+            "Inspect original RIFF WAVE or RF64 cue offsets, region lengths and labels",
             Query,
             IdInput
         ),
@@ -1501,6 +1510,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "capabilities.refresh",
     "capabilities.clear",
     "chapters.inspect",
+    "chapters.wave_cues",
     "chapters.export",
     "chapters.remove",
     "chapters.import",

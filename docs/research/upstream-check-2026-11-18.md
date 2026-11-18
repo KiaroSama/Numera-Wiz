@@ -49,3 +49,13 @@ requires hosted resolution and the existing wire and prior-package trials.
 The stable Rust manifest reports 1.100.0. The registry versions for the current
 eframe and Tokio packages are still 0.37.0 and 1.54.1. The verified application
 build matrix still uses the mandate's Rust 1.99.1 seed. [Rust stable manifest](https://static.rust-lang.org/dist/channel-rust-stable.toml) · [eframe](https://crates.io/crates/eframe) · [Tokio](https://crates.io/crates/tokio)
+
+The next FilmCraft revision delegates Radiance HDR decoding to a bounded
+shared decoder. The subsequent EffectCraft revision delegates PSD block
+framing and RIFF, RF64 and XMP markers to shared libraries. All 15 changed
+file patches in these two later comparisons were reviewed. A generated RIFF
+and RF64 pair tested against the pinned FFprobe read the Unicode cue label
+and sample offset, and inferred a chapter end from the file duration. Numera
+now inspects the original cue and `ltxt` length through the registered source
+handle in the CLI, MCP and shared panels. This covers RIFF and RF64 cue
+metadata. HDR, PSD and XMP workflows remain open. [FilmCraft comparison](https://github.com/storytold/filmcraft/compare/688444e75d059c0d2a5c13be75fc3cb210efebd1...6aa67684948a585ef3f40d81a63bbf228f9f320a) · [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/3f1cd00745d41345632b38beece0b09c9e265e69...f3c28669a243622fde9ee8eb9a23cae6cac7057d)

@@ -6,8 +6,10 @@ mod media;
 mod output_profile;
 mod preservation;
 mod progress;
+mod wave_cues;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
 pub use media::normalized_pair::NormalizedWindow;
+pub use wave_cues::inspect_original as inspect_wave_cues;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},

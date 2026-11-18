@@ -3,6 +3,76 @@ use serde_json::{Value, json};
 use std::{path::Path, time::Duration};
 use tokio_util::sync::CancellationToken;
 
+fn wave_with_cue(rf64: bool, label: &str) -> Vec<u8> {
+    fn chunk(output: &mut Vec<u8>, name: &[u8; 4], bytes: &[u8], size: u32) {
+        output.extend_from_slice(name);
+        output.extend_from_slice(&size.to_le_bytes());
+        output.extend_from_slice(bytes);
+        if !bytes.len().is_multiple_of(2) {
+            output.push(0);
+        }
+    }
+    let fields = |words: &[u32]| {
+        words.iter().flat_map(|word| word.to_le_bytes()).collect::<Vec<_>>()
+    };
+    let mut children = Vec::new();
+    let mut pcm = [1_u16, 1].into_iter().flat_map(u16::to_le_bytes).collect::<Vec<_>>();
+    pcm.extend(fields(&[48000, 96000]));
+    pcm.extend([2_u16, 16].into_iter().flat_map(u16::to_le_bytes));
+    chunk(&mut children, b"fmt ", &pcm, pcm.len() as u32);
+    chunk(&mut children, b"data", &vec![0; 96000], if rf64 { u32::MAX } else { 96000 });
+    let mut cue = fields(&[1, 7, 24000]);
+    cue.extend_from_slice(b"data");
+    cue.extend(fields(&[0, 0, 24000]));
+    chunk(&mut children, b"cue ", &cue, cue.len() as u32);
+    let mut annotations = b"adtl".to_vec();
+    let mut name = 7_u32.to_le_bytes().to_vec();
+    name.extend_from_slice(label.as_bytes());
+    name.push(0);
+    chunk(&mut annotations, b"labl", &name, name.len() as u32);
+    let mut length = fields(&[7, 12000]);
+    length.extend_from_slice(b"rgn ");
+    length.extend_from_slice(&[0; 8]);
+    chunk(&mut annotations, b"ltxt", &length, length.len() as u32);
+    chunk(&mut children, b"LIST", &annotations, annotations.len() as u32);
+
+    let mut result = if rf64 { b"RF64".to_vec() } else { b"RIFF".to_vec() };
+    let riff_size = children.len() as u32 + 4;
+    result.extend_from_slice(&(if rf64 { u32::MAX } else { riff_size }).to_le_bytes());
+    result.extend_from_slice(b"WAVE");
+    if rf64 {
+        let mut sizes: Vec<_> = [u64::from(riff_size) + 36, 96000, 48000]
+            .into_iter().flat_map(u64::to_le_bytes).collect();
+        sizes.extend_from_slice(&0_u32.to_le_bytes());
+        chunk(&mut result, b"ds64", &sizes, sizes.len() as u32);
+    }
+    result.extend(children);
+    result
+}
+
+pub(super) async fn verify_wave_cues(cli: &Cli, media: &fixture::Media, scope: &str) -> (String, Value) {
+    let label = "نشانهٔ موسیقی";
+    let mut rf64_result = None;
+    for (format, rf64) in [("riff", false), ("rf64", true)] {
+        let path = media.directory.path().join(format!("{format}-cue.wav"));
+        std::fs::write(&path, wave_with_cue(rf64, label)).unwrap();
+        let accepted = cli.mutation(scope, &format!("register-{format}-cue"), "assets.register", json!({"path":path})).await;
+        assert_eq!(accepted["ok"], true, "{accepted}");
+        let id = accepted["result"]["id"].as_str().unwrap();
+        let (response, exit) = cli.human(&["chapters", "wave-cues", "--asset", id]).await;
+        assert_eq!(exit, 0, "{response}");
+        let cues = response["result"].clone();
+        assert_eq!(cues["sample_rate_hz"], 48000);
+        assert_eq!(cues["cues"], json!([{"id":7,"sample_offset":24000,"sample_count":12000,"label":label}]));
+        let chapters = cli.query("chapters.inspect", json!({"id":id})).await;
+        assert_eq!(chapters["chapters"][0]["end_ticks"], "48000");
+        if rf64 {
+            rf64_result = Some((id.to_owned(), cues));
+        }
+    }
+    rf64_result.unwrap()
+}
+
 pub(super) async fn verify(cli: &Cli, media: &fixture::Media, scope: &str) -> (String, Value) {
     async fn remux(media: &fixture::Media, source: &Path, sidecar: &Path, output: &Path) {
         let args = [
