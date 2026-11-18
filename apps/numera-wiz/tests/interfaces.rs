@@ -79,6 +79,17 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
         vec![0, 1, 3]
     );
     assert!(String::from_utf8_lossy(&output.stderr).contains("[INFO]"));
+    let doctor = Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
+        .arg("--data-dir")
+        .arg(data.path())
+        .arg("doctor")
+        .output()
+        .unwrap();
+    assert!(doctor.status.success());
+    let doctor: serde_json::Value = serde_json::from_slice(&doctor.stdout).unwrap();
+    assert_eq!(doctor["media_components"]["status"], "unavailable");
+    assert_eq!(doctor["media_components"]["error"]["code"], "COMPONENT_UNAVAILABLE");
+    assert_eq!(doctor["media_gpu_initialized"], false);
 }
 #[tokio::test]
 async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {

@@ -70,7 +70,7 @@ pub(crate) fn apply(streams: &mut [Stream], patches: &[Patch]) -> Result<()> {
     for patch in patches {
         let target = streams.iter_mut().find(|stream| stream.index == patch.stream)
             .filter(|stream| matches!(stream.kind, StreamKind::Audio | StreamKind::Subtitle))
-            .ok_or_else(|| DomainError::new("STREAM_NOT_FOUND", "Disposition patch requires a retained audio or subtitle stream"))?;
+            .ok_or_else(|| DomainError::new("UNRESOLVED_SOURCE_INDEX", "Disposition patch requires a retained audio or subtitle stream"))?;
         if patch.clear_all {
             target.dispositions.clear();
         }

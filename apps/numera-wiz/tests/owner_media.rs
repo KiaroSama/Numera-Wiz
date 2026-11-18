@@ -108,6 +108,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
     assert_eq!(exit, 0, "{before}");
     assert!(before["result"]["advertised"].is_null());
+    let (doctor, exit) = cli.human(&["doctor"]).await;
+    assert_eq!(exit, 0, "{doctor}");
+    assert_eq!(doctor["media_components"]["status"], "identified");
+    assert_eq!(doctor["media_components"]["report"], before["result"]);
+    assert_eq!(doctor["media_gpu_initialized"], false);
     let (observed, exit) = cli
         .human(&["media", "capabilities", "refresh", "--force"])
         .await;

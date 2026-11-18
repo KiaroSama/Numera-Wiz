@@ -378,13 +378,31 @@ async fn run() -> Result<()> {
                     print_response(&client, nw_domain::commands::decode_request(&bytes)?).await
                 }
                 Some(Mode::Doctor) => {
+                    let capabilities = client.request(&Request::query(
+                        "capabilities.inspect",
+                        serde_json::json!({}),
+                    )).await?;
+                    let status = if capabilities.ok { "identified" } else { "unavailable" };
                     tracing::warn!(
                         "WARNING: Complete runtime, portable payload and GPU qualification remain pending"
                     );
                     println!(
                         "{}",
                         serde_json::to_string_pretty(
-                            &serde_json::json!({"product":"Numera Wiz","version":env!("CARGO_PKG_VERSION"),"scope":"development cleanup owner and shared workspace","media_gpu_initialized":false,"portable_release":"not_qualified","default_mcp_profile":"discovery_only","default_http_port":1578})
+                            &serde_json::json!({
+                                "product":"Numera Wiz",
+                                "version":env!("CARGO_PKG_VERSION"),
+                                "scope":"development cleanup owner and shared workspace",
+                                "media_gpu_initialized":false,
+                                "portable_release":"not_qualified",
+                                "default_mcp_profile":"discovery_only",
+                                "default_http_port":1578,
+                                "media_components":{
+                                    "status":status,
+                                    "report":capabilities.result,
+                                    "error":capabilities.error,
+                                }
+                            })
                         )?
                     );
                     Ok(())

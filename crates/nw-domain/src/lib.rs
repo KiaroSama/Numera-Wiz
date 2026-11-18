@@ -77,6 +77,7 @@ impl DomainError {
             | "CONTAINER_UNQUALIFIED"
             | "INPUT_ROUTE_REQUIRED"
             | "NATIVE_PATH_UNAVAILABLE"
+            | "DATA_ROOT_UNAVAILABLE"
             | "NATIVE_IDENTITY_UNAVAILABLE"
             | "NATIVE_FILE_TIMES_UNAVAILABLE"
             | "PUBLICATION_CLAIM_UNAVAILABLE"

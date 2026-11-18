@@ -34,7 +34,7 @@ facts. Never delete or replace live state to bypass a lock or version conflict.
 | `numera-wiz serve --port 1578 --access-profile operator --token-file <new-file>` | Retain the explicit public API/MCP listener and export a scoped token. |
 | `numera-wiz bridge --access-profile operator` | Run official stdio MCP under the stored named profile. |
 | `numera-wiz bridge --transport http --token-file <new-file>` | Retain direct HTTP MCP under the default discovery-only agent profile. |
-| `numera-wiz doctor` | Report implementation limits without initializing media GPU or a display. |
+| `numera-wiz doctor` | Report configured FFmpeg/ffprobe fingerprints and component readiness from the owner. |
 
 A busy requested port returns `PORT_IN_USE`; it is never incremented silently.
 The public listener drains after public client/service/work leases end; private
