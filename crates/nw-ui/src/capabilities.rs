@@ -24,7 +24,11 @@ impl WizApp {
                         ui.ctx(),
                     );
                 }
-                if ui.add_enabled(idle, egui::Button::new("Probe NVENC")).clicked() {
+                #[cfg(not(target_arch = "wasm32"))]
+                if ui
+                    .add_enabled(idle, egui::Button::new("Probe NVENC"))
+                    .clicked()
+                {
                     self.query(
                         "capabilities.refresh",
                         json!({"components":false,"devices":true}),
