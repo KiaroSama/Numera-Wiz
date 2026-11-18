@@ -516,5 +516,44 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
         "old_floor_refusal_before_current_recovery":true,"old_newer_rows_preserved":true,
         "original_source_native_identity_preserved":true,"original_current_project_receipts_replayed":true,
         "scope":"Actual adopted-r1 package promotion/refusal/restoration/old-write/current-replay; fresh/r0/cut-point/RSS/general-media/full-v1 remain unqualified"}))?;
+    let mut owner = Owner::start(
+        &journey.configuration.new,
+        journey.root,
+        journey.epochs,
+        journey.root_id,
+        journey.evidence,
+    )
+    .await?;
+    let issued = owner
+        .command(&query("access.replay_scope.create", json!({})), journey.evidence)
+        .await?;
+    let scope = text(&issued["result"], "replay_scope")?;
+    let review = owner
+        .command(&query("maintenance.promotion.plan", json!({})), journey.evidence)
+        .await?;
+    let successor = durable(
+        &scope,
+        "media-v1-after-legacy-restoration",
+        "maintenance.promotion.accept",
+        json!({"plan":review["result"]}),
+        None,
+    );
+    let successor = owner.command(&successor, journey.evidence).await?;
+    let mixed = owner
+        .command(
+            &query("maintenance.media_v2.plan", json!({"kind":"media_initialization_v2"})),
+            journey.evidence,
+        )
+        .await?;
+    ensure!(
+        mixed["result"]["source"]["origin"] == "media_v1_promotion"
+            && mixed["result"]["source"]["guard_revision"] == "0"
+            && mixed["result"]["source"]["origin_operation_id"] == successor["result"]["promotion_id"],
+        "Mixed review lost the genuine MediaV1 successor after an earlier restoration"
+    );
+    owner.stop(journey.evidence).await?;
+    journey.evidence.record(json!({"phase":"mixed-review-after-prior-restoration","status":"passed",
+        "prior_restoration":restore.id,"media_v1_successor":successor["result"]["promotion_id"],
+        "mixed_review_sha256":mixed["result"]["hash"]}))?;
     Ok(())
 }

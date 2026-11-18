@@ -102,32 +102,6 @@ fn unsupported(message: &str) -> DomainError {
     DomainError::new("INVALID_GENERATION_PLAN", message)
 }
 
-fn review_workspaces(lease: &RootLease) -> Result<DirectoryStamp> {
-    let directory = DirectoryStamp::capture_resolved(&lease.state().join("generation-workspaces"))?;
-    let mut count = 0;
-    directory.for_each_entry(|entry| {
-        count += 1;
-        if count > nw_domain::maintenance::MAX_GENERATIONS {
-            return Err(unsupported(
-                "Generation workspace inventory exceeds its admission bound",
-            ));
-        }
-        let name = entry
-            .file_name()
-            .ok_or_else(|| unsupported("Generation workspace name is missing"))?;
-        let workspace = directory.child_directory(name)?;
-        match std::fs::symlink_metadata(workspace.path().join("restoration-authority.json")) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => workspace.revalidate(),
-            Err(error) => Err(storage(error)),
-            Ok(_) => Err(unsupported(
-                "Retained legacy restoration authority needs a separately qualified source profile",
-            )),
-        }
-    })?;
-    lease.revalidate()?;
-    Ok(directory)
-}
-
 fn transform_matches(actual: &Enablement, expected: &Enablement) -> bool {
     actual.id == expected.id
         && actual.initialization == expected.initialization
@@ -442,7 +416,8 @@ impl Store {
                 "Complete accepted maintenance before reviewing a new generation",
             ));
         }
-        let workspaces = review_workspaces(lease)?;
+        let workspaces =
+            DirectoryStamp::capture_resolved(&lease.state().join("generation-workspaces"))?;
         let history = generations::activations(lease.root())?;
         let (active, _) = history
             .last()
@@ -523,11 +498,27 @@ impl Store {
         if operation.phase != EnablementPhase::Succeeded
             || operation.target_generation != active.generation
             || operation.activation_id != active.id
-            || operation.predecessor_restoration.is_some()
         {
             return Err(unsupported(
                 "MediaV1 origin is outside the completed source lineage",
             ));
+        }
+        if let Some(predecessor) = &operation.predecessor_restoration {
+            // RootLease has already verified and bound the retained authority chain.
+            let key = format!("restoration-control/{predecessor}");
+            let raw = table
+                .get(key.as_str())
+                .map_err(storage)?
+                .ok_or_else(|| unsupported("Origin restoration barrier is missing"))?;
+            let barrier: restoration_control::ExposureBarrier = decode(raw.value())?;
+            if barrier.schema_version != 1
+                || barrier.restoration_id != *predecessor
+                || barrier.root_id != active.root_id
+                || barrier.source_operation_id != operation.source_operation_id
+                || barrier.source_activation_id != operation.source_activation_id
+            {
+                return Err(unsupported("Origin restoration barrier differs from its predecessor"));
+            }
         }
         let source_sequence = usize::try_from(operation.source_sequence).map_err(storage)?;
         let prefix = history
