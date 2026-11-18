@@ -1221,6 +1221,7 @@ impl eframe::App for WizApp {
                 {
                     self.enter_projects(ui.ctx());
                 }
+                self.folder_controls(ui);
             });
         });
         if self.projects.active {
@@ -1260,7 +1261,6 @@ impl eframe::App for WizApp {
                 if ui.add_enabled(!self.waiting && self.pending.is_none(),egui::Button::new("Inspect available operations")).clicked() { self.query("commands.list",json!({}),Action::Inspect,ui.ctx()); }
                 egui::ScrollArea::vertical().max_height(180.0).show(ui,|ui| { ui.add(egui::TextEdit::multiline(&mut self.inspect).code_editor().interactive(false).desired_width(f32::INFINITY)); });
             });
-            self.folder_controls(ui);
             self.capability_panel(ui);
         });
         if !self.folder.open {
