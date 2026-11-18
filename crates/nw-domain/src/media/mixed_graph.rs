@@ -41,8 +41,15 @@ fn validate_capture(capture: &MixedCapture) -> Result<()> {
     capture.range.validate()?;
     capture.settings.validate()?;
     let duration = capture.range.end.checked_sub(capture.range.start)?;
-    if duration > Rational::new(i64::from(crate::media_execution::MEDIA_RENDER_TIMEOUT_SECONDS), 1)? {
-        return Err(projects::limit("Mixed export range exceeds the 600-second profile"));
+    if duration
+        > Rational::new(
+            i64::from(crate::media_execution::MEDIA_RENDER_TIMEOUT_SECONDS),
+            1,
+        )?
+    {
+        return Err(projects::limit(
+            "Mixed export range exceeds the 600-second profile",
+        ));
     }
     hash_text(&capture.header_sha256)?;
     if capture.header_bytes == 0
@@ -51,19 +58,27 @@ fn validate_capture(capture: &MixedCapture) -> Result<()> {
         || capture.facts.len() > projects::MAX_CLOSURE
         || capture.tracks.len() > MAX_TRACKS
     {
-        return Err(projects::limit("Mixed capture exceeds its bounded header, facts or tracks"));
+        return Err(projects::limit(
+            "Mixed capture exceeds its bounded header, facts or tracks",
+        ));
     }
     let mut facts = BTreeSet::new();
     let mut captured_bytes = capture.header_bytes;
     for fact in &capture.facts {
         hash_text(&fact.sha256)?;
-        if fact.bytes == 0 || fact.bytes > MAX_RAW_BYTES - captured_bytes || !facts.insert(&fact.id) {
-            return Err(invalid("Mixed capture has repeated or out-of-budget entity facts"));
+        if fact.bytes == 0 || fact.bytes > MAX_RAW_BYTES - captured_bytes || !facts.insert(&fact.id)
+        {
+            return Err(invalid(
+                "Mixed capture has repeated or out-of-budget entity facts",
+            ));
         }
         captured_bytes += fact.bytes;
     }
     if !facts.contains(&capture.sequence_id)
-        || capture.facts.windows(2).any(|pair| pair[0].id >= pair[1].id)
+        || capture
+            .facts
+            .windows(2)
+            .any(|pair| pair[0].id >= pair[1].id)
     {
         return Err(invalid("Mixed capture facts are missing or unordered"));
     }
@@ -73,10 +88,14 @@ fn validate_capture(capture: &MixedCapture) -> Result<()> {
     let mut last_order = None;
     let audio_grid = Rational::new(i64::from(capture.settings.sample_rate), 1)?;
     for track in &capture.tracks {
-        if !facts.contains(&track.id) || !seen.insert(&track.id) || last_order.is_some_and(|order| order >= track.order)
+        if !facts.contains(&track.id)
+            || !seen.insert(&track.id)
+            || last_order.is_some_and(|order| order >= track.order)
             || track.clips.len() > MAX_CLIPS - clip_ids.len()
         {
-            return Err(invalid("Mixed capture tracks differ from the captured identities or bounds"));
+            return Err(invalid(
+                "Mixed capture tracks differ from the captured identities or bounds",
+            ));
         }
         last_order = Some(track.order);
         let grid = match track.kind {
@@ -87,13 +106,23 @@ fn validate_capture(capture: &MixedCapture) -> Result<()> {
         for clip in &track.clips {
             clip.sequence_range.validate()?;
             clip.source_range.validate()?;
-            if !facts.contains(&clip.id) || !facts.contains(&clip.source_id) || !clip_ids.insert(&clip.id)
-                || !occurrence_ids.insert(&clip.occurrence_id) || clip.sequence_range.start < previous_end
-                || clip.sequence_range.end > capture.range.end || clip.rate <= Rational::ZERO
+            if !facts.contains(&clip.id)
+                || !facts.contains(&clip.source_id)
+                || !clip_ids.insert(&clip.id)
+                || !occurrence_ids.insert(&clip.occurrence_id)
+                || clip.sequence_range.start < previous_end
+                || clip.sequence_range.end > capture.range.end
+                || clip.rate <= Rational::ZERO
                 || clip.source_range.end.checked_sub(clip.source_range.start)?
-                    != clip.sequence_range.end.checked_sub(clip.sequence_range.start)?.checked_mul(clip.rate)?
+                    != clip
+                        .sequence_range
+                        .end
+                        .checked_sub(clip.sequence_range.start)?
+                        .checked_mul(clip.rate)?
             {
-                return Err(invalid("Mixed occurrence identity or rational map differs from the capture"));
+                return Err(invalid(
+                    "Mixed occurrence identity or rational map differs from the capture",
+                ));
             }
             match &clip.source {
                 OccurrenceSource::SolidColor { .. } if track.kind != TrackKind::Video => {
@@ -123,7 +152,9 @@ fn offset(point: Rational, origin: Rational, grid: Rational) -> Result<u64> {
 fn original_window(clip: &CapturedOccurrence, range: TimeRange) -> Result<OriginalWindow> {
     let original = |point: Rational| {
         clip.source_range.start.checked_add(
-            point.checked_sub(clip.sequence_range.start)?.checked_mul(clip.rate)?,
+            point
+                .checked_sub(clip.sequence_range.start)?
+                .checked_mul(clip.rate)?,
         )
     };
     Ok(OriginalWindow {
@@ -138,7 +169,12 @@ fn original_window(clip: &CapturedOccurrence, range: TimeRange) -> Result<Origin
 fn video_spans(capture: &MixedCapture) -> Result<Vec<VideoSpan>> {
     let grid = capture.settings.frame_rate;
     let mut boundaries = BTreeSet::from([capture.range.start, capture.range.end]);
-    for clip in capture.tracks.iter().filter(|track| track.kind == TrackKind::Video).flat_map(|track| &track.clips) {
+    for clip in capture
+        .tracks
+        .iter()
+        .filter(|track| track.kind == TrackKind::Video)
+        .flat_map(|track| &track.clips)
+    {
         boundaries.extend([clip.sequence_range.start, clip.sequence_range.end]);
     }
     let mut visible: Vec<(Option<&CapturedOccurrence>, TimeRange)> = Vec::new();
@@ -149,19 +185,30 @@ fn video_spans(capture: &MixedCapture) -> Result<Vec<VideoSpan>> {
         {
             range.end = *end;
         } else {
-            visible.push((active, TimeRange { start: *start, end: *end }));
+            visible.push((
+                active,
+                TimeRange {
+                    start: *start,
+                    end: *end,
+                },
+            ));
         }
     }
     if visible.len() > MAX_SEGMENTS {
-        return Err(projects::limit("Mixed sequence exceeds the video span budget"));
+        return Err(projects::limit(
+            "Mixed sequence exceeds the video span budget",
+        ));
     }
-    visible.into_iter().map(|(clip, range)| {
-        Ok(VideoSpan {
-            start_frame: offset(range.start, capture.range.start, grid)?.to_string(),
-            frame_count: offset(range.end, range.start, grid)?.to_string(),
-            window: clip.map(|clip| original_window(clip, range)).transpose()?,
+    visible
+        .into_iter()
+        .map(|(clip, range)| {
+            Ok(VideoSpan {
+                start_frame: offset(range.start, capture.range.start, grid)?.to_string(),
+                frame_count: offset(range.end, range.start, grid)?.to_string(),
+                window: clip.map(|clip| original_window(clip, range)).transpose()?,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 /// Compile an actual capture into frame/sample output ranges before execution planning.
@@ -169,7 +216,10 @@ pub fn compile_mixed_graph(capture: &MixedCapture) -> Result<MixedGraph> {
     validate_capture(capture)?;
     let video = video_spans(capture)?;
     let audio_grid = Rational::new(i64::from(capture.settings.sample_rate), 1)?;
-    let audio = capture.tracks.iter().filter(|track| track.kind == TrackKind::Audio)
+    let audio = capture
+        .tracks
+        .iter()
+        .filter(|track| track.kind == TrackKind::Audio)
         .flat_map(|track| &track.clips)
         .map(|clip| {
             let range = clip.sequence_range;
@@ -178,9 +228,15 @@ pub fn compile_mixed_graph(capture: &MixedCapture) -> Result<MixedGraph> {
                 sample_count: offset(range.end, range.start, audio_grid)?.to_string(),
                 window: original_window(clip, range)?,
             })
-        }).collect::<Result<_>>()?;
+        })
+        .collect::<Result<_>>()?;
     Ok(MixedGraph {
-        output_frames: offset(capture.range.end, capture.range.start, capture.settings.frame_rate)?.to_string(),
+        output_frames: offset(
+            capture.range.end,
+            capture.range.start,
+            capture.settings.frame_rate,
+        )?
+        .to_string(),
         output_samples: offset(capture.range.end, capture.range.start, audio_grid)?.to_string(),
         video,
         audio,

@@ -7,8 +7,8 @@ use nw_domain::{
 };
 use std::time::{Duration, Instant};
 
-mod timeline_preview;
 pub(super) mod mixed;
+mod timeline_preview;
 
 impl Service {
     pub(super) fn source_preview(

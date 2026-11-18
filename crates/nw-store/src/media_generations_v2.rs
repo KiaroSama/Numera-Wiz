@@ -1,19 +1,25 @@
 //! Read-side ancestry checks for MediaV2 maintenance.
 use crate::{
-    RECORDS, Store, copies, decode, encode, generations::{self, Activation, GenerationLocation, GenerationRole, RootLease},
-    media_generations::{self, Enablement}, records::record_quota, restoration_control, storage,
+    RECORDS, Store, copies, decode, encode,
+    generations::{self, Activation, GenerationLocation, GenerationRole, RootLease},
+    media_generations::{self, Enablement},
+    records::record_quota,
+    restoration_control, storage,
 };
 use nw_domain::{
     DomainError, Result,
     commands::{Request, Response},
     maintenance::{
         media_lifecycle::EnablementPhase,
-        media_v2::{EnablementKind, EnablementPlanV2, EnablementSubmitV2, MEDIA_V2_CAPABILITIES, SourceMediaV1, SourceOrigin, TargetProfileV2, exact_capabilities},
+        media_v2::{
+            EnablementKind, EnablementPlanV2, EnablementSubmitV2, MEDIA_V2_CAPABILITIES,
+            SourceMediaV1, SourceOrigin, TargetProfileV2, exact_capabilities,
+        },
         promotion::MEDIA_V1_CAPABILITIES,
     },
 };
-use redb::ReadableTable;
 use nw_platform::files::DirectoryStamp;
+use redb::ReadableTable;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
@@ -69,11 +75,16 @@ impl RecordV2 {
             nw_domain::projects::validate_id(predecessor)?;
         }
         let accepted = nw_domain::media_execution::exact(&self.accepted_at)?;
-        if self.schema_version != 2 || self.plan.id != id || self.plan.root_id != root
-            || self.creator.is_empty() || accepted == 0
+        if self.schema_version != 2
+            || self.plan.id != id
+            || self.plan.root_id != root
+            || self.creator.is_empty()
+            || accepted == 0
             || match (&self.phase, &self.completed_at) {
                 (EnablementPhase::Accepted, None) => false,
-                (EnablementPhase::Succeeded, Some(finished)) => nw_domain::media_execution::exact(finished)? < accepted,
+                (EnablementPhase::Succeeded, Some(finished)) => {
+                    nw_domain::media_execution::exact(finished)? < accepted
+                }
                 _ => true,
             }
         {
@@ -97,14 +108,20 @@ fn review_workspaces(lease: &RootLease) -> Result<DirectoryStamp> {
     directory.for_each_entry(|entry| {
         count += 1;
         if count > nw_domain::maintenance::MAX_GENERATIONS {
-            return Err(unsupported("Generation workspace inventory exceeds its admission bound"));
+            return Err(unsupported(
+                "Generation workspace inventory exceeds its admission bound",
+            ));
         }
-        let name = entry.file_name().ok_or_else(|| unsupported("Generation workspace name is missing"))?;
+        let name = entry
+            .file_name()
+            .ok_or_else(|| unsupported("Generation workspace name is missing"))?;
         let workspace = directory.child_directory(name)?;
         match std::fs::symlink_metadata(workspace.path().join("restoration-authority.json")) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => workspace.revalidate(),
             Err(error) => Err(storage(error)),
-            Ok(_) => Err(unsupported("Retained legacy restoration authority needs a separately qualified source profile")),
+            Ok(_) => Err(unsupported(
+                "Retained legacy restoration authority needs a separately qualified source profile",
+            )),
         }
     })?;
     lease.revalidate()?;
@@ -136,7 +153,9 @@ fn transform_matches(actual: &Enablement, expected: &Enablement) -> bool {
 impl Store {
     pub(crate) fn mixed_enablement(&self, id: &str) -> Result<Enablement> {
         nw_domain::projects::validate_id(id)?;
-        let retained: RecordV2 = self.get(&record_key(id))?.ok_or_else(DomainError::object_not_found)?;
+        let retained: RecordV2 = self
+            .get(&record_key(id))?
+            .ok_or_else(DomainError::object_not_found)?;
         retained.validate(id, self.root_id())?;
         Ok(retained.operation())
     }
@@ -150,19 +169,31 @@ impl Store {
         cancel: &CancellationToken,
     ) -> Result<EnablementPlanV2> {
         let source = self.prove_media_v1_source(lease, cancel)?;
-        let rollback_generation = source.generation.checked_add(1).ok_or_else(|| unsupported("Rollback generation number is exhausted"))?;
-        let target_generation = rollback_generation.checked_add(1).ok_or_else(|| unsupported("Target generation number is exhausted"))?;
+        let rollback_generation = source
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Rollback generation number is exhausted"))?;
+        let target_generation = rollback_generation
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Target generation number is exhausted"))?;
         let bytes = nw_domain::media_execution::exact(&source.bytes)?;
         let estimated = bytes
             .checked_mul(3)
             .and_then(|bytes| bytes.checked_add(64 * 1024 * 1024))
-            .ok_or_else(|| unsupported("Generation copy byte estimate exceeds its integer range"))?;
+            .ok_or_else(|| {
+                unsupported("Generation copy byte estimate exceeds its integer range")
+            })?;
         copies::require_copy_space(lease.state(), bytes, 3)?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Mixed media generation review was cancelled"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Mixed media generation review was cancelled",
+            ));
         }
         let now = clock()?;
-        let expires_at = now.checked_add(300).ok_or_else(|| unsupported("Review expiry exceeds its integer range"))?;
+        let expires_at = now
+            .checked_add(300)
+            .ok_or_else(|| unsupported("Review expiry exceeds its integer range"))?;
         let mut plan = EnablementPlanV2 {
             schema_version: 2,
             kind,
@@ -173,7 +204,10 @@ impl Store {
             rollback_generation,
             target_generation,
             target_profile: TargetProfileV2::MediaV2,
-            required_capabilities: MEDIA_V2_CAPABILITIES.iter().map(|value| (*value).into()).collect(),
+            required_capabilities: MEDIA_V2_CAPABILITIES
+                .iter()
+                .map(|value| (*value).into())
+                .collect(),
             estimated_additional_bytes: estimated.to_string(),
             application_build: application_build.to_owned(),
             created_at: now.to_string(),
@@ -202,8 +236,16 @@ impl Store {
         let plan = input.plan;
         plan.validate_hash()?;
         let current = self.review_media_v2(lease, plan.kind, build, &clock, cancel)?;
-        if current.hash != plan.hash || !nw_domain::media_execution::review_current(&plan.created_at, &plan.expires_at, clock()?)? {
-            return Err(unsupported("Mixed enablement source or review lifetime changed"));
+        if current.hash != plan.hash
+            || !nw_domain::media_execution::review_current(
+                &plan.created_at,
+                &plan.expires_at,
+                clock()?,
+            )?
+        {
+            return Err(unsupported(
+                "Mixed enablement source or review lifetime changed",
+            ));
         }
         nw_platform::generation_restoration::QualifiedDirectory::open(lease.state())?;
         copies::reserve_restoration_slot(lease, &plan.id)?;
@@ -212,10 +254,14 @@ impl Store {
         self.close_generation(lease)?;
         let prepared = (|| {
             let copy = copies::copy_locked(lease, &plan.id, "rollback", &path, cancel)?;
-            if copy.facts.root_id != plan.root_id || copy.facts.records_sha256 != plan.source.records_sha256
-                || copy.facts.record_count != plan.source.records || !exact_capabilities(&copy.facts.required_capabilities, MEDIA_V1_CAPABILITIES)
+            if copy.facts.root_id != plan.root_id
+                || copy.facts.records_sha256 != plan.source.records_sha256
+                || copy.facts.record_count != plan.source.records
+                || !exact_capabilities(&copy.facts.required_capabilities, MEDIA_V1_CAPABILITIES)
             {
-                return Err(unsupported("Rollback copy differs from the reviewed native source"));
+                return Err(unsupported(
+                    "Rollback copy differs from the reviewed native source",
+                ));
             }
             media_generations::flush_copy(&copy.path)
         })();
@@ -264,21 +310,36 @@ impl Store {
         Ok(response)
     }
 
-    pub(crate) fn recover_media_v2(&self, lease: &RootLease, clock: impl Fn() -> Result<u64>) -> Result<()> {
+    pub(crate) fn recover_media_v2(
+        &self,
+        lease: &RootLease,
+        clock: impl Fn() -> Result<u64>,
+    ) -> Result<()> {
         let (key, mut record) = {
             let read = self.db.begin_read().map_err(storage)?;
             let table = read.open_table(RECORDS).map_err(storage)?;
-            let Some(pending) = table.get(PENDING_MIXED_ENABLEMENT).map_err(storage)? else { return Ok(()) };
+            let Some(pending) = table.get(PENDING_MIXED_ENABLEMENT).map_err(storage)? else {
+                return Ok(());
+            };
             let id = std::str::from_utf8(pending.value()).map_err(storage)?;
             nw_domain::projects::validate_id(id)?;
             let key = record_key(id);
-            let retained = table.get(key.as_str()).map_err(storage)?.ok_or_else(|| unsupported("Accepted mixed operation is missing"))?;
+            let retained = table
+                .get(key.as_str())
+                .map_err(storage)?
+                .ok_or_else(|| unsupported("Accepted mixed operation is missing"))?;
             let record: RecordV2 = decode(retained.value())?;
             record.validate(id, self.root_id())?;
             if record.phase != EnablementPhase::Accepted {
                 return Err(unsupported("Accepted mixed operation identity differs"));
             }
-            restoration_control::receipt(&table, &record.receipt_key, &record.request_digest, id, "enablement_id")?;
+            restoration_control::receipt(
+                &table,
+                &record.receipt_key,
+                &record.request_digest,
+                id,
+                "enablement_id",
+            )?;
             (key, record)
         };
         let operation = record.operation();
@@ -286,21 +347,26 @@ impl Store {
         if selection.activation_id.as_deref() != Some(record.activation_id.as_str()) {
             let history = generations::activations(lease.root())?;
             if selection.activation_id.as_deref() != Some(operation.source_activation_id.as_str())
-                || selection.generation != operation.source_generation || media_generations::prefix_digest(&history) != operation.source_prefix_sha256
+                || selection.generation != operation.source_generation
+                || media_generations::prefix_digest(&history) != operation.source_prefix_sha256
             {
                 return Err(unsupported("Accepted mixed source is no longer selected"));
             }
-            let workspaces = DirectoryStamp::capture_resolved(&lease.state().join("generation-workspaces"))?;
+            let workspaces =
+                DirectoryStamp::capture_resolved(&lease.state().join("generation-workspaces"))?;
             let workspace = workspaces.child_directory(record.plan.id.as_ref())?;
             let rollback = workspace.child_directory("rollback".as_ref())?;
             let prior = copies::inspect_completed_copy(&rollback, &CancellationToken::new())?;
-            if prior.operation_id != record.plan.id || prior.role != "rollback"
+            if prior.operation_id != record.plan.id
+                || prior.role != "rollback"
                 || prior.source.root_id != record.plan.root_id
                 || prior.source.record_count != operation.source_records
                 || prior.source.records_sha256 != operation.source_records_sha256
                 || !exact_capabilities(&prior.source.required_capabilities, MEDIA_V1_CAPABILITIES)
             {
-                return Err(unsupported("Accepted mixed rollback copy differs from the reviewed source"));
+                return Err(unsupported(
+                    "Accepted mixed rollback copy differs from the reviewed source",
+                ));
             }
             self.close_generation(lease)?;
             let switched = (|| {
@@ -323,7 +389,9 @@ impl Store {
                 self.attach_media_selection(lease)
             })();
             if let Err(error) = switched {
-                if lease.selection()?.activation_id.as_deref() == Some(record.activation_id.as_str()) {
+                if lease.selection()?.activation_id.as_deref()
+                    == Some(record.activation_id.as_str())
+                {
                     self.attach_media_selection(lease)?;
                 } else {
                     self.reopen_current_generation(lease)?;
@@ -338,9 +406,13 @@ impl Store {
             let guard = media_generations::guard(&table)?;
             let marker = format!("generation-transform/{}", record.plan.id);
             let encoded = encode(&operation)?;
-            let transformed = table.get(marker.as_str()).map_err(storage)?
+            let transformed = table
+                .get(marker.as_str())
+                .map_err(storage)?
                 .is_some_and(|value| value.value() == encoded.as_slice());
-            if guard.migration_id != record.plan.id || guard.activation_id != record.activation_id || guard.validate()? != 0
+            if guard.migration_id != record.plan.id
+                || guard.activation_id != record.activation_id
+                || guard.validate()? != 0
                 || !transformed
             {
                 return Err(unsupported("Mixed target guard differs before completion"));
@@ -349,50 +421,86 @@ impl Store {
             crate::check_clock(&table, now)?;
             record.phase = EnablementPhase::Succeeded;
             record.completed_at = Some(now.to_string());
-            table.insert(key.as_str(), encode(&record)?.as_slice()).map_err(storage)?;
+            table
+                .insert(key.as_str(), encode(&record)?.as_slice())
+                .map_err(storage)?;
             table.remove(PENDING_MIXED_ENABLEMENT).map_err(storage)?;
-            table.insert("meta/clock", now.to_string().as_bytes()).map_err(storage)?;
+            table
+                .insert("meta/clock", now.to_string().as_bytes())
+                .map_err(storage)?;
         }
         write.commit().map_err(storage)
     }
 
-    fn prove_media_v1_source(&self, lease: &RootLease, cancel: &CancellationToken) -> Result<SourceMediaV1> {
+    fn prove_media_v1_source(
+        &self,
+        lease: &RootLease,
+        cancel: &CancellationToken,
+    ) -> Result<SourceMediaV1> {
         if self.pending_migration()?.is_some() || self.pending_media_maintenance()? {
-            return Err(unsupported("Complete accepted maintenance before reviewing a new generation"));
+            return Err(unsupported(
+                "Complete accepted maintenance before reviewing a new generation",
+            ));
         }
         let workspaces = review_workspaces(lease)?;
         let history = generations::activations(lease.root())?;
-        let (active, _) = history.last().ok_or_else(|| unsupported("MediaV1 source has no selected activation"))?;
+        let (active, _) = history
+            .last()
+            .ok_or_else(|| unsupported("MediaV1 source has no selected activation"))?;
         let selection = lease.selection()?;
         let selected = lease.path(&selection)?;
         if active.root_id != self.root_id()
             || selection.activation_id.as_deref() != Some(active.id.as_str())
-            || active.location != (GenerationLocation::Workspace { operation_id: active.operation_id.clone(), role: GenerationRole::Target })
-            || active.store_version != 3 || !exact_capabilities(&active.required_capabilities, MEDIA_V1_CAPABILITIES)
+            || active.location
+                != (GenerationLocation::Workspace {
+                    operation_id: active.operation_id.clone(),
+                    role: GenerationRole::Target,
+                })
+            || active.store_version != 3
+            || !exact_capabilities(&active.required_capabilities, MEDIA_V1_CAPABILITIES)
             || self.generation_path()? != selected
         {
-            return Err(unsupported("Selected native generation is outside the exact MediaV1 source profile"));
+            return Err(unsupported(
+                "Selected native generation is outside the exact MediaV1 source profile",
+            ));
         }
         let read = self.db.begin_read().map_err(storage)?;
         let table = read.open_table(RECORDS).map_err(storage)?;
-        let cap_row = table.get("meta/required-capabilities").map_err(storage)?
+        let cap_row = table
+            .get("meta/required-capabilities")
+            .map_err(storage)?
             .ok_or_else(|| unsupported("Selected MediaV1 capabilities are missing"))?;
         let caps: Vec<String> = decode(cap_row.value())?;
         if !exact_capabilities(&caps, MEDIA_V1_CAPABILITIES)
-            || table.get("meta/schema").map_err(storage)?.as_ref().map(|value| value.value()) != Some(b"3".as_slice())
+            || table
+                .get("meta/schema")
+                .map_err(storage)?
+                .as_ref()
+                .map(|value| value.value())
+                != Some(b"3".as_slice())
         {
-            return Err(unsupported("Selected store does not hold the exact MediaV1 reader floor"));
+            return Err(unsupported(
+                "Selected store does not hold the exact MediaV1 reader floor",
+            ));
         }
         let guard = media_generations::guard(&table)?;
         if guard.migration_id != active.operation_id || guard.activation_id != active.id {
-            return Err(unsupported("Selected MediaV1 adoption guard differs from the actual activation"));
+            return Err(unsupported(
+                "Selected MediaV1 adoption guard differs from the actual activation",
+            ));
         }
         let operation_id = &active.operation_id;
         let initialization_key = format!("generation-initialization/{operation_id}");
         let promotion_key = format!("generation-promotion/{operation_id}");
         let (origin, plan_hash, receipt_field, operation) = match (
-            table.get(initialization_key.as_str()).map_err(storage)?.is_some(),
-            table.get(promotion_key.as_str()).map_err(storage)?.is_some(),
+            table
+                .get(initialization_key.as_str())
+                .map_err(storage)?
+                .is_some(),
+            table
+                .get(promotion_key.as_str())
+                .map_err(storage)?
+                .is_some(),
         ) {
             (true, false) => (
                 SourceOrigin::MediaV1Initialization,
@@ -406,49 +514,89 @@ impl Store {
                 "promotion_id",
                 self.enablement(operation_id, false)?,
             ),
-            _ => return Err(unsupported("Selected MediaV1 origin record is missing or ambiguous")),
+            _ => {
+                return Err(unsupported(
+                    "Selected MediaV1 origin record is missing or ambiguous",
+                ));
+            }
         };
-        if operation.phase != EnablementPhase::Succeeded || operation.target_generation != active.generation
-            || operation.activation_id != active.id || operation.predecessor_restoration.is_some()
+        if operation.phase != EnablementPhase::Succeeded
+            || operation.target_generation != active.generation
+            || operation.activation_id != active.id
+            || operation.predecessor_restoration.is_some()
         {
-            return Err(unsupported("MediaV1 origin is outside the completed source lineage"));
+            return Err(unsupported(
+                "MediaV1 origin is outside the completed source lineage",
+            ));
         }
         let source_sequence = usize::try_from(operation.source_sequence).map_err(storage)?;
-        let prefix = history.get(..source_sequence).ok_or_else(|| unsupported("MediaV1 predecessor prefix is missing"))?;
-        let (predecessor, _) = prefix.last().ok_or_else(|| unsupported("MediaV1 predecessor prefix is empty"))?;
-        if predecessor.id != operation.source_activation_id || predecessor.operation_id != operation.source_operation_id
+        let prefix = history
+            .get(..source_sequence)
+            .ok_or_else(|| unsupported("MediaV1 predecessor prefix is missing"))?;
+        let (predecessor, _) = prefix
+            .last()
+            .ok_or_else(|| unsupported("MediaV1 predecessor prefix is empty"))?;
+        if predecessor.id != operation.source_activation_id
+            || predecessor.operation_id != operation.source_operation_id
             || predecessor.generation != operation.source_generation
             || media_generations::prefix_digest(prefix) != operation.source_prefix_sha256
         {
-            return Err(unsupported("MediaV1 origin no longer matches its captured predecessor prefix"));
+            return Err(unsupported(
+                "MediaV1 origin no longer matches its captured predecessor prefix",
+            ));
         }
         let transform_key = format!("generation-transform/{operation_id}");
-        let transform = table.get(transform_key.as_str()).map_err(storage)?.ok_or_else(|| unsupported("MediaV1 origin transformation is missing"))?;
+        let transform = table
+            .get(transform_key.as_str())
+            .map_err(storage)?
+            .ok_or_else(|| unsupported("MediaV1 origin transformation is missing"))?;
         if !transform_matches(&decode(transform.value())?, &operation) {
-            return Err(unsupported("MediaV1 transformation differs from the completed origin"));
+            return Err(unsupported(
+                "MediaV1 transformation differs from the completed origin",
+            ));
         }
-        let receipt = restoration_control::receipt(&table, &operation.receipt_key, &operation.request_digest, operation_id, receipt_field)?;
+        let receipt = restoration_control::receipt(
+            &table,
+            &operation.receipt_key,
+            &operation.request_digest,
+            operation_id,
+            receipt_field,
+        )?;
         let operation_workspace = workspaces.child_directory(operation_id.as_ref())?;
         let rollback = operation_workspace.child_directory("rollback".as_ref())?;
         let manifest = copies::inspect_completed_copy(&rollback, cancel)?;
-        if manifest.role != "rollback" || manifest.operation_id != *operation_id
-            || manifest.source.root_id != active.root_id || manifest.source.record_count != operation.source_records
+        if manifest.role != "rollback"
+            || manifest.operation_id != *operation_id
+            || manifest.source.root_id != active.root_id
+            || manifest.source.record_count != operation.source_records
             || manifest.source.records_sha256 != operation.source_records_sha256
         {
-            return Err(unsupported("MediaV1 rollback copy does not prove the original source"));
+            return Err(unsupported(
+                "MediaV1 rollback copy does not prove the original source",
+            ));
         }
         operation_workspace.revalidate()?;
         workspaces.revalidate()?;
         let (records, records_sha256) = media_generations::raw_hash(&table)?;
-        let stamp = nw_platform::files::SourceStamp::capture_resolved(&selected.join("store.redb"))?;
+        let stamp =
+            nw_platform::files::SourceStamp::capture_resolved(&selected.join("store.redb"))?;
         let bytes = stamp.byte_len()?.to_string();
         lease.revalidate()?;
         Ok(SourceMediaV1 {
-            origin, origin_operation_id: operation_id.clone(), origin_plan_sha256: plan_hash,
-            origin_receipt_sha256: nw_domain::projects::hash(&receipt), generation: active.generation,
-            activation_id: active.id.clone(), activation_sequence: active.sequence,
-            activation_prefix_sha256: media_generations::prefix_digest(&history), store_version: active.store_version,
-            capabilities: caps, guard_revision: guard.revision, records_sha256, records, bytes,
+            origin,
+            origin_operation_id: operation_id.clone(),
+            origin_plan_sha256: plan_hash,
+            origin_receipt_sha256: nw_domain::projects::hash(&receipt),
+            generation: active.generation,
+            activation_id: active.id.clone(),
+            activation_sequence: active.sequence,
+            activation_prefix_sha256: media_generations::prefix_digest(&history),
+            store_version: active.store_version,
+            capabilities: caps,
+            guard_revision: guard.revision,
+            records_sha256,
+            records,
+            bytes,
         })
     }
 }

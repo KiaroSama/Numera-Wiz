@@ -311,7 +311,6 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
         .unwrap_err();
     assert_eq!(error.code, "SOURCE_CHANGED");
     assert_eq!(engine.media_process_capacity(), (2, 2, 0));
-
 }
 
 fn observed_tag<'a>(value: &'a serde_json::Value, name: &str) -> Option<&'a str> {

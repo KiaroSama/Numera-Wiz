@@ -1,8 +1,11 @@
 //! Bounded accepted mixed-media rows and their private original bindings.
 use crate::{
-    DomainError, Result, media::{BoundSource, MediaPlanV2, MAX_CLIPS},
+    DomainError, Result,
+    media::{BoundSource, MAX_CLIPS, MediaPlanV2},
     media_execution::{MediaJobState, ReviewedMediaPlan, decode_reviewed_media_plan, exact, hash},
-    plans::SourcePurpose, projects, records::{FileIdentity, NativeObjectIdentity, StagingIntent},
+    plans::SourcePurpose,
+    projects,
+    records::{FileIdentity, NativeObjectIdentity, StagingIntent},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -106,14 +109,21 @@ impl AcceptedMixedPayload {
         hash(&self.original_bindings_sha256)?;
         hash(&self.raw_plan_sha256)?;
         hash(&self.plan_hash)?;
-        if self.schema_version != 2 || projects::hash(self.raw_plan.as_bytes()) != self.raw_plan_sha256 {
+        if self.schema_version != 2
+            || projects::hash(self.raw_plan.as_bytes()) != self.raw_plan_sha256
+        {
             return Err(invalid("Accepted mixed plan bytes or schema differ"));
         }
         let ReviewedMediaPlan::V2(plan) = decode_reviewed_media_plan(&self.raw_plan)? else {
             return Err(invalid("Mixed accepted payload requires a MediaV2 plan"));
         };
-        if plan.hash != self.plan_hash || plan.payload.root_id != self.root_id || plan.payload.principal != self.principal {
-            return Err(invalid("Accepted mixed plan root, principal or semantic digest differs"));
+        if plan.hash != self.plan_hash
+            || plan.payload.root_id != self.root_id
+            || plan.payload.principal != self.principal
+        {
+            return Err(invalid(
+                "Accepted mixed plan root, principal or semantic digest differs",
+            ));
         }
         Ok(*plan)
     }
@@ -124,9 +134,12 @@ impl MixedOriginalBindings {
         if self.sources.len() > MAX_CLIPS {
             return Err(invalid("Too many accepted mixed sources"));
         }
-        let encoded = serde_json::to_vec(self).map_err(|_| invalid("Cannot encode private mixed bindings"))?;
+        let encoded = serde_json::to_vec(self)
+            .map_err(|_| invalid("Cannot encode private mixed bindings"))?;
         if encoded.len() > 128 * 1024 {
-            return Err(invalid("Private mixed bindings exceed their serialized budget"));
+            return Err(invalid(
+                "Private mixed bindings exceed their serialized budget",
+            ));
         }
         let mut framed = b"NumeraWiz.MixedOriginalBindings.v2\0".to_vec();
         framed.extend(encoded);
@@ -134,21 +147,33 @@ impl MixedOriginalBindings {
     }
 
     pub fn validate(&self, accepted: &AcceptedMixedPayload, plan: &MediaPlanV2) -> Result<()> {
-        if self.schema_version != 2 || self.job_id != accepted.job_id || self.root_id != accepted.root_id
-            || self.principal != accepted.principal || self.raw_plan_sha256 != accepted.raw_plan_sha256
-            || self.plan_hash != plan.hash || self.digest()? != accepted.original_bindings_sha256
+        if self.schema_version != 2
+            || self.job_id != accepted.job_id
+            || self.root_id != accepted.root_id
+            || self.principal != accepted.principal
+            || self.raw_plan_sha256 != accepted.raw_plan_sha256
+            || self.plan_hash != plan.hash
+            || self.digest()? != accepted.original_bindings_sha256
             || self.sources.len() != plan.payload.sources.len()
         {
-            return Err(invalid("Private mixed inputs differ from the accepted plan binding"));
+            return Err(invalid(
+                "Private mixed inputs differ from the accepted plan binding",
+            ));
         }
         for (original, frozen) in self.sources.iter().zip(&plan.payload.sources) {
-            if original.source != *frozen || original.original.sha256 != frozen.content_sha256
-                || original.native_object.schema_version != 1 || original.native_parent.schema_version != 1
-                || original.original.path.is_empty() || original.original.path.len() > 16384
-                || original.original.path.contains('\0') || exact(&original.original.bytes)? == 0
+            if original.source != *frozen
+                || original.original.sha256 != frozen.content_sha256
+                || original.native_object.schema_version != 1
+                || original.native_parent.schema_version != 1
+                || original.original.path.is_empty()
+                || original.original.path.len() > 16384
+                || original.original.path.contains('\0')
+                || exact(&original.original.bytes)? == 0
                 || matches!(&original.source_purpose, SourcePurpose::CreatorBoundManaged { principal } if principal != &self.principal)
             {
-                return Err(invalid("An accepted original differs from the reviewed source metadata"));
+                return Err(invalid(
+                    "An accepted original differs from the reviewed source metadata",
+                ));
             }
         }
         Ok(())
@@ -156,17 +181,29 @@ impl MixedOriginalBindings {
 }
 
 impl MediaJobV2 {
-    pub fn validate_accepted(&self, accepted: &AcceptedMixedPayload, plan: &MediaPlanV2) -> Result<()> {
-        if self.envelope_version != 2 || self.id != accepted.job_id || self.creator != accepted.principal || self.plan_id != plan.id
-            || self.raw_plan_sha256 != accepted.raw_plan_sha256 || self.plan_hash != plan.hash
+    pub fn validate_accepted(
+        &self,
+        accepted: &AcceptedMixedPayload,
+        plan: &MediaPlanV2,
+    ) -> Result<()> {
+        if self.envelope_version != 2
+            || self.id != accepted.job_id
+            || self.creator != accepted.principal
+            || self.plan_id != plan.id
+            || self.raw_plan_sha256 != accepted.raw_plan_sha256
+            || self.plan_hash != plan.hash
             || self.original_bindings_sha256 != accepted.original_bindings_sha256
-            || self.reservation.schema_version != 2 || self.reservation.source_count != plan.payload.sources.len()
+            || self.reservation.schema_version != 2
+            || self.reservation.source_count != plan.payload.sources.len()
             || self.reservation.decoded_output_bytes != plan.payload.resources.decoded_output_bytes
             || exact(&self.reservation.retained_buffer_bytes)? == 0
-            || exact(&self.reservation.retained_buffer_bytes)? > crate::media_execution::MEDIA_RESERVATION_POOL_BYTES
+            || exact(&self.reservation.retained_buffer_bytes)?
+                > crate::media_execution::MEDIA_RESERVATION_POOL_BYTES
             || (self.state == MediaJobState::Succeeded) != self.artifact.is_some()
         {
-            return Err(invalid("Mixed job execution rows differ from the accepted plan"));
+            return Err(invalid(
+                "Mixed job execution rows differ from the accepted plan",
+            ));
         }
         Ok(())
     }
@@ -174,14 +211,21 @@ impl MediaJobV2 {
 
 impl MixedExecutionAuthority {
     pub fn validate(&self, accepted: &AcceptedMixedPayload) -> Result<()> {
-        if self.schema_version != 2 || self.job_id != accepted.job_id || self.root_id != accepted.root_id
-            || self.principal != accepted.principal || self.plan_hash != accepted.plan_hash
+        if self.schema_version != 2
+            || self.job_id != accepted.job_id
+            || self.root_id != accepted.root_id
+            || self.principal != accepted.principal
+            || self.plan_hash != accepted.plan_hash
             || self.raw_plan_sha256 != accepted.raw_plan_sha256
             || self.original_bindings_sha256 != accepted.original_bindings_sha256
-            || self.output_parent.schema_version != 1 || self.output.is_empty() || self.output.len() > 16384
+            || self.output_parent.schema_version != 1
+            || self.output.is_empty()
+            || self.output.len() > 16384
             || self.output.contains('\0')
         {
-            return Err(invalid("Mixed execution authority does not match the accepted source and output bindings"));
+            return Err(invalid(
+                "Mixed execution authority does not match the accepted source and output bindings",
+            ));
         }
         Ok(())
     }
@@ -189,7 +233,8 @@ impl MixedExecutionAuthority {
 
 pub fn decode_mixed_job(bytes: &[u8]) -> Result<MediaJobV2> {
     crate::commands::decode_json(bytes)?;
-    let job: MediaJobV2 = serde_json::from_slice(bytes).map_err(|_| invalid("Invalid mixed job row"))?;
+    let job: MediaJobV2 =
+        serde_json::from_slice(bytes).map_err(|_| invalid("Invalid mixed job row"))?;
     projects::validate_id(&job.id)?;
     projects::validate_id(&job.plan_id)?;
     hash(&job.raw_plan_sha256)?;
@@ -197,10 +242,18 @@ pub fn decode_mixed_job(bytes: &[u8]) -> Result<MediaJobV2> {
     hash(&job.original_bindings_sha256)?;
     let accepted_at = exact(&job.accepted_at)?;
     exact(&job.revision)?;
-    if job.envelope_version != 2 || job.queue_ticket != format!("{accepted_at:020}/{}", job.id)
-        || job.creator.is_empty() || job.creator.len() > 256 || job.creator.chars().any(char::is_control)
-        || job.output.is_empty() || job.output.len() > 16384 || job.output.contains('\0')
-        || job.owned_staging.as_ref().is_some_and(|intent| intent.job_id != job.id)
+    if job.envelope_version != 2
+        || job.queue_ticket != format!("{accepted_at:020}/{}", job.id)
+        || job.creator.is_empty()
+        || job.creator.len() > 256
+        || job.creator.chars().any(char::is_control)
+        || job.output.is_empty()
+        || job.output.len() > 16384
+        || job.output.contains('\0')
+        || job
+            .owned_staging
+            .as_ref()
+            .is_some_and(|intent| intent.job_id != job.id)
         || (job.state == MediaJobState::Succeeded) != job.artifact.is_some()
     {
         return Err(invalid("Mixed job identity or state is inconsistent"));

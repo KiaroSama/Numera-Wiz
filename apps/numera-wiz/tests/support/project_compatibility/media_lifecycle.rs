@@ -9,10 +9,10 @@ use nw_domain::records::NativeObjectIdentity;
 use nw_platform::files::{DirectoryStamp, SourceStamp};
 use tokio_util::sync::CancellationToken;
 
-#[path = "media_lifecycle/origins.rs"]
-mod origins;
 #[path = "media_lifecycle/mixed_origin.rs"]
 pub(super) mod mixed_origin;
+#[path = "media_lifecycle/origins.rs"]
+mod origins;
 
 pub(super) async fn origin(fresh: bool, evidence: &Evidence) -> Result<Value> {
     origins::run(fresh, evidence).await

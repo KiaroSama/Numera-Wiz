@@ -84,12 +84,30 @@ pub struct MixedReview<'a> {
 }
 
 fn source_set(capture: &MixedCapture, sources: &[BoundSource]) -> Result<()> {
-    let expected = capture.tracks.iter().flat_map(|t| &t.clips).filter_map(|clip| {
-        let OccurrenceSource::Registered { asset_id, content_sha256, probe_sha256, stream_index, media_kind } = &clip.source else {
-            return None;
-        };
-        Some((asset_id.as_str(), *stream_index, content_sha256.as_str(), probe_sha256.as_str(), *media_kind == projects::TrackKind::Audio))
-    }).collect::<BTreeSet<_>>();
+    let expected = capture
+        .tracks
+        .iter()
+        .flat_map(|t| &t.clips)
+        .filter_map(|clip| {
+            let OccurrenceSource::Registered {
+                asset_id,
+                content_sha256,
+                probe_sha256,
+                stream_index,
+                media_kind,
+            } = &clip.source
+            else {
+                return None;
+            };
+            Some((
+                asset_id.as_str(),
+                *stream_index,
+                content_sha256.as_str(),
+                probe_sha256.as_str(),
+                *media_kind == projects::TrackKind::Audio,
+            ))
+        })
+        .collect::<BTreeSet<_>>();
     let mut keys = BTreeSet::new();
     let mut last = None;
     for source in sources {
@@ -98,15 +116,29 @@ fn source_set(capture: &MixedCapture, sources: &[BoundSource]) -> Result<()> {
         hash_text(&source.content_sha256)?;
         hash_text(&source.probe_sha256)?;
         let key = (source.asset_id.as_str(), source.stream_index);
-        if last.is_some_and(|last| last >= key) || source.codec.is_empty() || source.codec.len() > 64
-            || source.time_base <= Rational::ZERO || source.asset_origin > source.stream_start {
-            return Err(invalid("Registered source bindings are not in canonical order or lack an exact clock"));
+        if last.is_some_and(|last| last >= key)
+            || source.codec.is_empty()
+            || source.codec.len() > 64
+            || source.time_base <= Rational::ZERO
+            || source.asset_origin > source.stream_start
+        {
+            return Err(invalid(
+                "Registered source bindings are not in canonical order or lack an exact clock",
+            ));
         }
         last = Some(key);
-        keys.insert((key.0, key.1, source.content_sha256.as_str(), source.probe_sha256.as_str(), source.media_kind == projects::TrackKind::Audio));
+        keys.insert((
+            key.0,
+            key.1,
+            source.content_sha256.as_str(),
+            source.probe_sha256.as_str(),
+            source.media_kind == projects::TrackKind::Audio,
+        ));
     }
     if expected != keys {
-        return Err(invalid("Registered bindings differ from the captured source set"));
+        return Err(invalid(
+            "Registered bindings differ from the captured source set",
+        ));
     }
     Ok(())
 }
@@ -120,8 +152,11 @@ fn resources(capture: &MixedCapture, graph: &MixedGraph, sources: usize) -> Resu
         AudioLayout::Mono => 1,
         AudioLayout::Stereo => 2,
     };
-    let audio_bytes = decimal(&graph.output_samples)?.checked_mul(channels * 2).ok_or_else(limit)?;
-    let decoded_bytes = video_bytes.checked_add(audio_bytes)
+    let audio_bytes = decimal(&graph.output_samples)?
+        .checked_mul(channels * 2)
+        .ok_or_else(limit)?;
+    let decoded_bytes = video_bytes
+        .checked_add(audio_bytes)
         .filter(|bytes| *bytes <= crate::media_execution::MAX_OUTPUT_BYTES)
         .ok_or_else(limit)?;
     Ok(MixedResources {
@@ -140,9 +175,13 @@ impl MediaPlanV2 {
         tools: MixedTools,
         review: MixedReview<'_>,
     ) -> Result<Self> {
-        if capture.sequence_id != request.sequence_id || capture.project_revision != request.revision
-            || capture.range != request.range {
-            return Err(invalid("Mixed review range or sequence differs from its authoritative capture"));
+        if capture.sequence_id != request.sequence_id
+            || capture.project_revision != request.revision
+            || capture.range != request.range
+        {
+            return Err(invalid(
+                "Mixed review range or sequence differs from its authoritative capture",
+            ));
         }
         let graph = compile_mixed_graph(&capture)?;
         let resources = resources(&capture, &graph, sources.len())?;
@@ -152,11 +191,22 @@ impl MediaPlanV2 {
             id: review.id.into(),
             hash: "0".repeat(64),
             created_at: review.now.to_string(),
-            expires_at: review.now.checked_add(300).ok_or_else(|| projects::limit("Mixed review clock range exhausted"))?.to_string(),
+            expires_at: review
+                .now
+                .checked_add(300)
+                .ok_or_else(|| projects::limit("Mixed review clock range exhausted"))?
+                .to_string(),
             payload: MixedPayload {
-                root_id: review.root_id.into(), application_build: review.application_build.into(), principal: review.principal.into(),
-                required_capability: "media_execution.v2".into(), capture, sources, graph, tools,
-                output: request.output.clone(), resources,
+                root_id: review.root_id.into(),
+                application_build: review.application_build.into(),
+                principal: review.principal.into(),
+                required_capability: "media_execution.v2".into(),
+                capture,
+                sources,
+                graph,
+                tools,
+                output: request.output.clone(),
+                resources,
             },
         };
         plan.hash = plan.digest()?;
@@ -167,19 +217,35 @@ impl MediaPlanV2 {
         let payload = &self.payload;
         projects::validate_id(&self.id)?;
         projects::validate_id(&payload.root_id)?;
-        for value in [&payload.application_build, &payload.tools.profile_sha256, &payload.tools.ffmpeg.sha256, &payload.tools.ffprobe.sha256] {
+        for value in [
+            &payload.application_build,
+            &payload.tools.profile_sha256,
+            &payload.tools.ffmpeg.sha256,
+            &payload.tools.ffprobe.sha256,
+        ] {
             hash_text(value)?;
         }
-        if self.envelope_version != 2 || payload.required_capability != "media_execution.v2"
-            || payload.principal.is_empty() || payload.principal.len() > 256 || payload.principal.chars().any(char::is_control)
-            || decimal(&payload.tools.ffmpeg.bytes)? == 0 || decimal(&payload.tools.ffprobe.bytes)? == 0
-            || decimal(&self.created_at)?.checked_add(300) != Some(decimal(&self.expires_at)?) {
-            return Err(invalid("Invalid mixed review identity, component or expiry"));
+        if self.envelope_version != 2
+            || payload.required_capability != "media_execution.v2"
+            || payload.principal.is_empty()
+            || payload.principal.len() > 256
+            || payload.principal.chars().any(char::is_control)
+            || decimal(&payload.tools.ffmpeg.bytes)? == 0
+            || decimal(&payload.tools.ffprobe.bytes)? == 0
+            || decimal(&self.created_at)?.checked_add(300) != Some(decimal(&self.expires_at)?)
+        {
+            return Err(invalid(
+                "Invalid mixed review identity, component or expiry",
+            ));
         }
         let graph = compile_mixed_graph(&payload.capture)?;
         source_set(&payload.capture, &payload.sources)?;
-        if payload.graph != graph || payload.resources != resources(&payload.capture, &graph, payload.sources.len())? {
-            return Err(invalid("Mixed review graph or resources differ from the authoritative capture"));
+        if payload.graph != graph
+            || payload.resources != resources(&payload.capture, &graph, payload.sources.len())?
+        {
+            return Err(invalid(
+                "Mixed review graph or resources differ from the authoritative capture",
+            ));
         }
         if encode(self)?.len() > MAX_PLAN_BYTES {
             return Err(projects::limit("Serialized mixed media plan exceeds128KiB"));

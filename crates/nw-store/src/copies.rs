@@ -83,19 +83,31 @@ pub(crate) fn inspect_completed_copy(
         }
         Ok(content)
     };
-    let manifest: CopyManifest = serde_json::from_slice(&read_evidence("copy.json")?).map_err(storage)?;
-    if manifest.schema_version != 1 || read_evidence("complete.json")? != completion_bytes(&manifest, &manifest.source.records_sha256)? {
-        return Err(conflict("Copy completion evidence differs from its manifest"));
+    let manifest: CopyManifest =
+        serde_json::from_slice(&read_evidence("copy.json")?).map_err(storage)?;
+    if manifest.schema_version != 1
+        || read_evidence("complete.json")?
+            != completion_bytes(&manifest, &manifest.source.records_sha256)?
+    {
+        return Err(conflict(
+            "Copy completion evidence differs from its manifest",
+        ));
     }
     let source = directory.open_child_source("store.redb".as_ref())?;
     let identity = source.identity_with_limit(cancel, versions::MAX_GENERATION_BYTES)?;
-    if identity.sha256 != manifest.source_file_sha256 || identity.bytes != manifest.source_file_bytes {
-        return Err(conflict("Completed copy bytes differ from verified copy evidence"));
+    if identity.sha256 != manifest.source_file_sha256
+        || identity.bytes != manifest.source_file_bytes
+    {
+        return Err(conflict(
+            "Completed copy bytes differ from verified copy evidence",
+        ));
     }
     let mut facts = versions::inspect_closed(directory.path())?;
     facts.store_bytes = manifest.source.store_bytes.clone();
     if facts != manifest.source {
-        return Err(conflict("Completed copy records differ from verified copy evidence"));
+        return Err(conflict(
+            "Completed copy records differ from verified copy evidence",
+        ));
     }
     source.revalidate()?;
     directory.revalidate()?;
@@ -600,7 +612,10 @@ mod tests {
         let marker = copied.path.join("complete.json");
         let original_marker = std::fs::read(&marker).unwrap();
         std::fs::write(&marker, b"{}\n").unwrap();
-        assert_eq!(inspect_completed_copy(&retained, &cancel).unwrap_err().code, "STORE_COPY_CONFLICT");
+        assert_eq!(
+            inspect_completed_copy(&retained, &cancel).unwrap_err().code,
+            "STORE_COPY_CONFLICT"
+        );
         assert_eq!(std::fs::read(&marker).unwrap(), b"{}\n");
         std::fs::write(&marker, original_marker).unwrap();
         drop(retained);

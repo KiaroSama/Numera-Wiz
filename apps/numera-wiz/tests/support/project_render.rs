@@ -196,16 +196,34 @@ pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fi
 }
 
 async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {
-    let (reviewed, code) = cli.human(&["maintenance", "media-v2", "promotion-plan"]).await;
+    let (reviewed, code) = cli
+        .human(&["maintenance", "media-v2", "promotion-plan"])
+        .await;
     assert_eq!(code, 0, "{}", reviewed["error"]);
     let reviewed = &reviewed["result"];
     assert_eq!(reviewed["kind"], "generation_promotion_v2");
-    assert!(reviewed["source"]["guard_revision"].as_str().unwrap().parse::<u64>().unwrap() > 0);
+    assert!(
+        reviewed["source"]["guard_revision"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 0
+    );
     let review_file = cli.data.join("mixed-enablement-review.json");
     std::fs::write(&review_file, serde_json::to_vec(reviewed).unwrap()).unwrap();
     let accept = [
-        "maintenance", "media-v2", "accept", "--plan-file", review_file.to_str().unwrap(),
-        "--replay-scope", scope, "--idempotency-key", key, "--request-id", key,
+        "maintenance",
+        "media-v2",
+        "accept",
+        "--plan-file",
+        review_file.to_str().unwrap(),
+        "--replay-scope",
+        scope,
+        "--idempotency-key",
+        key,
+        "--request-id",
+        key,
     ];
     let (accepted, code) = cli.human(&accept).await;
     assert_eq!(code, 0, "{}", accepted["error"]);
@@ -218,21 +236,35 @@ async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {
 }
 
 async fn restore_unadopted_mixed(cli: &Cli, scope: &str, enablement: &str) {
-    let (reviewed, code) = cli.human(&["maintenance", "media-v2", "restore", "plan", enablement]).await;
+    let (reviewed, code) = cli
+        .human(&["maintenance", "media-v2", "restore", "plan", enablement])
+        .await;
     assert_eq!(code, 0, "{}", reviewed["error"]);
     let review = &reviewed["result"];
     assert_eq!(review["kind"], "generation_promotion_restoration_v2");
     let file = cli.data.join("mixed-restoration-review.json");
     std::fs::write(&file, serde_json::to_vec(review).unwrap()).unwrap();
     let accept = [
-        "maintenance", "media-v2", "restore", "accept", "--plan-file", file.to_str().unwrap(),
-        "--replay-scope", scope, "--idempotency-key", "mixed-restore-owner", "--request-id", "mixed-restore-owner",
+        "maintenance",
+        "media-v2",
+        "restore",
+        "accept",
+        "--plan-file",
+        file.to_str().unwrap(),
+        "--replay-scope",
+        scope,
+        "--idempotency-key",
+        "mixed-restore-owner",
+        "--request-id",
+        "mixed-restore-owner",
     ];
     let (accepted, code) = cli.human(&accept).await;
     assert_eq!(code, 0, "{}", accepted["error"]);
     assert_eq!(accepted["result"]["restoration_id"], review["id"]);
     let id = review["id"].as_str().unwrap();
-    let (inspected, code) = cli.human(&["maintenance", "media-v2", "restore", "inspect", id]).await;
+    let (inspected, code) = cli
+        .human(&["maintenance", "media-v2", "restore", "inspect", id])
+        .await;
     assert_eq!(code, 0, "{}", inspected["error"]);
     assert_eq!(inspected["result"]["status"], "armed");
     assert_eq!(inspected["result"]["plan"], *review);
@@ -245,13 +277,26 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
     use nw_domain::media::MediaPlanV2;
     use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 
-    let settings = [ "timeline", "render", "--mixed", "--project", project,
-        "--revision", "4", "--sequence", sequence, "--end", "2" ];
+    let settings = [
+        "timeline",
+        "render",
+        "--mixed",
+        "--project",
+        project,
+        "--revision",
+        "4",
+        "--sequence",
+        sequence,
+        "--end",
+        "2",
+    ];
     let (before, code) = cli.human(&settings).await;
     assert_ne!(code, 0);
     assert_eq!(before["error"]["code"], "STORE_VERSION_UNSUPPORTED");
 
-    let (issued, code) = cli.human(&["access", "replay-scope", "create", "--json"]).await;
+    let (issued, code) = cli
+        .human(&["access", "replay-scope", "create", "--json"])
+        .await;
     assert_eq!(code, 0);
     let scope = issued["result"]["replay_scope"].as_str().unwrap();
     let first = enable_mixed(cli, scope, "mixed-enablement-owner").await;
@@ -287,8 +332,16 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
     let review_file = cli.data.join("mixed-render-review.json");
     std::fs::write(&review_file, &raw).unwrap();
     let submit = [
-        "jobs", "submit-media", "--plan-file", review_file.to_str().unwrap(),
-        "--replay-scope", scope, "--idempotency-key", "mixed-owner-job", "--request-id", "mixed-owner-job",
+        "jobs",
+        "submit-media",
+        "--plan-file",
+        review_file.to_str().unwrap(),
+        "--replay-scope",
+        scope,
+        "--idempotency-key",
+        "mixed-owner-job",
+        "--request-id",
+        "mixed-owner-job",
     ];
     let (accepted, code) = cli.human(&submit).await;
     assert_eq!(code, 0, "{}", accepted["error"]);
@@ -296,20 +349,28 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
     let job = cli.completed(id).await;
     assert_eq!(job["state"], "succeeded", "{}", job["error"]);
     assert_eq!(job["payload_kind"], "media_job_v2");
-    assert_eq!(job["payload_sha256"], nw_domain::projects::hash(raw.as_bytes()));
+    assert_eq!(
+        job["payload_sha256"],
+        nw_domain::projects::hash(raw.as_bytes())
+    );
     let artifact = format!("media-{id}-output");
-    let manifest = cli.query("artifacts.manifest", json!({"artifact_id":artifact})).await;
+    let manifest = cli
+        .query("artifacts.manifest", json!({"artifact_id":artifact}))
+        .await;
     let actual = nw_platform::files::identity(
         &cli.data.join("exports").join(format!("media-{id}.mkv")),
         &tokio_util::sync::CancellationToken::new(),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(manifest["sha256"], actual.sha256);
     assert_eq!(manifest["encoded_byte_count"], actual.bytes);
     let (replayed, code) = cli.human(&submit).await;
     assert_eq!(code, 0, "{}", replayed["error"]);
     assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
     assert_eq!(replayed["result"]["job_id"], id);
-    let (refused, code) = cli.human(&["maintenance", "media-v2", "restore", "plan", &second]).await;
+    let (refused, code) = cli
+        .human(&["maintenance", "media-v2", "restore", "plan", &second])
+        .await;
     assert_ne!(code, 0);
     assert_eq!(refused["error"]["code"], "RESTORATION_REFUSED");
 }

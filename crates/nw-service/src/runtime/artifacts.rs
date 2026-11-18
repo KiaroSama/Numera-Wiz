@@ -89,7 +89,8 @@ impl Service {
                 job.artifact.state == MediaArtifactState::Published,
             ),
             StoredJob::MediaV2(job) if media => (
-                job.owned_staging.as_ref(), job.artifact.as_ref(),
+                job.owned_staging.as_ref(),
+                job.artifact.as_ref(),
                 job.state == nw_domain::media_execution::MediaJobState::Succeeded,
             ),
             _ => return Err(DomainError::object_not_found()),

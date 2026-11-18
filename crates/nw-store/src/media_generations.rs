@@ -560,7 +560,11 @@ impl Store {
         }
         write.commit().map_err(storage)
     }
-    pub(crate) fn prepare_media_target(&self, lease: &RootLease, operation: &Enablement) -> Result<()> {
+    pub(crate) fn prepare_media_target(
+        &self,
+        lease: &RootLease,
+        operation: &Enablement,
+    ) -> Result<()> {
         let mut timing = LifecycleTiming::start("Copy accepted media target");
         let source = self.generation_path()?;
         let target = copies::workspace(lease, &operation.id)?.join("target");

@@ -273,24 +273,41 @@ fn inner(root: &Path, evidence: &Path) -> Result<Value> {
             && previous_identity["sha256"] == target["executable_sha256"],
         "Downloaded prior executable differs from independently frozen identity"
     );
-    let v1_path = configured("NW_COMPAT_MEDIA_V1_EXE", &workspace.join("media-v1").join(executable))?;
+    let v1_path = configured(
+        "NW_COMPAT_MEDIA_V1_EXE",
+        &workspace.join("media-v1").join(executable),
+    )?;
     let v1_manifest_path = root.join("ci/media-v1-compatibility-baseline.json");
     let v1_bytes = fs::read(&v1_manifest_path)?;
     let v1_manifest: Value = serde_json::from_slice(&v1_bytes)?;
-    let v1_target = v1_manifest["targets"].as_array().context("MediaV1 targets")?.iter()
-        .find(|target| target["target"] == label).context("MediaV1 target is missing")?;
-    baseline_metadata(&v1_manifest, v1_target, &evidence.join("media-v1-baseline-run.json"))?;
+    let v1_target = v1_manifest["targets"]
+        .as_array()
+        .context("MediaV1 targets")?
+        .iter()
+        .find(|target| target["target"] == label)
+        .context("MediaV1 target is missing")?;
+    baseline_metadata(
+        &v1_manifest,
+        v1_target,
+        &evidence.join("media-v1-baseline-run.json"),
+    )?;
     let v1_identity = digest(&v1_path)?;
     ensure!(
-        v1_identity["bytes"] == v1_target["executable_bytes"] && v1_identity["sha256"] == v1_target["executable_sha256"]
-            && v1_path != previous && v1_path != current && v1_identity != previous_identity,
+        v1_identity["bytes"] == v1_target["executable_bytes"]
+            && v1_identity["sha256"] == v1_target["executable_sha256"]
+            && v1_path != previous
+            && v1_path != current
+            && v1_identity != previous_identity,
         "Downloaded MediaV1 package differs from its independently frozen identity"
     );
-    write(&evidence.join("media-v1-preparation.json"), &json!({
-        "schema_version":1,"status":"prepared","target":label,"source_sha":v1_manifest["source_sha"],
-        "run_id":v1_manifest["run_id"],"manifest_sha256":hex::encode(Sha256::digest(&v1_bytes)),
-        "executable":v1_identity,
-    }))?;
+    write(
+        &evidence.join("media-v1-preparation.json"),
+        &json!({
+            "schema_version":1,"status":"prepared","target":label,"source_sha":v1_manifest["source_sha"],
+            "run_id":v1_manifest["run_id"],"manifest_sha256":hex::encode(Sha256::digest(&v1_bytes)),
+            "executable":v1_identity,
+        }),
+    )?;
     let name = format!(
         "numera-wiz-{}-{label}-{}-provenance.json",
         env!("CARGO_PKG_VERSION"),

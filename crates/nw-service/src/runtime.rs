@@ -1102,7 +1102,12 @@ impl Service {
             "timeline.render" => return self.media_review(&context, &request, &cancellation),
             "timeline.render_mixed" => {
                 drop(guard);
-                let (plan, _) = self.prepare_mixed_review(&context, &request, &commands::parse(params)?, &cancellation)?;
+                let (plan, _) = self.prepare_mixed_review(
+                    &context,
+                    &request,
+                    &commands::parse(params)?,
+                    &cancellation,
+                )?;
                 return Ok(Response::success(&request.request_id, plan).bounded());
             }
             "timeline.preview_frame" => {
@@ -1911,7 +1916,9 @@ impl Service {
                     raw.get("creator")
                         .and_then(Value::as_str)
                         .or_else(|| {
-                            (raw["payload_kind"] == "media_v2").then(|| raw["payload"]["principal"].as_str()).flatten()
+                            (raw["payload_kind"] == "media_v2")
+                                .then(|| raw["payload"]["principal"].as_str())
+                                .flatten()
                         })
                         .unwrap_or_default(),
                     ObjectAction::Read,
@@ -1922,15 +1929,21 @@ impl Service {
                             .map_err(|error| DomainError::new("INVALID_PLAN", error.to_string()))?,
                     )?;
                     let (id, project, response) = match &plan {
-                        nw_domain::media_execution::ReviewedMediaPlan::V1(plan) => (&plan.id, &plan.payload.capture.project_id, value(plan.as_ref())?),
-                        nw_domain::media_execution::ReviewedMediaPlan::V2(plan) => (&plan.id, &plan.payload.capture.project_id, value(plan.as_ref())?),
+                        nw_domain::media_execution::ReviewedMediaPlan::V1(plan) => (
+                            &plan.id,
+                            &plan.payload.capture.project_id,
+                            value(plan.as_ref())?,
+                        ),
+                        nw_domain::media_execution::ReviewedMediaPlan::V2(plan) => (
+                            &plan.id,
+                            &plan.payload.capture.project_id,
+                            value(plan.as_ref())?,
+                        ),
                     };
-                    if id != &input.id { return Err(DomainError::new("INVALID_PLAN", "Media plan key differs")); }
-                    self.read_project(
-                        &context,
-                        project.as_str(),
-                        ObjectAction::Read,
-                    )?;
+                    if id != &input.id {
+                        return Err(DomainError::new("INVALID_PLAN", "Media plan key differs"));
+                    }
+                    self.read_project(&context, project.as_str(), ObjectAction::Read)?;
                     return Ok(Response::success(&request.request_id, response).bounded());
                 }
                 let plan = self.read_plan(&context, &input.id, ObjectAction::Read)?;
@@ -2104,7 +2117,9 @@ impl Service {
                     nw_domain::media_execution::StoredJob::MediaV1(job) => {
                         self.media_job_view(&job)
                     }
-                    nw_domain::media_execution::StoredJob::MediaV2(job) => self.mixed_job_view(&job),
+                    nw_domain::media_execution::StoredJob::MediaV2(job) => {
+                        self.mixed_job_view(&job)
+                    }
                 }
             }
             "jobs.list" => self.inventory_page(
@@ -2124,12 +2139,22 @@ impl Service {
                     ObjectAction::Control,
                 )?;
                 let media_cancel = match execution {
-                    nw_domain::media_execution::StoredJob::MediaV1(job) => Some(self.store.cancel_media_with_clock(
-                        &context.principal, &request, &job.id, || self.clock.now(),
-                    )?),
-                    nw_domain::media_execution::StoredJob::MediaV2(job) => Some(self.store.cancel_mixed_with_clock(
-                        &context.principal, &request, &job.id, || self.clock.now(),
-                    )?),
+                    nw_domain::media_execution::StoredJob::MediaV1(job) => {
+                        Some(self.store.cancel_media_with_clock(
+                            &context.principal,
+                            &request,
+                            &job.id,
+                            || self.clock.now(),
+                        )?)
+                    }
+                    nw_domain::media_execution::StoredJob::MediaV2(job) => {
+                        Some(self.store.cancel_mixed_with_clock(
+                            &context.principal,
+                            &request,
+                            &job.id,
+                            || self.clock.now(),
+                        )?)
+                    }
                     nw_domain::media_execution::StoredJob::Legacy(_) => None,
                 };
                 if let Some(response) = media_cancel {

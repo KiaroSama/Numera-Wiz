@@ -112,7 +112,10 @@ pub(crate) fn reserve_queue_room(
             StoredJob::Legacy(_) => 0,
         };
         retained_bytes = retained_bytes.checked_add(bytes).ok_or_else(|| {
-            DomainError::new("RESOURCE_LIMIT", "Durable queue reservation exceeds its byte counter")
+            DomainError::new(
+                "RESOURCE_LIMIT",
+                "Durable queue reservation exceeds its byte counter",
+            )
         })?;
     }
     if pending >= domain::MAX_QUEUE || retained_bytes > domain::MEDIA_RESERVATION_POOL_BYTES {
@@ -166,7 +169,8 @@ pub(crate) fn require_media_floor(
         .unwrap_or_default();
     if schema.as_ref().map(|v| v.value()) != Some(b"3".as_slice())
         || !(exact_capabilities(&capabilities, &MEDIA_V2_CAPABILITIES)
-            || required == MediaFloor::V1 && exact_capabilities(&capabilities, MEDIA_V1_CAPABILITIES))
+            || required == MediaFloor::V1
+                && exact_capabilities(&capabilities, MEDIA_V1_CAPABILITIES))
     {
         return Err(DomainError::new(
             "STORE_VERSION_UNSUPPORTED",
@@ -304,7 +308,9 @@ impl Store {
                 media.validate_payload(&payload(&table, id)?)?;
                 validate_queue(&table, media)?;
             }
-            StoredJob::MediaV2(_) => { crate::media_execution_v2::read_execution(&table, id)?; }
+            StoredJob::MediaV2(_) => {
+                crate::media_execution_v2::read_execution(&table, id)?;
+            }
             StoredJob::Legacy(_) => {}
         }
         Ok(job)
@@ -335,7 +341,9 @@ impl Store {
                     media.validate_payload(&payload(&table, media.id.as_str())?)?;
                     validate_queue(&table, media)?;
                 }
-                StoredJob::MediaV2(media) => { crate::media_execution_v2::read_execution(&table, &media.id)?; }
+                StoredJob::MediaV2(media) => {
+                    crate::media_execution_v2::read_execution(&table, &media.id)?;
+                }
                 StoredJob::Legacy(_) => {}
             }
             visitor(job)?;

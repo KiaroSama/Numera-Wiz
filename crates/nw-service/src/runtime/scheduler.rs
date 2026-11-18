@@ -162,15 +162,27 @@ impl Service {
                             let job = finish.store.inspect_mixed_execution(&id)?.job;
                             if job.state == MediaJobState::Publishing && !uncertain {
                                 finish.reconcile_mixed_job(&job)?;
-                            } else if !job.state.terminal() && job.state != MediaJobState::Publishing {
-                                let error = outcome.err().unwrap_or_else(|| DomainError::new("VERIFICATION_REQUIRED", "Mixed renderer finished without a verified publication"));
+                            } else if !job.state.terminal()
+                                && job.state != MediaJobState::Publishing
+                            {
+                                let error = outcome.err().unwrap_or_else(|| {
+                                    DomainError::new(
+                                        "VERIFICATION_REQUIRED",
+                                        "Mixed renderer finished without a verified publication",
+                                    )
+                                });
                                 let state = media_failure_state(job.state, &error);
                                 finish.store.advance_mixed_job(&id, state, Some(error))?;
                             }
-                            finish.cancellations.lock().map_err(|_| lock_error())?.remove(&id);
+                            finish
+                                .cancellations
+                                .lock()
+                                .map_err(|_| lock_error())?
+                                .remove(&id);
                             let _ = finish.events.send(id);
                             Ok::<_, DomainError>(())
-                        }).await;
+                        })
+                        .await;
                         if let Ok(Err(error)) = finished {
                             tracing::error!(code = %error.code, "Mixed execution settlement remains retained");
                         }

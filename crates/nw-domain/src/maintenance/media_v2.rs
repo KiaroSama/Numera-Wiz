@@ -1,5 +1,9 @@
 //! Closed maintenance reviews for the transition from MediaV1 to MediaV2.
-use crate::{DomainError, Result, media_execution::{exact, hash}, projects};
+use crate::{
+    DomainError, Result,
+    media_execution::{exact, hash},
+    projects,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -19,7 +23,8 @@ pub const MEDIA_V2_CAPABILITIES: [&str; 10] = [
 
 pub fn exact_capabilities(actual: &[String], expected: &[&str]) -> bool {
     actual.len() == expected.len()
-        && actual.iter().map(String::as_str).collect::<BTreeSet<_>>() == expected.iter().copied().collect()
+        && actual.iter().map(String::as_str).collect::<BTreeSet<_>>()
+            == expected.iter().copied().collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -102,28 +107,50 @@ fn invalid(message: &str) -> DomainError {
 impl EnablementPlanV2 {
     pub fn digest(&self) -> Result<String> {
         let source = &self.source;
-        for value in [&self.id, &self.root_id, &source.origin_operation_id, &source.activation_id] {
+        for value in [
+            &self.id,
+            &self.root_id,
+            &source.origin_operation_id,
+            &source.activation_id,
+        ] {
             projects::validate_id(value)?;
         }
-        for value in [&self.application_build, &source.origin_plan_sha256, &source.origin_receipt_sha256, &source.activation_prefix_sha256, &source.records_sha256] {
+        for value in [
+            &self.application_build,
+            &source.origin_plan_sha256,
+            &source.origin_receipt_sha256,
+            &source.activation_prefix_sha256,
+            &source.records_sha256,
+        ] {
             hash(value)?;
         }
         let guard = exact(&source.guard_revision)?;
         let bytes = exact(&source.bytes)?;
         let estimated = exact(&self.estimated_additional_bytes)?;
-        if self.schema_version != 2 || source.store_version != 3
-            || !exact_capabilities(&source.capabilities, super::promotion::MEDIA_V1_CAPABILITIES)
+        if self.schema_version != 2
+            || source.store_version != 3
+            || !exact_capabilities(
+                &source.capabilities,
+                super::promotion::MEDIA_V1_CAPABILITIES,
+            )
             || !exact_capabilities(&self.required_capabilities, &MEDIA_V2_CAPABILITIES)
-            || source.generation == 0 || source.generation.checked_add(1) != Some(self.rollback_generation)
+            || source.generation == 0
+            || source.generation.checked_add(1) != Some(self.rollback_generation)
             || self.rollback_generation.checked_add(1) != Some(self.target_generation)
             || self.target_generation > super::MAX_GENERATIONS
             || !(1..=64).contains(&source.activation_sequence)
-            || !(1..=49000).contains(&source.records) || !(1..=super::MAX_MIGRATION_BYTES).contains(&bytes)
-            || bytes.checked_mul(3).and_then(|value| value.checked_add(64 * 1024 * 1024)) != Some(estimated)
+            || !(1..=49000).contains(&source.records)
+            || !(1..=super::MAX_MIGRATION_BYTES).contains(&bytes)
+            || bytes
+                .checked_mul(3)
+                .and_then(|value| value.checked_add(64 * 1024 * 1024))
+                != Some(estimated)
             || (self.kind == EnablementKind::MediaInitializationV2) != (guard == 0)
             || exact(&self.created_at)?.checked_add(300) != Some(exact(&self.expires_at)?)
         {
-            return Err(invalid("Mixed generation review differs from the exact source, target or guard policy"));
+            return Err(invalid(
+                "Mixed generation review differs from the exact source, target or guard policy",
+            ));
         }
         let mut semantic = self.clone();
         semantic.hash.clear();
@@ -132,13 +159,18 @@ impl EnablementPlanV2 {
         semantic.expires_at.clear();
         semantic.source.capabilities.sort();
         semantic.required_capabilities.sort();
-        let encoded = serde_json::to_vec(&semantic).map_err(|_| invalid("Cannot encode mixed generation review"))?;
+        let encoded = serde_json::to_vec(&semantic)
+            .map_err(|_| invalid("Cannot encode mixed generation review"))?;
         if encoded.len() > 32 * 1024 {
             return Err(invalid("Mixed generation review exceeds the 32 KiB budget"));
         }
         let mut framed = match self.kind {
-            EnablementKind::MediaInitializationV2 => b"NumeraWiz.MediaInitializationPlan.v2\0".to_vec(),
-            EnablementKind::GenerationPromotionV2 => b"NumeraWiz.GenerationPromotionPlan.v2\0".to_vec(),
+            EnablementKind::MediaInitializationV2 => {
+                b"NumeraWiz.MediaInitializationPlan.v2\0".to_vec()
+            }
+            EnablementKind::GenerationPromotionV2 => {
+                b"NumeraWiz.GenerationPromotionPlan.v2\0".to_vec()
+            }
         };
         framed.extend(encoded);
         Ok(projects::hash(&framed))

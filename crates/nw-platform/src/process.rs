@@ -239,7 +239,10 @@ struct StreamedOutput {
 
 impl StreamedOutput {
     fn legacy(consumer: ChunkConsumer) -> Self {
-        Self { max_bytes: LEGACY_STREAM_BYTES, consumer }
+        Self {
+            max_bytes: LEGACY_STREAM_BYTES,
+            consumer,
+        }
     }
 }
 
@@ -277,9 +280,19 @@ pub async fn stream_readonly_with_output_limits(
     consumer: ChunkConsumer,
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
-    stream_verified_readonly(program, args, deadline, input, StreamLimits {
-        stdout_bytes: LEGACY_STREAM_BYTES, stderr_bytes: stderr_limit,
-    }, consumer, cancel).await
+    stream_verified_readonly(
+        program,
+        args,
+        deadline,
+        input,
+        StreamLimits {
+            stdout_bytes: LEGACY_STREAM_BYTES,
+            stderr_bytes: stderr_limit,
+        },
+        consumer,
+        cancel,
+    )
+    .await
 }
 
 pub struct StreamLimits {
@@ -298,7 +311,10 @@ pub async fn stream_verified_readonly(
     cancel: CancellationToken,
 ) -> Result<RunOutput> {
     if !(1..=MAX_VERIFIED_STREAM_BYTES).contains(&limits.stdout_bytes) {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Reviewed streamed stdout budget is outside its supported range"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Reviewed streamed stdout budget is outside its supported range",
+        ));
     }
     if !input.metadata().map_err(crate::files::io_error)?.is_file() {
         return Err(DomainError::new(
@@ -315,7 +331,10 @@ pub async fn stream_verified_readonly(
             stderr: limits.stderr_bytes,
         },
         Stdio::from(input),
-        Some(StreamedOutput { max_bytes: limits.stdout_bytes, consumer }),
+        Some(StreamedOutput {
+            max_bytes: limits.stdout_bytes,
+            consumer,
+        }),
         cancel,
     )
     .await
@@ -377,7 +396,10 @@ pub async fn stream_readonly_with_policy(
 
 async fn consume<R: AsyncRead + Unpin>(
     mut reader: R,
-    StreamedOutput { max_bytes, mut consumer }: StreamedOutput,
+    StreamedOutput {
+        max_bytes,
+        mut consumer,
+    }: StreamedOutput,
 ) -> Result<(Vec<u8>, u64)> {
     let mut buffer = [0; 8192];
     let mut total = 0u64;

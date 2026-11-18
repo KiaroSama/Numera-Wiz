@@ -532,7 +532,10 @@ mod tests {
             let id = row["id"].as_str().unwrap();
             assert!(row.get("authorization").is_none() && row.get("policy_revision").is_none());
             assert!(row.get("current_read").is_none() && row.get("current_edit").is_none());
-            if matches!(id, "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed") {
+            if matches!(
+                id,
+                "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed"
+            ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["schema_version"], 1);
                 assert_eq!(requirement["command_id"], id);

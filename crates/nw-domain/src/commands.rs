@@ -200,9 +200,11 @@ impl ProjectContextRule {
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
-        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed" => {
-            ProjectContextRule::RequiredRead
-        }
+        "projects.inspect"
+        | "sequences.inspect"
+        | "timeline.render"
+        | "timeline.preview_frame"
+        | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
@@ -245,7 +247,8 @@ fn result_schema(id: &str) -> Option<Value> {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV2)).expect("schema"))
         }
         "maintenance.media_v2.plan" => Some(
-            serde_json::to_value(schema_for!(crate::maintenance::media_v2::EnablementPlanV2)).expect("schema"),
+            serde_json::to_value(schema_for!(crate::maintenance::media_v2::EnablementPlanV2))
+                .expect("schema"),
         ),
         "maintenance.promotion.plan" => Some(crate::maintenance::promotion::result_schema()),
         "maintenance.initialization.plan" => Some(

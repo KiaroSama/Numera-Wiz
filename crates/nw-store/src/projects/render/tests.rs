@@ -560,43 +560,88 @@ fn mixed_track_capture_preserves_original_clocks_and_rows() {
     assert_eq!(schedule.output_samples, "24000");
     assert_eq!(schedule.video.len(), 1);
     assert_eq!(schedule.video[0].frame_count, "2");
-    assert_eq!(schedule.video[0].window.as_ref().unwrap().occurrence_id, graph.tracks[2].clips[0].occurrence_id);
+    assert_eq!(
+        schedule.video[0].window.as_ref().unwrap().occurrence_id,
+        graph.tracks[2].clips[0].occurrence_id
+    );
     assert_eq!(schedule.audio.len(), 1);
     assert_eq!(schedule.audio[0].start_sample, "0");
     assert_eq!(schedule.audio[0].sample_count, "24000");
-    assert_eq!(schedule.audio[0].window.occurrence_id, graph.tracks[1].clips[0].occurrence_id);
+    assert_eq!(
+        schedule.audio[0].window.occurrence_id,
+        graph.tracks[1].clips[0].occurrence_id
+    );
 
     let mut large = graph.clone();
     large.settings.width = 1920;
     large.settings.height = 1080;
     large.range.end = time(600, 1);
-    let mut bindings = large.tracks.iter().flat_map(|track| &track.clips).map(|clip| {
-        let media::OccurrenceSource::Registered { asset_id, content_sha256, probe_sha256, stream_index, media_kind } = &clip.source else {
-            panic!("Expected a registered occurrence");
-        };
-        media::BoundSource {
-            asset_id: asset_id.clone(), asset_row_sha256: "ef".repeat(32),
-            content_sha256: content_sha256.clone(), probe_sha256: probe_sha256.clone(),
-            stream_index: *stream_index, media_kind: *media_kind,
-            codec: if *media_kind == TrackKind::Audio { "pcm_s16le" } else { "ffv1" }.into(),
-            time_base: time(1, 1000), asset_origin: Rational::ZERO, stream_start: Rational::ZERO,
-        }
-    }).collect::<Vec<_>>();
+    let mut bindings = large
+        .tracks
+        .iter()
+        .flat_map(|track| &track.clips)
+        .map(|clip| {
+            let media::OccurrenceSource::Registered {
+                asset_id,
+                content_sha256,
+                probe_sha256,
+                stream_index,
+                media_kind,
+            } = &clip.source
+            else {
+                panic!("Expected a registered occurrence");
+            };
+            media::BoundSource {
+                asset_id: asset_id.clone(),
+                asset_row_sha256: "ef".repeat(32),
+                content_sha256: content_sha256.clone(),
+                probe_sha256: probe_sha256.clone(),
+                stream_index: *stream_index,
+                media_kind: *media_kind,
+                codec: if *media_kind == TrackKind::Audio {
+                    "pcm_s16le"
+                } else {
+                    "ffv1"
+                }
+                .into(),
+                time_base: time(1, 1000),
+                asset_origin: Rational::ZERO,
+                stream_start: Rational::ZERO,
+            }
+        })
+        .collect::<Vec<_>>();
     bindings.sort_by(|left, right| left.asset_id.cmp(&right.asset_id));
     let request = serde_json::from_value(json!({
         "contract_kind":"media_v2","sequence_id":sequence,"revision":revision,"range":large.range,
         "output":{"container":"matroska","video_codec":"ffv1","audio_codec":"pcm_s16le","destination":{"kind":"download"}}
     })).unwrap();
     let tools = media::MixedTools {
-        ffmpeg: media::ComponentIdentity { sha256: "ab".repeat(32), bytes: "16".into() },
-        ffprobe: media::ComponentIdentity { sha256: "cd".repeat(32), bytes: "16".into() },
+        ffmpeg: media::ComponentIdentity {
+            sha256: "ab".repeat(32),
+            bytes: "16".into(),
+        },
+        ffprobe: media::ComponentIdentity {
+            sha256: "cd".repeat(32),
+            bytes: "16".into(),
+        },
         profile_sha256: "aa".repeat(32),
     };
     let root = Uuid::new_v4().to_string();
     let review = Uuid::new_v4().to_string();
-    let mut plan = media::MediaPlanV2::compile(&request, large, bindings, tools, media::MixedReview {
-        root_id: &root, application_build: &"11".repeat(32), principal: "compiler-capture", id: &review, now: 100,
-    }).unwrap();
+    let mut plan = media::MediaPlanV2::compile(
+        &request,
+        large,
+        bindings,
+        tools,
+        media::MixedReview {
+            root_id: &root,
+            application_build: &"11".repeat(32),
+            principal: "compiler-capture",
+            id: &review,
+            now: 100,
+        },
+    )
+    .unwrap();
     plan.validate_hash().unwrap();
     let raw = serde_json::to_string(&plan).unwrap();
     use nw_domain::media_execution::{ReviewedMediaPlan, decode_reviewed_media_plan};
@@ -611,10 +656,20 @@ fn mixed_track_capture_preserves_original_clocks_and_rows() {
     ] {
         assert!(decode_reviewed_media_plan(&invalid).is_err());
     }
-    assert!(plan.payload.resources.decoded_output_bytes.parse::<u64>().unwrap() > u64::from(u32::MAX));
+    assert!(
+        plan.payload
+            .resources
+            .decoded_output_bytes
+            .parse::<u64>()
+            .unwrap()
+            > u64::from(u32::MAX)
+    );
     assert!(plan.payload.graph.video.last().unwrap().window.is_none());
     plan.payload.graph.audio[0].sample_count = "23999".into();
-    assert!(plan.digest().is_err(), "An edited schedule cannot be legitimized by recomputing the digest");
+    assert!(
+        plan.digest().is_err(),
+        "An edited schedule cannot be legitimized by recomputing the digest"
+    );
 
     let mut legacy = fixture.input(1);
     legacy.sequence_id = sequence;

@@ -45,7 +45,10 @@ impl JobRow {
     pub(super) fn decode(value: Value) -> Result<Self, String> {
         if value.get("envelope_version").is_some() || value.get("payload_kind").is_some() {
             if !matches!(
-                (value["envelope_version"].as_u64(), value["payload_kind"].as_str()),
+                (
+                    value["envelope_version"].as_u64(),
+                    value["payload_kind"].as_str()
+                ),
                 (Some(1), Some("media_job_v1")) | (Some(2), Some("media_job_v2"))
             ) {
                 return Err("Unknown or incomplete media job inventory discriminator".into());

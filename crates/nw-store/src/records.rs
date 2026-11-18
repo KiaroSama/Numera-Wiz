@@ -732,8 +732,12 @@ impl Store {
     }
     pub fn execution_allowed(&self, id: &str) -> Result<()> {
         match self.inspect_execution(id)? {
-            nw_domain::media_execution::StoredJob::MediaV1(_) => return self.media_execution_allowed(id),
-            nw_domain::media_execution::StoredJob::MediaV2(_) => return self.allow_mixed_execution(id).map(|_| ()),
+            nw_domain::media_execution::StoredJob::MediaV1(_) => {
+                return self.media_execution_allowed(id);
+            }
+            nw_domain::media_execution::StoredJob::MediaV2(_) => {
+                return self.allow_mixed_execution(id).map(|_| ());
+            }
             nw_domain::media_execution::StoredJob::Legacy(_) => {}
         }
         let authorization: ExecutionAuthorization =

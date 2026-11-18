@@ -428,11 +428,17 @@ pub enum StoredJobKind {
 }
 
 pub fn stored_job_kind(bytes: &[u8]) -> Result<StoredJobKind> {
-    let JobDiscriminators { envelope_version, payload_kind } = serde_json::from_slice(bytes).map_err(codec)?;
+    let JobDiscriminators {
+        envelope_version,
+        payload_kind,
+    } = serde_json::from_slice(bytes).map_err(codec)?;
     if envelope_version.is_none() && payload_kind.is_none() {
         return Ok(StoredJobKind::Legacy);
     }
-    match (envelope_version.as_ref().and_then(Value::as_u64), payload_kind.as_ref().and_then(Value::as_str)) {
+    match (
+        envelope_version.as_ref().and_then(Value::as_u64),
+        payload_kind.as_ref().and_then(Value::as_str),
+    ) {
         (Some(1), Some("media_job_v1")) => Ok(StoredJobKind::MediaV1),
         (Some(2), Some("media_job_v2")) => Ok(StoredJobKind::MediaV2),
         _ => Err(invalid("Unknown or partial job discriminator")),
@@ -448,11 +454,19 @@ pub fn decode_job(bytes: &[u8]) -> Result<StoredJob> {
             job.validate()?;
             Ok(StoredJob::MediaV1(Box::new(job)))
         }
-        StoredJobKind::MediaV2 => Ok(StoredJob::MediaV2(Box::new(crate::media_v2_execution::decode_mixed_job(bytes)?))),
+        StoredJobKind::MediaV2 => Ok(StoredJob::MediaV2(Box::new(
+            crate::media_v2_execution::decode_mixed_job(bytes)?,
+        ))),
         StoredJobKind::Legacy => {
             let raw: Value = serde_json::from_slice(bytes).map_err(codec)?;
-            crate::plans::decode(raw.get("plan").cloned().ok_or_else(|| invalid("Stored legacy job has no plan"))?)?;
-            Ok(StoredJob::Legacy(Box::new(serde_json::from_value(raw).map_err(codec)?)))
+            crate::plans::decode(
+                raw.get("plan")
+                    .cloned()
+                    .ok_or_else(|| invalid("Stored legacy job has no plan"))?,
+            )?;
+            Ok(StoredJob::Legacy(Box::new(
+                serde_json::from_value(raw).map_err(codec)?,
+            )))
         }
     }
 }
@@ -482,8 +496,10 @@ pub fn decode_reviewed_media_plan(raw: &str) -> Result<ReviewedMediaPlan> {
             "Media plan exceeds128KiB",
         ));
     }
-    let JobDiscriminators { envelope_version, payload_kind } =
-        serde_json::from_str(raw).map_err(codec)?;
+    let JobDiscriminators {
+        envelope_version,
+        payload_kind,
+    } = serde_json::from_str(raw).map_err(codec)?;
     match (
         envelope_version.as_ref().and_then(Value::as_u64),
         payload_kind.as_ref().and_then(Value::as_str),

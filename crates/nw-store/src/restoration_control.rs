@@ -5,10 +5,7 @@ use crate::{
     records::record_quota,
     storage,
 };
-use nw_domain::{
-    DomainError, Result,
-    maintenance::media_lifecycle::*,
-};
+use nw_domain::{DomainError, Result, maintenance::media_lifecycle::*};
 use redb::{ReadableDatabase, ReadableTable};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

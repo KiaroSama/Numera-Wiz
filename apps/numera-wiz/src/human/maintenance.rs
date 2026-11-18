@@ -120,10 +120,17 @@ impl Maintenance {
                     "maintenance.media_v2.plan",
                     json!({"kind":EnablementKind::GenerationPromotionV2}),
                 )),
-                MixedEnablement::Accept { plan_file, identity } => {
+                MixedEnablement::Accept {
+                    plan_file,
+                    identity,
+                } => {
                     let plan: EnablementPlanV2 = commands::parse(document(&plan_file)?)?;
                     plan.validate_hash()?;
-                    accepted("maintenance.media_v2.accept", serde_json::to_value(plan)?, identity)
+                    accepted(
+                        "maintenance.media_v2.accept",
+                        serde_json::to_value(plan)?,
+                        identity,
+                    )
                 }
                 MixedEnablement::Restore(command) => command.prepare("maintenance.media_v2", None),
             },
@@ -169,17 +176,28 @@ impl Restoration {
     fn prepare(self, prefix: &str, kind: Option<RestorationKind>) -> Result<Request> {
         match self {
             Self::Plan { id } => Ok(query(&format!("{prefix}.restore.plan"), json!({"id":id}))),
-            Self::Inspect { id } => Ok(query(&format!("{prefix}.restore.inspect"), json!({"id":id}))),
-            Self::Accept { plan_file, identity } => {
+            Self::Inspect { id } => Ok(query(
+                &format!("{prefix}.restore.inspect"),
+                json!({"id":id}),
+            )),
+            Self::Accept {
+                plan_file,
+                identity,
+            } => {
                 let plan: GenerationRestorationPlan = commands::parse(document(&plan_file)?)?;
                 plan.validate_hash()?;
                 if kind.map_or(plan.schema_version != 2, |kind| kind != plan.kind) {
                     return Err(DomainError::new(
                         "INVALID_GENERATION_PLAN",
                         "Restoration kind differs from the chosen maintenance route",
-                    ).into());
+                    )
+                    .into());
                 }
-                accepted(&format!("{prefix}.restore.accept"), serde_json::to_value(plan)?, identity)
+                accepted(
+                    &format!("{prefix}.restore.accept"),
+                    serde_json::to_value(plan)?,
+                    identity,
+                )
             }
         }
     }

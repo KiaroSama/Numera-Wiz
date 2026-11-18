@@ -978,10 +978,14 @@ impl WizApp {
                 return Ok(());
             }
             Phase::MixedReview => {
-                let plan: nw_domain::media::MediaPlanV2 = serde_json::from_value(result)
-                    .map_err(|error| error.to_string())?;
+                let plan: nw_domain::media::MediaPlanV2 =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
                 plan.validate_hash().map_err(|error| error.message)?;
-                let group = self.projects.group.as_ref().ok_or("No displayed project to export")?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed project to export")?;
                 let capture = &plan.payload.capture;
                 if capture.project_id.as_str() != group.key.project
                     || group.view.sequence.as_deref() != Some(capture.sequence_id.as_str())
@@ -995,7 +999,9 @@ impl WizApp {
                 return Ok(());
             }
             Phase::MixedSubmit => {
-                let id = result["job_id"].as_str().ok_or("Accepted export job identity is missing")?;
+                let id = result["job_id"]
+                    .as_str()
+                    .ok_or("Accepted export job identity is missing")?;
                 nw_domain::projects::validate_id(id).map_err(|error| error.message)?;
                 self.projects.mixed_review = None;
                 self.status = format!("Export queued: {id}");

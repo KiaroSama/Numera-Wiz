@@ -162,10 +162,14 @@ impl Store {
             || prefix_digest(&history[..prefix]) != operation.source_prefix_sha256
             || history[..prefix].iter().any(|(entry, _)| {
                 let capabilities = &entry.required_capabilities;
-                let legacy = capabilities.iter().all(|cap| generations::CURRENT_CAPABILITIES.contains(&cap.as_str()));
-                let media_v1 = operation.mixed_media && nw_domain::maintenance::media_v2::exact_capabilities(
-                    capabilities, nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES,
-                );
+                let legacy = capabilities
+                    .iter()
+                    .all(|cap| generations::CURRENT_CAPABILITIES.contains(&cap.as_str()));
+                let media_v1 = operation.mixed_media
+                    && nw_domain::maintenance::media_v2::exact_capabilities(
+                        capabilities,
+                        nw_domain::maintenance::promotion::MEDIA_V1_CAPABILITIES,
+                    );
                 !(legacy || media_v1)
             })
         {
@@ -1139,7 +1143,10 @@ pub(crate) fn repair_owned_suffix(lease: &RootLease) -> Result<()> {
         if count >= 16 {
             return Err(refused("Accepted lineage exceeds16 retained workspaces"));
         }
-        for name in ["restoration-authority.json", "mixed-restoration-authority.json"] {
+        for name in [
+            "restoration-authority.json",
+            "mixed-restoration-authority.json",
+        ] {
             let path = member.path().join(name);
             if !path.try_exists().map_err(storage)? {
                 continue;
@@ -1147,7 +1154,9 @@ pub(crate) fn repair_owned_suffix(lease: &RootLease) -> Result<()> {
             let authority: Authority = decode(&security::read_private(&path, 65536)?)?;
             if member.file_name().to_str() != Some(authority.record.id.as_str())
                 || authority_name(authority.record.plan.kind) != name
-                || nodes.iter().any(|node: &Authority| node.record.id == authority.record.id)
+                || nodes
+                    .iter()
+                    .any(|node: &Authority| node.record.id == authority.record.id)
             {
                 return Err(refused("Accepted restoration workspace identity differs"));
             }

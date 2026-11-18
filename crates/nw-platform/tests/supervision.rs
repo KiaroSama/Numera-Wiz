@@ -123,7 +123,10 @@ async fn rejected_streamed_stdout_terminates_and_reaps_the_producer() {
         &["stream-sleep".into()],
         Duration::from_secs(15),
         source.reopen().unwrap(),
-        nw_platform::process::StreamLimits { stdout_bytes: 1024, stderr_bytes: 4096 },
+        nw_platform::process::StreamLimits {
+            stdout_bytes: 1024,
+            stderr_bytes: 4096,
+        },
         Box::new(|_| Ok(())),
         CancellationToken::new(),
     )
