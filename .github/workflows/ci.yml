@@ -166,8 +166,8 @@ jobs:
           path: target/browser-evidence/
           if-no-files-found: error
   native-ui:
-    needs: [checks, media]
-    if: ${{ !cancelled() && needs.media.result == 'success' }}
+    needs: [checks, media, web]
+    if: ${{ !cancelled() && needs.media.result == 'success' && needs.web.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -215,6 +215,7 @@ jobs:
           if-no-files-found: error
   checks:
     needs: web
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       actions: read
@@ -261,17 +262,19 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo run --locked -p xtask -- ci-linux-dependencies desktop
       - name: Load matching immutable UI namespace
+        id: web-assets
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: embedded-web
           path: target/web-ui
-      - name: Build the desktop composition with its matching browser assets
+      - name: Build the native desktop application
         id: native-build
+        if: ${{ !cancelled() }}
         env:
           NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
-        run: cargo rustc --locked -p numera-wiz --bin numera-wiz --features desktop,embedded-web -- -C strip=debuginfo
+        run: cargo rustc --locked -p numera-wiz --bin numera-wiz --features ${{ steps.web-assets.outcome == 'success' && 'desktop,embedded-web' || 'desktop' }} -- -C strip=debuginfo
       - name: Save exact native executables for the existing UI harness
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: numera-wiz-development-${{ matrix.os }}
@@ -283,7 +286,7 @@ jobs:
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: cargo run --locked -p xtask -- schemas
       - name: Assemble native development packages and SHA-256 manifests
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
         id: native-package
         run: cargo run --locked -p xtask -- package-development
       - name: Save unsigned native packages with manuals, notices and source identity
