@@ -133,7 +133,7 @@ pub enum Sequences {
         context: ReadContext,
         #[arg(long)]
         sequence: String,
-        #[arg(long, default_value = "entity", value_parser = ["entity", "track_page", "viewport"])]
+        #[arg(long, default_value = "entity", value_parser = ["entity", "track_page", "marker_page", "viewport"])]
         projection: String,
         #[arg(long = "track")]
         tracks: Vec<String>,
@@ -211,6 +211,49 @@ impl Sequences {
         }
     }
 }
+#[derive(Subcommand)]
+pub enum Markers {
+    Place {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        at: String,
+        #[arg(long, default_value = "0")]
+        length: String,
+        #[arg(long, default_value = "blue", value_parser = ["blue", "green", "orange", "red", "violet"])]
+        color: String,
+    },
+    Remove {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        marker: String,
+    },
+}
+impl Markers {
+    pub(super) fn prepare(self) -> Result<Request> {
+        match self {
+            Self::Place { context, sequence, name, at, length, color } => {
+                model::validate_id(&sequence)?;
+                model::label(&name)?;
+                context.request("markers.place", json!({"sequence_id":sequence,"name":name,
+                    "at":rational(&at)?,"length":rational(&length)?,"color":color}))
+            }
+            Self::Remove { context, sequence, marker } => {
+                model::validate_id(&sequence)?;
+                model::validate_id(&marker)?;
+                context.request("markers.remove", json!({"sequence_id":sequence,"marker_id":marker}))
+            }
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Clips {
     Link {

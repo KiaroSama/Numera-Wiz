@@ -302,6 +302,8 @@ impl Service {
                     "clips.move" => {
                         ProjectEditIntent::Move(commands::parse(request.params.clone())?)
                     }
+                    "markers.place" => ProjectEditIntent::Marker(commands::parse(request.params.clone())?),
+                    "markers.remove" => ProjectEditIntent::RemoveMarker(commands::parse(request.params.clone())?),
                     "clips.link" => {
                         ProjectEditIntent::Link(commands::parse(request.params.clone())?)
                     }

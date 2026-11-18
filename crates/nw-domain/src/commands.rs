@@ -206,7 +206,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
+        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
         }
         _ => ProjectContextRule::Forbidden,
@@ -279,6 +279,8 @@ fn result_schema(id: &str) -> Option<Value> {
         "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
         "clips.split" => Some(contracts::edit(EditResult::Split)),
         "clips.remove" => Some(contracts::edit(EditResult::Remove)),
+        "markers.place" => Some(contracts::edit(EditResult::Marker)),
+        "markers.remove" => Some(contracts::edit(EditResult::Remove)),
         "history.undo" | "history.redo" => Some(contracts::edit(EditResult::History)),
         _ => None,
     }
@@ -462,6 +464,18 @@ pub fn registry() -> Vec<Descriptor> {
             "Compensate the latest retained project edit",
             DurableMutation,
             Empty
+        ),
+        row!(
+            "markers.place",
+            "Create an exact sequence-anchored marker",
+            DurableMutation,
+            crate::projects::SequenceMarkerInput
+        ),
+        row!(
+            "markers.remove",
+            "Remove a marker from its owning sequence",
+            DurableMutation,
+            crate::projects::SequenceMarkerTarget
         ),
         row!(
             "history.redo",
@@ -919,7 +933,7 @@ mod tests {
         let sequence = finite_input_descriptor("sequences.inspect");
         finite_input_enum(
             finite_input_property(&sequence.params_schema, "projection"),
-            &["entity", "track_page", "viewport"],
+            &["entity", "track_page", "marker_page", "viewport"],
             "R1_FINITE_SEQUENCE_PROJECTION_MISSING",
         );
         for (id, field, values) in [
@@ -1512,6 +1526,8 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.unlink",
     "clips.split",
     "clips.remove",
+    "markers.place",
+    "markers.remove",
     "history.undo",
     "history.redo",
     "maintenance.plan",

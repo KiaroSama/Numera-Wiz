@@ -379,7 +379,7 @@ impl Store {
             if header_bytes.len() > 64 * 1024 { return Err(domain::limit("Project header exceeds its bounded section")); }
             rows.insert(format!("project-history-summary/{project}"), Some(encode(&history.summary())?));
             rows.insert(history_key, Some(encode(&history)?)); rows.insert(header_key, Some(header_bytes));
-            let index_reference_writes = rows.keys().filter(|key| ["project-bin/", "project-track/", "project-clip/", "project-dependency/", "project-reference/"].iter().any(|prefix| key.starts_with(prefix))).count();
+            let index_reference_writes = rows.keys().filter(|key| ["project-bin/", "project-track/", "project-clip/", "project-marker/", "project-dependency/", "project-reference/"].iter().any(|prefix| key.starts_with(prefix))).count();
             if index_reference_writes > MAX_INDEX_WRITES { return Err(domain::limit("Project index and retained reference writes exceed 512")); }
             let additions = rows.iter().filter(|(_, data)| data.is_some()).try_fold(0u64, |count, (key, _)| -> Result<u64> { Ok(count + u64::from(table.get(key.as_str()).map_err(storage)?.is_none())) })?;
             let removals = rows.iter().filter(|(_, data)| data.is_none()).try_fold(0u64, |count, (key, _)| -> Result<u64> { Ok(count + u64::from(table.get(key.as_str()).map_err(storage)?.is_some())) })?;
@@ -463,6 +463,21 @@ fn index_rows(
                 order: track.order,
                 clip_count: track.clip_count,
             })?,
+        ));
+    }
+    if entity.kind == "sequence_marker" && entity.kind_version == 1 {
+        let marker: SequenceMarker = entity.payload("sequence_marker")?;
+        let owner = entity.owner_id.as_ref().ok_or_else(|| domain::invalid("Sequence marker has no owner"))?;
+        let sequence: EntityEnvelope = table_value(table, &entity_key(project, owner))?.ok_or_else(DomainError::object_not_found)?;
+        let settings = sequence.payload::<Sequence>("sequence")?;
+        let position = marker.position_on(settings.settings.frame_rate)?;
+        if entity.semantic_scope != "annotation" {
+            return Err(domain::invalid("Sequence marker payload or ownership differs"));
+        }
+        rows.push((
+            format!("project-marker/{project}/{owner}/{position:016x}/{}", entity.id),
+            encode(&MarkerSummary { id: entity.id.clone(), name: entity.label.clone(), at: marker.at,
+                length: marker.length, color: marker.color })?,
         ));
     }
     if entity.kind == "clip" {
@@ -668,6 +683,20 @@ impl ProjectReadSnapshot {
             budget,
             owner.track_count,
         )
+    }
+    pub fn marker_page(
+        &self,
+        sequence: &EntityId,
+        after: Option<&str>,
+        limit: usize,
+        budget: usize,
+    ) -> Result<IndexedPage> {
+        let _: Sequence = self.entity(sequence)?.payload("sequence")?;
+        let mut page = self.index_page(&format!("project-marker/{}/{sequence}/", self.header.id), after, limit, budget, 0)?;
+        if page.next_key.is_some() {
+            page.count_accuracy = "lower_bound".into();
+        }
+        Ok(page)
     }
     fn index_page(
         &self,

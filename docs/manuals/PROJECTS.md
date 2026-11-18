@@ -170,6 +170,21 @@ revision, raw project/entity bytes, history and redo remain unchanged. Retrying 
 lost response uses the exact original identity, expected revision and parameters,
 including for no-change; it is different from the fresh second Link above.
 
+## Timeline markers
+
+Select a sequence and open **Timeline markers** in Projects to add or remove
+an annotation. A marker has a name, color, position and length. A zero length
+marks one point. Position and the end of a region must lie on the sequence
+frame grid. Markers stay at their sequence positions when unrelated clips
+move. Undo and Redo restore the marker and its original identity.
+
+Use `numera-wiz markers place` with `--project`, `--sequence`,
+`--expected-revision`, `--name`, `--at` and the retained mutation identity.
+`--length` defaults to zero and `--color` defaults to blue. `markers remove`
+takes the owning sequence and exact marker ID. The `marker_page` projection of
+`sequences.inspect` lists markers in frame order, then by ID. The CLI and MCP
+use the same project authority and replay rules.
+
 ## Sources, time and authorization
 
 Times use exact integer fractions. Video positions must lie on the declared frame

@@ -539,6 +539,75 @@ impl WizApp {
         });
         self.project_link_controls(ui, &group);
         self.timeline_preview(ui, &group);
+        self.timeline_markers(ui, &group);
+    }
+
+    fn timeline_markers(&mut self, ui: &mut egui::Ui, group: &Group) {
+        let Some(sequence) = &group.view.sequence else { return; };
+        ui.collapsing("Timeline markers", |ui| {
+            let idle = self.request_idle() && !self.projects.stale;
+            let browse = |app: &mut Self, cursor: Option<String>, ctx: &egui::Context| {
+                app.query_with_project(
+                    "sequences.inspect",
+                    json!({"sequence_id":sequence,"revision":group.key.revision,"projection":"marker_page","limit":32,"cursor":cursor}),
+                    Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                    app.project_action(Phase::Markers),
+                    ctx,
+                );
+            };
+            if ui.add_enabled(idle, egui::Button::new("Load markers")).clicked() {
+                browse(self, None, ui.ctx());
+            }
+            let mut remove = None;
+            let mut next = None;
+            if let Some(page) = &self.projects.marker_page {
+                if page.items.is_empty() {
+                    ui.label("No markers on this page");
+                }
+                for marker in &page.items {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{} · {}", exact(marker.at), marker.name));
+                        if ui.add_enabled(idle, egui::Button::new("Remove")).clicked() {
+                            remove = Some(marker.id.clone());
+                        }
+                    });
+                }
+                if let Some(cursor) = &page.next
+                    && ui.add_enabled(idle, egui::Button::new("Next markers")).clicked()
+                {
+                    next = Some(cursor.clone());
+                }
+            }
+            if let Some(marker) = remove {
+                self.mutate_project("markers.remove", json!({"sequence_id":sequence,"marker_id":marker}), ui.ctx());
+            }
+            if next.is_some() {
+                browse(self, next, ui.ctx());
+            }
+            ui.add_enabled_ui(idle, |ui| {
+                ui.label("Marker name");
+                ui.add(egui::TextEdit::singleline(&mut self.projects.forms.marker_name).char_limit(128));
+                rational(ui, "Position (seconds)", &mut self.projects.forms.marker_at);
+                rational(ui, "Length (seconds)", &mut self.projects.forms.marker_length);
+                let color = &mut self.projects.forms.marker_color;
+                egui::ComboBox::from_label("Marker color").selected_text(color.as_str()).show_ui(ui, |ui| {
+                    for name in ["blue", "green", "orange", "red", "violet"] {
+                        ui.selectable_value(color, name.to_owned(), name);
+                    }
+                });
+                if ui.button("Add marker").clicked() {
+                    let input = (self.projects.forms.marker_at.value(), self.projects.forms.marker_length.value());
+                    match input {
+                        (Ok(at), Ok(length)) => self.mutate_project(
+                            "markers.place",
+                            json!({"sequence_id":sequence,"name":self.projects.forms.marker_name,"at":at,"length":length,"color":self.projects.forms.marker_color}),
+                            ui.ctx(),
+                        ),
+                        (Err(error), _) | (_, Err(error)) => self.error = Some(error),
+                    }
+                }
+            });
+        });
     }
 
     fn timeline_preview(&mut self, ui: &mut egui::Ui, group: &Group) {

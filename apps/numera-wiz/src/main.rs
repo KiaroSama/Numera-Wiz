@@ -62,6 +62,10 @@ enum Mode {
         #[command(subcommand)]
         command: human::Clips,
     },
+    Markers {
+        #[command(subcommand)]
+        command: human::Markers,
+    },
     History {
         #[command(subcommand)]
         command: human::History,
@@ -338,6 +342,7 @@ async fn run() -> Result<()> {
                     human::run(&client, human::Command::Timeline(command)).await
                 }
                 Some(Mode::Clips { command }) => human::run(&client, human::Command::Clips(command)).await,
+                Some(Mode::Markers { command }) => human::run(&client, human::Command::Markers(command)).await,
                 Some(Mode::History { command }) => {
                     human::run(&client, human::Command::History(command)).await
                 }

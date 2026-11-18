@@ -212,6 +212,7 @@ pub(crate) fn removable(key: &str) -> bool {
                 | "project-bin"
                 | "project-track"
                 | "project-clip"
+                | "project-marker"
                 | "project-dependency"
                 | "project-reference"
                 | "project-patch"

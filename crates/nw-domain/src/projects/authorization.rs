@@ -91,7 +91,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
+        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
             Some(ProjectAction::Edit)
         }
         _ => return None,

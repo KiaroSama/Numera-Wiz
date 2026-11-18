@@ -10,7 +10,7 @@ use nw_domain::{
     commands::ProjectRef,
     projects::{
         Clip, Revision, Sequence, Track,
-        views::{ClipSummary, ProjectItemSummary, ProjectSummary, TrackSummary},
+        views::{ClipSummary, MarkerSummary, ProjectItemSummary, ProjectSummary, TrackSummary},
     },
     time::{Rational, TimeRange},
 };
@@ -42,6 +42,7 @@ pub(super) enum Phase {
     PreviewFrame,
     MixedReview,
     MixedSubmit,
+    Markers,
     Create,
     Mutation,
 }
@@ -194,6 +195,7 @@ pub(super) struct ProjectsUi {
     clip_selection: Option<ClipSelection>,
     preview_frame: Option<(Rational, egui::TextureHandle)>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
+    marker_page: Option<Page<MarkerSummary>>,
 }
 impl ProjectsUi {
     fn restored_view(&self, group: &Group) -> View {
@@ -208,6 +210,7 @@ impl ProjectsUi {
     fn advance(&mut self) -> Result<u64, String> {
         self.preview_frame = None;
         self.mixed_review = None;
+        self.marker_page = None;
         self.generation = self
             .generation
             .checked_add(1)
@@ -625,7 +628,7 @@ impl WizApp {
         if matches!(
             action,
             Action::Project(ProjectAction {
-                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit,
+                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit | Phase::Markers,
                 ..
             })
         ) {
@@ -751,6 +754,7 @@ impl WizApp {
                 | Phase::Tracks
                 | Phase::Track
                 | Phase::Viewport
+                | Phase::Markers
                 | Phase::Clip
                 | Phase::Source
                 | Phase::NextBin
@@ -1006,6 +1010,20 @@ impl WizApp {
                 self.projects.mixed_review = None;
                 self.status = format!("Export queued: {id}");
                 self.last_jobs = Instant::now() - Duration::from_secs(2);
+                return Ok(());
+            }
+            Phase::Markers => {
+                let group = self.projects.group.as_ref().ok_or("No displayed sequence for markers")?;
+                let page: SnapshotPage<MarkerSummary> = serde_json::from_value(result)
+                    .map_err(|error| error.to_string())?;
+                if page.schema_version != 1 || page.projection != "marker_page"
+                    || page.project_revision.as_deref() != Some(group.key.revision.as_str())
+                    || group.view.sequence.as_deref() != request.params["sequence_id"].as_str()
+                    || page.items.len() > 32
+                {
+                    return Err("Marker page does not match the displayed sequence and revision".into());
+                }
+                self.projects.marker_page = Some(Page::parse(page)?);
                 return Ok(());
             }
             _ => {}

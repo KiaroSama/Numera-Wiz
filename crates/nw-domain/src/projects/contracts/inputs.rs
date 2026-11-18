@@ -60,12 +60,13 @@ fn page(schema: &mut Value, detail: bool) {
 fn inspect(schema: &mut Value, sequence: bool) {
     page(schema, true);
     if sequence {
-        enumeration(schema, "projection", &["entity", "track_page", "viewport"]);
+        enumeration(schema, "projection", &["entity", "track_page", "marker_page", "viewport"]);
         bounded_array(schema, "track_ids", 0, 64);
         field(schema, "track_ids")["uniqueItems"] = json!(true);
         schema["oneOf"] = json!([
             {"properties":{"projection":{"const":"entity"},"track_ids":{"maxItems":0},"range":{"type":"null"},"cursor":{"type":"null"}}},
             {"properties":{"projection":{"const":"track_page"},"track_ids":{"maxItems":0},"range":{"type":"null"}}},
+            {"properties":{"projection":{"const":"marker_page"},"track_ids":{"maxItems":0},"range":{"type":"null"}}},
             {"required":["track_ids","range"],"properties":{"projection":{"const":"viewport"},"track_ids":{"minItems":1},"range":{"not":{"type":"null"}}}}
         ]);
     } else {

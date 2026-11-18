@@ -534,7 +534,7 @@ impl EntityEnvelope {
     pub fn known(&self) -> bool {
         self.envelope_version == 1
             && self.kind_version == 1
-            && ["bin", "sequence", "track", "clip", "source_binding"].contains(&self.kind.as_str())
+            && ["bin", "sequence", "track", "clip", "source_binding", "sequence_marker"].contains(&self.kind.as_str())
     }
     pub fn envelope_semantics_supported(&self) -> bool {
         self.envelope_version == 1
@@ -606,6 +606,46 @@ pub struct Sequence {
     pub track_count: usize,
     #[serde(default)]
     pub locked: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MarkerColor {
+    Blue,
+    Green,
+    Orange,
+    Red,
+    Violet,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SequenceMarkerInput {
+    pub sequence_id: EntityId,
+    pub name: String,
+    pub at: Rational,
+    pub length: Rational,
+    pub color: MarkerColor,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SequenceMarkerTarget {
+    pub sequence_id: EntityId,
+    pub marker_id: EntityId,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceMarker {
+    pub at: Rational,
+    pub length: Rational,
+    pub color: MarkerColor,
+}
+impl SequenceMarker {
+    pub fn position_on(&self, frame_rate: Rational) -> Result<u64> {
+        if self.length < Rational::ZERO {
+            return Err(invalid("Marker length must be nonnegative"));
+        }
+        let position = grid_tick(self.at, frame_rate)?;
+        grid_tick(self.at.checked_add(self.length)?, frame_rate)?;
+        Ok(position)
+    }
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

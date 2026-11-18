@@ -106,7 +106,7 @@ impl Query {
                     if input.track_ids.is_empty()
                         && input.range.is_none()
                         && input.cursor.is_none() => {}
-                "track_page" if input.track_ids.is_empty() && input.range.is_none() => {}
+                "track_page" | "marker_page" if input.track_ids.is_empty() && input.range.is_none() => {}
                 "viewport"
                     if !input.track_ids.is_empty()
                         && input.track_ids.len() <= 64
@@ -214,6 +214,10 @@ impl Query {
                         self.limit,
                         MAX_PAGE_BYTES - 8192,
                     )?,
+                    "marker_page" => read.marker_page(
+                        self.sequence.as_ref().ok_or_else(|| domain::invalid("Sequence identity required"))?,
+                        after, self.limit, MAX_PAGE_BYTES - 8192,
+                    )?,
                     "viewport" => read.clip_range(
                         self.sequence
                             .as_ref()
@@ -236,7 +240,7 @@ impl Query {
                         .as_ref()
                         .map(|key| ticket.cursor(id, binding, key, count))
                 );
-                result["total_count"] = json!(if self.projection == "viewport" {
+                result["total_count"] = json!(if matches!(self.projection.as_str(), "viewport" | "marker_page") {
                     count
                 } else {
                     page.total_count
@@ -264,6 +268,7 @@ fn entity_projection(entity: &EntityEnvelope) -> Result<Value> {
             "sequence" => value(&entity.payload::<Sequence>("sequence")?)?,
             "track" => value(&entity.payload::<Track>("track")?)?,
             "bin" => value(&entity.payload::<Bin>("bin")?)?,
+            "sequence_marker" => value(&entity.payload::<SequenceMarker>("sequence_marker")?)?,
             "source_binding" => {
                 let mut value = value(&entity.payload::<SourceBinding>("source_binding")?)?;
                 if let Some(kind) = value.as_object_mut().and_then(|v| v.remove("kind")) {

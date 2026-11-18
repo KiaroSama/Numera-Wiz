@@ -203,6 +203,43 @@ pub async fn registered_timeline_frame(
     assert_eq!(&response["structuredContent"]["result"], frame);
     sdk.cancel().await.unwrap();
     accepted_mixed_timeline(cli, project_id, sequence_id, finite).await;
+    sequence_markers(cli, project_id, sequence_id).await;
+}
+
+async fn sequence_markers(cli: &Cli, project: &str, sequence: &str) {
+    let (issued, code) = cli.human(&["access", "replay-scope", "create", "--json"]).await;
+    assert_eq!(code, 0);
+    let scope = issued["result"]["replay_scope"].as_str().unwrap();
+    let (placed, code) = cli.human(&[
+        "markers", "place", "--project", project, "--expected-revision", "4",
+        "--sequence", sequence, "--name", "نشانه é", "--at", "1/4", "--length", "1/2",
+        "--color", "violet", "--replay-scope", scope, "--idempotency-key", "sequence-grid-marker",
+        "--request-id", "sequence-grid-marker",
+    ]).await;
+    assert_eq!(code, 0, "{}", placed["error"]);
+    let id = &placed["result"]["created"]["marker_id"];
+    assert_eq!(placed["result"]["revision"], "5");
+    let query = |revision| {
+        let mut request = Request::query("sequences.inspect", json!({
+            "projection":"marker_page","sequence_id":sequence,"revision":revision,
+        }));
+        request.project = Some(ProjectRef { id: project.into(), expected_revision: None });
+        request
+    };
+    let first = cli.raw(&query("5")).await;
+    assert_eq!(first["ok"], true, "{}", first["error"]);
+    assert_eq!(first["result"]["items"], json!([{
+        "id":id,"name":"نشانه é","at":{"num":"1","den":"4"},
+        "length":{"num":"1","den":"2"},"color":"violet",
+    }]));
+    edit(cli, scope, project, "5", "sequence-marker-undo", "history.undo", json!({})).await;
+    assert_eq!(cli.raw(&query("6")).await["result"]["items"], json!([]));
+    edit(cli, scope, project, "6", "sequence-marker-redo", "history.redo", json!({})).await;
+    assert_eq!(cli.raw(&query("7")).await["result"]["items"], first["result"]["items"]);
+    edit(cli, scope, project, "7", "sequence-marker-remove", "markers.remove", json!({
+        "sequence_id":sequence,"marker_id":id,
+    })).await;
+    assert_eq!(cli.raw(&query("8")).await["result"]["items"], json!([]));
 }
 
 async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {

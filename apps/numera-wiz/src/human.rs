@@ -11,7 +11,7 @@ use nw_domain::{
     commands::{self, Request, Response},
     mux::{CleanIntent, Stream},
 };
-pub use projects::{Clips, History, Projects, Sequences};
+pub use projects::{Clips, History, Markers, Projects, Sequences};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -360,6 +360,7 @@ pub enum Command {
     Sequences(Sequences),
     Timeline(Timeline),
     Clips(Clips),
+    Markers(Markers),
     History(History),
     Media(Media),
     Chapters(Chapters),
@@ -402,6 +403,7 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Sequences(command) => command.prepare()?,
         Command::Timeline(command) => command.prepare()?,
         Command::Clips(command) => command.prepare()?,
+        Command::Markers(command) => command.prepare()?,
         Command::History(command) => command.prepare()?,
         Command::Chapters(Chapters::Inspect { asset }) => {
             query("chapters.inspect", json!({"id":asset}))

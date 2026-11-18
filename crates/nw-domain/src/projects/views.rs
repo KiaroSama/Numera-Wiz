@@ -102,6 +102,15 @@ pub struct TrackSummary {
     pub clip_count: usize,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MarkerSummary {
+    pub id: EntityId,
+    pub name: String,
+    pub at: Rational,
+    pub length: Rational,
+    pub color: super::MarkerColor,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipSummary {
     pub id: EntityId,
     pub track_id: EntityId,

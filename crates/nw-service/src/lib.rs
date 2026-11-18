@@ -559,6 +559,16 @@ mod tests {
                 assert!(schema.ok && schema.result.as_ref() == Some(row));
                 continue;
             }
+            if matches!(id, "markers.place" | "markers.remove") {
+                let requirement = &row["authorization_requirements"];
+                assert_eq!(requirement["command_id"], id);
+                assert_eq!(requirement["project_action"], "edit");
+                assert_eq!(requirement["request_gates"], serde_json::json!([
+                    "current_policy", "project_context", "project_rights", "request_parameters",
+                    "expected_revision", "writer_lease", "affected_scope"
+                ]));
+                continue;
+            }
             if !family.contains(id) {
                 assert!(
                     row.get("authorization_requirements").is_none(),

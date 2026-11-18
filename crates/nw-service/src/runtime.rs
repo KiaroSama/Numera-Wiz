@@ -608,7 +608,7 @@ impl Service {
         let readable = match request.command.id.as_str() {
             "projects.create" | "sequences.create" | "clips.place" | "clips.move"
             | "clips.link" | "clips.unlink" | "clips.split" | "clips.remove" | "history.undo"
-            | "history.redo" => self.project_receipt_readable(context, &response)?,
+            | "history.redo" | "markers.place" | "markers.remove" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1128,7 +1128,7 @@ impl Service {
             )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
             | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split"
-            | "clips.remove" | "history.undo" | "history.redo" => {
+            | "clips.remove" | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);
             }
