@@ -20,6 +20,9 @@ Portable executables default to the executable directory. The macOS app bundle
 uses `~/Library/Application Support/Numera Wiz`. An explicit `--data-dir` takes
 precedence and can select the existing state used by a previous development build.
 Each root has protected state and runtime subdirectories and one compatible owner.
+The qualified local filesystems are ext4 on Linux, APFS on macOS and NTFS on
+Windows. If startup reports `RESTORATION_UNAVAILABLE`, select a root on a
+supported volume with `--data-dir`.
 An incompatible active binary/registry returns `OWNER_VERSION_CONFLICT`. Accepted
 jobs survive a CLI/GUI/stdio client exit; an interrupted owner records recovery
 facts. Never delete or replace live state to bypass a lock or version conflict.

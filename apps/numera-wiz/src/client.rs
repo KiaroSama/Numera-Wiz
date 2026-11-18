@@ -42,6 +42,7 @@ enum OwnerStartupCode {
     FilesystemError,
     LogStorageError,
     InsecureDataRoot,
+    RestorationUnavailable,
     OtherDomain,
     AdapterError,
 }
@@ -55,6 +56,7 @@ impl OwnerStartupCode {
                 "FILESYSTEM_ERROR" => Self::FilesystemError,
                 "LOG_STORAGE_ERROR" => Self::LogStorageError,
                 "INSECURE_DATA_ROOT" => Self::InsecureDataRoot,
+                "RESTORATION_UNAVAILABLE" => Self::RestorationUnavailable,
                 _ => Self::OtherDomain,
             },
             None => Self::AdapterError,
@@ -68,6 +70,7 @@ impl OwnerStartupCode {
             Self::FilesystemError => "FILESYSTEM_ERROR",
             Self::LogStorageError => "LOG_STORAGE_ERROR",
             Self::InsecureDataRoot => "INSECURE_DATA_ROOT",
+            Self::RestorationUnavailable => "RESTORATION_UNAVAILABLE",
             Self::OtherDomain => "OTHER_DOMAIN",
             Self::AdapterError => "ADAPTER_ERROR",
         }
@@ -454,6 +457,7 @@ impl NativeClient {
         let runtime = runtime_root.join("owner.json");
         let mut bootstrap_gate = None;
         let mut spawned = false;
+        let storage_unavailable = Arc::new(AtomicBool::new(false));
         loop {
             self.credential.ensure_open()?;
             if runtime.try_exists()? {
@@ -543,6 +547,7 @@ impl NativeClient {
                     .context("Cannot start the protected owner")?;
                 let stdout = child.stdout.take();
                 tracing::info!(process_id = child.id(), "Protected owner child spawned");
+                let storage_unavailable = storage_unavailable.clone();
                 tokio::spawn(async move {
                     match child.wait().await {
                         Ok(status) if status.success() => {
@@ -550,6 +555,11 @@ impl NativeClient {
                         }
                         Ok(status) => {
                             let diagnostic = collect_owner_startup_failure(stdout, started).await;
+                            if diagnostic.record().is_some_and(|record| {
+                                record.code == OwnerStartupCode::RestorationUnavailable
+                            }) {
+                                storage_unavailable.store(true, Ordering::Release);
+                            }
                             tracing::warn!(
                                 exit_code = status.code(),
                                 startup_stage =
@@ -573,6 +583,13 @@ impl NativeClient {
                 // Retain the per-root gate through readiness; never launch another child
                 // while this attempt may still be initializing its log/store ownership.
                 spawned = true;
+            }
+            if storage_unavailable.load(Ordering::Acquire) {
+                return Err(nw_domain::DomainError::new(
+                    "RESTORATION_UNAVAILABLE",
+                    "The selected data root cannot provide the required durable storage operations. Select a supported local volume with --data-dir.",
+                )
+                .into());
             }
             if started.elapsed() > Duration::from_secs(20) {
                 return Err(nw_domain::DomainError::new(
@@ -889,6 +906,10 @@ mod binding_tests {
             ("FILESYSTEM_ERROR", OwnerStartupCode::FilesystemError),
             ("LOG_STORAGE_ERROR", OwnerStartupCode::LogStorageError),
             ("INSECURE_DATA_ROOT", OwnerStartupCode::InsecureDataRoot),
+            (
+                "RESTORATION_UNAVAILABLE",
+                OwnerStartupCode::RestorationUnavailable,
+            ),
         ];
         for (code, expected) in known_codes {
             let error = anyhow::Error::from(nw_domain::DomainError::new(
@@ -921,6 +942,7 @@ mod binding_tests {
                 OwnerStartupCode::FilesystemError,
                 OwnerStartupCode::LogStorageError,
                 OwnerStartupCode::InsecureDataRoot,
+                OwnerStartupCode::RestorationUnavailable,
                 OwnerStartupCode::OtherDomain,
                 OwnerStartupCode::AdapterError,
             ] {
