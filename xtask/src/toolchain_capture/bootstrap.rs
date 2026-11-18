@@ -18,6 +18,7 @@ const PACKAGE_LIMIT: u64 = 32 * 1024 * 1024;
 const CLOSURE_LIMIT: u64 = 192 * 1024 * 1024;
 const GUEST_PACKAGES: &str = "/verified-packages";
 const GUEST_XTASK: &str = "/bootstrap-xtask";
+const GUEST_FAILURE: &str = "/component-failure.json";
 
 struct Package<'a> {
     filename: &'a str,
@@ -46,6 +47,26 @@ fn number(value: &Value, field: &str) -> Result<u64> {
     value[field]
         .as_u64()
         .with_context(|| format!("Invalid package lock integer {field}"))
+}
+
+fn retain_failure(path: &Path, failure: &anyhow::Error) {
+    let cause = format!("{failure:#}");
+    // Vendor tools run with a cleared environment and public, locked inputs.
+    // Exclude any credential-shaped lines before storing a bounded excerpt.
+    let excerpt: String = cause
+        .lines()
+        .filter(|line| {
+            let line = line.to_ascii_lowercase();
+            !["authorization", "bearer", "secret", "credential", "token=", "signature="]
+                .iter()
+                .any(|term| line.contains(*term))
+        })
+        .flat_map(|line| line.chars().chain(['\n']))
+        .take(2048)
+        .collect();
+    if let Ok(content) = serde_json::to_vec_pretty(&json!({"failure":excerpt})) {
+        let _ = fs::write(path, content);
+    }
 }
 
 fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
@@ -338,7 +359,7 @@ fn guest(lock: &Value, packages: &[Package<'_>], nasm: &Tool<'_>) -> Result<()> 
         "Offline package install requires the copied worker in the selected OCI base"
     );
     let deadline = Instant::now() + Duration::from_secs(1320);
-    let base_status = fs::read("/var/lib/dpkg/status")?;
+    let base_status = fs::read("/var/lib/dpkg/status").context("Read the offline OCI baseline")?;
     ensure!(
         metadata::digest(&base_status) == text(lock, "base_status_sha256")?
             && inventory(deadline)?.0 == text(lock, "base_inventory_sha256")?,
@@ -400,8 +421,9 @@ fn guest(lock: &Value, packages: &[Package<'_>], nasm: &Tool<'_>) -> Result<()> 
         );
         observed.insert(program.into(), json!(version));
     }
-    let nasm = build_nasm(nasm, deadline)?;
-    let profile = standard_linux::build(Path::new(GUEST_PACKAGES), &lock["ffmpeg"], deadline)?;
+    let nasm = build_nasm(nasm, deadline).context("Bootstrap NASM inside the offline builder")?;
+    let profile = standard_linux::build(Path::new(GUEST_PACKAGES), &lock["ffmpeg"], deadline)
+        .context("Compile and qualify the offline Linux media runtime")?;
     println!(
         "{}",
         json!({
@@ -429,7 +451,8 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
         result.success()?;
         Ok(result)
     };
-    docker(&["pull", "--platform", "linux/amd64", image], 100)?;
+    docker(&["pull", "--platform", "linux/amd64", image], 100)
+        .context("Pull the digest-locked Linux build image")?;
     let mount = format!(
         "type=bind,src={},dst={GUEST_PACKAGES},readonly",
         directory.display()
@@ -477,8 +500,10 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
             ],
             25,
         )?;
-        let output = docker(&["start", "--attach", container], 1335)?;
-        let guest: Value = serde_json::from_slice(&output.stdout)?;
+        let output = docker(&["start", "--attach", container], 1335)
+            .context("Run the locked compiler worker with networking disabled")?;
+        let guest: Value = serde_json::from_slice(&output.stdout)
+            .context("Decode the offline compiler result")?;
         ensure!(
             guest["final_inventory_sha256"] == lock["final_inventory_sha256"]
                 && guest["package_count"] == lock["final_inventory_count"],
@@ -496,6 +521,14 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
         )?;
         Ok(guest)
     })();
+    if result.is_err()
+        && let Some(parent) = delivery.parent()
+    {
+        let retained = parent.join("worker-failure.json");
+        if let Some(retained) = retained.to_str() {
+            let _ = docker(&["cp", &format!("{container}:{GUEST_FAILURE}"), retained], 10);
+        }
+    }
     let mut cleanup = process::command("/usr/bin/docker");
     cleanup.args(["rm", "--force", container]);
     let cleanup = process::run(
@@ -792,13 +825,16 @@ fn source_archive(directory: &Path, delivery: &Path, media: &Value, snapshot: &s
     Ok(())
 }
 
-pub(super) fn run(root: &Path) -> Result<()> {
+fn run_inner(root: &Path) -> Result<()> {
     let lock: Value = serde_json::from_str(LOCK)?;
     let capture: Value = serde_json::from_str(CONFIG)?;
     let packages = load(&lock, &capture)?;
     let nasm = load_nasm(&capture)?;
     match std::env::args().skip(2).collect::<Vec<_>>().as_slice() {
-        [worker] if worker == "--offline-install-worker" => return guest(&lock, &packages, &nasm),
+        [worker] if worker == "--offline-install-worker" => {
+            return guest(&lock, &packages, &nasm)
+                .inspect_err(|error| retain_failure(Path::new(GUEST_FAILURE), error));
+        }
         [] => {}
         _ => bail!("Unknown offline compiler argument"),
     }
@@ -847,7 +883,8 @@ pub(super) fn run(root: &Path) -> Result<()> {
     if result.is_err() {
         fs::remove_dir_all(&directory)?;
     }
-    result?;
+    result.context("Stage the 200 locked Ubuntu package archives")?;
+    tracing::info!(package_count = packages.len(), "Verified the Linux build package inputs");
     download(
         nasm.url,
         &directory.join(nasm.filename),
@@ -855,7 +892,8 @@ pub(super) fn run(root: &Path) -> Result<()> {
         nasm.sha256,
         deadline,
         true,
-    )?;
+    )
+    .context("Stage the locked NASM source archive")?;
     let media = &lock["ffmpeg"];
     let media_name = text(media, "filename")?;
     let media_url = text(media, "url")?;
@@ -873,12 +911,17 @@ pub(super) fn run(root: &Path) -> Result<()> {
         media_sha,
         deadline,
         false,
-    )?;
+    )
+    .context("Stage the signed FFmpeg release source archive")?;
     let delivery = parent.join(format!("profile-{}", std::process::id()));
     let installed = offline_install(&directory, &delivery, &lock)?;
-    let relocated = qualify_relocated(&delivery, text(&lock, "base")?)?;
-    let corresponding = source_closure(&installed["ffmpeg"], snapshot)?;
-    source_archive(&directory, &delivery, media, snapshot)?;
+    tracing::info!("Built and qualified the Linux codec runtime in the locked worker");
+    let relocated = qualify_relocated(&delivery, text(&lock, "base")?)
+        .context("Qualify the relocated runtime in a fresh offline OCI container")?;
+    let corresponding = source_closure(&installed["ffmpeg"], snapshot)
+        .context("Match actual native imports to their corresponding source records")?;
+    source_archive(&directory, &delivery, media, snapshot)
+        .context("Assemble the checksum-verified corresponding source archive")?;
     run_tool(
         process::command("/usr/bin/tar")
             .current_dir(&delivery)
@@ -926,4 +969,15 @@ pub(super) fn run(root: &Path) -> Result<()> {
     fs::remove_dir_all(&directory).context("Remove staging archives after building the profile")?;
     tracing::info!(package_count = packages.len(), payload_bytes = number(&lock, "download_bytes")?, path = %delivery.display(), "Verified relocatable Linux CPU component build");
     Ok(())
+}
+
+pub(super) fn run(root: &Path) -> Result<()> {
+    run_inner(root).inspect_err(|error| {
+        if std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true") {
+            let directory = root.join("target/toolchain-bootstrap");
+            if fs::create_dir_all(&directory).is_ok() {
+                retain_failure(&directory.join("host-failure.json"), error);
+            }
+        }
+    })
 }

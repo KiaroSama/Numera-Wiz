@@ -380,7 +380,8 @@ pub(super) fn build(inputs: &Path, locked: &Value, deadline: Instant) -> Result<
             .args(CONFIGURE),
         deadline,
         180,
-    )?;
+    )
+    .context("Configure FFmpeg with the reviewed Linux libraries")?;
     ensure!(
         configured
             .text()?
@@ -394,7 +395,8 @@ pub(super) fn build(inputs: &Path, locked: &Value, deadline: Instant) -> Result<
             .args(["-j4", "ffmpeg", "ffprobe"]),
         deadline,
         1020,
-    )?;
+    )
+    .context("Compile the two Linux FFmpeg executables")?;
     fs::write(delivery.join("build.txt"), compilation.stdout)?;
     fs::copy(
         source.join("COPYING.GPLv3"),
@@ -403,7 +405,8 @@ pub(super) fn build(inputs: &Path, locked: &Value, deadline: Instant) -> Result<
     let font = fonts.join("DejaVuSans.ttf");
     fs::copy("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", &font)?;
     let font_package = distribution_package("fonts-dejavu-core", &notices, deadline)?;
-    let runtime = relocate(source, &binary_dir, &notices, deadline)?;
+    let runtime = relocate(source, &binary_dir, &notices, deadline)
+        .context("Relocate the native ELF dependency closure")?;
     let executable = binary_dir.join("ffmpeg");
     let mut facts = BTreeMap::new();
     for name in [
@@ -440,7 +443,8 @@ pub(super) fn build(inputs: &Path, locked: &Value, deadline: Instant) -> Result<
         fs::write(&path, observed.stdout)?;
         facts.insert(name, file_identity(&path)?);
     }
-    let qualifications = check_runtime(&binary_dir, delivery, deadline)?;
+    let qualifications = check_runtime(&binary_dir, delivery, deadline)
+        .context("Exercise the relocated CPU codec round trips")?;
     Ok(json!({
         "status": "linux_cpu_component_build_candidate",
         "source": locked,

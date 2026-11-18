@@ -522,6 +522,13 @@ jobs:
         id: standard-linux
         if: ${{ !cancelled() && steps.security_candidate_prepare.outcome == 'success' }}
         run: cargo run --locked -p xtask -- build-standard-linux-profile
+      - name: Retain the bounded CPU component failure evidence
+        if: ${{ !cancelled() && steps.standard-linux.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-cpu-component-failure
+          path: target/toolchain-bootstrap/*-failure.json
+          if-no-files-found: warn
       - name: Retain CPU component build and relocation evidence
         if: ${{ !cancelled() && steps.standard-linux.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
