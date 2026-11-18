@@ -10,12 +10,16 @@ to each operation/media/transport/package boundary separately.
 | `commands.list`, `commands.schema` | Live implementation/schema discovery. |
 | `access.replay_scope.create` | Bootstrap own durable retry identity. |
 | `media.probe` | Inspect authorized native media with a finite probe budget. |
+| `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
+| `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
 | `assets.register` | Durably register one native path or verified upload. |
 | `assets.register_folder`, `assets.folder_inspect` | Durable bounded native folder snapshot and immutable creator-scoped inspection, including per-file failures/companion inventory. |
 | `assets.list`, `assets.inspect`, `assets.output_suggest` | Authorized inventory, details and proposed absent output. |
 | `streams.clean.resolve` | Pure explicit original-stream inventory resolution. |
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
+| `chapters.inspect`, `chapters.export`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review a chapter-removal plan. |
+| `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
 | `jobs.submit`, `jobs.inspect`, `jobs.list`, `jobs.cancel` | Run, observe/page and control accepted jobs. Submission/cancellation are durable. |
 | `streams.clean.batch_plan`, `batches.plan_inspect` | Review 1-64 explicit batch candidates and frozen member outcomes. |
 | `batches.submit`, `batches.inspect`, `batches.list`, `batches.cancel` | Run, inspect/page and cancel a reviewed batch. Submission/cancellation are durable. |
@@ -41,6 +45,31 @@ Language matching is normalized exact matching (`en` differs from `eng`); title
 matching is substring OR, not regex. Unlisted retained streams append in source
 order; missing/dropped indices do not reappear. A no-match skip produces no
 artifact. Read the current schema for the exact tagged-variant fields.
+
+## Common registered-media queries
+
+- To enumerate FFmpeg codecs and filters while leaving hardware idle, use
+  `capabilities.refresh` with `{"params":{"components":true,"devices":false}}`.
+  Read `advertised` and `cpu_round_trip` separately. `hardware: "unknown"`
+  means the request made no device observation. A device request needs
+  explicit native-owner authority and a user request to check the hardware.
+- For a chapter-only sidecar, use `chapters.export` with
+  `{"params":{"asset_id":"ASSET_ID","include_global_metadata":false}}`.
+  Return the `ffmetadata` text and its `sha256`. `chapters.inspect` supplies
+  the original ticks and rational time bases for review.
+- To make original audio stream 2 the sole default of its type, use
+  `disposition.patch` with
+  `{"params":{"asset_id":"ASSET_ID","output":"ABSOLUTE_NEW_FILE","patch":{"stream":2,"exclusive_default":true}}}`.
+  Confirm the original stream kind in the source probe and check the returned
+  flags before submitting the reviewed plan. Its peers lose only `default`.
+- To remove the second audio track from several files, use the shared intent
+  in `streams.clean.batch_plan` with `audio_selection` set to
+  `{"selector":{"mode":"exclude_type_ordinals","values":[1]},"no_match":"reject"}`.
+  Resolve each requested position before reordering streams. Review each
+  candidate's outcome and retain the approved output paths, plan ID and hash.
+- To read one decoded source frame, query `media.preview_frame` with `asset_id`,
+  `stream_index` and zero-based `frame`. The result carries a 160 × 90 RGBA
+  frame in `rgba_base64` together with its source content digest.
 
 Keep-everything can plan a verified Rust byte copy. Current admitted remux uses
 FFmpeg and bounded packet/structure/tag assertions with exact rational clocks;
