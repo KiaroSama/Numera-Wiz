@@ -4,6 +4,8 @@ use serde_json::{Value, json};
 use std::{future::Future, time::Instant};
 
 pub const OBSERVER_PREFIX: &str = "project-observer-";
+// Current native/Chrome captures place this shared Cleanup control at y602.
+pub const REVIEW_CLEANUP_BUTTON: (u32, u32) = (331, 602);
 const PAGE: usize = 128;
 const PROJECT_COMMANDS: [&str; 13] = [
     "projects.list",
@@ -363,9 +365,9 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     }
     assert_eq!(assets.len(), 3);
     assert_eq!(jobs.len(), 3);
-    // Both retained185 captures show the genuine Review control at this point.
     // Keep a valid reviewed Cleanup plan so the Projects shortcut guard is meaningful.
-    let review = activate(driver, 330, 570, "streams.clean", 0).await;
+    let (review_x, review_y) = REVIEW_CLEANUP_BUTTON;
+    let review = activate(driver, review_x, review_y, "streams.clean", 0).await;
     evidence.push(review.evidence("streams.clean"));
     driver.screenshot("retained-cleanup-plan").await;
     if driver.browser() {

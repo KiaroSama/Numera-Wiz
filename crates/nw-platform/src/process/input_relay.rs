@@ -168,6 +168,17 @@ impl PumpReceipt {
 fn error(code: &str, message: &str) -> DomainError {
     DomainError::new(code, message)
 }
+
+pub(super) fn record_failure(slot: &mut Option<DomainError>, cause: &DomainError) {
+    // A sibling that observes cancellation may report before the worker that
+    // caused it. Preserve the first specific failure across that ordering.
+    if slot
+        .as_ref()
+        .is_none_or(|previous| previous.code == "CANCELLED" && cause.code != "CANCELLED")
+    {
+        *slot = Some(cause.clone());
+    }
+}
 fn lock<T>(value: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     value
         .lock()
@@ -393,7 +404,7 @@ impl OwnedInputRelaySet {
         }
         for worker in self.workers.iter_mut().flatten() {
             if let Some(cause) = lock(&worker.control.failure).as_ref() {
-                self.failure.get_or_insert_with(|| cause.clone());
+                record_failure(&mut self.failure, cause);
                 self.cancel.cancel();
             }
             if worker.handle.as_ref().is_some_and(JoinHandle::is_finished)
@@ -403,7 +414,7 @@ impl OwnedInputRelaySet {
                     Ok(mut result) => {
                         result.receipt.joined = true;
                         if let Err(cause) = &result.result {
-                            self.failure.get_or_insert_with(|| cause.clone());
+                            record_failure(&mut self.failure, cause);
                             self.cancel.cancel();
                         }
                         worker.result = Some(result);

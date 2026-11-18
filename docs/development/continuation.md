@@ -39,6 +39,25 @@ required.
 
 ## Latest completed hosted boundary
 
+[CI299](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43743633886),
+source `0e9a8009e3af6a0fa206ec1b80e0cf5e0cd5ad24`, passed seven jobs and failed
+six. All four desktop builds passed. The platform suites failed on Windows
+fixture executable path admission, on Linux and Intel Mac when cancellation
+masked a changed input, and on ARM Mac when process-group signaling returned
+`EPERM` after primary exit. The Windows reconnect log captured error 5 during
+atomic publication of `owner.json`. Both GUI runs failed at the same Review
+cleanup action. Clippy also reported three findings across the matrix.
+
+The following source changes address these failures: use the canonical fixture
+executable path, retain the first specific relay failure, and require a separate
+group-absence observation after reaping on macOS. Windows can reattempt atomic
+publication of the same synced private file for up to 250 ms after an access or
+sharing denial. The GUI tests now use the same target for Review cleanup, and a
+failed platform test step uploads its output while the remaining checks run.
+All these changes require qualification on the commit that contains them.
+
+## Earlier hosted boundary
+
 [CI295](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43489694891),
 source `f335e28c6a3d626b2abff0cb15e9e59533a5518f`, is terminal with nine
 passing jobs, three failures and one cancelled macOS Intel job. All four native

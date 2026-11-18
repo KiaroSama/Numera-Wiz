@@ -216,6 +216,9 @@ pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<(
         .sync_all()
         .map_err(|error| diagnostic_io_error("private_write.sync", error))?;
     if replace_owned {
+        #[cfg(windows)]
+        persist_owned_windows(file, path)?;
+        #[cfg(not(windows))]
         file.persist(path)
             .map_err(|error| diagnostic_io_error("private_write.persist", error.error))?;
     } else {
@@ -227,6 +230,31 @@ pub fn write_private(path: &Path, bytes: &[u8], replace_owned: bool) -> Result<(
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;
     Ok(())
+}
+
+#[cfg(windows)]
+fn persist_owned_windows(mut file: tempfile::NamedTempFile, path: &Path) -> Result<()> {
+    use std::time::{Duration, Instant};
+    use windows_sys::Win32::Foundation::{ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION};
+
+    // A concurrent reader can briefly prevent MoveFileExW from replacing the
+    // previous runtime record. Retry the same synced file within the existing
+    // startup budget. Keep the old record intact if replacement never succeeds.
+    let deadline = Instant::now() + Duration::from_millis(250);
+    loop {
+        match file.persist(path) {
+            Ok(_) => return Ok(()),
+            Err(problem)
+                if problem.error.raw_os_error().is_some_and(|code| {
+                    code == ERROR_ACCESS_DENIED as i32 || code == ERROR_SHARING_VIOLATION as i32
+                }) && Instant::now() < deadline =>
+            {
+                file = problem.file;
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(problem) => return Err(diagnostic_io_error("private_write.persist", problem.error)),
+        }
+    }
 }
 
 #[cfg(test)]

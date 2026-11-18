@@ -26,7 +26,7 @@ use windows_sys::Win32::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Operation {
-    NoOperation,
+    Idle,
     SubmittingConnect,
     SubmittingWrite { submitted: u32, offset: usize },
     PendingConnect,
@@ -117,7 +117,7 @@ impl Native {
             }),
             pipe: None,
             event: None,
-            phase: Operation::NoOperation,
+            phase: Operation::Idle,
             cancel_sent: false,
             cancel_error: None,
             close_ambiguity: None,
@@ -204,9 +204,9 @@ impl Native {
     )]
     fn reset(&mut self) -> Result<()> {
         if self.phase == Operation::Terminal {
-            self.phase = Operation::NoOperation;
+            self.phase = Operation::Idle;
         }
-        if self.phase != Operation::NoOperation {
+        if self.phase != Operation::Idle {
             return Err(error(
                 "RELAY_SETTLEMENT_UNCERTAIN",
                 "Cannot reuse live native operation storage",
@@ -231,7 +231,7 @@ impl Native {
         };
         self.cancel_sent = false;
         self.cancel_error = None;
-        self.phase = Operation::NoOperation;
+        self.phase = Operation::Idle;
         Ok(())
     }
     #[expect(
@@ -269,7 +269,7 @@ impl Native {
                     .map(|_| ())
             }
             _ => {
-                self.phase = Operation::NoOperation;
+                self.phase = Operation::Idle;
                 Err(native_error(code))
             }
         }
@@ -484,7 +484,7 @@ impl Native {
             if !immediate {
                 let code = last_code();
                 if code != ERROR_IO_PENDING {
-                    self.phase = Operation::NoOperation;
+                    self.phase = Operation::Idle;
                     return Err(native_error(code));
                 }
                 self.phase = Operation::PendingWrite { submitted, offset };

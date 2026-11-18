@@ -85,14 +85,16 @@ async fn prepare_with_policy(
 }
 
 fn invocation(program: &Path, mode: &str) -> InvocationSpec {
+    let program = nw_platform::files::source_path(program).unwrap();
+    let executable_sha256 = Sha256::digest(std::fs::read(&program).unwrap()).into();
     InvocationSpec {
-        program: program.to_owned(),
+        program,
         args: vec![
             SessionArg::Literal(mode.into()),
             SessionArg::Input(RelayInputId(0)),
             SessionArg::Input(RelayInputId(1)),
         ],
-        executable_sha256: Sha256::digest(std::fs::read(program).unwrap()).into(),
+        executable_sha256,
         profile_id: "owned-byte-fixture-v1".into(),
     }
 }

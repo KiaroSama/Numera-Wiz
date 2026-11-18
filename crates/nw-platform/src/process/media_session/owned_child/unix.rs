@@ -12,7 +12,7 @@ pub(in crate::process::media_session) struct OwnedChild {
     child: Option<Child>,
     group: Option<Pid>,
     exit: Option<ExitStatus>,
-    kill_sent: bool,
+    group_signal_finished: bool,
     group_absent: bool,
 }
 impl OwnedChild {
@@ -21,7 +21,7 @@ impl OwnedChild {
             child: None,
             group: None,
             exit: None,
-            kill_sent: false,
+            group_signal_finished: false,
             group_absent: false,
         }
     }
@@ -88,13 +88,21 @@ impl OwnedChild {
             .map_err(|e| error("PROCESS_WAIT_FAILED", &e.to_string()))?;
             // WNOWAIT anchors PID/PGID authority even after primary exit. After
             // the actual reap below, no destructive operation uses this number.
-            if (cancel || observation.is_some()) && !self.kill_sent {
+            if (cancel || observation.is_some()) && !self.group_signal_finished {
                 match rustix::process::kill_process_group(group, Signal::KILL) {
-                    Ok(()) | Err(rustix::io::Errno::SRCH) => self.kill_sent = true,
+                    Ok(()) | Err(rustix::io::Errno::SRCH) => self.group_signal_finished = true,
+                    // XNU skips zombies in group signaling. An exited primary
+                    // can therefore leave a group that returns EPERM until
+                    // it is reaped. The same error can mean an inaccessible
+                    // live member, so it does not establish group absence.
+                    #[cfg(target_os = "macos")]
+                    Err(rustix::io::Errno::PERM) if observation.is_some() => {
+                        self.group_signal_finished = true;
+                    }
                     Err(e) => return Err(error("TREE_TERMINATION_UNCERTAIN", &e.to_string())),
                 }
             }
-            if observation.is_some() && self.kill_sent {
+            if observation.is_some() && self.group_signal_finished {
                 self.exit = self
                     .child
                     .as_mut()
@@ -107,6 +115,10 @@ impl OwnedChild {
             match rustix::process::test_kill_process_group(group) {
                 Err(rustix::io::Errno::SRCH) => self.group_absent = true,
                 Ok(()) => {}
+                // A dead descendant may remain in the group until its parent
+                // reaps it. EPERM stays pending under the existing deadline.
+                #[cfg(target_os = "macos")]
+                Err(rustix::io::Errno::PERM) => {}
                 Err(e) => return Err(error("TREE_SETTLEMENT_UNCERTAIN", &e.to_string())),
             }
         }

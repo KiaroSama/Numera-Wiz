@@ -309,8 +309,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: cargo run --locked -p xtask -- prepare-project-compatibility
       - name: Check platform boundaries before the application regressions
-        if: ${{ !cancelled() }}
-        run: cargo test --locked -p nw-platform --all-targets
+        id: platform-unix
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked -p nw-platform --all-targets 2>&1 | tee target/platform-regressions.log
+      - name: Check Windows platform boundaries before the application regressions
+        id: platform-windows
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          cargo test --locked -p nw-platform --all-targets 2>&1 | Tee-Object -FilePath target/platform-regressions.log -Encoding utf8
+          exit $LASTEXITCODE
+      - name: Retain a failed platform regression log immediately
+        if: ${{ !cancelled() && (steps.platform-unix.outcome == 'failure' || steps.platform-windows.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: platform-regressions-${{ matrix.os }}
+          path: target/platform-regressions.log
+          if-no-files-found: error
       - name: Build the locked independent schema validator and retain provenance
         if: ${{ !cancelled() }}
         shell: bash

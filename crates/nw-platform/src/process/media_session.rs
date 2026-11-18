@@ -342,9 +342,7 @@ impl Shared {
     }
     fn fail(&self, cause: DomainError) {
         let mut mailbox = lock(&self.mailbox);
-        if mailbox.cause.is_none() {
-            mailbox.cause = Some(cause);
-        }
+        super::input_relay::record_failure(&mut mailbox.cause, &cause);
         self.cancel.cancel();
     }
     fn cause(&self) -> DomainError {
@@ -395,10 +393,9 @@ impl Client {
                     .finished
                     .as_ref()
                     .is_some_and(std::result::Result::is_err)
+                    && let Some(Err(failure)) = mailbox.finished.take()
                 {
-                    if let Some(Err(failure)) = mailbox.finished.take() {
-                        return Err(failure);
-                    }
+                    return Err(failure);
                 }
                 if if spawned {
                     mailbox.spawned
@@ -1061,13 +1058,13 @@ async fn settle(shared: &Shared, state: &mut CoordinatorState) {
             }
         }
         if workers && child && native_outputs && state.stdout.is_none() && state.stderr.is_none() {
-            if let Some(relays) = state.relays.as_mut() {
-                if let Err(cause) = relays.cleanup() {
-                    shared.fail(cause);
-                    registry::uncertain(shared.id);
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                    continue;
-                }
+            if let Some(relays) = state.relays.as_mut()
+                && let Err(cause) = relays.cleanup()
+            {
+                shared.fail(cause);
+                registry::uncertain(shared.id);
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                continue;
             }
             break;
         }
