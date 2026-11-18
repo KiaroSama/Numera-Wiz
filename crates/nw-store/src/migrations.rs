@@ -11,6 +11,7 @@ use nw_domain::{
     DomainError, Result,
     commands::{Request, Response},
     maintenance::{CURRENT_STORE_VERSION, MigrationPhase, MigrationPlan, MigrationRecord},
+    media_execution::{StoredJob, decode_reviewed_media_plan},
 };
 use redb::ReadableTable;
 use tokio_util::sync::CancellationToken;
@@ -154,17 +155,33 @@ impl Store {
             }
             Ok(())
         })?;
-        self.visit::<serde_json::Value>("plan/", |raw| nw_domain::plans::decode(raw).map(|_| ()))?;
-        self.visit::<serde_json::Value>("job/", |raw| {
-            let bytes = serde_json::to_vec(&raw).map_err(storage)?;
-            let job = crate::records::decode_job(&bytes)?;
-            if !job.state.terminal() {
+        {
+            let read = self.db.begin_read().map_err(storage)?;
+            let table = read.open_table(RECORDS).map_err(storage)?;
+            for row in table.range("plan/"..).map_err(storage)? {
+                let (key, row) = row.map_err(storage)?;
+                if !key.value().starts_with("plan/") {
+                    break;
+                }
+                let bytes = row.value();
+                crate::check_record_decode_size(bytes)?;
+                let marker: serde_json::Value = crate::decode(bytes)?;
+                if marker.get("envelope_version").is_some() && marker.get("payload_kind").is_some() {
+                    decode_reviewed_media_plan(std::str::from_utf8(bytes).map_err(storage)?)?;
+                } else {
+                    nw_domain::plans::decode(marker)?;
+                }
+            }
+        }
+        self.visit_executions(|job| {
+            if !job.terminal() {
                 return Err(DomainError::new(
                     "OWNER_BUSY",
                     "Accepted jobs must finish or be explicitly cancelled before migration",
                 ));
             }
-            if job.state == nw_domain::records::JobState::Succeeded
+            if let StoredJob::Legacy(job) = job
+                && job.state == nw_domain::records::JobState::Succeeded
                 && (job.artifact.is_none() || job.verification.is_none())
             {
                 return Err(invalid("A successful job lacks verified publication facts"));
