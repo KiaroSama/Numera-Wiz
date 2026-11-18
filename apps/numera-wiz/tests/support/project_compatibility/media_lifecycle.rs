@@ -557,12 +557,15 @@ pub(super) async fn run(journey: Journey<'_>) -> Result<()> {
     ensure!(
         mixed["result"]["source"]["origin"] == "media_v1_promotion"
             && mixed["result"]["source"]["guard_revision"] == "0"
-            && mixed["result"]["source"]["origin_operation_id"] == successor["result"]["promotion_id"],
+            && mixed["result"]["source"]["origin_operation_id"]
+                == successor["result"]["promotion_id"],
         "Mixed review lost the genuine MediaV1 successor after an earlier restoration"
     );
     owner.stop(journey.evidence).await?;
-    journey.evidence.record(json!({"phase":"mixed-review-after-prior-restoration","status":"passed",
+    journey.evidence.record(
+        json!({"phase":"mixed-review-after-prior-restoration","status":"passed",
         "prior_restoration":restore.id,"media_v1_successor":successor["result"]["promotion_id"],
-        "mixed_review_sha256":mixed["result"]["hash"]}))?;
+        "mixed_review_sha256":mixed["result"]["hash"]}),
+    )?;
     Ok(())
 }

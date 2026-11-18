@@ -165,7 +165,8 @@ impl Store {
                 }
                 let bytes = row.value();
                 let marker: serde_json::Value = crate::decode(bytes)?;
-                if marker.get("envelope_version").is_some() || marker.get("payload_kind").is_some() {
+                if marker.get("envelope_version").is_some() || marker.get("payload_kind").is_some()
+                {
                     decode_reviewed_media_plan(std::str::from_utf8(bytes).map_err(storage)?)?;
                 } else {
                     nw_domain::plans::decode(marker)?;
