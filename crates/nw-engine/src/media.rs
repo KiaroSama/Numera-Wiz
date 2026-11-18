@@ -1,5 +1,6 @@
 //! Observe actual identified components through the shared supervised process budget.
 pub(super) mod execution;
+mod normalized_pair;
 mod verification;
 use super::{Engine, blocking};
 use nw_domain::{

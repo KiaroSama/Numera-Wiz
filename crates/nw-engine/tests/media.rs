@@ -5,6 +5,122 @@ use tokio_util::sync::CancellationToken;
 #[path = "../../../test-support/media.rs"]
 mod fixture;
 use fixture::rules;
+
+async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
+    use nw_platform::{
+        files::{DirectoryStamp, SourceStamp, source_path},
+        process::{ByteInput, RelayInputId},
+    };
+    use sha2::{Digest, Sha256};
+    use std::{path::Path, time::Duration};
+
+    async fn collect(
+        ffmpeg: &Path,
+        path: &Path,
+        options: &[&str],
+        token: &CancellationToken,
+    ) -> Vec<u8> {
+        let mut args = ["-hide_banner", "-nostdin", "-v", "error", "-i"]
+            .map(String::from)
+            .to_vec();
+        args.push(path.to_str().unwrap().into());
+        args.extend(options.iter().map(|option| String::from(*option)));
+        args.push("pipe:1".into());
+        nw_platform::process::run(
+            ffmpeg,
+            &args,
+            Duration::from_secs(30),
+            256 * 1024,
+            token.clone(),
+        )
+        .await
+        .unwrap()
+        .stdout
+    }
+
+    let ffmpeg = Path::new(&engine.ffmpeg.path);
+    let root =
+        nw_platform::security::private_directory(&media.directory.path().join("normalized-pair"))
+            .unwrap();
+    let video = [
+        "-map",
+        "0:v:0",
+        "-c:v",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        "-fps_mode",
+        "passthrough",
+    ];
+    let audio = ["-map", "0:a:0", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1"];
+    let mut inputs = Vec::new();
+    for (index, options) in [video.as_slice(), audio.as_slice()].into_iter().enumerate() {
+        let mut options = options.to_vec();
+        if index == 1 {
+            options.extend(["-af", "asetpts=N/SR/TB", "-output_ts_offset", "0.125"]);
+        }
+        options.extend(["-f", "nut"]);
+        let bytes = collect(ffmpeg, &media.source, &options, token).await;
+        let path = root.join(format!("normalized-{index}.nut"));
+        std::fs::write(&path, &bytes).unwrap();
+        inputs.push(
+            ByteInput::new(
+                RelayInputId(index as u8),
+                SourceStamp::capture_resolved(&source_path(&path).unwrap()).unwrap(),
+                bytes.len() as u64,
+                Sha256::digest(&bytes).into(),
+            )
+            .unwrap(),
+        );
+    }
+    let output = engine
+        .mux_normalized_pair_candidate(
+            inputs
+                .try_into()
+                .unwrap_or_else(|_| panic!("Expected two transports")),
+            DirectoryStamp::capture_resolved(&root).unwrap(),
+            token.clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(engine.media_process_capacity(), (2, 2, 0));
+    assert!(
+        output
+            .closed
+            .pumps()
+            .iter()
+            .all(|pump| pump.transport_complete())
+    );
+    let candidate = root.join("candidate.nut");
+    std::fs::write(&candidate, output.output.stdout).unwrap();
+    let probe = fixture::probe(&media.bin, &candidate).await;
+    let streams = probe["streams"].as_array().unwrap();
+    assert_eq!(streams.len(), 2);
+    assert_eq!(streams[0]["codec_name"], "rawvideo");
+    assert_eq!(streams[0]["pix_fmt"], "rgba");
+    assert_eq!(streams[0]["start_pts"], 0);
+    assert_eq!(streams[1]["codec_name"], "pcm_s16le");
+    assert_eq!(streams[1]["sample_rate"], "48000");
+    assert_eq!(streams[1]["channels"], 1);
+    assert_eq!(streams[1]["time_base"], "1/48000");
+    assert_eq!(streams[1]["start_pts"], 6_000);
+
+    for (options, format, bytes) in [
+        (video.as_slice(), "rawvideo", 64 * 48 * 4 * 4),
+        (audio.as_slice(), "s16le", 48_000 * 2),
+    ] {
+        let mut options = options.to_vec();
+        options.extend(["-f", format]);
+        let expected = collect(ffmpeg, &media.source, &options, token).await;
+        let actual = collect(ffmpeg, &candidate, &options, token).await;
+        assert_eq!(expected.len(), bytes);
+        assert!(
+            actual == expected,
+            "Normalized {format} output differs from source decode"
+        );
+    }
+}
+
 fn observed_tag<'a>(value: &'a serde_json::Value, name: &str) -> Option<&'a str> {
     value
         .as_object()?
@@ -24,6 +140,7 @@ async fn actual_copy_and_order_metadata_remux() {
     let ffprobe = media.bin.join("ffprobe");
     let engine = Engine::new(ffmpeg.clone(), ffprobe.clone()).await.unwrap();
     let token = CancellationToken::new();
+    check_normalized_pair(&engine, &media, &token).await;
     let seek_source = directory.path().join("seek-index-é-索引.mp4");
     nw_platform::process::run(
         &ffmpeg,

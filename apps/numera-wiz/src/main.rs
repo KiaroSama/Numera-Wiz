@@ -201,11 +201,19 @@ async fn run() -> Result<()> {
             match result {
                 Err(error) => Err(error),
                 Ok(()) if closed.is_clean() => Ok(()),
-                Ok(()) => Err(nw_domain::DomainError::new(
-                    "LOG_STORAGE_ERROR",
-                    "Protected owner log handoff could not be confirmed",
-                )
-                .into()),
+                Ok(()) => {
+                    tracing::error!(
+                        resources_closed = closed.resources_closed,
+                        writer_healthy = closed.writer_healthy,
+                        confirmed_in_time = closed.confirmed_in_time,
+                        "Protected owner log handoff failed"
+                    );
+                    Err(nw_domain::DomainError::new(
+                        "LOG_STORAGE_ERROR",
+                        "Protected owner log handoff could not be confirmed",
+                    )
+                    .into())
+                }
             }
         }
         .await;

@@ -263,13 +263,22 @@ async fn select_clip<D: Driver>(driver: &mut D, row: usize) {
     driver.observed("projects.list").await;
     driver.loaded(8).await;
 }
-async fn select_source_track<D: Driver>(driver: &mut D) {
-    // Sequence and solid binding: two bin rows in this fixture phase.
-    driver.screenshot("tracks-before-source-selection").await;
+async fn select_track<D: Driver>(
+    driver: &mut D,
+    bin_rows: u32,
+    track_row: u32,
+    reads: usize,
+    evidence: &str,
+) {
+    // At the fixed test viewport each bin and track row consists of a button
+    // and an identity label. The CI301 capture shows the first track at y296
+    // with two bin rows. One additional row adds 36 pixels.
+    let y = 296 + (bin_rows - 2 + track_row) * 36;
+    driver.screenshot(evidence).await;
     driver.mark().await;
-    driver.click(55, 319).await;
+    driver.click(55, y).await;
     driver.observed("projects.list").await;
-    driver.loaded(6).await;
+    driver.loaded(reads).await;
 }
 async fn catalog_open<D: Driver>(driver: &mut D, project: &str, name: &str) {
     let catalog = read(driver, "projects.list", json!({"limit":64}), None).await;
@@ -602,7 +611,7 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
         left_start = 4;
         clip_at(&entity(driver, &graph, &graph.left).await, 4, 6, 0, 2);
     }
-    select_source_track(driver).await;
+    select_track(driver, 2, 1, 6, "tracks-before-source-selection").await;
     if driver.browser() {
         driver.click(318, 100).await;
         let denied = place_registered(driver).await;
@@ -632,12 +641,7 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     assert_eq!(binding["asset_id"], asset);
     assert_eq!(binding["stream_index"], physical);
     evidence.push(json!({"registered_clip":registered_clip,"source_binding":binding}));
-    // Three bin rows after registered placement; capture this layout candidate.
-    driver.screenshot("tracks-before-solid-selection").await;
-    driver.mark().await;
-    driver.click(55, 319).await;
-    driver.observed("projects.list").await;
-    driver.loaded(8).await;
+    select_track(driver, 3, 0, 8, "tracks-before-solid-selection").await;
     select_clip(driver, 0).await;
     let captured_revision = graph.revision.clone();
     let competing = external_move(driver, &graph).await;
@@ -694,7 +698,7 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     );
     let final_solid = entity(driver, &graph, &graph.left).await;
     driver.screenshot("reopened-project").await;
-    select_source_track_after_reopen(driver).await;
+    select_track(driver, 3, 1, 8, "tracks-before-reopened-source-selection").await;
     assert_eq!(
         ids(&viewport(driver, &graph, &graph.source_track).await),
         vec![registered_id.clone()]
@@ -718,17 +722,6 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     // and its original evidence write. The aggregate HOST deadline is unchanged.
     clip_group_journey(driver, &mut graph, name).await;
 }
-async fn select_source_track_after_reopen<D: Driver>(driver: &mut D) {
-    // Same three-bin-row fixture; ROOT must verify this later capture.
-    driver
-        .screenshot("tracks-before-reopened-source-selection")
-        .await;
-    driver.mark().await;
-    driver.click(55, 353).await;
-    driver.observed("projects.list").await;
-    driver.loaded(8).await;
-}
-
 async fn place_group_solid<D: Driver>(driver: &mut D, start: &str) -> Observation {
     driver.click(318, 100).await;
     driver.click(325, 134).await; // Explicit Finite solid source variant.
@@ -792,11 +785,7 @@ async fn group_clip<D: Driver>(
 async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: &str) {
     let started = Instant::now();
     let mut evidence = Vec::new();
-    driver.screenshot("group-before-solid-track").await;
-    driver.mark().await;
-    driver.click(55, 319).await;
-    driver.observed("projects.list").await;
-    driver.loaded(8).await;
+    select_track(driver, 3, 0, 8, "group-before-solid-track").await;
     let original = ids(&viewport(driver, graph, &graph.solid_track).await);
     assert_eq!(original, vec![graph.left.clone()]);
     let mut clips = Vec::new();

@@ -1,7 +1,6 @@
 //! Hosted browser Projects inputs and explicitly reviewed owner policy fixture.
 #[path = "../../tests/support/project_workbench.rs"]
 mod shared;
-pub(super) use shared::REVIEW_CLEANUP_BUTTON;
 use super::tests::{Fixture, browser_click, browser_key, driver};
 use base64::Engine as _;
 use nw_domain::{
@@ -10,6 +9,7 @@ use nw_domain::{
 };
 use serde_json::{Value, json};
 use sha2::Digest as _;
+pub(super) use shared::REVIEW_CLEANUP_BUTTON;
 use std::{
     path::Path,
     time::{Duration, Instant},

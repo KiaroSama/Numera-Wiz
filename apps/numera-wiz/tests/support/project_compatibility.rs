@@ -734,6 +734,11 @@ enum OwnerStderrError {
         stage: OwnerFailureStage,
         code: OwnerStartupCode,
     },
+    LogHandoff {
+        resources_closed: bool,
+        writer_healthy: bool,
+        confirmed_in_time: bool,
+    },
 }
 enum OwnerStderrRecord {
     Started(ApplicationStartStage),
@@ -816,6 +821,7 @@ fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStd
         "Application startup stage started",
         "Filesystem operation failed",
         "Owner startup stage failed",
+        "Protected owner log handoff failed",
     ]
     .into_iter()
     .find(|message| {
@@ -846,6 +852,19 @@ fn owner_stderr_record(line: &str) -> Result<Option<OwnerStderrRecord>, OwnerStd
         return ApplicationStartStage::from_label(label)
             .map(|stage| Some(OwnerStderrRecord::Started(stage)))
             .ok_or(Unrecognized);
+    }
+    if message == "Protected owner log handoff failed" {
+        let (confirmed_in_time, fields) = fields
+            .strip_prefix(" confirmed_in_time=")
+            .and_then(|fields| fields.split_once(" resources_closed="))
+            .ok_or(Malformed)?;
+        let (resources_closed, writer_healthy) =
+            fields.split_once(" writer_healthy=").ok_or(Malformed)?;
+        return Ok(Some(OwnerStderrRecord::Error(OwnerStderrError::LogHandoff {
+            resources_closed: resources_closed.parse().map_err(|_| Malformed)?,
+            writer_healthy: writer_healthy.parse().map_err(|_| Malformed)?,
+            confirmed_in_time: confirmed_in_time.parse().map_err(|_| Malformed)?,
+        })));
     }
     if message == "Filesystem operation failed" {
         let fields = fields.strip_prefix(" operation=").ok_or(Malformed)?;
@@ -1002,6 +1021,16 @@ fn owner_stderr_diagnostic_cases() {
         Some(ApplicationStartStage::RecoverAcceptedMediaRestoration)
     );
     assert!(stages.error_observations.is_empty());
+    let handoff = project(b"[2026-11-18T13:16:44.443Z] [ERROR] Protected owner log handoff failed confirmed_in_time=false resources_closed=true writer_healthy=true\n");
+    assert_eq!(handoff.observation, OwnerStderrStatus::Observed);
+    assert_eq!(
+        handoff.error_observations,
+        vec![OwnerStderrError::LogHandoff {
+            resources_closed: true,
+            writer_healthy: true,
+            confirmed_in_time: false,
+        }]
+    );
     let initialization: &[(&[u8], ApplicationStartStage)] = &[
         (
             b"[2026-11-13T16:44:01.001Z] [INFO] Application startup stage started stage=Check compatible genesis eligibility\n",
@@ -1499,6 +1528,9 @@ impl Owner {
                         "STORE_RECOVERY_REQUIRED",
                         "OWNER_BUSY",
                         "OWNER_IDENTITY_CONFLICT",
+                        "FILESYSTEM_ERROR",
+                        "LOG_STORAGE_ERROR",
+                        "ADAPTER_ERROR",
                     ]
                     .into_iter()
                     .filter(|code| diagnostics.contains(*code))
@@ -1668,13 +1700,27 @@ impl Owner {
         let status = tokio::time::timeout(Duration::from_secs(40), self.child.wait())
             .await
             .context("Owner did not gracefully drain after lease release")??;
-        ensure!(status.success(), "Owned owner did not exit cleanly");
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-        let (stderr, _) = tokio::join!(
+        let (stderr, stdout) = tokio::join!(
             tokio::time::timeout_at(deadline, self.stderr),
             self.stdout.collect(deadline, true),
         );
-        let stderr = stderr.context("Owner stderr drain deadline")???;
+        let stderr = stderr
+            .context("Owner stderr drain deadline")
+            .and_then(|captured| captured.context("Owner stderr reader failed")?);
+        if !status.success() {
+            evidence.record(json!({
+                "phase":"owner-stop-failed",
+                "binary":self.binary.label,
+                "epoch":self.record.epoch,
+                "exit_code":status.code(),
+                "exit_status":status.to_string(),
+                "diagnostic_frame":stdout,
+                "stderr_diagnostic":stderr.as_ref().ok().map(|capture| owner_stderr_diagnostic(capture, true)),
+            }))?;
+            anyhow::bail!("Owned owner did not exit cleanly ({status})");
+        }
+        let stderr = stderr?;
         evidence.record(json!({"phase":"owner-stopped","binary":self.binary.label,"epoch":self.record.epoch,"exit_code":status.code(),"stderr_bytes":stderr.total,"retained_stderr_sha256":sha(&stderr.bytes)}))?;
         Ok(())
     }

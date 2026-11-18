@@ -252,7 +252,9 @@ fn persist_owned_windows(mut file: tempfile::NamedTempFile, path: &Path) -> Resu
                 file = problem.file;
                 std::thread::sleep(Duration::from_millis(10));
             }
-            Err(problem) => return Err(diagnostic_io_error("private_write.persist", problem.error)),
+            Err(problem) => {
+                return Err(diagnostic_io_error("private_write.persist", problem.error));
+            }
         }
     }
 }

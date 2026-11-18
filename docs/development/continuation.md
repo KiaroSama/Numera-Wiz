@@ -1,4 +1,4 @@
-# Current owner direction — 2026-11-15
+# Current owner direction — 2026-11-18
 
 The active task is the complete attached version 1 mandate, Pure Rust with
 FFmpeg, plus repository-owned agent skills/plugins and full CLI/MCP access to
@@ -36,6 +36,35 @@ empty/quoted/backslash/Unicode argument round trips. They remain within the
 original test entry points; authored cases are not passing runtime evidence.
 General media integration, continuous preview and the complete mandate remain
 required.
+
+The engine can now pass two already-prepared NUT inputs to the owned session
+and collect a bounded NUT candidate. The FFmpeg invocation permits the NUT
+demuxer and private file transport, selects the video and audio streams
+explicitly, and reuses the engine's two-process budget. The existing Linux
+media test prepares inputs from real video and audio, inspects the output
+stream declarations and compares every decoded frame and sample with the
+source. This candidate path awaits hosted testing and remains outside the
+persistent project commands and publication path.
+
+The [November 18 upstream check](../research/upstream-check-2026-11-18.md)
+records the verified donor revisions and the remaining source coverage.
+
+## Hosted results at `e76b113`
+
+[CI301](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44309828441)
+passed the desktop build and platform regressions on all four native targets.
+Linux passed its full native job. Windows passed the MCP reconnect regression,
+then failed the prior-package compatibility journey when the previous binary
+exited with code 6 after the promoted store had been restored. Apple Silicon
+failed compatibility after a current owner exited unsuccessfully following
+lease release. The compatibility harness now retains the bounded failure
+frame, exit status and allowlisted diagnostic fields after reaping the child.
+
+Chrome passed the cleanup-review input and reached track selection in project
+revision 8. The existing harnesses now share the track targets derived from the
+captured layout. Formatting changes from the hosted artifact were applied in
+full. These corrections and the real two-input media fixture await a run on
+their own source. [Gitleaks at e76b113](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44309828398)
 
 ## Latest completed hosted boundary
 
