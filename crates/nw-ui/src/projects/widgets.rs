@@ -489,6 +489,7 @@ impl WizApp {
         let Some(clip) = &group.clip else {
             ui.label("Select a visible clip to inspect exact time and source details.");
             self.project_link_controls(ui, &group);
+            self.timeline_preview(ui, &group);
             return;
         };
         ui.monospace(group.view.clip.as_deref().unwrap_or(""));
@@ -537,7 +538,41 @@ impl WizApp {
             if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
         });
         self.project_link_controls(ui, &group);
+        self.timeline_preview(ui, &group);
     }
+
+    fn timeline_preview(&mut self, ui: &mut egui::Ui, group: &Group) {
+        let Some(sequence) = &group.view.sequence else { return; };
+        ui.collapsing("Timeline frame", |ui| {
+            let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
+            ui.add_enabled_ui(idle, |ui| {
+                rational(ui, "Sequence time (seconds)", &mut self.projects.forms.preview_at);
+                if ui.button("Decode timeline frame").clicked() {
+                    match self.projects.forms.preview_at.value() {
+                        Ok(at) => {
+                            self.projects.preview_frame = None;
+                            self.query_with_project(
+                                "timeline.preview_frame",
+                                json!({"sequence_id":sequence,"revision":group.key.revision,"at":at}),
+                                Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                                self.project_action(Phase::PreviewFrame),
+                                ui.ctx(),
+                            );
+                        }
+                        Err(error) => self.error = Some(error),
+                    }
+                }
+            });
+            if let Some((at, texture)) = &self.projects.preview_frame
+                && self.projects.forms.preview_at.value().ok() == Some(*at)
+            {
+                let width = ui.available_width().clamp(1.0, (nw_domain::preview::WIDTH * 2) as f32);
+                let height = width * nw_domain::preview::HEIGHT as f32 / nw_domain::preview::WIDTH as f32;
+                ui.image((texture.id(), egui::vec2(width, height)));
+            }
+        });
+    }
+
     fn project_link_controls(&mut self, ui: &mut egui::Ui, group: &Group) {
         ui.separator();
         let count = self

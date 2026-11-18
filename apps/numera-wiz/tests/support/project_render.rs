@@ -29,6 +29,81 @@ async fn edit(
     response["result"].clone()
 }
 
+pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fixture::Media) {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
+
+    let source = media.directory.path().join("timeline-nonmatching-origins.mkv");
+    let mut args = [
+        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+        "testsrc2=size=64x48:rate=4:duration=1", "-f", "lavfi", "-i", "sine=440:r=48000:d=2",
+        "-map", "0:v", "-map", "1:a", "-vf", "setpts=PTS+1/TB", "-c:v", "ffv1", "-c:a", "pcm_s16le",
+    ].map(String::from).to_vec();
+    args.push(source.to_str().unwrap().into());
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"), &args, std::time::Duration::from_secs(10), 4096,
+        tokio_util::sync::CancellationToken::new(),
+    ).await.unwrap();
+    let asset = cli.mutation(scope, "timeline-preview-register", "assets.register", json!({"path":source})).await;
+    assert_eq!(asset["ok"], true, "{asset}");
+    let asset_id = asset["result"]["id"].as_str().unwrap();
+    let asset = cli.query("assets.inspect", json!({"id":asset_id})).await;
+    assert_eq!(asset["probe"]["stream_details"]["0"]["start_pts"], 1000);
+    assert_eq!(asset["probe"]["stream_details"]["1"]["start_pts"], 0);
+    let project = cli.mutation(scope, "timeline-preview-project", "projects.create", json!({"name":"Original clocks preview"})).await;
+    assert_eq!(project["ok"], true, "{project}");
+    let project_id = project["result"]["project_id"].as_str().unwrap();
+    let sequence = edit(cli, scope, project_id, "0", "timeline-preview-sequence", "sequences.create", json!({
+        "name":"Three tracks", "settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},
+        "tracks":[{"kind":"video","name":"Background"},{"kind":"audio","name":"Audio"},{"kind":"video","name":"Picture"}]
+    })).await;
+    let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap();
+    let t = |num: u64, den: u64| json!({"num":num.to_string(),"den":den.to_string()});
+    let zero = t(0, 1);
+    for (index, (source, start, end, place)) in [
+        (json!({"kind":"solid_color","rgba":[0.2,0.4,0.8,1],"duration":t(4,1)}), zero.clone(), t(4,1), zero.clone()),
+        (json!({"kind":"registered","asset_id":asset_id,"stream_index":1}), zero.clone(), t(2,1), zero.clone()),
+        (json!({"kind":"registered","asset_id":asset_id,"stream_index":0}), t(1,1), t(2,1), t(1,2)),
+    ].into_iter().enumerate() {
+        edit(cli, scope, project_id, &(index+1).to_string(), &format!("timeline-preview-clip-{index}"), "clips.place", json!({
+            "sequence_id":sequence_id,"track_id":sequence["created"]["tracks"][index]["id"],"source":source,
+            "source_range":{"start":start,"end":end},"sequence_start":place,"collision":"reject"
+        })).await;
+    }
+    let native = cli.human(&[
+        "timeline", "preview-frame", "--project", project_id, "--revision", "4", "--sequence", sequence_id, "--at", "1",
+    ]).await;
+    assert_eq!(native.1, 0, "{}", native.0);
+    let frame = &native.0["result"];
+    let independent = cli.query("media.preview_frame", json!({"asset_id":asset_id,"stream_index":0,"frame":2})).await;
+    assert_eq!(frame["rgba_base64"], independent["rgba_base64"]);
+    assert_eq!(frame["origin"]["asset_id"], asset_id);
+    assert_eq!(frame["origin"]["stream_index"], 0);
+    for (at, kind, rgba) in [
+        ("1/4", "solid_color", [51, 102, 204, 255]),
+        ("4", "gap", [0, 0, 0, 255]),
+    ] {
+        let (response, exit) = cli.human(&[
+            "timeline", "preview-frame", "--project", project_id, "--revision", "4", "--sequence", sequence_id, "--at", at,
+        ]).await;
+        assert_eq!(exit, 0, "{response}");
+        let pixels = STANDARD.decode(response["result"]["rgba_base64"].as_str().unwrap()).unwrap();
+        assert_eq!(pixels.len(), nw_domain::preview::RGBA_BYTES);
+        assert!(pixels.chunks_exact(4).all(|pixel| pixel == rgba));
+        assert_eq!(response["result"]["origin"]["kind"], kind);
+    }
+    let mut bridge = cli.command();
+    bridge.args(["bridge", "--native-owner"]);
+    let sdk = ().serve(TokioChildProcess::new(bridge).unwrap()).await.unwrap();
+    let response = sdk.call_tool(CallToolRequestParams::new("timeline.preview_frame").with_arguments(
+        rmcp::object!({"params":{"sequence_id":sequence_id,"revision":"4","at":t(1,1)},"context":{"project":{"id":project_id}}}),
+    )).await.unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    assert_eq!(response["structuredContent"]["ok"], true, "{response}");
+    assert_eq!(&response["structuredContent"]["result"], frame);
+    sdk.cancel().await.unwrap();
+}
+
 pub async fn review(cli: &Cli, scope: &str) {
     let created = cli
         .mutation(

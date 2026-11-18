@@ -85,7 +85,7 @@ pub const PROJECT_TARGET_COMMANDS: [&str; 11] = [
 pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     let project_action = match command {
         "projects.create" | "projects.list" => None,
-        "projects.inspect" | "sequences.inspect" | "timeline.render" => Some(ProjectAction::Read),
+        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
             Some(ProjectAction::Edit)
@@ -101,19 +101,20 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         request_gates.push(RequestGate::ProjectRights);
     }
     request_gates.push(RequestGate::RequestParameters);
-    if write || command == "timeline.render" {
+    let timeline_query = matches!(command, "timeline.render" | "timeline.preview_frame");
+    if write || timeline_query {
         request_gates.push(RequestGate::ExpectedRevision);
     }
     if write || command == "projects.create" {
         request_gates.push(RequestGate::WriterLease);
     }
-    if write || command == "timeline.render" {
+    if write || timeline_query {
         request_gates.push(RequestGate::AffectedScope);
     }
     if matches!(command, "history.undo" | "history.redo") {
         request_gates.push(RequestGate::HistoryState);
     }
-    if command == "clips.place" {
+    if matches!(command, "clips.place" | "timeline.preview_frame") {
         request_gates.extend([
             RequestGate::SourceObjectRights,
             RequestGate::SourcePathAndIdentity,

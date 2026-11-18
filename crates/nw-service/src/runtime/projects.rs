@@ -10,10 +10,10 @@ use nw_domain::projects::{
 use nw_store::projects::{HistoryAction, ProjectCommit, ProjectReadSnapshot};
 use std::collections::{BTreeMap, VecDeque};
 
-struct HeldSource {
-    asset: Asset,
-    stamp: files::SourceStamp,
-    record_hash: String,
+pub(super) struct HeldSource {
+    pub(super) asset: Asset,
+    pub(super) stamp: files::SourceStamp,
+    pub(super) record_hash: String,
 }
 impl Service {
     pub(super) fn read_project(
@@ -51,7 +51,7 @@ impl Service {
             Err(error) => Err(error),
         }
     }
-    fn registered_project_source(
+    pub(super) fn registered_project_source(
         &self,
         context: &Context,
         asset_id: &str,
@@ -59,9 +59,9 @@ impl Service {
         cancel: &CancellationToken,
     ) -> Result<(SourceBinding, HeldSource)> {
         let key = named("asset", asset_id)?;
-        let asset: Asset = self
+        let (asset, record_hash) = self
             .store
-            .get(&key)?
+            .registered_asset_record(&key)?
             .ok_or_else(DomainError::object_not_found)?;
         self.object(context, &asset.id, &asset.creator)?;
         let path = self.path(context, Path::new(&asset.identity.path), false)?;
@@ -86,7 +86,6 @@ impl Service {
                 ));
             }
         };
-        let record_hash = self.store.project_fact_hash(&key)?;
         let stamp = files::SourceStamp::capture_resolved(&path)?;
         if let Some(object) = &asset.source_object {
             stamp.require_object(object)?;

@@ -1075,6 +1075,7 @@ impl Service {
                 "jobs.submit",
                 "batches.submit",
                 "timeline.render",
+                "timeline.preview_frame",
                 "media.probe",
                 "media.preview_frame",
                 "capabilities.refresh",
@@ -1098,6 +1099,11 @@ impl Service {
         let params = request.params.clone();
         let result = match request.command.id.as_str() {
             "timeline.render" => return self.media_review(&context, &request, &cancellation),
+            "timeline.preview_frame" => {
+                drop(guard);
+                let frame = self.timeline_frame(&context, &request, commands::parse(params)?, cancellation.clone())?;
+                return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
+            }
             "projects.list" => self.inventory_page(
                 &context,
                 commands::parse(params)?,

@@ -3,6 +3,7 @@ mod forms;
 #[cfg(test)]
 pub(super) mod tests;
 mod widgets;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::{Action, Asset, AssetSummary, Request, SnapshotPage, WizApp, egui};
 use forms::Forms;
 use nw_domain::{
@@ -38,6 +39,7 @@ pub(super) enum Phase {
     NextViewport,
     Assets,
     Asset,
+    PreviewFrame,
     Create,
     Mutation,
 }
@@ -188,6 +190,7 @@ pub(super) struct ProjectsUi {
     acceptance: Option<String>,
     focus_catalog: bool,
     clip_selection: Option<ClipSelection>,
+    preview_frame: Option<(Rational, egui::TextureHandle)>,
 }
 impl ProjectsUi {
     fn restored_view(&self, group: &Group) -> View {
@@ -200,6 +203,7 @@ impl ProjectsUi {
             .clone()
     }
     fn advance(&mut self) -> Result<u64, String> {
+        self.preview_frame = None;
         self.generation = self
             .generation
             .checked_add(1)
@@ -614,6 +618,9 @@ impl WizApp {
         Ok(true)
     }
     pub(super) fn project_request_failed(&mut self, action: Action) {
+        if matches!(action, Action::Project(ProjectAction { phase: Phase::PreviewFrame, .. })) {
+            return;
+        }
         if matches!(action, Action::Project(_))
             || (matches!(action, Action::Scope)
                 && self
@@ -924,6 +931,29 @@ impl WizApp {
                     })
                     .map(|stream| stream.index);
                 self.projects.asset = Some(Arc::new(asset));
+                return Ok(());
+            }
+            Phase::PreviewFrame => {
+                let frame: nw_domain::preview::TimelineFrame = serde_json::from_value(result)
+                    .map_err(|error| error.to_string())?;
+                let group = self.projects.group.as_ref().ok_or("No displayed project for this preview")?;
+                if frame.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(frame.sequence_id.as_str())
+                    || frame.revision.to_string() != group.key.revision
+                    || request.params["at"] != json!(frame.at)
+                    || frame.width != nw_domain::preview::WIDTH
+                    || frame.height != nw_domain::preview::HEIGHT
+                    || frame.rgba_base64.len() != nw_domain::preview::RGBA_BYTES.div_ceil(3) * 4
+                {
+                    return Err("Timeline preview differs from the displayed project, sequence or selected time".into());
+                }
+                let rgba = STANDARD.decode(&frame.rgba_base64).map_err(|_| "Invalid frame pixel encoding")?;
+                if rgba.len() != nw_domain::preview::RGBA_BYTES {
+                    return Err("Invalid timeline preview pixel count".into());
+                }
+                let image = egui::ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &rgba);
+                let texture = ctx.load_texture("timeline-preview-frame", image, egui::TextureOptions::LINEAR);
+                self.projects.preview_frame = Some((frame.at, texture));
                 return Ok(());
             }
             _ => {}

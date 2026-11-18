@@ -4,6 +4,17 @@ use nw_domain::{projects as model, time::TimeRange};
 
 #[derive(Subcommand)]
 pub enum Timeline {
+    /// Decode the visible source at one exact sequence time.
+    PreviewFrame {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        at: String,
+    },
     /// Review a finite lossless FFV1/PCM export; execution remains in development.
     Render {
         #[arg(long)]
@@ -24,6 +35,15 @@ pub enum Timeline {
 impl Timeline {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
+            Self::PreviewFrame { project, revision, sequence, at } => {
+                model::validate_id(&project)?;
+                model::validate_id(&sequence)?;
+                model::Revision::parse(&revision)?;
+                let at = super::projects::rational(&at)?;
+                let mut request = query("timeline.preview_frame", json!({"sequence_id":sequence,"revision":revision,"at":at}));
+                request.project = Some(commands::ProjectRef { id: project, expected_revision: None });
+                Ok(request)
+            }
             Self::Render {
                 project,
                 revision,

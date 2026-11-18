@@ -145,6 +145,26 @@ pub(super) fn decode_job(bytes: &[u8]) -> Result<Job> {
     serde_json::from_value(raw).map_err(storage)
 }
 impl Store {
+    pub fn registered_asset_record(
+        &self,
+        key: &str,
+    ) -> Result<Option<(nw_domain::records::Asset, String)>> {
+        valid_key(key)?;
+        let asset_id = key.strip_prefix("asset/").ok_or_else(|| {
+            DomainError::new("VALIDATION_ERROR", "Registered asset key required")
+        })?;
+        let read = self.db.begin_read().map_err(storage)?;
+        let table = read.open_table(RECORDS).map_err(storage)?;
+        let entry = table.get(key).map_err(storage)?;
+        let Some(entry) = entry else { return Ok(None) };
+        let bytes = entry.value();
+        let asset: nw_domain::records::Asset = decode(bytes)?;
+        if asset.id != asset_id {
+            return Err(DomainError::new("STORAGE_ERROR", "Registered asset identity differs from its key"));
+        }
+        Ok(Some((asset, nw_domain::projects::hash(bytes))))
+    }
+
     pub fn get_plan(&self, id: &str) -> Result<Option<nw_domain::records::Plan>> {
         if id.is_empty()
             || id.len() > 128

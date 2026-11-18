@@ -12,6 +12,7 @@ to each operation/media/transport/package boundary separately.
 | `media.probe` | Inspect authorized native media with a finite probe budget. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
+| `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |
 | `assets.register` | Durably register one native path or verified upload. |
 | `assets.register_folder`, `assets.folder_inspect` | Durable bounded native folder snapshot and immutable creator-scoped inspection, including per-file failures/companion inventory. |
 | `assets.list`, `assets.inspect`, `assets.output_suggest` | Authorized inventory, details and proposed absent output. |
@@ -79,6 +80,10 @@ artifact. Read the current schema for the exact tagged-variant fields.
 - To read one decoded source frame, query `media.preview_frame` with `asset_id`,
   `stream_index` and zero-based `frame`. The result carries a 160 × 90 RGBA
   frame in `rgba_base64` together with its source content digest.
+- To view one timeline frame, discover `timeline.preview_frame` and supply the
+  project in `context.project`, plus `sequence_id`, current `revision`, and
+  `at` as an exact sequence-frame time. The result identifies the visible
+  registered or solid-color occurrence, or a gap.
 
 Keep-everything can plan a verified Rust byte copy. Current admitted remux uses
 FFmpeg and bounded packet/structure/tag assertions with exact rational clocks;

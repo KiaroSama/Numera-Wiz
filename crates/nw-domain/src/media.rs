@@ -1,5 +1,6 @@
 //! Finite, authoritative project capture and a separately framed media review contract.
 mod capture;
+mod mixed_source;
 mod plan;
 use crate::{
     DomainError, Result,
@@ -7,6 +8,8 @@ use crate::{
     time::{Rational, TimeRange},
 };
 pub use capture::capture;
+pub use capture::mixed::{CapturedOccurrence, CapturedTrack, MixedCapture, OccurrenceSource, capture_mixed, capture_mixed_frame, visible_occurrence};
+pub use mixed_source::{BoundSource, bind_mixed_source};
 pub use plan::{MediaPlanV1, compile};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
@@ -323,7 +326,7 @@ struct RangeWire {
     start: RationalWire,
     end: RationalWire,
 }
-fn read_rational<'de, D: serde::Deserializer<'de>>(
+pub(crate) fn read_rational<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> std::result::Result<Rational, D::Error> {
     RationalWire::deserialize(d)?.checked()

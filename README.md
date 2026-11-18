@@ -40,6 +40,8 @@ export and continuous preview remain in development.
 - Set or remove selected container and stream tags in a verified Matroska copy.
 - Decode a single frame from a registered video stream in the shared GUI, CLI
   and MCP interface.
+- Preview one exact frame of an opaque layered sequence, including its
+  registered picture or an uncovered background.
 - Authorized folder intake with deterministic relative paths, retained probe
   failures, explicit bounds/exclusions and companion inventories. Inventory does
   not copy companions or qualify the whole MuxCls utility.

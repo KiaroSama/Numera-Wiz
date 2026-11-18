@@ -454,7 +454,79 @@ fn raw_reference_extensions() {
         "MEDIA_COMPILER_RAW_REFERENCES: actualStorePositiveAndRestored=2 unknownAcrossEnabledDisabledAnnotation=3 duplicateUnknown=1 invalidTypes=2 legacyCodecUnchanged"
     );
 }
+fn mixed_track_capture_preserves_original_clocks_and_rows() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = Store::open(directory.path()).unwrap();
+    let mut fixture = Fixture::new(&store);
+    let time = |numerator, denominator| Rational::new(numerator, denominator).unwrap();
+    let result = fixture.apply(
+        ProjectEditIntent::Sequence(SequenceInput {
+            name: "Mixed tracks".into(),
+            settings: SequenceSettings {
+                width: 64,
+                height: 48,
+                frame_rate: time(4, 1),
+                sample_rate: 48_000,
+                audio_layout: "stereo".into(),
+            },
+            tracks: [TrackKind::Video, TrackKind::Audio, TrackKind::Video]
+                .into_iter().enumerate().map(|(index, kind)| TrackInput { kind, name: format!("Track {index}") }).collect(),
+        }), false,
+    );
+    let sequence = serde_json::from_value::<EntityId>(result["created"]["sequence_id"].clone()).unwrap();
+    let expected = [0, 2, 5];
+    let mut asset_ids = Vec::new();
+    for (index, physical_stream) in expected.into_iter().enumerate() {
+        let track = serde_json::from_value::<EntityId>(result["created"]["tracks"][index]["id"].clone()).unwrap();
+        let asset_id = Uuid::new_v4().to_string();
+        let kind = if index == 1 { TrackKind::Audio } else { TrackKind::Video };
+        let origin = index as i64 + 1;
+        fixture.apply(
+            ProjectEditIntent::Place(
+                Box::new(PlaceInput {
+                    sequence_id: sequence.clone(),
+                    track_id: track,
+                    source: PlaceSource::Registered { asset_id: asset_id.clone(), stream_index: physical_stream },
+                    source_range: SourceSpan { start: time(origin, 1), end: time(origin + 2, 1) },
+                    sequence_start: Rational::ZERO,
+                    collision: "reject".into(),
+                }),
+                SourceBinding::Registered {
+                    asset_id: asset_id.clone(), content_sha256: "ab".repeat(32), probe_sha256: "cd".repeat(32),
+                    stream_index: physical_stream, media_kind: kind, extent_verification: "pending".into(),
+                },
+            ),
+            false,
+        );
+        asset_ids.push((asset_id, kind, physical_stream, origin));
+    }
+    let read = store.project_read(fixture.project.as_str()).unwrap();
+    let revision = read.header().revision;
+    let range = nw_domain::time::TimeRange { start: time(1, 4), end: time(3, 4) };
+    let graph = media::capture_mixed(&read, &sequence, revision, range).unwrap();
+    assert_eq!(graph.tracks.len(), 3);
+    let frame = media::capture_mixed_frame(&read, &sequence, revision, range.start).unwrap();
+    assert_eq!(frame.tracks.len(), 2);
+    assert_eq!(frame.range.end, time(1, 2));
+    assert_eq!(media::visible_occurrence(&frame, range.start).unwrap().id, graph.tracks[2].clips[0].id);
+    assert_eq!(graph.header_sha256, domain::hash(read.header_raw().as_bytes()));
+    for (track, (id, kind, index, origin)) in graph.tracks.iter().zip(asset_ids) {
+        assert_eq!(track.kind, kind);
+        assert_eq!(track.clips.len(), 1);
+        let clip = &track.clips[0];
+        assert_eq!(clip.sequence_range, range);
+        assert_eq!(clip.source_range.start, time(4 * origin + 1, 4));
+        assert_eq!(clip.source_range.end, time(4 * origin + 3, 4));
+        assert!(matches!(&clip.source, media::OccurrenceSource::Registered { asset_id, stream_index, .. } if asset_id == &id && *stream_index == index));
+        assert!(graph.facts.iter().any(|fact| fact.id == clip.source_id));
+    }
+    let mut legacy = fixture.input(1);
+    legacy.sequence_id = sequence;
+    assert_eq!(media::capture(&read, &legacy).unwrap_err().code, "UNSUPPORTED_AUDIO_TRACK");
+}
+
 pub(super) fn run() {
     over_budget_raw_capture();
     raw_reference_extensions();
+    mixed_track_capture_preserves_original_clocks_and_rows();
 }

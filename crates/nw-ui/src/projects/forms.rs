@@ -49,6 +49,7 @@ pub(super) struct Forms {
     pub split: ExactForm,
     pub viewport_start: ExactForm,
     pub viewport_end: ExactForm,
+    pub preview_at: ExactForm,
 }
 impl Default for Forms {
     fn default() -> Self {
@@ -72,6 +73,7 @@ impl Default for Forms {
             split: ExactForm::new("4", "1"),
             viewport_start: ExactForm::new("0", "1"),
             viewport_end: ExactForm::new("8", "1"),
+            preview_at: ExactForm::new("0", "1"),
         }
     }
 }

@@ -200,7 +200,7 @@ impl ProjectContextRule {
 }
 fn project_context(id: &str) -> ProjectContextRule {
     match id {
-        "projects.inspect" | "sequences.inspect" | "timeline.render" => {
+        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" => {
             ProjectContextRule::RequiredRead
         }
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
@@ -218,6 +218,9 @@ fn result_schema(id: &str) -> Option<Value> {
     match id {
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
+        }
+        "timeline.preview_frame" => {
+            Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }
         "capabilities.inspect" | "capabilities.refresh" => Some(
             serde_json::to_value(schema_for!(crate::capabilities::CapabilityReport))
@@ -391,6 +394,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Compile a finite opaque project review; media acceptance requires a qualified generation",
             Query,
             crate::media::RenderInput
+        ),
+        row!(
+            "timeline.preview_frame",
+            "Decode the visible source at one exact timeline frame",
+            Query,
+            crate::preview::TimelineFrameInput
         ),
         row!(
             "clips.place",
@@ -1439,6 +1448,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "sequences.inspect",
     "sequences.create",
     "timeline.render",
+    "timeline.preview_frame",
     "clips.place",
     "clips.move",
     "clips.link",

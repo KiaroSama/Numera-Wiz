@@ -94,6 +94,10 @@ Open **Source frame preview** in the Stream Cleanup form. Select an original
 video stream and a zero-based frame index, then choose **Decode frame**. The
 preview loads from the registered source and fits the picture in the display.
 
+In **Projects**, open **Timeline frame** in the detail pane. Enter an exact
+sequence time and choose **Decode timeline frame**. The preview shows the
+highest visible opaque layer at that frame and shows black in uncovered gaps.
+
 ## Dispositions
 
 Open **Disposition changes** in the Stream Cleanup form and select an original

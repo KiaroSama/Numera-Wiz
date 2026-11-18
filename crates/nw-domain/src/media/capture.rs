@@ -2,11 +2,32 @@ use super::*;
 use projects::{Bin, Clip, EntityEnvelope, Sequence, SourceBinding, Track, TrackKind};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+pub(super) mod mixed;
+
 fn corrupt(message: &str) -> DomainError {
     DomainError::new("PROJECT_CORRUPT", message)
 }
 fn unsupported(message: &str) -> DomainError {
     DomainError::new("UNSUPPORTED_SEMANTIC_NODE", message)
+}
+
+fn opaque_corner_color(rgba: [f64; 4]) -> Result<CornerColor> {
+    if rgba[3] != 1.0 || rgba[..3].iter().any(|v| *v != 0.0 && *v != 1.0) {
+        return Err(DomainError::new(
+            "UNSUPPORTED_COLOR_PRECISION",
+            "Compiler admits only opaque sRGB corner colors",
+        ));
+    }
+    Ok(match (rgba[0] == 1.0, rgba[1] == 1.0, rgba[2] == 1.0) {
+        (false, false, false) => CornerColor::Black,
+        (true, false, false) => CornerColor::Red,
+        (false, true, false) => CornerColor::Green,
+        (false, false, true) => CornerColor::Blue,
+        (true, true, false) => CornerColor::Yellow,
+        (true, false, true) => CornerColor::Magenta,
+        (false, true, true) => CornerColor::Cyan,
+        (true, true, true) => CornerColor::White,
+    })
 }
 #[derive(Deserialize)]
 struct RawReferenceProjection<'a> {
@@ -290,10 +311,13 @@ impl<R: RenderRead> Closure<'_, R> {
     }
 }
 
-pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> {
+fn capture_header<R: RenderRead>(
+    read: &R,
+    revision: Revision,
+) -> Result<(&projects::ProjectHeader, &str)> {
     let header = read.header();
     header.writable()?;
-    if header.revision != input.revision {
+    if header.revision != revision {
         return Err(DomainError::new(
             "STALE_REVISION",
             "Render revision differs from committed project",
@@ -317,25 +341,44 @@ pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> 
     if encode(&raw_header)? != encode(header)? {
         return Err(corrupt("Compiler header bytes differ from snapshot header"));
     }
-    input.range.validate()?;
-    let duration = input.range.end.checked_sub(input.range.start)?;
-    if duration > Rational::new(60, 1)? {
-        return Err(projects::limit("Compiler range exceeds60 seconds"));
-    }
+    Ok((header, header_raw))
+}
+
+struct CaptureSequence<'a, R> {
+    closure: Closure<'a, R>,
+    settings: MediaSettings,
+    audio_grid: Rational,
+    track_ids: Vec<EntityId>,
+    range: TimeRange,
+}
+
+#[derive(Clone, Copy)]
+enum CaptureRange {
+    Interval(TimeRange),
+    VideoFrame(Rational),
+}
+
+fn capture_sequence<'a, R: RenderRead>(
+    read: &'a R,
+    root: &EntityId,
+    header_bytes: usize,
+    sequence_id: &EntityId,
+    selection: CaptureRange,
+) -> Result<CaptureSequence<'a, R>> {
     let mut closure = Closure {
         read,
         ids: BTreeSet::new(),
         queue: VecDeque::new(),
         entities: BTreeMap::new(),
         facts: Vec::new(),
-        bytes: header_raw.len(),
+        bytes: header_bytes,
     };
-    closure.queue(&header.root_bin_id)?;
-    closure.load(&input.sequence_id)?;
-    let sequence_entity = closure.entity(&input.sequence_id)?;
+    closure.queue(root)?;
+    closure.load(sequence_id)?;
+    let sequence_entity = closure.entity(sequence_id)?;
     if !sequence_entity.enabled
         || sequence_entity.semantic_scope != "entity"
-        || sequence_entity.owner_id.as_ref() != Some(&header.root_bin_id)
+        || sequence_entity.owner_id.as_ref() != Some(root)
     {
         return Err(unsupported(
             "Compiler requires an enabled root-owned sequence",
@@ -361,17 +404,79 @@ pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> 
     };
     settings.validate()?;
     let audio_grid = Rational::new(i64::from(settings.sample_rate), 1)?;
-    for point in [input.range.start, input.range.end] {
+    let range = match selection {
+        CaptureRange::Interval(range) => range,
+        CaptureRange::VideoFrame(start) => TimeRange {
+            start,
+            end: start.checked_add(Rational::new(settings.frame_rate.denominator(), settings.frame_rate.numerator())?)?,
+        },
+    };
+    range.validate()?;
+    for point in [range.start, range.end] {
         projects::grid_tick(point, settings.frame_rate)?;
-        projects::grid_tick(point, audio_grid)?;
+        if matches!(selection, CaptureRange::Interval(_)) {
+            projects::grid_tick(point, audio_grid)?;
+        }
     }
-    let track_ids =
-        read.track_ids_for_render(&input.sequence_id, sequence.track_count, MAX_TRACKS)?;
+    let track_ids = read.track_ids_for_render(sequence_id, sequence.track_count, MAX_TRACKS)?;
     if track_ids.len() > MAX_TRACKS || track_ids.len() != sequence.track_count {
         return Err(corrupt(
             "Compiler requires complete bounded sequence tracks",
         ));
     }
+    Ok(CaptureSequence {
+        closure,
+        settings,
+        audio_grid,
+        track_ids,
+        range,
+    })
+}
+
+fn drain_and_check_root<R: RenderRead>(
+    closure: &mut Closure<'_, R>,
+    header: &projects::ProjectHeader,
+) -> Result<()> {
+    closure.drain()?;
+    let root = closure.entity(&header.root_bin_id)?;
+    if root.kind != "bin"
+        || root.owner_id.is_some()
+        || !root.enabled
+        || root.semantic_scope != "entity"
+    {
+        return Err(unsupported("Compiler requires an enabled root bin"));
+    }
+    for entity in closure
+        .entities
+        .values()
+        .filter(|entity| entity.enabled && entity.semantic_scope != "annotation")
+    {
+        for reference in entity.references.iter().filter(|r| r.role == "link") {
+            if closure.entity(&reference.target)?.kind != "clip" {
+                return Err(corrupt("Compiler clip link target is not a clip"));
+            }
+        }
+    }
+    if closure.entities.len() > header.entity_count {
+        return Err(corrupt("Captured entity count exceeds project header"));
+    }
+    Ok(())
+}
+
+pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> {
+    let (header, header_raw) = capture_header(read, input.revision)?;
+    input.range.validate()?;
+    let duration = input.range.end.checked_sub(input.range.start)?;
+    if duration > Rational::new(60, 1)? {
+        return Err(projects::limit("Compiler range exceeds60 seconds"));
+    }
+    let CaptureSequence {
+        mut closure,
+        settings,
+        audio_grid,
+        track_ids,
+        ..
+    } = capture_sequence(read, &header.root_bin_id, header_raw.len(), &input.sequence_id, CaptureRange::Interval(input.range))?;
     let mut unique_tracks = BTreeSet::new();
     let mut orders = BTreeSet::new();
     let mut enabled_video = None;
@@ -436,29 +541,7 @@ pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> 
         }
         closure.queue(id)?;
     }
-    closure.drain()?;
-    let root = closure.entity(&header.root_bin_id)?;
-    if root.kind != "bin"
-        || root.owner_id.is_some()
-        || !root.enabled
-        || root.semantic_scope != "entity"
-    {
-        return Err(unsupported("Compiler requires an enabled root bin"));
-    }
-    for entity in closure
-        .entities
-        .values()
-        .filter(|entity| entity.enabled && entity.semantic_scope != "annotation")
-    {
-        for reference in entity.references.iter().filter(|r| r.role == "link") {
-            if closure.entity(&reference.target)?.kind != "clip" {
-                return Err(corrupt("Compiler clip link target is not a clip"));
-            }
-        }
-    }
-    if closure.entities.len() > header.entity_count {
-        return Err(corrupt("Captured entity count exceeds project header"));
-    }
+    drain_and_check_root(&mut closure, header)?;
     let mut clips = Vec::new();
     let mut occurrences = BTreeSet::new();
     for id in &intersecting {
@@ -529,22 +612,7 @@ pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> 
                 if duration <= Rational::ZERO || clip.source_range.end > duration {
                     return Err(corrupt("Color source range exceeds finite source extent"));
                 }
-                if rgba[3] != 1.0 || rgba[..3].iter().any(|v| *v != 0.0 && *v != 1.0) {
-                    return Err(DomainError::new(
-                        "UNSUPPORTED_COLOR_PRECISION",
-                        "Compiler admits only opaque sRGB corner colors",
-                    ));
-                }
-                match (rgba[0] == 1.0, rgba[1] == 1.0, rgba[2] == 1.0) {
-                    (false, false, false) => CornerColor::Black,
-                    (true, false, false) => CornerColor::Red,
-                    (false, true, false) => CornerColor::Green,
-                    (false, false, true) => CornerColor::Blue,
-                    (true, true, false) => CornerColor::Yellow,
-                    (true, false, true) => CornerColor::Magenta,
-                    (false, true, true) => CornerColor::Cyan,
-                    (true, true, true) => CornerColor::White,
-                }
+                opaque_corner_color(rgba)?
             }
         };
         clips.push(ColorClip {
