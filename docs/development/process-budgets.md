@@ -24,9 +24,12 @@ in-memory per owner/Engine lifetime; durable cross-restart orphan accounting and
 owned-process reconciliation are still required. Restart is not evidence that an
 unconfirmed tree disappeared.
 
-The two-slot gate is a process-count limit. FFmpeg max_alloc remains a 64 MiB
-single-allocation guard. Neither establishes aggregate RSS, VRAM, scratch, child
-tree memory or the mandate's target desktop working set. Cross-root destination
+The two-slot gate is a process-count limit. Most FFmpeg steps use a 64 MiB
+single-allocation guard. Mixed FFV1 encoding and source staging have a 256 MiB
+guard and reserve that allowance in the shared acceptance pool. The FFV1
+encoder can request a 178,155,184-byte worst-case packet for one BGRA HD frame.
+Qualifying the target desktop working set requires separate measurements of
+aggregate RSS, VRAM, scratch and child-tree memory. Cross-root destination
 claims, scratch reservation, OS resource enforcement, measurements and the full
 resource scheduler remain open in T017/T034/T037. Asset registration and job
 submission now release the semantic lock during content hashing/probing, then

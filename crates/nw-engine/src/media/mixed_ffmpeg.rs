@@ -243,12 +243,14 @@ impl Engine {
             "-y",
             "-copyts",
             "-max_alloc",
-            "67108864",
-            "-threads",
-            "1",
         ]
         .map(String::from)
         .to_vec();
+        args.extend([
+            nw_domain::media::MIXED_FFV1_ALLOCATION_BYTES.to_string(),
+            "-threads".into(),
+            "1".into(),
+        ]);
         args.extend(input.options());
         args.extend(["-i".into(), "fd:".into()]);
         for stream in streams {
@@ -433,12 +435,14 @@ impl Engine {
             "-y",
             "-copyts",
             "-max_alloc",
-            "67108864",
-            "-filter_complex_threads",
-            "1",
         ]
         .map(String::from)
         .to_vec();
+        args.extend([
+            nw_domain::media::MIXED_FFV1_ALLOCATION_BYTES.to_string(),
+            "-filter_complex_threads".into(),
+            "1".into(),
+        ]);
         for stage in staged {
             args.extend(
                 [

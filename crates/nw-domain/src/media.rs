@@ -26,6 +26,7 @@ pub const MAX_CLIPS: usize = 128;
 pub const MAX_SEGMENTS: usize = 256;
 pub const MAX_RAW_BYTES: usize = 1024 * 1024;
 pub const MAX_PLAN_BYTES: usize = 128 * 1024;
+pub const MIXED_FFV1_ALLOCATION_BYTES: u64 = 256 * 1024 * 1024;
 pub const FILTERS: &[&str] = &[
     "color",
     "trim",

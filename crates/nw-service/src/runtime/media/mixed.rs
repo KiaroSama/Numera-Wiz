@@ -286,7 +286,10 @@ impl Service {
         };
         let settings = &plan.payload.capture.settings;
         let rgba = u64::from(settings.width) * u64::from(settings.height) * 4;
-        let retained = 32 * 1024 * 1024 + rgba * (4 * inputs.originals.len() as u64 + 4);
+        // The FFV1 encoder reserves one worst-case packet before writing a frame.
+        let retained = nw_domain::media::MIXED_FFV1_ALLOCATION_BYTES
+            + 32 * 1024 * 1024
+            + rgba * (4 * inputs.originals.len() as u64 + 4);
         let reservation = MixedReservation {
             schema_version: 2,
             decoded_output_bytes: plan.payload.resources.decoded_output_bytes.clone(),
