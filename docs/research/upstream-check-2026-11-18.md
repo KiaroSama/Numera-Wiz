@@ -33,9 +33,13 @@ The official registry lists rmcp 3.11.0 and redb 4.6.0. The rmcp change set
 includes bounded HTTP responses and stricter capability handling. The registry
 also declares new Unicode and percent-encoding dependencies. redb 4.6.0
 changes recovery from damaged slots, backend quiescence during close, and
-checks for open tables at commit. Both upgrades require hosted validation,
-including the existing wire and prior-package trials. [rmcp 3.11.0 changes](https://github.com/modelcontextprotocol/rust-sdk/compare/rmcp-v3.10.0...rmcp-v3.11.0) · [redb 4.6.0 changes](https://github.com/cberner/redb/compare/v4.5.0...v4.6.0)
+checks for open tables at commit. The source pins now select these releases.
+The downloaded crate hashes matched the official index. The SDK keeps the
+existing tool and resource capabilities, and redb keeps its stable backend
+interface without the experimental API feature. The refreshed lock still
+requires hosted resolution and the existing wire and prior-package trials.
+[rmcp 3.11.0 changes](https://github.com/modelcontextprotocol/rust-sdk/compare/rmcp-v3.10.0...rmcp-v3.11.0) · [redb 4.6.0 changes](https://github.com/cberner/redb/compare/v4.5.0...v4.6.0)
 
 The stable Rust manifest reports 1.100.0. The registry versions for the current
-eframe and Tokio packages are still 0.37.0 and 1.54.1. The fixture change
-leaves the toolchain and dependency pins in place. [Rust stable manifest](https://static.rust-lang.org/dist/channel-rust-stable.toml) · [eframe](https://crates.io/crates/eframe) · [Tokio](https://crates.io/crates/tokio)
+eframe and Tokio packages are still 0.37.0 and 1.54.1. The verified application
+build matrix still uses the mandate's Rust 1.99.1 seed. [Rust stable manifest](https://static.rust-lang.org/dist/channel-rust-stable.toml) · [eframe](https://crates.io/crates/eframe) · [Tokio](https://crates.io/crates/tokio)
