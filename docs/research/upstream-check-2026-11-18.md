@@ -73,3 +73,17 @@ test fails. The actual test continues to compare 150 decoded frames, their
 bounded subprocess diagnostics and verifies decoded timestamps and samples
 before publishing. The selective open-GOP stream-copy workflow remains open.
 [FFmpeg Skill comparison](https://github.com/kajisho5/ffmpeg-skill/compare/514c354...fe577168f39dd8effdf8c95b91ce16986a511f37)
+
+The next FFmpeg Skill change binds files discovered through parsed flags and
+input readers. Its tests cover joined flag syntax, changed side inputs and
+sidecar collisions. Numera's chapter review captures the parsed FFmetadata
+document in the reviewed plan and stages that content for FFmpeg. The
+existing CLI journey now reviews both flag forms and checks that editing the
+sidecar after review changes a new review while the accepted earlier plan
+publishes its original chapters. [FFmpeg Skill update](https://github.com/kajisho5/ffmpeg-skill/commit/ab4c2484d1dd0cc399613e7fe76938ffcf95ca97)
+
+EffectCraft's later PSD adapter reads the shared bounded descriptor prefixes
+for layer effects, solid fill and brightness/contrast. The five changed
+files were reviewed, including checks that short records preserve earlier
+state and oversized descriptors fail admission. Layered PSD import still
+requires a matching Numera workflow. [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/ad952917628648dc630f3f00fab86227a70a8dba...851642f6ec395c47a1843b6f6cf435c08de4f4eb)

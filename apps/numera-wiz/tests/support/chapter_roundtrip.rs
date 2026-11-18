@@ -274,7 +274,28 @@ pub(super) async fn import(cli: &Cli, media: &fixture::Media, scope: &str, expor
         ])
         .await;
     assert_eq!(status, 0, "{review}");
+    let revised_doc = doc.replace("title=", "title=Revised ");
+    assert_ne!(revised_doc, doc);
+    std::fs::write(&sidecar, &revised_doc).unwrap();
+    let joined_input = format!("--ffmetadata={}", sidecar.display());
+    let (revised, status) = cli
+        .human(&[
+            "chapters",
+            "import",
+            "--asset",
+            asset,
+            "--out",
+            output.to_str().unwrap(),
+            &joined_input,
+        ])
+        .await;
+    assert_eq!(status, 0, "{revised}");
+    assert_ne!(
+        revised["result"]["resolution"]["chapter_import"],
+        review["result"]["resolution"]["chapter_import"]
+    );
     submit(cli, scope, "import-registered-chapters", &review["result"]).await;
+    assert_eq!(std::fs::read_to_string(&sidecar).unwrap(), revised_doc);
     let original = observe(media, &directory.join("chapter.mkv")).await;
     let observed = observe(media, &output).await;
     assert_eq!(observed["chapters"], original["chapters"]);
