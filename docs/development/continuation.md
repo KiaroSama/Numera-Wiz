@@ -36,6 +36,14 @@ a second promotion, the reviewed mixed export and verification of the
 published bytes. Broader effect, transition and export profiles remain open.
 [CI335 owner transports](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44401583987/job/135148539123)
 
+CI341 built and packaged Linux x64, Windows x64, macOS ARM64 and macOS
+Intel from `cd1dab5`. Independent archive verification matched the
+packaged executables with the native build artifacts, checksums and the
+embedded web source identity. The CLI and official MCP journey passed
+marker creation, removal and history, exact RF64 cue projection, and a
+new MediaV1 job after restoration and before the next mixed upgrade.
+[CI341](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44408608170) · [Owner transports](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44408608170/job/135173158131)
+
 CI325 passed all thirteen jobs for `ea9c53a`, including the four native
 builds and regressions, Chrome, the native workspace exercise, FFmpeg media,
 the owner transports and the HTTP artifact exercise. Gitleaks passed on the
