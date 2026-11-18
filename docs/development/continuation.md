@@ -56,6 +56,19 @@ persistent project commands and publication path.
 The [November 18 upstream check](../research/upstream-check-2026-11-18.md)
 records the verified donor revisions and the remaining source coverage.
 
+## Latest completed hosted boundary
+
+[CI303 at `2013c3e`](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
+passed 11 of 13 jobs, including all four native builds and regression suites,
+the full Chrome journey, the real media fixture, owner transports, batch and
+HTTP delivery. Gitleaks passed on that source. The formatting job supplied the
+patch applied to the next revision. The native GUI completed track selection
+and selected the registered video stream. Its captures show that focusing the
+form shifted the field coordinates, so the recorded clip used source range
+`[1, 4)` instead of `[0, 1)`. The native harness now focuses the first field
+and uses keyboard traversal for the remaining fields and submission. The
+original duration and source-range assertions remain in the test.
+
 ## Hosted results at `e76b113`
 
 [CI301](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44309828441)
@@ -73,7 +86,7 @@ captured layout. Formatting changes from the hosted artifact were applied in
 full. These corrections and the real two-input media fixture await a run on
 their own source. [Gitleaks at e76b113](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44309828398)
 
-## Latest completed hosted boundary
+## Earlier native session boundary
 
 [CI299](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43743633886),
 source `0e9a8009e3af6a0fa206ec1b80e0cf5e0cd5ad24`, passed seven jobs and failed

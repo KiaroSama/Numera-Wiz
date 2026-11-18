@@ -322,20 +322,39 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
 }
 async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
     driver.mark().await;
-    driver.click(330, 312).await;
-    for (x, y, value) in [
-        (445, 376, "0"),
-        (545, 376, "1"),
-        (442, 398, "1"),
-        (542, 398, "1"),
-        (481, 420, "0"),
-        (580, 420, "1"),
-    ] {
-        driver.click(x, y).await;
-        driver.replace(value).await;
+    let browser = driver.browser();
+    let values = ["0", "1", "1", "1", "0", "1"];
+    if browser {
+        driver.click(330, 312).await;
+        for ((x, y), value) in [
+            (445, 376),
+            (545, 376),
+            (442, 398),
+            (542, 398),
+            (481, 420),
+            (580, 420),
+        ]
+        .into_iter()
+        .zip(values)
+        {
+            driver.click(x, y).await;
+            driver.replace(value).await;
+        }
+    } else {
+        // The native picker shows the first field here before focus scrolls.
+        driver.click(445, 392).await;
+        driver.replace(values[0]).await;
+        for value in &values[1..] {
+            field(driver, value).await;
+        }
     }
     driver.screenshot("registered-source-form").await;
-    driver.click(347, 442).await;
+    if browser {
+        driver.click(347, 442).await;
+    } else {
+        driver.key(Key::Tab).await;
+        driver.key(Key::Space).await;
+    }
     driver.observed("clips.place").await
 }
 async fn external_move<D: Driver>(driver: &mut D, graph: &Graph) -> Response {
