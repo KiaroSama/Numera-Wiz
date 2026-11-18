@@ -22,9 +22,19 @@ and probe, verifies the captured revision and FFmpeg identities, uses per-job
 staging and decodes every output frame and audio sample before publication.
 The MediaV2 promotion and restoration share generation-copy and control
 transactions with the earlier lifecycle. Restoration requires zero business
-adoption on the mixed target and retains accepted replay records. Hosted
-qualification is required for the implementation, rollback and cross-platform
-compatibility. Broader effect, transition and export profiles remain open.
+adoption on the mixed target and retains accepted replay records. The pinned
+FFmpeg job verified every decoded frame and sample in the small mixed fixture
+and streamed 4,379,443,200 decoded bytes in the HD fixture. Linux and Windows
+also used the prior native package to check floor refusal, restoration of the
+original file and replay of accepted receipts. [CI333](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44397749268)
+
+The initial owner journey found that promotion applied the legacy decoder to
+retained MediaV1 jobs. Promotion now validates the original plan bytes and each
+job with its matching codec. The actual CLI and MCP journey on `8bf1358` passed
+with a completed MediaV1 job already present. It also exercised restoration,
+a second promotion, the reviewed mixed export and verification of the
+published bytes. Broader effect, transition and export profiles remain open.
+[CI335 owner transports](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44401583987/job/135148539123)
 
 CI325 passed all thirteen jobs for `ea9c53a`, including the four native
 builds and regressions, Chrome, the native workspace exercise, FFmpeg media,
