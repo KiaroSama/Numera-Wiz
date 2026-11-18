@@ -177,15 +177,11 @@ fn current_authority(
             ));
         }
         if let Some(profile) = &profile
-            && (!profile.allows_object(
-                ObjectKind::Asset,
-                &asset.id,
-                &asset.creator,
-                ObjectAction::Read,
-            ) || !profile
-                .read_roots
-                .iter()
-                .any(|root| Path::new(&original.original.path).starts_with(root)))
+            && (!profile.allows_asset(&asset.creator)
+                || !profile
+                    .read_roots
+                    .iter()
+                    .any(|root| Path::new(&original.original.path).starts_with(root)))
         {
             return Err(denied(
                 "Current mixed source object or path authority differs",
