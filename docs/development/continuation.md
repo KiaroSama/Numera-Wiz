@@ -62,6 +62,10 @@ negative case supplies a valid NUT with compressed video and expects rejection
 before the relay runs. These changes require hosted verification on their own
 source.
 
+Stored jobs now select the decoder from their original JSON bytes. Repeated,
+null and partial version markers fail before inspecting or counting the job.
+Valid existing media records still use the same V1 schema and digest rules.
+
 The [November 18 upstream check](../research/upstream-check-2026-11-18.md)
 records the verified donor revisions and the remaining source coverage.
 

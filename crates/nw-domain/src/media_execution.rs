@@ -399,17 +399,38 @@ impl StoredJob {
         }
     }
 }
-pub fn decode_job(raw: Value) -> Result<StoredJob> {
-    if raw.get("envelope_version").is_some() || raw.get("payload_kind").is_some() {
-        if raw.get("envelope_version").and_then(Value::as_u64) != Some(1)
-            || raw.get("payload_kind").and_then(Value::as_str) != Some("media_job_v1")
+#[derive(Deserialize)]
+struct JobDiscriminators {
+    #[serde(default, deserialize_with = "present_marker")]
+    envelope_version: Option<Value>,
+    #[serde(default, deserialize_with = "present_marker")]
+    payload_kind: Option<Value>,
+}
+
+fn present_marker<'de, D: serde::Deserializer<'de>>(
+    decoder: D,
+) -> std::result::Result<Option<Value>, D::Error> {
+    Value::deserialize(decoder).map(Some)
+}
+
+pub fn decode_job(bytes: &[u8]) -> Result<StoredJob> {
+    // Read markers from the original bytes so duplicate or explicitly null
+    // discriminators cannot select a legacy or differently versioned codec.
+    let JobDiscriminators {
+        envelope_version,
+        payload_kind,
+    } = serde_json::from_slice(bytes).map_err(codec)?;
+    if envelope_version.is_some() || payload_kind.is_some() {
+        if envelope_version.as_ref().and_then(Value::as_u64) != Some(1)
+            || payload_kind.as_ref().and_then(Value::as_str) != Some("media_job_v1")
         {
             return Err(invalid("Unknown or partial job discriminator"));
         }
-        let job: MediaJobV1 = serde_json::from_value(raw).map_err(codec)?;
+        let job: MediaJobV1 = serde_json::from_slice(bytes).map_err(codec)?;
         job.validate()?;
         Ok(StoredJob::MediaV1(Box::new(job)))
     } else {
+        let raw: Value = serde_json::from_slice(bytes).map_err(codec)?;
         crate::plans::decode(
             raw.get("plan")
                 .cloned()

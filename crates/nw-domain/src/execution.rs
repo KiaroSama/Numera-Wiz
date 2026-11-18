@@ -185,12 +185,29 @@ mod tests {
             Some(Duration::from_secs(10800))
         );
         for raw in [
-            serde_json::json!({"envelope_version":1}),
-            serde_json::json!({"payload_kind":"media_job_v1"}),
-            serde_json::json!({"envelope_version":2,"payload_kind":"media_job_v1"}),
-            serde_json::json!({"envelope_version":1,"payload_kind":"future_job"}),
+            r#"{"envelope_version":1}"#,
+            r#"{"payload_kind":"media_job_v1"}"#,
+            r#"{"envelope_version":2,"payload_kind":"media_job_v1"}"#,
+            r#"{"envelope_version":1,"payload_kind":"future_job"}"#,
+            r#"{"envelope_version":null,"payload_kind":null}"#,
         ] {
-            assert!(crate::media_execution::decode_job(raw).is_err());
+            let error = crate::media_execution::decode_job(raw.as_bytes()).unwrap_err();
+            assert_eq!(error.code, "INVALID_RECORD");
+            assert_eq!(error.message, "Unknown or partial job discriminator");
+        }
+        for (raw, key) in [
+            (
+                r#"{"envelope_version":2,"envelope_version":1,"payload_kind":"media_job_v1"}"#,
+                "envelope_version",
+            ),
+            (
+                r#"{"envelope_version":1,"payload_kind":"future_job","payload_kind":"media_job_v1"}"#,
+                "payload_kind",
+            ),
+        ] {
+            let error = crate::media_execution::decode_job(raw.as_bytes()).unwrap_err();
+            assert_eq!(error.code, "INVALID_RECORD");
+            assert!(error.message.contains(&format!("duplicate field `{key}`")));
         }
         assert!(crate::media_execution::decode_plan("{}").is_err());
         assert!(crate::media_execution::exact("00").is_err());

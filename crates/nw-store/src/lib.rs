@@ -47,13 +47,17 @@ fn encode(value: &impl Serialize) -> Result<Vec<u8>> {
     }
     Ok(bytes)
 }
-fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+fn check_record_decode_size(bytes: &[u8]) -> Result<()> {
     if bytes.len() > MAX_RECORD {
         return Err(DomainError::new(
             "RESOURCE_LIMIT",
             "Stored record exceeds its admitted budget",
         ));
     }
+    Ok(())
+}
+fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    check_record_decode_size(bytes)?;
     serde_json::from_slice(bytes).map_err(storage)
 }
 #[derive(Serialize, Deserialize)]

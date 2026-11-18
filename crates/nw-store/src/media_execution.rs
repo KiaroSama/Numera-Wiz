@@ -72,7 +72,12 @@ fn read_job(
         .get(key.as_str())
         .map_err(storage)?
         .ok_or_else(DomainError::object_not_found)?;
-    domain::decode_job(decode(row.value())?)
+    decode_execution(row.value())
+}
+
+fn decode_execution(bytes: &[u8]) -> Result<StoredJob> {
+    super::check_record_decode_size(bytes)?;
+    domain::decode_job(bytes)
 }
 fn media_job(
     table: &impl ReadableTable<&'static str, &'static [u8]>,
@@ -253,7 +258,7 @@ impl Store {
                     "Retained job quota exceeded",
                 ));
             }
-            let job = domain::decode_job(decode(value.value())?)?;
+            let job = decode_execution(value.value())?;
             if key.value() != job_key(job.id())? {
                 return Err(DomainError::new(
                     "INVALID_RECORD",
@@ -321,7 +326,7 @@ impl Store {
             for row in table.range("job/"..).map_err(storage)? {
                 let (key, value) = row.map_err(storage)?;
                 if !key.value().starts_with("job/") { break; }
-                if !domain::decode_job(decode(value.value())?)?.terminal() { pending += 1; }
+                if !decode_execution(value.value())?.terminal() { pending += 1; }
                 if pending >= domain::MAX_QUEUE { return Err(DomainError::new("RESOURCE_LIMIT", "Durable job queue budget reached")); }
             }
             let mut accepted_job = job.clone();
