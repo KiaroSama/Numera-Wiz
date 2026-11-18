@@ -90,6 +90,10 @@ FFmpeg profile and full offline portable qualification are still required. They
 are not a finished release download. Ordinary compilation and media tests run
 in hosted CI. Owner hardware qualification uses matching prebuilt artifacts.
 
+The macOS app bundle stores application state in
+`~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another
+writable location for the native GUI, CLI or MCP bridge.
+
 See the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
 [MCP manual](docs/manuals/MCP.md) and [agent setup](docs/agents/README.md).
 The CLI exposes `commands list`, `commands schema <id>`, `media probe`, `media capabilities`,

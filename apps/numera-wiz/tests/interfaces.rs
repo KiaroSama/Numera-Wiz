@@ -11,6 +11,8 @@ mod project_compatibility;
 
 #[path = "support/evidence.rs"]
 mod evidence;
+#[path = "../src/install_root.rs"]
+mod install_root;
 fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLogs {
     evidence::RetainLogs {
         source: data.join("logs"),
@@ -25,6 +27,33 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
     let data = tempfile::tempdir().unwrap();
+    let packaged = data.path().join("Numera Wiz.app/Contents/MacOS/numera-wiz");
+    let home = data.path().join("User فضای آزمایش");
+    assert_eq!(
+        install_root::default_data_directory(&packaged, true, || Some(home.clone())).unwrap(),
+        home.join("Library/Application Support/Numera Wiz")
+    );
+    assert_eq!(
+        install_root::default_data_directory(&packaged, true, || None)
+            .unwrap_err()
+            .code,
+        "DATA_ROOT_UNAVAILABLE"
+    );
+    let standalone = data.path().join("numera-wiz");
+    assert_eq!(
+        install_root::default_data_directory(&standalone, true, || {
+            panic!("Standalone root needs no home lookup")
+        })
+        .unwrap(),
+        data.path()
+    );
+    assert_eq!(
+        install_root::default_data_directory(&packaged, false, || {
+            panic!("A non-macOS installation needs no home lookup")
+        })
+        .unwrap(),
+        packaged.parent().unwrap()
+    );
     let _logs = retain_owner_logs(data.path(), "cli");
     let output = Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
         .arg("--data-dir")

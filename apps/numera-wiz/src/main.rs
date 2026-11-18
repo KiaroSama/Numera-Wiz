@@ -3,6 +3,7 @@ mod access;
 mod artifacts_cli;
 mod client;
 mod human;
+mod install_root;
 mod mcp;
 mod server;
 mod web_assets;
@@ -185,13 +186,14 @@ async fn run() -> Result<()> {
         .into());
     }
     tracing::info!("Numera Wiz entry point started");
-    let root = args.data_dir.unwrap_or_else(|| {
-        std::env::current_exe()
-            .expect("executable path")
-            .parent()
-            .expect("executable directory")
-            .to_owned()
-    });
+    let root = match args.data_dir {
+        Some(root) => root,
+        None => install_root::default_data_directory(
+            &std::env::current_exe()?,
+            cfg!(target_os = "macos"),
+            std::env::home_dir,
+        )?,
+    };
     std::fs::create_dir_all(&root)?;
     let root = std::fs::canonicalize(root)?;
     if matches!(&args.command, Some(Mode::Owner)) {

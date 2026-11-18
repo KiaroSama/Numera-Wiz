@@ -16,8 +16,10 @@ The selected components directory must contain both `ffmpeg` and `ffprobe` (with
 not the required standard distribution. Processing without an admitted component
 selection returns `COMPONENT_UNAVAILABLE`; discovery still works.
 
-The default data directory is the executable's directory. The application protects
-its state and runtime subdirectories and attaches to one compatible owner process.
+Portable executables default to the executable directory. The macOS app bundle
+uses `~/Library/Application Support/Numera Wiz`. An explicit `--data-dir` takes
+precedence and can select the existing state used by a previous development build.
+Each root has protected state and runtime subdirectories and one compatible owner.
 An incompatible active binary/registry returns `OWNER_VERSION_CONFLICT`. Accepted
 jobs survive a CLI/GUI/stdio client exit; an interrupted owner records recovery
 facts. Never delete or replace live state to bypass a lock or version conflict.
