@@ -1,6 +1,7 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
 mod budget;
+mod capabilities;
 mod media;
 mod output_profile;
 mod preservation;
@@ -44,6 +45,7 @@ pub struct Engine {
     pub ffmpeg: FileIdentity,
     pub ffprobe: FileIdentity,
     process_budget: budget::ProcessBudget,
+    component_capabilities: Arc<tokio::sync::Mutex<Option<nw_domain::capabilities::CapabilityReport>>>,
 }
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     tokio::task::spawn_blocking(f)
@@ -69,6 +71,7 @@ impl Engine {
             ffmpeg: pair.0,
             ffprobe: pair.1,
             process_budget: budget::ProcessBudget::default(),
+            component_capabilities: Arc::default(),
         })
     }
     pub async fn probe(&self, path: &Path, cancel: CancellationToken) -> Result<MediaProbe> {

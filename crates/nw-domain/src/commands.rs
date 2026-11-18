@@ -216,6 +216,13 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
+        "capabilities.inspect" | "capabilities.refresh" => Some(
+            serde_json::to_value(schema_for!(crate::capabilities::CapabilityReport))
+                .expect("schema"),
+        ),
+        "capabilities.clear" => Some(
+            serde_json::to_value(schema_for!(crate::capabilities::ClearResult)).expect("schema"),
+        ),
         "timeline.render" => {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
         }
@@ -669,6 +676,24 @@ pub fn registry() -> Vec<Descriptor> {
             "Probe an explicitly authorized native input",
             Query,
             PathInput
+        ),
+        row!(
+            "capabilities.inspect",
+            "Inspect the component fingerprint and cached observations",
+            Query,
+            crate::capabilities::InspectInput
+        ),
+        row!(
+            "capabilities.refresh",
+            "Observe FFmpeg declarations and exercise a software round trip",
+            Query,
+            crate::capabilities::RefreshInput
+        ),
+        row!(
+            "capabilities.clear",
+            "Clear the in-memory component report for one fingerprint",
+            Query,
+            crate::capabilities::ClearInput
         ),
         row!(
             "assets.register",
@@ -1410,6 +1435,9 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.profiles.list",
     "access.credentials.issue",
     "media.probe",
+    "capabilities.inspect",
+    "capabilities.refresh",
+    "capabilities.clear",
     "assets.register",
     "assets.register_folder",
     "assets.folder_inspect",

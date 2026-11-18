@@ -102,6 +102,37 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await;
     assert_eq!(exit, 0, "{scope}");
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
+    let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{before}");
+    assert!(before["result"]["advertised"].is_null());
+    let (observed, exit) = cli
+        .human(&["media", "capabilities", "refresh", "--force"])
+        .await;
+    assert_eq!(exit, 0, "{observed}");
+    let capabilities = &observed["result"];
+    assert_eq!(capabilities["cpu_round_trip"], "exercised");
+    assert_eq!(capabilities["hardware"], "unknown");
+    assert!(capabilities["advertised"]["encoders"].as_array().unwrap().contains(&json!("ffv1")));
+    assert!(capabilities["advertised"]["pixel_formats"].as_array().unwrap().contains(&json!("yuv420p")));
+    assert!(capabilities["advertised"]["sample_formats"].as_array().unwrap().contains(&json!("s16")));
+    let fingerprint = capabilities["fingerprint"].as_str().unwrap();
+    let other = "0".repeat(64);
+    let (unrelated, exit) = cli
+        .human(&["media", "capabilities", "clear", "--fingerprint", &other])
+        .await;
+    assert_eq!(exit, 0, "{unrelated}");
+    assert_eq!(unrelated["result"]["cleared"], false);
+    let (retained, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{retained}");
+    assert_eq!(&retained["result"], capabilities);
+    let (cleared, exit) = cli
+        .human(&["media", "capabilities", "clear", "--fingerprint", fingerprint])
+        .await;
+    assert_eq!(exit, 0, "{cleared}");
+    assert_eq!(cleared["result"]["cleared"], true);
+    let (empty, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{empty}");
+    assert_eq!(empty["result"], before["result"]);
     let (schema, exit) = cli.human(&["commands", "schema", "streams.clean"]).await;
     assert_eq!(exit, 0, "{schema}");
     let (probe, exit) = cli
@@ -683,7 +714,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -697,6 +728,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "operator"]);
     let stdio = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
+    assert_eq!(
+        &call!(stdio, "capabilities.refresh", json!({}), json!({})),
+        capabilities
+    );
     let observed = call!(
         stdio,
         "media.probe",
@@ -1266,6 +1301,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
                 .auth_header(&token),
         );
         let http = ().serve_with_lifecycle(transport, lifecycle).await.unwrap();
+        assert_eq!(
+            &call!(http, "capabilities.refresh", json!({}), json!({})),
+            capabilities
+        );
         let probed = call!(http, "media.probe", json!({"path":media.source}), json!({}));
         assert_eq!(probed["streams"].as_array().unwrap().len(), 3);
         assert_eq!(probed["streams"][1]["tags"]["language"], "eng");

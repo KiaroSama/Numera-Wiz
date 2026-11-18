@@ -1076,6 +1076,7 @@ impl Service {
                 "batches.submit",
                 "timeline.render",
                 "media.probe",
+                "capabilities.refresh",
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
@@ -1376,6 +1377,9 @@ impl Service {
                     tracing::error!(code=%error.code,"Accepted policy change retained; active authority checks will fail closed");
                 }
                 return Ok(response);
+            }
+            "capabilities.inspect" | "capabilities.refresh" | "capabilities.clear" => {
+                self.component_capabilities(&request.command.id, params, cancellation.clone())?
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;

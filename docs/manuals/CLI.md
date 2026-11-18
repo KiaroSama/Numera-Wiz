@@ -49,6 +49,9 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 |---|---|
 | `commands list` / `commands schema ID` | Inspect the active registry and one parameter schema. |
 | `media probe PATH` | Probe an authorized source. |
+| `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
+| `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
+| `media capabilities clear --fingerprint SHA` | Clear the matching component report from owner memory. |
 | `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
 | `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |
 | `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |
@@ -105,6 +108,19 @@ scope and key, so a separate CLI retry retains the same identity. An explicit
 --request-id can be retained too. Reuse the same scope/key/parameters after a
 lost response. Changed content returns IDEMPOTENCY_CONFLICT. These commands
 never silently allocate a new mutation scope during a retry.
+
+## Engine capability reports
+
+Use `media capabilities refresh` to populate the owner process cache. The
+fingerprint incorporates the operating system, architecture and both executable
+digests. A forced refresh reads fresh lists and runs the fixed software check.
+An exercised CPU round trip means one generated frame was encoded to FFV1 in
+Matroska, decoded and compared with the expected samples. A failed check is
+returned without caching its result.
+
+The CPU profile reports hardware as `unknown`. Device refresh requests require
+an admitted device profile. Clear accepts the exact fingerprint from a report
+and affects only that in-memory entry. Restarting the owner resets the cache.
 
 ## Canonical operations
 

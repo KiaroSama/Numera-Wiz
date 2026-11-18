@@ -86,7 +86,7 @@ in hosted CI. Owner hardware qualification uses matching prebuilt artifacts.
 
 See the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
 [MCP manual](docs/manuals/MCP.md) and [agent setup](docs/agents/README.md).
-The CLI exposes `commands list`, `commands schema <id>`, `media probe`,
+The CLI exposes `commands list`, `commands schema <id>`, `media probe`, `media capabilities`,
 `assets register-folder`, `streams clean`, `jobs submit`, `jobs wait`,
 `jobs cancel`, batch controls and `artifacts save`. Parameters, access grants
 and durable retry identities are documented in those manuals.

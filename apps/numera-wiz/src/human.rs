@@ -101,6 +101,26 @@ pub enum Media {
         #[command(flatten)]
         probe: ProbePolicy,
     },
+    /// Inspect and refresh FFmpeg capabilities.
+    #[command(subcommand)]
+    Capabilities(Capabilities),
+}
+#[derive(Subcommand)]
+pub enum Capabilities {
+    /// Read current component fingerprints and cached observations.
+    Inspect,
+    /// Inspect declarations and exercise a fixed software encode/decode path.
+    Refresh {
+        #[arg(long)]
+        force: bool,
+        #[arg(long)]
+        devices: bool,
+    },
+    /// Clear the component cache entry matching this SHA-256 fingerprint.
+    Clear {
+        #[arg(long)]
+        fingerprint: String,
+    },
 }
 #[derive(Subcommand)]
 pub enum Assets {
@@ -304,6 +324,15 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             query("media.probe", params)
+        }
+        Command::Media(Media::Capabilities(Capabilities::Inspect)) => {
+            query("capabilities.inspect", json!({"scope":"components"}))
+        }
+        Command::Media(Media::Capabilities(Capabilities::Refresh { force, devices })) => {
+            query("capabilities.refresh", json!({"force":force,"devices":devices,"components":true}))
+        }
+        Command::Media(Media::Capabilities(Capabilities::Clear { fingerprint })) => {
+            query("capabilities.clear", json!({"namespace":"components","fingerprint":fingerprint}))
         }
         Command::Assets(Assets::Register {
             path,

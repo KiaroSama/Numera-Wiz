@@ -30,7 +30,7 @@ pub(super) async fn qualify(engine: &Engine, cancel: CancellationToken) -> Resul
         }
     }
 }
-async fn identities(engine: &Engine, cancel: CancellationToken) -> Result<()> {
+pub(super) async fn identities(engine: &Engine, cancel: CancellationToken) -> Result<()> {
     let ffmpeg = engine.ffmpeg.clone();
     let ffprobe = engine.ffprobe.clone();
     blocking(move || {
@@ -54,28 +54,10 @@ async fn observe(engine: &Engine, cancel: CancellationToken) -> Result<MediaTool
     identities(engine, cancel.clone()).await?;
     for (flag, required, kind) in [
         ("-filters", FILTERS, Listing::Filters),
-        ("-encoders", ENCODERS, Listing::Encoders),
+        ("-encoders", ENCODERS, Listing::Codecs),
         ("-muxers", MUXERS, Listing::Muxers),
     ] {
-        let args = ["-hide_banner", flag].map(String::from);
-        let ticket = engine.process_budget.acquire(&cancel).await?;
-        let result = process::run_with_output_limits(
-            Path::new(&engine.ffmpeg.path),
-            &args,
-            Duration::from_secs(5),
-            256 * 1024,
-            4096,
-            cancel.clone(),
-        )
-        .await;
-        let result = ticket.finish(result)?;
-        let stdout = std::str::from_utf8(&result.stdout).map_err(|_| {
-            DomainError::new(
-                "COMPONENT_UNAVAILABLE",
-                "Media component listing must be bounded UTF-8",
-            )
-        })?;
-        let names = names(stdout, kind);
+        let names = listing(engine, flag, kind, cancel.clone()).await?;
         if required.iter().any(|name| !names.contains(*name)) {
             return Err(DomainError::new(
                 "COMPONENT_UNAVAILABLE",
@@ -106,22 +88,62 @@ async fn observe(engine: &Engine, cancel: CancellationToken) -> Result<MediaTool
     tools.validate()?;
     Ok(tools)
 }
+pub(super) async fn listing(
+    engine: &Engine,
+    flag: &str,
+    kind: Listing,
+    cancel: CancellationToken,
+) -> Result<BTreeSet<String>> {
+    let args = ["-hide_banner", flag].map(String::from);
+    let ticket = engine.process_budget.acquire(&cancel).await?;
+    let result = process::run_with_output_limits(
+        Path::new(&engine.ffmpeg.path),
+        &args,
+        Duration::from_secs(5),
+        256 * 1024,
+        4096,
+        cancel,
+    )
+    .await;
+    let result = ticket.finish(result)?;
+    let stdout = std::str::from_utf8(&result.stdout).map_err(|_| {
+        DomainError::new(
+            "COMPONENT_UNAVAILABLE",
+            "Media component listing must be bounded UTF-8",
+        )
+    })?;
+    Ok(names(stdout, kind).into_iter().map(String::from).collect())
+}
+
 #[derive(Clone, Copy)]
-enum Listing {
+pub(super) enum Listing {
     Filters,
-    Encoders,
+    Codecs,
+    Demuxers,
     Muxers,
+    PixelFormats,
+    SampleFormats,
+    AcceleratorMethods,
 }
 fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
     text.lines()
         .filter_map(|line| {
-            let mut columns = line.split_whitespace();
-            let flags = columns.next()?;
-            let name = columns.next()?;
-            let description = columns.next()?;
-            if !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+            if matches!(kind, Listing::Demuxers | Listing::Muxers)
+                && line.as_bytes().get(3) == Some(&b'd')
+            {
                 return None;
             }
+            let mut columns = line.split_whitespace();
+            let flags = columns.next()?;
+            if matches!(kind, Listing::AcceleratorMethods) {
+                return columns.next().is_none().then_some(flags);
+            }
+            let name = columns.next()?;
+            if matches!(kind, Listing::SampleFormats) {
+                let depth = name.parse::<u8>().ok()?;
+                return (1..=64).contains(&depth).then_some(flags);
+            }
+            let description = columns.next()?;
             let admitted = match kind {
                 Listing::Filters => {
                     // FFmpeg9 emits two flags; retain the older three-flag format too.
@@ -130,7 +152,7 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
                         && description.contains("->")
                         && description.bytes().all(|b| b"AVN|->".contains(&b))
                 }
-                Listing::Encoders => {
+                Listing::Codecs => {
                     flags.len() == 6
                         && matches!(flags.as_bytes()[0], b'V' | b'A' | b'S')
                         && flags
@@ -138,9 +160,21 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
                             .skip(1)
                             .all(|b| b == b'.' || b.is_ascii_uppercase())
                 }
+                Listing::Demuxers => matches!(flags, "D" | "DE"),
                 Listing::Muxers => matches!(flags, "E" | "DE"),
+                Listing::PixelFormats => {
+                    flags.len() == 5
+                        && flags.bytes().all(|byte| b".IOHPB".contains(&byte))
+                        && description.parse::<u8>().is_ok()
+                }
+                Listing::SampleFormats | Listing::AcceleratorMethods => false,
             };
             admitted.then_some(name)
+        })
+        .flat_map(|name| name.split(','))
+        .filter(|name| {
+            !name.is_empty()
+                && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
         })
         .collect()
 }
@@ -160,7 +194,7 @@ pub(super) fn assert_listing_admission() {
     assert!(!filters.contains("asetpts"));
     let encoders = names(
         "Encoders:\n V..... = Video\n VF.... ffv1                 FFmpeg video codec #1\n A....D pcm_s16le            PCM signed 16-bit little-endian\n ...... invented             ffv1\n",
-        Listing::Encoders,
+        Listing::Codecs,
     );
     assert_eq!(encoders, BTreeSet::from(["ffv1", "pcm_s16le"]));
     let muxers = names(
@@ -168,5 +202,16 @@ pub(super) fn assert_listing_admission() {
         Listing::Muxers,
     );
     assert_eq!(muxers, BTreeSet::from(["matroska"]));
+    let demuxers = names(
+        " D   matroska,webm    Matroska / WebM\n D d lavfi            Libavfilter virtual input",
+        Listing::Demuxers,
+    );
+    assert_eq!(demuxers, BTreeSet::from(["matroska", "webm"]));
+    let pix = names("IO... yuv420p 3 12 8-8-8\nI.... = header", Listing::PixelFormats);
+    assert_eq!(pix, BTreeSet::from(["yuv420p"]));
+    let samples = names("name depth\ns16 16\nfltp 32\n", Listing::SampleFormats);
+    assert_eq!(samples, BTreeSet::from(["fltp", "s16"]));
+    let devices = names("Hardware acceleration methods:\ncuda\n\n", Listing::AcceleratorMethods);
+    assert_eq!(devices, BTreeSet::from(["cuda"]));
     verification::exercise();
 }

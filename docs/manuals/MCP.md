@@ -84,6 +84,18 @@ lifetimes. Use `jobs.cancel` to control an accepted job before its publication f
 Domain failures are structured tool errors. Invalid protocol envelopes use SDK
 protocol errors. No custom MCP wire parser or lifecycle implementation is used.
 
+## Engine capability reports
+
+Grant `capabilities.inspect`, `capabilities.refresh` or `capabilities.clear`
+to the operating profile when needed. Inspect accepts `{"scope":"components"}`.
+Refresh accepts `{"components":true,"devices":false,"force":true}`. Clear
+accepts `{"namespace":"components","fingerprint":"<reported SHA-256>"}`.
+All three commands use the current owner process and omit durable replay fields.
+
+Refresh returns the declared codecs, formats and filters separately from the
+verified CPU FFV1 round trip. Hardware remains `unknown` in the CPU profile.
+Clear removes only the matching in-memory report.
+
 ## Registered selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI

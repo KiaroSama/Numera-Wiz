@@ -62,6 +62,13 @@ output and invocation. The plan pane shows retained/dropped tracks and the
 verification scope. Changing the form invalidates the reviewed plan. An existing
 destination is preserved; it is not overwritten by a retry.
 
+## Engine capabilities
+
+Open **Engine capabilities** in the Stream Cleanup workspace. **Inspect** shows
+the current component fingerprint and cached result. **Refresh** reads the
+declared FFmpeg components and checks a software FFV1 encode/decode round trip.
+**Clear cache** removes the selected fingerprint from the owner's memory.
+
 ## Run and inspect
 
 Run reviewed plan, or press Ctrl+Enter on Windows/Linux and Cmd+Enter on macOS.

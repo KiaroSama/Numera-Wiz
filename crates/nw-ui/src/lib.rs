@@ -1,5 +1,6 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod batches;
+mod capabilities;
 mod cleanup;
 pub mod client;
 mod folders;
@@ -34,6 +35,8 @@ enum Action {
     Jobs,
     Cancel,
     Inspect,
+    Capabilities,
+    ClearCapabilities,
     ArtifactManifest,
     SelectionReport(u64),
     BatchOutput(u64, usize),
@@ -122,6 +125,7 @@ pub struct WizApp {
     last_jobs: Instant,
     stream_page: usize,
     inspect: String,
+    capability_report: Option<nw_domain::capabilities::CapabilityReport>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
     save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
@@ -296,6 +300,7 @@ impl WizApp {
             last_jobs: Instant::now(),
             stream_page: 0,
             inspect: String::new(),
+            capability_report: None,
             artifact_manifest: None,
             save_control: None,
             save_inbox: Arc::new(Mutex::new(None)),
@@ -757,6 +762,21 @@ impl WizApp {
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
+                }
+                Action::Capabilities => {
+                    self.capability_report =
+                        Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
+                }
+                Action::ClearCapabilities => {
+                    let cleared: nw_domain::capabilities::ClearResult =
+                        serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    self.capability_report = None;
+                    self.status = if cleared.cleared {
+                        "Capability cache cleared."
+                    } else {
+                        "No matching capability cache entry."
+                    }
+                    .into();
                 }
             }
             Ok(())
@@ -1237,6 +1257,7 @@ impl eframe::App for WizApp {
                 egui::ScrollArea::vertical().max_height(180.0).show(ui,|ui| { ui.add(egui::TextEdit::multiline(&mut self.inspect).code_editor().interactive(false).desired_width(f32::INFINITY)); });
             });
             self.folder_controls(ui);
+            self.capability_panel(ui);
         });
         if !self.folder.open {
             self.batch_window(ui.ctx());

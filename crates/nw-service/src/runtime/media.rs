@@ -1,9 +1,63 @@
 //! Authenticated finite compiler reviews do not persist new media records on old reader floors.
 use super::*;
-use nw_domain::media::{self as domain, RenderInput};
+use nw_domain::{
+    capabilities::{CapabilityScope, ClearInput, InspectInput, RefreshInput},
+    media::{self as domain, RenderInput},
+};
 use std::time::{Duration, Instant};
 
 impl Service {
+    pub(super) fn component_capabilities(
+        &self,
+        command: &str,
+        params: Value,
+        cancel: CancellationToken,
+    ) -> Result<Value> {
+        let runtime = tokio::runtime::Handle::current();
+        match command {
+            "capabilities.inspect" => {
+                let InspectInput {
+                    scope: CapabilityScope::Components,
+                } = commands::parse(params)?;
+                value(&runtime.block_on(self.engine()?.inspect_capabilities(cancel))?)
+            }
+            "capabilities.refresh" => {
+                let input: RefreshInput = commands::parse(params)?;
+                if input.devices {
+                    return Err(DomainError::new(
+                        "CAPABILITY_UNAVAILABLE",
+                        "This profile does not admit a device probe",
+                    ));
+                }
+                if !input.components {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Select at least one capability source to refresh",
+                    ));
+                }
+                value(&runtime.block_on(self.engine()?.refresh_capabilities(input.force, cancel))?)
+            }
+            "capabilities.clear" => {
+                let ClearInput {
+                    namespace: CapabilityScope::Components,
+                    fingerprint,
+                } = commands::parse(params)?;
+                if fingerprint.len() != 64
+                    || !fingerprint.bytes().all(|byte| {
+                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                    })
+                {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Capability fingerprint must be a lowercase SHA-256 digest",
+                    ));
+                }
+                value(&runtime.block_on(self.engine()?.clear_capabilities(&fingerprint, cancel))?)
+            }
+            _ => Err(DomainError::new("UNKNOWN_COMMAND", "Unregistered capability command")),
+        }
+    }
+
     pub(super) fn media_review(
         self: &Arc<Self>,
         context: &Context,
