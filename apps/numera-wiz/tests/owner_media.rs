@@ -147,10 +147,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     let mut owner_bridge = cli.command();
     owner_bridge.args(["bridge", "--native-owner"]);
-    let owner_bridge = ()
-        .serve(TokioChildProcess::new(owner_bridge).unwrap())
-        .await
-        .unwrap();
+    let owner_bridge = ().serve(TokioChildProcess::new(owner_bridge).unwrap()).await.unwrap();
     assert_eq!(
         call!(
             owner_bridge,

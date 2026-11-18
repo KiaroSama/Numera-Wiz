@@ -348,9 +348,11 @@ impl Engine {
         )
         .await;
         let planes = ticket.finish(decoded)?.stdout;
-        Ok(matches!(planes.split_at_checked(luma_bytes), Some((luma, chroma))
+        Ok(
+            matches!(planes.split_at_checked(luma_bytes), Some((luma, chroma))
             if chroma.len() == chroma_bytes
                 && luma.iter().all(|sample| sample.abs_diff(16) <= tolerance)
-                && chroma.iter().all(|sample| sample.abs_diff(128) <= tolerance)))
+                && chroma.iter().all(|sample| sample.abs_diff(128) <= tolerance)),
+        )
     }
 }

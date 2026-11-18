@@ -1378,14 +1378,13 @@ impl Service {
                 }
                 return Ok(response);
             }
-            "capabilities.inspect" | "capabilities.refresh" | "capabilities.clear" => {
-                self.component_capabilities(
+            "capabilities.inspect" | "capabilities.refresh" | "capabilities.clear" => self
+                .component_capabilities(
                     &request.command.id,
                     params,
                     policy.is_none(),
                     cancellation.clone(),
-                )?
-            }
+                )?,
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
                 let deadline = input

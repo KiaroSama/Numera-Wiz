@@ -33,11 +33,19 @@ impl Stream {
 pub enum Selector {
     All,
     None,
-    SourceIndices { values: Vec<u32> },
+    SourceIndices {
+        values: Vec<u32>,
+    },
     /// Remove zero-based positions among streams of the selected kind.
-    ExcludeTypeOrdinals { values: Vec<u32> },
-    Languages { values: Vec<String> },
-    TitleContainsAny { values: Vec<String> },
+    ExcludeTypeOrdinals {
+        values: Vec<u32>,
+    },
+    Languages {
+        values: Vec<String>,
+    },
+    TitleContainsAny {
+        values: Vec<String>,
+    },
 }
 #[derive(Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]

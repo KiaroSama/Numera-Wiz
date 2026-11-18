@@ -92,15 +92,17 @@ fn selection(
                 }
             });
         if *mode > 1 {
-            changed |=
-                ui.add(egui::TextEdit::singleline(text).char_limit(4096).hint_text(
-                    match *mode {
-                        2 => "Codes: eng, fas, und",
-                        3 => "Indices: 0, 2, 5",
-                        5 => "Zero-based positions, such as 0, 2",
-                        _ => "Original title contains",
-                    },
-                ))
+            changed |= ui
+                .add(
+                    egui::TextEdit::singleline(text)
+                        .char_limit(4096)
+                        .hint_text(match *mode {
+                            2 => "Codes: eng, fas, und",
+                            3 => "Indices: 0, 2, 5",
+                            5 => "Zero-based positions, such as 0, 2",
+                            _ => "Original title contains",
+                        }),
+                )
                 .changed();
         }
     });
