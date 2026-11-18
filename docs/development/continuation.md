@@ -8,6 +8,27 @@ and no-close policies below are historical and superseded by the owner's explici
 request to consolidate other branches/PRs and remove local-only planning/source
 files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
+## Metadata, preview and hosted evidence
+
+[CI317](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44357396100) at
+`65d2335` passed twelve of thirteen jobs. The four native builds and regressions,
+actual Chrome, large artifact transfer, FFmpeg media tests and both official
+MCP transports passed. The four native executable artifacts matched their
+packaged executable bytes, checksums and embedded browser source identity.
+[Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44357396269) passed.
+
+The native project journey timed out while placing a registered clip. Its
+retained screenshots show that a browser-derived pointer position selected
+the neighboring source. The native event coordinates now target the actual
+source buttons and the physical stream button. The journey still checks the
+registered source identity, exact clip times and accepted project mutation.
+
+The next hosted cohort includes an individual registered-source frame preview,
+Matroska container and stream tag editing, and FFmetadata chapter import. The
+reviewed import can apply selected container tags and verifies chapter times,
+Unicode values and all retained packet data before publishing. These routes
+use the shared GUI and the same typed CLI and MCP contracts.
+
 ## Owned two-input session qualification
 
 The current source adds a dedicated two-input process session in `nw-platform`

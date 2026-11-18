@@ -308,7 +308,13 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
         .expect("Retained real folder source in the current inventory order");
     let asset_id = id(&rows[row]["id"]);
     driver.mark().await;
-    driver.click(390, 197 + row as u32 * 21).await;
+    let row = row as u32;
+    let asset_y = if driver.browser() {
+        197 + row * 21
+    } else {
+        205 + row * 23
+    };
+    driver.click(390, asset_y).await;
     assert_eq!(driver.observed("assets.inspect").await.code, "OK");
     let asset = read(driver, "assets.inspect", json!({"id":asset_id}), None).await;
     let streams = asset["probe"]["streams"].as_array().unwrap();
@@ -316,7 +322,8 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
     assert_eq!(streams[0]["kind"], "video");
     let physical = streams[0]["index"].as_u64().unwrap() as u32;
     // First real video stream follows the three inspected-source rows.
-    driver.click(330, 312).await;
+    let first_stream_y = if driver.browser() { 312 } else { 323 };
+    driver.click(330, first_stream_y).await;
     driver.screenshot("registered-source-picker").await;
     (asset_id, physical)
 }
