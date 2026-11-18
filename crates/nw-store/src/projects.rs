@@ -256,8 +256,14 @@ impl Store {
             } else {
                 header = serde_json::from_str(current.as_deref().expect("Existing header checked above")).map_err(storage)?;
                 if header.id != project || request.project.as_ref().map(|p| p.id.as_str()) != Some(project.as_str()) { return Err(domain::invalid("Project envelope and stored identity differ")); }
-                let history_matches = matches!((&prepared.history_action, request.command.id.as_str()), (HistoryAction::Undo(_), "history.undo") | (HistoryAction::Redo(_), "history.redo"))
-                    || (matches!(&prepared.history_action, HistoryAction::Normal) && ["sequences.create", "clips.place", "clips.move", "clips.link", "clips.unlink", "clips.split", "clips.remove"].contains(&request.command.id.as_str()));
+                let history_matches = match request.command.id.as_str() {
+                    "history.undo" => matches!(&prepared.history_action, HistoryAction::Undo(_)),
+                    "history.redo" => matches!(&prepared.history_action, HistoryAction::Redo(_)),
+                    command => matches!(&prepared.history_action, HistoryAction::Normal)
+                        && domain::authorization::requirements(command).is_some_and(|requirement| {
+                            requirement.project_action == Some(domain::authorization::ProjectAction::Edit)
+                        }),
+                };
                 if !history_matches { return Err(domain::invalid("Project command and prepared history action differ")); }
                 header.writable()?;
                 let expected = request.project.as_ref().and_then(|p| p.expected_revision.as_deref()).ok_or_else(|| domain::invalid("Project write revision required"))?;
