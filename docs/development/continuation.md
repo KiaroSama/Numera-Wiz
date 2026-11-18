@@ -10,6 +10,18 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+CI325 passed all thirteen jobs for `ea9c53a`, including the four native
+builds and regressions, Chrome, the native workspace exercise, FFmpeg media,
+the owner transports and the HTTP artifact exercise. Gitleaks passed on the
+same commit. The executable inside each development package matched its raw
+build artifact, embedded web source identity and recorded SHA-256. The four
+native preservation reports matched those executables. [CI325](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44376947779) · [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44376947921)
+
+The next review batch adds one decoded frame from the visible timeline
+layer, plus original RIFF and RF64 cue data in the native/browser panel,
+typed CLI and MCP. Both changes have real media regression cases under the
+existing test entry points. They require verification on their own commit.
+
 CI323 at `1da8aba` built and packaged all four native targets. Linux, Apple Silicon, Chrome, the
 FFmpeg fixture, owner batch, official MCP transports, dependency resolution,
 formatting and web passed. The Windows platform suite observed incomplete
