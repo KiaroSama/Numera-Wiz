@@ -470,7 +470,7 @@ pub(crate) fn validate_continuity(
             Some(actual) if actual == old.value() => {}
             Some(actual) if adopted || key.starts_with("credential/") => {
                 crate::restoration_legacy::validate_transition(key, old.value(), &actual)?;
-                validate_changed_business(current, key, &actual)?;
+                validate_changed_business(current, key, &actual, operation.mixed_media)?;
             }
             None if adopted || key.starts_with("credential/") => {
                 crate::restoration_legacy::validate_removed(preimage, current, key, old.value())?;
@@ -510,7 +510,7 @@ pub(crate) fn validate_continuity(
         } else if key.starts_with("scope-rate/") {
             rate(None, value.value())?;
         } else if adopted || key.starts_with("credential/") {
-            validate_changed_business(current, key, value.value())?;
+            validate_changed_business(current, key, value.value(), operation.mixed_media)?;
         } else {
             return Err(invalid(
                 "Unexplained post-exposure row with unchanged source guard",
@@ -523,8 +523,11 @@ fn validate_changed_business(
     table: &impl ReadableTable<&'static str, &'static [u8]>,
     key: &str,
     raw: &[u8],
+    source_media_v1: bool,
 ) -> Result<()> {
-    let namespace = key.split('/').next().unwrap_or("");
+    let (namespace, id) = key
+        .split_once('/')
+        .ok_or_else(|| invalid("Changed record namespace is invalid"))?;
     match namespace {
         "profile" => {
             let profile: nw_domain::access::AccessProfile = decode(raw)?;
@@ -541,10 +544,27 @@ fn validate_changed_business(
             }
         }
         "plan" => {
-            let plan = nw_domain::plans::decode(decode(raw)?)?;
-            if key != format!("plan/{}", plan.id) {
-                return Err(invalid("Changed legacy plan key differs"));
+            let shape: serde_json::Value = decode(raw)?;
+            let plan_id = if source_media_v1
+                && (shape.get("envelope_version").is_some() || shape.get("payload_kind").is_some())
+            {
+                nw_domain::media_execution::decode_plan(std::str::from_utf8(raw).map_err(storage)?)?
+                    .id
+            } else {
+                nw_domain::plans::decode(shape)?.id
+            };
+            if id != plan_id {
+                return Err(invalid("Changed plan key differs"));
             }
+        }
+        "job" if source_media_v1
+            && nw_domain::media_execution::stored_job_kind(raw)?
+                != nw_domain::media_execution::StoredJobKind::Legacy =>
+        {
+            crate::media_execution::validate_restored_media_v1_job(table, id)?;
+        }
+        "job-payload" | "job-queue" if source_media_v1 => {
+            crate::media_execution::validate_restored_media_v1_job(table, id)?;
         }
         "job" => {
             let job = crate::records::decode_job(raw)?;

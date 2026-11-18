@@ -202,6 +202,37 @@ fn payload(
         .ok_or_else(|| DomainError::new("INVALID_RECORD", "Accepted media payload is missing"))?;
     decode(row.value())
 }
+
+pub(crate) fn validate_restored_media_v1_job(
+    table: &impl ReadableTable<&'static str, &'static [u8]>,
+    id: &str,
+) -> Result<()> {
+    let invalid = || DomainError::new("RESTORATION_REFUSED", "MediaV1 job provenance differs");
+    let job = media_job(table, id)?;
+    let accepted = payload(table, id)?;
+    let plan = job.validate_payload(&accepted)?;
+    let stored_plan = table
+        .get(format!("plan/{}", job.plan_id).as_str())
+        .map_err(storage)?
+        .ok_or_else(invalid)?;
+    let stored_plan = domain::decode_plan(std::str::from_utf8(stored_plan.value()).map_err(storage)?)?;
+    let auth = table
+        .get(format!("job-auth/{id}").as_str())
+        .map_err(storage)?
+        .ok_or_else(invalid)?;
+    let auth: ExecutionAuthorization = decode(auth.value())?;
+    let root = table.get("meta/root").map_err(storage)?.ok_or_else(invalid)?;
+    if job.id != id
+        || stored_plan.id != plan.id
+        || stored_plan.hash != plan.hash
+        || auth.principal != job.creator
+        || root.value() != plan.payload.root_id.as_bytes()
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
 fn allowed(
     table: &impl ReadableTable<&'static str, &'static [u8]>,
     job: &MediaJobV1,

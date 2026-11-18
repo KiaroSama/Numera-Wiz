@@ -29,7 +29,17 @@ async fn edit(
     response["result"].clone()
 }
 
-pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fixture::Media) {
+pub struct FiniteTimeline {
+    project: String,
+    sequence: String,
+}
+
+pub async fn registered_timeline_frame(
+    cli: &Cli,
+    scope: &str,
+    media: &super::fixture::Media,
+    finite: &FiniteTimeline,
+) {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 
@@ -192,7 +202,7 @@ pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fi
     assert_eq!(response["structuredContent"]["ok"], true, "{response}");
     assert_eq!(&response["structuredContent"]["result"], frame);
     sdk.cancel().await.unwrap();
-    accepted_mixed_timeline(cli, project_id, sequence_id).await;
+    accepted_mixed_timeline(cli, project_id, sequence_id, finite).await;
 }
 
 async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {
@@ -273,7 +283,7 @@ async fn restore_unadopted_mixed(cli: &Cli, scope: &str, enablement: &str) {
     assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
 }
 
-async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
+async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str, finite: &FiniteTimeline) {
     use nw_domain::media::MediaPlanV2;
     use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 
@@ -304,8 +314,11 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
     let (restored, code) = cli.human(&settings).await;
     assert_ne!(code, 0);
     assert_eq!(restored["error"]["code"], "STORE_VERSION_UNSUPPORTED");
+    let finite_job = submit_media_after_restoration(cli, scope, finite).await;
     let second = enable_mixed(cli, scope, "mixed-enablement-successor").await;
     assert_ne!(second, first);
+    let preserved = cli.query("jobs.inspect", json!({"id":finite_job["id"]})).await;
+    assert_eq!(preserved, finite_job);
 
     let (review, code) = cli.human(&settings).await;
     assert_eq!(code, 0, "{}", review["error"]);
@@ -375,7 +388,34 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str) {
     assert_eq!(refused["error"]["code"], "RESTORATION_REFUSED");
 }
 
-pub async fn review(cli: &Cli, scope: &str) {
+async fn submit_media_after_restoration(cli: &Cli, scope: &str, finite: &FiniteTimeline) -> Value {
+    let (review, code) = cli
+        .human(&[
+            "timeline", "render", "--project", &finite.project,
+            "--revision", "4", "--sequence", &finite.sequence, "--end", "5/2",
+        ])
+        .await;
+    assert_eq!(code, 0, "{}", review["error"]);
+    assert_eq!(review["result"]["payload_kind"], "media_v1");
+    let file = cli.data.join("finite-media-after-mixed-restoration.json");
+    let raw = serde_json::to_vec(&review["result"]).unwrap();
+    std::fs::write(&file, &raw).unwrap();
+    let (accepted, code) = cli
+        .human(&[
+            "jobs", "submit-media", "--plan-file", file.to_str().unwrap(), "--replay-scope",
+            scope, "--idempotency-key", "media-v1-after-mixed-restore", "--request-id",
+            "media-v1-after-mixed-restore",
+        ])
+        .await;
+    assert_eq!(code, 0, "{}", accepted["error"]);
+    let job = cli.completed(accepted["result"]["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "succeeded", "{}", job["error"]);
+    assert_eq!(job["payload_kind"], "media_job_v1");
+    assert_eq!(job["payload_sha256"], nw_domain::projects::hash(&raw));
+    job
+}
+
+pub async fn review(cli: &Cli, scope: &str) -> FiniteTimeline {
     let created = cli
         .mutation(
             scope,
@@ -555,6 +595,10 @@ pub async fn review(cli: &Cli, scope: &str) {
     }
     physical_output(cli, &decoded).await;
     accepted_output(cli, scope, project, &decoded).await;
+    FiniteTimeline {
+        project: project.into(),
+        sequence: sequence_id.into(),
+    }
 }
 
 async fn accepted_output(

@@ -1817,11 +1817,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     server.kill().await.unwrap();
     server.wait().await.unwrap();
     lost_ack::verify(&media, None).await;
-    tokio::time::timeout(
+    let finite = tokio::time::timeout(
         Duration::from_secs(40),
         project_render::review(&cli, &scope),
     )
     .await
     .expect("Whole finite compiler review exceeded 40 seconds");
-    project_render::registered_timeline_frame(&cli, &scope, &media).await;
+    project_render::registered_timeline_frame(&cli, &scope, &media, &finite).await;
 }
