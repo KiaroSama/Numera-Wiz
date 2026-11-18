@@ -127,7 +127,11 @@ impl shared::Driver for BrowserProjects<'_> {
             let actions = keys
                 .iter()
                 .map(|value| json!({"type":"keyDown","value":value}))
-                .chain(keys.iter().rev().map(|value| json!({"type":"keyUp","value":value})))
+                .chain(
+                    keys.iter()
+                        .rev()
+                        .map(|value| json!({"type":"keyUp","value":value})),
+                )
                 .collect::<Vec<_>>();
             driver(
                 self.client,
