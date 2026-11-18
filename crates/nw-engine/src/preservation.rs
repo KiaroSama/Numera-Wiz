@@ -185,15 +185,7 @@ impl Ledger {
             .clocks
             .get(&index)
             .ok_or_else(|| invalid("Packet references an unobserved stream"))?;
-        let hash = value["data_hash"]
-            .as_str()
-            .ok_or_else(|| invalid("Missing packet SHA-256"))?;
-        if !hash.starts_with("SHA256:")
-            || hash.len() != 71
-            || !hash[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
-        {
-            return Err(invalid("Invalid packet SHA-256"));
-        }
+        let hash = packet_sha256(&value["data_hash"])?;
         let size = integer(&value["size"])?.ok_or_else(|| invalid("Missing packet size"))?;
         let size = u64::try_from(size).map_err(|_| invalid("Negative packet size"))?;
         let pts = timestamp(&value["pts"], clock)?;
@@ -235,7 +227,20 @@ impl Ledger {
     }
 }
 
-fn integer(value: &Value) -> Result<Option<i64>> {
+pub(crate) fn packet_sha256(value: &Value) -> Result<&str> {
+    let hash = value
+        .as_str()
+        .ok_or_else(|| invalid("Missing packet SHA-256"))?;
+    if !hash.starts_with("SHA256:")
+        || hash.len() != 71
+        || !hash[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(invalid("Invalid packet SHA-256"));
+    }
+    Ok(hash)
+}
+
+pub(crate) fn integer(value: &Value) -> Result<Option<i64>> {
     if value.is_null() || value.as_str() == Some("N/A") {
         return Ok(None);
     }
@@ -250,7 +255,7 @@ fn integer(value: &Value) -> Result<Option<i64>> {
         .map_err(|_| invalid("Invalid integer packet field"))
 }
 
-fn timestamp(value: &Value, clock: Rational) -> Result<Option<Rational>> {
+pub(crate) fn timestamp(value: &Value, clock: Rational) -> Result<Option<Rational>> {
     integer(value)?
         .map(|ticks| Rational::new(ticks, 1)?.checked_mul(clock))
         .transpose()

@@ -1,6 +1,6 @@
 //! Bounded NUT candidates for registered windows and verified input pairs.
 use super::{identities, verification::ratio};
-use crate::{Engine, admission, blocking};
+use crate::{Engine, admission, blocking, preservation};
 use nw_domain::{DomainError, Result, mux::StreamKind, records::Asset, time::Rational};
 use nw_platform::{
     files::{self, DirectoryStamp, SourceStamp},
@@ -431,17 +431,14 @@ fn stream_signature(report: &Value, index: u32, role: StreamKind) -> Result<Stre
         if packet_index != u64::from(index) {
             continue;
         }
-        let pts = packet["pts"]
-            .as_i64()
+        let timestamp = preservation::timestamp(&packet["pts"], grid)?
             .ok_or_else(|| invalid_pair("Missing exact packet timestamp"))?;
-        let timestamp = Rational::new(pts, 1)?.checked_mul(grid)?;
         if previous_timestamp.is_some_and(|previous| previous >= timestamp) {
             return Err(invalid_pair("Normalized packet timestamps did not advance"));
         }
         previous_timestamp = Some(timestamp);
-        let size = packet["size"]
-            .as_str()
-            .and_then(|raw| raw.parse::<u64>().ok())
+        let size = preservation::integer(&packet["size"])?
+            .and_then(|size| u64::try_from(size).ok())
             .filter(|size| *size > 0)
             .ok_or_else(|| invalid_pair("Missing packet length"))?;
         if !size.is_multiple_of(shape) || (role == StreamKind::Video && size != shape) {
@@ -449,12 +446,9 @@ fn stream_signature(report: &Value, index: u32, role: StreamKind) -> Result<Stre
                 "Normalized packet length differs from its stream shape",
             ));
         }
-        let raw_hash = packet["data_hash"]
-            .as_str()
-            .and_then(|hash| hash.strip_prefix("SHA256:"))
-            .ok_or_else(|| invalid_pair("Missing normalized packet digest"))?;
+        let digest = preservation::packet_sha256(&packet["data_hash"])?;
         let mut hash = [0; 32];
-        hex::decode_to_slice(raw_hash, &mut hash)
+        hex::decode_to_slice(&digest[7..], &mut hash)
             .map_err(|_| invalid_pair("Invalid packet digest"))?;
         packets.push((timestamp, size, hash));
     }
