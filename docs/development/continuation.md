@@ -100,6 +100,20 @@ media fields explicitly. A component-level reproduction with the same binaries
 passed for both complete synthetic inputs and shortened frame/sample windows.
 [CI311](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44344745229)
 
+CI313 on `6383bff` passed the four native build and regression jobs, both
+GUI journeys, media, batch, both official MCP transports, dependency lock and
+the HTTP publication and revocation exercise. Its formatter supplied the
+exact patch committed for the NUT field projection. Gitleaks passed on that
+source. [CI313](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44346607094)
+
+The next source batch adds exact chapter inspection, FFmetadata export and
+reviewed chapter removal. It also resolves explicit audio/subtitle disposition
+edits through the existing cleanup planner. Real fixture cases exercise the
+Unicode chapter round trip, preservation of unrelated tags, and a default
+track change with `comment` and `original` retained. The macOS bundle defaults
+to a writable application-support directory. The CLI reports unavailable
+storage at startup and `doctor` reads the current component identities.
+
 ## Hosted results at `2013c3e`
 
 [CI303 at `2013c3e`](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
