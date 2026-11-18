@@ -22,7 +22,7 @@ fn output(command: &mut Command) -> Result<Vec<u8>> {
     Ok(result.stdout)
 }
 
-fn source(root: &Path) -> Result<String> {
+pub(crate) fn source(root: &Path) -> Result<String> {
     if std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true") {
         bail!("Native packaging and workflow evidence belong in GitHub Actions");
     }
@@ -41,7 +41,7 @@ fn source(root: &Path) -> Result<String> {
     Ok(expected)
 }
 
-fn digest(path: &Path) -> Result<Value> {
+pub(crate) fn digest(path: &Path) -> Result<Value> {
     let mut input = File::open(path).with_context(|| format!("open {}", path.display()))?;
     let mut hash = Sha256::new();
     let mut bytes = 0u64;

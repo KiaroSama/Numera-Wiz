@@ -42,9 +42,10 @@ fn run() -> Result<()> {
         "prepare-project-compatibility" => project_compatibility::prepare(root),
         "ci-linux-dependencies" => ci_host::linux_dependencies(),
         "capture-linux-toolchain" => toolchain_capture::run(root),
+        "build-standard-linux-profile" => toolchain_capture::bootstrap(root),
         "help" => {
             println!(
-                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | prepare-project-compatibility | record-ci-evidence | ci-linux-dependencies <desktop|browser|native> | capture-linux-toolchain [--self-check]"
+                "xtask verify-research | schemas | release-gate | build-fixture-profile | build-web | package-development | prepare-project-compatibility | record-ci-evidence | ci-linux-dependencies <desktop|browser|native> | capture-linux-toolchain [--self-check] | build-standard-linux-profile"
             );
             Ok(())
         }

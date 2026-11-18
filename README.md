@@ -5,6 +5,7 @@
 # Numera Wiz
 
 [![Rust CI](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml?query=branch%3Arewrite%2Frust-completion)
+[![Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml?query=branch%3Arewrite%2Frust-completion)
 [![Rust](https://img.shields.io/badge/Rust-1.99.1-DEA584?logo=rust)](rust-toolchain.toml)
 [![Platforms](https://img.shields.io/badge/builds-Windows%20%7C%20Linux%20%7C%20macOS-blue)](.github/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20HTTP-blue)](docs/agents/README.md)
@@ -93,13 +94,18 @@ export and continuous preview remain in development.
 checks out the exact source HEAD and builds Windows x64, Linux x64, macOS ARM64
 and macOS Intel artifacts with matching embedded browser assets. Native builds
 run before ordinary regression/lint checks; a failed prerequisite build remains
-a failure. Inspect all checks on the latest commit before using an artifact.
+a failure. [The review PR checks](https://github.com/KiaroSama/Numera-Wiz/pull/2/checks)
+show each check for the latest review commit.
 
 Development packages include the executable, manuals, source/dependency records
 and SHA-256 manifests. They are unsigned review artifacts; the standard bundled
 FFmpeg profile and full offline portable qualification are still required. They
 are not a finished release download. Ordinary compilation and media tests run
 in hosted CI. Owner hardware qualification uses matching prebuilt artifacts.
+
+The [Linux x64 CPU component build](docs/development/linux-cpu-component.md)
+produces a separate relocatable FFmpeg/ffprobe package with private libraries,
+offline fonts, matching source archives and executable qualification evidence.
 
 The macOS app bundle stores application state in
 `~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another

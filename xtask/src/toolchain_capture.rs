@@ -1,9 +1,11 @@
 //! Hosted, authenticated metadata capture; deliberately not a toolchain builder.
 mod cases;
+mod bootstrap;
 mod evidence;
 mod inner;
 mod metadata;
 mod process;
+mod standard_linux;
 
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
@@ -66,6 +68,10 @@ pub fn run(root: &Path) -> Result<()> {
         "actual capture is restricted to hosted Linux x64 CI"
     );
     capture_host(root)
+}
+
+pub fn bootstrap(root: &Path) -> Result<()> {
+    bootstrap::run(root)
 }
 
 fn supervise_inner(seconds: u64) -> Result<()> {
