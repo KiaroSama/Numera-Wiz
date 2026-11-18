@@ -43,9 +43,9 @@ impl Service {
                     fingerprint,
                 } = commands::parse(params)?;
                 if fingerprint.len() != 64
-                    || !fingerprint.bytes().all(|byte| {
-                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
-                    })
+                    || !fingerprint
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
                 {
                     return Err(DomainError::new(
                         "VALIDATION_ERROR",
@@ -54,7 +54,10 @@ impl Service {
                 }
                 value(&runtime.block_on(self.engine()?.clear_capabilities(&fingerprint, cancel))?)
             }
-            _ => Err(DomainError::new("UNKNOWN_COMMAND", "Unregistered capability command")),
+            _ => Err(DomainError::new(
+                "UNKNOWN_COMMAND",
+                "Unregistered capability command",
+            )),
         }
     }
 

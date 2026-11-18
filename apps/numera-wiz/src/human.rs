@@ -328,12 +328,14 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Media(Media::Capabilities(Capabilities::Inspect)) => {
             query("capabilities.inspect", json!({"scope":"components"}))
         }
-        Command::Media(Media::Capabilities(Capabilities::Refresh { force, devices })) => {
-            query("capabilities.refresh", json!({"force":force,"devices":devices,"components":true}))
-        }
-        Command::Media(Media::Capabilities(Capabilities::Clear { fingerprint })) => {
-            query("capabilities.clear", json!({"namespace":"components","fingerprint":fingerprint}))
-        }
+        Command::Media(Media::Capabilities(Capabilities::Refresh { force, devices })) => query(
+            "capabilities.refresh",
+            json!({"force":force,"devices":devices,"components":true}),
+        ),
+        Command::Media(Media::Capabilities(Capabilities::Clear { fingerprint })) => query(
+            "capabilities.clear",
+            json!({"namespace":"components","fingerprint":fingerprint}),
+        ),
         Command::Assets(Assets::Register {
             path,
             probe,

@@ -112,9 +112,24 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let capabilities = &observed["result"];
     assert_eq!(capabilities["cpu_round_trip"], "exercised");
     assert_eq!(capabilities["hardware"], "unknown");
-    assert!(capabilities["advertised"]["encoders"].as_array().unwrap().contains(&json!("ffv1")));
-    assert!(capabilities["advertised"]["pixel_formats"].as_array().unwrap().contains(&json!("yuv420p")));
-    assert!(capabilities["advertised"]["sample_formats"].as_array().unwrap().contains(&json!("s16")));
+    assert!(
+        capabilities["advertised"]["encoders"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("ffv1"))
+    );
+    assert!(
+        capabilities["advertised"]["pixel_formats"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("yuv420p"))
+    );
+    assert!(
+        capabilities["advertised"]["sample_formats"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("s16"))
+    );
     let fingerprint = capabilities["fingerprint"].as_str().unwrap();
     let other = "0".repeat(64);
     let (unrelated, exit) = cli
@@ -126,7 +141,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{retained}");
     assert_eq!(&retained["result"], capabilities);
     let (cleared, exit) = cli
-        .human(&["media", "capabilities", "clear", "--fingerprint", fingerprint])
+        .human(&[
+            "media",
+            "capabilities",
+            "clear",
+            "--fingerprint",
+            fingerprint,
+        ])
         .await;
     assert_eq!(exit, 0, "{cleared}");
     assert_eq!(cleared["result"]["cleared"], true);

@@ -15,7 +15,10 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 impl Engine {
-    pub async fn inspect_capabilities(&self, cancel: CancellationToken) -> Result<CapabilityReport> {
+    pub async fn inspect_capabilities(
+        &self,
+        cancel: CancellationToken,
+    ) -> Result<CapabilityReport> {
         let cache = self.lock_capabilities(&cancel).await?;
         media::identities(self, cancel).await?;
         let current = self.empty_capability_report();
@@ -68,7 +71,8 @@ impl Engine {
         let muxers = listing("-muxers", media::Listing::Muxers).await?;
         let pixel_formats = listing("-pix_fmts", media::Listing::PixelFormats).await?;
         let sample_formats = listing("-sample_fmts", media::Listing::SampleFormats).await?;
-        let hardware_accelerators = listing("-hwaccels", media::Listing::AcceleratorMethods).await?;
+        let hardware_accelerators =
+            listing("-hwaccels", media::Listing::AcceleratorMethods).await?;
         report.cpu_round_trip = if encoders.contains("ffv1")
             && encoders.contains("rawvideo")
             && decoders.contains("ffv1")
@@ -80,7 +84,9 @@ impl Engine {
             match self.exercise_software(cancel.clone()).await {
                 Ok(true) => Observation::Exercised,
                 Ok(false) => Observation::Failed,
-                Err(error) if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") => {
+                Err(error)
+                    if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") =>
+                {
                     Observation::Failed
                 }
                 Err(error) => return Err(error),

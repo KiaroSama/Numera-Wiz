@@ -45,7 +45,8 @@ pub struct Engine {
     pub ffmpeg: FileIdentity,
     pub ffprobe: FileIdentity,
     process_budget: budget::ProcessBudget,
-    component_capabilities: Arc<tokio::sync::Mutex<Option<nw_domain::capabilities::CapabilityReport>>>,
+    component_capabilities:
+        Arc<tokio::sync::Mutex<Option<nw_domain::capabilities::CapabilityReport>>>,
 }
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     tokio::task::spawn_blocking(f)

@@ -173,8 +173,7 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
         })
         .flat_map(|name| name.split(','))
         .filter(|name| {
-            !name.is_empty()
-                && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
         })
         .collect()
 }
@@ -207,11 +206,17 @@ pub(super) fn assert_listing_admission() {
         Listing::Demuxers,
     );
     assert_eq!(demuxers, BTreeSet::from(["matroska", "webm"]));
-    let pix = names("IO... yuv420p 3 12 8-8-8\nI.... = header", Listing::PixelFormats);
+    let pix = names(
+        "IO... yuv420p 3 12 8-8-8\nI.... = header",
+        Listing::PixelFormats,
+    );
     assert_eq!(pix, BTreeSet::from(["yuv420p"]));
     let samples = names("name depth\ns16 16\nfltp 32\n", Listing::SampleFormats);
     assert_eq!(samples, BTreeSet::from(["fltp", "s16"]));
-    let devices = names("Hardware acceleration methods:\ncuda\n\n", Listing::AcceleratorMethods);
+    let devices = names(
+        "Hardware acceleration methods:\ncuda\n\n",
+        Listing::AcceleratorMethods,
+    );
     assert_eq!(devices, BTreeSet::from(["cuda"]));
     verification::exercise();
 }
