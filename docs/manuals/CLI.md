@@ -56,6 +56,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `chapters inspect --asset ID` | Read exact chapter ticks, time bases and tags from the registered probe. |
 | `chapters export --asset ID` | Return UTF-8 FFmetadata and its SHA-256 digest. |
 | `chapters remove --asset ID --out PATH` | Review a stream-copy plan that removes chapters and preserves the retained streams and their metadata. |
+| `disposition patch --asset ID --out PATH --stream INDEX --exclusive-default` | Review a plan that makes an audio or subtitle stream the only default of its type. |
 | `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
 | `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |
 | `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |
@@ -131,6 +132,12 @@ Clear accepts the exact fingerprint from a report and affects only that
 in-memory component entry. Restarting the owner resets the cache.
 
 ## Canonical operations
+
+`disposition patch` addresses an original global stream index. Repeat `--add`
+and `--remove` for individual FFmpeg flags such as `comment`, `original` or
+`forced`. `--clear-all` clears flags on the selected stream before any additions.
+`--exclusive-default` changes the default bit on that stream and its peers of
+the same type. Review the resolved stream flags before submitting the plan.
 
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope
 creation, access-profile create/update/inspect/put/list, file-delivered token

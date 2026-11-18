@@ -283,6 +283,7 @@ impl WizApp {
                 audio_order: vec![],
                 subtitle_order: vec![],
                 stream_tag_patches: vec![],
+                disposition_patches: vec![],
                 preservation: Preservation::default(),
             },
             patches: vec![],
@@ -325,6 +326,9 @@ impl WizApp {
             .filter(|asset| self.selected.as_ref() == Some(&asset.id))
     }
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
+        if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
+            self.intent.disposition_patches.clear();
+        }
         self.selected = Some(asset.id.clone());
         self.asset_detail = Some(Arc::new(asset.clone()));
         self.output.clear();

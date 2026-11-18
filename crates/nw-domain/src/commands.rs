@@ -744,6 +744,12 @@ pub fn registry() -> Vec<Descriptor> {
             crate::chapters::RemoveInput
         ),
         row!(
+            "disposition.patch",
+            "Review a stream-copy plan with explicit audio or subtitle dispositions",
+            Query,
+            crate::dispositions::PatchInput
+        ),
+        row!(
             "streams.clean.report",
             "Report authorized source inventory and cleanup selections",
             Query,
@@ -1465,6 +1471,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "chapters.inspect",
     "chapters.export",
     "chapters.remove",
+    "disposition.patch",
     "assets.register",
     "assets.register_folder",
     "assets.folder_inspect",

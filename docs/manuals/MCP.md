@@ -120,6 +120,19 @@ and existing access to the asset and its source path.
 It returns the ordinary reviewed cleanup plan with chapter removal enabled.
 Submit that plan through `jobs.submit` to create the output.
 
+## Dispositions
+
+`disposition.patch` returns a reviewed cleanup plan. The `stream` is the
+original global index of a retained audio or subtitle stream.
+
+```json
+{"params":{"asset_id":"<asset-id>","output":"<new-path>","patch":{"stream":2,"exclusive_default":true}}}
+```
+
+The patch also accepts `add`, `remove` and `clear_all`. `add` and `remove` list
+FFmpeg disposition flag names. Exclusive default changes only the default bit
+on peers of the selected type. Submit the exact reviewed plan via `jobs.submit`.
+
 ## Cleanup selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI

@@ -1078,6 +1078,7 @@ impl Service {
                 "media.probe",
                 "capabilities.refresh",
                 "chapters.remove",
+                "disposition.patch",
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
@@ -1620,11 +1621,11 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "chapters.remove" => {
-                let input = if request.command.id == "chapters.remove" {
-                    commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
-                } else {
-                    commands::parse::<CleanInput>(params)?
+            "streams.clean" | "chapters.remove" | "disposition.patch" => {
+                let input = match request.command.id.as_str() {
+                    "chapters.remove" => commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup(),
+                    "disposition.patch" => commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup(),
+                    _ => commands::parse::<CleanInput>(params)?,
                 };
                 let plan = self.prepare_cleanup(&context, input, now)?;
                 let response = Response::success(
@@ -2702,6 +2703,7 @@ mod tests {
             audio_order: Vec::new(),
             subtitle_order: Vec::new(),
             stream_tag_patches: Vec::new(),
+            disposition_patches: Vec::new(),
             preservation: Preservation::default(),
         };
         let output = root.path().join("output.mkv");
@@ -3344,6 +3346,7 @@ mod tests {
             audio_order: Vec::new(),
             subtitle_order: Vec::new(),
             preservation: Preservation::default(),
+            disposition_patches: Vec::new(),
             stream_tag_patches: (1..=64)
                 .map(|index| StreamTagPatch {
                     kind: StreamKind::Audio,
@@ -4091,6 +4094,7 @@ mod tests {
             audio_order: vec![],
             subtitle_order: vec![],
             stream_tag_patches: vec![],
+            disposition_patches: vec![],
             preservation: nw_domain::mux::Preservation::default(),
         };
         let params =

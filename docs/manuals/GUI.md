@@ -85,6 +85,13 @@ time base. **Copy FFmetadata** copies chapter times and tags to the clipboard.
 To remove chapters from an output, clear **Chapters** in **Preservation**
 before reviewing the cleanup plan.
 
+## Dispositions
+
+Open **Disposition changes** in the Stream Cleanup form and select an original
+audio or subtitle stream. Use **Add flags** and **Remove flags** to edit
+individual flags. **Only default of this type** changes the default flag among
+peers and preserves their other flags. Review the cleanup plan before running it.
+
 ## Run and inspect
 
 Run reviewed plan, or press Ctrl+Enter on Windows/Linux and Cmd+Enter on macOS.

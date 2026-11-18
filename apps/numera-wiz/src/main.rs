@@ -74,6 +74,11 @@ enum Mode {
         #[command(subcommand)]
         command: human::Chapters,
     },
+    /// Review audio or subtitle disposition changes.
+    Disposition {
+        #[command(subcommand)]
+        command: human::Disposition,
+    },
     Assets {
         #[command(subcommand)]
         command: human::Assets,
@@ -332,6 +337,9 @@ async fn run() -> Result<()> {
                 Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
                 Some(Mode::Chapters { command }) => {
                     human::run(&client, human::Command::Chapters(command)).await
+                }
+                Some(Mode::Disposition { command }) => {
+                    human::run(&client, human::Command::Disposition(command)).await
                 }
                 Some(Mode::Assets { command }) => {
                     human::run(&client, human::Command::Assets(command)).await

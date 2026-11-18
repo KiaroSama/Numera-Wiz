@@ -2,6 +2,7 @@
 pub mod capabilities;
 pub mod chapters;
 pub mod commands;
+pub mod dispositions;
 pub mod execution;
 pub mod media;
 pub mod media_execution;

@@ -146,6 +146,26 @@ pub enum Chapters {
     },
 }
 #[derive(Subcommand)]
+pub enum Disposition {
+    /// Review explicit changes to the flags on a retained audio or subtitle stream.
+    Patch {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        stream: u32,
+        #[arg(long)]
+        add: Vec<String>,
+        #[arg(long)]
+        remove: Vec<String>,
+        #[arg(long)]
+        clear_all: bool,
+        #[arg(long)]
+        exclusive_default: bool,
+    },
+}
+#[derive(Subcommand)]
 pub enum Assets {
     /// Register a bounded folder snapshot, retaining individual probe failures.
     RegisterFolder {
@@ -306,6 +326,7 @@ pub enum Command {
     History(History),
     Media(Media),
     Chapters(Chapters),
+    Disposition(Disposition),
     Assets(Assets),
     Streams(Streams),
     Plans(Plans),
@@ -354,6 +375,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Chapters(Chapters::Remove { asset, out }) => query(
             "chapters.remove",
             json!({"asset_id":asset,"output":native_path(&out)?}),
+        ),
+        Command::Disposition(Disposition::Patch { asset, out, stream, add, remove, clear_all, exclusive_default }) => query(
+            "disposition.patch",
+            json!({"asset_id":asset,"output":native_path(&out)?,"patch":{"stream":stream,"add":add,"remove":remove,"clear_all":clear_all,"exclusive_default":exclusive_default}}),
         ),
         Command::Media(Media::Probe { path, probe }) => {
             let mut params = json!({"path":native_path(&path)?});

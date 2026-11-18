@@ -2,6 +2,7 @@
 use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
+    dispositions::{PATCH_FLAGS, Patch as DispositionPatch},
     mux::{CleanIntent, NoMatch, Selector, StreamKind, StreamTagPatch, TagPatch},
     records::Asset,
 };
@@ -83,6 +84,78 @@ fn chapters(ui: &mut egui::Ui, asset: &Asset) {
                 }
             });
     });
+}
+
+fn disposition_flags(ui: &mut egui::Ui, label: &str, selected: &mut Vec<String>) -> bool {
+    let mut changed = false;
+    ui.menu_button(label, |ui| {
+        for &name in PATCH_FLAGS {
+            let mut checked = selected.iter().any(|value| value == name);
+            if ui.checkbox(&mut checked, name).changed() {
+                if checked {
+                    selected.push(name.into());
+                } else {
+                    selected.retain(|value| value != name);
+                }
+                changed = true;
+            }
+        }
+    });
+    if !selected.is_empty() {
+        ui.label(selected.join(", "));
+    }
+    changed
+}
+
+fn dispositions(ui: &mut egui::Ui, asset: &Asset, patches: &mut Vec<DispositionPatch>) -> bool {
+    let targets = asset.probe.streams.iter()
+        .filter(|stream| matches!(stream.kind, StreamKind::Audio | StreamKind::Subtitle))
+        .collect::<Vec<_>>();
+    let Some(first) = targets.first() else {
+        return false;
+    };
+    let mut changed = false;
+    ui.collapsing("Disposition changes", |ui| {
+        let mut deleted = None;
+        for (index, patch) in patches.iter_mut().enumerate() {
+            ui.push_id(index, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    egui::ComboBox::from_id_salt("disposition-stream")
+                        .selected_text(format!("Stream {}", patch.stream))
+                        .show_ui(ui, |ui| {
+                            for stream in &targets {
+                                let label = format!("{} {:?}", stream.index, stream.kind);
+                                changed |= ui.selectable_value(&mut patch.stream, stream.index, label).changed();
+                            }
+                        });
+                    changed |= ui.checkbox(&mut patch.exclusive_default, "Only default of this type").changed();
+                    changed |= ui.checkbox(&mut patch.clear_all, "Clear all target flags").changed();
+                    if ui.small_button("Remove change").clicked() {
+                        deleted = Some(index);
+                    }
+                });
+                ui.horizontal_wrapped(|ui| {
+                    changed |= disposition_flags(ui, "Add flags", &mut patch.add);
+                    changed |= disposition_flags(ui, "Remove flags", &mut patch.remove);
+                });
+            });
+        }
+        if let Some(index) = deleted {
+            patches.remove(index);
+            changed = true;
+        }
+        if ui.add_enabled(patches.len() < 256, egui::Button::new("Add disposition change")).clicked() {
+            patches.push(DispositionPatch {
+                stream: first.index,
+                add: Vec::new(),
+                remove: Vec::new(),
+                clear_all: false,
+                exclusive_default: false,
+            });
+            changed = true;
+        }
+    });
+    changed
 }
 
 fn selector(mode: usize, text: &str) -> Result<Selector, String> {
@@ -326,7 +399,8 @@ impl WizApp {
                 ui.small("Seconds per stage. Disabled requires protected local-owner authority. Copy waits for any admitted filesystem call to return.");
                 changed
             }).body_returned.unwrap_or(false);
-            if budget_changed { self.changed(); }
+            let disposition_changed = dispositions(ui, asset, &mut self.intent.disposition_patches);
+            if budget_changed || disposition_changed { self.changed(); }
         });
     }
     pub(super) fn plan_panel(&mut self, ui: &mut egui::Ui) {
@@ -356,6 +430,17 @@ impl WizApp {
                         None => format!("Source {} removed", outcome.source_index),
                     });
                     ui.small(&outcome.reason);
+                }
+                if !self.intent.disposition_patches.is_empty() {
+                    ui.collapsing("Resolved dispositions", |ui| {
+                        for stream in &plan.resolution.streams {
+                            if matches!(stream.kind, StreamKind::Audio | StreamKind::Subtitle) {
+                                let flags = stream.dispositions.iter().cloned().collect::<Vec<_>>();
+                                let flags = if flags.is_empty() { "None".into() } else { flags.join(", ") };
+                                ui.label(format!("Source {} {:?} · {flags}", stream.index, stream.kind));
+                            }
+                        }
+                    });
                 }
                 for warning in &plan.resolution.warnings {
                     ui.colored_label(egui::Color32::from_rgb(237, 177, 99), warning);

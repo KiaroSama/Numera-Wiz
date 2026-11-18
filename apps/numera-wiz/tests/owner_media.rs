@@ -781,6 +781,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         1
     );
     chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
+    chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
 
     let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(

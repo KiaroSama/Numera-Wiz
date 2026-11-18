@@ -275,6 +275,7 @@ mod tests {
             audio_order: vec![],
             subtitle_order: vec![],
             stream_tag_patches: vec![],
+            disposition_patches: vec![],
             preservation: Preservation::default(),
         }
     }

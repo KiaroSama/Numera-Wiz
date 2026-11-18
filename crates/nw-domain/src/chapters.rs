@@ -24,27 +24,14 @@ pub struct RemoveInput {
 
 impl RemoveInput {
     pub fn into_cleanup(self) -> crate::commands::CleanInput {
-        use crate::mux::{CleanIntent, NoMatch, Preservation, Selection, Selector};
-        let all = Selection {
-            selector: Selector::All,
-            no_match: NoMatch::AllowEmpty,
-        };
+        let mut intent = crate::mux::CleanIntent::preserving_all();
+        intent.preservation.chapters = false;
         crate::commands::CleanInput {
             execution_limits: Default::default(),
             file_times: Default::default(),
             asset_id: self.asset_id,
             output: self.output,
-            intent: CleanIntent {
-                audio_selection: all.clone(),
-                subtitle_selection: all,
-                audio_order: Vec::new(),
-                subtitle_order: Vec::new(),
-                stream_tag_patches: Vec::new(),
-                preservation: Preservation {
-                    chapters: false,
-                    ..Preservation::default()
-                },
-            },
+            intent,
         }
     }
 }

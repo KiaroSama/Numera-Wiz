@@ -165,7 +165,26 @@ pub struct CleanIntent {
     pub subtitle_order: Vec<u32>,
     #[serde(default)]
     pub stream_tag_patches: Vec<StreamTagPatch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disposition_patches: Vec<crate::dispositions::Patch>,
     pub preservation: Preservation,
+}
+impl CleanIntent {
+    pub fn preserving_all() -> Self {
+        let all = Selection {
+            selector: Selector::All,
+            no_match: NoMatch::AllowEmpty,
+        };
+        Self {
+            audio_selection: all.clone(),
+            subtitle_selection: all,
+            audio_order: Vec::new(),
+            subtitle_order: Vec::new(),
+            stream_tag_patches: Vec::new(),
+            disposition_patches: Vec::new(),
+            preservation: Preservation::default(),
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -348,6 +367,7 @@ pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
     }
     validate_selector(&intent.audio_selection.selector)?;
     validate_selector(&intent.subtitle_selection.selector)?;
+    crate::dispositions::validate(&intent.disposition_patches)?;
     for patch in &intent.stream_tag_patches {
         if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 {
             return Err(DomainError::new(
@@ -486,6 +506,9 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
             }
         }
     }
+    if !skip {
+        crate::dispositions::apply(&mut kept, &intent.disposition_patches)?;
+    }
     let mut reasons = Vec::new();
     if kept != streams {
         reasons.push("Stream selection, ordering, tags or dispositions change".into());
@@ -580,6 +603,7 @@ mod tests {
             audio_order: vec![],
             subtitle_order: vec![],
             stream_tag_patches: vec![],
+            disposition_patches: vec![],
             preservation: Preservation::default(),
         }
     }
@@ -670,6 +694,22 @@ mod tests {
         assert!(!result.streams[1].tags.contains_key("title"));
         assert_eq!(result.streams[2].tags["title"], "First");
         assert!(result.warnings.iter().any(|v| v.contains("77")));
+
+        let mut source = source;
+        source[1].dispositions = BTreeSet::from(["default".into(), "comment".into()]);
+        source[2].dispositions = BTreeSet::from(["original".into()]);
+        rules.disposition_patches = vec![crate::dispositions::Patch {
+            stream: 2,
+            add: Vec::new(),
+            remove: Vec::new(),
+            clear_all: false,
+            exclusive_default: true,
+        }];
+        let resolved = resolve(&source, &rules).unwrap();
+        assert_eq!(resolved.streams[1].dispositions, BTreeSet::from(["default".into(), "original".into()]));
+        assert_eq!(resolved.streams[2].dispositions, BTreeSet::from(["comment".into()]));
+        rules.disposition_patches[0].remove = vec!["default".into()];
+        assert_eq!(resolve(&source, &rules).unwrap_err().code, "VALIDATION_ERROR");
     }
     #[test]
     fn no_match_and_exact_language_are_explicit() {
