@@ -141,7 +141,7 @@ impl AudioCheck {
     }
 }
 
-fn ratio(text: &str) -> Result<Rational> {
+pub(super) fn ratio(text: &str) -> Result<Rational> {
     if text.len() > 48 {
         return Err(failed("Observed time base exceeds its bound"));
     }

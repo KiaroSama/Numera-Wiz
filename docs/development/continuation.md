@@ -53,6 +53,15 @@ and checks rejection of a different physical file with identical bytes. These
 cases passed in CI305. The candidate paths remain outside the persistent project
 commands and publication path.
 
+The current normalized pair stage uses `ffprobe` on held NUT inputs and the
+bounded candidate. It requires the original RGBA and PCM stream formats,
+matching packet lengths and SHA-256 values, and equal presentation timestamps
+after exact rational time-base conversion. The original media regression still
+decodes the actual output independently and compares the samples. Its new
+negative case supplies a valid NUT with compressed video and expects rejection
+before the relay runs. These changes require hosted verification on their own
+source.
+
 The [November 18 upstream check](../research/upstream-check-2026-11-18.md)
 records the verified donor revisions and the remaining source coverage.
 
@@ -71,6 +80,12 @@ CI307 matched the ARM64 cancellation before runner assignment. The workflow
 now schedules that lane on the standard macOS 26 Apple Silicon runner and
 preserves its job name, target triple and previous-package artifact identity.
 [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+
+CI309 on `72eddac` passed the Linux native checks, Chrome, owner batch and
+transport tests, media, web and dependency lock. Apple Silicon received a
+macOS 26 runner and built the desktop application. The formatting patch from
+CI309 was applied before the follow-up source changes.
+[CI309](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44336531084)
 
 ## Hosted results at `2013c3e`
 

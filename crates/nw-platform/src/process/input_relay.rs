@@ -65,6 +65,19 @@ impl ByteInput {
             hash: expected_sha256,
         })
     }
+    /// Open the held, digest-checked input for a sequential verifier. Close it
+    /// before handing this input to the relay, whose own full check still runs.
+    pub fn verification_file(&mut self, cancel: &CancellationToken) -> Result<File> {
+        let observed = self.source.identity_with_limit(cancel, self.len)?;
+        if observed.sha256 != hex::encode(self.hash) {
+            return Err(error(
+                "SOURCE_CHANGED",
+                "Input digest changed before verification",
+            ));
+        }
+        self.rewind()?;
+        self.reader.try_clone().map_err(crate::files::io_error)
+    }
     fn rewind(&mut self) -> Result<()> {
         self.source.require_object(&self.identity)?;
         if self.source.byte_len()? != self.len {

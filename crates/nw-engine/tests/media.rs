@@ -115,6 +115,39 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
     assert_eq!(streams[1]["time_base"], "1/48000");
     assert_eq!(streams[1]["start_pts"], 6_000);
 
+    let compressed_path = root.join("compressed-video.nut");
+    let compressed = collect(
+        ffmpeg,
+        &media.source,
+        &["-map", "0:v:0", "-c:v", "mpeg4", "-f", "nut"],
+        token,
+    )
+    .await;
+    std::fs::write(&compressed_path, &compressed).unwrap();
+    let audio_path = root.join("normalized-1.nut");
+    let original_audio = std::fs::read(&audio_path).unwrap();
+    let reinput = |slot, path: &Path, bytes: &[u8]| {
+        ByteInput::new(
+            RelayInputId(slot),
+            SourceStamp::capture_resolved(&source_path(path).unwrap()).unwrap(),
+            bytes.len() as u64,
+            Sha256::digest(bytes).into(),
+        )
+        .unwrap()
+    };
+    let result = engine
+        .mux_normalized_pair_candidate(
+            [
+                reinput(0, &compressed_path, &compressed),
+                reinput(1, &audio_path, &original_audio),
+            ],
+            DirectoryStamp::capture_resolved(&root).unwrap(),
+            token.clone(),
+        )
+        .await;
+    assert!(matches!(result, Err(err) if err.code == "VERIFICATION_FAILED"));
+    assert_eq!(engine.media_process_capacity(), (2, 2, 0));
+
     for (options, format, bytes) in [
         (video.as_slice(), "rawvideo", 64 * 48 * 4 * 4),
         (audio.as_slice(), "s16le", 48_000 * 2),
