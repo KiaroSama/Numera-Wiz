@@ -408,7 +408,8 @@ jobs:
           if-no-files-found: error
 
       - name: Save reusable compiler outputs even after a test failure
-        if: always() && !cancelled() && steps.rust-cache.outputs.cache-hit != 'true'
+        # Archive compression exhausted the macOS Intel job budget after verification passed.
+        if: always() && !cancelled() && runner.os != 'macOS' && steps.rust-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |

@@ -50,13 +50,24 @@ source object to decode a frame or sample window through a held seekable input.
 The source content and FFmpeg identity are checked again after decoding. The
 same media test compares decoded windows against an independent full decode
 and checks rejection of a different physical file with identical bytes. These
-new cases await hosted testing. The candidate paths remain outside the
-persistent project commands and publication path.
+cases passed in CI305. The candidate paths remain outside the persistent project
+commands and publication path.
 
 The [November 18 upstream check](../research/upstream-check-2026-11-18.md)
 records the verified donor revisions and the remaining source coverage.
 
 ## Latest completed hosted boundary
+
+[CI305 at `981fd42`](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44324561560)
+passed ten jobs, including Linux and Windows native checks, Chrome and native
+GUI, media windows, owner transports, batch, HTTP delivery, dependency resolution
+and web. Gitleaks passed. The formatting job provided the patch for the next
+revision. macOS Intel passed the build, tests and lints and uploaded its evidence
+before the job timed out during cache compression. macOS ARM64 was cancelled
+before its first step and produced no runner log. The next workflow retains
+macOS cache restoration and keeps cache archival out of the macOS checks jobs.
+
+## Hosted results at `2013c3e`
 
 [CI303 at `2013c3e`](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
 passed 11 of 13 jobs, including all four native builds and regression suites,

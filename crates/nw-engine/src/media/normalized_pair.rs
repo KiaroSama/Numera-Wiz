@@ -79,7 +79,10 @@ impl Engine {
         })?;
         let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
         let length = expected.bytes.parse::<u64>().map_err(|_| {
-            DomainError::new("INVALID_IDENTITY", "Registered source has an invalid byte count")
+            DomainError::new(
+                "INVALID_IDENTITY",
+                "Registered source has an invalid byte count",
+            )
         })?;
         let token = cancel.clone();
         let (input, source, expected) = blocking(move || {
@@ -129,7 +132,16 @@ impl Engine {
         ]);
         args.extend(encoding.iter().map(|option| String::from(*option)));
         args.extend(
-            ["-map_metadata", "-1", "-map_chapters", "-1", "-f", "nut", "pipe:1"].map(String::from),
+            [
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
+                "-f",
+                "nut",
+                "pipe:1",
+            ]
+            .map(String::from),
         );
         let ticket = self.process_budget.acquire(&cancel).await?;
         let ffmpeg = self.ffmpeg.clone();

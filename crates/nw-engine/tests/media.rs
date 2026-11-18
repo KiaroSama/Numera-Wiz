@@ -211,7 +211,10 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
     std::fs::write(&paired_path, paired.output.stdout).unwrap();
     for (options, expected) in registered_decodes {
         let actual = collect(ffmpeg, &paired_path, &options, token).await;
-        assert!(actual == expected, "Paired registration changed decoded media");
+        assert!(
+            actual == expected,
+            "Paired registration changed decoded media"
+        );
     }
     let other_path = root.join("different-physical-source.mkv");
     std::fs::copy(&source, &other_path).unwrap();
