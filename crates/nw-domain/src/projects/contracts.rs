@@ -290,7 +290,7 @@ fn opaque_entity(sequence_only: bool) -> Value {
     // A current known codec is selected before semantic compatibility is considered.
     // Unknown kinds and unsupported versions retain the original payload as a STRING.
     schema["not"] = json!({"properties":{
-        "kind":{"enum":["bin","sequence","track","clip","source_binding"]},
+        "kind":{"enum":super::KNOWN_ENTITY_KINDS},
         "kind_version":{"const":1},"envelope_version":{"const":1}
     },"required":["kind","kind_version","envelope_version"]});
     schema

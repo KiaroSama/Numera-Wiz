@@ -942,13 +942,16 @@ mod tests {
             "authorization",
         ];
         for (id, projections) in [
-            ("projects.inspect", ["summary", "entity", "bin_page"]),
-            ("sequences.inspect", ["entity", "track_page", "viewport"]),
+            ("projects.inspect", &["summary", "entity", "bin_page"][..]),
+            (
+                "sequences.inspect",
+                &["entity", "track_page", "marker_page", "viewport"][..],
+            ),
         ] {
             let root = schema(id);
             let branches = root["oneOf"].as_array().expect("projection alternatives");
-            assert_eq!(branches.len(), 3);
-            for projection in projections {
+            assert_eq!(branches.len(), projections.len());
+            for &projection in projections {
                 let branch = branches
                     .iter()
                     .find(|branch| branch["properties"]["projection"]["const"] == projection)
@@ -1016,6 +1019,13 @@ mod tests {
                                 serde_json::json!(["video", "audio"])
                             );
                         }
+                        "marker_page" => {
+                            fields(root, item, &["id", "name", "at", "length", "color"]);
+                            assert_eq!(
+                                resolve(root, item)["properties"]["color"]["enum"],
+                                serde_json::json!(["blue", "green", "orange", "red", "violet"])
+                            );
+                        }
                         "viewport" => fields(
                             root,
                             item,
@@ -1023,7 +1033,7 @@ mod tests {
                         ),
                         _ => unreachable!(),
                     }
-                    if projection == "viewport" {
+                    if matches!(projection, "marker_page" | "viewport") {
                         assert_eq!(
                             branch["properties"]["count_accuracy"]["enum"],
                             serde_json::json!(["exact", "lower_bound"])
@@ -1087,6 +1097,7 @@ mod tests {
                     "extent_verification",
                 ],
             ),
+            ("SequenceMarkerEntity", vec!["at", "length", "color"]),
             ("OpaqueEntity", vec!["payload_json"]),
         ] {
             let node = &defs[name];
@@ -1171,9 +1182,13 @@ mod tests {
         );
         assert_eq!(
             defs["OpaqueEntity"]["not"]["properties"]["kind"]["enum"],
-            serde_json::json!(["bin", "sequence", "track", "clip", "source_binding"])
+            serde_json::json!([
+                "bin", "sequence", "track", "clip", "source_binding", "sequence_marker"
+            ])
         );
-        assert_eq!(defs["Entity"]["anyOf"].as_array().unwrap().len(), 7);
+        let variants = defs["Entity"]["anyOf"].as_array().unwrap();
+        assert_eq!(variants.len(), 8);
+        assert!(variants.contains(&serde_json::json!({"$ref":"#/$defs/SequenceMarkerEntity"})));
         assert!(defs["Entity"].get("oneOf").is_none());
         let mut opaque_keys = entity_common.to_vec();
         assert!(!permits_keys(inspect, &defs["OpaqueEntity"], &opaque_keys));
@@ -1220,6 +1235,8 @@ mod tests {
             ("clips.unlink", vec!["clip_ids"], true),
             ("clips.split", vec!["clip_ids", "no_change"], true),
             ("clips.remove", vec![], false),
+            ("markers.place", vec!["marker_id"], false),
+            ("markers.remove", vec![], false),
             ("history.undo", vec![], false),
             ("history.redo", vec![], false),
         ] {

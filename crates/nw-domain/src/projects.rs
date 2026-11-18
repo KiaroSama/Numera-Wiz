@@ -79,6 +79,14 @@ macro_rules! identifier {
 identifier!(ProjectId);
 identifier!(EntityId);
 identifier!(OperationId);
+const KNOWN_ENTITY_KINDS: [&str; 6] = [
+    "bin",
+    "sequence",
+    "track",
+    "clip",
+    "source_binding",
+    "sequence_marker",
+];
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -535,15 +543,7 @@ impl EntityEnvelope {
     pub fn known(&self) -> bool {
         self.envelope_version == 1
             && self.kind_version == 1
-            && [
-                "bin",
-                "sequence",
-                "track",
-                "clip",
-                "source_binding",
-                "sequence_marker",
-            ]
-            .contains(&self.kind.as_str())
+            && KNOWN_ENTITY_KINDS.contains(&self.kind.as_str())
     }
     pub fn envelope_semantics_supported(&self) -> bool {
         self.envelope_version == 1
