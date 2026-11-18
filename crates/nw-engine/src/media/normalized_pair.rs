@@ -330,11 +330,21 @@ impl Engine {
             "stream=index,time_base,{STREAM_FORMAT_FIELDS}:packet=stream_index,pts,size,data_hash"
         );
         let mut args = [
-            "-v", "error", "-max_alloc", "67108864",
-            "-show_streams", "-show_packets", "-show_data_hash", "sha256", "-show_entries",
+            "-v",
+            "error",
+            "-max_alloc",
+            "67108864",
+            "-show_streams",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
             fields.as_str(),
-            "-of", "json=compact=1:string_validation=fail",
-        ].map(String::from).to_vec();
+            "-of",
+            "json=compact=1:string_validation=fail",
+        ]
+        .map(String::from)
+        .to_vec();
         args.extend(admission::options("nut"));
         args.extend(["-i", "fd:"].map(String::from));
         let ticket = self.process_budget.acquire(&cancel).await?;
