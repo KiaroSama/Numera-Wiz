@@ -170,11 +170,17 @@ pub(super) async fn import(cli: &Cli, media: &fixture::Media, scope: &str, expor
     assert_eq!(artist(&observed), "Sidecar artist");
     assert_eq!(tag(&observed["format"], "title"), tag(&original["format"], "title"));
 
-    let invalid = cli.raw(&nw_domain::commands::Request::query("chapters.import", json!({
-        "asset_id":asset,"output":directory.join("chapters-out-of-range.mkv"),
-        "ffmetadata":";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=99999\ntitle=Invalid\n"
-    }))).await;
-    assert_eq!(invalid["error"]["code"], "INVALID_CHAPTERS");
+    for document in [
+        ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=99999\n",
+        ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/3\nSTART=1\nEND=2\n",
+        ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=499\nEND=600\n",
+        ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\nEND=600\n",
+    ] {
+        let invalid = cli.raw(&nw_domain::commands::Request::query("chapters.import", json!({
+            "asset_id":asset,"output":directory.join("rejected-chapters.mkv"),"ffmetadata":document
+        }))).await;
+        assert_eq!(invalid["error"]["code"], "INVALID_CHAPTERS", "{invalid}");
+    }
 }
 
 pub(super) async fn verify_dispositions(
