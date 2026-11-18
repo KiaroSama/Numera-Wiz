@@ -46,24 +46,43 @@ impl PatchInput {
 impl Patch {
     pub fn validate(&self) -> Result<()> {
         if self.set.len() + self.remove.len() > 32 {
-            return Err(DomainError::new("RESOURCE_LIMIT", "At most 32 tag changes are allowed"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "At most 32 tag changes are allowed",
+            ));
         }
         let mut names = BTreeSet::new();
         if self.set.is_empty() && self.remove.is_empty()
             || self.set.keys().chain(&self.remove).any(|key| {
-                key.is_empty() || key.len() > 64 || matches!(key.as_str(), "encoder" | "duration")
-                    || !key.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+                key.is_empty()
+                    || key.len() > 64
+                    || matches!(key.as_str(), "encoder" | "duration")
+                    || !key.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                    })
                     || !names.insert(key)
             })
-            || self.set.values().any(|value| value.is_empty() || value.len() > 1024 || value.contains('\0'))
+            || self
+                .set
+                .values()
+                .any(|value| value.is_empty() || value.len() > 1024 || value.contains('\0'))
         {
             return Err(DomainError::new(
                 "VALIDATION_ERROR",
                 "Tag changes must be nonempty and disjoint, with bounded lowercase names and nonempty UTF-8 values without NUL",
             ));
         }
-        if self.set.iter().map(|(key, value)| key.len() + value.len()).sum::<usize>() > 8192 {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Tag values exceed the 8 KiB edit budget"));
+        if self
+            .set
+            .iter()
+            .map(|(key, value)| key.len() + value.len())
+            .sum::<usize>()
+            > 8192
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Tag values exceed the 8 KiB edit budget",
+            ));
         }
         Ok(())
     }
@@ -72,16 +91,33 @@ impl Patch {
         for name in &self.remove {
             tags.remove(name);
         }
-        tags.extend(self.set.iter().map(|(name, value)| (name.clone(), value.clone())));
+        tags.extend(
+            self.set
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone())),
+        );
     }
 
     pub(crate) fn apply_to_streams(&self, streams: &mut [Stream]) -> Result<()> {
         if let Target::Stream { index } = self.target {
-            let stream = streams.iter_mut().find(|stream| {
-                stream.index == index && matches!(stream.kind, crate::mux::StreamKind::Video | crate::mux::StreamKind::Audio | crate::mux::StreamKind::Subtitle) && !stream.attached_picture()
-            }).ok_or_else(|| DomainError::new(
-                "UNRESOLVED_SOURCE_INDEX", "Metadata patch requires a retained video, audio or subtitle stream",
-            ))?;
+            let stream = streams
+                .iter_mut()
+                .find(|stream| {
+                    stream.index == index
+                        && matches!(
+                            stream.kind,
+                            crate::mux::StreamKind::Video
+                                | crate::mux::StreamKind::Audio
+                                | crate::mux::StreamKind::Subtitle
+                        )
+                        && !stream.attached_picture()
+                })
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "UNRESOLVED_SOURCE_INDEX",
+                        "Metadata patch requires a retained video, audio or subtitle stream",
+                    )
+                })?;
             self.apply(&mut stream.tags);
         }
         Ok(())

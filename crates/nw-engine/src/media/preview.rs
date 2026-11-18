@@ -64,8 +64,17 @@ impl Engine {
             frame + 1,
         );
         let mut args = [
-            "-hide_banner", "-nostdin", "-v", "error", "-xerror", "-max_alloc", "67108864",
-            "-threads", "1", "-filter_threads", "1",
+            "-hide_banner",
+            "-nostdin",
+            "-v",
+            "error",
+            "-xerror",
+            "-max_alloc",
+            "67108864",
+            "-threads",
+            "1",
+            "-filter_threads",
+            "1",
         ]
         .map(String::from)
         .to_vec();
@@ -78,10 +87,22 @@ impl Engine {
             "-vf".into(),
             filters,
         ]);
-        args.extend([
-            "-frames:v", "1", "-c:v", "rawvideo", "-threads", "1", "-pix_fmt", "rgba",
-            "-f", "rawvideo", "pipe:1",
-        ].map(String::from));
+        args.extend(
+            [
+                "-frames:v",
+                "1",
+                "-c:v",
+                "rawvideo",
+                "-threads",
+                "1",
+                "-pix_fmt",
+                "rgba",
+                "-f",
+                "rawvideo",
+                "pipe:1",
+            ]
+            .map(String::from),
+        );
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone())
             .await

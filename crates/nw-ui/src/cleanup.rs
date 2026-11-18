@@ -40,14 +40,20 @@ pub(super) struct MetadataForm {
 impl MetadataForm {
     fn patch(&self) -> Result<MetadataPatch, String> {
         let mut patch = MetadataPatch {
-            target: self.stream.map_or(Target::Global {}, |index| Target::Stream { index }),
+            target: self
+                .stream
+                .map_or(Target::Global {}, |index| Target::Stream { index }),
             set: Default::default(),
             remove: Vec::new(),
         };
         for edit in &self.edits {
             if edit.remove {
                 patch.remove.push(edit.key.clone());
-            } else if patch.set.insert(edit.key.clone(), edit.value.clone()).is_some() {
+            } else if patch
+                .set
+                .insert(edit.key.clone(), edit.value.clone())
+                .is_some()
+            {
                 return Err(format!("Tag {} is listed more than once", edit.key));
             }
         }
@@ -57,19 +63,40 @@ impl MetadataForm {
 
     fn controls(&mut self, ui: &mut egui::Ui, asset: &Asset) -> bool {
         let mut changed = false;
-        let label = self.stream.map_or_else(|| "Container".into(), |index| format!("Stream {index}"));
-        egui::ComboBox::from_id_salt("metadata-target").selected_text(label).show_ui(ui, |ui| {
-            changed |= ui.selectable_value(&mut self.stream, None, "Container").changed();
-            for stream in &asset.probe.streams {
-                if matches!(stream.kind, StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle)
-                    && !stream.attached_picture()
-                {
-                    changed |= ui.selectable_value(&mut self.stream, Some(stream.index),
-                        format!("Stream {} {:?}", stream.index, stream.kind)).changed();
+        let label = self
+            .stream
+            .map_or_else(|| "Container".into(), |index| format!("Stream {index}"));
+        egui::ComboBox::from_id_salt("metadata-target")
+            .selected_text(label)
+            .show_ui(ui, |ui| {
+                changed |= ui
+                    .selectable_value(&mut self.stream, None, "Container")
+                    .changed();
+                for stream in &asset.probe.streams {
+                    if matches!(
+                        stream.kind,
+                        StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle
+                    ) && !stream.attached_picture()
+                    {
+                        changed |= ui
+                            .selectable_value(
+                                &mut self.stream,
+                                Some(stream.index),
+                                format!("Stream {} {:?}", stream.index, stream.kind),
+                            )
+                            .changed();
+                    }
                 }
-            }
-        });
-        let original = self.stream.and_then(|index| asset.probe.streams.iter().find(|stream| stream.index == index))
+            });
+        let original = self
+            .stream
+            .and_then(|index| {
+                asset
+                    .probe
+                    .streams
+                    .iter()
+                    .find(|stream| stream.index == index)
+            })
             .map_or(&asset.probe.global_tags, |stream| &stream.tags);
         ui.collapsing("Current tags", |ui| {
             for (name, value) in original {
@@ -80,9 +107,22 @@ impl MetadataForm {
         for (index, edit) in self.edits.iter_mut().enumerate() {
             ui.push_id(index, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    changed |= ui.add(egui::TextEdit::singleline(&mut edit.key).hint_text("Tag name").char_limit(64)).changed();
+                    changed |= ui
+                        .add(
+                            egui::TextEdit::singleline(&mut edit.key)
+                                .hint_text("Tag name")
+                                .char_limit(64),
+                        )
+                        .changed();
                     changed |= ui.checkbox(&mut edit.remove, "Remove tag").changed();
-                    changed |= ui.add_enabled(!edit.remove, egui::TextEdit::singleline(&mut edit.value).hint_text("Value").char_limit(1024)).changed();
+                    changed |= ui
+                        .add_enabled(
+                            !edit.remove,
+                            egui::TextEdit::singleline(&mut edit.value)
+                                .hint_text("Value")
+                                .char_limit(1024),
+                        )
+                        .changed();
                     if ui.small_button("Delete edit").clicked() {
                         deleted = Some(index);
                     }
@@ -93,7 +133,10 @@ impl MetadataForm {
             self.edits.remove(index);
             changed = true;
         }
-        if ui.add_enabled(self.edits.len() < 32, egui::Button::new("Add tag edit")).clicked() {
+        if ui
+            .add_enabled(self.edits.len() < 32, egui::Button::new("Add tag edit"))
+            .clicked()
+        {
             self.edits.push(MetadataEdit::default());
             changed = true;
         }
@@ -566,26 +609,39 @@ impl WizApp {
                     ui.group(|ui| {
                         match patch.target {
                             Target::Global {} => ui.strong("Container tags"),
-                            Target::Stream { index } => ui.strong(format!("Original stream {index} tags")),
+                            Target::Stream { index } => {
+                                ui.strong(format!("Original stream {index} tags"))
+                            }
                         };
-                        for (name, value) in &patch.set { ui.label(format!("Set {name} = {value}")); }
-                        for name in &patch.remove { ui.label(format!("Remove {name}")); }
+                        for (name, value) in &patch.set {
+                            ui.label(format!("Set {name} = {value}"));
+                        }
+                        for name in &patch.remove {
+                            ui.label(format!("Remove {name}"));
+                        }
                     });
                 }
                 if let Some(import) = &plan.resolution.chapter_import {
-                    ui.collapsing(format!("Imported chapters ({})", import.chapters.len()), |ui| {
-                        for chapter in &import.chapters {
-                            ui.label(format!("{}–{} ticks ({} / {} seconds per tick)",
-                                chapter.start_ticks, chapter.end_ticks,
-                                chapter.time_base.numerator(), chapter.time_base.denominator()));
-                            for (name, value) in &chapter.tags {
-                                ui.label(format!("{name} = {value}"));
+                    ui.collapsing(
+                        format!("Imported chapters ({})", import.chapters.len()),
+                        |ui| {
+                            for chapter in &import.chapters {
+                                ui.label(format!(
+                                    "{}–{} ticks ({} / {} seconds per tick)",
+                                    chapter.start_ticks,
+                                    chapter.end_ticks,
+                                    chapter.time_base.numerator(),
+                                    chapter.time_base.denominator()
+                                ));
+                                for (name, value) in &chapter.tags {
+                                    ui.label(format!("{name} = {value}"));
+                                }
                             }
-                        }
-                        for (name, value) in &import.global_tags {
-                            ui.label(format!("Container tag {name} = {value}"));
-                        }
-                    });
+                            for (name, value) in &import.global_tags {
+                                ui.label(format!("Container tag {name} = {value}"));
+                            }
+                        },
+                    );
                 }
                 for warning in &plan.resolution.warnings {
                     ui.colored_label(egui::Color32::from_rgb(237, 177, 99), warning);

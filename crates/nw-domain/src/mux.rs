@@ -584,8 +584,16 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
         reasons,
         warnings,
         preservation: intent.preservation.clone(),
-        metadata_patch: if skip { None } else { intent.metadata_patch.clone() },
-        chapter_import: if skip { None } else { intent.chapter_import.clone() },
+        metadata_patch: if skip {
+            None
+        } else {
+            intent.metadata_patch.clone()
+        },
+        chapter_import: if skip {
+            None
+        } else {
+            intent.chapter_import.clone()
+        },
     })
 }
 

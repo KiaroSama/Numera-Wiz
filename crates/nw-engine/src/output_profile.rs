@@ -45,8 +45,13 @@ impl OutputProfile {
     }
     pub fn admit(self, source: &Asset, outcome: &CleanResolution) -> Result<()> {
         if let Some(import) = &outcome.chapter_import {
-            if self != Self::Matroska || !outcome.preservation.chapters || outcome.metadata_patch.is_some() {
-                return Err(incompatible("Chapter import requires a Matroska output and one metadata policy"));
+            if self != Self::Matroska
+                || !outcome.preservation.chapters
+                || outcome.metadata_patch.is_some()
+            {
+                return Err(incompatible(
+                    "Chapter import requires a Matroska output and one metadata policy",
+                ));
             }
             let extent = source.probe.container_duration.ok_or_else(|| DomainError::new(
                 "INVALID_CHAPTERS",

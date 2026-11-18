@@ -180,7 +180,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let cli_metadata = cli.query("metadata.patch", metadata.clone()).await;
     let sdk_metadata = call!(owner_bridge, "metadata.patch", metadata, json!({}));
     assert_eq!(cli_metadata["hash"], sdk_metadata["hash"]);
-    assert_eq!(sdk_metadata["resolution"]["streams"][2]["tags"]["title"], "Reviewed by MCP");
+    assert_eq!(
+        sdk_metadata["resolution"]["streams"][2]["tags"]["title"],
+        "Reviewed by MCP"
+    );
     owner_bridge.cancel().await.unwrap();
     let no_source = cli
         .raw(&Request::query(
@@ -402,10 +405,18 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
-    let (source_preview, exit) = cli.human(&[
-        "media", "preview-frame", "--asset", asset["id"].as_str().unwrap(),
-        "--stream", "0", "--frame", "2",
-    ]).await;
+    let (source_preview, exit) = cli
+        .human(&[
+            "media",
+            "preview-frame",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "0",
+            "--frame",
+            "2",
+        ])
+        .await;
     assert_eq!(exit, 0, "{}", source_preview["error"]);
     let source_preview = &source_preview["result"];
     assert_eq!(source_preview["source_sha256"], asset["identity"]["sha256"]);
@@ -413,7 +424,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(source_preview["height"], nw_domain::preview::HEIGHT);
     assert_eq!(source_preview["frame"], 2);
     assert_eq!(
-        STANDARD.decode(source_preview["rgba_base64"].as_str().unwrap()).unwrap().len(),
+        STANDARD
+            .decode(source_preview["rgba_base64"].as_str().unwrap())
+            .unwrap()
+            .len(),
         nw_domain::preview::RGBA_BYTES
     );
     assert_eq!(
@@ -842,8 +856,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     let private_preview = stdio
         .call_tool(
-            CallToolRequestParams::new("media.preview_frame")
-                .with_arguments(rmcp::object!({"params":{"asset_id":asset["id"],"stream_index":0,"frame":2}})),
+            CallToolRequestParams::new("media.preview_frame").with_arguments(
+                rmcp::object!({"params":{"asset_id":asset["id"],"stream_index":0,"frame":2}}),
+            ),
         )
         .await
         .unwrap();
@@ -900,7 +915,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"asset_id":operator_asset["id"],"stream_index":0,"frame":2}),
         json!({})
     );
-    assert!(stdio_preview["rgba_base64"] == source_preview["rgba_base64"], "stdio preview pixels differ");
+    assert!(
+        stdio_preview["rgba_base64"] == source_preview["rgba_base64"],
+        "stdio preview pixels differ"
+    );
     let stdio_project_semantics = project_sdk!(stdio, operator_scope, operator_asset, "stdio");
     assert_eq!(stdio_project_semantics, cli_project_semantics);
     let report = call!(
@@ -1452,7 +1470,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"asset_id":asset["id"],"stream_index":0,"frame":2}),
             json!({})
         );
-        assert!(http_preview["rgba_base64"] == source_preview["rgba_base64"], "HTTP preview pixels differ");
+        assert!(
+            http_preview["rgba_base64"] == source_preview["rgba_base64"],
+            "HTTP preview pixels differ"
+        );
         let report = call!(
             http,
             "streams.clean.report",

@@ -1392,7 +1392,8 @@ impl Service {
                 )?,
             "media.preview_frame" => {
                 drop(guard);
-                let frame = self.source_preview(&context, commands::parse(params)?, cancellation.clone())?;
+                let frame =
+                    self.source_preview(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
             }
             "media.probe" => {
@@ -1637,7 +1638,8 @@ impl Service {
                         commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
                     }
                     "chapters.import" => {
-                        commands::parse::<nw_domain::chapters::ImportInput>(params)?.into_cleanup()?
+                        commands::parse::<nw_domain::chapters::ImportInput>(params)?
+                            .into_cleanup()?
                     }
                     "disposition.patch" => {
                         commands::parse::<nw_domain::dispositions::PatchInput>(params)?

@@ -412,15 +412,31 @@ pub fn prepare(command: Command) -> Result<Request> {
             "chapters.remove",
             json!({"asset_id":asset,"output":native_path(&out)?}),
         ),
-        Command::Chapters(Chapters::Import { asset, out, ffmetadata, include_global_metadata }) => {
+        Command::Chapters(Chapters::Import {
+            asset,
+            out,
+            ffmetadata,
+            include_global_metadata,
+        }) => {
             let limit = nw_domain::chapters::MAX_TEXT_BYTES;
             let mut bytes = Vec::new();
-            std::fs::File::open(ffmetadata)?.take((limit + 1) as u64).read_to_end(&mut bytes)?;
+            std::fs::File::open(ffmetadata)?
+                .take((limit + 1) as u64)
+                .read_to_end(&mut bytes)?;
             if bytes.len() > limit {
-                return Err(DomainError::new("RESOURCE_LIMIT", "FFmetadata document exceeds 64 KiB").into());
+                return Err(DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "FFmetadata document exceeds 64 KiB",
+                )
+                .into());
             }
-            let ffmetadata = String::from_utf8(bytes).map_err(|_| DomainError::new("INVALID_CHAPTERS", "FFmetadata document must be UTF-8"))?;
-            query("chapters.import", json!({"asset_id":asset,"output":native_path(&out)?,"ffmetadata":ffmetadata,"include_global_metadata":include_global_metadata}))
+            let ffmetadata = String::from_utf8(bytes).map_err(|_| {
+                DomainError::new("INVALID_CHAPTERS", "FFmetadata document must be UTF-8")
+            })?;
+            query(
+                "chapters.import",
+                json!({"asset_id":asset,"output":native_path(&out)?,"ffmetadata":ffmetadata,"include_global_metadata":include_global_metadata}),
+            )
         }
         Command::Metadata(Metadata::Patch { asset, out, patch }) => {
             let patch: nw_domain::metadata::Patch = commands::parse(document(&patch)?)?;
@@ -455,7 +471,11 @@ pub fn prepare(command: Command) -> Result<Request> {
             probe.apply(&mut params)?;
             query("media.probe", params)
         }
-        Command::Media(Media::PreviewFrame { asset, stream, frame }) => query(
+        Command::Media(Media::PreviewFrame {
+            asset,
+            stream,
+            frame,
+        }) => query(
             "media.preview_frame",
             json!({"asset_id":asset,"stream_index":stream,"frame":frame}),
         ),

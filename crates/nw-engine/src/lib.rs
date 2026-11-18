@@ -408,7 +408,8 @@ impl Engine {
             ));
         }
         if plan.resolution.action != CleanAction::Remux
-            && (plan.resolution.metadata_patch.is_some() || plan.resolution.chapter_import.is_some())
+            && (plan.resolution.metadata_patch.is_some()
+                || plan.resolution.chapter_import.is_some())
         {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -571,14 +572,20 @@ impl Engine {
             .iter()
             .map(|v| match v.as_str() {
                 "@owned_staging@" => staging_name.clone(),
-                "@chapter_sidecar@" => sidecar.as_ref().expect("Validated chapter invocation").argument.clone(),
+                "@chapter_sidecar@" => sidecar
+                    .as_ref()
+                    .expect("Validated chapter invocation")
+                    .argument
+                    .clone(),
                 _ => v.clone(),
             })
             .collect::<Vec<_>>();
         observer(ExecutionEvent::Prepared(args.clone())).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = source_stamp.revalidate().and_then(|_| {
-            sidecar.as_ref().map_or(Ok(()), |sidecar| sidecar.stamp.revalidate())
+            sidecar
+                .as_ref()
+                .map_or(Ok(()), |sidecar| sidecar.stamp.revalidate())
         }) {
             return ticket.finish(Err(error));
         }
@@ -729,10 +736,15 @@ struct ChapterSidecar {
 
 impl ChapterSidecar {
     fn verify(&self, cancel: &CancellationToken) -> Result<()> {
-        if self.stamp.identity_with_limit(cancel, nw_domain::chapters::MAX_TEXT_BYTES as u64)?
+        if self
+            .stamp
+            .identity_with_limit(cancel, nw_domain::chapters::MAX_TEXT_BYTES as u64)?
             != self.expected
         {
-            return Err(DomainError::new("SOURCE_CHANGED", "The owned chapter document changed"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "The owned chapter document changed",
+            ));
         }
         Ok(())
     }
@@ -746,28 +758,48 @@ async fn stage_chapter_sidecar(
     use std::io::Write;
 
     let document = import.document()?;
-    let parent = staging.parent().ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging parent required"))?.to_owned();
+    let parent = staging
+        .parent()
+        .ok_or_else(|| DomainError::new("PATH_DENIED", "Owned staging parent required"))?
+        .to_owned();
     let cancel = cancel.clone();
     blocking(move || {
         if nw_platform::security::private_directory(&parent)? != parent {
-            return Err(DomainError::new("TARGET_CHANGED", "Chapter staging changed location"));
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "Chapter staging changed location",
+            ));
         }
-        let mut file = tempfile::Builder::new().prefix("chapters-").suffix(".ffmetadata")
-            .tempfile_in(parent).map_err(io_error)?;
+        let mut file = tempfile::Builder::new()
+            .prefix("chapters-")
+            .suffix(".ffmetadata")
+            .tempfile_in(parent)
+            .map_err(io_error)?;
         file.write_all(document.as_bytes()).map_err(io_error)?;
         file.as_file().sync_all().map_err(io_error)?;
-        nw_platform::security::verify_private_file(file.path(), nw_domain::chapters::MAX_TEXT_BYTES as u64)?;
+        nw_platform::security::verify_private_file(
+            file.path(),
+            nw_domain::chapters::MAX_TEXT_BYTES as u64,
+        )?;
         let path = files::path_text(file.path())?;
-        let stamp = files::SourceStamp::capture_open_resolved(file.path(), file.as_file().try_clone().map_err(io_error)?)?;
+        let stamp = files::SourceStamp::capture_open_resolved(
+            file.path(),
+            file.as_file().try_clone().map_err(io_error)?,
+        )?;
         let sidecar = ChapterSidecar {
             stamp,
-            expected: FileIdentity { path: path.clone(), bytes: document.len().to_string(), sha256: nw_domain::projects::hash(document.as_bytes()) },
+            expected: FileIdentity {
+                path: path.clone(),
+                bytes: document.len().to_string(),
+                sha256: nw_domain::projects::hash(document.as_bytes()),
+            },
             argument: format!("file:{path}"),
             _temporary: file,
         };
         sidecar.verify(&cancel)?;
         Ok(sidecar)
-    }).await
+    })
+    .await
 }
 async fn prepare_owned_staging(
     output_path: &str,
@@ -1176,7 +1208,17 @@ fn lower_remux(
     args.extend(admission::options(demuxer));
     args.extend(["-i".into(), "fd:".into()]);
     if resolution.chapter_import.is_some() {
-        args.extend(["-protocol_whitelist", "file", "-f", "ffmetadata", "-i", "@chapter_sidecar@"].map(String::from));
+        args.extend(
+            [
+                "-protocol_whitelist",
+                "file",
+                "-f",
+                "ffmetadata",
+                "-i",
+                "@chapter_sidecar@",
+            ]
+            .map(String::from),
+        );
     }
     for stream in &resolution.streams {
         args.extend(["-map".into(), format!("0:{}", stream.index)]);
@@ -1317,10 +1359,11 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
         ));
     }
     if let Some(import) = &plan.resolution.chapter_import {
-        import.match_observed(&nw_domain::chapters::probe_chapters(actual)?).map_err(|error| {
-            DomainError::new("VERIFICATION_FAILED", error.message)
-        })?;
-    } else if plan.resolution.preservation.chapters && actual.chapters != plan.source.probe.chapters {
+        import
+            .match_observed(&nw_domain::chapters::probe_chapters(actual)?)
+            .map_err(|error| DomainError::new("VERIFICATION_FAILED", error.message))?;
+    } else if plan.resolution.preservation.chapters && actual.chapters != plan.source.probe.chapters
+    {
         return Err(DomainError::new(
             "VERIFICATION_FAILED",
             "Preserved chapters differ from the frozen source snapshot",

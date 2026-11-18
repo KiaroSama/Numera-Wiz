@@ -1,5 +1,8 @@
 use super::{Chapter, MAX_CHAPTERS, MAX_TEXT_BYTES, limit, write_chapters};
-use crate::{DomainError, Result, time::{Rational, TimeRange}};
+use crate::{
+    DomainError, Result,
+    time::{Rational, TimeRange},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -26,7 +29,10 @@ pub struct Import {
 impl ImportInput {
     pub fn into_cleanup(self) -> Result<crate::commands::CleanInput> {
         let mut intent = crate::mux::CleanIntent::preserving_all();
-        intent.chapter_import = Some(Import::parse(&self.ffmetadata, self.include_global_metadata)?);
+        intent.chapter_import = Some(Import::parse(
+            &self.ffmetadata,
+            self.include_global_metadata,
+        )?);
         Ok(crate::commands::CleanInput {
             execution_limits: Default::default(),
             file_times: Default::default(),
@@ -43,40 +49,65 @@ fn invalid(message: &str) -> DomainError {
 
 fn integer(value: &str) -> Result<i64> {
     if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(invalid("Chapter offsets and time-base fields must be unsigned decimal integers"));
+        return Err(invalid(
+            "Chapter offsets and time-base fields must be unsigned decimal integers",
+        ));
     }
-    value.parse().map_err(|_| invalid("Chapter time field is too large"))
+    value
+        .parse()
+        .map_err(|_| invalid("Chapter time field is too large"))
 }
 
 fn range(chapter: &Chapter) -> Result<TimeRange> {
     let base = chapter.time_base;
-    if base <= Rational::ZERO || base.numerator() > i64::from(i32::MAX)
-        || base.denominator() > i64::from(i32::MAX) {
-        return Err(invalid("Chapter time bases must have positive 32-bit terms"));
+    if base <= Rational::ZERO
+        || base.numerator() > i64::from(i32::MAX)
+        || base.denominator() > i64::from(i32::MAX)
+    {
+        return Err(invalid(
+            "Chapter time bases must have positive 32-bit terms",
+        ));
     }
     let points = |text: &str| {
         let tick = integer(text)?;
         let seconds = base.checked_mul(Rational::new(tick, 1)?)?;
         let nanoseconds = seconds.checked_mul(Rational::new(1_000_000_000, 1)?)?;
         if nanoseconds.denominator() != 1 {
-            return Err(invalid("Chapter time does not fit the Matroska nanosecond grid"));
+            return Err(invalid(
+                "Chapter time does not fit the Matroska nanosecond grid",
+            ));
         }
         Ok(seconds)
     };
-    let output = TimeRange { start: points(&chapter.start_ticks)?, end: points(&chapter.end_ticks)? };
-    output.validate().map_err(|_| invalid("Chapter end must follow its start"))?;
+    let output = TimeRange {
+        start: points(&chapter.start_ticks)?,
+        end: points(&chapter.end_ticks)?,
+    };
+    output
+        .validate()
+        .map_err(|_| invalid("Chapter end must follow its start"))?;
     Ok(output)
 }
 
 fn chapter(mut fields: BTreeMap<String, String>) -> Result<Chapter> {
-    let base = fields.remove("TIMEBASE").ok_or_else(|| invalid("TIMEBASE is required"))?;
-    let (num, den) = base.split_once('/').ok_or_else(|| invalid("TIMEBASE must be a rational ratio"))?;
+    let base = fields
+        .remove("TIMEBASE")
+        .ok_or_else(|| invalid("TIMEBASE is required"))?;
+    let (num, den) = base
+        .split_once('/')
+        .ok_or_else(|| invalid("TIMEBASE must be a rational ratio"))?;
     let (num, den) = (integer(num)?, integer(den)?);
     if num == 0 || den == 0 || num > i64::from(i32::MAX) || den > i64::from(i32::MAX) {
-        return Err(invalid("Chapter time bases must have positive 32-bit terms"));
+        return Err(invalid(
+            "Chapter time bases must have positive 32-bit terms",
+        ));
     }
-    let start = fields.remove("START").ok_or_else(|| invalid("START is required"))?;
-    let end = fields.remove("END").ok_or_else(|| invalid("END is required"))?;
+    let start = fields
+        .remove("START")
+        .ok_or_else(|| invalid("START is required"))?;
+    let end = fields
+        .remove("END")
+        .ok_or_else(|| invalid("END is required"))?;
     Ok(Chapter {
         time_base: Rational::new(num, den)?,
         start_ticks: integer(&start)?.to_string(),
@@ -96,13 +127,17 @@ fn field(row: &str) -> Result<(String, String)> {
             continue;
         }
         let character = if character == '\\' {
-            chars.next().ok_or_else(|| invalid("Incomplete FFmetadata escape"))?
+            chars
+                .next()
+                .ok_or_else(|| invalid("Incomplete FFmetadata escape"))?
         } else {
             character
         };
         value.as_mut().unwrap_or(&mut key).push(character);
     }
-    let value = value.filter(|_| !key.is_empty()).ok_or_else(|| invalid("FFmetadata row must be a key and value"))?;
+    let value = value
+        .filter(|_| !key.is_empty())
+        .ok_or_else(|| invalid("FFmetadata row must be a key and value"))?;
     Ok((key, value))
 }
 
@@ -114,13 +149,18 @@ impl Import {
         if text.contains('\0') {
             return Err(invalid("FFmetadata must contain no NUL"));
         }
-        let (header, text) = text.split_once('\n').ok_or_else(|| invalid("Missing FFmetadata header"))?;
+        let (header, text) = text
+            .split_once('\n')
+            .ok_or_else(|| invalid("Missing FFmetadata header"))?;
         if header.trim_end_matches('\r') != ";FFMETADATA1" {
             return Err(invalid("Expected the FFmetadata version 1 header"));
         }
         let mut lines = text.split_inclusive('\n');
         let mut fields = BTreeMap::new();
-        let mut imported = Self { chapters: Vec::new(), global_tags: BTreeMap::new() };
+        let mut imported = Self {
+            chapters: Vec::new(),
+            global_tags: BTreeMap::new(),
+        };
         let mut in_chapter = false;
         while let Some(physical) = lines.next() {
             let mut row = physical.trim_end_matches(['\r', '\n']).to_owned();
@@ -128,13 +168,17 @@ impl Import {
                 continue;
             }
             while row.bytes().rev().take_while(|byte| *byte == b'\\').count() % 2 == 1 {
-                let following = lines.next().ok_or_else(|| invalid("Incomplete FFmetadata line continuation"))?;
+                let following = lines
+                    .next()
+                    .ok_or_else(|| invalid("Incomplete FFmetadata line continuation"))?;
                 row.push('\n');
                 row.push_str(following.trim_end_matches(['\r', '\n']));
             }
             if row == "[CHAPTER]" {
                 if in_chapter {
-                    imported.chapters.push(chapter(std::mem::take(&mut fields))?);
+                    imported
+                        .chapters
+                        .push(chapter(std::mem::take(&mut fields))?);
                     if imported.chapters.len() == MAX_CHAPTERS {
                         return Err(limit());
                     }
@@ -146,7 +190,9 @@ impl Import {
                     in_chapter = true;
                 }
             } else if row.starts_with('[') {
-                return Err(invalid("Only chapter sections are admitted in this FFmetadata document"));
+                return Err(invalid(
+                    "Only chapter sections are admitted in this FFmetadata document",
+                ));
             } else {
                 let (key, value) = field(&row)?;
                 if fields.insert(key, value).is_some() {
@@ -178,14 +224,18 @@ impl Import {
         for chapter in &self.chapters {
             let timing = range(chapter)?;
             if timing.start < end || extent.is_some_and(|extent| timing.end > extent) {
-                return Err(invalid("Chapters must be ordered, nonoverlapping and within the registered extent"));
+                return Err(invalid(
+                    "Chapters must be ordered, nonoverlapping and within the registered extent",
+                ));
             }
             let mut names = BTreeSet::new();
             if chapter.tags.keys().any(|key| {
                 let key = key.to_lowercase();
                 matches!(key.as_str(), "timebase" | "start" | "end") || !names.insert(key)
             }) {
-                return Err(invalid("Chapter tags cannot repeat names or duplicate timing fields"));
+                return Err(invalid(
+                    "Chapter tags cannot repeat names or duplicate timing fields",
+                ));
             }
             end = timing.end;
         }
@@ -195,23 +245,34 @@ impl Import {
                 target: crate::metadata::Target::Global {},
                 set: self.global_tags.clone(),
                 remove: Vec::new(),
-            }.validate()?;
+            }
+            .validate()?;
         }
         Ok(())
     }
 
     pub fn match_observed(&self, observed: &[Chapter]) -> Result<()> {
         if self.chapters.len() != observed.len() {
-            return Err(invalid("Output chapter count differs from the reviewed import"));
+            return Err(invalid(
+                "Output chapter count differs from the reviewed import",
+            ));
         }
         for (expected, actual) in self.chapters.iter().zip(observed) {
-            let observed_tags = actual.tags.iter()
-                .map(|(name, value)| (name.to_lowercase(), value)).collect::<BTreeMap<_, _>>();
+            let observed_tags = actual
+                .tags
+                .iter()
+                .map(|(name, value)| (name.to_lowercase(), value))
+                .collect::<BTreeMap<_, _>>();
             if range(expected)? != range(actual)?
                 || expected.tags.len() != actual.tags.len()
-                || expected.tags.iter().any(|(name, value)| observed_tags.get(&name.to_lowercase()) != Some(&value))
+                || expected
+                    .tags
+                    .iter()
+                    .any(|(name, value)| observed_tags.get(&name.to_lowercase()) != Some(&value))
             {
-                return Err(invalid("Output chapter times or tags differ from the reviewed import"));
+                return Err(invalid(
+                    "Output chapter times or tags differ from the reviewed import",
+                ));
             }
         }
         Ok(())

@@ -138,19 +138,33 @@ pub(super) async fn remove(cli: &Cli, media: &fixture::Media, scope: &str, asset
 pub(super) async fn import(cli: &Cli, media: &fixture::Media, scope: &str, export: &Value) {
     let directory = media.directory.path();
     let registered = cli
-        .mutation(scope, "chapter-import-source", "assets.register", json!({"path":directory.join("no-chapters.mkv")}))
+        .mutation(
+            scope,
+            "chapter-import-source",
+            "assets.register",
+            json!({"path":directory.join("no-chapters.mkv")}),
+        )
         .await;
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"]["id"].as_str().unwrap();
     let ffmetadata = export["ffmetadata"].as_str().unwrap();
-    let doc = format!(";FFMETADATA1\nartist=Sidecar artist\n{}", ffmetadata.strip_prefix(";FFMETADATA1\n").unwrap());
+    let doc = format!(
+        ";FFMETADATA1\nartist=Sidecar artist\n{}",
+        ffmetadata.strip_prefix(";FFMETADATA1\n").unwrap()
+    );
     let sidecar = directory.join("chapter-input.ffmetadata");
     std::fs::write(&sidecar, &doc).unwrap();
     let output = directory.join("chapters-imported.mkv");
     let (review, status) = cli
         .human(&[
-            "chapters", "import", "--asset", asset, "--out", output.to_str().unwrap(),
-            "--ffmetadata", sidecar.to_str().unwrap(),
+            "chapters",
+            "import",
+            "--asset",
+            asset,
+            "--out",
+            output.to_str().unwrap(),
+            "--ffmetadata",
+            sidecar.to_str().unwrap(),
         ])
         .await;
     assert_eq!(status, 0, "{review}");
@@ -161,14 +175,22 @@ pub(super) async fn import(cli: &Cli, media: &fixture::Media, scope: &str, expor
     assert_eq!(artist(&observed), "Fixture artist");
 
     let output = directory.join("chapters-with-global-tags.mkv");
-    let plan = cli.query("chapters.import", json!({
-        "asset_id":asset,"output":output,"ffmetadata":doc,"include_global_metadata":true
-    })).await;
+    let plan = cli
+        .query(
+            "chapters.import",
+            json!({
+                "asset_id":asset,"output":output,"ffmetadata":doc,"include_global_metadata":true
+            }),
+        )
+        .await;
     submit(cli, scope, "import-chapter-tags", &plan).await;
     let observed = observe(media, &output).await;
     assert_eq!(observed["chapters"], original["chapters"]);
     assert_eq!(artist(&observed), "Sidecar artist");
-    assert_eq!(tag(&observed["format"], "title"), tag(&original["format"], "title"));
+    assert_eq!(
+        tag(&observed["format"], "title"),
+        tag(&original["format"], "title")
+    );
 
     for document in [
         ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=99999\n",
@@ -237,18 +259,30 @@ pub(super) async fn verify_metadata(cli: &Cli, media: &fixture::Media, scope: &s
     .unwrap();
     let (review, status) = cli
         .human(&[
-            "metadata", "patch", "--asset", asset, "--out", global.to_str().unwrap(),
-            "--patch", patch.to_str().unwrap(),
+            "metadata",
+            "patch",
+            "--asset",
+            asset,
+            "--out",
+            global.to_str().unwrap(),
+            "--patch",
+            patch.to_str().unwrap(),
         ])
         .await;
     assert_eq!(status, 0, "{review}");
     let plan = &review["result"];
     assert_eq!(plan["resolution"]["action"], "remux");
-    assert_eq!(plan["resolution"]["metadata_patch"]["target"]["scope"], "global");
+    assert_eq!(
+        plan["resolution"]["metadata_patch"]["target"]["scope"],
+        "global"
+    );
     submit(cli, scope, "patch-container-metadata", plan).await;
     let global = observe(media, &global).await;
     let source = observe(media, &directory.join("chapter.mkv")).await;
-    assert_eq!(tag(&global["format"], "project_code"), Some(&json!("ویرایش شماره ۲")));
+    assert_eq!(
+        tag(&global["format"], "project_code"),
+        Some(&json!("ویرایش شماره ۲"))
+    );
     assert!(tag(&global["format"], "title").is_none());
     assert_eq!(artist(&global), artist(&source));
     assert_eq!(global["chapters"], source["chapters"]);
@@ -262,18 +296,35 @@ pub(super) async fn verify_metadata(cli: &Cli, media: &fixture::Media, scope: &s
     submit(cli, scope, "patch-track-metadata", &plan).await;
     let observed = observe(media, &stream).await;
     for key in ["language", "review_note"] {
-        assert_eq!(tag(&observed["streams"][1], key), tag(&source["streams"][1], key));
+        assert_eq!(
+            tag(&observed["streams"][1], key),
+            tag(&source["streams"][1], key)
+        );
     }
-    assert_eq!(observed["streams"][1]["disposition"], source["streams"][1]["disposition"]);
-    assert_eq!(tag(&observed["streams"][2], "title"), Some(&json!("گویندهٔ دوم")));
-    assert_eq!(tag(&observed["streams"][2], "project_code"), Some(&json!("cue=2")));
+    assert_eq!(
+        observed["streams"][1]["disposition"],
+        source["streams"][1]["disposition"]
+    );
+    assert_eq!(
+        tag(&observed["streams"][2], "title"),
+        Some(&json!("گویندهٔ دوم"))
+    );
+    assert_eq!(
+        tag(&observed["streams"][2], "project_code"),
+        Some(&json!("cue=2"))
+    );
     assert!(tag(&observed["streams"][2], "language").is_none());
     assert_eq!(artist(&observed), artist(&source));
 
     let mut contradictory = input;
     contradictory["output"] = json!(directory.join("invalid-tag-change.mkv"));
     contradictory["patch"]["remove"] = json!(["title"]);
-    let invalid = cli.raw(&nw_domain::commands::Request::query("metadata.patch", contradictory)).await;
+    let invalid = cli
+        .raw(&nw_domain::commands::Request::query(
+            "metadata.patch",
+            contradictory,
+        ))
+        .await;
     assert_eq!(invalid["error"]["code"], "VALIDATION_ERROR");
 }
 
@@ -320,7 +371,8 @@ fn artist(observed: &Value) -> &Value {
 }
 
 fn tag<'a>(row: &'a Value, name: &str) -> Option<&'a Value> {
-    row["tags"].as_object()?.iter().find_map(|(key, value)| {
-        key.eq_ignore_ascii_case(name).then_some(value)
-    })
+    row["tags"]
+        .as_object()?
+        .iter()
+        .find_map(|(key, value)| key.eq_ignore_ascii_case(name).then_some(value))
 }

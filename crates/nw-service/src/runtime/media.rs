@@ -22,15 +22,30 @@ impl Service {
         self.object(context, &asset.id, &asset.creator)?;
         let path = self.path(context, Path::new(&asset.identity.path), false)?;
         let source = files::SourceStamp::capture_resolved(&path)?;
-        let pixels = tokio::runtime::Handle::current().block_on(self.engine()?.preview_registered_frame(
-            &asset, source, input.stream_index, input.frame, cancel.clone(),
-        ))?;
+        let pixels =
+            tokio::runtime::Handle::current().block_on(self.engine()?.preview_registered_frame(
+                &asset,
+                source,
+                input.stream_index,
+                input.frame,
+                cancel.clone(),
+            ))?;
         let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Preview cancelled before delivery"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Preview cancelled before delivery",
+            ));
         }
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command("media.preview_frame")) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Source preview grant changed during decoding"));
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command("media.preview_frame"))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Source preview grant changed during decoding",
+            ));
         }
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;

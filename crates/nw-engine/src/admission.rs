@@ -5,12 +5,12 @@ use nw_domain::{
     records::{Asset, FileIdentity},
 };
 use nw_platform::files::{SourceStamp, io_error};
-use tokio_util::sync::CancellationToken;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
+use tokio_util::sync::CancellationToken;
 
 pub struct Input {
     pub file: File,
@@ -45,11 +45,15 @@ pub(super) async fn registered_stream(
     })?;
     let demuxer = frozen_demuxer(&asset.probe.format)?;
     let length = expected.bytes.parse::<u64>().map_err(|_| {
-        DomainError::new("INVALID_IDENTITY", "Registered source has an invalid byte count")
+        DomainError::new(
+            "INVALID_IDENTITY",
+            "Registered source has an invalid byte count",
+        )
     })?;
     crate::blocking(move || {
         source.require_object(&object)?;
-        if source.byte_len()? != length || source.identity_with_limit(&cancel, length)? != expected {
+        if source.byte_len()? != length || source.identity_with_limit(&cancel, length)? != expected
+        {
             return Err(DomainError::new(
                 "SOURCE_CHANGED",
                 "Registered source content changed",
