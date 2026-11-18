@@ -35,6 +35,8 @@ export and continuous preview remain in development.
   Cleanup plans, reports and batches resolve the positions for each file.
 - Inspect FFmpeg component declarations and verify a CPU FFV1 round trip.
   An explicit native-owner request can check H.264 and HEVC NVENC encoding.
+- Inspect exact chapter ranges, export FFmetadata or remove chapters through
+  a reviewed stream-copy plan.
 - Authorized folder intake with deterministic relative paths, retained probe
   failures, explicit bounds/exclusions and companion inventories. Inventory does
   not copy companions or qualify the whole MuxCls utility.

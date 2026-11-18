@@ -1077,6 +1077,7 @@ impl Service {
                 "timeline.render",
                 "media.probe",
                 "capabilities.refresh",
+                "chapters.remove",
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
@@ -1497,15 +1498,27 @@ impl Service {
                 read_model::InventoryKind::Assets,
                 &cancellation,
             )?,
-            "assets.inspect" => {
-                let input: IdInput = commands::parse(params)?;
+            "assets.inspect" | "chapters.inspect" | "chapters.export" => {
+                let (id, include_global_metadata) = if request.command.id == "chapters.export" {
+                    let input: nw_domain::chapters::ExportInput = commands::parse(params)?;
+                    (input.asset_id, input.include_global_metadata)
+                } else {
+                    let input: IdInput = commands::parse(params)?;
+                    (input.id, false)
+                };
                 let asset: Asset = self
                     .store
-                    .get(&named("asset", &input.id)?)?
+                    .get(&named("asset", &id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &asset.id, &asset.creator)?;
                 self.path(&context, Path::new(&asset.identity.path), false)?;
-                value(&asset)?
+                match request.command.id.as_str() {
+                    "chapters.inspect" => value(&nw_domain::chapters::inspect(&asset)?)?,
+                    "chapters.export" => {
+                        value(&nw_domain::chapters::export(&asset, include_global_metadata)?)?
+                    }
+                    _ => value(&asset)?,
+                }
             }
             "assets.output_suggest" => {
                 let input: IdInput = commands::parse(params)?;
@@ -1607,8 +1620,12 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" => {
-                let input: CleanInput = commands::parse(params)?;
+            "streams.clean" | "chapters.remove" => {
+                let input = if request.command.id == "chapters.remove" {
+                    commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
+                } else {
+                    commands::parse::<CleanInput>(params)?
+                };
                 let plan = self.prepare_cleanup(&context, input, now)?;
                 let response = Response::success(
                     &request.request_id,

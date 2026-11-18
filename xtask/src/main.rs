@@ -235,7 +235,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-ffmpeg",
         "--enable-ffprobe",
         "--enable-protocol=file,pipe,fd",
-        "--enable-demuxer=matroska,mov,wav,srt,nut",
+        "--enable-demuxer=matroska,mov,wav,srt,nut,ffmetadata",
         "--enable-muxer=matroska,mov,mp4,null,rawvideo,pcm_s16le,nut",
         "--enable-encoder=ffv1,mpeg4,pcm_s16le,rawvideo",
         "--enable-decoder=ffv1,mpeg4,pcm_s16le,subrip,wrapped_avframe,rawvideo",

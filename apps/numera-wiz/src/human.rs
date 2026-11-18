@@ -124,6 +124,28 @@ pub enum Capabilities {
     },
 }
 #[derive(Subcommand)]
+pub enum Chapters {
+    /// Inspect exact chapter times and tags.
+    Inspect {
+        #[arg(long)]
+        asset: String,
+    },
+    /// Return an FFmetadata document and its SHA-256 digest.
+    Export {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        include_global_metadata: bool,
+    },
+    /// Review a stream-copy plan that removes chapters.
+    Remove {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        out: PathBuf,
+    },
+}
+#[derive(Subcommand)]
 pub enum Assets {
     /// Register a bounded folder snapshot, retaining individual probe failures.
     RegisterFolder {
@@ -283,6 +305,7 @@ pub enum Command {
     Clips(Clips),
     History(History),
     Media(Media),
+    Chapters(Chapters),
     Assets(Assets),
     Streams(Streams),
     Plans(Plans),
@@ -321,6 +344,17 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Timeline(command) => command.prepare()?,
         Command::Clips(command) => command.prepare()?,
         Command::History(command) => command.prepare()?,
+        Command::Chapters(Chapters::Inspect { asset }) => {
+            query("chapters.inspect", json!({"id":asset}))
+        }
+        Command::Chapters(Chapters::Export { asset, include_global_metadata }) => query(
+            "chapters.export",
+            json!({"asset_id":asset,"include_global_metadata":include_global_metadata}),
+        ),
+        Command::Chapters(Chapters::Remove { asset, out }) => query(
+            "chapters.remove",
+            json!({"asset_id":asset,"output":native_path(&out)?}),
+        ),
         Command::Media(Media::Probe { path, probe }) => {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;

@@ -53,6 +53,9 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
 | `media capabilities clear --fingerprint SHA` | Clear the matching component report from owner memory. |
+| `chapters inspect --asset ID` | Read exact chapter ticks, time bases and tags from the registered probe. |
+| `chapters export --asset ID` | Return UTF-8 FFmetadata and its SHA-256 digest. |
+| `chapters remove --asset ID --out PATH` | Review a stream-copy plan that removes chapters and preserves the retained streams and their metadata. |
 | `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
 | `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |
 | `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |

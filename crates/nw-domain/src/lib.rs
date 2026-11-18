@@ -1,5 +1,6 @@
 //! Shared, display-independent command and media contracts.
 pub mod capabilities;
+pub mod chapters;
 pub mod commands;
 pub mod execution;
 pub mod media;

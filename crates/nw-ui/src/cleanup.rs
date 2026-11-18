@@ -44,6 +44,47 @@ fn values(text: &str) -> Vec<String> {
         .map(str::to_owned)
         .collect()
 }
+
+fn chapters(ui: &mut egui::Ui, asset: &Asset) {
+    if asset.probe.chapters.as_array().is_none_or(Vec::is_empty) {
+        return;
+    }
+    egui::CollapsingHeader::new("Chapters").show(ui, |ui| {
+        let inventory = match nw_domain::chapters::inspect(asset) {
+            Ok(inventory) => inventory,
+            Err(error) => {
+                ui.label(error.message);
+                return;
+            }
+        };
+        if ui.button("Copy FFmetadata").clicked() {
+            match nw_domain::chapters::export(asset, false) {
+                Ok(export) => ui.ctx().copy_text(export.ffmetadata),
+                Err(error) => {
+                    ui.label(error.message);
+                }
+            }
+        }
+        egui::ScrollArea::vertical()
+            .id_salt("chapter-inventory")
+            .max_height(200.0)
+            .show(ui, |ui| {
+                for chapter in inventory.chapters {
+                    if let Some(title) = chapter.tags.get("title") {
+                        ui.strong(title);
+                    }
+                    ui.label(format!(
+                        "{}–{} ticks ({} / {} seconds per tick)",
+                        chapter.start_ticks,
+                        chapter.end_ticks,
+                        chapter.time_base.numerator(),
+                        chapter.time_base.denominator(),
+                    ));
+                }
+            });
+    });
+}
+
 fn selector(mode: usize, text: &str) -> Result<Selector, String> {
     Ok(match mode {
         0 => Selector::All,
@@ -214,6 +255,7 @@ impl WizApp {
                 });
                 if asset.probe.streams.len() > 64 { ui.horizontal(|ui| {if ui.add_enabled(self.stream_page>0,egui::Button::new("Previous streams")).clicked(){self.stream_page-=1;}ui.label(format!("Page {}",self.stream_page+1));if ui.add_enabled(first+64<asset.probe.streams.len(),egui::Button::new("Next streams")).clicked(){self.stream_page+=1;}}); }
             });
+            chapters(ui, asset);
             ui.separator();
             let mut changed = false;
             ui.strong("Audio selection"); changed |= selection(ui,"audio-selection",&mut self.audio_mode,&mut self.audio_values,&mut self.intent.audio_selection.no_match);

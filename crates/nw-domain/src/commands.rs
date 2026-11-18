@@ -223,6 +223,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "capabilities.clear" => Some(
             serde_json::to_value(schema_for!(crate::capabilities::ClearResult)).expect("schema"),
         ),
+        "chapters.inspect" => Some(
+            serde_json::to_value(schema_for!(crate::chapters::Inventory)).expect("schema"),
+        ),
+        "chapters.export" => Some(
+            serde_json::to_value(schema_for!(crate::chapters::Export)).expect("schema"),
+        ),
         "timeline.render" => {
             Some(serde_json::to_value(schema_for!(crate::media::MediaPlanV1)).expect("schema"))
         }
@@ -718,6 +724,24 @@ pub fn registry() -> Vec<Descriptor> {
             "Resolve MuxCls selection without I/O",
             Query,
             ResolveInput
+        ),
+        row!(
+            "chapters.inspect",
+            "Inspect exact chapter times and tags from a registered probe",
+            Query,
+            IdInput
+        ),
+        row!(
+            "chapters.export",
+            "Export an FFmetadata chapter document with its content digest",
+            Query,
+            crate::chapters::ExportInput
+        ),
+        row!(
+            "chapters.remove",
+            "Review a stream-copy cleanup plan that removes chapters",
+            Query,
+            crate::chapters::RemoveInput
         ),
         row!(
             "streams.clean.report",
@@ -1438,6 +1462,9 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "capabilities.inspect",
     "capabilities.refresh",
     "capabilities.clear",
+    "chapters.inspect",
+    "chapters.export",
+    "chapters.remove",
     "assets.register",
     "assets.register_folder",
     "assets.folder_inspect",

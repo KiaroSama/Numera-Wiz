@@ -86,6 +86,8 @@ mod lost_ack;
 mod project_render;
 #[path = "support/project_topology.rs"]
 mod project_topology;
+#[path = "support/chapter_roundtrip.rs"]
+mod chapter_roundtrip;
 
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
@@ -102,6 +104,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await;
     assert_eq!(exit, 0, "{scope}");
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
+    let (chapter_asset, chapter_export) = chapter_roundtrip::verify(&cli, &media, &scope).await;
     let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
     assert_eq!(exit, 0, "{before}");
     assert!(before["result"]["advertised"].is_null());
@@ -156,6 +159,15 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({})
         ),
         devices
+    );
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "chapters.export",
+            json!({"asset_id":chapter_asset}),
+            json!({})
+        ),
+        chapter_export
     );
     owner_bridge.cancel().await.unwrap();
     let no_source = cli
@@ -768,6 +780,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .len(),
         1
     );
+    chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
 
     let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(

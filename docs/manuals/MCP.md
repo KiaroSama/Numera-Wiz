@@ -100,12 +100,27 @@ Granting `capabilities.refresh` to an agent profile permits component refresh.
 The ordinary report keeps hardware `unknown`. Clear removes the matching
 in-memory component report.
 
-## Registered selection reports
+## Position-based track removal
 
 The audio and subtitle selectors accept `exclude_type_ordinals`. Each value
 is a zero-based position among streams of that type in the original source.
 The cleanup plan, selection report and batch plan resolve these positions for
 each registered asset.
+
+## Chapters
+
+`chapters.inspect` takes `{"id":"<asset-id>"}` and returns exact chapter ticks,
+time bases and tags from the registered probe. `chapters.export` takes
+`{"asset_id":"<asset-id>"}` and returns `ffmetadata`, its SHA-256 digest and the
+source content digest. Set `include_global_metadata` to `true` to include
+the registered global tags. Both queries require explicit command authorization
+and existing access to the asset and its source path.
+
+`chapters.remove` takes `{"asset_id":"<asset-id>","output":"<new-path>"}`.
+It returns the ordinary reviewed cleanup plan with chapter removal enabled.
+Submit that plan through `jobs.submit` to create the output.
+
+## Cleanup selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI
 example. It is a query, so omit replay_scope and idempotency_key. The response

@@ -77,6 +77,14 @@ H.264 and HEVC encoding on the default NVIDIA device using a generated frame.
 The current view shows the outcomes until the next capability request.
 **Clear cache** removes the selected fingerprint from the owner's memory.
 
+## Chapters
+
+Open **Chapters** below the original stream inventory for a registered asset
+with chapters. The panel shows titles and exact ranges in ticks with their
+time base. **Copy FFmetadata** copies chapter times and tags to the clipboard.
+To remove chapters from an output, clear **Chapters** in **Preservation**
+before reviewing the cleanup plan.
+
 ## Run and inspect
 
 Run reviewed plan, or press Ctrl+Enter on Windows/Linux and Cmd+Enter on macOS.
