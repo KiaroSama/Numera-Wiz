@@ -276,6 +276,7 @@ mod tests {
             subtitle_order: vec![],
             stream_tag_patches: vec![],
             disposition_patches: vec![],
+            metadata_patch: None,
             preservation: Preservation::default(),
         }
     }

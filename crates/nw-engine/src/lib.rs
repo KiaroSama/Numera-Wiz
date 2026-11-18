@@ -403,6 +403,12 @@ impl Engine {
                 "Copy/skip plans cannot contain a media subprocess",
             ));
         }
+        if plan.resolution.action != CleanAction::Remux && plan.resolution.metadata_patch.is_some() {
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Metadata changes require a reviewed remux",
+            ));
+        }
         Ok(())
     }
     pub async fn execute(
@@ -1120,6 +1126,16 @@ fn lower_remux(
             "-1".into()
         },
     ]);
+    if let Some(patch) = &resolution.metadata_patch
+        && matches!(patch.target, nw_domain::metadata::Target::Global {})
+    {
+        for (key, value) in &patch.set {
+            args.extend(["-metadata".into(), format!("{key}={value}")]);
+        }
+        for key in &patch.remove {
+            args.extend(["-metadata".into(), format!("{key}=")]);
+        }
+    }
     for (index, stream) in resolution.streams.iter().enumerate() {
         args.extend([
             format!("-map_metadata:s:{index}"),
@@ -1228,13 +1244,17 @@ fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
             "Preserved chapters differ from the frozen source snapshot",
         ));
     }
-    let empty = BTreeMap::new();
-    let expected = if plan.resolution.preservation.global_tags {
-        &plan.source.probe.global_tags
+    let mut expected = if plan.resolution.preservation.global_tags {
+        plan.source.probe.global_tags.clone()
     } else {
-        &empty
+        BTreeMap::new()
     };
-    verify_tags(expected, &actual.global_tags, "Container", true, profile)?;
+    if let Some(patch) = &plan.resolution.metadata_patch
+        && matches!(patch.target, nw_domain::metadata::Target::Global {})
+    {
+        patch.apply(&mut expected);
+    }
+    verify_tags(&expected, &actual.global_tags, "Container", true, profile)?;
     Ok(())
 }
 
@@ -1305,6 +1325,7 @@ mod tag_tests {
             reasons: vec![],
             warnings: vec![],
             preservation: nw_domain::mux::Preservation::default(),
+            metadata_patch: None,
         };
         let current = lower_remux(&source, &resolved, OutputProfile::Matroska).unwrap();
         assert!(

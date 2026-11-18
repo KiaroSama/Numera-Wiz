@@ -98,6 +98,14 @@ audio or subtitle stream. Use **Add flags** and **Remove flags** to edit
 individual flags. **Only default of this type** changes the default flag among
 peers and preserves their other flags. Review the cleanup plan before running it.
 
+## Metadata changes
+
+In **Metadata changes**, select the container or an original stream. Expand
+**Current tags** to see the registered values. Add the tag edits, mark any tags
+to remove, enter a fresh `.mkv` destination, then choose **Review tag changes**.
+The review lists the requested changes. Running it verifies the preserved
+streams, chapters and unrelated tags before publishing the output.
+
 ## Run and inspect
 
 Run reviewed plan, or press Ctrl+Enter on Windows/Linux and Cmd+Enter on macOS.

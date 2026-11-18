@@ -44,6 +44,14 @@ impl OutputProfile {
         }
     }
     pub fn admit(self, source: &Asset, outcome: &CleanResolution) -> Result<()> {
+        if let Some(patch) = &outcome.metadata_patch {
+            patch.validate()?;
+            if self != Self::Matroska {
+                return Err(incompatible(
+                    "This metadata patch route requires a Matroska output",
+                ));
+            }
+        }
         if self == Self::Matroska {
             return Ok(());
         }
@@ -234,6 +242,7 @@ mod tests {
             reasons: vec![],
             warnings: vec![],
             preservation: Preservation::default(),
+            metadata_patch: None,
         };
         (source, resolution)
     }

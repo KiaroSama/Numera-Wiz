@@ -20,6 +20,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
 | `chapters.inspect`, `chapters.export`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review a chapter-removal plan. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
+| `metadata.patch` | Review explicit container or original-stream tag changes for a fresh Matroska file. |
 | `jobs.submit`, `jobs.inspect`, `jobs.list`, `jobs.cancel` | Run, observe/page and control accepted jobs. Submission/cancellation are durable. |
 | `streams.clean.batch_plan`, `batches.plan_inspect` | Review 1-64 explicit batch candidates and frozen member outcomes. |
 | `batches.submit`, `batches.inspect`, `batches.list`, `batches.cancel` | Run, inspect/page and cancel a reviewed batch. Submission/cancellation are durable. |
@@ -62,6 +63,10 @@ artifact. Read the current schema for the exact tagged-variant fields.
   `{"params":{"asset_id":"ASSET_ID","output":"ABSOLUTE_NEW_FILE","patch":{"stream":2,"exclusive_default":true}}}`.
   Confirm the original stream kind in the source probe and check the returned
   flags before submitting the reviewed plan. Its peers lose only `default`.
+- To set a tag on original stream 2 when `metadata.patch` is active, use
+  `{"params":{"asset_id":"ASSET_ID","output":"ABSOLUTE_NEW_FILE.mkv","patch":{"target":{"scope":"stream","index":2},"set":{"title":"Commentary"}}}}`.
+  For a container tag, set `target` to `{"scope":"global"}`. Put tag names to
+  delete in `remove`. Review the returned plan before submitting its ID and hash.
 - To remove the second audio track from several files, use the shared intent
   in `streams.clean.batch_plan` with `audio_selection` set to
   `{"selector":{"mode":"exclude_type_ordinals","values":[1]},"no_match":"reject"}`.

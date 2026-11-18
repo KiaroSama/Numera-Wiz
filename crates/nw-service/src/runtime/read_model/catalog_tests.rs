@@ -610,6 +610,7 @@ async fn unrelated_inventories() {
                 reasons: Vec::new(),
                 warnings: Vec::new(),
                 preservation: Default::default(),
+                metadata_patch: None,
             },
             argv_template: Vec::new(),
             created_at: "0".into(),

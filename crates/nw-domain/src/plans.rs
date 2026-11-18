@@ -255,6 +255,7 @@ mod tests {
                 reasons: vec![],
                 warnings: vec![],
                 preservation: Preservation::default(),
+                metadata_patch: None,
             },
             argv_template: vec![],
             created_at: "100".into(),

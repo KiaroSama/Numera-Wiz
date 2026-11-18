@@ -609,6 +609,7 @@ mod tests {
             reasons: vec![],
             warnings: vec![],
             preservation: Preservation::default(),
+            metadata_patch: None,
         };
         let plan = Plan {
             execution_limits: None,

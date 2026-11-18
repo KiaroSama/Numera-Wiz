@@ -167,6 +167,8 @@ pub struct CleanIntent {
     pub stream_tag_patches: Vec<StreamTagPatch>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub disposition_patches: Vec<crate::dispositions::Patch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_patch: Option<crate::metadata::Patch>,
     pub preservation: Preservation,
 }
 impl CleanIntent {
@@ -182,6 +184,7 @@ impl CleanIntent {
             subtitle_order: Vec::new(),
             stream_tag_patches: Vec::new(),
             disposition_patches: Vec::new(),
+            metadata_patch: None,
             preservation: Preservation::default(),
         }
     }
@@ -207,6 +210,8 @@ pub struct CleanResolution {
     pub reasons: Vec<String>,
     pub warnings: Vec<String>,
     pub preservation: Preservation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_patch: Option<crate::metadata::Patch>,
 }
 
 pub fn normalize_language(value: &str) -> String {
@@ -368,6 +373,9 @@ pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
     validate_selector(&intent.audio_selection.selector)?;
     validate_selector(&intent.subtitle_selection.selector)?;
     crate::dispositions::validate(&intent.disposition_patches)?;
+    if let Some(patch) = &intent.metadata_patch {
+        patch.validate()?;
+    }
     for patch in &intent.stream_tag_patches {
         if patch.source_indices.len() > 256 || patch.original_languages.len() > 256 {
             return Err(DomainError::new(
@@ -508,6 +516,9 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
     }
     if !skip {
         crate::dispositions::apply(&mut kept, &intent.disposition_patches)?;
+        if let Some(patch) = &intent.metadata_patch {
+            patch.apply_to_streams(&mut kept)?;
+        }
     }
     let mut reasons = Vec::new();
     if kept != streams {
@@ -518,6 +529,9 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
     }
     if !intent.preservation.chapters {
         reasons.push("Chapter removal requested".into());
+    }
+    if intent.metadata_patch.is_some() {
+        reasons.push("Explicit metadata changes requested".into());
     }
     let action = if skip {
         CleanAction::Skip
@@ -553,6 +567,7 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
         reasons,
         warnings,
         preservation: intent.preservation.clone(),
+        metadata_patch: if skip { None } else { intent.metadata_patch.clone() },
     })
 }
 
@@ -604,6 +619,7 @@ mod tests {
             subtitle_order: vec![],
             stream_tag_patches: vec![],
             disposition_patches: vec![],
+            metadata_patch: None,
             preservation: Preservation::default(),
         }
     }

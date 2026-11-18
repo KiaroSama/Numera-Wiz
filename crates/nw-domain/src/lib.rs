@@ -6,6 +6,7 @@ pub mod dispositions;
 pub mod execution;
 pub mod media;
 pub mod media_execution;
+pub mod metadata;
 pub mod mux;
 pub mod preview;
 pub mod time;

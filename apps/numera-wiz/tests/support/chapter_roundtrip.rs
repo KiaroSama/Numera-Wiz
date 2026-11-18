@@ -178,6 +178,57 @@ pub(super) async fn verify_dispositions(
     assert_eq!(artist(&output), "Fixture artist");
 }
 
+pub(super) async fn verify_metadata(cli: &Cli, media: &fixture::Media, scope: &str, asset: &str) {
+    let directory = media.directory.path();
+    let global = directory.join("global-metadata.mkv");
+    let patch = directory.join("global-metadata.json");
+    std::fs::write(
+        &patch,
+        r#"{"target":{"scope":"global"},"set":{"project_code":"ویرایش شماره ۲"},"remove":["title"]}"#,
+    )
+    .unwrap();
+    let (review, status) = cli
+        .human(&[
+            "metadata", "patch", "--asset", asset, "--out", global.to_str().unwrap(),
+            "--patch", patch.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(status, 0, "{review}");
+    let plan = &review["result"];
+    assert_eq!(plan["resolution"]["action"], "remux");
+    assert_eq!(plan["resolution"]["metadata_patch"]["target"]["scope"], "global");
+    submit(cli, scope, "patch-container-metadata", plan).await;
+    let global = observe(media, &global).await;
+    let source = observe(media, &directory.join("chapter.mkv")).await;
+    assert_eq!(tag(&global["format"], "project_code"), Some(&json!("ویرایش شماره ۲")));
+    assert!(tag(&global["format"], "title").is_none());
+    assert_eq!(artist(&global), artist(&source));
+    assert_eq!(global["chapters"], source["chapters"]);
+
+    let stream = directory.join("stream-metadata.mkv");
+    let input = json!({"asset_id":asset, "output":stream, "patch":{
+        "target":{"scope":"stream","index":2},
+        "set":{"title":"گویندهٔ دوم","project_code":"cue=2"},"remove":["language"]
+    }});
+    let plan = cli.query("metadata.patch", input.clone()).await;
+    submit(cli, scope, "patch-track-metadata", &plan).await;
+    let observed = observe(media, &stream).await;
+    for key in ["language", "review_note"] {
+        assert_eq!(tag(&observed["streams"][1], key), tag(&source["streams"][1], key));
+    }
+    assert_eq!(observed["streams"][1]["disposition"], source["streams"][1]["disposition"]);
+    assert_eq!(tag(&observed["streams"][2], "title"), Some(&json!("گویندهٔ دوم")));
+    assert_eq!(tag(&observed["streams"][2], "project_code"), Some(&json!("cue=2")));
+    assert!(tag(&observed["streams"][2], "language").is_none());
+    assert_eq!(artist(&observed), artist(&source));
+
+    let mut contradictory = input;
+    contradictory["output"] = json!(directory.join("invalid-tag-change.mkv"));
+    contradictory["patch"]["remove"] = json!(["title"]);
+    let invalid = cli.raw(&nw_domain::commands::Request::query("metadata.patch", contradictory)).await;
+    assert_eq!(invalid["error"]["code"], "VALIDATION_ERROR");
+}
+
 async fn submit(cli: &Cli, scope: &str, key: &str, plan: &Value) {
     let submission = cli
         .mutation(
@@ -217,11 +268,11 @@ async fn observe(media: &fixture::Media, input: &Path) -> Value {
 }
 
 fn artist(observed: &Value) -> &Value {
-    observed["format"]["tags"]
-        .as_object()
-        .unwrap()
-        .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case("artist"))
-        .unwrap()
-        .1
+    tag(&observed["format"], "artist").unwrap()
+}
+
+fn tag<'a>(row: &'a Value, name: &str) -> Option<&'a Value> {
+    row["tags"].as_object()?.iter().find_map(|(key, value)| {
+        key.eq_ignore_ascii_case(name).then_some(value)
+    })
 }

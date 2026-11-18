@@ -3,6 +3,7 @@ use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
     dispositions::{PATCH_FLAGS, Patch as DispositionPatch},
+    metadata::{Patch as MetadataPatch, Target},
     mux::{CleanIntent, NoMatch, Selector, StreamKind, StreamTagPatch, TagPatch},
     records::Asset,
 };
@@ -21,6 +22,83 @@ pub struct PatchForm {
     language: String,
     title_mode: usize,
     title: String,
+}
+
+#[derive(Default)]
+struct MetadataEdit {
+    key: String,
+    value: String,
+    remove: bool,
+}
+
+#[derive(Default)]
+pub(super) struct MetadataForm {
+    stream: Option<u32>,
+    edits: Vec<MetadataEdit>,
+}
+
+impl MetadataForm {
+    fn patch(&self) -> Result<MetadataPatch, String> {
+        let mut patch = MetadataPatch {
+            target: self.stream.map_or(Target::Global {}, |index| Target::Stream { index }),
+            set: Default::default(),
+            remove: Vec::new(),
+        };
+        for edit in &self.edits {
+            if edit.remove {
+                patch.remove.push(edit.key.clone());
+            } else if patch.set.insert(edit.key.clone(), edit.value.clone()).is_some() {
+                return Err(format!("Tag {} is listed more than once", edit.key));
+            }
+        }
+        patch.validate().map_err(|error| error.message)?;
+        Ok(patch)
+    }
+
+    fn controls(&mut self, ui: &mut egui::Ui, asset: &Asset) -> bool {
+        let mut changed = false;
+        let label = self.stream.map_or_else(|| "Container".into(), |index| format!("Stream {index}"));
+        egui::ComboBox::from_id_salt("metadata-target").selected_text(label).show_ui(ui, |ui| {
+            changed |= ui.selectable_value(&mut self.stream, None, "Container").changed();
+            for stream in &asset.probe.streams {
+                if matches!(stream.kind, StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle)
+                    && !stream.attached_picture()
+                {
+                    changed |= ui.selectable_value(&mut self.stream, Some(stream.index),
+                        format!("Stream {} {:?}", stream.index, stream.kind)).changed();
+                }
+            }
+        });
+        let original = self.stream.and_then(|index| asset.probe.streams.iter().find(|stream| stream.index == index))
+            .map_or(&asset.probe.global_tags, |stream| &stream.tags);
+        ui.collapsing("Current tags", |ui| {
+            for (name, value) in original {
+                ui.label(format!("{name} = {value}"));
+            }
+        });
+        let mut deleted = None;
+        for (index, edit) in self.edits.iter_mut().enumerate() {
+            ui.push_id(index, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    changed |= ui.add(egui::TextEdit::singleline(&mut edit.key).hint_text("Tag name").char_limit(64)).changed();
+                    changed |= ui.checkbox(&mut edit.remove, "Remove tag").changed();
+                    changed |= ui.add_enabled(!edit.remove, egui::TextEdit::singleline(&mut edit.value).hint_text("Value").char_limit(1024)).changed();
+                    if ui.small_button("Delete edit").clicked() {
+                        deleted = Some(index);
+                    }
+                });
+            });
+        }
+        if let Some(index) = deleted {
+            self.edits.remove(index);
+            changed = true;
+        }
+        if ui.add_enabled(self.edits.len() < 32, egui::Button::new("Add tag edit")).clicked() {
+            self.edits.push(MetadataEdit::default());
+            changed = true;
+        }
+        changed
+    }
 }
 fn indices(text: &str) -> Result<Vec<u32>, String> {
     if text.trim().is_empty() {
@@ -416,6 +494,15 @@ impl WizApp {
             }).body_returned.unwrap_or(false);
             let disposition_changed = dispositions(ui, asset, &mut self.intent.disposition_patches);
             if budget_changed || disposition_changed { self.changed(); }
+            ui.collapsing("Metadata changes", |ui| {
+                if self.metadata.controls(ui, asset) { self.changed(); }
+                if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty() && !self.metadata.edits.is_empty(), egui::Button::new("Review tag changes")).clicked() {
+                    match self.metadata.patch() {
+                        Ok(patch) => self.query("metadata.patch", json!({"asset_id": asset.id, "output": self.output, "patch": patch}), Action::Plan(self.generation), ui.ctx()),
+                        Err(error) => self.error = Some(error),
+                    }
+                }
+            });
             self.preview_source_panel(ui, asset);
         });
     }
@@ -463,6 +550,16 @@ impl WizApp {
                                 ));
                             }
                         }
+                    });
+                }
+                if let Some(patch) = &plan.resolution.metadata_patch {
+                    ui.group(|ui| {
+                        match patch.target {
+                            Target::Global {} => ui.strong("Container tags"),
+                            Target::Stream { index } => ui.strong(format!("Original stream {index} tags")),
+                        };
+                        for (name, value) in &patch.set { ui.label(format!("Set {name} = {value}")); }
+                        for name in &patch.remove { ui.label(format!("Remove {name}")); }
                     });
                 }
                 for warning in &plan.resolution.warnings {

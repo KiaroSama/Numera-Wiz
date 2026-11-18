@@ -75,6 +75,11 @@ enum Mode {
         #[command(subcommand)]
         command: human::Chapters,
     },
+    /// Review container and stream tag edits.
+    Metadata {
+        #[command(subcommand)]
+        command: human::Metadata,
+    },
     /// Review audio or subtitle disposition changes.
     Disposition {
         #[command(subcommand)]
@@ -339,6 +344,9 @@ async fn run() -> Result<()> {
                 Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
                 Some(Mode::Chapters { command }) => {
                     human::run(&client, human::Command::Chapters(command)).await
+                }
+                Some(Mode::Metadata { command }) => {
+                    human::run(&client, human::Command::Metadata(command)).await
                 }
                 Some(Mode::Disposition { command }) => {
                     human::run(&client, human::Command::Disposition(command)).await

@@ -133,6 +133,21 @@ The patch also accepts `add`, `remove` and `clear_all`. `add` and `remove` list
 FFmpeg disposition flag names. Exclusive default changes only the default bit
 on peers of the selected type. Submit the exact reviewed plan via `jobs.submit`.
 
+## Metadata changes
+
+`metadata.patch` reviews a stream-copy plan for a new `.mkv` destination. Set
+`target` to `{"scope":"global"}` for container tags or use the original stream
+index in `{"scope":"stream","index":2}`. Use lowercase ASCII tag names and
+UTF-8 values. The same `patch` object can be passed as the CLI patch file.
+
+```json
+{"params":{"asset_id":"<asset-id>","output":"<new-file.mkv>","patch":{"target":{"scope":"stream","index":2},"set":{"title":"Commentary"},"remove":["language"]}}}
+```
+
+Review the returned plan's metadata patch, then submit its ID and hash through
+`jobs.submit`. The worker verifies retained packet and chapter data alongside
+the requested metadata changes.
+
 ## Source frame preview
 
 `media.preview_frame` takes `asset_id`, `stream_index` and zero-based `frame`.

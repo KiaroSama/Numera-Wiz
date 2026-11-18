@@ -113,6 +113,7 @@ pub struct WizApp {
     file_times: nw_domain::file_times::FileTimeRequest,
     execution_limits: nw_domain::execution::CleanupLimits,
     patches: Vec<cleanup::PatchForm>,
+    metadata: cleanup::MetadataForm,
     audio_mode: usize,
     subtitle_mode: usize,
     audio_values: String,
@@ -287,9 +288,11 @@ impl WizApp {
                 subtitle_order: vec![],
                 stream_tag_patches: vec![],
                 disposition_patches: vec![],
+                metadata_patch: None,
                 preservation: Preservation::default(),
             },
             patches: vec![],
+            metadata: Default::default(),
             audio_mode: 0,
             subtitle_mode: 0,
             audio_values: String::new(),
@@ -332,6 +335,7 @@ impl WizApp {
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
         if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
             self.intent.disposition_patches.clear();
+            self.metadata = Default::default();
             self.source_preview = Default::default();
         }
         self.selected = Some(asset.id.clone());

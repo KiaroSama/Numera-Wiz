@@ -155,6 +155,18 @@ pub enum Chapters {
     },
 }
 #[derive(Subcommand)]
+pub enum Metadata {
+    /// Review selected container or stream tag changes from a JSON patch.
+    Patch {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        patch: PathBuf,
+    },
+}
+#[derive(Subcommand)]
 pub enum Disposition {
     /// Review explicit changes to the flags on a retained audio or subtitle stream.
     Patch {
@@ -335,6 +347,7 @@ pub enum Command {
     History(History),
     Media(Media),
     Chapters(Chapters),
+    Metadata(Metadata),
     Disposition(Disposition),
     Assets(Assets),
     Streams(Streams),
@@ -388,6 +401,13 @@ pub fn prepare(command: Command) -> Result<Request> {
             "chapters.remove",
             json!({"asset_id":asset,"output":native_path(&out)?}),
         ),
+        Command::Metadata(Metadata::Patch { asset, out, patch }) => {
+            let patch: nw_domain::metadata::Patch = commands::parse(document(&patch)?)?;
+            query(
+                "metadata.patch",
+                json!({"asset_id":asset,"output":native_path(&out)?,"patch":patch}),
+            )
+        }
         Command::Disposition(Disposition::Patch {
             asset,
             out,

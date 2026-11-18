@@ -62,6 +62,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `chapters inspect --asset ID` | Read exact chapter ticks, time bases and tags from the registered probe. |
 | `chapters export --asset ID` | Return UTF-8 FFmetadata and its SHA-256 digest. |
 | `chapters remove --asset ID --out PATH` | Review a stream-copy plan that removes chapters and preserves the retained streams and their metadata. |
+| `metadata patch --asset ID --out PATH --patch PATCH.json` | Review explicit changes to container tags or to one original stream in a new Matroska file. |
 | `disposition patch --asset ID --out PATH --stream INDEX --exclusive-default` | Review a plan that makes an audio or subtitle stream the only default of its type. |
 | `assets register PATH --replay-scope SCOPE --idempotency-key KEY` | Register one source with durable retry identity. |
 | `assets list` / `assets inspect ID` / `assets output ID` | Page assets, inspect one, or suggest a new output. |

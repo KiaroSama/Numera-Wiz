@@ -1080,6 +1080,7 @@ impl Service {
                 "capabilities.refresh",
                 "chapters.remove",
                 "disposition.patch",
+                "metadata.patch",
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
@@ -1628,7 +1629,7 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "chapters.remove" | "disposition.patch" => {
+            "streams.clean" | "chapters.remove" | "disposition.patch" | "metadata.patch" => {
                 let input = match request.command.id.as_str() {
                     "chapters.remove" => {
                         commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
@@ -1636,6 +1637,9 @@ impl Service {
                     "disposition.patch" => {
                         commands::parse::<nw_domain::dispositions::PatchInput>(params)?
                             .into_cleanup()
+                    }
+                    "metadata.patch" => {
+                        commands::parse::<nw_domain::metadata::PatchInput>(params)?.into_cleanup()
                     }
                     _ => commands::parse::<CleanInput>(params)?,
                 };
@@ -2716,6 +2720,7 @@ mod tests {
             subtitle_order: Vec::new(),
             stream_tag_patches: Vec::new(),
             disposition_patches: Vec::new(),
+            metadata_patch: None,
             preservation: Preservation::default(),
         };
         let output = root.path().join("output.mkv");
@@ -3167,6 +3172,7 @@ mod tests {
                 reasons: Vec::new(),
                 warnings: Vec::new(),
                 preservation: Preservation::default(),
+                metadata_patch: None,
             },
             argv_template: vec![identity.path.clone()],
             created_at: "1".into(),
@@ -3359,6 +3365,7 @@ mod tests {
             subtitle_order: Vec::new(),
             preservation: Preservation::default(),
             disposition_patches: Vec::new(),
+            metadata_patch: None,
             stream_tag_patches: (1..=64)
                 .map(|index| StreamTagPatch {
                     kind: StreamKind::Audio,
@@ -4107,6 +4114,7 @@ mod tests {
             subtitle_order: vec![],
             stream_tag_patches: vec![],
             disposition_patches: vec![],
+            metadata_patch: None,
             preservation: nw_domain::mux::Preservation::default(),
         };
         let params =

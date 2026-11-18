@@ -174,6 +174,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         ),
         chapter_export
     );
+    let metadata = json!({"asset_id":chapter_asset,"output":media.directory.path().join("sdk-metadata-review.mkv"),"patch":{
+        "target":{"scope":"stream","index":2},"set":{"title":"Reviewed by MCP"}
+    }});
+    let cli_metadata = cli.query("metadata.patch", metadata.clone()).await;
+    let sdk_metadata = call!(owner_bridge, "metadata.patch", metadata, json!({}));
+    assert_eq!(cli_metadata["hash"], sdk_metadata["hash"]);
+    assert_eq!(sdk_metadata["resolution"]["streams"][2]["tags"]["title"], "Reviewed by MCP");
     owner_bridge.cancel().await.unwrap();
     let no_source = cli
         .raw(&Request::query(
@@ -801,6 +808,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
+    chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 
     let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
