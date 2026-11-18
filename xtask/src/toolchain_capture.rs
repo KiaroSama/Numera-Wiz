@@ -1,6 +1,6 @@
 //! Hosted, authenticated metadata capture; deliberately not a toolchain builder.
-mod cases;
 mod bootstrap;
+mod cases;
 mod evidence;
 mod inner;
 mod metadata;

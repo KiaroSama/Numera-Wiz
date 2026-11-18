@@ -1,5 +1,5 @@
 //! Verify the dated compiler package closure before any offline installation.
-use super::{metadata, process, standard_linux, CONFIG};
+use super::{CONFIG, metadata, process, standard_linux};
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -37,11 +37,15 @@ struct Tool<'a> {
 }
 
 fn text<'a>(value: &'a Value, field: &str) -> Result<&'a str> {
-    value[field].as_str().with_context(|| format!("Missing package lock field {field}"))
+    value[field]
+        .as_str()
+        .with_context(|| format!("Missing package lock field {field}"))
 }
 
 fn number(value: &Value, field: &str) -> Result<u64> {
-    value[field].as_u64().with_context(|| format!("Invalid package lock integer {field}"))
+    value[field]
+        .as_u64()
+        .with_context(|| format!("Invalid package lock integer {field}"))
 }
 
 fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
@@ -52,10 +56,16 @@ fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
             && lock["snapshot"] == capture["snapshot"],
         "The package lock must supplement the same OCI image and Ubuntu snapshot"
     );
-    for field in ["base_status_sha256", "base_inventory_sha256", "final_inventory_sha256"] {
+    for field in [
+        "base_status_sha256",
+        "base_inventory_sha256",
+        "final_inventory_sha256",
+    ] {
         metadata::sha256(text(lock, field)?)?;
     }
-    let rows = lock["packages"].as_array().context("Missing package closure")?;
+    let rows = lock["packages"]
+        .as_array()
+        .context("Missing package closure")?;
     let count = number(lock, "package_count")?;
     ensure!(
         (1..=256).contains(&count)
@@ -73,7 +83,9 @@ fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
             path.starts_with("pool/")
                 && path.ends_with(".deb")
                 && path.split('/').all(|part| !matches!(part, "" | "." | ".."))
-                && path.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".+~-_/".contains(&byte)),
+                && path
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b".+~-_/".contains(&byte)),
             "Unsafe snapshot package path"
         );
         let name = text(row, "name")?;
@@ -81,22 +93,42 @@ fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
         let architecture = text(row, "architecture")?;
         ensure!(
             !name.is_empty()
-                && name.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b".+-".contains(&byte))
+                && name.bytes().all(|byte| byte.is_ascii_lowercase()
+                    || byte.is_ascii_digit()
+                    || b".+-".contains(&byte))
                 && !version.is_empty()
-                && version.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".+:~-".contains(&byte))
+                && version
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b".+:~-".contains(&byte))
                 && matches!(architecture, "amd64" | "all"),
             "Invalid Debian package identity"
         );
         let basename = path.rsplit('/').next().context("Package basename")?;
-        ensure!(paths.insert(basename) && identities.insert((name, architecture)), "Duplicate package");
+        ensure!(
+            paths.insert(basename) && identities.insert((name, architecture)),
+            "Duplicate package"
+        );
         let size = number(row, "size")?;
-        ensure!((1..=PACKAGE_LIMIT).contains(&size), "Package payload exceeds its bound");
+        ensure!(
+            (1..=PACKAGE_LIMIT).contains(&size),
+            "Package payload exceeds its bound"
+        );
         total = process::check_count(total, size, CLOSURE_LIMIT)?;
         let sha256 = text(row, "sha256")?;
         metadata::sha256(sha256)?;
-        packages.push(Package { filename: path, name, architecture, version, size, sha256 });
+        packages.push(Package {
+            filename: path,
+            name,
+            architecture,
+            version,
+            size,
+            sha256,
+        });
     }
-    ensure!(total == number(lock, "download_bytes")?, "Package closure byte count differs");
+    ensure!(
+        total == number(lock, "download_bytes")?,
+        "Package closure byte count differs"
+    );
     Ok(packages)
 }
 
@@ -112,7 +144,9 @@ fn load_nasm(capture: &Value) -> Result<Tool<'_>> {
     let filename = url.rsplit('/').next().context("NASM archive filename")?;
     ensure!(
         !version.is_empty()
-            && version.bytes().all(|byte| byte.is_ascii_digit() || byte == b'.')
+            && version
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || byte == b'.')
             && filename == format!("nasm-{version}.tar.xz")
             && url == format!("https://www.nasm.us/pub/nasm/releasebuilds/{version}/{filename}"),
         "Unexpected NASM source archive"
@@ -124,12 +158,22 @@ fn load_nasm(capture: &Value) -> Result<Tool<'_>> {
     );
     let sha256 = text(row, "sha256")?;
     metadata::sha256(sha256)?;
-    Ok(Tool { version, url, filename, size, sha256 })
+    Ok(Tool {
+        version,
+        url,
+        filename,
+        size,
+        sha256,
+    })
 }
 
 pub(super) fn verify(path: &Path, size: u64, expected_sha256: &str) -> Result<()> {
     let mut file = File::open(path)?;
-    ensure!(file.metadata()?.len() == size, "Archive size differs for {}", path.display());
+    ensure!(
+        file.metadata()?.len() == size,
+        "Archive size differs for {}",
+        path.display()
+    );
     let mut hash = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
     let mut total = 0;
@@ -157,7 +201,10 @@ fn download(
     deadline: Instant,
     allow_https_redirect: bool,
 ) -> Result<()> {
-    let mut partial_name = output.file_name().context("Missing download filename")?.to_owned();
+    let mut partial_name = output
+        .file_name()
+        .context("Missing download filename")?
+        .to_owned();
     partial_name.push(".partial");
     let partial = output.with_file_name(partial_name);
     let length = size.to_string();
@@ -165,20 +212,25 @@ fn download(
     let transfer_seconds = seconds.to_string();
     let mut command = process::command("/usr/bin/curl");
     command.args([
-        "--disable", "--silent", "--show-error", "--fail", "--proto", "=https",
-        "--max-time", &transfer_seconds, "--max-filesize", &length,
+        "--disable",
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--proto",
+        "=https",
+        "--max-time",
+        &transfer_seconds,
+        "--max-filesize",
+        &length,
     ]);
     if allow_https_redirect {
         command.args(["--location", "--max-redirs", "5", "--proto-redir", "=https"]);
     }
     command.args(["--", url]);
-    let response = process::run(
-        &mut command,
-        deadline,
-        seconds + 5,
-        Some(&partial),
-    )?;
-    response.success().with_context(|| format!("Fetch {}", output.display()))?;
+    let response = process::run(&mut command, deadline, seconds + 5, Some(&partial))?;
+    response
+        .success()
+        .with_context(|| format!("Fetch {}", output.display()))?;
     verify(&partial, size, expected_sha256)?;
     fs::rename(&partial, output)?;
     Ok(())
@@ -197,7 +249,9 @@ fn inventory(deadline: Instant) -> Result<(String, usize)> {
     found.success()?;
     let mut records = BTreeSet::new();
     for line in found.text()?.lines() {
-        let (identity, status) = line.rsplit_once('\t').context("Invalid installed package record")?;
+        let (identity, status) = line
+            .rsplit_once('\t')
+            .context("Invalid installed package record")?;
         if status == "install ok installed" {
             ensure!(
                 identity.split('\t').count() == 3 && records.insert(identity),
@@ -213,7 +267,11 @@ fn inventory(deadline: Instant) -> Result<(String, usize)> {
     Ok((hex::encode(hash.finalize()), records.len()))
 }
 
-pub(super) fn run_tool(command: &mut Command, deadline: Instant, seconds: u64) -> Result<process::Output> {
+pub(super) fn run_tool(
+    command: &mut Command,
+    deadline: Instant,
+    seconds: u64,
+) -> Result<process::Output> {
     let output = process::run(command, deadline, seconds, None)?;
     output.success()?;
     Ok(output)
@@ -227,7 +285,12 @@ fn build_nasm(tool: &Tool<'_>, deadline: Instant) -> Result<Value> {
     run_tool(
         process::command("/usr/bin/tar")
             .current_dir(source)
-            .args(["--extract", "--no-same-owner", "--strip-components=1", "--file"])
+            .args([
+                "--extract",
+                "--no-same-owner",
+                "--strip-components=1",
+                "--file",
+            ])
             .arg(&archive),
         deadline,
         20,
@@ -255,8 +318,15 @@ fn build_nasm(tool: &Tool<'_>, deadline: Instant) -> Result<Value> {
         deadline,
         10,
     )?;
-    let version = observed.text()?.lines().next().context("Missing NASM version")?;
-    ensure!(version.len() <= 256 && version.contains(tool.version), "NASM reported a different version");
+    let version = observed
+        .text()?
+        .lines()
+        .next()
+        .context("Missing NASM version")?;
+    ensure!(
+        version.len() <= 256 && version.contains(tool.version),
+        "NASM reported a different version"
+    );
     Ok(json!({"version":version,"archive_sha256":tool.sha256}))
 }
 
@@ -275,22 +345,29 @@ fn guest(lock: &Value, packages: &[Package<'_>], nasm: &Tool<'_>) -> Result<()> 
         "Installed base package identities differ from the reviewed OCI capture"
     );
     let mut install = process::command("/usr/bin/apt-get");
-    install
-        .env("DEBIAN_FRONTEND", "noninteractive")
-        .args([
-            "-o", "Dir::Etc::sourcelist=/dev/null",
-            "-o", "Dir::Etc::sourceparts=/nonexistent",
-            "--no-install-recommends", "--no-install-suggests",
-            "--no-remove", "--assume-yes", "install",
-        ]);
+    install.env("DEBIAN_FRONTEND", "noninteractive").args([
+        "-o",
+        "Dir::Etc::sourcelist=/dev/null",
+        "-o",
+        "Dir::Etc::sourceparts=/nonexistent",
+        "--no-install-recommends",
+        "--no-install-suggests",
+        "--no-remove",
+        "--assume-yes",
+        "install",
+    ]);
     for package in packages {
-        let name = Path::new(package.filename).file_name().context("Package filename")?;
+        let name = Path::new(package.filename)
+            .file_name()
+            .context("Package filename")?;
         let path = Path::new(GUEST_PACKAGES).join(name);
         verify(&path, package.size, package.sha256)?;
         install.arg(path);
     }
     let installed = process::run(&mut install, deadline, 150, None)?;
-    installed.success().context("Offline Debian package installation")?;
+    installed
+        .success()
+        .context("Offline Debian package installation")?;
     let (final_hash, count) = inventory(deadline)?;
     ensure!(
         final_hash == text(lock, "final_inventory_sha256")?
@@ -298,19 +375,33 @@ fn guest(lock: &Value, packages: &[Package<'_>], nasm: &Tool<'_>) -> Result<()> 
         "Installed closure differs from the reviewed package inventory"
     );
     let mut observed = serde_json::Map::new();
-    for program in ["/usr/bin/gcc-13", "/usr/bin/g++-13", "/usr/bin/make", "/usr/bin/pkgconf", "/usr/bin/python3"] {
-        let result = process::run(process::command(program).arg("--version"), deadline, 5, None)?;
+    for program in [
+        "/usr/bin/gcc-13",
+        "/usr/bin/g++-13",
+        "/usr/bin/make",
+        "/usr/bin/pkgconf",
+        "/usr/bin/python3",
+    ] {
+        let result = process::run(
+            process::command(program).arg("--version"),
+            deadline,
+            5,
+            None,
+        )?;
         result.success()?;
-        let version = result.text()?.lines().next().context("Tool did not identify its version")?;
-        ensure!(!version.is_empty() && version.len() <= 256, "Compiler version exceeds its bound");
+        let version = result
+            .text()?
+            .lines()
+            .next()
+            .context("Tool did not identify its version")?;
+        ensure!(
+            !version.is_empty() && version.len() <= 256,
+            "Compiler version exceeds its bound"
+        );
         observed.insert(program.into(), json!(version));
     }
     let nasm = build_nasm(nasm, deadline)?;
-    let profile = standard_linux::build(
-        Path::new(GUEST_PACKAGES),
-        &lock["ffmpeg"],
-        deadline,
-    )?;
+    let profile = standard_linux::build(Path::new(GUEST_PACKAGES), &lock["ffmpeg"], deadline)?;
     println!(
         "{}",
         json!({
@@ -329,19 +420,46 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
     let image = text(lock, "base")?;
     let deadline = Instant::now() + Duration::from_secs(1470);
     let docker = |args: &[&str], seconds: u64| -> Result<process::Output> {
-        let result = process::run(process::command("/usr/bin/docker").args(args), deadline, seconds, None)?;
+        let result = process::run(
+            process::command("/usr/bin/docker").args(args),
+            deadline,
+            seconds,
+            None,
+        )?;
         result.success()?;
         Ok(result)
     };
     docker(&["pull", "--platform", "linux/amd64", image], 100)?;
-    let mount = format!("type=bind,src={},dst={GUEST_PACKAGES},readonly", directory.display());
+    let mount = format!(
+        "type=bind,src={},dst={GUEST_PACKAGES},readonly",
+        directory.display()
+    );
     let created = docker(
         &[
-            "create", "--platform", "linux/amd64", "--pull", "never",
-            "--network", "none", "--memory", "3g", "--cpus", "4", "--pids-limit", "128",
-            "--security-opt", "no-new-privileges", "--mount", &mount,
-            "--env", "NW_TOOLCHAIN_BOOTSTRAP_WORKER=1", "--entrypoint", GUEST_XTASK,
-            image, "build-standard-linux-profile", "--offline-install-worker",
+            "create",
+            "--platform",
+            "linux/amd64",
+            "--pull",
+            "never",
+            "--network",
+            "none",
+            "--memory",
+            "3g",
+            "--cpus",
+            "4",
+            "--pids-limit",
+            "128",
+            "--security-opt",
+            "no-new-privileges",
+            "--mount",
+            &mount,
+            "--env",
+            "NW_TOOLCHAIN_BOOTSTRAP_WORKER=1",
+            "--entrypoint",
+            GUEST_XTASK,
+            image,
+            "build-standard-linux-profile",
+            "--offline-install-worker",
         ],
         15,
     )?;
@@ -352,7 +470,9 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
         docker(
             &[
                 "cp",
-                executable.to_str().context("Compiler worker executable path")?,
+                executable
+                    .to_str()
+                    .context("Compiler worker executable path")?,
                 &format!("{container}:{GUEST_XTASK}"),
             ],
             25,
@@ -366,8 +486,11 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
         );
         docker(
             &[
-                "cp", &format!("{container}:{}", standard_linux::DELIVERY),
-                delivery.to_str().context("Standard profile delivery path")?,
+                "cp",
+                &format!("{container}:{}", standard_linux::DELIVERY),
+                delivery
+                    .to_str()
+                    .context("Standard profile delivery path")?,
             ],
             40,
         )?;
@@ -375,9 +498,16 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
     })();
     let mut cleanup = process::command("/usr/bin/docker");
     cleanup.args(["rm", "--force", container]);
-    let cleanup = process::run(&mut cleanup, Instant::now() + Duration::from_secs(15), 15, None)?;
+    let cleanup = process::run(
+        &mut cleanup,
+        Instant::now() + Duration::from_secs(15),
+        15,
+        None,
+    )?;
     if result.is_ok() {
-        cleanup.success().context("Remove the completed offline compiler container")?;
+        cleanup
+            .success()
+            .context("Remove the completed offline compiler container")?;
     } else if cleanup.success().is_err() {
         tracing::warn!("Failed to confirm removal of the temporary offline compiler container");
     }
@@ -385,77 +515,181 @@ fn offline_install(directory: &Path, delivery: &Path, lock: &Value) -> Result<Va
 }
 
 fn qualify_relocated(delivery: &Path, image: &str) -> Result<Value> {
-    let mount = format!("type=bind,src={},dst=/relocated/media,readonly", delivery.display());
+    let mount = format!(
+        "type=bind,src={},dst=/relocated/media,readonly",
+        delivery.display()
+    );
     let deadline = Instant::now() + Duration::from_secs(55);
     let run = |executable, arguments: &[&str]| {
         run_tool(
-            process::command("/usr/bin/docker").args([
-                "run", "--rm", "--pull", "never", "--platform", "linux/amd64",
-                "--network", "none", "--memory", "512m", "--cpus", "2", "--pids-limit", "64",
-                "--mount", &mount, "--entrypoint", executable, image,
-            ]).args(arguments),
+            process::command("/usr/bin/docker")
+                .args([
+                    "run",
+                    "--rm",
+                    "--pull",
+                    "never",
+                    "--platform",
+                    "linux/amd64",
+                    "--network",
+                    "none",
+                    "--memory",
+                    "512m",
+                    "--cpus",
+                    "2",
+                    "--pids-limit",
+                    "64",
+                    "--mount",
+                    &mount,
+                    "--entrypoint",
+                    executable,
+                    image,
+                ])
+                .args(arguments),
             deadline,
             20,
         )
     };
-    let video = run("/relocated/media/bin/ffprobe", &[
-        "-v", "error", "-show_entries", "stream=codec_name,width,height", "-of", "json",
-        "/relocated/media/qualification/h264.mkv",
-    ])?;
+    let video = run(
+        "/relocated/media/bin/ffprobe",
+        &[
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,width,height",
+            "-of",
+            "json",
+            "/relocated/media/qualification/h264.mkv",
+        ],
+    )?;
     let video: Value = serde_json::from_slice(&video.stdout)?;
-    ensure!(video["streams"] == json!([{"codec_name":"h264","width":128,"height":128}]),
-        "Fresh container could not inspect the relocated H.264 fixture");
-    let subtitles = run("/relocated/media/bin/ffmpeg", &["-hide_banner", "-h", "filter=subtitles"])?;
-    ensure!(subtitles.text()?.contains("wrap_unicode"), "Bundled libass has no Unicode-wrap support");
-    fs::write(delivery.join("qualification/shape.vgs"), b"rect 16 16 80 80\nsetcolor red\nfill\n")?;
-    fs::write(delivery.join("qualification/subtitles.srt"), "1\n00:00:00,000 --> 00:00:00,800\nسلام دنیا · Numera Wiz\n")?;
+    ensure!(
+        video["streams"] == json!([{"codec_name":"h264","width":128,"height":128}]),
+        "Fresh container could not inspect the relocated H.264 fixture"
+    );
+    let subtitles = run(
+        "/relocated/media/bin/ffmpeg",
+        &["-hide_banner", "-h", "filter=subtitles"],
+    )?;
+    ensure!(
+        subtitles.text()?.contains("wrap_unicode"),
+        "Bundled libass has no Unicode-wrap support"
+    );
+    fs::write(
+        delivery.join("qualification/shape.vgs"),
+        b"rect 16 16 80 80\nsetcolor red\nfill\n",
+    )?;
+    fs::write(
+        delivery.join("qualification/subtitles.srt"),
+        "1\n00:00:00,000 --> 00:00:00,800\nسلام دنیا · Numera Wiz\n",
+    )?;
     let render = |filter: Option<&str>| {
         let mut arguments = vec![
-            "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "color=size=128x128:rate=4:duration=1",
+            "-hide_banner",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=size=128x128:rate=4:duration=1",
         ];
         if let Some(filter) = filter {
             arguments.extend(["-vf", filter]);
         }
-        arguments.extend(["-frames:v", "4", "-pix_fmt", "yuv420p", "-f", "framehash", "-hash", "sha256", "-"]);
+        arguments.extend([
+            "-frames:v",
+            "4",
+            "-pix_fmt",
+            "yuv420p",
+            "-f",
+            "framehash",
+            "-hash",
+            "sha256",
+            "-",
+        ]);
         run("/relocated/media/bin/ffmpeg", &arguments)
     };
     let baseline = render(None)?;
     let mut effects = serde_json::Map::new();
     for (name, filter) in [
-        ("text", "drawtext=fontfile=/relocated/media/fonts/DejaVuSans.ttf:text=Numera:fontcolor=white:x=8:y=8"),
-        ("vector", "drawvg=file=/relocated/media/qualification/shape.vgs"),
-        ("subtitles", "subtitles=filename=/relocated/media/qualification/subtitles.srt:fontsdir=/relocated/media/fonts:force_style='FontName=DejaVu Sans':wrap_unicode=1"),
+        (
+            "text",
+            "drawtext=fontfile=/relocated/media/fonts/DejaVuSans.ttf:text=Numera:fontcolor=white:x=8:y=8",
+        ),
+        (
+            "vector",
+            "drawvg=file=/relocated/media/qualification/shape.vgs",
+        ),
+        (
+            "subtitles",
+            "subtitles=filename=/relocated/media/qualification/subtitles.srt:fontsdir=/relocated/media/fonts:force_style='FontName=DejaVu Sans':wrap_unicode=1",
+        ),
     ] {
         let rendered = render(Some(filter))?;
-        let frames = rendered.text()?.lines().filter(|line| !line.is_empty() && !line.starts_with('#'))
+        let frames = rendered
+            .text()?
+            .lines()
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
             .collect::<Vec<_>>();
-        let baseline_frames = baseline.text()?.lines().filter(|line| !line.is_empty() && !line.starts_with('#'));
-        ensure!(frames.len() == 4 && !frames.iter().copied().eq(baseline_frames),
-            "Fresh container produced no {name} pixels with the bundled component");
-        fs::write(delivery.join(format!("qualification/offline-{name}.framehash.txt")), &rendered.stdout)?;
-        effects.insert(name.into(), json!({"frames":frames.len(),"sha256":metadata::digest(&rendered.stdout)}));
+        let baseline_frames = baseline
+            .text()?
+            .lines()
+            .filter(|line| !line.is_empty() && !line.starts_with('#'));
+        ensure!(
+            frames.len() == 4 && !frames.iter().copied().eq(baseline_frames),
+            "Fresh container produced no {name} pixels with the bundled component"
+        );
+        fs::write(
+            delivery.join(format!("qualification/offline-{name}.framehash.txt")),
+            &rendered.stdout,
+        )?;
+        effects.insert(
+            name.into(),
+            json!({"frames":frames.len(),"sha256":metadata::digest(&rendered.stdout)}),
+        );
     }
-    Ok(json!({"base":image,"network":"none","subtitles_wrap_unicode":true,"effects":effects,"probed":video}))
+    Ok(
+        json!({"base":image,"network":"none","subtitles_wrap_unicode":true,"effects":effects,"probed":video}),
+    )
 }
 
 fn source_closure(profile: &Value, snapshot: &str) -> Result<Value> {
     let locked: Value = serde_json::from_str(SOURCE_LOCK)?;
-    ensure!(locked["snapshot"] == snapshot, "Corresponding sources use a different Ubuntu snapshot");
-    let libraries = profile["runtime"]["package_provenance"].as_object().context("Missing native source identities")?;
-    let native = libraries.values().chain(std::iter::once(&profile["font"]["provenance"]));
-    let observed = native.map(|row| Ok((text(row, "source")?, text(row, "source_version")?)))
+    ensure!(
+        locked["snapshot"] == snapshot,
+        "Corresponding sources use a different Ubuntu snapshot"
+    );
+    let libraries = profile["runtime"]["package_provenance"]
+        .as_object()
+        .context("Missing native source identities")?;
+    let native = libraries
+        .values()
+        .chain(std::iter::once(&profile["font"]["provenance"]));
+    let observed = native
+        .map(|row| Ok((text(row, "source")?, text(row, "source_version")?)))
         .collect::<Result<BTreeSet<_>>>()?;
-    let sources = locked["source_packages"].as_array().context("Missing corresponding-source lock")?;
-    let expected = sources.iter().map(|row| Ok((text(row, "name")?, text(row, "version")?)))
+    let sources = locked["source_packages"]
+        .as_array()
+        .context("Missing corresponding-source lock")?;
+    let expected = sources
+        .iter()
+        .map(|row| Ok((text(row, "name")?, text(row, "version")?)))
         .collect::<Result<BTreeSet<_>>>()?;
-    ensure!(observed == expected && expected.len() == sources.len(), "Native payload and source lock differ");
-    Ok(json!({"package_count":expected.len(),"source_lock_sha256":metadata::digest(SOURCE_LOCK.as_bytes()),
-        "total_source_bytes":number(&locked, "total_source_bytes")?}))
+    ensure!(
+        observed == expected && expected.len() == sources.len(),
+        "Native payload and source lock differ"
+    );
+    Ok(
+        json!({"package_count":expected.len(),"source_lock_sha256":metadata::digest(SOURCE_LOCK.as_bytes()),
+        "total_source_bytes":number(&locked, "total_source_bytes")?}),
+    )
 }
 
 fn source_archive(directory: &Path, delivery: &Path, media: &Value, snapshot: &str) -> Result<()> {
     let locked: Value = serde_json::from_str(SOURCE_LOCK)?;
-    let sources = locked["source_packages"].as_array().context("Missing corresponding-source lock")?;
+    let sources = locked["source_packages"]
+        .as_array()
+        .context("Missing corresponding-source lock")?;
     let archive_root = directory.join("corresponding-source");
     fs::create_dir(&archive_root)?;
     let name = text(media, "filename")?;
@@ -475,32 +709,70 @@ fn source_archive(directory: &Path, delivery: &Path, media: &Value, snapshot: &s
     let mut total = 0;
     for source in sources {
         let pool = text(source, "directory")?;
-        ensure!(pool.starts_with("pool/") && pool.split('/').all(|component| {
-            !matches!(component, "" | "." | "..") && component.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".+~_-".contains(&byte))
-        }), "Invalid corresponding-source directory");
-        for file in source["files"].as_array().context("Missing source archive members")? {
+        ensure!(
+            pool.starts_with("pool/")
+                && pool.split('/').all(|component| {
+                    !matches!(component, "" | "." | "..")
+                        && component
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b".+~_-".contains(&byte))
+                }),
+            "Invalid corresponding-source directory"
+        );
+        for file in source["files"]
+            .as_array()
+            .context("Missing source archive members")?
+        {
             let name = text(file, "filename")?;
-            ensure!(!matches!(name, "" | "." | "..") && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".+~_-".contains(&byte)),
-                "Invalid corresponding-source filename");
+            ensure!(
+                !matches!(name, "" | "." | "..")
+                    && name
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b".+~_-".contains(&byte)),
+                "Invalid corresponding-source filename"
+            );
             let size = number(file, "bytes")?;
-            ensure!((1..=process::FILE_LIMIT).contains(&size), "Corresponding-source payload too large");
+            ensure!(
+                (1..=process::FILE_LIMIT).contains(&size),
+                "Corresponding-source payload too large"
+            );
             total = process::check_count(total, size, 256 * 1024 * 1024)?;
             let digest = text(file, "sha256")?;
             metadata::sha256(digest)?;
-            ensure!(inputs.insert(name, (pool, size, digest)).is_none(), "Repeated corresponding-source archive");
+            ensure!(
+                inputs.insert(name, (pool, size, digest)).is_none(),
+                "Repeated corresponding-source archive"
+            );
         }
     }
-    ensure!(!inputs.is_empty() && total == number(&locked, "total_source_bytes")?, "Corresponding-source archive size differs");
+    ensure!(
+        !inputs.is_empty() && total == number(&locked, "total_source_bytes")?,
+        "Corresponding-source archive size differs"
+    );
     let input_rows = inputs.into_iter().collect::<Vec<_>>();
     std::thread::scope(|scope| -> Result<()> {
-        let workers = input_rows.chunks(input_rows.len().div_ceil(6)).map(|group| {
-            let archive_root = &archive_root;
-            scope.spawn(move || group.iter().try_for_each(|(name, (pool, size, digest))| {
-                download(&format!("{snapshot}/{pool}/{name}"), &archive_root.join(name), *size, digest, deadline, false)
-            }))
-        }).collect::<Vec<_>>();
+        let workers = input_rows
+            .chunks(input_rows.len().div_ceil(6))
+            .map(|group| {
+                let archive_root = &archive_root;
+                scope.spawn(move || {
+                    group.iter().try_for_each(|(name, (pool, size, digest))| {
+                        download(
+                            &format!("{snapshot}/{pool}/{name}"),
+                            &archive_root.join(name),
+                            *size,
+                            digest,
+                            deadline,
+                            false,
+                        )
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
         for worker in workers {
-            worker.join().map_err(|_| anyhow::anyhow!("Corresponding-source staging worker stopped"))??;
+            worker
+                .join()
+                .map_err(|_| anyhow::anyhow!("Corresponding-source staging worker stopped"))??;
         }
         Ok(())
     })?;
@@ -509,9 +781,11 @@ fn source_archive(directory: &Path, delivery: &Path, media: &Value, snapshot: &s
     let destination = delivery.join("corresponding-source.tar");
     let deadline = Instant::now() + Duration::from_secs(40);
     run_tool(
-        process::command("/usr/bin/tar").current_dir(directory)
+        process::command("/usr/bin/tar")
+            .current_dir(directory)
             .args(["--create", "--sort=name", "--format=posix", "--file"])
-            .arg(destination).arg("corresponding-source"),
+            .arg(destination)
+            .arg("corresponding-source"),
         deadline,
         40,
     )?;
@@ -535,7 +809,8 @@ pub(super) fn run(root: &Path) -> Result<()> {
         "Staging compiler payloads requires a hosted Linux x64 job"
     );
     let source = crate::package::source(root)?;
-    let parent = nw_platform::security::private_directory(&root.join("target/toolchain-bootstrap"))?;
+    let parent =
+        nw_platform::security::private_directory(&root.join("target/toolchain-bootstrap"))?;
     let directory = parent.join(format!("packages-{}", std::process::id()));
     fs::create_dir(&directory)?;
     let snapshot = text(&lock, "snapshot")?;
@@ -547,7 +822,9 @@ pub(super) fn run(root: &Path) -> Result<()> {
                 let directory = &directory;
                 scope.spawn(move || {
                     group.iter().try_for_each(|package| {
-                        let name = Path::new(package.filename).file_name().context("Package filename")?;
+                        let name = Path::new(package.filename)
+                            .file_name()
+                            .context("Package filename")?;
                         download(
                             &format!("{snapshot}/{}", package.filename),
                             &directory.join(name),
@@ -561,7 +838,9 @@ pub(super) fn run(root: &Path) -> Result<()> {
             })
             .collect();
         for handle in handles {
-            handle.join().map_err(|_| anyhow::anyhow!("Package staging worker stopped"))??;
+            handle
+                .join()
+                .map_err(|_| anyhow::anyhow!("Package staging worker stopped"))??;
         }
         Ok(())
     });
@@ -570,7 +849,12 @@ pub(super) fn run(root: &Path) -> Result<()> {
     }
     result?;
     download(
-        nasm.url, &directory.join(nasm.filename), nasm.size, nasm.sha256, deadline, true,
+        nasm.url,
+        &directory.join(nasm.filename),
+        nasm.size,
+        nasm.sha256,
+        deadline,
+        true,
     )?;
     let media = &lock["ffmpeg"];
     let media_name = text(media, "filename")?;
@@ -582,21 +866,42 @@ pub(super) fn run(root: &Path) -> Result<()> {
     );
     let media_sha = text(media, "sha256")?;
     metadata::sha256(media_sha)?;
-    download(media_url, &directory.join(media_name), number(media, "size")?, media_sha, deadline, false)?;
+    download(
+        media_url,
+        &directory.join(media_name),
+        number(media, "size")?,
+        media_sha,
+        deadline,
+        false,
+    )?;
     let delivery = parent.join(format!("profile-{}", std::process::id()));
     let installed = offline_install(&directory, &delivery, &lock)?;
     let relocated = qualify_relocated(&delivery, text(&lock, "base")?)?;
     let corresponding = source_closure(&installed["ffmpeg"], snapshot)?;
     source_archive(&directory, &delivery, media, snapshot)?;
     run_tool(
-        process::command("/usr/bin/tar").current_dir(&delivery)
-            .args(["--create", "--gzip", "--sort=name", "--file", "linux-x64-ffmpeg-component.tar.gz", "bin", "fonts", "notices"]),
+        process::command("/usr/bin/tar")
+            .current_dir(&delivery)
+            .args([
+                "--create",
+                "--gzip",
+                "--sort=name",
+                "--file",
+                "linux-x64-ffmpeg-component.tar.gz",
+                "bin",
+                "fonts",
+                "notices",
+            ]),
         Instant::now() + Duration::from_secs(65),
         65,
     )?;
-    let archives = ["linux-x64-ffmpeg-component.tar.gz", "corresponding-source.tar"].into_iter()
-        .map(|name| Ok((name, crate::package::digest(&delivery.join(name))?)))
-        .collect::<Result<BTreeMap<_, _>>>()?;
+    let archives = [
+        "linux-x64-ffmpeg-component.tar.gz",
+        "corresponding-source.tar",
+    ]
+    .into_iter()
+    .map(|name| Ok((name, crate::package::digest(&delivery.join(name))?)))
+    .collect::<Result<BTreeMap<_, _>>>()?;
     let report = json!({
         "schema_version":1,
         "app_source":source,
@@ -612,7 +917,10 @@ pub(super) fn run(root: &Path) -> Result<()> {
         "corresponding_sources":corresponding,
         "archives":archives,
     });
-    let mut manifest = OpenOptions::new().write(true).create_new(true).open(delivery.join("verified-build.json"))?;
+    let mut manifest = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(delivery.join("verified-build.json"))?;
     serde_json::to_writer_pretty(&mut manifest, &report)?;
     manifest.write_all(b"\n")?;
     fs::remove_dir_all(&directory).context("Remove staging archives after building the profile")?;
