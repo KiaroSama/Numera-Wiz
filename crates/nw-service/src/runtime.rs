@@ -1623,8 +1623,12 @@ impl Service {
             }
             "streams.clean" | "chapters.remove" | "disposition.patch" => {
                 let input = match request.command.id.as_str() {
-                    "chapters.remove" => commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup(),
-                    "disposition.patch" => commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup(),
+                    "chapters.remove" => {
+                        commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
+                    }
+                    "disposition.patch" => {
+                        commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup()
+                    }
                     _ => commands::parse::<CleanInput>(params)?,
                 };
                 let plan = self.prepare_cleanup(&context, input, now)?;

@@ -368,7 +368,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Chapters(Chapters::Inspect { asset }) => {
             query("chapters.inspect", json!({"id":asset}))
         }
-        Command::Chapters(Chapters::Export { asset, include_global_metadata }) => query(
+        Command::Chapters(Chapters::Export {
+            asset,
+            include_global_metadata,
+        }) => query(
             "chapters.export",
             json!({"asset_id":asset,"include_global_metadata":include_global_metadata}),
         ),
@@ -376,10 +379,27 @@ pub fn prepare(command: Command) -> Result<Request> {
             "chapters.remove",
             json!({"asset_id":asset,"output":native_path(&out)?}),
         ),
-        Command::Disposition(Disposition::Patch { asset, out, stream, add, remove, clear_all, exclusive_default }) => query(
-            "disposition.patch",
-            json!({"asset_id":asset,"output":native_path(&out)?,"patch":{"stream":stream,"add":add,"remove":remove,"clear_all":clear_all,"exclusive_default":exclusive_default}}),
-        ),
+        Command::Disposition(Disposition::Patch {
+            asset,
+            out,
+            stream,
+            add,
+            remove,
+            clear_all,
+            exclusive_default,
+        }) => {
+            let patch = nw_domain::dispositions::Patch {
+                stream,
+                add,
+                remove,
+                clear_all,
+                exclusive_default,
+            };
+            query(
+                "disposition.patch",
+                json!({"asset_id":asset,"output":native_path(&out)?,"patch":patch}),
+            )
+        }
         Command::Media(Media::Probe { path, probe }) => {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
