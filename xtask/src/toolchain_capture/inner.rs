@@ -339,7 +339,16 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
             let destination = Path::new(WORK).join(format!("download-{pocket}-{component}.xz"));
             let mut download = apt("/usr/lib/apt/apt-helper", &["download-file", &url]);
             download.arg(&destination).arg(format!("SHA256:{hash}"));
-            let output = recorded_download(&mut download, deadline)?;
+            // The signed compressed size sets the transfer allowance. The
+            // worker deadline and the individual byte limit still cap it.
+            let transfer_seconds = 20 + size.div_ceil(512 * 1024).min(40);
+            let output = recorded(
+                raw,
+                &format!("download-{pocket}-{component}"),
+                &mut download,
+                deadline,
+                transfer_seconds,
+            )?;
             let compressed = if destination.exists() {
                 Some(raw.copy(
                     &format!("metadata/{pocket}/{component}/Packages.xz"),
@@ -348,14 +357,6 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
             } else {
                 None
             };
-            raw.bytes(
-                &format!("commands/download-{pocket}-{component}.stdout"),
-                &output.stdout,
-            )?;
-            raw.bytes(
-                &format!("commands/download-{pocket}-{component}.stderr"),
-                &output.stderr,
-            )?;
             output.success()?;
             let compressed =
                 compressed.context("successful helper download produced no raw index")?;
@@ -483,10 +484,6 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
         "snapshot lock has required unresolved rows"
     );
     Ok(())
-}
-
-fn recorded_download(command: &mut Command, deadline: Instant) -> Result<process::Output> {
-    process::run(command, deadline, 20, None)
 }
 
 fn package_row(fields: &Fields, index: &str) -> Result<Value> {
