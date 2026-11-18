@@ -10,6 +10,12 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+[CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
+all thirteen required jobs on `cbc8c9d`. It verified the four native builds
+and regressions, real native and Chrome input, registered frame and original
+WAVE cue queries through official clients, and larger-than-memory HTTP
+delivery. The same commit passed [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206665).
+
 The mixed timeline export adds a typed review for opaque video layering and
 overlapping audio windows. The implementation binds the original source asset
 and probe, verifies the captured revision and FFmpeg identities, uses per-job
