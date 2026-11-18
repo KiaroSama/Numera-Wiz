@@ -192,11 +192,11 @@ does not prove verified publication. Use actual terminal job/artifact facts.
 
 ## Validation and remaining qualification
 
-Static checks establish metadata/config syntax and documented routes. They do
-not establish native client execution or media/package support. Ordinary source
-builds and media/adapter tests remain hosted GitHub Actions work under project
-policy. No local Rust build, media job, client installation or remote publication
-is part of preparing these files.
+Claude Code 2.1.327 passed strict validation and reported the `numera-wiz`
+stdio server and `numera-wiz:numera-wiz` skill. Codex CLI 0.167.0-alpha.4 listed
+`numera-wiz@numera-wiz-local` version 0.1.0 from the repository's marketplace
+using temporary config overrides. The package includes the official PNG at
+`assets/icon.png`. Rust builds, media and adapter tests run in GitHub Actions.
 
 Validate the root portable manifest and MCP config against the published
 [plugin schema](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json) and
@@ -224,11 +224,10 @@ For each actual target client/version and OS, the qualification run must:
    malformed envelopes, denied paths, stale plans and resource limits. Record
    transport/client/package evidence rather than inferring parity from schemas.
 
-Native Claude/Codex/Cursor client installation/startup and packaged media
-journeys have not been executed for this integration. Full FFmWiz F01-F15,
-standalone/embedded MuxCls, editor/preview, standard offline packages and hardware
-qualification remain separate completion requirements. A metadata package does
-not close those gates.
+Live skill invocation and MCP calls in Claude Code, Codex, and Cursor remain
+pending. Full FFmWiz F01-F15, standalone and embedded MuxCls, editor and preview,
+standard offline packages and hardware qualification remain completion
+requirements.
 
 ## Official format evidence
 

@@ -12,6 +12,8 @@
     "longDescription": "Discover implemented Numera Wiz commands, inspect authorized media, review cleanup plans, submit and observe jobs, and retrieve verified artifacts. The default connection is discovery-only; an owner must configure any operating profile.",
     "developerName": "Numera Wiz contributors",
     "category": "Productivity",
+    "logo": "./assets/icon.png",
+    "composerIcon": "./assets/icon.png",
     "capabilities": ["Read", "Write"],
     "defaultPrompt": "Use Numera Wiz to discover the available commands and current limits, then help me review and perform an authorized media workflow."
   }
