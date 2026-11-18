@@ -85,7 +85,9 @@ pub const PROJECT_TARGET_COMMANDS: [&str; 11] = [
 pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     let project_action = match command {
         "projects.create" | "projects.list" => None,
-        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" => Some(ProjectAction::Read),
+        "projects.inspect" | "sequences.inspect" | "timeline.render" | "timeline.preview_frame" => {
+            Some(ProjectAction::Read)
+        }
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.remove" | "history.undo" | "history.redo" => {
             Some(ProjectAction::Edit)

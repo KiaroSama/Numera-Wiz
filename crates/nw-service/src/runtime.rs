@@ -1101,7 +1101,12 @@ impl Service {
             "timeline.render" => return self.media_review(&context, &request, &cancellation),
             "timeline.preview_frame" => {
                 drop(guard);
-                let frame = self.timeline_frame(&context, &request, commands::parse(params)?, cancellation.clone())?;
+                let frame = self.timeline_frame(
+                    &context,
+                    &request,
+                    commands::parse(params)?,
+                    cancellation.clone(),
+                )?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
             }
             "projects.list" => self.inventory_page(
@@ -1540,26 +1545,46 @@ impl Service {
             "chapters.wave_cues" => {
                 let input: IdInput = commands::parse(params)?;
                 let key = named("asset", &input.id)?;
-                let (asset, record_hash) = self.store.registered_asset_record(&key)?
+                let (asset, record_hash) = self
+                    .store
+                    .registered_asset_record(&key)?
                     .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &asset.id, &asset.creator)?;
                 let path = self.path(&context, Path::new(&asset.identity.path), false)?;
                 if path != Path::new(&asset.identity.path) {
-                    return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE path changed"));
+                    return Err(DomainError::new(
+                        "SOURCE_CHANGED",
+                        "Registered WAVE path changed",
+                    ));
                 }
                 drop(guard);
                 let stamp = files::SourceStamp::capture_resolved(&path)?;
                 let cues = nw_engine::inspect_wave_cues(&asset, &stamp, &cancellation)?;
                 let _guard = self.mutation.lock().map_err(|_| lock_error())?;
                 if cancellation.is_cancelled() {
-                    return Err(DomainError::new("CANCELLED", "Wave cue delivery was cancelled"));
+                    return Err(DomainError::new(
+                        "CANCELLED",
+                        "Wave cue delivery was cancelled",
+                    ));
                 }
-                if self.policy(&context)?.as_ref().is_some_and(|profile| !profile.allows_command(&request.command.id)) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Wave cue command grant changed"));
+                if self
+                    .policy(&context)?
+                    .as_ref()
+                    .is_some_and(|profile| !profile.allows_command(&request.command.id))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Wave cue command grant changed",
+                    ));
                 }
                 self.object(&context, &asset.id, &asset.creator)?;
-                if self.path(&context, &path, false)? != path || self.store.project_fact_hash(&key)? != record_hash {
-                    return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE authority changed"));
+                if self.path(&context, &path, false)? != path
+                    || self.store.project_fact_hash(&key)? != record_hash
+                {
+                    return Err(DomainError::new(
+                        "SOURCE_CHANGED",
+                        "Registered WAVE authority changed",
+                    ));
                 }
                 stamp.revalidate()?;
                 return Ok(Response::success(&request.request_id, cues).bounded());

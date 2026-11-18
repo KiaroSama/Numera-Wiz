@@ -9,7 +9,6 @@ mod progress;
 mod wave_cues;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
 pub use media::normalized_pair::NormalizedWindow;
-pub use wave_cues::inspect_original as inspect_wave_cues;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},
@@ -27,6 +26,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+pub use wave_cues::inspect_original as inspect_wave_cues;
 
 #[derive(Debug, Clone)]
 pub enum ExecutionEvent {

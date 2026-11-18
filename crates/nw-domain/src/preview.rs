@@ -1,5 +1,8 @@
 //! A bounded decoded frame from an explicitly selected registered source stream.
-use crate::{projects::{EntityId, ProjectId, Revision}, time::Rational};
+use crate::{
+    projects::{EntityId, ProjectId, Revision},
+    time::Rational,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +46,15 @@ pub struct TimelineFrameInput {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FrameOrigin {
     Gap {},
-    SolidColor { clip_id: EntityId },
-    Registered { clip_id: EntityId, asset_id: String, source_sha256: String, stream_index: u32 },
+    SolidColor {
+        clip_id: EntityId,
+    },
+    Registered {
+        clip_id: EntityId,
+        asset_id: String,
+        source_sha256: String,
+        stream_index: u32,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

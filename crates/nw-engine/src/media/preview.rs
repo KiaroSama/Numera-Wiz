@@ -29,7 +29,14 @@ impl Engine {
                 "Preview frame exceeds the supported index bound",
             ));
         }
-        self.preview_selected_frame(asset, source, stream_index, FrameSelection::Index(frame), cancel).await
+        self.preview_selected_frame(
+            asset,
+            source,
+            stream_index,
+            FrameSelection::Index(frame),
+            cancel,
+        )
+        .await
     }
 
     pub async fn preview_bound_frame(
@@ -40,17 +47,36 @@ impl Engine {
         at: Rational,
         cancel: CancellationToken,
     ) -> Result<Vec<u8>> {
-        if binding.media_kind != TrackKind::Video || binding.asset_id != asset.id
-            || binding.content_sha256 != asset.identity.sha256 || binding.time_base <= Rational::ZERO
-            || at < Rational::ZERO {
-            return Err(DomainError::new("INVALID_PLAN", "Timeline frame requires the bound original video stream"));
+        if binding.media_kind != TrackKind::Video
+            || binding.asset_id != asset.id
+            || binding.content_sha256 != asset.identity.sha256
+            || binding.time_base <= Rational::ZERO
+            || at < Rational::ZERO
+        {
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "Timeline frame requires the bound original video stream",
+            ));
         }
         let point = binding.asset_origin.checked_add(at)?;
-        let tick = point.checked_mul(Rational::new(binding.time_base.denominator(), binding.time_base.numerator())?)?;
+        let tick = point.checked_mul(Rational::new(
+            binding.time_base.denominator(),
+            binding.time_base.numerator(),
+        )?)?;
         if point < binding.stream_start || tick.denominator() != 1 || tick.numerator() == i64::MAX {
-            return Err(DomainError::new("FRAME_UNAVAILABLE", "No exact original video tick covers the selected timeline point"));
+            return Err(DomainError::new(
+                "FRAME_UNAVAILABLE",
+                "No exact original video tick covers the selected timeline point",
+            ));
         }
-        self.preview_selected_frame(asset, source, binding.stream_index, FrameSelection::OriginalTick(tick.numerator()), cancel).await
+        self.preview_selected_frame(
+            asset,
+            source,
+            binding.stream_index,
+            FrameSelection::OriginalTick(tick.numerator()),
+            cancel,
+        )
+        .await
     }
 
     async fn preview_selected_frame(
@@ -100,10 +126,17 @@ impl Engine {
         .await?;
         let (width, height) = (preview::WIDTH, preview::HEIGHT);
         let (preserve_clock, trim) = match selection {
-            FrameSelection::Index(frame) => (false, format!("trim=start_frame={frame}:end_frame={}", frame + 1)),
-            FrameSelection::OriginalTick(tick) => (true, format!("trim=start_pts={tick}:end_pts={}", tick + 1)),
+            FrameSelection::Index(frame) => (
+                false,
+                format!("trim=start_frame={frame}:end_frame={}", frame + 1),
+            ),
+            FrameSelection::OriginalTick(tick) => {
+                (true, format!("trim=start_pts={tick}:end_pts={}", tick + 1))
+            }
         };
-        let filters = format!("{trim},setpts=PTS-STARTPTS,scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba");
+        let filters = format!(
+            "{trim},setpts=PTS-STARTPTS,scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba"
+        );
         let mut args = [
             "-hide_banner",
             "-nostdin",

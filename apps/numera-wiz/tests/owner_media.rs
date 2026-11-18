@@ -176,7 +176,12 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         chapter_export
     );
     assert_eq!(
-        call!(owner_bridge, "chapters.wave_cues", json!({"id":wave_asset}), json!({})),
+        call!(
+            owner_bridge,
+            "chapters.wave_cues",
+            json!({"id":wave_asset}),
+            json!({})
+        ),
         wave_cues
     );
     let metadata = json!({"asset_id":chapter_asset,"output":media.directory.path().join("sdk-metadata-review.mkv"),"patch":{

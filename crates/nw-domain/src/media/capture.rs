@@ -408,7 +408,10 @@ fn capture_sequence<'a, R: RenderRead>(
         CaptureRange::Interval(range) => range,
         CaptureRange::VideoFrame(start) => TimeRange {
             start,
-            end: start.checked_add(Rational::new(settings.frame_rate.denominator(), settings.frame_rate.numerator())?)?,
+            end: start.checked_add(Rational::new(
+                settings.frame_rate.denominator(),
+                settings.frame_rate.numerator(),
+            )?)?,
         },
     };
     range.validate()?;
@@ -476,7 +479,13 @@ pub fn capture<R: RenderRead>(read: &R, input: &RenderInput) -> Result<Capture> 
         audio_grid,
         track_ids,
         ..
-    } = capture_sequence(read, &header.root_bin_id, header_raw.len(), &input.sequence_id, CaptureRange::Interval(input.range))?;
+    } = capture_sequence(
+        read,
+        &header.root_bin_id,
+        header_raw.len(),
+        &input.sequence_id,
+        CaptureRange::Interval(input.range),
+    )?;
     let mut unique_tracks = BTreeSet::new();
     let mut orders = BTreeSet::new();
     let mut enabled_video = None;

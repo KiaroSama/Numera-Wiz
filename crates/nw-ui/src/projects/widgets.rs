@@ -542,7 +542,9 @@ impl WizApp {
     }
 
     fn timeline_preview(&mut self, ui: &mut egui::Ui, group: &Group) {
-        let Some(sequence) = &group.view.sequence else { return; };
+        let Some(sequence) = &group.view.sequence else {
+            return;
+        };
         ui.collapsing("Timeline frame", |ui| {
             let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
             ui.add_enabled_ui(idle, |ui| {

@@ -35,13 +35,24 @@ pub enum Timeline {
 impl Timeline {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::PreviewFrame { project, revision, sequence, at } => {
+            Self::PreviewFrame {
+                project,
+                revision,
+                sequence,
+                at,
+            } => {
                 model::validate_id(&project)?;
                 model::validate_id(&sequence)?;
                 model::Revision::parse(&revision)?;
                 let at = super::projects::rational(&at)?;
-                let mut request = query("timeline.preview_frame", json!({"sequence_id":sequence,"revision":revision,"at":at}));
-                request.project = Some(commands::ProjectRef { id: project, expected_revision: None });
+                let mut request = query(
+                    "timeline.preview_frame",
+                    json!({"sequence_id":sequence,"revision":revision,"at":at}),
+                );
+                request.project = Some(commands::ProjectRef {
+                    id: project,
+                    expected_revision: None,
+                });
                 Ok(request)
             }
             Self::Render {

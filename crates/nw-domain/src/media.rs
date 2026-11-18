@@ -8,7 +8,10 @@ use crate::{
     time::{Rational, TimeRange},
 };
 pub use capture::capture;
-pub use capture::mixed::{CapturedOccurrence, CapturedTrack, MixedCapture, OccurrenceSource, capture_mixed, capture_mixed_frame, visible_occurrence};
+pub use capture::mixed::{
+    CapturedOccurrence, CapturedTrack, MixedCapture, OccurrenceSource, capture_mixed,
+    capture_mixed_frame, visible_occurrence,
+};
 pub use mixed_source::{BoundSource, bind_mixed_source};
 pub use plan::{MediaPlanV1, compile};
 use schemars::{JsonSchema, Schema, SchemaGenerator};

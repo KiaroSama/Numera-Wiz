@@ -150,9 +150,9 @@ impl Store {
         key: &str,
     ) -> Result<Option<(nw_domain::records::Asset, String)>> {
         valid_key(key)?;
-        let asset_id = key.strip_prefix("asset/").ok_or_else(|| {
-            DomainError::new("VALIDATION_ERROR", "Registered asset key required")
-        })?;
+        let asset_id = key
+            .strip_prefix("asset/")
+            .ok_or_else(|| DomainError::new("VALIDATION_ERROR", "Registered asset key required"))?;
         let read = self.db.begin_read().map_err(storage)?;
         let table = read.open_table(RECORDS).map_err(storage)?;
         let entry = table.get(key).map_err(storage)?;
@@ -160,7 +160,10 @@ impl Store {
         let bytes = entry.value();
         let asset: nw_domain::records::Asset = decode(bytes)?;
         if asset.id != asset_id {
-            return Err(DomainError::new("STORAGE_ERROR", "Registered asset identity differs from its key"));
+            return Err(DomainError::new(
+                "STORAGE_ERROR",
+                "Registered asset identity differs from its key",
+            ));
         }
         Ok(Some((asset, nw_domain::projects::hash(bytes))))
     }

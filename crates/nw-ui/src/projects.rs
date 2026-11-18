@@ -3,8 +3,8 @@ mod forms;
 #[cfg(test)]
 pub(super) mod tests;
 mod widgets;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::{Action, Asset, AssetSummary, Request, SnapshotPage, WizApp, egui};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use forms::Forms;
 use nw_domain::{
     commands::ProjectRef,
@@ -618,7 +618,13 @@ impl WizApp {
         Ok(true)
     }
     pub(super) fn project_request_failed(&mut self, action: Action) {
-        if matches!(action, Action::Project(ProjectAction { phase: Phase::PreviewFrame, .. })) {
+        if matches!(
+            action,
+            Action::Project(ProjectAction {
+                phase: Phase::PreviewFrame,
+                ..
+            })
+        ) {
             return;
         }
         if matches!(action, Action::Project(_))
@@ -934,9 +940,13 @@ impl WizApp {
                 return Ok(());
             }
             Phase::PreviewFrame => {
-                let frame: nw_domain::preview::TimelineFrame = serde_json::from_value(result)
-                    .map_err(|error| error.to_string())?;
-                let group = self.projects.group.as_ref().ok_or("No displayed project for this preview")?;
+                let frame: nw_domain::preview::TimelineFrame =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed project for this preview")?;
                 if frame.project_id.as_str() != group.key.project
                     || group.view.sequence.as_deref() != Some(frame.sequence_id.as_str())
                     || frame.revision.to_string() != group.key.revision
@@ -947,12 +957,19 @@ impl WizApp {
                 {
                     return Err("Timeline preview differs from the displayed project, sequence or selected time".into());
                 }
-                let rgba = STANDARD.decode(&frame.rgba_base64).map_err(|_| "Invalid frame pixel encoding")?;
+                let rgba = STANDARD
+                    .decode(&frame.rgba_base64)
+                    .map_err(|_| "Invalid frame pixel encoding")?;
                 if rgba.len() != nw_domain::preview::RGBA_BYTES {
                     return Err("Invalid timeline preview pixel count".into());
                 }
-                let image = egui::ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &rgba);
-                let texture = ctx.load_texture("timeline-preview-frame", image, egui::TextureOptions::LINEAR);
+                let image =
+                    egui::ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &rgba);
+                let texture = ctx.load_texture(
+                    "timeline-preview-frame",
+                    image,
+                    egui::TextureOptions::LINEAR,
+                );
                 self.projects.preview_frame = Some((frame.at, texture));
                 return Ok(());
             }
