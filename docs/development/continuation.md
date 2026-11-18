@@ -86,10 +86,19 @@ preserves its job name, target triple and previous-package artifact identity.
 [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
 CI309 on `72eddac` passed the four native build and regression jobs, Chrome,
-owner batch and transport tests, media, web and dependency lock. Apple Silicon
-ran on the standard macOS 26 runner. The formatting patch from CI309 was
-applied before the follow-up source changes.
+owner batch and transport tests, media, web, native UI, HTTP delivery and
+dependency lock. Gitleaks passed on the same commit. Apple Silicon ran on the
+standard macOS 26 runner. The formatting patch addressed the run's sole failure.
 [CI309](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44336531084)
+
+CI311 on `e197652` exposed an overstrict NUT comparison. The exact FFmpeg
+fixture from that run showed equal data, lengths and presentation times for
+all four video and 47 audio packets. FFprobe returned nested encoder and
+duration tags on the inputs even though the requested stream fields excluded
+them. The mux explicitly removes those tags. The verifier now projects the
+media fields explicitly. A component-level reproduction with the same binaries
+passed for both complete synthetic inputs and shortened frame/sample windows.
+[CI311](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44344745229)
 
 ## Hosted results at `2013c3e`
 

@@ -20,6 +20,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 const CANDIDATE_LIMIT: usize = 256 * 1024;
+const STREAM_FORMAT_FIELDS: &str = "codec_type,codec_name,width,height,pix_fmt,sample_rate,channels,channel_layout,sample_fmt,color_range,color_space,color_transfer,color_primaries";
 
 /// Source positions on the selected stream's decoded frame or sample grid.
 pub enum NormalizedWindow {
@@ -325,10 +326,13 @@ impl Engine {
     }
 
     async fn inspect_nut(&self, input: File, cancel: CancellationToken) -> Result<Value> {
+        let fields = format!(
+            "stream=index,time_base,{STREAM_FORMAT_FIELDS}:packet=stream_index,pts,size,data_hash"
+        );
         let mut args = [
             "-v", "error", "-max_alloc", "67108864",
             "-show_streams", "-show_packets", "-show_data_hash", "sha256", "-show_entries",
-            "stream=index,codec_type,codec_name,width,height,pix_fmt,sample_rate,channels,channel_layout,sample_fmt,time_base,color_range,color_space,color_transfer,color_primaries:packet=stream_index,pts,size,data_hash",
+            fields.as_str(),
             "-of", "json=compact=1:string_validation=fail",
         ].map(String::from).to_vec();
         args.extend(admission::options("nut"));
@@ -412,12 +416,14 @@ fn stream_signature(report: &Value, index: u32, role: StreamKind) -> Result<Stre
         return Err(invalid_pair("Normalized stream index differs"));
     }
     let grid = ratio(stream["time_base"].as_str().unwrap_or_default())?;
-    let mut format = stream.clone();
-    let properties = format
-        .as_object_mut()
-        .ok_or_else(|| invalid_pair("Missing normalized stream properties"))?;
-    properties.remove("index");
-    properties.remove("time_base");
+    // FFprobe may emit nested tags even with a field list. The normalized mux
+    // explicitly discards metadata, so compare the declared media fields only.
+    let format = Value::Object(
+        STREAM_FORMAT_FIELDS
+            .split(',')
+            .filter_map(|field| stream.get(field).map(|value| (field.into(), value.clone())))
+            .collect(),
+    );
     let mut packets = Vec::new();
     let entries = report["packets"]
         .as_array()
