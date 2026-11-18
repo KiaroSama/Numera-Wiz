@@ -204,9 +204,12 @@ impl AsyncChunkSink for Reject {
         Box::pin(async { Ok(()) })
     }
 }
-struct Pending;
+struct Pending(Option<tokio::sync::oneshot::Sender<()>>);
 impl AsyncChunkSink for Pending {
     fn write<'a>(&'a mut self, _bytes: &'a [u8]) -> SinkFuture<'a> {
+        if let Some(ready) = self.0.take() {
+            let _ = ready.send(());
+        }
         Box::pin(std::future::pending::<Result<()>>())
     }
     fn finish(&mut self) -> SinkFuture<'_> {
@@ -230,8 +233,9 @@ pub(super) async fn sinks(program: &Path) {
         let path = std::fs::canonicalize(root.path()).unwrap();
         let token = CancellationToken::new();
         let (prepared, charge) = prepared(&path, token.clone()).await;
+        let (ready, written) = tokio::sync::oneshot::channel();
         let sink: Box<dyn AsyncChunkSink> = if pending {
-            Box::new(Pending)
+            Box::new(Pending(Some(ready)))
         } else {
             Box::new(Reject)
         };
@@ -245,10 +249,12 @@ pub(super) async fn sinks(program: &Path) {
         )
         .await
         .unwrap_or_else(|failure| panic!("spawn: {}", failure.cause));
-        let trigger = token.clone();
-        let cancel = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(250)).await;
-            trigger.cancel();
+        let cancel = pending.then(|| {
+            tokio::spawn(async move {
+                let readiness = written.await;
+                token.cancel();
+                readiness
+            })
         });
         let start = Instant::now();
         let failure = match session.finish().await {
@@ -267,12 +273,21 @@ pub(super) async fn sinks(program: &Path) {
             Settlement::Closed(closed) => {
                 assert!(closed.outputs_joined());
                 assert!(closed.child_reaped());
-                assert!(closed.diagnostic_bytes() >= 8192);
+                assert!(
+                    closed.diagnostic_bytes() >= 8192,
+                    "pending={pending}, received {} diagnostic bytes",
+                    closed.diagnostic_bytes()
+                );
             }
             Settlement::Retained(_) => assert_eq!(charge.load(Ordering::Acquire), 2),
         }
         assert!(start.elapsed() < Duration::from_secs(8));
-        cancel.await.unwrap();
+        if let Some(cancel) = cancel {
+            cancel
+                .await
+                .unwrap()
+                .expect("Fixture must reach the pending sink");
+        }
         settle(charge).await;
         clean();
     }
@@ -317,7 +332,7 @@ pub(super) async fn lifecycle(program: &Path) {
                 prepared,
                 invocation(&executable, "relay-two-input"),
                 StdoutMode::Binary {
-                    sink: Box::new(Pending),
+                    sink: Box::new(Pending(None)),
                     byte_limit: 4096,
                 },
             )
@@ -420,7 +435,7 @@ pub(super) async fn deadlines(program: &Path) {
             prepared,
             invocation(program, "relay-two-input"),
             StdoutMode::Binary {
-                sink: Box::new(Pending),
+                sink: Box::new(Pending(None)),
                 byte_limit: 4096,
             },
         )

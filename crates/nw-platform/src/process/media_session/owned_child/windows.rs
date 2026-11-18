@@ -715,9 +715,12 @@ impl OwnedChild {
         Ok(self.exit)
     }
     pub(in crate::process::media_session) fn pump_outputs(&mut self, cancel: bool) -> Result<()> {
-        // Attempt both independent pipes even if one reports an error.
+        // Stderr has an independent consumer. Drain diagnostics through EOF
+        // after tree termination, including reads that completed before cancel.
+        // A failed setup with no reader still needs explicit cancellation.
         let first = self.outputs[0].pump(cancel);
-        let second = self.outputs[1].pump(cancel);
+        let diagnostics = &mut self.outputs[1];
+        let second = diagnostics.pump(cancel && diagnostics.sender.is_none());
         first.and(second)
     }
     pub(in crate::process::media_session) fn outputs_settled(&self) -> bool {
