@@ -53,8 +53,10 @@ pub fn map_cues(clip: &Clip, source: &WaveCueInventory) -> Result<Vec<ProjectedC
     let sample_time = |tick| Rational::new(tick, i64::from(source.sample_rate_hz));
     let reciprocal = Rational::new(clip.rate.denominator(), clip.rate.numerator())?;
     let sequence_time = |at: Rational| {
-        clip.sequence_start
-            .checked_add(at.checked_sub(clip.source_range.start)?.checked_mul(reciprocal)?)
+        clip.sequence_start.checked_add(
+            at.checked_sub(clip.source_range.start)?
+                .checked_mul(reciprocal)?,
+        )
     };
     let mut cues = Vec::new();
     for cue in &source.cues {

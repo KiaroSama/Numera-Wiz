@@ -60,7 +60,11 @@ fn page(schema: &mut Value, detail: bool) {
 fn inspect(schema: &mut Value, sequence: bool) {
     page(schema, true);
     if sequence {
-        enumeration(schema, "projection", &["entity", "track_page", "marker_page", "viewport"]);
+        enumeration(
+            schema,
+            "projection",
+            &["entity", "track_page", "marker_page", "viewport"],
+        );
         bounded_array(schema, "track_ids", 0, 64);
         field(schema, "track_ids")["uniqueItems"] = json!(true);
         schema["oneOf"] = json!([
@@ -85,7 +89,10 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
     if !super::super::authorization::PROJECT_TARGET_COMMANDS.contains(&command)
         && !matches!(
             command,
-            "projects.create" | "projects.list" | "markers.place" | "markers.remove"
+            "projects.create"
+                | "projects.list"
+                | "markers.place"
+                | "markers.remove"
                 | "markers.wave_projection"
         )
     {

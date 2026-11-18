@@ -258,7 +258,8 @@ pub(crate) fn validate(
                 }
             }
         }
-        "project-bin" | "project-track" | "project-clip" | "project-marker" | "project-dependency" => {
+        "project-bin" | "project-track" | "project-clip" | "project-marker"
+        | "project-dependency" => {
             let entity_id = EntityId::parse(*parts.last().ok_or_else(refused)?)?;
             let entity: EntityEnvelope =
                 table_value(table, &entity_key(&project, &entity_id))?.ok_or_else(refused)?;
@@ -412,7 +413,9 @@ pub(crate) fn validate_project(
                 let entity: EntityEnvelope = decode(value.value())?;
                 sequences += usize::from(entity.kind == "sequence");
                 if entity.known() {
-                    if entity.kind != "sequence_marker" && let Some(owner) = &entity.owner_id {
+                    if entity.kind != "sequence_marker"
+                        && let Some(owner) = &entity.owner_id
+                    {
                         *counts.entry(owner.clone()).or_default() += 1;
                     }
                     let count = match entity.kind.as_str() {

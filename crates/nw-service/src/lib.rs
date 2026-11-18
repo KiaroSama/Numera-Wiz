@@ -534,7 +534,9 @@ mod tests {
             assert!(row.get("current_read").is_none() && row.get("current_edit").is_none());
             if matches!(
                 id,
-                "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed"
+                "timeline.render"
+                    | "timeline.preview_frame"
+                    | "timeline.render_mixed"
                     | "markers.wave_projection"
             ) {
                 let requirement = &row["authorization_requirements"];
@@ -567,10 +569,18 @@ mod tests {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
                 assert_eq!(requirement["project_action"], "edit");
-                assert_eq!(requirement["request_gates"], serde_json::json!([
-                    "current_policy", "project_context", "project_rights", "request_parameters",
-                    "expected_revision", "writer_lease", "affected_scope"
-                ]));
+                assert_eq!(
+                    requirement["request_gates"],
+                    serde_json::json!([
+                        "current_policy",
+                        "project_context",
+                        "project_rights",
+                        "request_parameters",
+                        "expected_revision",
+                        "writer_lease",
+                        "affected_scope"
+                    ])
+                );
                 continue;
             }
             if !family.contains(id) {

@@ -92,9 +92,8 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
-            Some(ProjectAction::Edit)
-        }
+        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
+        | "history.redo" => Some(ProjectAction::Edit),
         _ => return None,
     };
     let write = project_action == Some(ProjectAction::Edit);
@@ -108,7 +107,9 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     request_gates.push(RequestGate::RequestParameters);
     let timeline_query = matches!(
         command,
-        "timeline.render" | "timeline.preview_frame" | "timeline.render_mixed"
+        "timeline.render"
+            | "timeline.preview_frame"
+            | "timeline.render_mixed"
             | "markers.wave_projection"
     );
     if write || timeline_query {
@@ -125,7 +126,9 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     }
     if matches!(
         command,
-        "clips.place" | "timeline.preview_frame" | "timeline.render_mixed"
+        "clips.place"
+            | "timeline.preview_frame"
+            | "timeline.render_mixed"
             | "markers.wave_projection"
     ) {
         request_gates.extend([

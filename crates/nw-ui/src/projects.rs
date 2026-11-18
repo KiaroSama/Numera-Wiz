@@ -631,8 +631,11 @@ impl WizApp {
         if matches!(
             action,
             Action::Project(ProjectAction {
-                phase: Phase::PreviewFrame | Phase::MixedReview | Phase::MixedSubmit
-                    | Phase::Markers | Phase::WaveProjection,
+                phase: Phase::PreviewFrame
+                    | Phase::MixedReview
+                    | Phase::MixedSubmit
+                    | Phase::Markers
+                    | Phase::WaveProjection,
                 ..
             })
         ) {
@@ -1017,24 +1020,38 @@ impl WizApp {
                 return Ok(());
             }
             Phase::Markers => {
-                let group = self.projects.group.as_ref().ok_or("No displayed sequence for markers")?;
-                let page: SnapshotPage<MarkerSummary> = serde_json::from_value(result)
-                    .map_err(|error| error.to_string())?;
-                if page.schema_version != 1 || page.projection != "marker_page"
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed sequence for markers")?;
+                let page: SnapshotPage<MarkerSummary> =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                if page.schema_version != 1
+                    || page.projection != "marker_page"
                     || page.project_revision.as_deref() != Some(group.key.revision.as_str())
                     || group.view.sequence.as_deref() != request.params["sequence_id"].as_str()
                     || page.items.len() > 32
                 {
-                    return Err("Marker page does not match the displayed sequence and revision".into());
+                    return Err(
+                        "Marker page does not match the displayed sequence and revision".into(),
+                    );
                 }
                 self.projects.marker_page = Some(Page::parse(page)?);
                 return Ok(());
             }
             Phase::WaveProjection => {
-                let group = self.projects.group.as_ref().ok_or("No displayed clip for WAVE cues")?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed clip for WAVE cues")?;
                 let projection: nw_domain::projects::wave_projection::Projection =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
-                let asset = group.source.as_ref().and_then(|value| value["asset_id"].as_str());
+                let asset = group
+                    .source
+                    .as_ref()
+                    .and_then(|value| value["asset_id"].as_str());
                 if projection.project_id.as_str() != group.key.project
                     || group.view.sequence.as_deref() != Some(projection.sequence_id.as_str())
                     || group.view.clip.as_deref() != Some(projection.clip_id.as_str())

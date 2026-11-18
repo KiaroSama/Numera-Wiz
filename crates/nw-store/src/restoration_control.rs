@@ -557,9 +557,10 @@ fn validate_changed_business(
                 return Err(invalid("Changed plan key differs"));
             }
         }
-        "job" if source_media_v1
-            && nw_domain::media_execution::stored_job_kind(raw)?
-                != nw_domain::media_execution::StoredJobKind::Legacy =>
+        "job"
+            if source_media_v1
+                && nw_domain::media_execution::stored_job_kind(raw)?
+                    != nw_domain::media_execution::StoredJobKind::Legacy =>
         {
             crate::media_execution::validate_restored_media_v1_job(table, id)?;
         }

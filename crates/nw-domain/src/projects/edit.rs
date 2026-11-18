@@ -406,14 +406,25 @@ pub fn resolve_edit<R: ProjectRead>(
             sequence.semantics()?;
             let settings = sequence.payload::<Sequence>("sequence")?;
             if settings.locked {
-                return Err(DomainError::new("ENTITY_LOCKED", "Sequence marker owner is locked"));
+                return Err(DomainError::new(
+                    "ENTITY_LOCKED",
+                    "Sequence marker owner is locked",
+                ));
             }
-            let marker = SequenceMarker { at: input.at, length: input.length, color: input.color };
+            let marker = SequenceMarker {
+                at: input.at,
+                length: input.length,
+                color: input.color,
+            };
             marker.position_on(settings.settings.frame_rate)?;
             let marker_id = ids.next()?;
             let mut entity = EntityEnvelope::new(
-                &read.header().id, marker_id.clone(), "sequence_marker", Some(input.sequence_id),
-                input.name, &marker,
+                &read.header().id,
+                marker_id.clone(),
+                "sequence_marker",
+                Some(input.sequence_id),
+                input.name,
+                &marker,
             )?;
             entity.semantic_scope = "annotation".into();
             edit.insert(entity)?;
@@ -422,13 +433,18 @@ pub fn resolve_edit<R: ProjectRead>(
         ProjectEditIntent::RemoveMarker(input) => {
             let entity = edit.get(&input.marker_id)?;
             let _: SequenceMarker = entity.payload("sequence_marker")?;
-            if entity.owner_id.as_ref() != Some(&input.sequence_id) || entity.semantic_scope != "annotation" {
+            if entity.owner_id.as_ref() != Some(&input.sequence_id)
+                || entity.semantic_scope != "annotation"
+            {
                 return Err(DomainError::object_not_found());
             }
             let sequence = edit.get(&input.sequence_id)?;
             sequence.semantics()?;
             if sequence.payload::<Sequence>("sequence")?.locked {
-                return Err(DomainError::new("ENTITY_LOCKED", "Sequence marker owner is locked"));
+                return Err(DomainError::new(
+                    "ENTITY_LOCKED",
+                    "Sequence marker owner is locked",
+                ));
             }
             edit.delete(&input.marker_id)?;
             json!({})

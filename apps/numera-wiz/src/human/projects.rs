@@ -247,21 +247,46 @@ pub enum Markers {
 impl Markers {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::Place { context, sequence, name, at, length, color } => {
+            Self::Place {
+                context,
+                sequence,
+                name,
+                at,
+                length,
+                color,
+            } => {
                 model::validate_id(&sequence)?;
                 model::label(&name)?;
-                context.request("markers.place", json!({"sequence_id":sequence,"name":name,
-                    "at":rational(&at)?,"length":rational(&length)?,"color":color}))
+                context.request(
+                    "markers.place",
+                    json!({"sequence_id":sequence,"name":name,
+                    "at":rational(&at)?,"length":rational(&length)?,"color":color}),
+                )
             }
-            Self::Remove { context, sequence, marker } => {
+            Self::Remove {
+                context,
+                sequence,
+                marker,
+            } => {
                 model::validate_id(&sequence)?;
                 model::validate_id(&marker)?;
-                context.request("markers.remove", json!({"sequence_id":sequence,"marker_id":marker}))
+                context.request(
+                    "markers.remove",
+                    json!({"sequence_id":sequence,"marker_id":marker}),
+                )
             }
-            Self::WaveProjection { project, clip, revision } => {
+            Self::WaveProjection {
+                project,
+                clip,
+                revision,
+            } => {
                 model::validate_id(&clip)?;
                 read_request(
-                    ReadContext { project, revision: Some(revision), replace_snapshot: None },
+                    ReadContext {
+                        project,
+                        revision: Some(revision),
+                        replace_snapshot: None,
+                    },
                     "markers.wave_projection",
                     json!({"clip_id":clip}),
                 )

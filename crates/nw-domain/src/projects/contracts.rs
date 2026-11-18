@@ -410,11 +410,17 @@ fn entity_definitions(defs: &mut Map<String, Value>) {
     defs.insert("OpaqueEntity".into(), opaque_entity(false));
     defs.insert(
         "SequenceMarkerEntity".into(),
-        extend(entity_common(json!({"const":"sequence_marker"}), true), [
-            ("at", reference("Rational")),
-            ("length", reference("Rational")),
-            ("color", enumeration(&["blue", "green", "orange", "red", "violet"])),
-        ]),
+        extend(
+            entity_common(json!({"const":"sequence_marker"}), true),
+            [
+                ("at", reference("Rational")),
+                ("length", reference("Rational")),
+                (
+                    "color",
+                    enumeration(&["blue", "green", "orange", "red", "violet"]),
+                ),
+            ],
+        ),
     );
     defs.insert("OpaqueSequenceEntity".into(), opaque_entity(true));
     defs.insert(
@@ -469,11 +475,19 @@ pub fn inspect(sequence_only: bool) -> Value {
         )],
     );
     let branches = if sequence_only {
-        defs.insert("MarkerSummary".into(), object([
-            ("id", reference("Id")), ("name", string()), ("at", reference("Rational")),
-            ("length", reference("Rational")),
-            ("color", enumeration(&["blue", "green", "orange", "red", "violet"])),
-        ]));
+        defs.insert(
+            "MarkerSummary".into(),
+            object([
+                ("id", reference("Id")),
+                ("name", string()),
+                ("at", reference("Rational")),
+                ("length", reference("Rational")),
+                (
+                    "color",
+                    enumeration(&["blue", "green", "orange", "red", "violet"]),
+                ),
+            ]),
+        );
         defs.insert(
             "TrackSummary".into(),
             object([
@@ -497,7 +511,11 @@ pub fn inspect(sequence_only: bool) -> Value {
         vec![
             entity,
             collection("track_page", "TrackSummary", json!({"const":"exact"})),
-            collection("marker_page", "MarkerSummary", enumeration(&["exact", "lower_bound"])),
+            collection(
+                "marker_page",
+                "MarkerSummary",
+                enumeration(&["exact", "lower_bound"]),
+            ),
             collection(
                 "viewport",
                 "ClipSummary",

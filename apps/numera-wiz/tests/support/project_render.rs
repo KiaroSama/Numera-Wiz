@@ -206,32 +206,57 @@ pub async fn registered_timeline_frame(
     accepted_mixed_timeline(cli, project_id, sequence_id, finite).await;
     sequence_markers(cli, project_id, sequence_id).await;
     let placed = edit(
-        cli, scope, project_id, "8", "wave-cue-occurrence", "clips.place",
+        cli,
+        scope,
+        project_id,
+        "8",
+        "wave-cue-occurrence",
+        "clips.place",
         json!({
             "sequence_id":sequence_id, "track_id":sequence["created"]["tracks"][1]["id"],
             "source":{"kind":"registered","asset_id":wave_asset,"stream_index":0},
             "source_range":{"start":t(1,4),"end":t(3,4)},
             "sequence_start":t(3,1),"collision":"reject"
         }),
-    ).await;
+    )
+    .await;
     let clip = placed["created"]["clip_ids"][0].as_str().unwrap();
     assert_eq!(placed["revision"], "9");
-    let (response, code) = cli.human(&[
-        "markers", "wave-projection", "--project", project_id, "--clip", clip,
-        "--revision", "9",
-    ]).await;
+    let (response, code) = cli
+        .human(&[
+            "markers",
+            "wave-projection",
+            "--project",
+            project_id,
+            "--clip",
+            clip,
+            "--revision",
+            "9",
+        ])
+        .await;
     assert_eq!(code, 0, "{}", response["error"]);
     assert_eq!(response["result"]["asset_id"], wave_asset);
     assert_eq!(response["result"]["clip_id"], clip);
-    assert_eq!(response["result"]["cues"], json!([{
-        "original":{"id":7,"sample_offset":24000,"sample_count":12000,"label":"نشانهٔ موسیقی"},
-        "source_start":t(1,2), "source_end":t(3,4),
-        "sequence_start":t(13,4), "sequence_end":t(7,2),
-    }]));
-    let (stale, code) = cli.human(&[
-        "markers", "wave-projection", "--project", project_id, "--clip", clip,
-        "--revision", "8",
-    ]).await;
+    assert_eq!(
+        response["result"]["cues"],
+        json!([{
+            "original":{"id":7,"sample_offset":24000,"sample_count":12000,"label":"نشانهٔ موسیقی"},
+            "source_start":t(1,2), "source_end":t(3,4),
+            "sequence_start":t(13,4), "sequence_end":t(7,2),
+        }])
+    );
+    let (stale, code) = cli
+        .human(&[
+            "markers",
+            "wave-projection",
+            "--project",
+            project_id,
+            "--clip",
+            clip,
+            "--revision",
+            "8",
+        ])
+        .await;
     assert_ne!(code, 0);
     assert_eq!(stale["error"]["code"], "STALE_REVISION");
     let mut bridge = cli.command();
@@ -247,38 +272,99 @@ pub async fn registered_timeline_frame(
 }
 
 async fn sequence_markers(cli: &Cli, project: &str, sequence: &str) {
-    let (issued, code) = cli.human(&["access", "replay-scope", "create", "--json"]).await;
+    let (issued, code) = cli
+        .human(&["access", "replay-scope", "create", "--json"])
+        .await;
     assert_eq!(code, 0);
     let scope = issued["result"]["replay_scope"].as_str().unwrap();
-    let (placed, code) = cli.human(&[
-        "markers", "place", "--project", project, "--expected-revision", "4",
-        "--sequence", sequence, "--name", "نشانه é", "--at", "1/4", "--length", "1/2",
-        "--color", "violet", "--replay-scope", scope, "--idempotency-key", "sequence-grid-marker",
-        "--request-id", "sequence-grid-marker",
-    ]).await;
+    let (placed, code) = cli
+        .human(&[
+            "markers",
+            "place",
+            "--project",
+            project,
+            "--expected-revision",
+            "4",
+            "--sequence",
+            sequence,
+            "--name",
+            "نشانه é",
+            "--at",
+            "1/4",
+            "--length",
+            "1/2",
+            "--color",
+            "violet",
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "sequence-grid-marker",
+            "--request-id",
+            "sequence-grid-marker",
+        ])
+        .await;
     assert_eq!(code, 0, "{}", placed["error"]);
     let id = &placed["result"]["created"]["marker_id"];
     assert_eq!(placed["result"]["revision"], "5");
     let query = |revision| {
-        let mut request = Request::query("sequences.inspect", json!({
-            "projection":"marker_page","sequence_id":sequence,"revision":revision,
-        }));
-        request.project = Some(ProjectRef { id: project.into(), expected_revision: None });
+        let mut request = Request::query(
+            "sequences.inspect",
+            json!({
+                "projection":"marker_page","sequence_id":sequence,"revision":revision,
+            }),
+        );
+        request.project = Some(ProjectRef {
+            id: project.into(),
+            expected_revision: None,
+        });
         request
     };
     let first = cli.raw(&query("5")).await;
     assert_eq!(first["ok"], true, "{}", first["error"]);
-    assert_eq!(first["result"]["items"], json!([{
-        "id":id,"name":"نشانه é","at":{"num":"1","den":"4"},
-        "length":{"num":"1","den":"2"},"color":"violet",
-    }]));
-    edit(cli, scope, project, "5", "sequence-marker-undo", "history.undo", json!({})).await;
+    assert_eq!(
+        first["result"]["items"],
+        json!([{
+            "id":id,"name":"نشانه é","at":{"num":"1","den":"4"},
+            "length":{"num":"1","den":"2"},"color":"violet",
+        }])
+    );
+    edit(
+        cli,
+        scope,
+        project,
+        "5",
+        "sequence-marker-undo",
+        "history.undo",
+        json!({}),
+    )
+    .await;
     assert_eq!(cli.raw(&query("6")).await["result"]["items"], json!([]));
-    edit(cli, scope, project, "6", "sequence-marker-redo", "history.redo", json!({})).await;
-    assert_eq!(cli.raw(&query("7")).await["result"]["items"], first["result"]["items"]);
-    edit(cli, scope, project, "7", "sequence-marker-remove", "markers.remove", json!({
-        "sequence_id":sequence,"marker_id":id,
-    })).await;
+    edit(
+        cli,
+        scope,
+        project,
+        "6",
+        "sequence-marker-redo",
+        "history.redo",
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        cli.raw(&query("7")).await["result"]["items"],
+        first["result"]["items"]
+    );
+    edit(
+        cli,
+        scope,
+        project,
+        "7",
+        "sequence-marker-remove",
+        "markers.remove",
+        json!({
+            "sequence_id":sequence,"marker_id":id,
+        }),
+    )
+    .await;
     assert_eq!(cli.raw(&query("8")).await["result"]["items"], json!([]));
 }
 
@@ -360,7 +446,12 @@ async fn restore_unadopted_mixed(cli: &Cli, scope: &str, enablement: &str) {
     assert_eq!(replayed["receipt_id"], accepted["receipt_id"]);
 }
 
-async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str, finite: &FiniteTimeline) {
+async fn accepted_mixed_timeline(
+    cli: &Cli,
+    project: &str,
+    sequence: &str,
+    finite: &FiniteTimeline,
+) {
     use nw_domain::media::MediaPlanV2;
     use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
 
@@ -394,7 +485,9 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str, finit
     let finite_job = submit_media_after_restoration(cli, scope, finite).await;
     let second = enable_mixed(cli, scope, "mixed-enablement-successor").await;
     assert_ne!(second, first);
-    let preserved = cli.query("jobs.inspect", json!({"id":finite_job["id"]})).await;
+    let preserved = cli
+        .query("jobs.inspect", json!({"id":finite_job["id"]}))
+        .await;
     assert_eq!(preserved, finite_job);
 
     let (review, code) = cli.human(&settings).await;
@@ -468,8 +561,16 @@ async fn accepted_mixed_timeline(cli: &Cli, project: &str, sequence: &str, finit
 async fn submit_media_after_restoration(cli: &Cli, scope: &str, finite: &FiniteTimeline) -> Value {
     let (review, code) = cli
         .human(&[
-            "timeline", "render", "--project", &finite.project,
-            "--revision", "4", "--sequence", &finite.sequence, "--end", "5/2",
+            "timeline",
+            "render",
+            "--project",
+            &finite.project,
+            "--revision",
+            "4",
+            "--sequence",
+            &finite.sequence,
+            "--end",
+            "5/2",
         ])
         .await;
     assert_eq!(code, 0, "{}", review["error"]);
@@ -479,13 +580,22 @@ async fn submit_media_after_restoration(cli: &Cli, scope: &str, finite: &FiniteT
     std::fs::write(&file, &raw).unwrap();
     let (accepted, code) = cli
         .human(&[
-            "jobs", "submit-media", "--plan-file", file.to_str().unwrap(), "--replay-scope",
-            scope, "--idempotency-key", "media-v1-after-mixed-restore", "--request-id",
+            "jobs",
+            "submit-media",
+            "--plan-file",
+            file.to_str().unwrap(),
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "media-v1-after-mixed-restore",
+            "--request-id",
             "media-v1-after-mixed-restore",
         ])
         .await;
     assert_eq!(code, 0, "{}", accepted["error"]);
-    let job = cli.completed(accepted["result"]["job_id"].as_str().unwrap()).await;
+    let job = cli
+        .completed(accepted["result"]["job_id"].as_str().unwrap())
+        .await;
     assert_eq!(job["state"], "succeeded", "{}", job["error"]);
     assert_eq!(job["payload_kind"], "media_job_v1");
     assert_eq!(job["payload_sha256"], nw_domain::projects::hash(&raw));

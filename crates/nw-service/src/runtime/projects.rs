@@ -164,7 +164,8 @@ impl Service {
             .batch_preflights
             .try_acquire()
             .map_err(|_| domain::limit("Source preflight capacity is busy; retry this request"))?;
-        let (binding, held) = self.registered_project_source(context, &asset_id, stream_index, cancel)?;
+        let (binding, held) =
+            self.registered_project_source(context, &asset_id, stream_index, cancel)?;
         if !matches!(
             binding,
             SourceBinding::Registered {
@@ -174,23 +175,35 @@ impl Service {
                 ..
             } if actual_content == content_sha256 && actual_probe == probe_sha256
         ) {
-            return Err(DomainError::new("SOURCE_CHANGED", "WAVE occurrence source changed"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "WAVE occurrence source changed",
+            ));
         }
         let wave = nw_engine::inspect_wave_cues(&held.asset, &held.stamp, cancel)?;
         let cues = wave_projection::map_cues(&clip, &wave)?;
 
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Wave cue projection cancelled"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Wave cue projection cancelled",
+            ));
         }
         if self
             .policy(context)?
             .as_ref()
             .is_some_and(|policy| !policy.allows_command(&request.command.id))
         {
-            return Err(DomainError::new("PERMISSION_DENIED", "Wave cue projection grant changed"));
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Wave cue projection grant changed",
+            ));
         }
-        if self.read_project(context, project, ObjectAction::Read)?.header().revision
+        if self
+            .read_project(context, project, ObjectAction::Read)?
+            .header()
+            .revision
             != input.revision
         {
             return Err(stale());
@@ -198,9 +211,15 @@ impl Service {
         self.object(context, &held.asset.id, &held.asset.creator)?;
         let path = Path::new(&held.asset.identity.path);
         if self.path(context, path, false)? != path
-            || self.store.project_fact_hash(&named("asset", &held.asset.id)?)? != held.record_hash
+            || self
+                .store
+                .project_fact_hash(&named("asset", &held.asset.id)?)?
+                != held.record_hash
         {
-            return Err(DomainError::new("SOURCE_CHANGED", "Registered WAVE authority changed"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "Registered WAVE authority changed",
+            ));
         }
         held.stamp.revalidate()?;
         let result = wave_projection::Projection {
@@ -391,8 +410,12 @@ impl Service {
                     "clips.move" => {
                         ProjectEditIntent::Move(commands::parse(request.params.clone())?)
                     }
-                    "markers.place" => ProjectEditIntent::Marker(commands::parse(request.params.clone())?),
-                    "markers.remove" => ProjectEditIntent::RemoveMarker(commands::parse(request.params.clone())?),
+                    "markers.place" => {
+                        ProjectEditIntent::Marker(commands::parse(request.params.clone())?)
+                    }
+                    "markers.remove" => {
+                        ProjectEditIntent::RemoveMarker(commands::parse(request.params.clone())?)
+                    }
                     "clips.link" => {
                         ProjectEditIntent::Link(commands::parse(request.params.clone())?)
                     }

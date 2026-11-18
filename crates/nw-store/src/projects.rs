@@ -467,17 +467,31 @@ fn index_rows(
     }
     if entity.kind == "sequence_marker" && entity.kind_version == 1 {
         let marker: SequenceMarker = entity.payload("sequence_marker")?;
-        let owner = entity.owner_id.as_ref().ok_or_else(|| domain::invalid("Sequence marker has no owner"))?;
-        let sequence: EntityEnvelope = table_value(table, &entity_key(project, owner))?.ok_or_else(DomainError::object_not_found)?;
+        let owner = entity
+            .owner_id
+            .as_ref()
+            .ok_or_else(|| domain::invalid("Sequence marker has no owner"))?;
+        let sequence: EntityEnvelope = table_value(table, &entity_key(project, owner))?
+            .ok_or_else(DomainError::object_not_found)?;
         let settings = sequence.payload::<Sequence>("sequence")?;
         let position = marker.position_on(settings.settings.frame_rate)?;
         if entity.semantic_scope != "annotation" {
-            return Err(domain::invalid("Sequence marker payload or ownership differs"));
+            return Err(domain::invalid(
+                "Sequence marker payload or ownership differs",
+            ));
         }
         rows.push((
-            format!("project-marker/{project}/{owner}/{position:016x}/{}", entity.id),
-            encode(&MarkerSummary { id: entity.id.clone(), name: entity.label.clone(), at: marker.at,
-                length: marker.length, color: marker.color })?,
+            format!(
+                "project-marker/{project}/{owner}/{position:016x}/{}",
+                entity.id
+            ),
+            encode(&MarkerSummary {
+                id: entity.id.clone(),
+                name: entity.label.clone(),
+                at: marker.at,
+                length: marker.length,
+                color: marker.color,
+            })?,
         ));
     }
     if entity.kind == "clip" {
@@ -692,7 +706,13 @@ impl ProjectReadSnapshot {
         budget: usize,
     ) -> Result<IndexedPage> {
         let _: Sequence = self.entity(sequence)?.payload("sequence")?;
-        let mut page = self.index_page(&format!("project-marker/{}/{sequence}/", self.header.id), after, limit, budget, 0)?;
+        let mut page = self.index_page(
+            &format!("project-marker/{}/{sequence}/", self.header.id),
+            after,
+            limit,
+            budget,
+            0,
+        )?;
         if page.next_key.is_some() {
             page.count_accuracy = "lower_bound".into();
         }

@@ -215,13 +215,17 @@ pub(crate) fn validate_restored_media_v1_job(
         .get(format!("plan/{}", job.plan_id).as_str())
         .map_err(storage)?
         .ok_or_else(invalid)?;
-    let stored_plan = domain::decode_plan(std::str::from_utf8(stored_plan.value()).map_err(storage)?)?;
+    let stored_plan =
+        domain::decode_plan(std::str::from_utf8(stored_plan.value()).map_err(storage)?)?;
     let auth = table
         .get(format!("job-auth/{id}").as_str())
         .map_err(storage)?
         .ok_or_else(invalid)?;
     let auth: ExecutionAuthorization = decode(auth.value())?;
-    let root = table.get("meta/root").map_err(storage)?.ok_or_else(invalid)?;
+    let root = table
+        .get("meta/root")
+        .map_err(storage)?
+        .ok_or_else(invalid)?;
     if job.id != id
         || stored_plan.id != plan.id
         || stored_plan.hash != plan.hash
