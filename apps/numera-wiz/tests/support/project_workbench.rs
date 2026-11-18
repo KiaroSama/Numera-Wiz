@@ -46,6 +46,7 @@ pub enum Key {
     Space,
     Escape,
     CtrlEnter,
+    CtrlShiftEnter,
 }
 #[derive(Clone, Copy)]
 pub enum Policy {
@@ -401,8 +402,10 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
     assert_eq!(assets.len(), 3);
     assert_eq!(jobs.len(), 3);
     // Keep a valid reviewed Cleanup plan so the Projects shortcut guard is meaningful.
-    let (review_x, review_y) = REVIEW_CLEANUP_BUTTON;
-    let review = activate(driver, review_x, review_y, "streams.clean", 0).await;
+    driver.mark().await;
+    driver.key(Key::CtrlShiftEnter).await;
+    let review = driver.observed("streams.clean").await;
+    assert_eq!(review.code, "OK");
     evidence.push(review.evidence("streams.clean"));
     driver.screenshot("retained-cleanup-plan").await;
     if driver.browser() {

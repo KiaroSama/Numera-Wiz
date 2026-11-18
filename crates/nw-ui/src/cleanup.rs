@@ -419,6 +419,27 @@ fn patch(mode: usize, text: &str) -> TagPatch {
     }
 }
 impl WizApp {
+    pub(super) fn review_cleanup(&mut self, ctx: &egui::Context) {
+        if !self.cleanup_actions_allowed(ctx)
+            || !self.workspace_switch_allowed()
+            || self.output.trim().is_empty()
+        {
+            return;
+        }
+        let Some(asset) = self.selected_asset() else {
+            return;
+        };
+        match self.normalized_intent() {
+            Ok(intent) => self.query(
+                "streams.clean",
+                json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times,"execution_limits":self.execution_limits}),
+                Action::Plan(self.generation),
+                ctx,
+            ),
+            Err(error) => self.error = Some(error),
+        }
+    }
+
     pub(super) fn normalized_intent(&self) -> Result<CleanIntent, String> {
         let mut intent = self.intent.clone();
         intent.audio_selection.selector = selector(self.audio_mode, &self.audio_values)?;
@@ -521,7 +542,7 @@ impl WizApp {
             ui.small("An existing destination is preserved. Changed layouts require an admitted preservation profile for the selected output container.");
             if changed {self.changed();}
             if ui.add_enabled(!self.waiting && self.pending.is_none() && !self.output.trim().is_empty(),egui::Button::new("Review cleanup plan")).clicked() {
-                match self.normalized_intent() { Ok(intent) => self.query("streams.clean",json!({"asset_id":asset.id,"output":self.output,"intent":intent,"file_times":self.file_times,"execution_limits":self.execution_limits}),Action::Plan(self.generation),ui.ctx()), Err(error) => self.error=Some(error) }
+                self.review_cleanup(ui.ctx());
             }
             if ui.add_enabled(!self.waiting && self.pending.is_none(), egui::Button::new("Selection report")).clicked() {
                 match self.normalized_intent() {

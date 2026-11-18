@@ -111,6 +111,10 @@ streams, chapters and unrelated tags before publishing the output.
 
 ## Run and inspect
 
+Use Ctrl+Shift+Enter on Windows/Linux or Cmd+Shift+Enter on macOS to review
+the current cleanup settings from the cleanup workspace. The shortcut is
+inactive while a text field or another workspace has focus.
+
 Run reviewed plan, or press Ctrl+Enter on Windows/Linux and Cmd+Enter on macOS.
 This shortcut has the same guard and submission handler as the button: a current
 reviewed plan is required, and it is unavailable while a request is unresolved.

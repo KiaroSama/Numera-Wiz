@@ -1177,9 +1177,21 @@ impl eframe::App for WizApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Consume keyboard input in the input-bearing UI pass, never in timer-only logic ticks.
-        if !self.projects.active
-            && !ui.ctx().text_edit_focused()
-            && !self.folder.open
+        let cleanup_shortcuts =
+            !self.projects.active && !ui.ctx().text_edit_focused() && !self.folder.open;
+        if cleanup_shortcuts
+            && ui.ctx().input_mut(|input| {
+                input.consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers {
+                        shift: true,
+                        ..egui::Modifiers::COMMAND
+                    },
+                    egui::Key::Enter,
+                ))
+            })
+        {
+            self.review_cleanup(ui.ctx());
+        } else if cleanup_shortcuts
             && ui.ctx().input_mut(|input| {
                 input.consume_shortcut(&egui::KeyboardShortcut::new(
                     egui::Modifiers::COMMAND,

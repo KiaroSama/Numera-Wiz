@@ -118,14 +118,31 @@ impl shared::Driver for BrowserProjects<'_> {
         browser_click(self.client, self.base, self.route, x, y).await;
     }
     async fn key(&mut self, key: shared::Key) {
-        if matches!(key, shared::Key::CtrlEnter) {
-            driver(self.client,self.base,reqwest::Method::POST,&format!("{}/actions",self.route),json!({"actions":[{"type":"key","id":"keyboard","actions":[{"type":"keyDown","value":"\u{E009}"},{"type":"keyDown","value":"\u{E007}"},{"type":"keyUp","value":"\u{E007}"},{"type":"keyUp","value":"\u{E009}"}]}]})).await;
+        if matches!(key, shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter) {
+            let keys: &[&str] = if matches!(key, shared::Key::CtrlShiftEnter) {
+                &["\u{E009}", "\u{E008}", "\u{E007}"]
+            } else {
+                &["\u{E009}", "\u{E007}"]
+            };
+            let actions = keys
+                .iter()
+                .map(|value| json!({"type":"keyDown","value":value}))
+                .chain(keys.iter().rev().map(|value| json!({"type":"keyUp","value":value})))
+                .collect::<Vec<_>>();
+            driver(
+                self.client,
+                self.base,
+                reqwest::Method::POST,
+                &format!("{}/actions", self.route),
+                json!({"actions":[{"type":"key","id":"keyboard","actions":actions}]}),
+            )
+            .await;
         } else {
             let value = match key {
                 shared::Key::Tab => "\u{E004}",
                 shared::Key::Space => " ",
                 shared::Key::Escape => "\u{E00C}",
-                shared::Key::CtrlEnter => unreachable!(),
+                shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter => unreachable!(),
             };
             browser_key(self.client, self.base, self.route, value).await;
         }
