@@ -163,6 +163,18 @@ job remains a successful inspection query with failure facts in the returned job
 
 ## Selection report and filesystem times
 
+Set `audio_selection` or `subtitle_selection` to remove zero-based positions
+among that stream type. This example removes the second track of that type.
+
+```json
+{"selector":{"mode":"exclude_type_ordinals","values":[1]},"no_match":"reject"}
+```
+
+The positions are resolved against original stream order in each file, before
+output reordering. A missing position rejects the candidate with `reject` or
+skips it with `skip_file`. `allow_empty` keeps processing and records a warning.
+The same selection works in a cleanup plan, selection report or batch plan.
+
 streams.clean.report is a query requiring current command, asset and path rights.
 It accepts 1-64 distinct explicit asset IDs and the full common intent. For example:
 

@@ -39,6 +39,11 @@ Keep, Set and Clear. Choose the explicit stream kind, including video, and use
 original indices/languages to limit the rule. Later explicit edits win for each
 field. The source is unchanged.
 
+Choose **Remove by track position** in the audio or subtitle selection to remove
+the same position across files with different track layouts. Enter `1` for the
+second track of that type. The plan shows the original stream indices removed
+from each source.
+
 Selection report opens the same owner's source inventory and pure rule preview.
 It shows every candidate as ready, skipped or rejected, with separate source and
 retained counts. Switch between unique streams and original indices; tables use

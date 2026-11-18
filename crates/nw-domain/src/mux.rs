@@ -34,6 +34,8 @@ pub enum Selector {
     All,
     None,
     SourceIndices { values: Vec<u32> },
+    /// Remove zero-based positions among streams of the selected kind.
+    ExcludeTypeOrdinals { values: Vec<u32> },
     Languages { values: Vec<String> },
     TitleContainsAny { values: Vec<String> },
 }
@@ -43,6 +45,7 @@ enum SelectorWire {
     All {},
     None {},
     SourceIndices { values: Vec<u32> },
+    ExcludeTypeOrdinals { values: Vec<u32> },
     Languages { values: Vec<String> },
     TitleContainsAny { values: Vec<String> },
 }
@@ -54,6 +57,7 @@ impl<'de> Deserialize<'de> for Selector {
             SelectorWire::All {} => Self::All,
             SelectorWire::None {} => Self::None,
             SelectorWire::SourceIndices { values } => Self::SourceIndices { values },
+            SelectorWire::ExcludeTypeOrdinals { values } => Self::ExcludeTypeOrdinals { values },
             SelectorWire::Languages { values } => Self::Languages { values },
             SelectorWire::TitleContainsAny { values } => Self::TitleContainsAny { values },
         })
@@ -196,6 +200,12 @@ fn validate_selector(selector: &Selector) -> Result<()> {
                     .all(|v| !v.trim().is_empty() && v.len() <= 1024)
         }
         Selector::SourceIndices { values } => !values.is_empty() && values.len() <= 256,
+        Selector::ExcludeTypeOrdinals { values } => {
+            !values.is_empty()
+                && values.len() <= 256
+                && values.iter().all(|ordinal| *ordinal < 256)
+                && values.iter().collect::<BTreeSet<_>>().len() == values.len()
+        }
         _ => true,
     };
     if valid {
@@ -212,6 +222,7 @@ fn matches(selector: &Selector, stream: &Stream) -> bool {
         Selector::All => true,
         Selector::None => false,
         Selector::SourceIndices { values } => values.contains(&stream.index),
+        Selector::ExcludeTypeOrdinals { .. } => true,
         Selector::Languages { values } => values.iter().any(|v| {
             normalize_language(v)
                 == normalize_language(stream.tags.get("language").map_or("und", String::as_str))
@@ -226,6 +237,34 @@ fn matches(selector: &Selector, stream: &Stream) -> bool {
         }
     }
 }
+
+fn select_kind(
+    source: &[Stream],
+    kind: StreamKind,
+    selection: &Selection,
+) -> (BTreeSet<u32>, bool) {
+    let available = source.iter().filter(|stream| stream.kind == kind);
+    if let Selector::ExcludeTypeOrdinals { values } = &selection.selector {
+        let mut ordered: Vec<u32> = available.map(|stream| stream.index).collect();
+        ordered.sort_unstable();
+        let missing = values
+            .iter()
+            .any(|ordinal| *ordinal as usize >= ordered.len());
+        let retained = ordered
+            .into_iter()
+            .enumerate()
+            .filter_map(|(ordinal, index)| (!values.contains(&(ordinal as u32))).then_some(index))
+            .collect();
+        return (retained, missing);
+    }
+    let retained: BTreeSet<u32> = available
+        .filter(|stream| matches(&selection.selector, stream))
+        .map(|stream| stream.index)
+        .collect();
+    let missing = retained.is_empty() && !matches!(selection.selector, Selector::None);
+    (retained, missing)
+}
+
 fn reorder(streams: &mut [Stream], kind: &StreamKind, order: &[u32], warnings: &mut Vec<String>) {
     let selected: Vec<_> = streams
         .iter()
@@ -356,12 +395,15 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
         ));
     }
     validate_intent(intent)?;
+    let (audio, missing_audio) = select_kind(streams, StreamKind::Audio, &intent.audio_selection);
+    let (subtitles, missing_subtitles) =
+        select_kind(streams, StreamKind::Subtitle, &intent.subtitle_selection);
     let mut kept = Vec::new();
     let mut ordinary_video_seen = false;
     for stream in streams {
         let preserve = match stream.kind {
-            StreamKind::Audio => matches(&intent.audio_selection.selector, stream),
-            StreamKind::Subtitle => matches(&intent.subtitle_selection.selector, stream),
+            StreamKind::Audio => audio.contains(&stream.index),
+            StreamKind::Subtitle => subtitles.contains(&stream.index),
             StreamKind::Video if stream.attached_picture() => intent.preservation.attached_pictures,
             StreamKind::Video => {
                 let keep = !ordinary_video_seen || intent.preservation.additional_video;
@@ -378,18 +420,17 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
     }
     let mut skip = false;
     let mut warnings = Vec::new();
-    for (kind, selection) in [
-        (StreamKind::Audio, &intent.audio_selection),
-        (StreamKind::Subtitle, &intent.subtitle_selection),
+    for (missing, reason, selection) in [
+        (missing_audio, "NO_AUDIO_MATCH", &intent.audio_selection),
+        (
+            missing_subtitles,
+            "NO_SUBTITLE_MATCH",
+            &intent.subtitle_selection,
+        ),
     ] {
-        if matches!(selection.selector, Selector::None) || kept.iter().any(|s| s.kind == kind) {
+        if !missing {
             continue;
         }
-        let reason = if kind == StreamKind::Audio {
-            "NO_AUDIO_MATCH"
-        } else {
-            "NO_SUBTITLE_MATCH"
-        };
         match selection.no_match {
             NoMatch::SkipFile => {
                 skip = true;
@@ -397,10 +438,13 @@ pub fn resolve(streams: &[Stream], intent: &CleanIntent) -> Result<CleanResoluti
             }
             NoMatch::AllowEmpty => warnings.push(reason.into()),
             NoMatch::Reject => {
-                return Err(DomainError::new(
-                    reason,
-                    "No selected streams matched the original probe",
-                ));
+                let explanation =
+                    if matches!(selection.selector, Selector::ExcludeTypeOrdinals { .. }) {
+                        "A requested removal position does not exist in the original stream kind"
+                    } else {
+                        "No selected streams matched the original probe"
+                    };
+                return Err(DomainError::new(reason, explanation));
             }
         }
     }
@@ -548,6 +592,31 @@ mod tests {
             vec![0, 1, 3]
         );
         assert_eq!(result.action, CleanAction::Remux);
+
+        rules.audio_selection.selector = Selector::ExcludeTypeOrdinals { values: vec![1] };
+        rules.audio_selection.no_match = NoMatch::Reject;
+        let shifted = vec![
+            stream(7, StreamKind::Audio, "fra"),
+            stream(2, StreamKind::Video, "und"),
+            stream(3, StreamKind::Audio, "eng"),
+            stream(5, StreamKind::Attachment, "und"),
+        ];
+        let result = resolve(&shifted, &rules).unwrap();
+        assert_eq!(
+            result.streams.iter().map(|s| s.index).collect::<Vec<_>>(),
+            vec![2, 3, 5]
+        );
+        let missing = resolve(&source, &rules).unwrap_err();
+        assert_eq!(missing.code, "NO_AUDIO_MATCH");
+        rules.audio_selection.selector = Selector::ExcludeTypeOrdinals { values: vec![0] };
+        let all_removed = resolve(&source, &rules).unwrap();
+        assert_eq!(all_removed.action, CleanAction::Remux);
+        assert!(
+            !all_removed
+                .streams
+                .iter()
+                .any(|s| s.kind == StreamKind::Audio)
+        );
     }
     #[test]
     fn patches_use_original_language_and_last_explicit_field() {

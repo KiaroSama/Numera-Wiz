@@ -54,6 +54,9 @@ fn selector(mode: usize, text: &str) -> Result<Selector, String> {
         3 => Selector::SourceIndices {
             values: indices(text)?,
         },
+        5 => Selector::ExcludeTypeOrdinals {
+            values: indices(text)?,
+        },
         _ => Selector::TitleContainsAny {
             values: text
                 .lines()
@@ -78,6 +81,7 @@ fn selection(
         "Exact language codes",
         "Original stream indices",
         "Title contains",
+        "Remove by track position",
     ];
     ui.horizontal(|ui| {
         egui::ComboBox::from_id_salt(id)
@@ -90,19 +94,22 @@ fn selection(
         if *mode > 1 {
             changed |=
                 ui.add(egui::TextEdit::singleline(text).char_limit(4096).hint_text(
-                    if *mode == 3 {
-                        "Indices: 0, 2, 5"
-                    } else if *mode == 2 {
-                        "Codes: eng, fas, und"
-                    } else {
-                        "Original title contains"
+                    match *mode {
+                        2 => "Codes: eng, fas, und",
+                        3 => "Indices: 0, 2, 5",
+                        5 => "Zero-based positions, such as 0, 2",
+                        _ => "Original title contains",
                     },
                 ))
                 .changed();
         }
     });
     ui.horizontal(|ui| {
-        ui.small("When the requested selection matches nothing:");
+        ui.small(if *mode == 5 {
+            "When a requested track position is missing"
+        } else {
+            "When the requested selection matches nothing:"
+        });
         egui::ComboBox::from_id_salt((id, "no-match"))
             .selected_text(match no_match {
                 NoMatch::SkipFile => "Skip file",

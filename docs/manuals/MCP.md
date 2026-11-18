@@ -102,6 +102,11 @@ in-memory component report.
 
 ## Registered selection reports
 
+The audio and subtitle selectors accept `exclude_type_ordinals`. Each value
+is a zero-based position among streams of that type in the original source.
+The cleanup plan, selection report and batch plan resolve these positions for
+each registered asset.
+
 streams.clean.report uses the same asset_ids and full typed intent as the CLI
 example. It is a query, so omit replay_scope and idempotency_key. The response
 contains all candidate outcomes and bounded unique/original-index source and

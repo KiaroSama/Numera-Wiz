@@ -408,6 +408,101 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(original_packets.get(&1), retained_packets.get(&1));
     assert!(!retained_packets.contains_key(&2));
 
+    let reordered = media.directory.path().join("reordered.mkv");
+    let remap = [
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        media.source.to_str().unwrap(),
+        "-map",
+        "0:1",
+        "-map",
+        "0:0",
+        "-map",
+        "0:2",
+        "-c",
+        "copy",
+        "-f",
+        "matroska",
+        reordered.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &remap,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let moved = cli
+        .mutation(
+            &scope,
+            "register-reordered",
+            "assets.register",
+            json!({"path":reordered}),
+        )
+        .await;
+    assert_eq!(moved["ok"], true, "{moved}");
+    let remove_outputs = [
+        media.directory.path().join("remove-first-audio-1.mkv"),
+        media.directory.path().join("remove-first-audio-2.mkv"),
+    ];
+    let mut remove = fixture::rules();
+    remove.audio_selection.selector = Selector::ExcludeTypeOrdinals { values: vec![0] };
+    remove.audio_selection.no_match = nw_domain::mux::NoMatch::Reject;
+    let review = cli
+        .query(
+            "streams.clean.batch_plan",
+            input(
+                &[assets[0].clone(), moved["result"].clone()],
+                &remove_outputs,
+                &remove,
+                "reject_all",
+            ),
+        )
+        .await;
+    assert!(
+        review["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item["action"] == "remux")
+    );
+    let submitted = cli
+        .mutation(
+            &scope,
+            "remove-first-audio",
+            "batches.submit",
+            json!({"plan_id":review["id"],"plan_hash":review["hash"]}),
+        )
+        .await;
+    assert_eq!(submitted["ok"], true, "{submitted}");
+    let batch = submitted["result"]["batch_id"].as_str().unwrap();
+    let (removed, status) = cli.human(&["batches", "wait", batch]).await;
+    assert_eq!(status, 0, "{removed}");
+    assert_eq!(removed["result"]["succeeded"], 2);
+    let expected_audio: Vec<_> = original_packets[&2]
+        .iter()
+        .map(|packet| &packet["data_hash"])
+        .collect();
+    for path in remove_outputs {
+        let probe = fixture::probe(&media.bin, &path).await;
+        assert_eq!(probe["streams"].as_array().unwrap().len(), 2);
+        assert_eq!(probe["streams"][1]["tags"]["language"], "fas");
+        let captured = packets(&media.bin, &path).await;
+        assert_eq!(
+            captured[&1]
+                .iter()
+                .map(|packet| &packet["data_hash"])
+                .collect::<Vec<_>>(),
+            expected_audio
+        );
+    }
+
     // An operator cannot borrow the native owner's retry namespace.
     let denied = sdk!(
         stdio,
