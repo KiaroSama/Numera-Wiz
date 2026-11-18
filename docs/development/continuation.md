@@ -10,6 +10,15 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+CI323 at `1da8aba` built and packaged all four native targets. Linux, Apple Silicon, Chrome, the
+FFmpeg fixture, owner batch, official MCP transports, dependency resolution,
+formatting and web passed. The Windows platform suite observed incomplete
+diagnostics after cancellation. The Windows process owner now drains stderr
+while terminating the child tree, and the existing regression triggers
+cancellation after receiving actual stdout. The Intel runner reached the
+30-minute job limit during ordinary regressions. Its job now has 45 minutes for
+the same build, packaging and tests. [CI323](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44370161467)
+
 [CI317](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44357396100) at
 `65d2335` passed twelve of thirteen jobs. The four native builds and regressions,
 actual Chrome, large artifact transfer, FFmpeg media tests and both official
