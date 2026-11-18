@@ -67,6 +67,11 @@ before the job timed out during cache compression. macOS ARM64 was cancelled
 before its first step and produced no runner log. The next workflow retains
 macOS cache restoration and keeps cache archival out of the macOS checks jobs.
 
+CI307 matched the ARM64 cancellation before runner assignment. The workflow
+now schedules that lane on the standard macOS 26 Apple Silicon runner and
+preserves its job name, target triple and previous-package artifact identity.
+[GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+
 ## Hosted results at `2013c3e`
 
 [CI303 at `2013c3e`](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44316223601)
