@@ -139,9 +139,16 @@ impl shared::Driver for BrowserProjects<'_> {
             self.base,
             reqwest::Method::POST,
             &format!("{}/actions", self.route),
-            json!({"actions":[{"type":"wheel","id":"project-source-scroll","actions":[{
-                "type":"scroll","x":600,"y":300,"deltaX":0,"deltaY":-600,"duration":180,"origin":"viewport"
-            }]}]}),
+            json!({"actions":[
+                {"type":"pointer","id":"mouse","parameters":{"pointerType":"mouse"},"actions":[
+                    {"type":"pointerMove","x":600,"y":300,"duration":100,"origin":"viewport"},
+                    {"type":"pause","duration":180}
+                ]},
+                {"type":"wheel","id":"project-source-scroll","actions":[
+                    {"type":"pause","duration":100},
+                    {"type":"scroll","x":600,"y":300,"deltaX":0,"deltaY":-600,"duration":180,"origin":"viewport"}
+                ]}
+            ]}),
         )
         .await;
         self.painted().await;
