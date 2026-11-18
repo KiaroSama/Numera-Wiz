@@ -375,12 +375,10 @@ async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
         }
     }
     driver.screenshot("registered-source-form").await;
-    if browser {
-        driver.click(347, 461).await;
-    } else {
-        driver.key(Key::Tab).await;
-        driver.key(Key::Space).await;
-    }
+    // The final denominator has focus. Use the next control because revealing
+    // the focused field can scroll the submit button while entering values.
+    driver.key(Key::Tab).await;
+    driver.key(Key::Space).await;
     driver.observed("clips.place").await
 }
 async fn external_move<D: Driver>(driver: &mut D, graph: &Graph) -> Response {
