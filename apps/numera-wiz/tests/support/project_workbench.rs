@@ -63,6 +63,7 @@ pub struct Observation {
     pub expected_revision: Option<String>,
     pub code: String,
     pub receipt: Option<String>,
+    pub inspected_asset: Option<String>,
 }
 impl Observation {
     pub fn evidence(&self, command: &str) -> Value {
@@ -321,21 +322,19 @@ async fn source_picker<D: Driver>(driver: &mut D, expected_assets: &[String]) ->
     let asset_id = id(&rows[row]["id"]);
     driver.mark().await;
     let row = row as u32;
-    let asset_y = if driver.browser() {
-        197 + row * 21
-    } else {
-        205 + row * 23
-    };
-    driver.click(390, asset_y).await;
-    assert_eq!(driver.observed("assets.inspect").await.code, "OK");
+    driver.click(390, 205 + row * 23).await;
+    let inspected = driver.observed("assets.inspect").await;
+    assert_eq!(inspected.code, "OK");
+    if driver.browser() {
+        assert_eq!(inspected.inspected_asset.as_deref(), Some(asset_id.as_str()));
+    }
     let asset = read(driver, "assets.inspect", json!({"id":asset_id}), None).await;
     let streams = asset["probe"]["streams"].as_array().unwrap();
     assert_eq!(streams.len(), 3);
     assert_eq!(streams[0]["kind"], "video");
     let physical = streams[0]["index"].as_u64().unwrap() as u32;
     // First real video stream follows the three inspected-source rows.
-    let first_stream_y = if driver.browser() { 312 } else { 323 };
-    driver.click(330, first_stream_y).await;
+    driver.click(330, 323).await;
     driver.screenshot("registered-source-picker").await;
     (asset_id, physical)
 }
@@ -344,14 +343,14 @@ async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
     let browser = driver.browser();
     let values = ["0", "1", "1", "1", "0", "1"];
     if browser {
-        driver.click(330, 312).await;
+        driver.click(330, 323).await;
         for ((x, y), value) in [
-            (445, 376),
-            (545, 376),
-            (442, 398),
-            (542, 398),
-            (481, 420),
-            (580, 420),
+            (445, 369),
+            (545, 369),
+            (442, 392),
+            (542, 392),
+            (481, 415),
+            (580, 415),
         ]
         .into_iter()
         .zip(values)
@@ -369,7 +368,7 @@ async fn place_registered<D: Driver>(driver: &mut D) -> Observation {
     }
     driver.screenshot("registered-source-form").await;
     if browser {
-        driver.click(347, 442).await;
+        driver.click(347, 438).await;
     } else {
         driver.key(Key::Tab).await;
         driver.key(Key::Space).await;

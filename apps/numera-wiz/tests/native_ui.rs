@@ -1105,6 +1105,7 @@ impl project_workbench::Driver for NativeProjects<'_> {
                         .as_str()
                         .filter(|id| !id.is_empty())
                         .map(str::to_owned),
+                    inspected_asset: None,
                 };
             }
             if started.elapsed() >= Duration::from_secs(10) {

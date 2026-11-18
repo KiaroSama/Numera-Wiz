@@ -256,6 +256,11 @@ impl shared::Driver for BrowserProjects<'_> {
                             response.response["error"]["code"].as_str().unwrap().into()
                         },
                         receipt: response.response["receipt_id"].as_str().map(str::to_owned),
+                        inspected_asset: if command == "assets.inspect" {
+                            response.response["result"]["id"].as_str().map(str::to_owned)
+                        } else {
+                            None
+                        },
                     };
                     if !ok {
                         assert!(observation.receipt.is_none());
