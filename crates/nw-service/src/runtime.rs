@@ -1390,11 +1390,11 @@ impl Service {
                     policy.is_none(),
                     cancellation.clone(),
                 )?,
-            "media.preview_frame" => value(&self.source_preview(
-                &context,
-                commands::parse(params)?,
-                cancellation.clone(),
-            )?)?,
+            "media.preview_frame" => {
+                drop(guard);
+                let frame = self.source_preview(&context, commands::parse(params)?, cancellation.clone())?;
+                return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
+            }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;
                 let deadline = input

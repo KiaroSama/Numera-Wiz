@@ -25,6 +25,7 @@ impl Service {
         let pixels = tokio::runtime::Handle::current().block_on(self.engine()?.preview_registered_frame(
             &asset, source, input.stream_index, input.frame, cancel.clone(),
         ))?;
+        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
             return Err(DomainError::new("CANCELLED", "Preview cancelled before delivery"));
         }
