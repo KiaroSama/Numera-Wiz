@@ -517,35 +517,38 @@ mod tests {
             "source_path_and_identity",
         ];
         let mut count = 0;
-        assert_eq!(
-            result["commands"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|row| row["id"] == "timeline.render")
-                .count(),
-            1
-        );
+        for query in ["timeline.render", "timeline.preview_frame"] {
+            assert_eq!(
+                result["commands"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|row| row["id"] == query)
+                    .count(),
+                1
+            );
+        }
         for row in result["commands"].as_array().unwrap() {
             let id = row["id"].as_str().unwrap();
             assert!(row.get("authorization").is_none() && row.get("policy_revision").is_none());
             assert!(row.get("current_read").is_none() && row.get("current_edit").is_none());
-            if id == "timeline.render" {
+            if matches!(id, "timeline.render" | "timeline.preview_frame") {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["schema_version"], 1);
                 assert_eq!(requirement["command_id"], id);
                 assert_eq!(requirement["project_action"], "read");
-                assert_eq!(
-                    requirement["request_gates"],
-                    serde_json::json!([
-                        "current_policy",
-                        "project_context",
-                        "project_rights",
-                        "request_parameters",
-                        "expected_revision",
-                        "affected_scope"
-                    ])
-                );
+                let mut gates = vec![
+                    "current_policy",
+                    "project_context",
+                    "project_rights",
+                    "request_parameters",
+                    "expected_revision",
+                    "affected_scope",
+                ];
+                if id == "timeline.preview_frame" {
+                    gates.extend(["source_object_rights", "source_path_and_identity"]);
+                }
+                assert_eq!(requirement["request_gates"], serde_json::json!(gates));
                 let schema = CommandService.dispatch(
                     Principal::DiscoveryAgent,
                     Request::query("commands.schema", serde_json::json!({"id":id})),

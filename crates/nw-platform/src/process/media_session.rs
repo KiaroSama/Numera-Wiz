@@ -836,14 +836,16 @@ async fn drive(shared: &Arc<Shared>, state: &mut CoordinatorState) -> Result<()>
             .ok_or_else(|| error("SESSION_STATE_FAILED", "Relay owner missing"))?
             .observe()?;
         observe_child(shared, state)?;
+        // Termination requested by this session can already have signaled the
+        // child. Keep the recorded cause when interpreting that exit status.
+        if shared.cancel.is_cancelled() {
+            return Err(shared.cause());
+        }
         if state.exit.is_some_and(|status| !status.success()) {
             return Err(error(
                 "PROCESS_FAILED",
                 "Owned byte child exited unsuccessfully",
             ));
-        }
-        if shared.cancel.is_cancelled() {
-            return Err(shared.cause());
         }
         if shared
             .policy

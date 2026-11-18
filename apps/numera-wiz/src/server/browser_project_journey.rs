@@ -294,6 +294,23 @@ impl shared::Driver for BrowserProjects<'_> {
                         "Captured load has no terminal canonical projection"
                     );
                     observed.clear();
+                    drop(observed);
+                    // The HTTP response is observable before the canvas applies
+                    // its terminal projection. Let Chrome paint that frame before
+                    // the next physical pointer or keyboard action.
+                    let painted = driver(
+                        self.client,
+                        self.base,
+                        reqwest::Method::POST,
+                        &format!("{}/execute/async", self.route),
+                        json!({"script":"const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done(true)));","args":[]}),
+                    )
+                    .await;
+                    assert_eq!(
+                        painted.as_bool(),
+                        Some(true),
+                        "Chrome must finish painting the loaded project"
+                    );
                     return;
                 }
             }

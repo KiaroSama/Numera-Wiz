@@ -246,12 +246,23 @@ async fn move_selected<D: Driver>(driver: &mut D, capture_first: bool) -> Observ
     driver.mark().await;
     driver.click(1248, 240).await;
     driver.replace("2").await;
-    field(driver, "1").await;
+    if driver.browser() {
+        driver.click(1347, 240).await;
+        driver.replace("1").await;
+    } else {
+        field(driver, "1").await;
+    }
     if capture_first {
         driver.screenshot("move-fields-before-submit").await;
     }
-    driver.key(Key::Tab).await;
-    driver.key(Key::Space).await;
+    if driver.browser() {
+        // Use the actual Move button after editing the fraction. Focus can stay
+        // in the denominator when a refreshed project replaces its controls.
+        driver.click(1150, 263).await;
+    } else {
+        driver.key(Key::Tab).await;
+        driver.key(Key::Space).await;
+    }
     driver.observed("clips.move").await
 }
 async fn refresh<D: Driver>(driver: &mut D, reads: usize) {

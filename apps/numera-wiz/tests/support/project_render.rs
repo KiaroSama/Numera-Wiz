@@ -179,7 +179,7 @@ pub async fn registered_timeline_frame(cli: &Cli, scope: &str, media: &super::fi
             .decode(response["result"]["rgba_base64"].as_str().unwrap())
             .unwrap();
         assert_eq!(pixels.len(), nw_domain::preview::RGBA_BYTES);
-        assert!(pixels.chunks_exact(4).all(|pixel| pixel == rgba));
+        assert!(pixels.as_chunks::<4>().0.iter().all(|pixel| pixel == &rgba));
         assert_eq!(response["result"]["origin"]["kind"], kind);
     }
     let mut bridge = cli.command();
