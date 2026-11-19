@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    os::unix::fs::PermissionsExt,
     path::{Component, Path, PathBuf},
     process::{Command, Output, Stdio},
 };
@@ -88,6 +89,14 @@ fn basename(name: &str) -> bool {
         && name
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.-+@".contains(&byte))
+}
+
+fn allow_staged_write(path: &Path) -> Result<()> {
+    let permissions = fs::metadata(path)?.permissions();
+    if permissions.mode() & 0o200 == 0 {
+        fs::set_permissions(path, fs::Permissions::from_mode(permissions.mode() | 0o200))?;
+    }
+    Ok(())
 }
 
 fn http() -> Command {
@@ -261,8 +270,9 @@ fn pkg_config_files(work: &Path, dependencies: &BuildInputs) -> Result<std::ffi:
                     continue;
                 }
                 let path = path.canonicalize()?;
+                let metadata = fs::metadata(&path)?;
                 ensure!(
-                    path.starts_with(keg) && fs::metadata(&path)?.len() <= 128 * 1024,
+                    path.starts_with(keg) && metadata.is_file() && metadata.len() <= 128 * 1024,
                     "Invalid pkg-config input from the downloaded keg"
                 );
                 if !rewritten.insert(path.clone()) {
@@ -281,7 +291,8 @@ fn pkg_config_files(work: &Path, dependencies: &BuildInputs) -> Result<std::ffi:
                     );
                 }
                 if relocated != contents {
-                    fs::write(path, relocated)?;
+                    allow_staged_write(&path).context("Make staged pkg-config metadata writable")?;
+                    fs::write(path, relocated).context("Write relocated pkg-config metadata")?;
                 }
             }
         }
@@ -455,6 +466,7 @@ fn relocate(
         );
         let file = bin.join(&name);
         fs::copy(&original, &file)?;
+        allow_staged_write(&file).context("Make the copied Mach-O file writable for relocation")?;
         let library = name.ends_with(".dylib");
         let mut update = Command::new("/usr/bin/install_name_tool");
         for path in runpaths(&file)? {
@@ -587,8 +599,8 @@ fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
 }
 
 fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result<()> {
-    let config = pkg_config_files(work, dependencies)?;
-    let (sdk, standard_config) = sdk_metadata(work)?;
+    let config = pkg_config_files(work, dependencies).context("Prepare native pkg-config search paths")?;
+    let (sdk, standard_config) = sdk_metadata(work).context("Prepare native SDK metadata")?;
     let search = std::env::join_paths(std::env::split_paths(&config).chain([standard_config]))?;
     let lame = &dependencies.lame;
     let mut configure = Command::new("/bin/bash");
@@ -614,10 +626,16 @@ fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result
     if let Some(assembler) = &dependencies.assembler {
         configure.arg(format!("--x86asmexe={}", assembler.display()));
     }
-    let configured = execute(
-        &mut configure,
-        "Configure FFmpeg with the locked macOS dependencies",
-    )?;
+    let configured = configure.stdin(Stdio::null()).output()
+        .context("Start FFmpeg configure with the locked macOS dependencies")?;
+    let last = |bytes: &[u8]| bytes.len().saturating_sub(768);
+    ensure!(
+        configured.status.success(),
+        "Configure FFmpeg failed ({}): {}\n{}",
+        configured.status,
+        String::from_utf8_lossy(&configured.stdout[last(&configured.stdout)..]),
+        String::from_utf8_lossy(&configured.stderr[last(&configured.stderr)..]),
+    );
     ensure!(
         std::str::from_utf8(&configured.stdout)?.contains("License: GPL version 3 or later"),
         "Unexpected license from the macOS FFmpeg configuration"
@@ -631,7 +649,8 @@ fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result
         .env("MACOSX_DEPLOYMENT_TARGET", "15.0")
         .env("SDKROOT", sdk)
         .args(["-j4", "ffmpeg", "ffprobe"])
-        .status()?;
+        .status()
+        .context("Start the native macOS FFmpeg build")?;
     ensure!(status.success(), "Compile the two macOS FFmpeg executables");
     Ok(())
 }
