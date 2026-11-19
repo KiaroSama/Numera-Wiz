@@ -5,6 +5,7 @@ use crate::{
     projects::{EntityId, ProjectId, Revision},
     time::{Rational, TimeRange},
 };
+pub mod native_wire;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

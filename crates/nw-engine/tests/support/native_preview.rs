@@ -1,5 +1,9 @@
 //! Qualify the real producer against a deliberately paced presentation clock.
-use nw_domain::time::{Rational, TimeRange};
+use nw_domain::{
+    preview::native_wire::{self, Descriptor, Format, Header, PacketOrder},
+    projects::{EntityId, ProjectId, Revision},
+    time::{Rational, TimeRange},
+};
 use nw_engine::{Engine, NativePreviewPipe, NativePreviewProfile};
 use nw_platform::process::{self, AsyncChunkSink, StreamLimits};
 use std::{path::PathBuf, time::Duration};
@@ -74,6 +78,36 @@ pub async fn exercise(engine: &Engine, token: &CancellationToken) {
     assert_eq!(first.pts, selected.range.start);
     assert_eq!(first.duration, t(1, 24));
     assert_eq!(first.bytes.len(), (WIDTH * HEIGHT * 4) as usize);
+    let id = "55215fa4-840f-41ee-b794-cb5143fa0f0c";
+    let format = Format::Rgba8 { width: WIDTH, height: HEIGHT, frame_rate: selected.frame_rate };
+    let descriptor = Descriptor {
+        version: 1,
+        session_id: EntityId::parse(id).unwrap(),
+        generation: selected.generation,
+        project_id: ProjectId::parse(id).unwrap(),
+        sequence_id: EntityId::parse(id).unwrap(),
+        revision: Revision(41),
+        range: selected.range,
+        format,
+    };
+    let wire = native_wire::encode_header(&descriptor).unwrap();
+    let header = wire[..4].try_into().unwrap();
+    let decoded: Descriptor = native_wire::decode_header(header, &wire[4..]).unwrap();
+    assert_eq!(decoded, descriptor);
+    assert!(native_wire::header_length((8193u32).to_be_bytes()).is_err());
+    assert!(native_wire::decode_header::<Descriptor>(header, &wire[4..wire.len() - 1]).is_err());
+
+    let mut order = PacketOrder::new(decoded).unwrap();
+    let packet_header = first.wire_header(format).unwrap();
+    let mut stale = packet_header.clone();
+    stale.generation -= 1;
+    stale.payload_bytes = u32::MAX;
+    assert!(order.admit(&stale).is_err());
+    let wire = native_wire::encode_header(&packet_header).unwrap();
+    let decoded: Header = native_wire::decode_header(wire[..4].try_into().unwrap(), &wire[4..]).unwrap();
+    assert_eq!(decoded, packet_header);
+    assert_eq!(order.admit(&decoded).unwrap(), first.bytes.len());
+    assert!(order.admit(&decoded).is_err());
     assert!(pipe.advance(GENERATION - 1, t(4, 1)).is_err());
     assert!(pipe.advance(GENERATION, t(2, 1)).is_err());
 
@@ -82,6 +116,7 @@ pub async fn exercise(engine: &Engine, token: &CancellationToken) {
         let packet = tokio::time::timeout(Duration::from_secs(2), pipe.video.recv())
             .await.unwrap().unwrap();
         assert_eq!(packet.sequence, sequence);
+        assert_eq!(order.admit(&packet.wire_header(format).unwrap()).unwrap(), packet.bytes.len());
         assert!(packet.pts <= t(13, 4), "Future frame escaped frozen clock");
     }
     assert!(tokio::time::timeout(Duration::from_millis(90), pipe.video.recv()).await.is_err());

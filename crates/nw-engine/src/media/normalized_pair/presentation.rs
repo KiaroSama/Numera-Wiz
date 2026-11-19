@@ -2,6 +2,7 @@
 use super::nut::{Format, NutReader};
 use nw_domain::{
     DomainError, Result,
+    preview::native_wire::{Format as WireFormat, Header},
     projects::grid_tick,
     time::{Rational, TimeRange},
 };
@@ -64,6 +65,20 @@ pub struct NativePreviewPacket {
     pub pts: Rational,
     pub duration: Rational,
     pub bytes: Vec<u8>,
+}
+
+impl NativePreviewPacket {
+    pub fn wire_header(&self, format: WireFormat) -> Result<Header> {
+        Ok(Header {
+            generation: self.generation,
+            sequence: self.sequence,
+            pts: self.pts,
+            duration: self.duration,
+            format,
+            payload_bytes: u32::try_from(self.bytes.len())
+                .map_err(|_| reject("Native payload length exceeds its wire range"))?,
+        })
+    }
 }
 
 #[derive(Debug, Default)]
