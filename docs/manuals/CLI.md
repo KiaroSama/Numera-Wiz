@@ -923,8 +923,8 @@ its ID and hash through the usual job commands.
 ### Edit PCM audio in sample order
 
 Use `numera-wiz media edit-audio --file edit.json` with a registered
-WAVE or Matroska source and a new WAVE destination. The ordered pieces
-use zero-based sample positions and exclusive ends.
+WAVE or Matroska source and a new `.wav` or `.mka` destination. The ordered
+pieces use zero-based sample positions and exclusive ends.
 
 ```json
 {
@@ -938,8 +938,10 @@ use zero-based sample positions and exclusive ends.
 }
 ```
 
-The route produces one original-rate signed 16-bit PCM stream, preserving
-mono, stereo or an explicitly labeled 5.1 layout. Standard tempo is 100.
+WAVE stores one signed 16-bit PCM stream at the original rate and preserves
+mono, stereo or explicitly labeled 5.1 layouts. Matroska audio (`.mka`) stores
+16-bit FLAC at the original rate for mono, stereo and standard 5.1. The plan
+requires a FLAC encoder and decoder. Standard tempo is 100.
 A tempo change requires a source interval of at least one second. Review
 the expected output frame count and the declared tolerance for
 pitch-preserving tempo processing. Use the returned plan ID and hash

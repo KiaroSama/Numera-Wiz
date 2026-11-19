@@ -552,6 +552,8 @@ impl Engine {
             media_join::SCOPE
         } else if plan.subtitle_burn.is_some() {
             subtitle_burn::SCOPE
+        } else if plan.audio_edit.is_some() {
+            audio_edit::scope(Path::new(&plan.output))
         } else if plan.audio_normalization.is_empty() {
             profile.scope()
         } else {

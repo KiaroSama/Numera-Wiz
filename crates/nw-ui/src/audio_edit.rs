@@ -53,7 +53,7 @@ impl WizApp {
                             changed |= ui.selectable_value(stream, item.index, format!("Audio {}", item.index)).changed();
                         }
                     });
-                ui.small("Enter sample positions in the order they should play. End samples are exclusive. Use a new .wav destination.");
+                ui.small("Enter sample positions in the order they should play. End samples are exclusive. Use a new .wav or .mka destination.");
                 let removable = self.audio_edit.pieces.len() > 1;
                 let mut remove = None;
                 for (index, piece) in self.audio_edit.pieces.iter_mut().enumerate() {

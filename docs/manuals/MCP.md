@@ -599,7 +599,7 @@ ID and hash with `jobs.submit`.
 `audio.edit` reviews ordered sample intervals and per-piece reversal and
 tempo for one registered PCM s16le stream. It returns exact unity-tempo
 sample counts and a reviewed duration tolerance for tempo changes. It
-produces one signed 16-bit WAVE stream. Use `commands.schema` to inspect
+produces signed 16-bit WAVE or lossless FLAC in `.mka`. Use `commands.schema` to inspect
 the typed input and `jobs.submit` to execute a reviewed plan.
 
 

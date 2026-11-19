@@ -199,8 +199,10 @@ FLAC. Numera's single-file and explicit batch extraction use the same Rust
 Matroska planner for `.mka`, reject non-audio streams in that output, and
 verify the original packet payloads and clocks. A separate FFmpeg 9.0.2 run
 matched 47 packets and retained the Persian language tag on the selected PCM
-track. The new application journey is awaiting hosted qualification. Accurate
-FLAC encoding is a separate pending workflow.
+track. Accurate sample edits produce FLAC when `.mka` is selected, with the
+same original rate and admitted channel layout. An independent FFmpeg run
+reproduced all 6,588 edited, reordered and channel-aligned 5.1 sample frames.
+Both new application journeys are awaiting hosted qualification.
 [FFmpeg Skill update](https://github.com/kajisho5/ffmpeg-skill/commit/15f7965cea)
 
 FFmpeg development includes additional APNG probe coverage for large ancillary

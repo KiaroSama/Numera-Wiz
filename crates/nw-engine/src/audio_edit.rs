@@ -7,22 +7,48 @@ use nw_domain::{
     mux::{CleanResolution, Stream, StreamKind},
     records::{Asset, MediaProbe, Plan},
 };
-use nw_platform::files;
-use std::path::Path;
+use nw_platform::{files, process};
+use std::{
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 use tokio_util::sync::CancellationToken;
 
 pub(super) const SCOPE: &str = "Verify the edited PCM sample count, rate, channel layout and 16-bit precision. Unity-tempo ranges use exact sample boundaries. Tempo processing uses the reviewed overlap-add duration tolerance.";
+const FLAC_SCOPE: &str = "Verify one 16-bit FLAC track in Matroska and decode it to count samples at the original rate and channel layout. Unity-tempo ranges use exact sample boundaries. Tempo processing uses the reviewed overlap-add duration tolerance.";
 const MAX_SOURCE_BYTES: u64 = 1024 * 1024 * 1024;
+
+fn is_matroska_audio(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("mka"))
+}
+
+pub(super) fn scope(path: &Path) -> &'static str {
+    if is_matroska_audio(path) {
+        FLAC_SCOPE
+    } else {
+        SCOPE
+    }
+}
 
 fn unavailable(message: &str) -> DomainError {
     DomainError::new("AUDIO_EDIT_UNQUALIFIED", message)
 }
 
 pub(super) fn format(probe: &MediaProbe, index: u32) -> Result<(u32, u8, &str)> {
+    audio_format(probe, index, "pcm_s16le")
+}
+
+fn audio_format<'a>(probe: &'a MediaProbe, index: u32, codec: &str) -> Result<(u32, u8, &'a str)> {
     if probe.streams.iter().all(|track| {
-        track.index != index || track.kind != StreamKind::Audio || track.codec != "pcm_s16le"
+        track.index != index || track.kind != StreamKind::Audio || track.codec != codec
     }) {
-        return Err(unavailable("Choose an original PCM s16le audio track"));
+        return Err(unavailable("The requested audio stream does not have the required codec"));
     }
     let details = probe
         .stream_details
@@ -49,14 +75,20 @@ pub(super) fn format(probe: &MediaProbe, index: u32) -> Result<(u32, u8, &str)> 
     Ok((rate, channels, layout))
 }
 
-fn resolution(streams: &[Stream], index: u32) -> Result<CleanResolution> {
+fn resolution(streams: &[Stream], index: u32, flac: bool) -> Result<CleanResolution> {
     let mut resolution = nw_domain::mux::extract_one(streams, index)?;
     resolution.preservation.global_tags = false;
     resolution.preservation.stream_tags = false;
     resolution.preservation.dispositions = false;
     resolution.streams[0].tags.clear();
     resolution.streams[0].dispositions.clear();
-    resolution.reasons = vec!["Render the ordered sample intervals into a PCM WAVE file".into()];
+    if flac {
+        resolution.streams[0].codec = "flac".into();
+        resolution.streams[0].tags.insert("encoder".into(), "Lavc flac".into());
+        resolution.reasons = vec!["Render the ordered sample intervals as FLAC in Matroska audio".into()];
+    } else {
+        resolution.reasons = vec!["Render the ordered sample intervals into a PCM WAVE file".into()];
+    }
     if let Some(outcome) = resolution
         .outcomes
         .iter_mut()
@@ -71,6 +103,7 @@ impl Engine {
     pub async fn inspect_audio_edit(
         &self,
         source: &Asset,
+        output: &Path,
         index: u32,
         pieces: Vec<Piece>,
         cancel: CancellationToken,
@@ -94,7 +127,25 @@ impl Engine {
                 "Sample edits admit registered WAVE or Matroska sources up to 1 GiB",
             ));
         }
+        let flac = is_matroska_audio(output);
+        if !flac && OutputProfile::from_output(output)? != OutputProfile::WavePcm {
+            return Err(unavailable("Choose a new .wav or .mka output"));
+        }
+        if flac {
+            use crate::media::{Listing, listing};
+            let encoders = listing(self, "-encoders", Listing::Codecs, cancel.clone()).await?;
+            let decoders = listing(self, "-decoders", Listing::Codecs, cancel.clone()).await?;
+            if !encoders.contains("flac") || !decoders.contains("flac") {
+                return Err(DomainError::new(
+                    "COMPONENT_UNAVAILABLE",
+                    "The selected component needs a FLAC encoder and decoder",
+                ));
+            }
+        }
         let (sample_rate, channels, layout) = format(&source.probe, index)?;
+        if flac && layout == "5.1(side)" {
+            return Err(unavailable("FLAC output requires mono, stereo or standard 5.1 layout"));
+        }
         let path = Path::new(&source.identity.path);
         let identity = source.identity.clone();
         let object = registered_object(source)?.clone();
@@ -131,17 +182,19 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
+        let flac = is_matroska_audio(output);
+        let profile = OutputProfile::from_output(output)?;
         let mut plan = self.review_stream_copy(
             source,
             output,
             Default::default(),
             creator,
             now,
-            |streams| resolution(streams, edit.stream_index),
+            |streams| resolution(streams, edit.stream_index, flac),
         )?;
         plan.audio_edit = Some(edit);
-        plan.verification_scope = SCOPE.into();
-        plan.argv_template = invocation(&plan, OutputProfile::WavePcm)?;
+        plan.verification_scope = scope(output).into();
+        plan.argv_template = invocation(&plan, profile)?;
         plan.hash = plan_digest(&plan)?;
         self.validate_plan(&plan)?;
         Ok(plan)
@@ -161,25 +214,75 @@ impl Engine {
                 "Edited PCM differs from the reviewed sample count or channel layout",
             )
         };
-        let (rate, channels, layout) = format(probe, 0)?;
+        let flac = is_matroska_audio(Path::new(&plan.output));
+        let (codec, container) = if flac { ("flac", "matroska") } else { ("pcm_s16le", "wav") };
+        let (rate, channels, layout) = audio_format(probe, 0, codec).map_err(|_| failed())?;
         let (nominal, tolerance) = edit.output_samples()?;
-        if probe.format != "wav"
+        let details = &probe.stream_details[&0];
+        let bits = if flac { details["bits_per_raw_sample"] == "16" } else { details["bits_per_sample"] == 16 };
+        if crate::admission::frozen_demuxer(&probe.format)? != container
             || probe.streams.len() != 1
             || rate != edit.sample_rate
             || channels != edit.channels
             || layout != edit.channel_layout
-            || probe.stream_details[&0]["bits_per_sample"] != 16
+            || !bits
         {
             return Err(failed());
         }
-        let samples =
-            crate::preservation::pcm_frames(self, path, probe, 0, channels, cancel).await?;
-        if u64::from(samples).abs_diff(nominal) > tolerance {
+        let samples = if flac {
+            self.verify_flac_samples(path, channels, nominal + tolerance, cancel).await?
+        } else {
+            u64::from(crate::preservation::pcm_frames(self, path, probe, 0, channels, cancel).await?)
+        };
+        if samples.abs_diff(nominal) > tolerance {
             return Err(failed());
+        }
+        if flac {
+            return Ok(format!(
+                "Verified {samples} decoded FLAC sample frames at {rate} Hz, signed 16 bit, {layout}; reviewed nominal {nominal}, allowed deviation {tolerance} sample frames."
+            ));
         }
         Ok(format!(
             "Verified {samples} PCM sample frames at {rate} Hz, signed 16 bit, {layout}; reviewed nominal {nominal}, allowed deviation {tolerance} sample frames."
         ))
+    }
+
+    async fn verify_flac_samples(
+        &self,
+        path: &Path,
+        channels: u8,
+        max_samples: u64,
+        cancel: CancellationToken,
+    ) -> Result<u64> {
+        let source = files::SourceStamp::capture_resolved(path)?;
+        let input = crate::admission::from_file(source.try_clone_file()?, &cancel)?;
+        let mut args = ["-hide_banner", "-nostdin", "-v", "error", "-xerror", "-max_alloc", "67108864", "-threads", "1"].map(String::from).to_vec();
+        args.extend(input.options());
+        args.extend(["-i", "fd:", "-map", "0:a:0", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"].map(String::from));
+        let frame_bytes = u64::from(channels) * 2;
+        let total = Arc::new(AtomicU64::new(0));
+        let counter = Arc::clone(&total);
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let result = process::stream_verified_readonly(
+            Path::new(&self.ffmpeg.path),
+            &args,
+            Duration::from_secs(90),
+            input.file,
+            process::StreamLimits { stdout_bytes: max_samples * frame_bytes, stderr_bytes: 4096 },
+            Box::new(move |chunk| {
+                counter.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+                Ok(())
+            }),
+            cancel,
+        )
+        .await;
+        ticket.finish(result)?;
+        source.revalidate()?;
+        let bytes = total.load(Ordering::Relaxed);
+        if bytes == 0 || !bytes.is_multiple_of(frame_bytes) {
+            return Err(DomainError::new("VERIFICATION_FAILED", "Decoded FLAC does not contain complete sample frames"));
+        }
+        Ok(bytes / frame_bytes)
     }
 }
 
@@ -247,8 +350,9 @@ pub(super) fn invocation(plan: &Plan, profile: OutputProfile) -> Result<Vec<Stri
         .as_ref()
         .ok_or_else(|| unavailable("Missing reviewed audio edit"))?;
     let (rate, channels, layout) = format(&plan.source.probe, edit.stream_index)?;
-    if profile != OutputProfile::WavePcm
-        || OutputProfile::from_output(Path::new(&plan.output))? != profile
+    let flac = is_matroska_audio(Path::new(&plan.output));
+    let target = if flac { OutputProfile::Matroska } else { OutputProfile::WavePcm };
+    if profile != target || OutputProfile::from_output(Path::new(&plan.output))? != profile
         || (rate, channels, layout)
             != (
                 edit.sample_rate,
@@ -256,14 +360,14 @@ pub(super) fn invocation(plan: &Plan, profile: OutputProfile) -> Result<Vec<Stri
                 edit.channel_layout.as_str(),
             )
         || plan.resolution.streams
-            != resolution(&plan.source.probe.streams, edit.stream_index)?.streams
+            != resolution(&plan.source.probe.streams, edit.stream_index, flac)?.streams
         || plan.resolution.preservation.chapters
         || plan.resolution.preservation.global_tags
         || plan.resolution.preservation.stream_tags
         || plan.resolution.preservation.dispositions
     {
         return Err(unavailable(
-            "Review the original sample layout and a new .wav destination",
+            "Review the original sample layout and a new .wav or .mka destination",
         ));
     }
     edit.output_samples()?;
@@ -287,10 +391,11 @@ pub(super) fn invocation(plan: &Plan, profile: OutputProfile) -> Result<Vec<Stri
         "-fflags".into(),
         "+bitexact".into(),
         "-c:a".into(),
-        "pcm_s16le".into(),
-        "-f".into(),
-        "wav".into(),
-        "@owned_staging@".into(),
+        if flac { "flac".into() } else { "pcm_s16le".into() },
     ]);
+    if flac {
+        args.extend(["-sample_fmt", "s16", "-flags:a", "+bitexact", "-disposition:a:0", "0", "-metadata:s:a:0", "encoder=Lavc flac"].map(String::from));
+    }
+    args.extend(["-f", profile.muxer(), "@owned_staging@"].map(String::from));
     Ok(args)
 }

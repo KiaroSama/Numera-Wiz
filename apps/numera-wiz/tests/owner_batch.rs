@@ -569,6 +569,38 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     assert_eq!(probe["streams"][0]["channel_layout"], "5.1");
     assert_eq!(probe["streams"][0]["sample_rate"], "48000");
     assert_eq!(probe["streams"][0]["bits_per_sample"], 16);
+    let matroska = directory.join("ترتیب-ویرایش.mka");
+    let mut flac_params = params;
+    flac_params["output"] = json!(matroska);
+    let flac = cli.query("audio.edit", flac_params).await;
+    assert_eq!(flac["resolution"]["streams"][0]["codec"], "flac");
+    let flac_job = accepted(
+        &cli,
+        &scope,
+        "execute-numbered-sample-flac",
+        "jobs.submit",
+        json!({"plan_id":flac["id"],"plan_hash":flac["hash"]}),
+    )
+    .await;
+    succeeded(&cli, &flac_job).await;
+    let mut decoded = decoded;
+    decoded[3] = matroska.to_str().unwrap().to_owned();
+    let flac_pcm = nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &decoded,
+        Duration::from_secs(30),
+        128 * 1024,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap()
+    .stdout;
+    assert!(flac_pcm == expected, "FLAC differs from the original edited samples");
+    let flac_probe = fixture::probe(&components, &matroska).await;
+    assert_eq!(flac_probe["streams"].as_array().unwrap().len(), 1);
+    assert_eq!(flac_probe["streams"][0]["codec_name"], "flac");
+    assert_eq!(flac_probe["streams"][0]["channel_layout"], "5.1");
+    assert_eq!(flac_probe["streams"][0]["bits_per_raw_sample"], "16");
     let tone = directory.join("tone-1000.wav");
     let make_tone = [
         "-v",
@@ -655,7 +687,8 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
             json!({"tempo_percent":percent,"observed_hz":measured,"output_samples":tones.len()}),
         );
     }
-    json!({"job":job["job_id"],"samples":6588,"channel_layout":"5.1","bit_exact_expected_pcm":true,"tempo":tempo_facts})
+    json!({"job":job["job_id"],"samples":6588,"channel_layout":"5.1","bit_exact_expected_pcm":true,
+        "flac_matroska":{"job":flac_job["job_id"],"bit_exact_expected_pcm":true},"tempo":tempo_facts})
 }
 
 async fn packet_join(parent: &Path) -> Value {

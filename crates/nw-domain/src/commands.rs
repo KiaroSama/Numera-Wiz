@@ -964,7 +964,7 @@ fn build_registry() -> Vec<Descriptor> {
         ),
         row!(
             "audio.edit",
-            "Review ordered PCM cuts, per-piece reversal and pitch-preserving tempo",
+            "Review ordered PCM cuts, reversal and pitch-preserving tempo for WAVE or Matroska FLAC",
             Query,
             crate::audio_edit::EditInput
         ),

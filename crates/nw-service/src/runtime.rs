@@ -1914,6 +1914,7 @@ impl Service {
                 drop(guard);
                 let (stamp, edit) = runtime.block_on(self.engine()?.inspect_audio_edit(
                     &bound,
+                    Path::new(&input.output),
                     input.stream_index,
                     input.pieces,
                     cancellation.clone(),

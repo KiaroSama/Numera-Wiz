@@ -346,10 +346,10 @@ the BT.709 tone map and enter the source peak in nits. Enter a new
 Matroska destination, review the plan, and run the job.
 
 
-In **Edit PCM audio samples**, select the original audio stream, enter a
-new WAVE destination, and specify the playback order of the sample
-intervals. Choose reverse and tempo independently for each interval.
-Review the output sample count and run the job.
+In **Edit PCM audio samples**, select the original audio stream and a new
+`.wav` or `.mka` destination. Enter the sample intervals in playback order.
+Choose reverse and tempo for each interval. Review the output sample count
+and run the job. `.mka` saves the result as lossless FLAC.
 
 
 Open the first input and expand **Join compatible media in order**.
