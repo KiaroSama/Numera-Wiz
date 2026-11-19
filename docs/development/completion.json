@@ -207,8 +207,18 @@
     {
       "subject_id": "F03",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "matroska_original_keyframe_cut",
+          "commit": "275c2e16f3754795d7d8f8813e5918eae787ae5f",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44465325122/job/135366961088",
+          "artifact_sha256": "c0e17d921614334e9d7ae3bf2f0cf1180d1077a2fedd27bd1ffb83644f9c8a4f",
+          "asserted_domain": "One reviewed Matroska stream-copy cut",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The output retained eight packets at their original clock and rejected the non-keyframe start."
+        }
+      ]
     },
     {
       "subject_id": "F04",
@@ -219,8 +229,18 @@
     {
       "subject_id": "F05",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "matroska_external_audio_and_subrip_copy",
+          "commit": "275c2e16f3754795d7d8f8813e5918eae787ae5f",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44465325122/job/135366961088",
+          "artifact_sha256": "c0e17d921614334e9d7ae3bf2f0cf1180d1077a2fedd27bd1ffb83644f9c8a4f",
+          "asserted_domain": "Append two audio and two SubRip tracks while preserving originals",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The CLI and both official MCP transports produced the same plan. Three original streams retained their packet timing and digest."
+        }
+      ]
     },
     {
       "subject_id": "F06",
