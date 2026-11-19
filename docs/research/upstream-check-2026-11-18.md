@@ -160,6 +160,12 @@ return types and read-only range lifetimes. Numera currently uses redb
 a verified prior-package open and handoff across the supported systems.
 [Craft Libraries change](https://github.com/storytold/craft-libs/commit/56c3c833bb869a140271e2aceec2112322cacc58) · [redb 5.0 changes](https://github.com/cberner/redb/releases/tag/v5.0.0)
 
+At 11:14 UTC, Craft Libraries had added bounded CMS views for signed-data and
+signer records. Its fixtures retain certificate and CRL sets, optional signer
+attributes and unread trailing fields. The application packages currently
+check delivered bytes against archive manifests. Platform signing and trust
+verification remain distinct release work. [Craft Libraries comparison](https://github.com/storytold/craft-libs/compare/56c3c833bb869a140271e2aceec2112322cacc58...1acd07f6bc48b04df49aa00e1c3852b159151d63)
+
 FFmWiz uses average bitrate for `quality_vbr` and `strict_size`. Its peak and
 buffer are two and four times the average for `quality_vbr`, and one and two
 times the average for `strict_size`. The Numera CPU AVC planner applies those
