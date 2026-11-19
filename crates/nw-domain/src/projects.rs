@@ -784,6 +784,13 @@ pub struct TrimInput {
     pub tail: Rational,
     pub link_policy: LinkPolicy,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetTrackEnabledInput {
+    pub track_id: EntityId,
+    pub enabled: bool,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveInput {

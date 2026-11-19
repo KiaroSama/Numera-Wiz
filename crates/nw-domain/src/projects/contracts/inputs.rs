@@ -162,7 +162,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
             enumeration(&mut schema, "collision", &["reject"]);
             enumeration(&mut schema, "link_policy", &["expand"]);
         }
-        "clips.link" | "clips.unlink" | "clips.trim" => {} // Typed policy and unique selection.
+        "clips.link" | "clips.unlink" | "clips.trim" | "tracks.set_enabled" => {} // Typed parameters.
         "clips.split" => enumeration(&mut schema, "link_policy", &["expand"]),
         "clips.remove" => {
             bounded_array(&mut schema, "clip_ids", 1, 128);

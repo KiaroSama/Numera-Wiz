@@ -594,7 +594,7 @@ mod tests {
                 assert_eq!(&catalog_fields(&schema.result.unwrap()), row);
                 continue;
             }
-            if matches!(id, "markers.place" | "markers.remove" | "clips.trim") {
+            if matches!(id, "markers.place" | "markers.remove" | "clips.trim" | "tracks.set_enabled") {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
                 assert_eq!(requirement["project_action"], "edit");

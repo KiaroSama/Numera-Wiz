@@ -279,6 +279,14 @@ impl WizApp {
         {
             self.project_next_page(Phase::NextTracks, ui.ctx());
         }
+        if let Some(track) = group.tracks.items.iter().find(|track| {
+            Some(track.id.as_str()) == group.view.track.as_deref()
+        }) {
+            let label = if track.enabled { "Disable track" } else { "Enable track" };
+            if ui.add_enabled(ready, egui::Button::new(label)).clicked() {
+                self.mutate_project("tracks.set_enabled", json!({"track_id":track.id,"enabled":!track.enabled}), ui.ctx());
+            }
+        }
     }
     fn project_timeline(&mut self, ui: &mut egui::Ui) {
         let Some(group) = self.projects.group.clone() else {

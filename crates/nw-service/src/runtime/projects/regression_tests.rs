@@ -808,6 +808,32 @@ pub(in crate::runtime) async fn linked_edits() {
     for (id, raw) in right_ids.iter().zip(before) {
         assert_eq!(fixture.raw(id), raw);
     }
+    let track_fixture = Fixture::new().await;
+    let clip: Clip = track_fixture.entity(&track_fixture.clips[0]).payload("clip").unwrap();
+    let original_track = track_fixture.raw(&clip.track_id);
+    let disable = json!({"track_id":clip.track_id,"enabled":false});
+    let changed = track_fixture
+        .accept(track_fixture.request("tracks.set_enabled", "disable-video-track", disable.clone()))
+        .await;
+    assert_eq!(changed["changed_ids"], json!([clip.track_id]));
+    assert!(!track_fixture.entity(&clip.track_id).enabled);
+    let read = track_fixture.service.store.project_read(track_fixture.project.as_str()).unwrap();
+    let tracks = read.track_page(&clip.sequence_id, None, 16, 64 * 1024).unwrap();
+    let track = tracks.items.iter().find(|row| row["id"] == clip.track_id.as_str()).unwrap();
+    assert_eq!(track["enabled"], false);
+    let capture = nw_domain::media::capture_mixed_frame(
+        &read, &clip.sequence_id, read.header().revision, clip.sequence_start,
+    ).unwrap();
+    assert!(capture.tracks.iter().all(|track| track.id != clip.track_id));
+    drop(read);
+    let noop = track_fixture
+        .accept(track_fixture.request("tracks.set_enabled", "already-disabled", disable))
+        .await;
+    assert_eq!(noop["no_change"], true);
+    track_fixture
+        .accept(track_fixture.request("history.undo", "enable-video-track-undo", json!({})))
+        .await;
+    assert_eq!(track_fixture.raw(&clip.track_id), original_track);
     conformance.reject_copy(20, 1, |v| {
         v["no_change"] = json!(false);
     });

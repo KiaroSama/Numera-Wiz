@@ -100,6 +100,12 @@ pub struct TrackSummary {
     pub name: String,
     pub order: u32,
     pub clip_count: usize,
+    #[serde(default = "enabled_by_default")]
+    pub enabled: bool,
+}
+
+fn enabled_by_default() -> bool {
+    true
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

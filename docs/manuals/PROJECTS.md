@@ -19,6 +19,7 @@ solid-color binding here does not produce a video file.
 | `projects.inspect` | `projects inspect` | Read summary, one entity or a bin page. |
 | `sequences.create` | `sequences create` | Create explicit sequence settings and video/audio tracks. |
 | `sequences.inspect` | `sequences inspect` | Read sequence detail, tracks or a bounded clip viewport. |
+| `tracks.set_enabled` | `tracks set-enabled` | Include or exclude one track from preview and render at the expected revision. |
 | `clips.place` | `clips place` | Place a registered physical stream or finite solid-color source. |
 | `clips.move` | `clips move` | Move the selected/link-expanded clips by one exact delta. |
 | `clips.link` | `clips link` | Expand complete clip topology and assign one shared opaque group. |
@@ -169,6 +170,21 @@ accepted, replayable receipt with `no_change:true` and empty `changed_ids`, whil
 revision, raw project/entity bytes, history and redo remain unchanged. Retrying a
 lost response uses the exact original identity, expected revision and parameters,
 including for no-change; it is different from the fresh second Link above.
+
+## Track participation
+
+In Projects, select an audio or video track and choose **Disable track**.
+Preview and render omit that track's clips. Choose **Enable track** to include
+them again. The track, clip positions and link groups retain their identities.
+Undo restores the previous enabled state.
+
+```text
+numera-wiz tracks set-enabled TRACK --enabled false --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key disable-track
+```
+
+MCP exposes the same edit as `tracks.set_enabled` with `track_id` and
+`enabled` parameters. Use its ordinary project write context. The
+`sequences.inspect` track page includes each track's committed `enabled` state.
 
 ## Timeline markers
 

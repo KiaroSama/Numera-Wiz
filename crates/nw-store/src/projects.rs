@@ -468,6 +468,7 @@ fn index_rows(
                 name: entity.label.clone(),
                 order: track.order,
                 clip_count: track.clip_count,
+                enabled: entity.enabled,
             })?,
         ));
     }
@@ -696,13 +697,24 @@ impl ProjectReadSnapshot {
         budget: usize,
     ) -> Result<IndexedPage> {
         let owner: Sequence = self.entity(sequence)?.payload("sequence")?;
-        self.index_page(
+        let mut page = self.index_page(
             &format!("project-track/{}/{sequence}/", self.header.id),
             after,
             limit,
             budget,
             owner.track_count,
-        )
+        )?;
+        for item in &mut page.items {
+            if item.get("enabled").is_none() {
+                let summary: TrackSummary = serde_json::from_value(item.clone()).map_err(storage)?;
+                let entity = self.entity(&summary.id)?;
+                if entity.kind != "track" || entity.owner_id.as_ref() != Some(sequence) {
+                    return Err(domain::invalid("Track index points to a different entity"));
+                }
+                item["enabled"] = json!(entity.enabled);
+            }
+        }
+        Ok(page)
     }
     pub fn marker_page(
         &self,

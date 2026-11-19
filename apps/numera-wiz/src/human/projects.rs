@@ -391,6 +391,25 @@ impl Clips {
     }
 }
 #[derive(Subcommand)]
+pub enum Tracks {
+    /// Enable or mute a track at the expected project revision.
+    SetEnabled {
+        #[command(flatten)]
+        context: WriteContext,
+        track: String,
+        #[arg(long, action = clap::ArgAction::Set)]
+        enabled: bool,
+    },
+}
+
+impl Tracks {
+    pub(super) fn prepare(self) -> Result<Request> {
+        let Self::SetEnabled { context, track, enabled } = self;
+        context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
+    }
+}
+
+#[derive(Subcommand)]
 pub enum History {
     Undo {
         #[command(flatten)]

@@ -94,6 +94,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
 | `logs status` | Inspect owner log health under current owner authority. |
 | `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
+| `tracks set-enabled TRACK --enabled false` | Disable a track at the expected project revision while preserving clip identities. |
 | `clips place/move/link/unlink/split/trim/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
 | `markers wave-projection --project ID --clip ID --revision N` | Read original WAVE cues at their exact positions in a committed audio clip. |
 

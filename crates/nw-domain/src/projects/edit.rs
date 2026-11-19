@@ -42,6 +42,7 @@ pub enum ProjectEditIntent {
     Unlink(UnlinkInput),
     Split(SplitInput),
     Trim(TrimInput),
+    SetTrackEnabled(SetTrackEnabledInput),
     Remove(RemoveInput),
 }
 pub struct AllocatedIds(pub VecDeque<EntityId>);
@@ -670,6 +671,26 @@ pub fn resolve_edit<R: ProjectRead>(
                 clip.duration = clip.source_range.duration()?;
                 edit.clip_context(&clip)?;
                 entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({})
+        }
+        ProjectEditIntent::SetTrackEnabled(input) => {
+            let mut entity = edit.get(&input.track_id)?;
+            entity.semantics()?;
+            let track: Track = entity.payload("track")?;
+            let sequence = edit.get(&track.sequence_id)?;
+            if entity.owner_id.as_ref() != Some(&sequence.id) {
+                return Err(invalid("Track ownership differs from its sequence"));
+            }
+            if track.locked || sequence.payload::<Sequence>("sequence")?.locked {
+                return Err(DomainError::new(
+                    "ENTITY_LOCKED",
+                    "Edit touches a locked track or sequence",
+                ));
+            }
+            if entity.enabled != input.enabled {
+                entity.enabled = input.enabled;
                 edit.set(entity)?;
             }
             json!({})

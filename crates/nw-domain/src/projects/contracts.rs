@@ -356,6 +356,7 @@ fn entity_definitions(defs: &mut Map<String, Value>) {
                 ("order", uint32()),
                 ("grid", reference("Rational")),
                 ("clip_count", count()),
+                ("enabled", boolean()),
                 ("locked", boolean()),
             ],
         ),
