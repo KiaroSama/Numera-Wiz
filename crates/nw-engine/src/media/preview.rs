@@ -6,7 +6,11 @@ use nw_domain::{
     records::Asset, time::Rational,
 };
 use nw_platform::{files::SourceStamp, process};
-use std::{io::Cursor, path::Path, time::Duration};
+use std::{
+    io::{Cursor, Seek, Write},
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tokio_util::sync::CancellationToken;
 
 enum FrameSelection {
@@ -101,6 +105,57 @@ struct PreviewBuffer {
 }
 
 impl Engine {
+    /// Encode the exact bounded RGBA bytes already selected by the timeline monitor.
+    pub async fn encode_monitor_png(
+        &self,
+        pixels: Vec<u8>,
+        scratch: PathBuf,
+        cancel: CancellationToken,
+    ) -> Result<ObservedPng> {
+        if pixels.len() != preview::RGBA_BYTES {
+            return Err(DomainError::new("FRAME_UNAVAILABLE", "Incomplete monitor frame"));
+        }
+        let raster = format!("{}x{}", preview::WIDTH, preview::HEIGHT);
+        let args = [
+            "-hide_banner", "-nostdin", "-v", "error", "-xerror", "-max_alloc", "67108864",
+            "-protocol_whitelist", "fd", "-f", "rawvideo", "-video_size", &raster,
+            "-pixel_format", "rgba", "-framerate", "1", "-i", "fd:",
+            "-map", "0:v:0", "-map_metadata", "-1", "-map_chapters", "-1",
+            "-frames:v", "1", "-c:v", "png", "-threads", "1", "-pix_fmt", "rgba",
+            "-f", "image2pipe", "pipe:1",
+        ].map(str::to_owned);
+        let graph = serde_json::to_vec(&args).map_err(|_| {
+            DomainError::new("INVALID_PLAN", "Monitor encoding graph identity is unavailable")
+        })?;
+        let input = blocking(move || {
+            let root = nw_platform::security::private_directory(&scratch)?;
+            let mut file = tempfile::tempfile_in(root).map_err(crate::io_error)?;
+            file.write_all(&pixels).map_err(crate::io_error)?;
+            file.rewind().map_err(crate::io_error)?;
+            Ok(file)
+        }).await?;
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        if let Err(error) = identities(self, cancel.clone()).await {
+            return ticket.finish(Err(error));
+        }
+        let result = process::run_readonly(
+            Path::new(&self.ffmpeg.path),
+            &args,
+            Duration::from_secs(7),
+            preview::MAX_INLINE_PNG_BYTES,
+            input,
+            cancel.clone(),
+        ).await;
+        let output = ticket.finish(result)?;
+        verify_png(&output.stdout, &cancel)?;
+        identities(self, cancel).await?;
+        Ok(ObservedPng {
+            bytes: output.stdout,
+            timing: None,
+            graph_sha256: nw_domain::projects::hash(&graph),
+        })
+    }
+
     pub async fn preview_registered_frame(
         &self,
         asset: &Asset,

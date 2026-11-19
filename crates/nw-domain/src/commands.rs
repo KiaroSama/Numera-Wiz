@@ -925,7 +925,7 @@ fn build_registry() -> Vec<Descriptor> {
         ),
         row!(
             "previews.observe",
-            "Observe one lossless inline PNG from an authorized registered source",
+            "Observe one lossless inline PNG from an authorized source or committed timeline",
             Query,
             crate::preview::ObserveInput
         ),

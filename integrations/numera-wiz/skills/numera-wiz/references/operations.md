@@ -14,6 +14,7 @@ to each operation/media/transport/package boundary separately.
 | `media.analyze.reference`, `media.analyze.stream` | Measure PSNR and SSIM on aligned video frames or inspect original packets and decoded frames with exact timestamps. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
+| `previews.observe` | Read a lossless image from an authorized source or exact committed sequence frame with timing and origin metadata. |
 | `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |
 | `timeline.render_mixed` | Review a committed sequence range for a mixed FFV1/PCM export on an enabled MediaV2 generation. |
 | `clips.place`, `clips.move`, `clips.link`, `clips.unlink`, `clips.split`, `clips.trim`, `clips.remove` | Edit exact project clips at the reviewed revision. Trim shortens each linked clip at its start, end or both and keeps later clips at their positions. |
@@ -27,7 +28,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.extract.batch_plan`, `streams.extract.folder_batch_plan` | Review separate Matroska outputs using track types and ordinals. For a folder snapshot inspect the excluded rows and derived destinations. Submit the approved ID and hash via `batches.submit`. |
 | `streams.add`, `streams.replace`, `audio.normalize` | Add or replace registered tracks with a verified stream plan, or normalize selected PCM tracks from independently measured loudness. |
 | `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
-| `jobs.plan` | Review admitted FFmWiz packet-copy or short FFV1 picture-retiming settings against the matching registered source. |
+| `jobs.plan` | Review admitted FFmWiz packet-copy, short FFV1 retiming or CPU H.264 settings against the matching registered source. |
 | `media.cut`, `media.split_plan`, `media.join` | Review original-keyframe cuts, split batches or ordered joins of compatible Matroska segments. |
 | `audio.edit`, `media.retime` | Review ordered PCM sample ranges or change a registered short FFV1 picture's speed and direction. |
 | `subtitles.burn` | Review embedded or registered SubRip, explicit SDR preservation or HDR tone mapping, and the retained audio tracks. |

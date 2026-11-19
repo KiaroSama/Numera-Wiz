@@ -2,8 +2,24 @@
 use super::*;
 use nw_domain::{
     media::{OccurrenceSource, bind_mixed_source, capture_mixed_frame, visible_occurrence},
-    preview::{self, FrameOrigin, TimelineFrame, TimelineFrameInput},
+    preview::{self, FrameOrigin, FrameTiming, TimelineFrame, TimelineFrameInput, TimelineObservation},
+    projects::{EntityId, ProjectId},
+    time::Rational,
 };
+
+struct TimelineFrameData {
+    project_id: ProjectId,
+    sequence_id: EntityId,
+    origin: FrameOrigin,
+    bytes: Vec<u8>,
+    encoded: Option<EncodedTimeline>,
+}
+
+struct EncodedTimeline {
+    component_sha256: String,
+    graph_sha256: String,
+    observation: TimelineObservation,
+}
 
 impl Service {
     pub(in crate::runtime) fn timeline_frame(
@@ -23,10 +39,63 @@ impl Service {
                 )
             })?
             .id;
+        let (revision, at) = (input.revision, input.at);
+        let data = self.timeline_frame_data(context, project, input, false, cancel)?;
+        Ok(TimelineFrame {
+            project_id: data.project_id,
+            sequence_id: data.sequence_id,
+            revision,
+            at,
+            origin: data.origin,
+            width: preview::WIDTH,
+            height: preview::HEIGHT,
+            rgba_base64: STANDARD.encode(data.bytes),
+        })
+    }
+
+    pub(super) fn observe_timeline_frame(
+        &self,
+        context: &Context,
+        project: &ProjectId,
+        input: TimelineFrameInput,
+        cancel: CancellationToken,
+    ) -> Result<StillFile> {
+        let data = self.timeline_frame_data(context, project.as_str(), input, true, cancel)?;
+        let encoded = data.encoded.expect("Encoded timeline frame");
+        let range = encoded.observation.interval;
+        let duration = range.end.checked_sub(range.start)?;
+        let source_sha256 = match &encoded.observation.origin {
+            FrameOrigin::Registered { source_sha256, .. } => Some(source_sha256.clone()),
+            _ => None,
+        };
+        Ok(StillFile {
+            bytes: data.bytes,
+            actual_frame_index: None,
+            timing: Some(FrameTiming {
+                time_base: duration,
+                pts: Some(range.start),
+                duration: Some(duration),
+            }),
+            source_sha256,
+            component_sha256: encoded.component_sha256,
+            graph_sha256: encoded.graph_sha256,
+            timeline: Some(encoded.observation),
+        })
+    }
+
+    fn timeline_frame_data(
+        &self,
+        context: &Context,
+        project: &str,
+        input: TimelineFrameInput,
+        encode_png: bool,
+        cancel: CancellationToken,
+    ) -> Result<TimelineFrameData> {
         let read = self.read_project(context, project, ObjectAction::Read)?;
         let capture = capture_mixed_frame(&read, &input.sequence_id, input.revision, input.at)?;
         drop(read);
         let mut held_source = None;
+        let mut original_source_pts: Option<Rational> = None;
         let (origin, pixels) = match visible_occurrence(&capture, input.at) {
             Some(clip) => match &clip.source {
                 OccurrenceSource::Registered {
@@ -58,6 +127,9 @@ impl Service {
                             cancel.clone(),
                         ),
                     )?;
+                    if encode_png {
+                        original_source_pts = Some(binding.asset_origin.checked_add(clip.source_range.start)?);
+                    }
                     held_source = Some(source);
                     (
                         FrameOrigin::Registered {
@@ -83,6 +155,29 @@ impl Service {
                 [0, 0, 0, 255].repeat(preview::WIDTH * preview::HEIGHT),
             ),
         };
+        let (bytes, encoded) = if encode_png {
+            let engine = self.engine()?;
+            let png = tokio::runtime::Handle::current().block_on(engine.encode_monitor_png(
+                pixels,
+                self.root.join("runtime").join("timeline-monitor"),
+                cancel.clone(),
+            ))?;
+            let graph = serde_json::to_vec(&(&capture, png.graph_sha256)).map_err(|_| {
+                DomainError::new("SERIALIZATION_FAILED", "Timeline observation graph identity is unavailable")
+            })?;
+            let observation = TimelineObservation {
+                interval: capture.range,
+                origin: origin.clone(),
+                original_source_pts,
+            };
+            (png.bytes, Some(EncodedTimeline {
+                component_sha256: engine.ffmpeg.sha256.clone(),
+                graph_sha256: nw_domain::projects::hash(&graph),
+                observation,
+            }))
+        } else {
+            (pixels, None)
+        };
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
             return Err(DomainError::new(
@@ -90,10 +185,11 @@ impl Service {
                 "Timeline preview cancelled before delivery",
             ));
         }
+        let command = if encode_png { preview::OBSERVE_COMMAND } else { "timeline.preview_frame" };
         if self
             .policy(context)?
             .as_ref()
-            .is_some_and(|policy| !policy.allows_command(&request.command.id))
+            .is_some_and(|policy| !policy.allows_command(command))
         {
             return Err(DomainError::new(
                 "PERMISSION_DENIED",
@@ -125,15 +221,12 @@ impl Service {
             }
             source.stamp.revalidate()?;
         }
-        Ok(TimelineFrame {
+        Ok(TimelineFrameData {
             project_id: capture.project_id,
             sequence_id: capture.sequence_id,
-            revision: input.revision,
-            at: input.at,
             origin,
-            width: preview::WIDTH,
-            height: preview::HEIGHT,
-            rgba_base64: STANDARD.encode(pixels),
+            bytes,
+            encoded,
         })
     }
 }

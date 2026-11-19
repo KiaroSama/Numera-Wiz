@@ -234,6 +234,17 @@ pub enum Previews {
         #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=1_000_000))]
         frame: u32,
     },
+    /// Observe the selected grid frame from an exact committed sequence revision.
+    ObserveTimeline {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        at: String,
+    },
 }
 #[derive(Clone, Copy, clap::ValueEnum)]
 pub enum ObservationKind {
@@ -745,6 +756,17 @@ pub fn prepare(command: Command) -> Result<Request> {
                 asset, stream, frame,
             ))?,
         ),
+        Command::Previews(Previews::ObserveTimeline {
+            project, sequence, revision, at,
+        }) => {
+            let input = nw_domain::preview::ObserveInput::timeline(
+                nw_domain::projects::ProjectId::parse(project)?,
+                nw_domain::projects::EntityId::parse(sequence)?,
+                nw_domain::projects::Revision::parse(&revision)?,
+                projects::rational(&at)?,
+            );
+            query(nw_domain::preview::OBSERVE_COMMAND, serde_json::to_value(input)?)
+        }
         Command::Media(Media::PreviewSegment {
             asset,
             video_stream,

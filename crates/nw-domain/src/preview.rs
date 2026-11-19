@@ -1,7 +1,7 @@
 //! A bounded decoded frame from an explicitly selected registered source stream.
 use crate::{
     projects::{EntityId, ProjectId, Revision},
-    time::Rational,
+    time::{Rational, TimeRange},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ pub struct TimelineFrameInput {
     pub at: Rational,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FrameOrigin {
     Gap {},
@@ -105,6 +105,28 @@ impl ObserveInput {
             delivery: Delivery::Inline,
         }
     }
+
+    pub fn timeline(
+        project_id: ProjectId,
+        sequence_id: EntityId,
+        revision: Revision,
+        at: Rational,
+    ) -> Self {
+        Self::Still {
+            target: ObserveTarget::TimelineFrame {
+                project_id,
+                sequence_id,
+                revision,
+                at,
+            },
+            frame_selection: FrameSelection::ExactSequenceGrid,
+            source_policy: SourcePolicy::OriginalRequired,
+            display_profile: DisplayProfile::TimelineMonitorRgba8,
+            fit: Fit::Contain,
+            encoding: Encoding::Png {},
+            delivery: Delivery::Inline,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -116,12 +138,19 @@ pub enum ObserveTarget {
         #[schemars(range(max = 1000000))]
         frame_index: u32,
     },
+    TimelineFrame {
+        project_id: ProjectId,
+        sequence_id: EntityId,
+        revision: Revision,
+        at: Rational,
+    },
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FrameSelection {
     DecodedIndex,
+    ExactSequenceGrid,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -130,10 +159,11 @@ pub enum SourcePolicy {
     OriginalRequired,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayProfile {
     SourceMonitorRgba8,
+    TimelineMonitorRgba8,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -164,12 +194,24 @@ pub struct FrameTiming {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct TimelineObservation {
+    pub interval: TimeRange,
+    pub origin: FrameOrigin,
+    pub original_source_pts: Option<Rational>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ObservationMetadata {
     pub observation_id: String,
     pub target: ObserveTarget,
-    pub actual_frame_index: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_frame_index: Option<u32>,
     pub timing: Option<FrameTiming>,
-    pub source_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<TimelineObservation>,
     pub component_sha256: String,
     pub graph_sha256: String,
     pub frame_selection: FrameSelection,

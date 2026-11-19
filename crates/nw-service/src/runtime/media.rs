@@ -12,6 +12,16 @@ pub(super) mod mixed;
 pub(super) use browser_segment::BrowserSegmentLease;
 mod timeline_preview;
 
+struct StillFile {
+    bytes: Vec<u8>,
+    actual_frame_index: Option<u32>,
+    timing: Option<nw_domain::preview::FrameTiming>,
+    source_sha256: Option<String>,
+    component_sha256: String,
+    graph_sha256: String,
+    timeline: Option<nw_domain::preview::TimelineObservation>,
+}
+
 impl Service {
     fn analysis_source(
         &self,
@@ -221,29 +231,55 @@ impl Service {
             encoding,
             delivery,
         } = input;
-        let ObserveTarget::RegisteredSource {
-            ref asset_id,
-            stream_index,
-            frame_index,
-        } = target;
-        let (asset, source) = self.analysis_source(context, asset_id)?;
-        let engine = self.engine()?;
-        let observed =
-            tokio::runtime::Handle::current().block_on(engine.observe_registered_png(
-                &asset,
-                source,
-                stream_index,
-                frame_index,
-                cancel.clone(),
-            ))?;
+        let file = match &target {
+            ObserveTarget::RegisteredSource { asset_id, stream_index, frame_index }
+                if frame_selection == preview::FrameSelection::DecodedIndex
+                    && display_profile == preview::DisplayProfile::SourceMonitorRgba8 =>
+            {
+                let (asset, source) = self.analysis_source(context, asset_id)?;
+                let engine = self.engine()?;
+                let observed = tokio::runtime::Handle::current().block_on(
+                    engine.observe_registered_png(
+                        &asset, source, *stream_index, *frame_index, cancel.clone(),
+                    ),
+                )?;
+                self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
+                StillFile {
+                    bytes: observed.bytes,
+                    actual_frame_index: Some(*frame_index),
+                    timing: observed.timing,
+                    source_sha256: Some(asset.identity.sha256),
+                    component_sha256: engine.ffmpeg.sha256.clone(),
+                    graph_sha256: observed.graph_sha256,
+                    timeline: None,
+                }
+            }
+            ObserveTarget::TimelineFrame { project_id, sequence_id, revision, at }
+                if frame_selection == preview::FrameSelection::ExactSequenceGrid
+                    && display_profile == preview::DisplayProfile::TimelineMonitorRgba8 =>
+            {
+                self.observe_timeline_frame(
+                    context, project_id,
+                    preview::TimelineFrameInput {
+                        sequence_id: sequence_id.clone(), revision: *revision, at: *at,
+                    },
+                    cancel,
+                )?
+            }
+            _ => return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Choose the frame selection and display profile for this observation target",
+            )),
+        };
         let metadata = ObservationMetadata {
             observation_id: Uuid::new_v4().to_string(),
             target,
-            actual_frame_index: frame_index,
-            timing: observed.timing,
-            source_sha256: asset.identity.sha256.clone(),
-            component_sha256: engine.ffmpeg.sha256.clone(),
-            graph_sha256: observed.graph_sha256,
+            actual_frame_index: file.actual_frame_index,
+            timing: file.timing,
+            source_sha256: file.source_sha256,
+            component_sha256: file.component_sha256,
+            graph_sha256: file.graph_sha256,
+            timeline: file.timeline,
             frame_selection,
             source_policy,
             display_profile,
@@ -253,8 +289,8 @@ impl Service {
             width: preview::WIDTH,
             height: preview::HEIGHT,
             mime_type: preview::PNG_MIME_TYPE.into(),
-            encoded_byte_count: observed.bytes.len(),
-            encoded_sha256: nw_domain::projects::hash(&observed.bytes),
+            encoded_byte_count: file.bytes.len(),
+            encoded_sha256: nw_domain::projects::hash(&file.bytes),
         };
         if serde_json::to_vec(&metadata)
             .map_err(|_| DomainError::new("SERIALIZATION_FAILED", "Invalid observation metadata"))?
@@ -266,12 +302,10 @@ impl Service {
                 "Observation metadata exceeds its 64 KiB budget",
             ));
         }
-        let still = InlineObservation {
+        Ok(InlineObservation {
             metadata,
-            png_base64: STANDARD.encode(&observed.bytes),
-        };
-        self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
-        Ok(still)
+            png_base64: STANDARD.encode(&file.bytes),
+        })
     }
 
     pub(super) fn component_capabilities(

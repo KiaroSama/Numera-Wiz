@@ -167,6 +167,29 @@ pub async fn registered_timeline_frame(
     assert_eq!(frame["rgba_base64"], independent["rgba_base64"]);
     assert_eq!(frame["origin"]["asset_id"], asset_id);
     assert_eq!(frame["origin"]["stream_index"], 0);
+    let (observed, code) = cli.human(&[
+        "previews", "observe-timeline", "--project", project_id, "--revision", "4",
+        "--sequence", sequence_id, "--at", "1",
+    ]).await;
+    assert_eq!(code, 0, "{observed}");
+    let observed = &observed["result"];
+    let metadata = &observed["metadata"];
+    assert_eq!(metadata["timeline"]["origin"], frame["origin"]);
+    assert_eq!(metadata["timeline"]["interval"], json!({"start":t(1,1),"end":t(5,4)}));
+    assert_eq!(metadata["timeline"]["original_source_pts"], t(3,2));
+    assert_eq!(metadata["source_sha256"], frame["origin"]["source_sha256"]);
+    assert_eq!(metadata["timing"]["pts"], t(1,1));
+    let png = STANDARD.decode(observed["png_base64"].as_str().unwrap()).unwrap();
+    assert_eq!(metadata["encoded_sha256"], nw_domain::projects::hash(&png));
+    let sample = media.directory.path().join("timeline-observed-frame.png");
+    std::fs::write(&sample, png).unwrap();
+    let pixels = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v","error","-f","png_pipe","-i"])
+        .arg(&sample)
+        .args(["-frames:v","1","-c:v","rawvideo","-pix_fmt","rgba","-f","rawvideo","pipe:1"])
+        .output().await.unwrap();
+    assert!(pixels.status.success(), "{}", String::from_utf8_lossy(&pixels.stderr));
+    assert_eq!(STANDARD.encode(pixels.stdout), frame["rgba_base64"]);
     for (at, kind, rgba) in [
         ("1/4", "solid_color", [51, 102, 204, 255]),
         ("4", "gap", [0, 0, 0, 255]),
@@ -202,6 +225,29 @@ pub async fn registered_timeline_frame(
     let response = serde_json::to_value(response).unwrap();
     assert_eq!(response["structuredContent"]["ok"], true, "{response}");
     assert_eq!(&response["structuredContent"]["result"], frame);
+    let params = |revision, at| json!({
+        "kind":"still","target":{"kind":"timeline_frame","project_id":project_id,
+            "sequence_id":sequence_id,"revision":revision,"at":at},
+        "frame_selection":"exact_sequence_grid","source_policy":"original_required",
+        "display_profile":"timeline_monitor_rgba8","fit":"contain",
+        "encoding":{"format":"png"},"delivery":"inline"
+    });
+    let response = sdk.call_tool(CallToolRequestParams::new("previews.observe").with_arguments(
+        rmcp::object!({"params":params("4",t(1,1))}),
+    )).await.unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    assert_eq!(response["structuredContent"]["ok"], true, "{response}");
+    assert_eq!(response["content"][0]["type"], "image");
+    assert_eq!(response["content"][0]["mimeType"], "image/png");
+    assert_eq!(response["content"][0]["data"], observed["png_base64"]);
+    for field in ["target","timing","timeline","source_sha256","graph_sha256","encoded_sha256"] {
+        assert_eq!(response["structuredContent"]["result"][field], metadata[field]);
+    }
+    let stale = cli.raw(&Request::query("previews.observe",params("3",t(1,1)))).await;
+    assert_eq!(stale["error"]["code"], "STALE_REVISION");
+    let gap = cli.query("previews.observe",params("4",t(4,1))).await;
+    assert_eq!(gap["metadata"]["timeline"]["origin"]["kind"], "gap");
+    assert!(gap["metadata"]["source_sha256"].is_null());
     sdk.cancel().await.unwrap();
     accepted_mixed_timeline(cli, project_id, sequence_id, finite).await;
     sequence_markers(cli, project_id, sequence_id).await;

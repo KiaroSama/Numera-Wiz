@@ -257,6 +257,14 @@ The supported parameters are `kind: "still"`, a `target` with `kind:
 {"format":"png"}` and `delivery: "inline"`. This response-scoped mode
 uses the 160 × 90 source monitor and caps PNG bytes at 96 KiB before base64.
 
+To observe the same frame as the timeline monitor, set `target.kind` to
+`timeline_frame` with `project_id`, `sequence_id`, `revision` and a rational
+`at`. Use `frame_selection: "exact_sequence_grid"` and
+`display_profile: "timeline_monitor_rgba8"` with the same PNG delivery
+settings. The response identifies the sequence interval, active source or
+generator, and the original source presentation time when available.
+Project and source access apply to the captured revision.
+
 `previews.source_segment` takes `asset_id`, `video_stream` and optional
 `audio_stream`. It produces a manifest for the first two seconds of a zero-origin
 limited BT.709 video stream with optional zero-origin stereo 48 kHz audio. The
