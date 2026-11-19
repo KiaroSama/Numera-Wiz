@@ -10,6 +10,19 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Verified package checkpoint
 
+At `a7f01b5`, Windows x64, Linux x64, macOS Apple Silicon and macOS Intel
+passed their native regressions and each standalone package's first-launch
+CPU FFV1 exercise. Each archive was checked against its GitHub digest,
+executable architecture, embedded FFmpeg and ffprobe hashes, and corresponding
+source archive. [CI386 packages](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131#artifacts)
+
+The same commit passed the actual source media and official CLI/MCP transport
+journeys. SubRip rendered from SDR, PQ and HLG fixtures. The lossless renders
+retained the selected audio packets and original sample aspect. CPU H.264/AAC
+in MP4 and Matroska retained all six variable presentation times. Two inputs
+with the same basename also produced independently verified folder outputs.
+[Owner batch evidence](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/artifacts/14514885603)
+
 [CI379](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44471710173#artifacts)
 built standalone packages for Windows x64, Linux x64, macOS Apple Silicon and
 macOS Intel at `fd71c4c`. Each hosted first launch exercised its embedded CPU
