@@ -54,16 +54,27 @@ pub enum RemovableTrack {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Removal {
-    OriginalIndex { index: u32 },
-    TypeOrdinal { track_kind: RemovableTrack, ordinal: usize },
+    OriginalIndex {
+        index: u32,
+    },
+    TypeOrdinal {
+        track_kind: RemovableTrack,
+        ordinal: usize,
+    },
 }
 
 impl ReplaceInput {
     pub fn validate(&self) -> Result<()> {
         if self.remove.len() > MAX_ADDED_TRACKS || self.additions.len() > MAX_ADDED_INPUTS {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Replacement exceeds the admitted track or input bound"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Replacement exceeds the admitted track or input bound",
+            ));
         }
-        if self.remove.is_empty() && self.additions.is_empty() && matches!(self.metadata, Metadata::Preserve) {
+        if self.remove.is_empty()
+            && self.additions.is_empty()
+            && matches!(self.metadata, Metadata::Preserve)
+        {
             return Err(invalid("Select removals, additions or a metadata change"));
         }
         Ok(())
@@ -74,24 +85,44 @@ impl ReplaceInput {
         let mut remove = BTreeSet::new();
         for removal in &self.remove {
             let source = match removal {
-                Removal::OriginalIndex { index } => streams.iter().find(|stream| stream.index == *index && eligible(stream)),
-                Removal::TypeOrdinal { track_kind, ordinal } => {
+                Removal::OriginalIndex { index } => streams
+                    .iter()
+                    .find(|stream| stream.index == *index && eligible(stream)),
+                Removal::TypeOrdinal {
+                    track_kind,
+                    ordinal,
+                } => {
                     let kind = match track_kind {
                         RemovableTrack::Audio => StreamKind::Audio,
                         RemovableTrack::Subtitle => StreamKind::Subtitle,
                     };
-                    streams.iter().filter(|stream| stream.kind == kind).nth(*ordinal)
+                    streams
+                        .iter()
+                        .filter(|stream| stream.kind == kind)
+                        .nth(*ordinal)
                 }
-            }.ok_or_else(|| invalid("Removal does not resolve to an original audio or subtitle track"))?;
+            }
+            .ok_or_else(|| {
+                invalid("Removal does not resolve to an original audio or subtitle track")
+            })?;
             if !remove.insert(source.index) {
-                return Err(invalid("Two removal selectors address the same source track"));
+                return Err(invalid(
+                    "Two removal selectors address the same source track",
+                ));
             }
         }
         let retained = |kind| {
-            let values = streams.iter().filter(|stream| stream.kind == kind && !remove.contains(&stream.index))
-                .map(|stream| stream.index).collect::<Vec<_>>();
+            let values = streams
+                .iter()
+                .filter(|stream| stream.kind == kind && !remove.contains(&stream.index))
+                .map(|stream| stream.index)
+                .collect::<Vec<_>>();
             crate::mux::Selection {
-                selector: if values.is_empty() { crate::mux::Selector::None } else { crate::mux::Selector::SourceIndices { values } },
+                selector: if values.is_empty() {
+                    crate::mux::Selector::None
+                } else {
+                    crate::mux::Selector::SourceIndices { values }
+                },
                 no_match: crate::mux::NoMatch::AllowEmpty,
             }
         };

@@ -4,8 +4,8 @@ use crate::{
     time::{Rational, TimeRange},
 };
 use schemars::JsonSchema;
-use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -37,8 +37,12 @@ impl SplitInput {
         validate_ranges(self.outputs.iter().map(|item| item.range))?;
         let mut outputs = BTreeSet::new();
         for item in &self.outputs {
-            if item.output.is_empty() || item.output.len() > 16384 || !outputs.insert(&item.output) {
-                return Err(DomainError::new("VALIDATION_ERROR", "Split outputs require distinct bounded destination paths"));
+            if item.output.is_empty() || item.output.len() > 16384 || !outputs.insert(&item.output)
+            {
+                return Err(DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Split outputs require distinct bounded destination paths",
+                ));
             }
         }
         Ok(())
@@ -47,13 +51,19 @@ impl SplitInput {
 
 pub fn validate_ranges(ranges: impl ExactSizeIterator<Item = TimeRange>) -> Result<()> {
     if !(2..=16).contains(&ranges.len()) {
-        return Err(DomainError::new("VALIDATION_ERROR", "A packet split requires two to sixteen output intervals"));
+        return Err(DomainError::new(
+            "VALIDATION_ERROR",
+            "A packet split requires two to sixteen output intervals",
+        ));
     }
     let mut previous_end = Rational::ZERO;
     for range in ranges {
         validate(range)?;
         if range.start < previous_end {
-            return Err(DomainError::new("INVALID_TIME", "Split intervals must be in source order and cannot overlap"));
+            return Err(DomainError::new(
+                "INVALID_TIME",
+                "Split intervals must be in source order and cannot overlap",
+            ));
         }
         previous_end = range.end;
     }

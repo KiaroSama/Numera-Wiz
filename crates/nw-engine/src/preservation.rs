@@ -88,7 +88,9 @@ impl Ledger {
             streams,
             window,
         } = self;
-        records.feed(bytes, |value| Self::packet(clocks, streams, *window, &value))
+        records.feed(bytes, |value| {
+            Self::packet(clocks, streams, *window, &value)
+        })
     }
 
     fn packet(
@@ -348,8 +350,12 @@ async fn scan(
     let ledger = Arc::new(Mutex::new(Ledger::new(probe, window)?));
     let consumer = ledger.clone();
     consume_packets(engine, path, cancel, observer, deadline, move |bytes| {
-        consumer.lock().map_err(|_| invalid("Packet parser lock poisoned"))?.feed(bytes)
-    }).await?;
+        consumer
+            .lock()
+            .map_err(|_| invalid("Packet parser lock poisoned"))?
+            .feed(bytes)
+    })
+    .await?;
     let ledger = take_observation(ledger)?;
     ledger.finish()?;
     Ok(ledger)
@@ -433,39 +439,69 @@ pub(super) async fn check_cuts(
     cancel: CancellationToken,
 ) -> Result<Vec<Result<()>>> {
     let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
-    let ledgers = windows.iter().map(|&window| Ledger::new(&source.probe, Some(window)).map(Ok))
+    let ledgers = windows
+        .iter()
+        .map(|&window| Ledger::new(&source.probe, Some(window)).map(Ok))
         .collect::<Result<Vec<Result<Ledger>>>>()?;
     let scan = Arc::new(Mutex::new((ProbeRecords::new(b"{\"packets\":["), ledgers)));
     let consumer = scan.clone();
-    consume_packets(engine, Path::new(&source.identity.path), cancel, &observer,
-        nw_domain::execution::CleanupLimits::default().operation, move |bytes| {
-            let mut shared = consumer.lock().map_err(|_| invalid("Packet parser lock poisoned"))?;
+    consume_packets(
+        engine,
+        Path::new(&source.identity.path),
+        cancel,
+        &observer,
+        nw_domain::execution::CleanupLimits::default().operation,
+        move |bytes| {
+            let mut shared = consumer
+                .lock()
+                .map_err(|_| invalid("Packet parser lock poisoned"))?;
             let (parser, ledgers) = &mut *shared;
             parser.feed(bytes, |packet| {
                 for entry in ledgers.iter_mut() {
                     if let Ok(ledger) = entry
-                        && let Err(error) = Ledger::packet(&ledger.clocks, &mut ledger.streams, ledger.window, &packet)
+                        && let Err(error) = Ledger::packet(
+                            &ledger.clocks,
+                            &mut ledger.streams,
+                            ledger.window,
+                            &packet,
+                        )
                     {
                         *entry = Err(error);
                     }
                 }
                 Ok(())
             })
-        }).await?;
+        },
+    )
+    .await?;
     let (parser, ledgers) = take_observation(scan)?;
     parser.finish()?;
-    Ok(ledgers.into_iter().zip(windows).map(|(ledger, &window)| {
-        ledger.and_then(|ledger| validate_cut(&ledger, &source.probe, window))
-    }).collect())
+    Ok(ledgers
+        .into_iter()
+        .zip(windows)
+        .map(|(ledger, &window)| {
+            ledger.and_then(|ledger| validate_cut(&ledger, &source.probe, window))
+        })
+        .collect())
 }
 
 fn validate_cut(ledger: &Ledger, probe: &MediaProbe, range: TimeRange) -> Result<()> {
-    let mut picture = probe.streams.iter().filter(|stream| {
-        stream.kind == nw_domain::mux::StreamKind::Video && !stream.attached_picture()
-    }).peekable();
-    if picture.peek().is_none() || picture.any(|stream| {
-        ledger.streams.get(&stream.index).and_then(|entry| entry.first) != Some((range.start, true))
-    }) {
+    let mut picture = probe
+        .streams
+        .iter()
+        .filter(|stream| {
+            stream.kind == nw_domain::mux::StreamKind::Video && !stream.attached_picture()
+        })
+        .peekable();
+    if picture.peek().is_none()
+        || picture.any(|stream| {
+            ledger
+                .streams
+                .get(&stream.index)
+                .and_then(|entry| entry.first)
+                != Some((range.start, true))
+        })
+    {
         return Err(DomainError::new(
             "COPY_BOUNDARY_UNQUALIFIED",
             "Start must match an original keyframe on each retained picture stream",
@@ -537,23 +573,41 @@ pub async fn verify(
             let name = format!("Input {slot} stream {}", stream.index);
             let left = source.streams.get(&stream.index);
             let right = output.streams.get(&output_index);
-            if slot == 0 && plan.subtitle_burn.as_ref().is_some_and(|burn| burn.video_stream == stream.index) {
+            if slot == 0
+                && plan
+                    .subtitle_burn
+                    .as_ref()
+                    .is_some_and(|burn| burn.video_stream == stream.index)
+            {
                 let same_clock = left.zip(right).is_some_and(|(left, right)| {
-                    left.first.is_some() && left.packets == right.packets
-                        && left.presentation.clone().finalize() == right.presentation.clone().finalize()
+                    left.first.is_some()
+                        && left.packets == right.packets
+                        && left.presentation.clone().finalize()
+                            == right.presentation.clone().finalize()
                 });
                 if !same_clock {
-                    return Err(invalid("Rendered caption video does not preserve the original frame presentation sequence"));
+                    return Err(invalid(
+                        "Rendered caption video does not preserve the original frame presentation sequence",
+                    ));
                 }
                 crate::subtitle_burn::verify_picture(plan, observed, output_index)?;
                 continue;
             }
-            if slot == 0 && plan.audio_normalization.iter().any(|track| track.request.stream_index == stream.index) {
+            if slot == 0
+                && plan
+                    .audio_normalization
+                    .iter()
+                    .any(|track| track.request.stream_index == stream.index)
+            {
                 let samples_match = left.zip(right).is_some_and(|(left, right)| {
-                    left.bytes > 0 && left.bytes == right.bytes && left.first.map(|v| v.0) == right.first.map(|v| v.0)
+                    left.bytes > 0
+                        && left.bytes == right.bytes
+                        && left.first.map(|v| v.0) == right.first.map(|v| v.0)
                 });
                 if !samples_match {
-                    return Err(invalid("Normalized PCM sample count or start differs from the original"));
+                    return Err(invalid(
+                        "Normalized PCM sample count or start differs from the original",
+                    ));
                 }
                 verify_codec(probe, stream.index, observed, output_index, &name)?;
                 continue;

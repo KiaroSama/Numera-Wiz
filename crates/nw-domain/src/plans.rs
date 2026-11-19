@@ -114,10 +114,15 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
         burn.color.validate()?;
         burn.audio.validate()?;
         if plan.resolution.action != crate::mux::CleanAction::Remux
-            || !plan.added_tracks.is_empty() || !plan.audio_normalization.is_empty() || plan.packet_cut.is_some()
-            || plan.resolution.chapter_import.is_some() || plan.resolution.metadata_patch.is_some()
+            || !plan.added_tracks.is_empty()
+            || !plan.audio_normalization.is_empty()
+            || plan.packet_cut.is_some()
+            || plan.resolution.chapter_import.is_some()
+            || plan.resolution.metadata_patch.is_some()
         {
-            return Err(invalid("Burning subtitles is a separate reviewed picture transformation"));
+            return Err(invalid(
+                "Burning subtitles is a separate reviewed picture transformation",
+            ));
         }
     }
     if !plan.added_tracks.is_empty() {
@@ -136,9 +141,15 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     }
     if !plan.audio_normalization.is_empty() {
         if !plan.added_tracks.is_empty() || plan.packet_cut.is_some() {
-            return Err(invalid("Audio normalization uses one uncut original source"));
+            return Err(invalid(
+                "Audio normalization uses one uncut original source",
+            ));
         }
-        let requests = plan.audio_normalization.iter().map(|track| track.request).collect::<Vec<_>>();
+        let requests = plan
+            .audio_normalization
+            .iter()
+            .map(|track| track.request)
+            .collect::<Vec<_>>();
         crate::audio_normalization::validate_requests(&requests)?;
         for track in &plan.audio_normalization {
             track.validate()?;
@@ -198,10 +209,16 @@ fn digest_value(mut value: Value) -> Result<String> {
             semantic_source(source);
         }
     }
-    if let Some(external) = object.get_mut("subtitle_burn")
-        .and_then(|burn| burn.get_mut("subtitle")).and_then(|source| source.get_mut("source"))
+    if let Some(external) = object
+        .get_mut("subtitle_burn")
+        .and_then(|burn| burn.get_mut("subtitle"))
+        .and_then(|source| source.get_mut("source"))
     {
-        semantic_source(external.as_object_mut().ok_or_else(|| invalid("External subtitle source must be an object"))?);
+        semantic_source(
+            external
+                .as_object_mut()
+                .ok_or_else(|| invalid("External subtitle source must be an object"))?,
+        );
     }
     let bytes =
         serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;

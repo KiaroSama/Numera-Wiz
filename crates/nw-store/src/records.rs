@@ -280,9 +280,15 @@ impl Store {
             || !batch
                 .items
                 .iter()
-                .filter_map(|item| item.plan.as_ref().map(|reference| {
-                    (reference.id.as_str(), reference.hash.as_str(), item.packet_cut)
-                }))
+                .filter_map(|item| {
+                    item.plan.as_ref().map(|reference| {
+                        (
+                            reference.id.as_str(),
+                            reference.hash.as_str(),
+                            item.packet_cut,
+                        )
+                    })
+                })
                 .eq(children
                     .iter()
                     .map(|plan| (plan.id.as_str(), plan.hash.as_str(), plan.packet_cut)))

@@ -101,28 +101,69 @@ async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
 }
 async fn caption_frame(components: &Path, path: &Path, time: &str) -> Vec<u8> {
     let arguments = [
-        "-v", "error", "-i", path.to_str().unwrap(), "-ss", time, "-map", "0:v:0",
-        "-frames:v", "1", "-pix_fmt", "rgb24", "-c:v", "rawvideo", "-threads", "1",
-        "-f", "rawvideo", "pipe:1",
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &arguments, Duration::from_secs(30),
-        96 * 64 * 3, CancellationToken::new()).await.unwrap().stdout
+        "-v",
+        "error",
+        "-i",
+        path.to_str().unwrap(),
+        "-ss",
+        time,
+        "-map",
+        "0:v:0",
+        "-frames:v",
+        "1",
+        "-pix_fmt",
+        "rgb24",
+        "-c:v",
+        "rawvideo",
+        "-threads",
+        "1",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &arguments,
+        Duration::from_secs(30),
+        96 * 64 * 3,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap()
+    .stdout
 }
 
 async fn caption_burn(parent: &Path) -> Value {
-    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
-        .expect("Hosted caption proof needs the same-source authenticated CPU media profile"));
+    let components = std::path::PathBuf::from(
+        std::env::var_os("NW_CAPTION_COMPONENTS")
+            .expect("Hosted caption proof needs the same-source authenticated CPU media profile"),
+    );
     let directory = parent.join("caption 'unicode [راست]:0");
     std::fs::create_dir(&directory).unwrap();
     let subtitles = directory.join("ترجمه فارسی.srt");
-    std::fs::write(&subtitles, "1\n00:00:00,375 --> 00:00:01,125\nسلام دنیا و العربية!\n\n").unwrap();
+    std::fs::write(
+        &subtitles,
+        "1\n00:00:00,375 --> 00:00:01,125\nسلام دنیا و العربية!\n\n",
+    )
+    .unwrap();
     let cli = Cli {
         data: directory.join("state"),
         components: components.clone(),
         request_timeout: Duration::from_secs(60),
     };
-    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
-    let external = cli.mutation(&scope, "register-external-caption", "assets.register", json!({"path":subtitles})).await;
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let external = cli
+        .mutation(
+            &scope,
+            "register-external-caption",
+            "assets.register",
+            json!({"path":subtitles}),
+        )
+        .await;
     let mut cases = Vec::new();
     for transfer in ["bt709", "smpte2084", "arib-std-b67"] {
         let hdr = transfer != "bt709";
@@ -134,33 +175,112 @@ async fn caption_burn(parent: &Path) -> Value {
             ("bt709", "bt709", "yuv420p")
         };
         let args = [
-            "-v", "error", "-filter_threads", "1",
-            "-f", "lavfi", "-i", "testsrc2=size=96x64:rate=8:duration=2",
-            "-f", "lavfi", "-i", "sine=frequency=330:sample_rate=48000:duration=2",
-            "-f", "lavfi", "-i", "sine=frequency=550:sample_rate=48000:duration=2",
-            "-i", subtitles.to_str().unwrap(), "-map", "0:v", "-map", "1:a", "-map", "2:a", "-map", "3:s",
-            "-vf", "setsar=4/3", "-c:v", "ffv1", "-pix_fmt", pixel_format, "-color_range", "tv",
-            "-colorspace", matrix, "-color_primaries", primaries, "-color_trc", transfer,
-            "-c:a:0", "pcm_s16le", "-c:a:1", "flac", "-c:s", "copy", input.to_str().unwrap(),
-        ].map(str::to_owned);
-        nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
-            4096, CancellationToken::new()).await.unwrap();
-        let registered = cli.mutation(&scope, &format!("register-caption-{transfer}"), "assets.register", json!({"path":input})).await;
-        let subtitle = if hdr { json!({"kind":"embedded","stream_index":3}) }
-            else { json!({"kind":"external","asset_id":external["id"]}) };
-        let color = if hdr { json!({"kind":"tone_map_bt709","peak_nits":1000}) }
-            else { json!({"kind":"preserve_sdr"}) };
+            "-v",
+            "error",
+            "-filter_threads",
+            "1",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=8:duration=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=330:sample_rate=48000:duration=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=550:sample_rate=48000:duration=2",
+            "-i",
+            subtitles.to_str().unwrap(),
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "2:a",
+            "-map",
+            "3:s",
+            "-vf",
+            "setsar=4/3",
+            "-c:v",
+            "ffv1",
+            "-pix_fmt",
+            pixel_format,
+            "-color_range",
+            "tv",
+            "-colorspace",
+            matrix,
+            "-color_primaries",
+            primaries,
+            "-color_trc",
+            transfer,
+            "-c:a:0",
+            "pcm_s16le",
+            "-c:a:1",
+            "flac",
+            "-c:s",
+            "copy",
+            input.to_str().unwrap(),
+        ]
+        .map(str::to_owned);
+        nw_platform::process::run(
+            &components.join("ffmpeg"),
+            &args,
+            Duration::from_secs(30),
+            4096,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let registered = cli
+            .mutation(
+                &scope,
+                &format!("register-caption-{transfer}"),
+                "assets.register",
+                json!({"path":input}),
+            )
+            .await;
+        let subtitle = if hdr {
+            json!({"kind":"embedded","stream_index":3})
+        } else {
+            json!({"kind":"external","asset_id":external["id"]})
+        };
+        let color = if hdr {
+            json!({"kind":"tone_map_bt709","peak_nits":1000})
+        } else {
+            json!({"kind":"preserve_sdr"})
+        };
         let params = json!({"asset_id":registered["id"],"output":output,"video_stream":0,"subtitle":subtitle,
             "color":color,"audio":{"kind":"copy_selected","indices":[2,1]},"quality":"lossless_ffv1"});
         let review = cli.query("subtitles.burn", params.clone()).await;
         let document = directory.join(format!("burn-{transfer}.json"));
         std::fs::write(&document, serde_json::to_vec(&params).unwrap()).unwrap();
-        let (typed, code) = cli.human(&["media", "burn-subtitles", "--file", document.to_str().unwrap()]).await;
+        let (typed, code) = cli
+            .human(&[
+                "media",
+                "burn-subtitles",
+                "--file",
+                document.to_str().unwrap(),
+            ])
+            .await;
         assert_eq!(code, 0, "{typed}");
         assert_eq!(typed["result"]["hash"], review["hash"]);
-        assert_eq!(review["subtitle_burn"]["font_sha256"].as_str().unwrap().len(), 64);
-        let job = cli.mutation(&scope, &format!("burn-caption-{transfer}"), "jobs.submit",
-            json!({"plan_id":review["id"],"plan_hash":review["hash"]})).await;
+        assert_eq!(
+            review["subtitle_burn"]["font_sha256"]
+                .as_str()
+                .unwrap()
+                .len(),
+            64
+        );
+        let job = cli
+            .mutation(
+                &scope,
+                &format!("burn-caption-{transfer}"),
+                "jobs.submit",
+                json!({"plan_id":review["id"],"plan_hash":review["hash"]}),
+            )
+            .await;
         cli.completed(job["job_id"].as_str().unwrap()).await;
         let probe = fixture::probe(&components, &output).await;
         assert_eq!(probe["streams"].as_array().unwrap().len(), 3);
@@ -181,24 +301,36 @@ async fn caption_burn(parent: &Path) -> Value {
         assert_eq!(probe["streams"][2]["codec_name"], "pcm_s16le");
         let original_packets = packets(&components, &input).await;
         let burned_packets = packets(&components, &output).await;
-        for (input_index, output_index) in [(2,1), (1,2)] {
-            let expected: Vec<_> = original_packets[&input_index].iter().cloned().map(|mut packet| {
-                packet["stream_index"] = json!(output_index);
-                packet
-            }).collect();
+        for (input_index, output_index) in [(2, 1), (1, 2)] {
+            let expected: Vec<_> = original_packets[&input_index]
+                .iter()
+                .cloned()
+                .map(|mut packet| {
+                    packet["stream_index"] = json!(output_index);
+                    packet
+                })
+                .collect();
             assert_eq!(burned_packets[&output_index], expected);
         }
         let frame = caption_frame(&components, &output, "0.500").await;
-        assert_eq!(frame.len(),96 * 64 * 3);
+        assert_eq!(frame.len(), 96 * 64 * 3);
         let original = caption_frame(&components, &input, "0.500").await;
         assert_ne!(frame, original);
         if !hdr {
-            assert_eq!(caption_frame(&components, &output, "0").await, caption_frame(&components, &input, "0").await);
-            assert_eq!(caption_frame(&components, &output, "1.500").await, caption_frame(&components, &input, "1.500").await);
+            assert_eq!(
+                caption_frame(&components, &output, "0").await,
+                caption_frame(&components, &input, "0").await
+            );
+            assert_eq!(
+                caption_frame(&components, &output, "1.500").await,
+                caption_frame(&components, &input, "1.500").await
+            );
         }
-        cases.push(json!({"job":job["job_id"],"source_transfer":transfer,"correct_sdr_tags":true,
+        cases.push(
+            json!({"job":job["job_id"],"source_transfer":transfer,"correct_sdr_tags":true,
             "non_square_sar_preserved":true,"independent_audio_packet_equality":true,
-            "caption_picture_sha256":hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&frame))}));
+            "caption_picture_sha256":hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&frame))}),
+        );
     }
     json!(cases)
 }
@@ -1398,7 +1530,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(expected_cut.len(), 8);
     assert_eq!(cut_packets[&0], expected_cut);
 
-    let split_outputs = [media.directory.path().join("split-اول.mkv"), media.directory.path().join("split-دوم.mkv")];
+    let split_outputs = [
+        media.directory.path().join("split-اول.mkv"),
+        media.directory.path().join("split-دوم.mkv"),
+    ];
     let split = json!({"asset_id":cut_source["id"],"chapters":"drop","outputs":[
         {"output":split_outputs[0],"range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}}},
         {"output":split_outputs[1],"range":{"start":{"num":"1","den":"1"},"end":{"num":"2","den":"1"}}}
@@ -1406,49 +1541,84 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let mut rejected_split = split.clone();
     rejected_split["outputs"][1]["range"]["start"] = json!({"num":"5","den":"4"});
     let rejected = call!(http, "media.split_plan", rejected_split, json!({}));
-    assert_eq!(rejected["items"][1]["error"]["code"], "COPY_BOUNDARY_UNQUALIFIED");
     assert_eq!(
-        sdk!(http, "batches.submit", json!({"plan_id":rejected["id"],"plan_hash":rejected["hash"]}),
-            json!({"replay_scope":http_scope,"idempotency_key":"reject-unqualified-packet-split"}))["error"]["code"],
+        rejected["items"][1]["error"]["code"],
+        "COPY_BOUNDARY_UNQUALIFIED"
+    );
+    assert_eq!(
+        sdk!(
+            http,
+            "batches.submit",
+            json!({"plan_id":rejected["id"],"plan_hash":rejected["hash"]}),
+            json!({"replay_scope":http_scope,"idempotency_key":"reject-unqualified-packet-split"})
+        )["error"]["code"],
         "BATCH_REJECTED",
     );
     assert!(split_outputs.iter().all(|path| !path.exists()));
     let split_document = media.directory.path().join("packet-split.json");
     std::fs::write(&split_document, serde_json::to_vec(&split).unwrap()).unwrap();
-    let (typed_split, code) = cli.human(&["--access-profile", "batch-operator", "media", "split", "--file",
-        split_document.to_str().unwrap()]).await;
+    let (typed_split, code) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "media",
+            "split",
+            "--file",
+            split_document.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(code, 0, "{typed_split}");
     let stdio_split = call!(stdio, "media.split_plan", split.clone(), json!({}));
     let http_split = call!(http, "media.split_plan", split.clone(), json!({}));
     assert_eq!(typed_split["result"]["hash"], stdio_split["hash"]);
     assert_eq!(stdio_split["hash"], http_split["hash"]);
     for index in 0..split_outputs.len() {
-        assert_eq!(http_split["items"][index]["packet_cut"], split["outputs"][index]["range"]);
+        assert_eq!(
+            http_split["items"][index]["packet_cut"],
+            split["outputs"][index]["range"]
+        );
     }
-    let split_batch = call!(http, "batches.submit",
+    let split_batch = call!(
+        http,
+        "batches.submit",
         json!({"plan_id":http_split["id"],"plan_hash":http_split["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"verified-original-clock-split"}));
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-original-clock-split"})
+    );
     let split_result = finished!(http, split_batch["batch_id"]);
     assert_eq!(split_result["succeeded"], 2, "{split_result}");
     for (index, path) in split_outputs.iter().enumerate() {
         let start = i64::try_from(index).unwrap() * 1000;
-        let expected: Vec<_> = source_packets[&0].iter()
-            .filter(|packet| (start..start + 1000).contains(&packet["pts"].as_i64().unwrap())).cloned().collect();
+        let expected: Vec<_> = source_packets[&0]
+            .iter()
+            .filter(|packet| (start..start + 1000).contains(&packet["pts"].as_i64().unwrap()))
+            .cloned()
+            .collect();
         assert_eq!(expected.len(), 8);
         assert_eq!(packets(&media.bin, path).await[&0], expected);
     }
 
     let replacement_output = media.directory.path().join("track-replacement.mkv");
     let replacement = json!({"target":sdk_assets[0]["id"],"output":replacement_output,"conversion":"forbid",
-        "metadata":"strip_global","remove":[{"kind":"type_ordinal","track_kind":"audio","ordinal":1}],
-        "additions":[{"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
-            {"stream_index":1,"title":"Alternate mix","language":"fas","disposition":[]}
-        ]}}]});
+    "metadata":"strip_global","remove":[{"kind":"type_ordinal","track_kind":"audio","ordinal":1}],
+    "additions":[{"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
+        {"stream_index":1,"title":"Alternate mix","language":"fas","disposition":[]}
+    ]}}]});
     let replacement_document = media.directory.path().join("track-replacement.json");
-    std::fs::write(&replacement_document, serde_json::to_vec(&replacement).unwrap()).unwrap();
-    let (typed_replace, code) = cli.human(&[
-        "--access-profile", "batch-operator", "streams", "replace", "--file", replacement_document.to_str().unwrap(),
-    ]).await;
+    std::fs::write(
+        &replacement_document,
+        serde_json::to_vec(&replacement).unwrap(),
+    )
+    .unwrap();
+    let (typed_replace, code) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "streams",
+            "replace",
+            "--file",
+            replacement_document.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(code, 0, "{typed_replace}");
     let stdio_replace = call!(stdio, "streams.replace", replacement.clone(), json!({}));
     let http_replace = call!(http, "streams.replace", replacement, json!({}));
@@ -1456,12 +1626,19 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(stdio_replace["hash"], http_replace["hash"]);
     assert!(http_replace["resolution"]["outcomes"][2]["output_index"].is_null());
     assert_eq!(http_replace["added_tracks"][0]["first_output_index"], 2);
-    let replace_job = call!(http, "jobs.submit", json!({"plan_id":http_replace["id"],"plan_hash":http_replace["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"verified-track-replacement"}));
+    let replace_job = call!(
+        http,
+        "jobs.submit",
+        json!({"plan_id":http_replace["id"],"plan_hash":http_replace["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-track-replacement"})
+    );
     cli.completed(replace_job["job_id"].as_str().unwrap()).await;
     let replacement_probe = fixture::probe(&media.bin, &replacement_output).await;
     assert!(replacement_probe["format"]["tags"]["title"].is_null());
-    assert_eq!(replacement_probe["streams"][2]["tags"]["title"], "Alternate mix");
+    assert_eq!(
+        replacement_probe["streams"][2]["tags"]["title"],
+        "Alternate mix"
+    );
     assert_eq!(replacement_probe["streams"][2]["tags"]["language"], "fas");
     let replacement_packets = packets(&media.bin, &replacement_output).await;
     assert_eq!(replacement_packets[&0], original_packets[&0]);
@@ -1473,37 +1650,96 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(replacement_packets[&2], expected_replacement);
 
     let strip_output = media.directory.path().join("metadata-only.mkv");
-    let strip = call!(http, "streams.replace", json!({"target":sdk_assets[0]["id"],
-        "output":strip_output,"conversion":"forbid","metadata":"strip_global"}), json!({}));
+    let strip = call!(
+        http,
+        "streams.replace",
+        json!({"target":sdk_assets[0]["id"],
+        "output":strip_output,"conversion":"forbid","metadata":"strip_global"}),
+        json!({})
+    );
     assert_eq!(strip["resolution"]["action"], "remux");
-    let strip_job = call!(http, "jobs.submit", json!({"plan_id":strip["id"],"plan_hash":strip["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"verified-metadata-only"}));
+    let strip_job = call!(
+        http,
+        "jobs.submit",
+        json!({"plan_id":strip["id"],"plan_hash":strip["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-metadata-only"})
+    );
     cli.completed(strip_job["job_id"].as_str().unwrap()).await;
     assert!(fixture::probe(&media.bin, &strip_output).await["format"]["tags"]["title"].is_null());
     assert_eq!(packets(&media.bin, &strip_output).await, original_packets);
 
     let normalize_source = media.directory.path().join("different-loudness.mkv");
     let mut sampled = [
-        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
-        "testsrc2=size=64x48:rate=4:duration=5", "-f", "lavfi", "-i",
-        "sine=frequency=440:sample_rate=48000:duration=5", "-f", "lavfi", "-i",
-        "sine=frequency=950:sample_rate=48000:duration=5", "-f", "lavfi", "-i",
-        "sine=frequency=650:sample_rate=48000:duration=5", "-filter_complex", "[2:a]volume=0.1[quiet]",
-        "-map", "0:v", "-map", "1:a", "-map", "[quiet]", "-map", "3:a", "-c:v", "ffv1", "-c:a", "pcm_s16le", "-f", "matroska",
-    ].map(str::to_owned).to_vec();
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=64x48:rate=4:duration=5",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=5",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=950:sample_rate=48000:duration=5",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=650:sample_rate=48000:duration=5",
+        "-filter_complex",
+        "[2:a]volume=0.1[quiet]",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "[quiet]",
+        "-map",
+        "3:a",
+        "-c:v",
+        "ffv1",
+        "-c:a",
+        "pcm_s16le",
+        "-f",
+        "matroska",
+    ]
+    .map(str::to_owned)
+    .to_vec();
     sampled.push(normalize_source.to_str().unwrap().into());
-    nw_platform::process::run(&media.bin.join("ffmpeg"), &sampled, Duration::from_secs(30), 4096,
-        CancellationToken::new()).await.unwrap();
-    let audio = call!(stdio, "assets.register", json!({"path":normalize_source}),
-        json!({"replay_scope":sdk_scope,"idempotency_key":"distinct-normalization-tracks"}));
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &sampled,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let audio = call!(
+        stdio,
+        "assets.register",
+        json!({"path":normalize_source}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"distinct-normalization-tracks"})
+    );
     let normalize_output = media.directory.path().join("normalized-independently.mkv");
     let normalize = json!({"asset_id":audio["id"],"output":normalize_output,
         "tracks":[{"stream_index":1},{"stream_index":2}]});
     let normalize_document = media.directory.path().join("normalize.json");
     std::fs::write(&normalize_document, serde_json::to_vec(&normalize).unwrap()).unwrap();
-    let (typed_normalize, code) = cli.human(&[
-        "--access-profile", "batch-operator", "media", "normalize", "--file", normalize_document.to_str().unwrap(),
-    ]).await;
+    let (typed_normalize, code) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "media",
+            "normalize",
+            "--file",
+            normalize_document.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(code, 0, "{typed_normalize}");
     let stdio_normalize = call!(stdio, "audio.normalize", normalize.clone(), json!({}));
     let http_normalize = call!(http, "audio.normalize", normalize, json!({}));
@@ -1511,34 +1747,70 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(stdio_normalize["hash"], http_normalize["hash"]);
     let measurements = http_normalize["audio_normalization"].as_array().unwrap();
     assert_eq!(measurements.len(), 2);
-    let first = measurements[0]["measurement"]["integrated_centi_lufs"].as_i64().unwrap();
-    let second = measurements[1]["measurement"]["integrated_centi_lufs"].as_i64().unwrap();
+    let first = measurements[0]["measurement"]["integrated_centi_lufs"]
+        .as_i64()
+        .unwrap();
+    let second = measurements[1]["measurement"]["integrated_centi_lufs"]
+        .as_i64()
+        .unwrap();
     assert!((first - second).abs() > 1500);
-    let normalized_job = call!(http, "jobs.submit", json!({"plan_id":http_normalize["id"],"plan_hash":http_normalize["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"verified-independent-normalization"}));
-    cli.completed(normalized_job["job_id"].as_str().unwrap()).await;
+    let normalized_job = call!(
+        http,
+        "jobs.submit",
+        json!({"plan_id":http_normalize["id"],"plan_hash":http_normalize["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-independent-normalization"})
+    );
+    cli.completed(normalized_job["job_id"].as_str().unwrap())
+        .await;
     let input_packets = packets(&media.bin, &normalize_source).await;
     let output_packets = packets(&media.bin, &normalize_output).await;
     assert_eq!(input_packets[&0], output_packets[&0]);
     assert_eq!(input_packets[&3], output_packets[&3]);
     let mut independently_measured = Vec::new();
     for index in [1, 2] {
-        let bytes = |packets: &[Value]| packets.iter().map(|packet| packet["size"].as_str().unwrap().parse::<u64>().unwrap()).sum::<u64>();
-        assert_eq!(bytes(&input_packets[&index]), bytes(&output_packets[&index]));
+        let bytes = |packets: &[Value]| {
+            packets
+                .iter()
+                .map(|packet| packet["size"].as_str().unwrap().parse::<u64>().unwrap())
+                .sum::<u64>()
+        };
+        assert_eq!(
+            bytes(&input_packets[&index]),
+            bytes(&output_packets[&index])
+        );
         let args = [
-            "-hide_banner".into(), "-nostdin".into(), "-nostats".into(), "-v".into(), "info".into(), "-i".into(),
-            normalize_output.to_str().unwrap().into(), "-map".into(), format!("0:{index}"), "-af".into(),
-            "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json".into(), "-f".into(), "null".into(), "-".into(),
+            "-hide_banner".into(),
+            "-nostdin".into(),
+            "-nostats".into(),
+            "-v".into(),
+            "info".into(),
+            "-i".into(),
+            normalize_output.to_str().unwrap().into(),
+            "-map".into(),
+            format!("0:{index}"),
+            "-af".into(),
+            "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json".into(),
+            "-f".into(),
+            "null".into(),
+            "-".into(),
         ];
-        let result = nw_platform::process::run(&media.bin.join("ffmpeg"), &args, Duration::from_secs(20), 4096,
-            CancellationToken::new()).await.unwrap();
+        let result = nw_platform::process::run(
+            &media.bin.join("ffmpeg"),
+            &args,
+            Duration::from_secs(20),
+            4096,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
         let start = result.stderr_tail.rfind("\n{").unwrap() + 1;
         let end = result.stderr_tail.rfind("\n}").unwrap() + 2;
         let stats: Value = serde_json::from_str(&result.stderr_tail[start..end]).unwrap();
         let lufs = stats["input_i"].as_str().unwrap().parse::<f64>().unwrap();
         let peak = stats["input_tp"].as_str().unwrap().parse::<f64>().unwrap();
         assert!((lufs + 16.0).abs() <= 0.4 && peak <= -1.5);
-        independently_measured.push(json!({"stream":index,"integrated_lufs":lufs,"true_peak_dbtp":peak}));
+        independently_measured
+            .push(json!({"stream":index,"integrated_lufs":lufs,"true_peak_dbtp":peak}));
     }
     http.cancel().await.unwrap();
     server.start_kill().unwrap();

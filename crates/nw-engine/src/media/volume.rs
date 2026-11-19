@@ -148,10 +148,21 @@ impl Engine {
         use nw_domain::audio_normalization::{FirstPass, Track};
         request.settings.validate()?;
         let graph = format!("{}:print_format=json", request.settings.loudnorm());
-        let (_, measured) = self.measure_registered_audio(asset, source, request.stream_index,
-            cancel, &graph, loudness_measurements).await?;
+        let (_, measured) = self
+            .measure_registered_audio(
+                asset,
+                source,
+                request.stream_index,
+                cancel,
+                &graph,
+                loudness_measurements,
+            )
+            .await?;
         let (Some(integrated), Some(peak)) = (measured.integrated, measured.true_peak) else {
-            return Err(DomainError::new("NORMALIZATION_UNQUALIFIED", "Source signal did not produce finite first-pass loudness facts"));
+            return Err(DomainError::new(
+                "NORMALIZATION_UNQUALIFIED",
+                "Source signal did not produce finite first-pass loudness facts",
+            ));
         };
         let track = Track {
             request,

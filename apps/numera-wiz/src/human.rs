@@ -641,7 +641,8 @@ pub fn prepare(command: Command) -> Result<Request> {
             query("media.split_plan", serde_json::to_value(input)?)
         }
         Command::Media(Media::Normalize { file }) => {
-            let mut input: nw_domain::audio_normalization::NormalizeInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::audio_normalization::NormalizeInput =
+                commands::parse(document(&file)?)?;
             nw_domain::audio_normalization::validate_requests(&input.tracks)?;
             input.output = native_path(Path::new(&input.output))?;
             query("audio.normalize", serde_json::to_value(input)?)
@@ -846,7 +847,8 @@ pub fn prepare(command: Command) -> Result<Request> {
             query("streams.add", serde_json::to_value(input)?)
         }
         Command::Streams(Streams::Replace { file }) => {
-            let mut input: nw_domain::track_append::ReplaceInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::track_append::ReplaceInput =
+                commands::parse(document(&file)?)?;
             input.validate()?;
             input.output = native_path(Path::new(&input.output))?;
             query("streams.replace", serde_json::to_value(input)?)

@@ -26,8 +26,16 @@ impl Default for CutForm {
             start: "0".into(),
             end: "1".into(),
             parts: vec![
-                SplitFields { start: "0".into(), end: "1".into(), ..Default::default() },
-                SplitFields { start: "1".into(), end: "2".into(), ..Default::default() },
+                SplitFields {
+                    start: "0".into(),
+                    end: "1".into(),
+                    ..Default::default()
+                },
+                SplitFields {
+                    start: "1".into(),
+                    end: "2".into(),
+                    ..Default::default()
+                },
             ],
         }
     }
@@ -87,13 +95,25 @@ impl WizApp {
         }
         if review {
             let input = (|| {
-                let outputs = self.packet_cut.parts.iter().map(|part| {
-                    Ok::<_, String>(SplitOutput {
-                        output: part.output.trim().to_owned(),
-                        range: TimeRange { start: seconds(&part.start)?, end: seconds(&part.end)? },
+                let outputs = self
+                    .packet_cut
+                    .parts
+                    .iter()
+                    .map(|part| {
+                        Ok::<_, String>(SplitOutput {
+                            output: part.output.trim().to_owned(),
+                            range: TimeRange {
+                                start: seconds(&part.start)?,
+                                end: seconds(&part.end)?,
+                            },
+                        })
                     })
-                }).collect::<Result<Vec<_>, _>>()?;
-                let input = SplitInput { asset_id: source.id.clone(), outputs, chapters: ChapterPolicy::Drop };
+                    .collect::<Result<Vec<_>, _>>()?;
+                let input = SplitInput {
+                    asset_id: source.id.clone(),
+                    outputs,
+                    chapters: ChapterPolicy::Drop,
+                };
                 input.validate().map_err(|error| error.message)?;
                 Ok::<_, String>(input)
             })();

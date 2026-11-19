@@ -447,42 +447,85 @@ impl Service {
     ) -> Result<BatchPlanReview> {
         input.validate()?;
         self.batch_child_command(context, "media.cut")?;
-        let initial_revision = self.policy(context)?.as_ref().map_or(0, |policy| policy.revision);
-        let source: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+        let initial_revision = self
+            .policy(context)?
+            .as_ref()
+            .map_or(0, |policy| policy.revision);
+        let source: Asset = self
+            .store
+            .get(&named("asset", &input.asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
         self.object(context, &source.id, &source.creator)?;
         self.path(context, Path::new(&source.identity.path), false)?;
-        let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("RESOURCE_LIMIT", "Packet split review capacity is full")
-        })?;
+        let _permit = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new("RESOURCE_LIMIT", "Packet split review capacity is full")
+            })?;
         let ranges: Vec<_> = input.outputs.iter().map(|item| item.range).collect();
-        let (stamp, results) = runtime.block_on(self.engine()?.inspect_packet_cuts(&source, &ranges, cancel.clone()))?;
+        let (stamp, results) = runtime.block_on(self.engine()?.inspect_packet_cuts(
+            &source,
+            &ranges,
+            cancel.clone(),
+        ))?;
         let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         self.confirm_batch_policy(context, initial_revision, "media.split_plan")?;
         self.batch_child_command(context, "media.cut")?;
         stamp.revalidate()?;
         let now = self.clock.now()?;
-        let targets: Vec<_> = input.outputs.into_iter().map(|item| ItemInput {
-            asset_id: source.id.clone(),
-            output: item.output,
-        }).collect();
-        let mut reviewed = self.review_batch_items(context, targets.iter().map(|item| (item, None)), cancel,
+        let targets: Vec<_> = input
+            .outputs
+            .into_iter()
+            .map(|item| ItemInput {
+                asset_id: source.id.clone(),
+                output: item.output,
+            })
+            .collect();
+        let mut reviewed = self.review_batch_items(
+            context,
+            targets.iter().map(|item| (item, None)),
+            cancel,
             |item, _, index| {
                 results[index].clone()?;
-                self.prepare_native_copy(context, &item.asset_id, &item.output, Default::default(),
+                self.prepare_native_copy(
+                    context,
+                    &item.asset_id,
+                    &item.output,
+                    Default::default(),
                     |engine, current, output| {
-                        if current.identity != source.identity || current.source_object != source.source_object {
-                            return Err(DomainError::new("SOURCE_CHANGED", "Registered split source changed during inspection"));
+                        if current.identity != source.identity
+                            || current.source_object != source.source_object
+                        {
+                            return Err(DomainError::new(
+                                "SOURCE_CHANGED",
+                                "Registered split source changed during inspection",
+                            ));
                         }
-                        engine.packet_cut_plan_at(current, output, ranges[index], &context.principal, now)
-                    })
-            })?;
+                        engine.packet_cut_plan_at(
+                            current,
+                            output,
+                            ranges[index],
+                            &context.principal,
+                            now,
+                        )
+                    },
+                )
+            },
+        )?;
         for (item, range) in reviewed.items.iter_mut().zip(ranges) {
             item.packet_cut = Some(range);
         }
         stamp.revalidate()?;
-        let batch = self.retain_batch_plan(context, now, FailurePolicy::RejectAll,
-            UnresolvedPolicy::Reject, Vec::new(), reviewed)?;
+        let batch = self.retain_batch_plan(
+            context,
+            now,
+            FailurePolicy::RejectAll,
+            UnresolvedPolicy::Reject,
+            Vec::new(),
+            reviewed,
+        )?;
         self.batch_review(context, &batch)
     }
 
@@ -867,7 +910,10 @@ impl Service {
                 return Err(DomainError::new("CANCELLED", "Batch preflight cancelled"));
             }
             let child = self.read_plan(context, &reference.id, ObjectAction::Submit)?;
-            if child.hash != reference.hash || child.packet_cut != item.packet_cut || child.expires_at.parse::<u64>().unwrap_or(0) <= now {
+            if child.hash != reference.hash
+                || child.packet_cut != item.packet_cut
+                || child.expires_at.parse::<u64>().unwrap_or(0) <= now
+            {
                 return Err(DomainError::new(
                     "INVALID_PLAN",
                     "A batch child changed or expired",

@@ -29,7 +29,14 @@ impl Engine {
         now: u64,
     ) -> Result<Plan> {
         validate_sources(&primary, &additions, &files::path_text(output)?)?;
-        self.replace_tracks_plan_at(primary, additions, output, &CleanIntent::preserving_all(), creator, now)
+        self.replace_tracks_plan_at(
+            primary,
+            additions,
+            output,
+            &CleanIntent::preserving_all(),
+            creator,
+            now,
+        )
     }
 
     pub fn replace_tracks_plan_at(
@@ -85,7 +92,9 @@ pub(super) fn validate_track_additions(plan: &Plan, profile: OutputProfile) -> R
         || plan.resolution.chapter_import.is_some()
         || plan.resolution.streams.iter().any(|selected| {
             !plan.source.probe.streams.iter().any(|source| {
-                selected.index == source.index && selected.kind == source.kind && selected.codec == source.codec
+                selected.index == source.index
+                    && selected.kind == source.kind
+                    && selected.codec == source.codec
             })
         })
     {

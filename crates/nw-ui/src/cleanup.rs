@@ -631,21 +631,30 @@ impl WizApp {
                     ));
                 }
                 if let Some(burn) = &plan.subtitle_burn {
-                    ui.label(format!("Burn into picture {} with DejaVu Sans", burn.video_stream));
+                    ui.label(format!(
+                        "Burn into picture {} with DejaVu Sans",
+                        burn.video_stream
+                    ));
                     if let Some(index) = burn.embedded_subtitle_stream {
                         ui.label(format!("Original subtitle stream {index}"));
                     }
                     if let Some(external) = &burn.external_subtitle_asset {
                         ui.label(format!("Registered subtitle {external}"));
                     }
-                    if let nw_domain::subtitle_burn::Color::ToneMapBt709 { peak_nits } = burn.color {
-                        ui.label(format!("Tone map to BT.709 using a source peak of {peak_nits} nits"));
+                    if let nw_domain::subtitle_burn::Color::ToneMapBt709 { peak_nits } = burn.color
+                    {
+                        ui.label(format!(
+                            "Tone map to BT.709 using a source peak of {peak_nits} nits"
+                        ));
                     }
                 }
                 for track in &plan.audio_normalization {
-                    ui.label(format!("Audio {} · measured {:.2} LUFS · target {:.2} LUFS",
-                        track.request.stream_index, f64::from(track.measurement.integrated_centi_lufs) / 100.0,
-                        f64::from(track.request.settings.integrated_centi_lufs) / 100.0));
+                    ui.label(format!(
+                        "Audio {} · measured {:.2} LUFS · target {:.2} LUFS",
+                        track.request.stream_index,
+                        f64::from(track.measurement.integrated_centi_lufs) / 100.0,
+                        f64::from(track.request.settings.integrated_centi_lufs) / 100.0
+                    ));
                 }
                 ui.separator();
                 for outcome in &plan.resolution.outcomes {

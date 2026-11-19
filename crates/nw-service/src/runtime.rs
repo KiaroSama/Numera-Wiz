@@ -574,13 +574,17 @@ impl Service {
             }
             first_output_index += input.tracks.len();
         }
-        if let Some(burn) = &plan.subtitle_burn && source_visible {
+        if let Some(burn) = &plan.subtitle_burn
+            && source_visible
+        {
             use nw_domain::subtitle_burn::{BurnReview, SubtitleSource};
             let (embedded_subtitle_stream, external_subtitle_asset) = match &burn.subtitle {
                 SubtitleSource::Embedded { stream_index } => (Some(*stream_index), None),
                 SubtitleSource::External { source } => {
                     let available = self.object(context, &source.id, &source.creator).is_ok()
-                        && self.path(context, Path::new(&source.identity.path), false).is_ok();
+                        && self
+                            .path(context, Path::new(&source.identity.path), false)
+                            .is_ok();
                     (None, available.then(|| source.id.clone()))
                 }
             };
@@ -1848,43 +1852,86 @@ impl Service {
                 value(&report.finish()?)?
             }
             "audio.normalize" => {
-                let input: nw_domain::audio_normalization::NormalizeInput = commands::parse(params)?;
+                let input: nw_domain::audio_normalization::NormalizeInput =
+                    commands::parse(params)?;
                 nw_domain::audio_normalization::validate_requests(&input.tracks)?;
-                let bound: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                let bound: Asset = self
+                    .store
+                    .get(&named("asset", &input.asset_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &bound.id, &bound.creator)?;
                 self.path(&context, Path::new(&bound.identity.path), false)?;
                 self.path(&context, Path::new(&input.output), true)?;
-                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-                    DomainError::new("RESOURCE_LIMIT", "Loudness review capacity is full")
-                })?;
+                let _permit = self
+                    .batch_preflights
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| {
+                        DomainError::new("RESOURCE_LIMIT", "Loudness review capacity is full")
+                    })?;
                 drop(guard);
-                let (tracks, inspected) = runtime.block_on(self.engine()?.inspect_normalization(
-                    &bound, &input.tracks, cancellation.clone()))?;
+                let (tracks, inspected) =
+                    runtime.block_on(self.engine()?.inspect_normalization(
+                        &bound,
+                        &input.tracks,
+                        cancellation.clone(),
+                    ))?;
                 let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
                 if cancellation.is_cancelled() {
-                    return Err(DomainError::new("CANCELLED", "Loudness review was cancelled"));
+                    return Err(DomainError::new(
+                        "CANCELLED",
+                        "Loudness review was cancelled",
+                    ));
                 }
-                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("audio.normalize")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Loudness review access changed during measurement"));
+                if self
+                    .policy(&context)?
+                    .is_some_and(|profile| !profile.allows_command("audio.normalize"))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Loudness review access changed during measurement",
+                    ));
                 }
                 inspected.revalidate()?;
-                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output,
-                    Default::default(), |engine, current, output| {
-                        if current.identity != bound.identity || current.source_object != bound.source_object {
-                            return Err(DomainError::new("SOURCE_CHANGED", "Original normalized audio source changed during measurement"));
+                let plan = self.prepare_native_copy(
+                    &context,
+                    &input.asset_id,
+                    &input.output,
+                    Default::default(),
+                    |engine, current, output| {
+                        if current.identity != bound.identity
+                            || current.source_object != bound.source_object
+                        {
+                            return Err(DomainError::new(
+                                "SOURCE_CHANGED",
+                                "Original normalized audio source changed during measurement",
+                            ));
                         }
-                        engine.normalization_plan_at(current, output, tracks, &context.principal, self.clock.now()?)
-                    })?;
+                        engine.normalization_plan_at(
+                            current,
+                            output,
+                            tracks,
+                            &context.principal,
+                            self.clock.now()?,
+                        )
+                    },
+                )?;
                 inspected.revalidate()?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
                 return Ok(response);
             }
             "media.split_plan" => value(&self.prepare_packet_split(
-                &context, commands::parse(params)?, &cancellation, &runtime,
+                &context,
+                commands::parse(params)?,
+                &cancellation,
+                &runtime,
             )?)?,
             "media.cut" => {
                 let input: nw_domain::packet_cut::CutInput = commands::parse(params)?;
@@ -1960,8 +2007,9 @@ impl Service {
                 drop(permit);
                 return Ok(response);
             }
-            "streams.clean" | "streams.add" | "streams.replace" | "streams.extract" | "subtitles.burn" | "jobs.plan"
-            | "chapters.remove" | "chapters.import" | "disposition.patch" | "metadata.patch" => {
+            "streams.clean" | "streams.add" | "streams.replace" | "streams.extract"
+            | "subtitles.burn" | "jobs.plan" | "chapters.remove" | "chapters.import"
+            | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
@@ -2280,11 +2328,13 @@ impl Service {
                         additions.push(stamp);
                     }
                     if let Some(burn) = &plan.subtitle_burn {
-                        let font = files::SourceStamp::capture_resolved(Path::new(&burn.font.path))?;
+                        let font =
+                            files::SourceStamp::capture_resolved(Path::new(&burn.font.path))?;
                         font.require_object(&burn.font_object)?;
                         additions.push(font);
                     }
-                    for component in [&plan.ffmpeg, &plan.ffprobe].into_iter()
+                    for component in [&plan.ffmpeg, &plan.ffprobe]
+                        .into_iter()
                         .chain(plan.subtitle_burn.iter().map(|burn| &burn.font))
                     {
                         files::revalidate(component, &cancellation).map_err(|error| {
@@ -2650,21 +2700,39 @@ impl Service {
                 use nw_domain::subtitle_burn::{BurnInput, SubtitleInput, SubtitleSource};
                 let input: BurnInput = commands::parse(params)?;
                 let subtitle = match &input.subtitle {
-                    SubtitleInput::Embedded { stream_index } => SubtitleSource::Embedded { stream_index: *stream_index },
+                    SubtitleInput::Embedded { stream_index } => SubtitleSource::Embedded {
+                        stream_index: *stream_index,
+                    },
                     SubtitleInput::External { asset_id } => {
-                        let source: Asset = self.store.get(&named("asset", asset_id)?)?
+                        let source: Asset = self
+                            .store
+                            .get(&named("asset", asset_id)?)?
                             .ok_or_else(DomainError::object_not_found)?;
                         self.object(context, &source.id, &source.creator)?;
                         self.path(context, Path::new(&source.identity.path), false)?;
-                        SubtitleSource::External { source: Box::new(source) }
+                        SubtitleSource::External {
+                            source: Box::new(source),
+                        }
                     }
                 };
                 let asset = input.asset_id.clone();
                 let output_path = input.output.clone();
-                return self.prepare_native_copy(context, &asset, &output_path,
-                    Default::default(), |engine, source, output| {
-                        engine.subtitle_burn_plan_at(source, output, input, subtitle, &context.principal, now)
-                    });
+                return self.prepare_native_copy(
+                    context,
+                    &asset,
+                    &output_path,
+                    Default::default(),
+                    |engine, source, output| {
+                        engine.subtitle_burn_plan_at(
+                            source,
+                            output,
+                            input,
+                            subtitle,
+                            &context.principal,
+                            now,
+                        )
+                    },
+                );
             }
             "streams.add" => {
                 let input: nw_domain::track_append::AppendInput = commands::parse(params)?;
@@ -2696,11 +2764,23 @@ impl Service {
                 let input: nw_domain::track_append::ReplaceInput = commands::parse(params)?;
                 input.validate()?;
                 let additions = self.resolve_additions(context, &input.additions)?;
-                return self.prepare_native_copy(context, &input.target, &input.output, Default::default(),
+                return self.prepare_native_copy(
+                    context,
+                    &input.target,
+                    &input.output,
+                    Default::default(),
                     |engine, primary, output| {
                         let intent = input.primary_intent(&primary.probe.streams)?;
-                        engine.replace_tracks_plan_at(primary, additions, output, &intent, &context.principal, now)
-                    });
+                        engine.replace_tracks_plan_at(
+                            primary,
+                            additions,
+                            output,
+                            &intent,
+                            &context.principal,
+                            now,
+                        )
+                    },
+                );
             }
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params)?;
@@ -2775,13 +2855,19 @@ impl Service {
         context: &Context,
         additions: &[nw_domain::track_append::Addition],
     ) -> Result<Vec<nw_domain::track_append::AddedInput>> {
-        additions.iter().cloned().map(|addition| {
-            let source: Asset = self.store.get(&named("asset", &addition.asset_id)?)?
-                .ok_or_else(DomainError::object_not_found)?;
-            self.object(context, &source.id, &source.creator)?;
-            self.path(context, Path::new(&source.identity.path), false)?;
-            addition.resolve(source)
-        }).collect()
+        additions
+            .iter()
+            .cloned()
+            .map(|addition| {
+                let source: Asset = self
+                    .store
+                    .get(&named("asset", &addition.asset_id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(context, &source.id, &source.creator)?;
+                self.path(context, Path::new(&source.identity.path), false)?;
+                addition.resolve(source)
+            })
+            .collect()
     }
 
     fn prepare_native_copy(

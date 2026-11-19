@@ -689,7 +689,14 @@ impl Engine {
         )
         .await?;
         let caption = if plan.subtitle_burn.is_some() {
-            Some(self.stage_caption(plan, staging.path().parent().expect("Owned staging directory"), cancel.clone()).await?)
+            Some(
+                self.stage_caption(
+                    plan,
+                    staging.path().parent().expect("Owned staging directory"),
+                    cancel.clone(),
+                )
+                .await?,
+            )
         } else {
             None
         };
@@ -713,7 +720,11 @@ impl Engine {
             .iter()
             .map(|v| match v.as_str() {
                 "@owned_staging@" => staging_name.clone(),
-                subtitle_burn::FILTER => caption.as_ref().expect("Validated caption invocation").filter().to_owned(),
+                subtitle_burn::FILTER => caption
+                    .as_ref()
+                    .expect("Validated caption invocation")
+                    .filter()
+                    .to_owned(),
                 "@chapter_sidecar@" => sidecar
                     .as_ref()
                     .expect("Validated chapter invocation")
@@ -795,7 +806,9 @@ impl Engine {
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
         if !plan.audio_normalization.is_empty() {
-            let measured = self.verify_normalization(plan, &observed, &actual, cancel.clone()).await?;
+            let measured = self
+                .verify_normalization(plan, &observed, &actual, cancel.clone())
+                .await?;
             verification.push(' ');
             verification.push_str(&measured.join(". "));
             verification.push('.');
@@ -832,7 +845,11 @@ impl Engine {
                             .into_iter()
                             .map(track_append::StagedInput::into_source),
                     )
-                    .chain(caption.into_iter().flat_map(subtitle_burn::StagedCaption::into_sources))
+                    .chain(
+                        caption
+                            .into_iter()
+                            .flat_map(subtitle_burn::StagedCaption::into_sources),
+                    )
                     .collect(),
             },
             plan,

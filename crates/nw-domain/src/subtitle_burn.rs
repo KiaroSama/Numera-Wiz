@@ -39,9 +39,13 @@ pub enum Audio {
 impl Audio {
     pub fn validate(&self) -> Result<()> {
         if let Self::CopySelected { indices } = self
-            && (!(1..=32).contains(&indices.len()) || indices.iter().collect::<BTreeSet<_>>().len() != indices.len())
+            && (!(1..=32).contains(&indices.len())
+                || indices.iter().collect::<BTreeSet<_>>().len() != indices.len())
         {
-            return Err(DomainError::new("VALIDATION_ERROR", "Select one to thirty-two distinct original audio streams"));
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Select one to thirty-two distinct original audio streams",
+            ));
         }
         Ok(())
     }
@@ -62,7 +66,10 @@ impl Color {
         if let Self::ToneMapBt709 { peak_nits } = self
             && !(100..=10000).contains(&peak_nits)
         {
-            return Err(DomainError::new("VALIDATION_ERROR", "Choose a reviewed HDR source peak from 100 to 10000 nits"));
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Choose a reviewed HDR source peak from 100 to 10000 nits",
+            ));
         }
         Ok(())
     }

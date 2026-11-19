@@ -32,7 +32,10 @@ fn unavailable(message: &str) -> DomainError {
     DomainError::new("SUBTITLE_BURN_UNQUALIFIED", message)
 }
 fn unsupported_text() -> DomainError {
-    DomainError::new("SUBTITLE_TEXT_REQUIRED", "Choose a SubRip text track or registered UTF-8 SRT. Bitmap subtitles cannot be rendered by this text workflow.")
+    DomainError::new(
+        "SUBTITLE_TEXT_REQUIRED",
+        "Choose a SubRip text track or registered UTF-8 SRT. Bitmap subtitles cannot be rendered by this text workflow.",
+    )
 }
 fn font_path(component: &FileIdentity) -> Result<PathBuf> {
     Path::new(&component.path)
@@ -44,20 +47,35 @@ fn font_path(component: &FileIdentity) -> Result<PathBuf> {
 
 fn selected<'a>(streams: &'a [Stream], burn: &Burn) -> Result<Vec<&'a Stream>> {
     burn.audio.validate()?;
-    let picture = streams.iter().find(|stream| {
-        stream.index == burn.video_stream && stream.kind == StreamKind::Video && !stream.attached_picture()
-    }).ok_or_else(|| unavailable("Choose a registered ordinary picture stream"))?;
+    let picture = streams
+        .iter()
+        .find(|stream| {
+            stream.index == burn.video_stream
+                && stream.kind == StreamKind::Video
+                && !stream.attached_picture()
+        })
+        .ok_or_else(|| unavailable("Choose a registered ordinary picture stream"))?;
     if picture.codec != "ffv1" {
-        return Err(unavailable("The lossless original-clock caption route requires an FFV1 picture"));
+        return Err(unavailable(
+            "The lossless original-clock caption route requires an FFV1 picture",
+        ));
     }
     let mut output = vec![picture];
     match &burn.audio {
         Audio::None {} => {}
-        Audio::CopyAll {} => output.extend(streams.iter().filter(|stream| stream.kind == StreamKind::Audio)),
+        Audio::CopyAll {} => output.extend(
+            streams
+                .iter()
+                .filter(|stream| stream.kind == StreamKind::Audio),
+        ),
         Audio::CopySelected { indices } => {
             for index in indices {
-                let stream = streams.iter().find(|stream| stream.index == *index && stream.kind == StreamKind::Audio)
-                    .ok_or_else(|| unavailable("A selected audio index is absent from the original probe"))?;
+                let stream = streams
+                    .iter()
+                    .find(|stream| stream.index == *index && stream.kind == StreamKind::Audio)
+                    .ok_or_else(|| {
+                        unavailable("A selected audio index is absent from the original probe")
+                    })?;
                 output.push(stream);
             }
         }
@@ -67,18 +85,25 @@ fn selected<'a>(streams: &'a [Stream], burn: &Burn) -> Result<Vec<&'a Stream>> {
 
 fn resolution(streams: &[Stream], burn: &Burn) -> Result<CleanResolution> {
     let output = selected(streams, burn)?;
-    let outcomes = streams.iter().map(|input| {
-        let output_index = output.iter().position(|stream| stream.index == input.index).map(|index| index as u32);
-        StreamOutcome {
-            source_index: input.index,
-            output_index,
-            reason: match (input.index == burn.video_stream, output_index) {
-                (true, _) => "Render the selected text track into the picture",
-                (false, Some(_)) => "Preserve the selected original audio packets",
-                (false, None) => "Excluded by the picture and audio selection",
-            }.into(),
-        }
-    }).collect();
+    let outcomes = streams
+        .iter()
+        .map(|input| {
+            let output_index = output
+                .iter()
+                .position(|stream| stream.index == input.index)
+                .map(|index| index as u32);
+            StreamOutcome {
+                source_index: input.index,
+                output_index,
+                reason: match (input.index == burn.video_stream, output_index) {
+                    (true, _) => "Render the selected text track into the picture",
+                    (false, Some(_)) => "Preserve the selected original audio packets",
+                    (false, None) => "Excluded by the picture and audio selection",
+                }
+                .into(),
+            }
+        })
+        .collect();
     Ok(CleanResolution {
         action: CleanAction::Remux,
         streams: output.into_iter().cloned().collect(),
@@ -86,8 +111,12 @@ fn resolution(streams: &[Stream], burn: &Burn) -> Result<CleanResolution> {
         reasons: vec!["Render SubRip through libass and encode lossless FFV1".into()],
         warnings: Vec::new(),
         preservation: Preservation {
-            additional_video: false, attached_pictures: false, attachments: false,
-            data: false, unknown: false, ..Default::default()
+            additional_video: false,
+            attached_pictures: false,
+            attachments: false,
+            data: false,
+            unknown: false,
+            ..Default::default()
         },
         metadata_patch: None,
         chapter_import: None,
@@ -95,15 +124,28 @@ fn resolution(streams: &[Stream], burn: &Burn) -> Result<CleanResolution> {
 }
 
 fn source_picture<'a>(probe: &'a MediaProbe, burn: &Burn) -> Result<&'a Value> {
-    let details = probe.stream_details.get(&burn.video_stream)
+    let details = probe
+        .stream_details
+        .get(&burn.video_stream)
         .ok_or_else(|| unavailable("Missing registered picture format"))?;
-    if details["width"].as_u64().is_none_or(|value| !(2..=4096).contains(&value) || value % 2 != 0)
-        || details["height"].as_u64().is_none_or(|value| !(2..=2160).contains(&value) || value % 2 != 0)
-        || details["side_data_list"].as_array().is_some_and(|rows| rows.iter().any(|row| {
-            !matches!(row["side_data_type"].as_str(), Some("Mastering display metadata" | "Content light level metadata"))
-        }))
+    if details["width"]
+        .as_u64()
+        .is_none_or(|value| !(2..=4096).contains(&value) || value % 2 != 0)
+        || details["height"]
+            .as_u64()
+            .is_none_or(|value| !(2..=2160).contains(&value) || value % 2 != 0)
+        || details["side_data_list"].as_array().is_some_and(|rows| {
+            rows.iter().any(|row| {
+                !matches!(
+                    row["side_data_type"].as_str(),
+                    Some("Mastering display metadata" | "Content light level metadata")
+                )
+            })
+        })
     {
-        return Err(unavailable("Caption burn requires even dimensions through 4096×2160 and an ordinary unrotated picture"));
+        return Err(unavailable(
+            "Caption burn requires even dimensions through 4096×2160 and an ordinary unrotated picture",
+        ));
     }
     Ok(details)
 }
@@ -112,34 +154,52 @@ fn color_filter(details: &Value, color: Color) -> Result<String> {
     match color {
         Color::PreserveSdr {} => {
             if details["pix_fmt"] != "yuv420p"
-                || details["side_data_list"].as_array().is_some_and(|rows| !rows.is_empty())
+                || details["side_data_list"]
+                    .as_array()
+                    .is_some_and(|rows| !rows.is_empty())
                 || COLOR_TAGS.iter().any(|(key, _, expected)| {
-                    details[*key].as_str().is_some_and(|value| value != *expected && value != "unknown")
+                    details[*key]
+                        .as_str()
+                        .is_some_and(|value| value != *expected && value != "unknown")
                 })
             {
-                return Err(unavailable("The SDR route requires yuv420p and limited BT.709 or unspecified SDR signaling"));
+                return Err(unavailable(
+                    "The SDR route requires yuv420p and limited BT.709 or unspecified SDR signaling",
+                ));
             }
             Ok(String::new())
         }
         Color::ToneMapBt709 { peak_nits } => {
             color.validate()?;
-            let transfer = details["color_transfer"].as_str().filter(|value| matches!(*value, "smpte2084" | "arib-std-b67"))
-                .ok_or_else(|| unavailable("Tone mapping requires explicitly signaled PQ or HLG"))?;
-            if details["color_space"] != "bt2020nc" || details["color_primaries"] != "bt2020"
-                || details["color_range"] != "tv" || details["pix_fmt"] != "yuv420p10le"
+            let transfer = details["color_transfer"]
+                .as_str()
+                .filter(|value| matches!(*value, "smpte2084" | "arib-std-b67"))
+                .ok_or_else(|| {
+                    unavailable("Tone mapping requires explicitly signaled PQ or HLG")
+                })?;
+            if details["color_space"] != "bt2020nc"
+                || details["color_primaries"] != "bt2020"
+                || details["color_range"] != "tv"
+                || details["pix_fmt"] != "yuv420p10le"
             {
-                return Err(unavailable("The SDR tone map admits limited-range 10-bit BT.2020 input"));
+                return Err(unavailable(
+                    "The SDR tone map admits limited-range 10-bit BT.2020 input",
+                ));
             }
             let peak = format!("{}.{:02}", peak_nits / 100, peak_nits % 100);
-            Ok(format!(concat!(
-                "zscale=matrixin=bt2020nc:transferin={transfer}:primariesin=bt2020:rangein=limited:",
-                "matrix=gbr:primaries=bt2020:range=full:transfer=linear:npl=100,format=gbrpf32le,",
-                "zscale=matrixin=0:transferin=linear:primariesin=bt2020:matrix=0:transfer=linear:primaries=bt709,",
-                "tonemap=mobius:param=0.3:desat=2:peak={peak},",
-                "zscale=matrixin=0:transferin=linear:primariesin=bt709:transfer=bt709:matrix=bt709:primaries=bt709:range=limited,",
-                "format=yuv420p,sidedata=mode=delete:type=MASTERING_DISPLAY_METADATA,",
-                "sidedata=mode=delete:type=CONTENT_LIGHT_LEVEL,"
-            ), transfer=transfer, peak=peak))
+            Ok(format!(
+                concat!(
+                    "zscale=matrixin=bt2020nc:transferin={transfer}:primariesin=bt2020:rangein=limited:",
+                    "matrix=gbr:primaries=bt2020:range=full:transfer=linear:npl=100,format=gbrpf32le,",
+                    "zscale=matrixin=0:transferin=linear:primariesin=bt2020:matrix=0:transfer=linear:primaries=bt709,",
+                    "tonemap=mobius:param=0.3:desat=2:peak={peak},",
+                    "zscale=matrixin=0:transferin=linear:primariesin=bt709:transfer=bt709:matrix=bt709:primaries=bt709:range=limited,",
+                    "format=yuv420p,sidedata=mode=delete:type=MASTERING_DISPLAY_METADATA,",
+                    "sidedata=mode=delete:type=CONTENT_LIGHT_LEVEL,"
+                ),
+                transfer = transfer,
+                peak = peak
+            ))
         }
     }
 }
@@ -148,16 +208,24 @@ fn verify_text_source(source: &Asset, burn: &Burn) -> Result<()> {
     match &burn.subtitle {
         SubtitleSource::Embedded { stream_index } => {
             if !source.probe.streams.iter().any(|stream| {
-                stream.index == *stream_index && stream.kind == StreamKind::Subtitle && stream.codec == "subrip"
+                stream.index == *stream_index
+                    && stream.kind == StreamKind::Subtitle
+                    && stream.codec == "subrip"
             }) {
                 return Err(unsupported_text());
             }
         }
         SubtitleSource::External { source: captions } => {
-            if captions.id == source.id || captions.source_object == source.source_object
-                || captions.probe.format != "srt" || captions.probe.streams.len() != 1
+            if captions.id == source.id
+                || captions.source_object == source.source_object
+                || captions.probe.format != "srt"
+                || captions.probe.streams.len() != 1
                 || captions.probe.streams[0].codec != "subrip"
-                || !captions.identity.bytes.parse::<usize>().is_ok_and(|size| (1..=MAX_SUBTITLE_BYTES).contains(&size))
+                || !captions
+                    .identity
+                    .bytes
+                    .parse::<usize>()
+                    .is_ok_and(|size| (1..=MAX_SUBTITLE_BYTES).contains(&size))
             {
                 return Err(unsupported_text());
             }
@@ -191,7 +259,14 @@ impl Engine {
             font_object: font_stamp.object_identity()?,
         };
         verify_text_source(&source, &burn)?;
-        let mut plan = self.review_stream_copy(source, output, Default::default(), creator, now, |streams| resolution(streams, &burn))?;
+        let mut plan = self.review_stream_copy(
+            source,
+            output,
+            Default::default(),
+            creator,
+            now,
+            |streams| resolution(streams, &burn),
+        )?;
         plan.subtitle_burn = Some(burn);
         plan.verification_scope = SCOPE.into();
         plan.argv_template = invocation(&plan, OutputProfile::Matroska)?;
@@ -202,32 +277,65 @@ impl Engine {
 }
 
 pub(super) fn invocation(plan: &Plan, profile: OutputProfile) -> Result<Vec<String>> {
-    let burn = plan.subtitle_burn.as_ref().ok_or_else(|| unavailable("Missing reviewed caption operation"))?;
-    if profile != OutputProfile::Matroska || crate::admission::frozen_demuxer(&plan.source.probe.format)? != "matroska"
+    let burn = plan
+        .subtitle_burn
+        .as_ref()
+        .ok_or_else(|| unavailable("Missing reviewed caption operation"))?;
+    if profile != OutputProfile::Matroska
+        || crate::admission::frozen_demuxer(&plan.source.probe.format)? != "matroska"
         || plan.resolution.action != CleanAction::Remux
-        || !burn.font.bytes.parse::<u64>().is_ok_and(|size| (1..=MAX_FONT_BYTES).contains(&size))
+        || !burn
+            .font
+            .bytes
+            .parse::<u64>()
+            .is_ok_and(|size| (1..=MAX_FONT_BYTES).contains(&size))
         || files::source_path(&font_path(&plan.ffmpeg)?)? != Path::new(&burn.font.path)
     {
-        return Err(unavailable("Review an FFV1 Matroska route with the installed Numera Wiz font"));
+        return Err(unavailable(
+            "Review an FFV1 Matroska route with the installed Numera Wiz font",
+        ));
     }
     verify_text_source(&plan.source, burn)?;
     let expected = resolution(&plan.source.probe.streams, burn)?;
     let serialize = |resolution: &CleanResolution| {
-        serde_json::to_value(resolution).map_err(|_| unavailable("Cannot evaluate the reviewed caption stream map"))
+        serde_json::to_value(resolution)
+            .map_err(|_| unavailable("Cannot evaluate the reviewed caption stream map"))
     };
     if serialize(&expected)? != serialize(&plan.resolution)? {
-        return Err(unavailable("The caption stream map differs from the reviewed picture and audio"));
+        return Err(unavailable(
+            "The caption stream map differs from the reviewed picture and audio",
+        ));
     }
     let details = source_picture(&plan.source.probe, burn)?;
     color_filter(details, burn.color)?;
     let mut args = lower_remux(&plan.source, &plan.resolution, profile)?;
-    let input = args.iter().position(|arg| arg == "-i").expect("Shared held source");
-    args.splice(input..input, ["-noautorotate", "-threads", "2"].map(str::to_owned));
+    let input = args
+        .iter()
+        .position(|arg| arg == "-i")
+        .expect("Shared held source");
+    args.splice(
+        input..input,
+        ["-noautorotate", "-threads", "2"].map(str::to_owned),
+    );
     let offset = args.len() - 3;
     let mut video = [
-        "-filter_threads", "1", "-c:v", "ffv1", "-level:v", "3", "-threads:v", "2",
-        "-pix_fmt", "yuv420p", "-fps_mode:v", "passthrough", "-vf", FILTER,
-    ].map(str::to_owned).to_vec();
+        "-filter_threads",
+        "1",
+        "-c:v",
+        "ffv1",
+        "-level:v",
+        "3",
+        "-threads:v",
+        "2",
+        "-pix_fmt",
+        "yuv420p",
+        "-fps_mode:v",
+        "passthrough",
+        "-vf",
+        FILTER,
+    ]
+    .map(str::to_owned)
+    .to_vec();
     for (key, control, expected) in COLOR_TAGS {
         if matches!(burn.color, Color::ToneMapBt709 { .. }) || details[key] == expected {
             video.extend([control.into(), expected.into()]);
@@ -276,23 +384,57 @@ fn escape_option(value: &str) -> String {
 }
 
 impl Engine {
-    async fn embedded_srt(&self, setup: &Plan, index: u32, cancel: CancellationToken) -> Result<Vec<u8>> {
+    async fn embedded_srt(
+        &self,
+        setup: &Plan,
+        index: u32,
+        cancel: CancellationToken,
+    ) -> Result<Vec<u8>> {
         let canonical = PathBuf::from(&setup.source.identity.path);
         let cancel_open = cancel.clone();
         let object = registered_object(&setup.source)?.clone();
         let input = blocking(move || {
             let input = crate::admission::open(&canonical, &cancel_open)?;
-            let held = files::SourceStamp::capture_open_resolved(&canonical, input.file.try_clone().map_err(io_error)?)?;
+            let held = files::SourceStamp::capture_open_resolved(
+                &canonical,
+                input.file.try_clone().map_err(io_error)?,
+            )?;
             held.require_object(&object)?;
             Ok(input)
-        }).await?;
-        let mut args = ["-v", "error", "-nostdin", "-copyts", "-max_alloc", "67108864"].map(str::to_owned).to_vec();
+        })
+        .await?;
+        let mut args = [
+            "-v",
+            "error",
+            "-nostdin",
+            "-copyts",
+            "-max_alloc",
+            "67108864",
+        ]
+        .map(str::to_owned)
+        .to_vec();
         args.extend(input.options());
-        args.extend(["-i".into(), "fd:".into(), "-map".into(), format!("0:{index}"),
-            "-c:s".into(), "copy".into(), "-f".into(), "srt".into(), "pipe:1".into()]);
+        args.extend([
+            "-i".into(),
+            "fd:".into(),
+            "-map".into(),
+            format!("0:{index}"),
+            "-c:s".into(),
+            "copy".into(),
+            "-f".into(),
+            "srt".into(),
+            "pipe:1".into(),
+        ]);
         let ticket = self.process_budget.acquire(&cancel).await?;
-        let result = process::run_readonly(Path::new(&self.ffmpeg.path), &args,
-            Duration::from_secs(60), MAX_SUBTITLE_BYTES, input.file, cancel).await;
+        let result = process::run_readonly(
+            Path::new(&self.ffmpeg.path),
+            &args,
+            Duration::from_secs(60),
+            MAX_SUBTITLE_BYTES,
+            input.file,
+            cancel,
+        )
+        .await;
         let bytes = ticket.finish(result)?.stdout;
         if bytes.is_empty() || std::str::from_utf8(&bytes).is_err() {
             return Err(unsupported_text());
@@ -300,29 +442,45 @@ impl Engine {
         Ok(bytes)
     }
 
-    pub(super) async fn stage_caption(&self, plan: &Plan, parent: &Path, cancel: CancellationToken) -> Result<StagedCaption> {
+    pub(super) async fn stage_caption(
+        &self,
+        plan: &Plan,
+        parent: &Path,
+        cancel: CancellationToken,
+    ) -> Result<StagedCaption> {
         let burn = plan.subtitle_burn.as_ref().expect("Reviewed caption");
         let prefix = color_filter(source_picture(&plan.source.probe, burn)?, burn.color)?;
-        let directory = tempfile::Builder::new().prefix("caption-input-").tempdir_in(parent).map_err(io_error)?;
+        let directory = tempfile::Builder::new()
+            .prefix("caption-input-")
+            .tempdir_in(parent)
+            .map_err(io_error)?;
         let font_dir = nw_platform::security::private_directory(&directory.path().join("fonts"))?;
         let mut originals = Vec::new();
         let output = directory.path().join("captions.srt");
         let original = match &burn.subtitle {
             SubtitleSource::Embedded { stream_index } => {
-                let bytes = self.embedded_srt(plan, *stream_index, cancel.clone()).await?;
+                let bytes = self
+                    .embedded_srt(plan, *stream_index, cancel.clone())
+                    .await?;
                 nw_platform::security::write_private(&output, &bytes, false)?;
                 None
             }
-            SubtitleSource::External { source } => {
-                Some(stage_file(&source.identity, registered_object(source)?, &output, &cancel)?)
-            }
+            SubtitleSource::External { source } => Some(stage_file(
+                &source.identity,
+                registered_object(source)?,
+                &output,
+                &cancel,
+            )?),
         };
         originals.extend(original);
         let font = font_dir.join(FONT);
         originals.push(stage_file(&burn.font, &burn.font_object, &font, &cancel)?);
-        let filter = format!("{prefix}subtitles=filename={}:fontsdir={}:force_style={}:wrap_unicode=1",
-            escape_option(&files::path_text(&output)?), escape_option(&files::path_text(&font_dir)?),
-            escape_option("FontName=DejaVu Sans"));
+        let filter = format!(
+            "{prefix}subtitles=filename={}:fontsdir={}:force_style={}:wrap_unicode=1",
+            escape_option(&files::path_text(&output)?),
+            escape_option(&files::path_text(&font_dir)?),
+            escape_option("FontName=DejaVu Sans")
+        );
         Ok(StagedCaption {
             _directory: directory,
             originals,
@@ -341,9 +499,16 @@ fn stage_file(
 ) -> Result<files::SourceStamp> {
     let parent = output.parent().expect("Owned staging directory");
     let temp = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
-    let (temp, _, stamp) = files::copy_into_staging_observed(identity, object, temp, cancel,
-        DeadlinePolicy::Finite { seconds: 30 }, &mut |_| Ok(()))?;
-    temp.persist_noclobber(output).map_err(|error| io_error(error.error))?;
+    let (temp, _, stamp) = files::copy_into_staging_observed(
+        identity,
+        object,
+        temp,
+        cancel,
+        DeadlinePolicy::Finite { seconds: 30 },
+        &mut |_| Ok(()),
+    )?;
+    temp.persist_noclobber(output)
+        .map_err(|error| io_error(error.error))?;
     stamp.revalidate()?;
     Ok(stamp)
 }
@@ -351,10 +516,21 @@ fn stage_file(
 pub(super) fn verify_picture(plan: &Plan, probe: &MediaProbe, output: u32) -> Result<()> {
     let burn = plan.subtitle_burn.as_ref().expect("Reviewed caption");
     let source = source_picture(&plan.source.probe, burn)?;
-    let result = probe.stream_details.get(&output).ok_or_else(|| unavailable("Missing rendered picture attributes"))?;
-    let failed = || DomainError::new("VERIFICATION_FAILED", "Caption rendering changed the original geometry or missed the reviewed SDR signaling");
-    if result["codec_name"] != "ffv1" || result["pix_fmt"] != "yuv420p"
-        || ["width", "height", "sample_aspect_ratio"].into_iter().any(|key| source[key] != result[key])
+    let result = probe
+        .stream_details
+        .get(&output)
+        .ok_or_else(|| unavailable("Missing rendered picture attributes"))?;
+    let failed = || {
+        DomainError::new(
+            "VERIFICATION_FAILED",
+            "Caption rendering changed the original geometry or missed the reviewed SDR signaling",
+        )
+    };
+    if result["codec_name"] != "ffv1"
+        || result["pix_fmt"] != "yuv420p"
+        || ["width", "height", "sample_aspect_ratio"]
+            .into_iter()
+            .any(|key| source[key] != result[key])
         || COLOR_TAGS.into_iter().any(|(key, _, expected)| {
             if matches!(burn.color, Color::ToneMapBt709 { .. }) || source[key] == expected {
                 result[key] != expected
@@ -362,7 +538,9 @@ pub(super) fn verify_picture(plan: &Plan, probe: &MediaProbe, output: u32) -> Re
                 result[key].as_str().is_some_and(|tag| tag != "unknown")
             }
         })
-        || result["side_data_list"].as_array().is_some_and(|rows| !rows.is_empty())
+        || result["side_data_list"]
+            .as_array()
+            .is_some_and(|rows| !rows.is_empty())
     {
         return Err(failed());
     }

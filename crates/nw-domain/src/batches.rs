@@ -366,20 +366,32 @@ impl BatchPlan {
             let source = &self.items[0];
             for item in &self.items {
                 let range = item.packet_cut.ok_or_else(|| {
-                    DomainError::new("INVALID_PLAN", "Packet split batches require an interval for every destination")
+                    DomainError::new(
+                        "INVALID_PLAN",
+                        "Packet split batches require an interval for every destination",
+                    )
                 })?;
-                if item.asset_id != source.asset_id || item.source_sha256 != source.source_sha256
-                    || item.source_bytes != source.source_bytes || item.extraction.is_some()
+                if item.asset_id != source.asset_id
+                    || item.source_sha256 != source.source_sha256
+                    || item.source_bytes != source.source_bytes
+                    || item.extraction.is_some()
                     || (item.plan.is_some() && item.action != Some(CleanAction::Remux))
                 {
-                    return Err(DomainError::new("INVALID_PLAN", "Each packet split member must use the same original source and copy policy"));
+                    return Err(DomainError::new(
+                        "INVALID_PLAN",
+                        "Each packet split member must use the same original source and copy policy",
+                    ));
                 }
                 ranges.push(range);
             }
             if self.failure_policy != FailurePolicy::RejectAll
-                || self.unresolved_policy != UnresolvedPolicy::Reject || !self.unresolved.is_empty()
+                || self.unresolved_policy != UnresolvedPolicy::Reject
+                || !self.unresolved.is_empty()
             {
-                return Err(DomainError::new("INVALID_PLAN", "A packet split requires every destination to be eligible"));
+                return Err(DomainError::new(
+                    "INVALID_PLAN",
+                    "A packet split requires every destination to be eligible",
+                ));
             }
             crate::packet_cut::validate_ranges(ranges.into_iter())?;
         }

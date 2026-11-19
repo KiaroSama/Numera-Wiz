@@ -5,7 +5,10 @@ use nw_domain::{
     commands,
     mux::StreamKind,
     records::Asset,
-    track_append::{Addition, AppendInput, Conversion, MAX_ADDED_INPUTS, MAX_ADDED_TRACKS, Metadata, Removal, ReplaceInput, Selection},
+    track_append::{
+        Addition, AppendInput, Conversion, MAX_ADDED_INPUTS, MAX_ADDED_TRACKS, Metadata, Removal,
+        ReplaceInput, Selection,
+    },
 };
 use std::collections::BTreeSet;
 
@@ -103,18 +106,39 @@ impl WizApp {
                 }
             }
         };
-        let (command, params) = if self.track_append.remove.is_empty() && !self.track_append.strip_global {
-            ("streams.add", serde_json::json!(AppendInput {
-                target: primary.id.clone(), additions, output: self.output.clone(), conversion: Conversion::Forbid,
-            }))
-        } else {
-            ("streams.replace", serde_json::json!(ReplaceInput {
-                target: primary.id.clone(), additions,
-                remove: self.track_append.remove.iter().map(|index| Removal::OriginalIndex { index: *index }).collect(),
-                metadata: if self.track_append.strip_global { Metadata::StripGlobal } else { Metadata::Preserve },
-                output: self.output.clone(), conversion: Conversion::Forbid,
-            }))
-        };
+        let (command, params) =
+            if self.track_append.remove.is_empty() && !self.track_append.strip_global {
+                (
+                    "streams.add",
+                    serde_json::json!(AppendInput {
+                        target: primary.id.clone(),
+                        additions,
+                        output: self.output.clone(),
+                        conversion: Conversion::Forbid,
+                    }),
+                )
+            } else {
+                (
+                    "streams.replace",
+                    serde_json::json!(ReplaceInput {
+                        target: primary.id.clone(),
+                        additions,
+                        remove: self
+                            .track_append
+                            .remove
+                            .iter()
+                            .map(|index| Removal::OriginalIndex { index: *index })
+                            .collect(),
+                        metadata: if self.track_append.strip_global {
+                            Metadata::StripGlobal
+                        } else {
+                            Metadata::Preserve
+                        },
+                        output: self.output.clone(),
+                        conversion: Conversion::Forbid,
+                    }),
+                )
+            };
         self.query(command, params, Action::Plan(self.generation), ui.ctx());
     }
 }

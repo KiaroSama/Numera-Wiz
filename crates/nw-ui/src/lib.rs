@@ -6,14 +6,14 @@ pub mod client;
 mod config_import;
 mod folders;
 mod jobs;
-mod observations;
 mod normalize;
+mod observations;
 mod packet_cut;
 mod preview;
 mod projects;
 mod reference;
-mod track_append;
 mod subtitle_burn;
+mod track_append;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{

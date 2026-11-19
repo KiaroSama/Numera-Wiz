@@ -95,7 +95,9 @@ pub struct Plan {
 impl Plan {
     pub fn external_sources(&self) -> impl Iterator<Item = &Asset> {
         self.added_tracks.iter().map(|input| &input.source).chain(
-            self.subtitle_burn.as_ref().and_then(|burn| burn.subtitle.external()),
+            self.subtitle_burn
+                .as_ref()
+                .and_then(|burn| burn.subtitle.external()),
         )
     }
 }

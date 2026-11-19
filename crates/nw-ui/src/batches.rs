@@ -150,7 +150,8 @@ impl WizApp {
         if !self.cleanup_actions_allowed(ctx) || self.waiting || self.pending.is_some() {
             return;
         }
-        if !self.batch.is_folder_review() && !self.batch.packet_split
+        if !self.batch.is_folder_review()
+            && !self.batch.packet_split
             && let Some(index) = self
                 .batch
                 .candidates
@@ -336,11 +337,20 @@ impl WizApp {
         }
     }
 
-    pub(super) fn review_packet_split(&mut self, input: nw_domain::packet_cut::SplitInput, ctx: &egui::Context) {
+    pub(super) fn review_packet_split(
+        &mut self,
+        input: nw_domain::packet_cut::SplitInput,
+        ctx: &egui::Context,
+    ) {
         if self.cleanup_actions_allowed(ctx) && !self.folder.open {
             self.batch.folder = None;
             self.batch.invalidate();
-            self.query("media.split_plan", json!(input), Action::BatchPlan(self.batch.generation), ctx);
+            self.query(
+                "media.split_plan",
+                json!(input),
+                Action::BatchPlan(self.batch.generation),
+                ctx,
+            );
         }
     }
 
@@ -406,7 +416,8 @@ impl WizApp {
                 let plan: BatchPlanReview =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
                 if generation == self.batch.generation {
-                    self.batch.packet_split = plan.items.iter().any(|item| item.packet_cut.is_some());
+                    self.batch.packet_split =
+                        plan.items.iter().any(|item| item.packet_cut.is_some());
                     self.batch.open |= self.batch.packet_split;
                     self.batch.plan = Some(Arc::new(plan));
                     self.status = "Batch reviewed. Inspect every candidate before running.".into();
