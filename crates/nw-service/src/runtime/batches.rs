@@ -1,10 +1,14 @@
 //! Media batch composition. Child media plans and jobs remain the authoritative engine work.
 use super::*;
 use nw_domain::batches::{
-    Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, ExtractBatchInput,
-    ExtractSelector, FailurePolicy, ItemInput, ItemResult, PlanReference, PlannedItem,
-    PlannedItemView, ReviewedExtraction, UnresolvedIndex, UnresolvedPolicy,
+    Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, CleanFolderBatchInput,
+    ExtractBatchInput, ExtractSelector, FailurePolicy, FolderBatchExclusion, FolderBatchReview,
+    ItemInput, ItemResult, PlanReference, PlannedItem, PlannedItemView, ReviewedExtraction,
+    UnresolvedIndex, UnresolvedPolicy,
 };
+use nw_domain::ingest::FolderEntryOutcome;
+
+const FOLDER_BATCH_COMMAND: &str = "streams.clean.folder_batch_plan";
 
 pub(super) struct MemberLease {
     index: u32,
@@ -30,6 +34,63 @@ struct ReviewedBatchItems {
     children: Vec<Plan>,
 }
 
+fn contains_directory(
+    ancestor: &files::DirectoryStamp,
+    descendant: &files::DirectoryStamp,
+) -> Result<bool> {
+    if descendant.path().starts_with(ancestor.path()) {
+        return Ok(true);
+    }
+    let identity = ancestor.object_identity()?;
+    if descendant.object_identity()? == identity {
+        return Ok(true);
+    }
+    for parent in descendant.path().ancestors().skip(1) {
+        if parent.is_absolute()
+            && files::DirectoryStamp::capture_resolved(parent)?.object_identity()? == identity
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn folder_output_name(index: u32, source: &Path) -> Result<String> {
+    let invalid = || {
+        DomainError::new(
+            "INVALID_RECORD",
+            "Registered folder media needs a representable filename and container extension",
+        )
+    };
+    let stem = source
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .ok_or_else(invalid)?;
+    let extension = source
+        .extension()
+        .and_then(|name| name.to_str())
+        .filter(|name| {
+            (1..=4).contains(&name.len()) && name.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        })
+        .ok_or_else(invalid)?;
+    let safe_stem: String = stem
+        .chars()
+        .take(64)
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    Ok(format!(
+        "media-{:02}-{safe_stem}.{}",
+        index + 1,
+        extension.to_ascii_lowercase()
+    ))
+}
+
 impl Service {
     pub(super) fn batch_child_command(&self, context: &Context, command: &str) -> Result<()> {
         if self
@@ -51,11 +112,191 @@ impl Service {
         now: u64,
         cancel: &CancellationToken,
     ) -> Result<BatchPlan> {
+        self.prepare_cleanup_batch(context, input, now, cancel, None)
+    }
+
+    pub(super) fn prepare_folder_batch(
+        &self,
+        context: &Context,
+        input: CleanFolderBatchInput,
+        now: u64,
+        cancel: &CancellationToken,
+    ) -> Result<FolderBatchReview> {
         input.validate()?;
         let revision = self
             .policy(context)?
             .as_ref()
             .map_or(0, |policy| policy.revision);
+        self.batch_child_command(context, "assets.folder_inspect")?;
+        self.batch_child_command(context, "streams.clean")?;
+        let snapshot = self.read_folder(context, &input.snapshot_id)?;
+        if snapshot.hash != input.snapshot_hash {
+            return Err(DomainError::new(
+                "FOLDER_SNAPSHOT_MISMATCH",
+                "Folder snapshot hash differs from the retained intake",
+            ));
+        }
+        if !snapshot.complete {
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_INCOMPLETE",
+                "Folder enumeration was incomplete; inspect and rescan before review",
+            ));
+        }
+        let failed = snapshot
+            .entries
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.outcome,
+                    FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+                )
+            })
+            .count();
+        if failed != 0 {
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_FAILED",
+                format!("Folder intake retained {failed} failed entries; inspect and resolve them before review"),
+            ));
+        }
+        if !snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == FolderEntryOutcome::Registered)
+        {
+            return Err(DomainError::new(
+                "FOLDER_EMPTY",
+                "Folder intake retained no eligible registered video for cleanup",
+            ));
+        }
+        let _preflight = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Folder intake and batch preflight capacity is full",
+                )
+            })?;
+        let output = Path::new(&input.output_root);
+        let output_denied = || {
+            DomainError::new(
+                "PATH_DENIED",
+                "Folder cleanup requires an authorized existing ordinary absolute output directory",
+            )
+            .field("output_root")
+        };
+        if !output.is_absolute() {
+            return Err(output_denied());
+        }
+        self.check_media_namespace(output, true)?;
+        let canonical = std::fs::canonicalize(output).map_err(|_| output_denied())?;
+        self.root_authority(context, &canonical, true)
+            .map_err(|error| {
+                if error.code == "PATH_DENIED" {
+                    output_denied()
+                } else {
+                    error
+                }
+            })?;
+        self.check_media_namespace(&canonical, true)?;
+        if !super::folders::ordinary_metadata(output).is_ok_and(|metadata| metadata.is_dir()) {
+            return Err(output_denied());
+        }
+        let output = files::DirectoryStamp::capture_resolved(&canonical)?;
+        let source_root = Path::new(&snapshot.root);
+        let source = files::DirectoryStamp::capture_resolved(source_root)?;
+        source.require_object(&snapshot.root_object)?;
+        if contains_directory(&source, &output)? || contains_directory(&output, &source)? {
+            return Err(DomainError::new(
+                "SOURCE_OUTPUT_ALIAS",
+                "Folder cleanup output and intake must use disjoint directory trees",
+            )
+            .field("output_root"));
+        }
+        let mut items = Vec::new();
+        let mut excluded = Vec::new();
+        for entry in &snapshot.entries {
+            if cancel.is_cancelled() {
+                return Err(DomainError::new("CANCELLED", "Folder batch review cancelled"));
+            }
+            if entry.outcome != FolderEntryOutcome::Registered {
+                excluded.push(FolderBatchExclusion {
+                    index: entry.index,
+                    outcome: entry.outcome,
+                });
+                continue;
+            }
+            let id = entry.asset_id.as_deref().ok_or_else(|| {
+                DomainError::new("INVALID_RECORD", "Registered folder entry has no asset")
+            })?;
+            let asset: Asset = self
+                .store
+                .get(&named("asset", id)?)?
+                .ok_or_else(DomainError::object_not_found)?;
+            self.object(context, id, &asset.creator)?;
+            let expected_path = source_root.join(entry.relative_path.split('/').collect::<PathBuf>());
+            if asset.id != id
+                || asset.creator != snapshot.creator
+                || Some(&asset.identity) != entry.identity.as_ref()
+                || asset.source_object != entry.source_object
+                || Path::new(&asset.identity.path) != expected_path
+            {
+                return Err(DomainError::new(
+                    "INVALID_RECORD",
+                    "Registered asset differs from its retained folder entry",
+                ));
+            }
+            self.root_authority(context, &expected_path, false)?;
+            items.push(ItemInput {
+                asset_id: id.into(),
+                output: files::path_text(
+                    &output.path().join(folder_output_name(entry.index, &expected_path)?),
+                )?,
+            });
+        }
+        let plan = self.prepare_cleanup_batch(
+            context,
+            CleanBatchInput {
+                items,
+                intent: input.intent,
+                file_times: input.file_times,
+                execution_limits: input.execution_limits,
+                failure_policy: input.failure_policy,
+                unresolved_policy: input.unresolved_policy,
+            },
+            now,
+            cancel,
+            Some((&source, &output, revision)),
+        )?;
+        let plan = self.batch_review(context, &plan)?;
+        self.confirm_batch_policy(context, revision, FOLDER_BATCH_COMMAND)?;
+        Ok(FolderBatchReview {
+            snapshot_id: snapshot.id,
+            snapshot_hash: snapshot.hash,
+            excluded,
+            plan,
+        })
+    }
+
+    fn prepare_cleanup_batch(
+        &self,
+        context: &Context,
+        input: CleanBatchInput,
+        now: u64,
+        cancel: &CancellationToken,
+        folder: Option<(&files::DirectoryStamp, &files::DirectoryStamp, u64)>,
+    ) -> Result<BatchPlan> {
+        input.validate()?;
+        let (command, revision) = match folder {
+            Some((_, _, revision)) => (FOLDER_BATCH_COMMAND, revision),
+            None => (
+                "streams.clean.batch_plan",
+                self.policy(context)?
+                    .as_ref()
+                    .map_or(0, |policy| policy.revision),
+            ),
+        };
         self.batch_child_command(context, "streams.clean")?;
         self.admit_execution_limits(context, &input.execution_limits)?;
         let mut unresolved = BTreeSet::new();
@@ -94,9 +335,34 @@ impl Service {
             context,
             input.items.iter().map(|item| (item, None)),
             cancel,
-            |item, _| self.prepare_cleanup(context, input.clean_input(item), now),
+            |item, _| {
+                let plan = self.prepare_cleanup(context, input.clean_input(item), now)?;
+                if let Some((_, output, _)) = folder {
+                    let rights = nw_domain::plans::validate_requirements(&plan)?;
+                    let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
+                        DomainError::new(
+                            "INVALID_PLAN",
+                            "Folder batch child has no reviewed output directory identity",
+                        )
+                    })?;
+                    output.require_object(parent)?;
+                    if plan.output != item.output {
+                        return Err(DomainError::new(
+                            "TARGET_CHANGED",
+                            "Folder batch child resolved outside its derived destination",
+                        ));
+                    }
+                }
+                Ok(plan)
+            },
         )?;
-        self.confirm_batch_policy(context, revision, "streams.clean.batch_plan")?;
+        if let Some((source, output, _)) = folder {
+            source.revalidate()?;
+            output.revalidate()?;
+            self.root_authority(context, source.path(), false)?;
+            self.root_authority(context, output.path(), true)?;
+        }
+        self.confirm_batch_policy(context, revision, command)?;
         self.retain_batch_plan(
             context,
             now,

@@ -58,6 +58,13 @@ fn input(
         "failure_policy":failure, "unresolved_policy":"reject"
     })
 }
+fn folder_batch_input(snapshot: &Value, output_root: &Path) -> Value {
+    json!({
+        "snapshot_id":snapshot["id"], "snapshot_hash":snapshot["hash"], "output_root":output_root,
+        "intent":fixture::rules(), "file_times":"new", "execution_limits":CleanupLimits::default(),
+        "failure_policy":"reject_all", "unresolved_policy":"reject"
+    })
+}
 async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
     let mut args = [
         "-v",
@@ -138,7 +145,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     std::fs::create_dir_all(intake.join("nested-é")).unwrap();
     std::fs::create_dir_all(intake.join("excluded")).unwrap();
     std::fs::copy(&media.source, intake.join("-first-فارسی.mkv")).unwrap();
-    std::fs::copy(&second, intake.join("nested-é/second.mkv")).unwrap();
+    std::fs::copy(&second, intake.join("nested-é/-first-فارسی.mkv")).unwrap();
     std::fs::write(
         intake.join("broken.mkv"),
         b"Unsupported media remains visible",
@@ -331,6 +338,134 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         std::fs::read(&folder_output).unwrap(),
         std::fs::read(&media.source).unwrap()
     );
+    let folder_destination = media.directory.path().join("folder-batch-output");
+    std::fs::create_dir(&folder_destination).unwrap();
+    let rejected_intake = sdk!(
+        stdio,
+        "streams.clean.folder_batch_plan",
+        folder_batch_input(&sdk_folder, &folder_destination),
+        json!({})
+    );
+    assert_eq!(rejected_intake["error"]["code"], "FOLDER_INTAKE_FAILED");
+    let foreign_intake = sdk!(
+        stdio,
+        "streams.clean.folder_batch_plan",
+        folder_batch_input(&owner_folder, &folder_destination),
+        json!({})
+    );
+    assert_eq!(foreign_intake["error"]["code"], "OBJECT_NOT_FOUND");
+    let clean_folder = call!(
+        stdio,
+        "assets.register_folder",
+        json!({"path":intake,"recursive":true,"exclude_relative":["broken.mkv","excluded"],
+            "companion_policy":"inventory","probe_timeout":{"mode":"finite","seconds":30}}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"folder-batch-snapshot"})
+    );
+    let missing_output = folder_destination.join("missing");
+    let source_child = intake.join("excluded");
+    let ungranted_output = tempfile::tempdir().unwrap();
+    for (path, expected) in [
+        (intake.as_path(), "SOURCE_OUTPUT_ALIAS"),
+        (source_child.as_path(), "SOURCE_OUTPUT_ALIAS"),
+        (media.directory.path(), "SOURCE_OUTPUT_ALIAS"),
+        (missing_output.as_path(), "PATH_DENIED"),
+        (ungranted_output.path(), "PATH_DENIED"),
+    ] {
+        let result = sdk!(
+            stdio,
+            "streams.clean.folder_batch_plan",
+            folder_batch_input(&clean_folder, path),
+            json!({})
+        );
+        assert_eq!(result["error"]["code"], expected, "{result}");
+    }
+    assert!(!missing_output.exists());
+    let mut bad_digest = folder_batch_input(&clean_folder, &folder_destination);
+    bad_digest["snapshot_hash"] = "00".repeat(32).into();
+    let mismatch = sdk!(
+        stdio,
+        "streams.clean.folder_batch_plan",
+        bad_digest,
+        json!({})
+    );
+    assert_eq!(mismatch["error"]["code"], "FOLDER_SNAPSHOT_MISMATCH");
+    let companions = media.directory.path().join("companions");
+    std::fs::create_dir(&companions).unwrap();
+    for count in [1, 33] {
+        for number in 0..count {
+            std::fs::write(companions.join(format!("{number}.txt")), b"inventory").unwrap();
+        }
+        let snapshot = call!(
+            stdio,
+            "assets.register_folder",
+            json!({"path":companions,"recursive":false,"exclude_relative":[],
+                "companion_policy":"exclude"}),
+            json!({"replay_scope":sdk_scope,"idempotency_key":format!("folder-bound-{count}")})
+        );
+        let response = sdk!(
+            stdio,
+            "streams.clean.folder_batch_plan",
+            folder_batch_input(&snapshot, &folder_destination),
+            json!({})
+        );
+        let expected = if count == 1 {
+            "FOLDER_EMPTY"
+        } else {
+            "FOLDER_INTAKE_INCOMPLETE"
+        };
+        assert_eq!(response["error"]["code"], expected, "{response}");
+    }
+    let folder_input = folder_batch_input(&clean_folder, &folder_destination);
+    let folder_document = media.directory.path().join("folder-batch.json");
+    std::fs::write(&folder_document, serde_json::to_vec(&folder_input).unwrap()).unwrap();
+    let (folder_cli, status) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "batches",
+            "plan-folder",
+            "--file",
+            folder_document.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(status, 0, "{folder_cli}");
+    let sdk_folder_batch = call!(
+        stdio,
+        "streams.clean.folder_batch_plan",
+        folder_input.clone(),
+        json!({})
+    );
+    assert_eq!(
+        folder_cli["result"]["plan"]["hash"],
+        sdk_folder_batch["plan"]["hash"]
+    );
+    assert_eq!(sdk_folder_batch["snapshot_id"], clean_folder["id"]);
+    assert_eq!(sdk_folder_batch["snapshot_hash"], clean_folder["hash"]);
+    let exclusions = sdk_folder_batch["excluded"].as_array().unwrap();
+    assert_eq!(exclusions.len(), 3);
+    assert!(exclusions.iter().any(|entry| {
+        let index = entry["index"].as_u64().unwrap() as usize;
+        clean_folder["entries"][index]["relative_path"] == "notes.txt"
+            && entry["outcome"] == "companion_inventoried"
+    }));
+    let folder_items = sdk_folder_batch["plan"]["items"].as_array().unwrap();
+    assert_eq!(folder_items.len(), 2);
+    assert_ne!(folder_items[0]["output_name"], folder_items[1]["output_name"]);
+    for item in folder_items {
+        assert_eq!(item["action"], "copy_unchanged");
+        let name = item["output_name"].as_str().unwrap();
+        assert!(name.is_ascii() && name.len() <= 96 && name.ends_with(".mkv"));
+        assert!(!name.contains(['/', '\\']));
+    }
+    assert_eq!(std::fs::read_dir(&folder_destination).unwrap().count(), 0);
+    let retained_folder_batch = call!(
+        stdio,
+        "batches.plan_inspect",
+        json!({"id":sdk_folder_batch["plan"]["id"]}),
+        json!({})
+    );
+    assert_eq!(retained_folder_batch, sdk_folder_batch["plan"]);
+
     let mut intent = fixture::rules();
     intent.audio_selection.selector = Selector::Languages {
         values: vec!["eng".into()],
@@ -886,6 +1021,45 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         json!({})
     );
     assert_eq!(http_extraction["hash"], sdk_extraction["hash"]);
+    // The retained snapshot stays authoritative when the live directory gains another file.
+    std::fs::copy(&media.source, intake.join("new-after-snapshot.mkv")).unwrap();
+    let http_folder_batch = call!(
+        http,
+        "streams.clean.folder_batch_plan",
+        folder_input.clone(),
+        json!({})
+    );
+    assert_eq!(
+        http_folder_batch["plan"]["hash"],
+        sdk_folder_batch["plan"]["hash"]
+    );
+    assert_eq!(http_folder_batch["excluded"], sdk_folder_batch["excluded"]);
+    let folder_group = call!(
+        http,
+        "batches.submit",
+        json!({"plan_id":http_folder_batch["plan"]["id"],"plan_hash":http_folder_batch["plan"]["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"folder-batch"})
+    );
+    let folder_group_result = finished!(http, folder_group["batch_id"]);
+    assert_eq!(folder_group_result["succeeded"], 2);
+    for (item, source) in folder_items.iter().zip([&media.source, &second]) {
+        let output = folder_destination.join(item["output_name"].as_str().unwrap());
+        assert_eq!(std::fs::read(output).unwrap(), std::fs::read(source).unwrap());
+    }
+    let destination_collision = call!(
+        http,
+        "streams.clean.folder_batch_plan",
+        folder_input,
+        json!({})
+    );
+    assert!(
+        destination_collision["plan"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item["error"]["code"] == "OUTPUT_COLLISION" && item["plan"].is_null())
+    );
+    assert_eq!(std::fs::read_dir(&folder_destination).unwrap().count(), 2);
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
@@ -907,7 +1081,9 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "folder_intake":{"native_cli":owner_folder["id"],"official_sdk_stdio":sdk_folder["id"],
             "same_normalized_outcomes":true,"retained_probe_failures":1,"registered_media":2,
             "companion_inventory_only":true,"jobs_wait_cli":true,"verified_copy_job":folder_accepted["job_id"]},
-        "scope":"Bounded native/stdio folder intake and explicit cleanup batches; companion copying, output trees, replacement and GUI batching remain separate qualification"});
+        "folder_batch":{"batch":folder_group["batch_id"],"published":2,"match_cli_stdio_http":true,
+            "intentional_exclusions":3,"no_replace":true,"copy_full_byte_equality":true},
+        "scope":"Retained video-folder cleanup to a disjoint destination; companion copying, output trees, mixed audio/encode workflows, replacement and GUI batching remain separate qualification"});
     std::fs::write(
         evidence.join("batch-media-report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

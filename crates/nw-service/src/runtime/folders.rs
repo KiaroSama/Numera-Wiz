@@ -30,7 +30,7 @@ fn bounded_error(mut error: DomainError) -> DomainError {
     error.message.truncate(end);
     error
 }
-fn ordinary_metadata(path: &Path) -> Result<std::fs::Metadata> {
+pub(super) fn ordinary_metadata(path: &Path) -> Result<std::fs::Metadata> {
     let metadata = std::fs::symlink_metadata(path).map_err(files::io_error)?;
     if metadata.file_type().is_symlink() {
         return Err(DomainError::new(
@@ -121,7 +121,7 @@ impl Service {
         files::DirectoryStamp::capture_resolved(&canonical)?.revalidate()?;
         Ok(canonical)
     }
-    fn read_folder(&self, context: &Context, id: &str) -> Result<FolderSnapshot> {
+    pub(super) fn read_folder(&self, context: &Context, id: &str) -> Result<FolderSnapshot> {
         let raw: Value = self
             .store
             .get(&named("folder", id)?)?

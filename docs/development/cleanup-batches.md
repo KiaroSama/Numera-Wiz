@@ -60,6 +60,7 @@ saved bytes or output artifacts.
 Canonical commands:
 
 - `streams.clean.batch_plan`
+- `streams.clean.folder_batch_plan`
 - `batches.plan_inspect`
 - `batches.submit`
 - `batches.list`
@@ -70,6 +71,7 @@ Typed CLI:
 
 ```sh
 numera-wiz batches plan --file batch.json
+numera-wiz batches plan-folder --file folder-batch.json
 numera-wiz batches plan-inspect PLAN_ID
 numera-wiz batches submit --plan PLAN_ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY
 numera-wiz batches inspect BATCH_ID
@@ -90,6 +92,28 @@ with registered assets and destinations with reviewed native paths. CLI relative
 destinations are made absolute before invoking the canonical handler. A browser
 must obtain engine destinations through granted output suggestions or explicitly
 reviewed engine paths; its local file picker is not an engine filesystem grant.
+
+### Cleanup from a retained folder snapshot
+
+Start with the explicit batch document and replace `items` with `snapshot_id`,
+`snapshot_hash` and `output_root`. Get the ID and hash through
+`assets.folder_inspect`. The root must be an existing, authorized engine
+directory in a tree disjoint from the intake root. The engine derives one flat
+filename per registered video from the snapshot row number and a bounded
+portable stem, keeping the original extension. Name collisions with an
+existing file or directory become ordinary `OUTPUT_COLLISION` rows.
+
+The folder review rejects incomplete intake, any failed intake row, or an empty
+registered set. Its `excluded` array identifies the intentionally excluded or
+inventory-only snapshot rows by zero-based index and outcome. Its `plan` is the
+ordinary retained batch review. Inspect or submit that exact ID and hash using
+the standard batch commands. The retained snapshot remains the reference for
+the full intake inventory. Review creates no directories or media files.
+
+This development slice covers registered video cleanup through CLI and MCP.
+Output-tree reproduction and in-source output exclusion, companion copying,
+partial intake failure composition, mixed audio and encode workflows, and
+direct folder-derived batch controls in the native/browser workspace remain open.
 
 The new records currently use the development schema-2 root. Stopped-generation
 compatibility, downgrade rejection and migration remain mandatory before release.

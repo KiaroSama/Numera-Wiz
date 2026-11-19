@@ -400,6 +400,11 @@ pub enum Batches {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review cleanup from a retained folder snapshot and a separate existing directory.
+    PlanFolder {
+        #[arg(long)]
+        file: PathBuf,
+    },
     PlanInspect {
         id: String,
     },
@@ -761,6 +766,16 @@ pub fn prepare(command: Command) -> Result<Request> {
                 item.output = native_path(Path::new(&item.output))?;
             }
             query("streams.clean.batch_plan", serde_json::to_value(input)?)
+        }
+        Command::Batches(Batches::PlanFolder { file }) => {
+            let mut input: nw_domain::batches::CleanFolderBatchInput =
+                commands::parse(document(&file)?)?;
+            input.validate()?;
+            input.output_root = native_path(Path::new(&input.output_root))?;
+            query(
+                "streams.clean.folder_batch_plan",
+                serde_json::to_value(input)?,
+            )
         }
         Command::Batches(Batches::PlanInspect { id }) => {
             query("batches.plan_inspect", json!({"id":id}))

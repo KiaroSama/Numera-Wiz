@@ -245,6 +245,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "streams.extract.batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
         ),
+        "streams.clean.folder_batch_plan" => Some(
+            serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -652,6 +655,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Review every explicit cleanup batch candidate",
             Query,
             crate::batches::CleanBatchInput
+        ),
+        row!(
+            "streams.clean.folder_batch_plan",
+            "Review cleanup from a retained folder snapshot in a separate output directory",
+            Query,
+            crate::batches::CleanFolderBatchInput
         ),
         row!(
             "batches.plan_inspect",
@@ -1650,6 +1659,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "maintenance.initialization.restore.accept",
     "maintenance.initialization.restore.inspect",
     "streams.clean.batch_plan",
+    "streams.clean.folder_batch_plan",
     "batches.plan_inspect",
     "batches.submit",
     "batches.list",

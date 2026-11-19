@@ -91,6 +91,37 @@ impl CleanBatchInput {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CleanFolderBatchInput {
+    pub snapshot_id: String,
+    pub snapshot_hash: String,
+    pub output_root: String,
+    pub intent: CleanIntent,
+    pub file_times: FileTimeRequest,
+    pub execution_limits: CleanupLimits,
+    pub failure_policy: FailurePolicy,
+    pub unresolved_policy: UnresolvedPolicy,
+}
+impl CleanFolderBatchInput {
+    pub fn validate(&self) -> Result<()> {
+        if !identifier(&self.snapshot_id) || !sha(&self.snapshot_hash) {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Folder batch review requires a retained snapshot ID and SHA-256",
+            ));
+        }
+        if self.output_root.is_empty() || self.output_root.len() > 4096 {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Folder batch review needs a bounded native output directory",
+            )
+            .field("output_root"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExtractKind {
@@ -410,6 +441,19 @@ pub struct BatchPlanReview {
     pub unresolved_policy: UnresolvedPolicy,
     pub unresolved: Vec<UnresolvedIndex>,
     pub items: Vec<PlannedItemView>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FolderBatchExclusion {
+    /// Zero-based row in the retained folder snapshot.
+    pub index: u32,
+    pub outcome: crate::ingest::FolderEntryOutcome,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FolderBatchReview {
+    pub snapshot_id: String,
+    pub snapshot_hash: String,
+    pub excluded: Vec<FolderBatchExclusion>,
+    pub plan: BatchPlanReview,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

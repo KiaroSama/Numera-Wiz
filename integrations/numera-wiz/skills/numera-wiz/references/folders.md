@@ -37,14 +37,20 @@ hard timeout. Source registration/probe policies have the same scoped-owner
 restrictions as single registration. Symlinks/reparse points and owner-managed
 intake roots are rejected; protected descendant namespaces are excluded.
 
-Per-file failed probes, exclusions, rejected files and inventory-only companions
-remain visible. A partial/incomplete snapshot is not a complete folder success.
-Inspect entries before selecting registered `asset_id` values and authorized
-absent outputs for an explicit `streams.clean.batch_plan`. Do not submit missing
-members or companions as if they were registered video assets. Batch planning,
-per-member review, exact-hash submit, observation and verified delivery remain
-separate operations. Repeating the original durable folder identity resolves
-its snapshot receipt rather than silently rescanning changed contents.
+Inspect every snapshot entry before planning. `streams.clean.folder_batch_plan`
+requires the authorized `snapshot_id`, exact `snapshot_hash`, an existing
+`output_root` in a disjoint tree, and the ordinary cleanup intent, file-time,
+execution-limit, failure and unresolved-index policies. The corresponding
+CLI is `batches plan-folder --file folder-batch.json`. This query refuses
+incomplete intake, failed entries and empty registered sets. Its `excluded`
+rows refer to the retained snapshot's zero-based indices, including inventory
+and explicit exclusions. Review those rows and the generated names and child
+decisions in `plan`; use that exact plan ID/hash for separately authorized
+submission with `batches.submit`.
+
+For a user-selected set of individual assets, use `streams.clean.batch_plan`
+with explicit destinations. Repeating the original durable folder identity
+resolves its snapshot receipt. A new scan requires a new durable request.
 
 Full donor folder/companion semantics and packaged cross-client media
 qualification remain broader obligations than this bounded intake.

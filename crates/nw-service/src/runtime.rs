@@ -712,22 +712,8 @@ impl Service {
         }
         Ok(())
     }
-    fn path_with_purpose(
-        &self,
-        context: &Context,
-        path: &Path,
-        write: bool,
-        purpose: Option<&nw_domain::records::FileIdentity>,
-    ) -> Result<PathBuf> {
-        if staging_path(path) {
-            return Err(staging_denied());
-        }
-        let canonical = if write {
-            files::output_path(path)?
-        } else {
-            files::source_path(path)?
-        };
-        if staging_path(&canonical) {
+    fn check_media_namespace(&self, canonical: &Path, write: bool) -> Result<()> {
+        if staging_path(canonical) {
             return Err(staging_denied());
         }
         if ["state", "runtime", "logs", "ingest"]
@@ -752,6 +738,24 @@ impl Service {
                 "Application and component folders cannot receive media exports. Choose another destination.",
             ));
         }
+        Ok(())
+    }
+    fn path_with_purpose(
+        &self,
+        context: &Context,
+        path: &Path,
+        write: bool,
+        purpose: Option<&nw_domain::records::FileIdentity>,
+    ) -> Result<PathBuf> {
+        if staging_path(path) {
+            return Err(staging_denied());
+        }
+        let canonical = if write {
+            files::output_path(path)?
+        } else {
+            files::source_path(path)?
+        };
+        self.check_media_namespace(&canonical, write)?;
         if purpose.is_some_and(|identity| write || canonical != Path::new(&identity.path)) {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -765,22 +769,7 @@ impl Service {
         {
             self.managed_read(context, &canonical)?;
         }
-        if let Some(profile) = self.policy(context)? {
-            let roots = if write {
-                profile.write_roots
-            } else {
-                profile.read_roots
-            };
-            if !roots
-                .iter()
-                .any(|root| canonical.starts_with(Path::new(root)))
-            {
-                return Err(DomainError::new(
-                    "PATH_DENIED",
-                    "Current profile has no grant for this native path",
-                ));
-            }
-        }
+        self.root_authority(context, &canonical, write)?;
         Ok(canonical)
     }
     fn engine(&self) -> Result<&Engine> {
@@ -1098,6 +1087,7 @@ impl Service {
                 "streams.extract",
                 "streams.extract.batch_plan",
                 "streams.clean.batch_plan",
+                "streams.clean.folder_batch_plan",
             ]
             .contains(&request.command.id.as_str())
         {
@@ -1779,6 +1769,12 @@ impl Service {
                 let plan = self.prepare_batch(&context, input, now, &cancellation)?;
                 value(&self.batch_review(&context, &plan)?)?
             }
+            "streams.clean.folder_batch_plan" => value(&self.prepare_folder_batch(
+                &context,
+                commands::parse(params)?,
+                now,
+                &cancellation,
+            )?)?,
             "streams.extract.batch_plan" => {
                 let input: nw_domain::batches::ExtractBatchInput = commands::parse(params)?;
                 let plan = self.prepare_extract_batch(&context, input, now, &cancellation)?;

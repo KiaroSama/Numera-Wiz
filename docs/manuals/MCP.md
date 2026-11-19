@@ -342,6 +342,13 @@ folders until the owner explicitly grants registration, owned-object and root
 rights. Companions are inventory only, not copied artifacts. A lost mutation
 response is resolved with its original replay scope/key.
 
+`streams.clean.folder_batch_plan` takes the exact retained snapshot ID and hash,
+an existing output directory outside the source tree, and the ordinary cleanup
+intent and policies. Review `excluded` against the snapshot and use
+`batches.submit` with the returned `plan.id` and `plan.hash`. The profile needs
+the folder review, folder inspection and cleanup commands plus independent read
+and write grants. [Folder batch contract](../development/cleanup-batches.md#cleanup-from-a-retained-folder-snapshot)
+
 `jobs wait` is a native CLI observer, not a new MCP tool. MCP clients poll the
 existing authorized `jobs.inspect` projection and use `jobs.cancel` for accepted
 job cancellation. SDK request cancellation retains its independent lifetime.

@@ -652,9 +652,13 @@ deadlines can cancel a longer unaccepted scan; retry the original identity and
 inspect any retained receipt before changing parameters. Large paged discovery
 and companion/output-tree execution remain separate unfinished work.
 
-Use returned registered asset IDs with `streams report`, `streams clean` and the
-existing explicit batch document. No failed candidate is silently turned into a
-verified job. The native/browser Folder intake section uses these same commands.
+Use returned registered asset IDs with `streams report`, `streams clean` and
+explicit batch planning. For a complete snapshot with successful intake, use
+`batches plan-folder --file folder-batch.json` to derive a cleanup batch for an
+existing separate output directory. Review the exclusions and submit the
+returned `plan.id` and `plan.hash` through the ordinary batch commands. The
+[folder batch contract](../development/cleanup-batches.md#cleanup-from-a-retained-folder-snapshot)
+describes the document and its limits.
 
 ## Waiting for one job
 

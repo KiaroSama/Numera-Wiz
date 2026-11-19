@@ -118,8 +118,9 @@ the typed failure; never delete a lock, state file or protected runtime record.
 For folder intake, use durable `assets.register_folder` and query
 `assets.folder_inspect`, following [folder intake](references/folders.md).
 Review the immutable snapshot's completeness, every registration/probe failure,
-exclusions and inventory-only companions before selecting explicit batch members.
-Folder registration does not execute or publish a cleanup batch.
+exclusions and inventory-only companions. Use `streams.clean.folder_batch_plan`
+to review a complete, failure-free snapshot against an authorized separate
+output directory, then inspect its exclusions and ordinary child plans.
 
 For a bounded explicit cleanup batch, inspect `streams.clean.batch_plan` and
 the batch schemas, then plan all candidates with explicit failure/unresolved
