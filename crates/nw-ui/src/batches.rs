@@ -605,9 +605,11 @@ impl WizApp {
             return;
         }
         let mut open = true;
-        let folder_mode = self.batch.is_folder_review();
+        let folder_kind = self.batch.folder.as_ref().map(|folder| folder.kind);
+        let folder_mode = folder_kind.is_some();
+        let folder_encode = matches!(folder_kind, Some(FolderBatchKind::Encode));
         let split_mode = self.batch.packet_split;
-        let title = match self.batch.folder.as_ref().map(|folder| folder.kind) {
+        let title = match folder_kind {
             Some(FolderBatchKind::Encode) => "Folder H.264 export",
             Some(FolderBatchKind::Extract) => "Folder stream extraction",
             Some(FolderBatchKind::Cleanup) => "Folder cleanup batch",
