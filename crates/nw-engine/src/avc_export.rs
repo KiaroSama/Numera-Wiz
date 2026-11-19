@@ -540,7 +540,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         ["-noautorotate", "-threads", "2"].map(str::to_owned),
     );
     let end = args.len() - 3;
-    let mut export = ["-c:v", settings.codec.encoder()].map(str::to_owned).to_vec();
+    let mut export = ["-c:v", settings.codec.encoder()]
+        .map(str::to_owned)
+        .to_vec();
     if settings.codec == VideoCodec::Vp9 {
         export.extend(
             [

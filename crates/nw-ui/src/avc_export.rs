@@ -47,7 +47,10 @@ impl WizApp {
             .iter()
             .filter(|item| {
                 item.kind == StreamKind::Video
-                    && matches!(item.codec.as_str(), "ffv1" | "h264" | "hevc" | "av1" | "vp9")
+                    && matches!(
+                        item.codec.as_str(),
+                        "ffv1" | "h264" | "hevc" | "av1" | "vp9"
+                    )
                     && !item.attached_picture()
             })
             .collect();
