@@ -35,6 +35,20 @@ archives. Gitleaks still reports both historical matches. The classifier
 reviews them only at those two lines, with the matching rule and the
 complete verified historical file digest.
 
+[CI361](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44440612517)
+passed the ordinary Linux build and regressions, the web build, the exact
+dependency lock and the offline FFmpeg component. The active Gitleaks run
+passed. The separate synthetic scanner check exposed a test fixture binding
+error, which is corrected in the current source.
+
+The Apple Silicon packaging report located a permissions error before FFmpeg
+configuration. The pinned Homebrew archives contain 113 read-only pkg-config
+files that need path relocation and 106 read-only dylibs. The packager grants
+owner write access to staged metadata and copied libraries before relocating
+them. Linux portable qualification now runs with its verified media input and
+the same-source web bundle. The fixture-dependent test jobs keep their own
+results when portable packaging fails.
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original
