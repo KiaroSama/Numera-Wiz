@@ -147,14 +147,16 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
                 let depth = name.parse::<u8>().ok()?;
                 return (1..=64).contains(&depth).then_some(flags);
             }
-            let description = columns.next()?;
+            // Compact FFmpeg builds omit the descriptive text for codecs and formats.
+            // Only the table fields needed to recognize each row are mandatory.
             let admitted = match kind {
                 Listing::Filters => {
+                    let pads = columns.next()?;
                     // FFmpeg9 emits two flags; retain the older three-flag format too.
                     matches!(flags.len(), 2 | 3)
                         && flags.bytes().all(|b| b".TSC".contains(&b))
-                        && description.contains("->")
-                        && description.bytes().all(|b| b"AVN|->".contains(&b))
+                        && pads.contains("->")
+                        && pads.bytes().all(|b| b"AVN|->".contains(&b))
                 }
                 Listing::Codecs => {
                     flags.len() == 6
@@ -169,7 +171,9 @@ fn names(text: &str, kind: Listing) -> BTreeSet<&str> {
                 Listing::PixelFormats => {
                     flags.len() == 5
                         && flags.bytes().all(|byte| b".IOHPB".contains(&byte))
-                        && description.parse::<u8>().is_ok()
+                        && columns
+                            .next()
+                            .is_some_and(|count| count.parse::<u8>().is_ok())
                 }
                 Listing::SampleFormats | Listing::AcceleratorMethods => false,
             };
@@ -196,17 +200,17 @@ pub(super) fn assert_listing_admission() {
     );
     assert!(!filters.contains("asetpts"));
     let encoders = names(
-        "Encoders:\n V..... = Video\n VF.... ffv1                 FFmpeg video codec #1\n A....D pcm_s16le            PCM signed 16-bit little-endian\n ...... invented             ffv1\n",
+        "Encoders:\n V..... = Video\n VF.... ffv1                 \n V..... rawvideo             \n A....D pcm_s16le            PCM signed 16-bit little-endian\n ...... invented             ffv1\n",
         Listing::Codecs,
     );
-    assert_eq!(encoders, BTreeSet::from(["ffv1", "pcm_s16le"]));
+    assert_eq!(encoders, BTreeSet::from(["ffv1", "pcm_s16le", "rawvideo"]));
     let muxers = names(
-        "Muxers:\n .E = Muxing supported\n  E  matroska        Matroska\n D   input_only      Matroska\n",
+        "Muxers:\n .E. = Muxing supported\n  E  matroska        \n  E  rawvideo        \n D   input_only      Matroska\n",
         Listing::Muxers,
     );
-    assert_eq!(muxers, BTreeSet::from(["matroska"]));
+    assert_eq!(muxers, BTreeSet::from(["matroska", "rawvideo"]));
     let demuxers = names(
-        " D   matroska,webm    Matroska / WebM\n D d lavfi            Libavfilter virtual input",
+        "Formats:\n D.. = Demuxing supported\n D   matroska,webm    \n D d lavfi            Libavfilter virtual input",
         Listing::Demuxers,
     );
     assert_eq!(demuxers, BTreeSet::from(["matroska", "webm"]));

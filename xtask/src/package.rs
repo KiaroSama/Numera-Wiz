@@ -138,7 +138,7 @@ pub(crate) fn qualify_portable_application(command: &mut Command, work: &Path) -
                         .bytes()
                         .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
             })
-            .unwrap_or("unavailable")
+            .unwrap_or("<absent or invalid>")
     };
     let response_status = match &response {
         Ok(report) => format!("JSON envelope ok={:?}", report["ok"].as_bool()),

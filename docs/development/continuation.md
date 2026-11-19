@@ -57,6 +57,18 @@ response file, checks the file's byte limit and JSON envelope, and still
 requires a verified FFV1 round trip using the exact embedded tools.
 [Windows](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44440612517/job/135281407252) · [Intel macOS](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44440612517/job/135281407264)
 
+[CI365](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44447677067) at
+`ff72f4f` built the offline Linux component and started the standalone app. Its
+first launch attached to the protected owner and returned a valid 17,488-byte
+capability response. The compact FFmpeg build omits the optional descriptions
+for FFV1, rawvideo and Matroska. The old parser consequently discarded those
+rows and skipped the CPU exercise. With the exact CI-built helper, the required
+listing rows are present and the existing FFV1 command decodes all 384 expected
+YUV bytes. The parser now uses the name and flags for codecs and container
+formats. Filters still require pad signatures, and pixel formats still require
+a component count. The first-launch gate continues to require the exercised
+CPU round trip and matching embedded component hashes on each platform.
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original
