@@ -11,7 +11,7 @@ use nw_domain::{
     commands::{self, Request, Response},
     mux::{CleanIntent, Stream},
 };
-pub use projects::{Clips, History, Markers, Projects, Sequences, Tracks};
+pub use projects::{Bins, Clips, History, Markers, Projects, Sequences, Tracks};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -569,6 +569,7 @@ pub enum Interchange {
 
 pub enum Command {
     Projects(Projects),
+    Bins(Bins),
     Sequences(Sequences),
     Timeline(Timeline),
     Clips(Clips),
@@ -615,6 +616,7 @@ fn query(id: &str, params: Value) -> Request {
 pub fn prepare(command: Command) -> Result<Request> {
     let request = match command {
         Command::Projects(command) => command.prepare()?,
+        Command::Bins(command) => command.prepare()?,
         Command::Sequences(command) => command.prepare()?,
         Command::Timeline(command) => command.prepare()?,
         Command::Clips(command) => command.prepare()?,

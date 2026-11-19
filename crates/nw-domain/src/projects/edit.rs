@@ -42,6 +42,7 @@ pub trait ProjectRead {
 }
 pub enum ProjectEditIntent {
     Sequence(SequenceInput),
+    CreateBin(CreateBinInput),
     Marker(SequenceMarkerInput),
     RemoveMarker(SequenceMarkerTarget),
     Place(Box<PlaceInput>, SourceBinding),
@@ -564,6 +565,28 @@ pub fn resolve_edit<R: ProjectRead>(
     };
     let root = read.header().root_bin_id.clone();
     let created = match intent {
+        ProjectEditIntent::CreateBin(input) => {
+            label(&input.name)?;
+            let parent = edit.get(&input.parent_id)?;
+            parent.semantics()?;
+            if parent.payload::<Bin>("bin")?.locked {
+                return Err(DomainError::new("ENTITY_LOCKED", "Parent bin is locked"));
+            }
+            let bin_id = ids.next()?;
+            edit.insert(EntityEnvelope::new(
+                &read.header().id,
+                bin_id.clone(),
+                "bin",
+                Some(input.parent_id.clone()),
+                input.name,
+                &Bin {
+                    member_count: 0,
+                    locked: false,
+                },
+            )?)?;
+            edit.count(&input.parent_id, 1)?;
+            json!({"bin_id":bin_id})
+        }
         ProjectEditIntent::Sequence(input) => {
             label(&input.name)?;
             input.settings.validate()?;

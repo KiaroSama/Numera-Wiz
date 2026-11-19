@@ -100,7 +100,8 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "interchange.fcpxml.export"
         | "interchange.aaf.export"
         | "interchange.omf.export" => Some(ProjectAction::Read),
-        "sequences.create"
+        "bins.add"
+        | "sequences.create"
         | "clips.place"
         | "clips.move"
         | "clips.link"

@@ -214,7 +214,8 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "interchange.fcpxml.export"
         | "interchange.aaf.export"
         | "interchange.omf.export" => ProjectContextRule::RequiredRead,
-        "sequences.create"
+        "bins.add"
+        | "sequences.create"
         | "clips.place"
         | "clips.move"
         | "clips.link"
@@ -365,6 +366,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "projects.list" => Some(contracts::catalog()),
         "projects.inspect" => Some(contracts::inspect(false)),
         "sequences.inspect" => Some(contracts::inspect(true)),
+        "bins.add" => Some(contracts::edit(EditResult::Bin)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
         "interchange.edl.import"
@@ -551,6 +553,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Read a bounded captured project projection",
             Query,
             crate::projects::views::InspectInput
+        ),
+        row!(
+            "bins.add",
+            "Create an empty child bin in a committed project",
+            DurableMutation,
+            crate::projects::CreateBinInput
         ),
         row!(
             "sequences.inspect",
@@ -1983,6 +1991,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "projects.list",
     "projects.create",
     "projects.inspect",
+    "bins.add",
     "sequences.inspect",
     "sequences.create",
     "timeline.render",

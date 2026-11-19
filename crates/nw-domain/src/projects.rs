@@ -664,6 +664,12 @@ pub struct Bin {
     #[serde(default)]
     pub locked: bool,
 }
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateBinInput {
+    pub parent_id: EntityId,
+    pub name: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sequence {
     pub settings: SequenceSettings,

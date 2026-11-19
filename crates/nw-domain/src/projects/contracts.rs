@@ -573,6 +573,7 @@ pub fn inspect(sequence_only: bool) -> Value {
 /// Shapes of the actual edit-created sections; group identifiers are opaque, not entities.
 #[derive(Clone, Copy)]
 pub enum EditResult {
+    Bin,
     Sequence,
     Marker,
     Place,
@@ -599,6 +600,7 @@ pub fn edit(kind: EditResult) -> Value {
                 ])}),
             ),
         ]),
+        EditResult::Bin => object([("bin_id", reference("Id"))]),
         EditResult::Marker => object([("marker_id", reference("Id"))]),
         EditResult::Place => object([
             ("source_id", reference("Id")),

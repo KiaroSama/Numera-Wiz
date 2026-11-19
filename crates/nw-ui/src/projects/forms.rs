@@ -45,6 +45,7 @@ impl ExactForm {
 }
 pub(super) struct Forms {
     pub project_name: String,
+    pub bin_name: String,
     pub sequence_name: String,
     pub width: String,
     pub height: String,
@@ -84,6 +85,7 @@ impl Default for Forms {
     fn default() -> Self {
         Self {
             project_name: "New project".into(),
+            bin_name: String::new(),
             sequence_name: "Sequence".into(),
             width: "1920".into(),
             height: "1080".into(),

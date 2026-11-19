@@ -116,6 +116,33 @@ impl Projects {
     }
 }
 #[derive(Subcommand)]
+pub enum Bins {
+    /// Create an empty child bin in the selected project.
+    Add {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long)]
+        parent: String,
+        #[arg(long)]
+        name: String,
+    },
+}
+impl Bins {
+    pub(super) fn prepare(self) -> Result<Request> {
+        match self {
+            Self::Add { context, parent, name } => {
+                model::label(&name)?;
+                let input = model::CreateBinInput {
+                    parent_id: model::EntityId::parse(parent)?,
+                    name,
+                };
+                context.request("bins.add", serde_json::to_value(input)?)
+            }
+        }
+    }
+}
+
+#[derive(Subcommand)]
 pub enum Sequences {
     Create {
         #[command(flatten)]

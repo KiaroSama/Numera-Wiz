@@ -688,6 +688,7 @@ impl Service {
         let readable = match request.command.id.as_str() {
             "projects.create"
             | "sequences.create"
+            | "bins.add"
             | "clips.place"
             | "clips.move"
             | "clips.link"
@@ -1384,6 +1385,7 @@ impl Service {
             "projects.create"
             | "projects.inspect"
             | "sequences.create"
+            | "bins.add"
             | "sequences.inspect"
             | "clips.place"
             | "clips.move"

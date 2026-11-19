@@ -497,6 +497,9 @@ impl Service {
                 None
             } else {
                 Some(match request.command.id.as_str() {
+                    "bins.add" => {
+                        ProjectEditIntent::CreateBin(commands::parse(request.params.clone())?)
+                    }
                     "sequences.create" => {
                         ProjectEditIntent::Sequence(commands::parse(request.params.clone())?)
                     }
@@ -730,7 +733,7 @@ impl Service {
                     | ProjectEditIntent::SetTrackGain(_)
                     | ProjectEditIntent::SetTrackEnabled(_)
                     | ProjectEditIntent::SetTrackLocked(_) => 0,
-                    ProjectEditIntent::Link(_) => 1,
+                    ProjectEditIntent::Link(_) | ProjectEditIntent::CreateBin(_) => 1,
                     ProjectEditIntent::ImportCuts { placements, .. } => placements.len() * 3,
                     _ => MAX_CHANGES * 2,
                 };

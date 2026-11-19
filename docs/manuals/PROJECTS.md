@@ -16,6 +16,7 @@ continuous playback, general export and the complete editor remain required work
 | `projects.list` | `projects list` | Page authorized common project headers in ascending UUID order. |
 | `projects.create` | `projects create` | Create a project and root bin at revision `0`. |
 | `projects.inspect` | `projects inspect` | Read summary, one entity or a bin page. |
+| `bins.add` | `bins add` | Create a child bin in the current project. |
 | `sequences.create` | `sequences create` | Create explicit sequence settings and video/audio tracks. |
 | `sequences.inspect` | `sequences inspect` | Read sequence detail, tracks or a bounded clip viewport. |
 | `tracks.set_enabled` | `tracks set-enabled` | Include or exclude one track from preview and render at the expected revision. |
@@ -754,6 +755,16 @@ offers `entity`, `track_page` and `viewport`. Pages default to 128/max512 and ta
 query fields and limit. A live ticket captures one revision for 30 seconds and
 supports eight query bindings. Project and inventory tickets share 32 global/four
 per-principal limits and a 16 MiB metadata/serialization reserve.
+
+Open a parent bin in the Projects workspace. Choose **New bin**, enter its
+name, and select **Create bin**. The edit uses the current committed project
+revision and joins its Undo history.
+
+```text
+numera-wiz bins add --parent PARENT --name "Clips" --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key create-clips-bin
+```
+
+MCP uses `bins.add` with `parent_id` and `name`.
 
 To search the direct children of a bin by display name, use **Search** in the
 project bin panel or set `query` on the `bin_page` projection. Matching uses a

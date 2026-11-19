@@ -75,8 +75,9 @@ export and continuous preview remain in development.
   Final Cut Pro XML, linked AAF picture or audio, linked OMF 2 audio, and
   Avid Log Exchange metadata for registered sources.
 - [Project state editing](docs/manuals/PROJECTS.md) through shared CLI/MCP commands:
-  authorized catalog discovery, exact sequence grids, place/move/split/lift,
-  linked Slip, Roll and Slide, atomic history and bounded revision snapshots. Shared
+  authorized catalog discovery, nested bins and display-name search, exact
+  sequence grids, place/move/split/lift, linked Slip, Roll, Slide and clip locks,
+  atomic history and bounded revision snapshots. Shared
   native/browser controls implement catalog discovery, project/sequence creation,
   solid-color/registered-source placement, move/split/lift, bounded clip selection,
   Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen.

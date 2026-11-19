@@ -326,14 +326,46 @@ impl WizApp {
                 "No more matching names."
             });
         }
-        if ui
-            .add_enabled(ready, egui::Button::new("Root bin"))
-            .clicked()
-        {
+        let root_clicked = ui
+            .horizontal(|ui| {
+                let root = ui
+                    .add_enabled(ready, egui::Button::new("Root bin"))
+                    .clicked();
+                if let Some(parent) = group.view.bin.as_deref() {
+                    ui.add_enabled_ui(ready, |ui| {
+                        ui.menu_button("New bin", |ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.projects.forms.bin_name)
+                                    .hint_text("Bin name")
+                                    .char_limit(128),
+                            );
+                            if ui.button("Create bin").clicked() {
+                                let name = &self.projects.forms.bin_name;
+                                match nw_domain::projects::label(name) {
+                                    Ok(()) => {
+                                        self.mutate_project(
+                                            "bins.add",
+                                            json!({"parent_id":parent,"name":name}),
+                                            ui.ctx(),
+                                        );
+                                        self.projects.forms.bin_name.clear();
+                                        ui.close();
+                                    }
+                                    Err(error) => self.error = Some(error.message),
+                                }
+                            }
+                        });
+                    });
+                }
+                root
+            })
+            .inner;
+        if root_clicked {
             let mut view = group.view.clone();
             view.bin = None;
             view.bin_query = None;
             self.project_reselect(view, ui.ctx());
+            return;
         }
         let mut selection = None;
         egui::ScrollArea::vertical()

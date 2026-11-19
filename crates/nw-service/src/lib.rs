@@ -618,7 +618,8 @@ mod tests {
             }
             if matches!(
                 id,
-                "markers.place"
+                "bins.add"
+                    | "markers.place"
                     | "markers.remove"
                     | "clips.trim"
                     | "clips.slip"
@@ -748,6 +749,7 @@ mod tests {
             "projects.create",
             "projects.list",
             "projects.inspect",
+            "bins.add",
             "sequences.create",
             "sequences.inspect",
             "clips.place",
@@ -1367,6 +1369,7 @@ mod tests {
             "history",
         ];
         for (id, created_keys, noop) in [
+            ("bins.add", vec!["bin_id"], false),
             ("sequences.create", vec!["sequence_id", "tracks"], false),
             ("clips.place", vec!["source_id", "clip_ids"], false),
             ("clips.move", vec![], true),

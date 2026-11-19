@@ -93,6 +93,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
         && !matches!(
             command,
             "projects.create"
+                | "bins.add"
                 | "projects.list"
                 | "markers.place"
                 | "markers.remove"
@@ -134,7 +135,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
         }
     }
     match command {
-        "projects.create" => label(field(&mut schema, "name")),
+        "projects.create" | "bins.add" => label(field(&mut schema, "name")),
         "projects.list" => page(&mut schema, false),
         "projects.inspect" => inspect(&mut schema, false),
         "sequences.inspect" => inspect(&mut schema, true),

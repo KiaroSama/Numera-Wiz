@@ -840,8 +840,53 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
         .reopen_current_generation(&service.root_lease)
         .unwrap();
     let stale = service
-        .dispatch(context, page_request(Some(fresh["next_cursor"].clone())))
+        .dispatch(context.clone(), page_request(Some(fresh["next_cursor"].clone())))
         .await;
     assert_eq!(stale.error.unwrap().code, "SNAPSHOT_EXPIRED");
+
+    let create_bin = |revision: &str, parent: &str, name: &str, key: &str| {
+        let mut request =
+            Request::query("bins.add", json!({"parent_id":parent,"name":name}));
+        request.project = Some(nw_domain::commands::ProjectRef {
+            id: project.into(),
+            expected_revision: Some(revision.into()),
+        });
+        request.replay_scope = Some(scope.clone());
+        request.idempotency_key = Some(key.into());
+        request
+    };
+    let parent = service
+        .dispatch(
+            context.clone(),
+            create_bin("3", bin, "Édit sources", "sources-bin"),
+        )
+        .await;
+    assert!(parent.ok, "{:?}", parent.error);
+    let parent = parent.result.unwrap();
+    let parent_id = parent["created"]["bin_id"].as_str().unwrap();
+    let child_request = create_bin("4", parent_id, "Rough cuts", "rough-cuts-bin");
+    let child = service
+        .dispatch(context.clone(), child_request.clone())
+        .await;
+    assert!(child.ok, "{:?}", child.error);
+    let child_id = child.result.as_ref().unwrap()["created"]["bin_id"]
+        .as_str()
+        .unwrap();
+    let replay = service.dispatch(context.clone(), child_request).await;
+    assert_eq!(replay.receipt_id, child.receipt_id);
+    let mut read_child = Request::query(
+        "projects.inspect",
+        json!({"projection":"bin_page","bin_id":parent_id,"query":"ROUGH"}),
+    );
+    read_child.project = Some(nw_domain::commands::ProjectRef {
+        id: project.into(),
+        expected_revision: None,
+    });
+    let contents = service.dispatch(context, read_child).await;
+    assert!(contents.ok, "{:?}", contents.error);
+    let contents = contents.result.unwrap();
+    assert_eq!(contents["items"][0]["id"], child_id);
+    assert_eq!(contents["items"][0]["kind"], "bin");
+    assert_eq!(contents["total_count"], 1);
     pressure::exercise_pressure_scheduling().await;
 }
