@@ -27,6 +27,19 @@ impl Engine {
         Ok(stamp)
     }
 
+    pub async fn inspect_packet_cuts(
+        &self,
+        asset: &Asset,
+        ranges: &[TimeRange],
+        cancel: CancellationToken,
+    ) -> Result<(files::SourceStamp, Vec<Result<()>>)> {
+        packet_cut::validate_ranges(ranges.iter().copied())?;
+        let stamp = cut_source(asset, &cancel).await?;
+        let outcomes = crate::preservation::check_cuts(self, asset, ranges, cancel).await?;
+        stamp.revalidate()?;
+        Ok((stamp, outcomes))
+    }
+
     pub fn packet_cut_plan_at(
         &self,
         source: Asset,

@@ -1125,6 +1125,7 @@ impl Service {
                 "timeline.preview_frame",
                 "media.probe",
                 "media.cut",
+                "media.split_plan",
                 "media.analyze.volume",
                 "media.analyze.loudness",
                 "audio.normalize",
@@ -1862,6 +1863,9 @@ impl Service {
                 }
                 return Ok(response);
             }
+            "media.split_plan" => value(&self.prepare_packet_split(
+                &context, commands::parse(params)?, &cancellation, &runtime,
+            )?)?,
             "media.cut" => {
                 let input: nw_domain::packet_cut::CutInput = commands::parse(params)?;
                 let bound: Asset = self

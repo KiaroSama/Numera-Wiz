@@ -4,6 +4,7 @@ use crate::{
     time::{Rational, TimeRange},
 };
 use schemars::JsonSchema;
+use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -13,6 +14,50 @@ pub struct CutInput {
     pub output: String,
     pub range: TimeRange,
     pub chapters: ChapterPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitInput {
+    pub asset_id: String,
+    #[schemars(length(min = 2, max = 16))]
+    pub outputs: Vec<SplitOutput>,
+    pub chapters: ChapterPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitOutput {
+    pub output: String,
+    pub range: TimeRange,
+}
+
+impl SplitInput {
+    pub fn validate(&self) -> Result<()> {
+        validate_ranges(self.outputs.iter().map(|item| item.range))?;
+        let mut outputs = BTreeSet::new();
+        for item in &self.outputs {
+            if item.output.is_empty() || item.output.len() > 16384 || !outputs.insert(&item.output) {
+                return Err(DomainError::new("VALIDATION_ERROR", "Split outputs require distinct bounded destination paths"));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_ranges(ranges: impl ExactSizeIterator<Item = TimeRange>) -> Result<()> {
+    if !(2..=16).contains(&ranges.len()) {
+        return Err(DomainError::new("VALIDATION_ERROR", "A packet split requires two to sixteen output intervals"));
+    }
+    let mut previous_end = Rational::ZERO;
+    for range in ranges {
+        validate(range)?;
+        if range.start < previous_end {
+            return Err(DomainError::new("INVALID_TIME", "Split intervals must be in source order and cannot overlap"));
+        }
+        previous_end = range.end;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]

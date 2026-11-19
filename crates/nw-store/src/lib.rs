@@ -719,6 +719,7 @@ mod tests {
                 action: Some(plan.resolution.action.clone()),
                 error: None,
                 extraction: None,
+                packet_cut: None,
             });
             children.push(plan);
         }

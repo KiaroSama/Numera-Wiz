@@ -1293,6 +1293,46 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(expected_cut.len(), 8);
     assert_eq!(cut_packets[&0], expected_cut);
 
+    let split_outputs = [media.directory.path().join("split-اول.mkv"), media.directory.path().join("split-دوم.mkv")];
+    let split = json!({"asset_id":cut_source["id"],"chapters":"drop","outputs":[
+        {"output":split_outputs[0],"range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}}},
+        {"output":split_outputs[1],"range":{"start":{"num":"1","den":"1"},"end":{"num":"2","den":"1"}}}
+    ]});
+    let mut rejected_split = split.clone();
+    rejected_split["outputs"][1]["range"]["start"] = json!({"num":"5","den":"4"});
+    let rejected = call!(http, "media.split_plan", rejected_split, json!({}));
+    assert_eq!(rejected["items"][1]["error"]["code"], "COPY_BOUNDARY_UNQUALIFIED");
+    assert_eq!(
+        sdk!(http, "batches.submit", json!({"plan_id":rejected["id"],"plan_hash":rejected["hash"]}),
+            json!({"replay_scope":http_scope,"idempotency_key":"reject-unqualified-packet-split"}))["error"]["code"],
+        "BATCH_REJECTED",
+    );
+    assert!(split_outputs.iter().all(|path| !path.exists()));
+    let split_document = media.directory.path().join("packet-split.json");
+    std::fs::write(&split_document, serde_json::to_vec(&split).unwrap()).unwrap();
+    let (typed_split, code) = cli.human(&["--access-profile", "batch-operator", "media", "split", "--file",
+        split_document.to_str().unwrap()]).await;
+    assert_eq!(code, 0, "{typed_split}");
+    let stdio_split = call!(stdio, "media.split_plan", split.clone(), json!({}));
+    let http_split = call!(http, "media.split_plan", split.clone(), json!({}));
+    assert_eq!(typed_split["result"]["hash"], stdio_split["hash"]);
+    assert_eq!(stdio_split["hash"], http_split["hash"]);
+    for index in 0..split_outputs.len() {
+        assert_eq!(http_split["items"][index]["packet_cut"], split["outputs"][index]["range"]);
+    }
+    let split_batch = call!(http, "batches.submit",
+        json!({"plan_id":http_split["id"],"plan_hash":http_split["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-original-clock-split"}));
+    let split_result = finished!(http, split_batch["batch_id"]);
+    assert_eq!(split_result["succeeded"], 2, "{split_result}");
+    for (index, path) in split_outputs.iter().enumerate() {
+        let start = i64::try_from(index).unwrap() * 1000;
+        let expected: Vec<_> = source_packets[&0].iter()
+            .filter(|packet| (start..start + 1000).contains(&packet["pts"].as_i64().unwrap())).cloned().collect();
+        assert_eq!(expected.len(), 8);
+        assert_eq!(packets(&media.bin, path).await[&0], expected);
+    }
+
     let replacement_output = media.directory.path().join("track-replacement.mkv");
     let replacement = json!({"target":sdk_assets[0]["id"],"output":replacement_output,"conversion":"forbid",
         "metadata":"strip_global","remove":[{"kind":"type_ordinal","track_kind":"audio","ordinal":1}],
@@ -1421,6 +1461,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "track_append":{"job":append_job["job_id"],"kept_original_streams":3,"added_audio":2,"added_subtitles":2,
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
+        "packet_split":{"batch":split_batch["batch_id"],"verified_parts":2,"original_clock_packets":16,"rejected_member_blocks_batch":true},
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},

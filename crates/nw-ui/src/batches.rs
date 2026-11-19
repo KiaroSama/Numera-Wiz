@@ -73,6 +73,7 @@ pub(super) struct BatchUi {
     unresolved: UnresolvedPolicy,
     plan: Option<Arc<BatchPlanReview>>,
     folder: Option<FolderBatchMode>,
+    packet_split: bool,
     active: Option<String>,
     result: Option<Arc<BatchResult>>,
     history: Vec<BatchSummary>,
@@ -91,6 +92,7 @@ impl Default for BatchUi {
             unresolved: UnresolvedPolicy::Reject,
             plan: None,
             folder: None,
+            packet_split: false,
             active: None,
             result: None,
             history: Vec::new(),
@@ -148,7 +150,7 @@ impl WizApp {
         if !self.cleanup_actions_allowed(ctx) || self.waiting || self.pending.is_some() {
             return;
         }
-        if !self.batch.is_folder_review()
+        if !self.batch.is_folder_review() && !self.batch.packet_split
             && let Some(index) = self
                 .batch
                 .candidates
@@ -315,6 +317,7 @@ impl WizApp {
                 "Cleanup controls changed while planning. Review the folder again.".into();
             return;
         }
+        self.batch.packet_split = false;
         self.batch.folder = Some(FolderBatchMode {
             snapshot,
             requested_output_root,
@@ -325,6 +328,20 @@ impl WizApp {
         self.close_folder();
         self.status =
             "Folder batch reviewed. Inspect the destinations and exclusions before running.".into();
+    }
+
+    pub(super) fn invalidate_packet_split(&mut self) {
+        if self.batch.packet_split {
+            self.batch.invalidate();
+        }
+    }
+
+    pub(super) fn review_packet_split(&mut self, input: nw_domain::packet_cut::SplitInput, ctx: &egui::Context) {
+        if self.cleanup_actions_allowed(ctx) && !self.folder.open {
+            self.batch.folder = None;
+            self.batch.invalidate();
+            self.query("media.split_plan", json!(input), Action::BatchPlan(self.batch.generation), ctx);
+        }
     }
 
     pub(super) fn batch_policy_controls(&mut self, ui: &mut egui::Ui, include_unresolved: bool) {
@@ -389,6 +406,8 @@ impl WizApp {
                 let plan: BatchPlanReview =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
                 if generation == self.batch.generation {
+                    self.batch.packet_split = plan.items.iter().any(|item| item.packet_cut.is_some());
+                    self.batch.open |= self.batch.packet_split;
                     self.batch.plan = Some(Arc::new(plan));
                     self.status = "Batch reviewed. Inspect every candidate before running.".into();
                 } else {
@@ -552,8 +571,11 @@ impl WizApp {
         }
         let mut open = true;
         let folder_mode = self.batch.is_folder_review();
+        let split_mode = self.batch.packet_split;
         let title = if folder_mode {
             "Folder cleanup batch"
+        } else if split_mode {
+            "Packet split"
         } else if self.batch.extract {
             "Stream extraction batch"
         } else {
@@ -564,7 +586,7 @@ impl WizApp {
             .default_height(540.0).open(&mut open).show(ctx, |ui| {
                 let idle = !self.waiting && self.pending.is_none();
                 ui.horizontal(|ui| {
-                    if !folder_mode && ui.add_enabled(idle && !self.batch.candidates.is_empty()
+                    if !folder_mode && !split_mode && ui.add_enabled(idle && !self.batch.candidates.is_empty()
                         && self.batch.candidates.iter().all(|item| !item.output.is_empty() && !item.needs_output),
                         egui::Button::new("Review batch")).clicked() { self.review_batch(ui.ctx()); }
                     let eligible = self.batch.plan.as_deref().is_some_and(plan_can_submit);
@@ -572,9 +594,10 @@ impl WizApp {
                     if ui.add_enabled(idle,egui::Button::new("Refresh batch history")).clicked() {
                         self.query("batches.list",json!({"replace_snapshot":self.batch.snapshot}),Action::BatchHistory,ui.ctx());
                     }
-                    if folder_mode {
+                    if folder_mode || split_mode {
                         if ui.add_enabled(idle, egui::Button::new("Return to explicit candidates")).clicked() {
                             self.batch.folder = None;
+                            self.batch.packet_split = false;
                             self.batch.invalidate();
                         }
                     } else {
@@ -599,7 +622,7 @@ impl WizApp {
                             }
                         });
                     });
-                } else {
+                } else if !split_mode {
                     self.explicit_batch_controls(ui, idle);
                 }
                 if let Some(plan) = self.batch.plan.clone() {
@@ -618,8 +641,12 @@ impl WizApp {
                                     self.query("plans.inspect",json!({"id":reference.id}),Action::Inspect,ui.ctx());
                                 }
                             });
-                            if folder_mode && let Some(output) = &item.output_path {
+                            if (folder_mode || split_mode) && let Some(output) = &item.output_path {
                                 ui.monospace(output);
+                            }
+                            if let Some(range) = item.packet_cut {
+                                ui.label(format!("Original time {}/{} to {}/{} seconds (end exclusive)",
+                                    range.start.numerator(), range.start.denominator(), range.end.numerator(), range.end.denominator()));
                             }
                             if let Some(extraction) = item.extraction {
                                 ui.label(format!(

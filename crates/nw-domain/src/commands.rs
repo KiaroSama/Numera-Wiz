@@ -243,7 +243,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "audio.normalize" | "media.cut" | "streams.add" | "streams.replace" | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
-        "streams.extract.batch_plan" => Some(
+        "streams.extract.batch_plan" | "media.split_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
         ),
         "streams.clean.folder_batch_plan" => Some(
@@ -855,6 +855,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Review an original-keyframe packet copy cut of a registered Matroska source",
             Query,
             crate::packet_cut::CutInput
+        ),
+        row!(
+            "media.split_plan",
+            "Review two to sixteen packet-copy ranges in one registered Matroska source",
+            Query,
+            crate::packet_cut::SplitInput
         ),
         row!(
             "capabilities.inspect",
@@ -1759,6 +1765,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.credentials.issue",
     "media.probe",
     "media.cut",
+    "media.split_plan",
     "media.analyze.volume",
     "media.analyze.loudness",
     "audio.normalize",

@@ -114,6 +114,11 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
+    /// Review multiple exact source ranges and their separate Matroska destinations.
+    Split {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Measure and review independent loudness normalization of selected PCM tracks.
     Normalize {
         #[arg(long)]
@@ -614,6 +619,14 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             query("media.probe", params)
+        }
+        Command::Media(Media::Split { file }) => {
+            let mut input: nw_domain::packet_cut::SplitInput = commands::parse(document(&file)?)?;
+            input.validate()?;
+            for item in &mut input.outputs {
+                item.output = native_path(Path::new(&item.output))?;
+            }
+            query("media.split_plan", serde_json::to_value(input)?)
         }
         Command::Media(Media::Normalize { file }) => {
             let mut input: nw_domain::audio_normalization::NormalizeInput = commands::parse(document(&file)?)?;

@@ -223,6 +223,8 @@ pub struct PlannedItem {
     pub error: Option<DomainError>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extraction: Option<ReviewedExtraction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub packet_cut: Option<crate::time::TimeRange>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -359,6 +361,28 @@ impl BatchPlan {
                 }
             }
         }
+        if self.items.iter().any(|item| item.packet_cut.is_some()) {
+            let mut ranges = Vec::with_capacity(self.items.len());
+            let source = &self.items[0];
+            for item in &self.items {
+                let range = item.packet_cut.ok_or_else(|| {
+                    DomainError::new("INVALID_PLAN", "Packet split batches require an interval for every destination")
+                })?;
+                if item.asset_id != source.asset_id || item.source_sha256 != source.source_sha256
+                    || item.source_bytes != source.source_bytes || item.extraction.is_some()
+                    || (item.plan.is_some() && item.action != Some(CleanAction::Remux))
+                {
+                    return Err(DomainError::new("INVALID_PLAN", "Each packet split member must use the same original source and copy policy"));
+                }
+                ranges.push(range);
+            }
+            if self.failure_policy != FailurePolicy::RejectAll
+                || self.unresolved_policy != UnresolvedPolicy::Reject || !self.unresolved.is_empty()
+            {
+                return Err(DomainError::new("INVALID_PLAN", "A packet split requires every destination to be eligible"));
+            }
+            crate::packet_cut::validate_ranges(ranges.into_iter())?;
+        }
         let semantic_items = self.items.iter().map(|item| {
             let mut semantic = serde_json::json!({
                 "index":item.index,"source_sha256":item.source_sha256,"source_bytes":item.source_bytes,
@@ -368,6 +392,9 @@ impl BatchPlan {
             });
             if let Some(extraction) = item.extraction {
                 semantic["extraction"] = serde_json::json!(extraction);
+            }
+            if let Some(range) = item.packet_cut {
+                semantic["packet_cut"] = serde_json::json!(range);
             }
             semantic
         }).collect::<Vec<_>>();
@@ -429,6 +456,8 @@ pub struct PlannedItemView {
     pub error: Option<crate::views::ErrorView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extraction: Option<ReviewedExtraction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub packet_cut: Option<crate::time::TimeRange>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BatchPlanReview {
@@ -740,6 +769,7 @@ mod tests {
                     "Explicit rejected candidate",
                 )),
                 extraction: None,
+                packet_cut: None,
             }],
         };
         plan.hash = plan.digest().unwrap();

@@ -318,3 +318,9 @@ configuration and set the directory used to resolve media paths. Review the
 diagnostics, then choose **Review packet-copy job for the selected source**.
 The selected file must match the configuration input. Review the planned
 destination and retained streams before choosing **Run reviewed plan**.
+
+
+On a registered Matroska asset, open **Split into separate packet-copy
+files**, enter two or more exact source intervals and choose a new
+`.mkv` path for each. The **Packet split** window shows each range and
+its eligibility. Run the reviewed batch once all parts pass the checks.

@@ -546,3 +546,10 @@ existing manifest/chunk routes afterward. This new path still needs integrated
 hosted qualification; preview and the general editor pipeline remain unfinished.
 See the [finite CLI profile](CLI.md#finite-timeline-review-in-development) for
 execution limits and the historical review-only qualification boundary.
+
+
+Use `media.split_plan` with a registered Matroska `asset_id` and an
+ordered `outputs` list of destination/range pairs. Specify
+`chapters: "drop"` and grant `media.cut` alongside the split command.
+Inspect each range and its outcome, then submit the plan ID and hash through
+`batches.submit`. Track the individual results with `batches.inspect`.

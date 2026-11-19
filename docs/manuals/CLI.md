@@ -835,3 +835,27 @@ records an actual component-backed public review, typed CLI parity and finite
 result-schema checks on Linux. It also records real Store admission/reference
 controls. This evidence does not qualify a rendered output, media job acceptance,
 the standard offline profile or all current CI checks.
+
+
+### Split a video without re-encoding
+
+Run `numera-wiz media split --file split.json`. Use a registered Matroska
+asset, integral or rational source times in ascending order, and one new
+absolute Matroska destination per part. This example keeps the original
+packet clocks across the two outputs.
+
+```json
+{
+  "asset_id": "<registered asset id>",
+  "chapters": "drop",
+  "outputs": [
+    {"output": "/exports/part-1.mkv", "range": {"start": {"num": "0", "den": "1"}, "end": {"num": "12", "den": "1"}}},
+    {"output": "/exports/part-2.mkv", "range": {"start": {"num": "12", "den": "1"}, "end": {"num": "24", "den": "1"}}}
+  ]
+}
+```
+
+A split requires two to sixteen nonoverlapping intervals. The end of each
+interval is exclusive. Each start must already be a keyframe. Inspect the
+result, then use `batches submit` with its plan ID and hash. A rejected
+part blocks submission and each accepted job independently verifies its output.

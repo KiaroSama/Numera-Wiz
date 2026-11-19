@@ -87,14 +87,14 @@ impl Ledger {
             streams,
             window,
         } = self;
-        records.feed(bytes, |value| Self::packet(clocks, streams, *window, value))
+        records.feed(bytes, |value| Self::packet(clocks, streams, *window, &value))
     }
 
     fn packet(
         clocks: &BTreeMap<u32, Rational>,
         streams: &mut BTreeMap<u32, StreamDigest>,
         window: Option<TimeRange>,
-        value: Value,
+        value: &Value,
     ) -> Result<()> {
         let index = value["stream_index"]
             .as_u64()
@@ -103,15 +103,8 @@ impl Ledger {
         let clock = *clocks
             .get(&index)
             .ok_or_else(|| invalid("Packet references an unobserved stream"))?;
-        let hash = packet_sha256(&value["data_hash"])?;
-        let size = integer(&value["size"])?.ok_or_else(|| invalid("Missing packet size"))?;
-        let size = u64::try_from(size).map_err(|_| invalid("Negative packet size"))?;
         let pts = timestamp(&value["pts"], clock)?;
         let dts = timestamp(&value["dts"], clock)?;
-        let duration = timestamp(&value["duration"], clock)?;
-        let flags = value["flags"]
-            .as_str()
-            .ok_or_else(|| invalid("Missing packet flags"))?;
         if let Some(window) = window {
             let pts = pts
                 .ok_or_else(|| invalid("Packet cuts require an original presentation timestamp"))?;
@@ -125,6 +118,13 @@ impl Ledger {
                 ));
             }
         }
+        let hash = packet_sha256(&value["data_hash"])?;
+        let size = integer(&value["size"])?.ok_or_else(|| invalid("Missing packet size"))?;
+        let size = u64::try_from(size).map_err(|_| invalid("Negative packet size"))?;
+        let duration = timestamp(&value["duration"], clock)?;
+        let flags = value["flags"]
+            .as_str()
+            .ok_or_else(|| invalid("Missing packet flags"))?;
         let record = canonical(json!([
             hash,
             size.to_string(),
@@ -340,6 +340,31 @@ async fn scan(
     deadline: nw_domain::execution::DeadlinePolicy,
     window: Option<TimeRange>,
 ) -> Result<Ledger> {
+    let ledger = Arc::new(Mutex::new(Ledger::new(probe, window)?));
+    let consumer = ledger.clone();
+    consume_packets(engine, path, cancel, observer, deadline, move |bytes| {
+        consumer.lock().map_err(|_| invalid("Packet parser lock poisoned"))?.feed(bytes)
+    }).await?;
+    let ledger = take_observation(ledger)?;
+    ledger.finish()?;
+    Ok(ledger)
+}
+
+fn take_observation<T>(value: Arc<Mutex<T>>) -> Result<T> {
+    Arc::try_unwrap(value)
+        .map_err(|_| invalid("Packet consumer did not finish"))?
+        .into_inner()
+        .map_err(|_| invalid("Packet parser lock poisoned"))
+}
+
+async fn consume_packets(
+    engine: &Engine,
+    path: &Path,
+    cancel: CancellationToken,
+    observer: &Observer,
+    deadline: nw_domain::execution::DeadlinePolicy,
+    consume: impl FnMut(&[u8]) -> Result<()> + Send + 'static,
+) -> Result<()> {
     let source = path.to_owned();
     let admission_cancel = cancel.clone();
     let input = crate::blocking(move || admission::open(&source, &admission_cancel)).await?;
@@ -363,30 +388,17 @@ async fn scan(
     let mut prepared = vec![engine.ffprobe.path.clone()];
     prepared.extend(args.clone());
     observer(ExecutionEvent::Prepared(prepared)).await?;
-    let ledger = Arc::new(Mutex::new(Ledger::new(probe, window)?));
-    let consumer = ledger.clone();
     let ticket = engine.process_budget.acquire(&cancel).await?;
     let process = nw_platform::process::stream_readonly_with_policy(
         Path::new(&engine.ffprobe.path),
         &args,
         deadline,
         input.file,
-        Box::new(move |bytes| {
-            consumer
-                .lock()
-                .map_err(|_| invalid("Packet parser lock poisoned"))?
-                .feed(bytes)
-        }),
+        Box::new(consume),
         cancel,
     )
     .await;
-    ticket.finish(process)?;
-    let ledger = Arc::try_unwrap(ledger)
-        .map_err(|_| invalid("Packet consumer did not finish"))?
-        .into_inner()
-        .map_err(|_| invalid("Packet parser lock poisoned"))?;
-    ledger.finish()?;
-    Ok(ledger)
+    ticket.finish(process)
 }
 
 pub(super) async fn check_cut(
@@ -409,21 +421,50 @@ pub(super) async fn check_cut(
     validate_cut(&ledger, &source.probe, window)
 }
 
+pub(super) async fn check_cuts(
+    engine: &Engine,
+    source: &nw_domain::records::Asset,
+    windows: &[TimeRange],
+    cancel: CancellationToken,
+) -> Result<Vec<Result<()>>> {
+    let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
+    let ledgers = windows.iter().map(|&window| Ledger::new(&source.probe, Some(window)).map(Ok))
+        .collect::<Result<Vec<Result<Ledger>>>>()?;
+    let scan = Arc::new(Mutex::new((ProbeRecords::new(b"{\"packets\":["), ledgers)));
+    let consumer = scan.clone();
+    consume_packets(engine, Path::new(&source.identity.path), cancel, &observer,
+        nw_domain::execution::CleanupLimits::default().operation, move |bytes| {
+            let mut shared = consumer.lock().map_err(|_| invalid("Packet parser lock poisoned"))?;
+            let (parser, ledgers) = &mut *shared;
+            parser.feed(bytes, |packet| {
+                for entry in ledgers.iter_mut() {
+                    if let Ok(ledger) = entry
+                        && let Err(error) = Ledger::packet(&ledger.clocks, &mut ledger.streams, ledger.window, &packet)
+                    {
+                        *entry = Err(error);
+                    }
+                }
+                Ok(())
+            })
+        }).await?;
+    let (parser, ledgers) = take_observation(scan)?;
+    parser.finish()?;
+    Ok(ledgers.into_iter().zip(windows).map(|(ledger, &window)| {
+        ledger.and_then(|ledger| validate_cut(&ledger, &source.probe, window))
+    }).collect())
+}
+
 fn validate_cut(ledger: &Ledger, probe: &MediaProbe, range: TimeRange) -> Result<()> {
-    for stream in &probe.streams {
-        if stream.kind == nw_domain::mux::StreamKind::Video
-            && !stream.attached_picture()
-            && ledger
-                .streams
-                .get(&stream.index)
-                .and_then(|observed| observed.first)
-                != Some((range.start, true))
-        {
-            return Err(DomainError::new(
-                "COPY_BOUNDARY_UNQUALIFIED",
-                "Start must match an original keyframe on each retained picture stream",
-            ));
-        }
+    let mut picture = probe.streams.iter().filter(|stream| {
+        stream.kind == nw_domain::mux::StreamKind::Video && !stream.attached_picture()
+    }).peekable();
+    if picture.peek().is_none() || picture.any(|stream| {
+        ledger.streams.get(&stream.index).and_then(|entry| entry.first) != Some((range.start, true))
+    }) {
+        return Err(DomainError::new(
+            "COPY_BOUNDARY_UNQUALIFIED",
+            "Start must match an original keyframe on each retained picture stream",
+        ));
     }
     Ok(())
 }
