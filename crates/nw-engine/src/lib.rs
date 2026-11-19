@@ -340,11 +340,11 @@ impl Engine {
         if !output
             .extension()
             .and_then(|value| value.to_str())
-            .is_some_and(|value| value.eq_ignore_ascii_case("mkv"))
+            .is_some_and(|value| value.eq_ignore_ascii_case("mkv") || value.eq_ignore_ascii_case("mka"))
         {
             return Err(DomainError::new(
                 "CONTAINER_UNQUALIFIED",
-                "Select a Matroska .mkv output for stream extraction",
+                "Select a .mkv output, or .mka for audio-only extraction",
             ));
         }
         self.review_stream_copy(
@@ -1401,15 +1401,18 @@ pub fn plan_digest(plan: &Plan) -> Result<String> {
 }
 
 fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
-    if output
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_ascii_lowercase())
-        != Some("mkv".into())
-    {
+    let extension = output.extension().and_then(|value| value.to_str());
+    if extension.is_some_and(|value| value.eq_ignore_ascii_case("mka")) {
+        if streams.is_empty() || streams.iter().any(|stream| stream.kind != StreamKind::Audio) {
+            return Err(DomainError::new(
+                "INCOMPATIBLE_PRESERVATION",
+                "A Matroska audio .mka output requires an audio-only stream selection",
+            ));
+        }
+    } else if !extension.is_some_and(|value| value.eq_ignore_ascii_case("mkv")) {
         return Err(DomainError::new(
             "CONTAINER_UNQUALIFIED",
-            "Development remux profile currently admits Matroska .mkv only; additional muxers remain required",
+            "The Matroska profile admits .mkv and audio-only .mka output",
         ));
     }
     for stream in streams {

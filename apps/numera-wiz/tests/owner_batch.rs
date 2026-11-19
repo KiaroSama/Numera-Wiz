@@ -2229,6 +2229,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         media.directory.path().join("extracted-video.mkv"),
         media.directory.path().join("extracted-audio.mkv"),
         media.directory.path().join("missing-audio.mkv"),
+        media.directory.path().join("extracted-matroska-audio.mka"),
+        media.directory.path().join("refused-picture.mka"),
     ];
     let extract_file = media.directory.path().join("extract-batch.json");
     let first_id = folder_asset("-first-فارسی.mkv");
@@ -2237,7 +2239,9 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "items":[
             {"target":{"asset_id":first_id,"output":extract_outputs[0]},"selector":{"kind":"video","ordinal":1}},
             {"target":{"asset_id":first_id,"output":extract_outputs[1]},"selector":{"kind":"audio","ordinal":2}},
-            {"target":{"asset_id":second_id,"output":extract_outputs[2]},"selector":{"kind":"audio","ordinal":2}}
+            {"target":{"asset_id":second_id,"output":extract_outputs[2]},"selector":{"kind":"audio","ordinal":2}},
+            {"target":{"asset_id":first_id,"output":extract_outputs[3]},"selector":{"kind":"audio","ordinal":2}},
+            {"target":{"asset_id":first_id,"output":extract_outputs[4]},"selector":{"kind":"video","ordinal":1}}
         ],
         "failure_policy":"continue_with_rejected"
     });
@@ -2260,6 +2264,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(extraction["items"][1]["extraction"]["source_index"], 2);
     assert_eq!(extraction["items"][2]["error"]["code"], "STREAM_NOT_FOUND");
     assert!(extraction["items"][2]["extraction"]["source_index"].is_null());
+    assert_eq!(extraction["items"][3]["extraction"]["source_index"], 2);
+    assert_eq!(extraction["items"][4]["error"]["code"], "INCOMPATIBLE_PRESERVATION");
     let extract_submit = cli
         .mutation(
             &scope,
@@ -2277,11 +2283,12 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         ])
         .await;
     assert_eq!(status, 9, "{extract_result}");
-    assert_eq!(extract_result["result"]["succeeded"], 2);
-    assert_eq!(extract_result["result"]["failed"], 1);
-    assert!(!extract_outputs[2].exists());
+    assert_eq!(extract_result["result"]["succeeded"], 3);
+    assert_eq!(extract_result["result"]["failed"], 2);
+    assert!(!extract_outputs[2].exists() && !extract_outputs[4].exists());
     let source_packets = packets(&media.bin, &media.source).await;
-    for (output, original) in extract_outputs.iter().zip([0_u64, 2]) {
+    for (index, original) in [(0, 0_u64), (1, 2), (3, 2)] {
+        let output = &extract_outputs[index];
         let copied = packets(&media.bin, output).await;
         assert_eq!(copied.len(), 1);
         let mut expected = source_packets[&original].clone();
@@ -2292,7 +2299,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     }
     let sdk_extraction_input = json!({
         "items":[
-            {"target":{"asset_id":sdk_assets[0]["id"],"output":media.directory.path().join("sdk-extracted-audio.mkv")},
+            {"target":{"asset_id":sdk_assets[0]["id"],"output":media.directory.path().join("sdk-extracted-audio.mka")},
              "selector":{"kind":"audio","ordinal":2}},
             {"target":{"asset_id":sdk_assets[1]["id"],"output":media.directory.path().join("sdk-missing-audio.mkv")},
              "selector":{"kind":"audio","ordinal":2}}

@@ -189,3 +189,24 @@ The FFmWiz H.264 importer accepts explicit width, height, size presets,
 fit boxes and stretch boxes. It uses nearest-even rounding and calculates
 the display dimensions after crop and orientation. Presets choose the
 closest displayed edge. [FFmWiz size resolution](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/ext00c.py#L168-L247)
+
+## November 19, 12:20 UTC follow-up
+
+FFmWiz, MuxCls, FilmCraft, EffectCraft, Shotcut and Vidonex retain the revisions
+reviewed above. FFmpeg Skill 3.14.1 adds audio-only Matroska output. Its packet
+copy route preserves the selected codec, while its accurate encode route uses
+FLAC. Numera's single-file and explicit batch extraction use the same Rust
+Matroska planner for `.mka`, reject non-audio streams in that output, and
+verify the original packet payloads and clocks. A separate FFmpeg 9.0.2 run
+matched 47 packets and retained the Persian language tag on the selected PCM
+track. The new application journey is awaiting hosted qualification. Accurate
+FLAC encoding is a separate pending workflow.
+[FFmpeg Skill update](https://github.com/kajisho5/ffmpeg-skill/commit/15f7965cea)
+
+FFmpeg development includes additional APNG probe coverage for large ancillary
+chunks and a MOV writer change to initialize the elementary stream descriptor
+ID to zero. Current package components still use stable 9.0.2. Craft
+Libraries adds OpenPGP message signature and key inspection alongside a
+format-only AAF regression edit. That mail signature crate has no opt-in
+or package trust integration in Numera.
+[FFmpeg comparison](https://github.com/FFmpeg/FFmpeg/compare/4da74f951349f82e77cebc00be64423ccf8f6844...cd39c36377fcdac674fea5905cf633e6b8b8a471) · [Craft Libraries comparison](https://github.com/storytold/craft-libs/compare/1acd07f6bc48b04df49aa00e1c3852b159151d63...a9949872bd91ecf6bcec4e86339e3f50ad007fb9)

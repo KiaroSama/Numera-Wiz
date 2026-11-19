@@ -29,6 +29,8 @@ or `batches plan-folder` for a retained folder snapshot. The folder review
 records failures and companion inventory. `continue_with_rejected` reviews
 the successfully registered files while retaining the original failure outcomes.
 The CLI manual covers requests and submission. [CLI manual](CLI.md)
+Single-file and explicit batch extraction accept `.mka` for an audio-only
+Matroska output. They retain the original codec, packet payloads and timing.
 The remux verifier now requires a complete bounded packet read with exact
 rational timestamps, packet hashes/flags, codec/extradata and ffprobe-exposed
 side data alongside structural/tag/disposition/chapter assertions. Decoded

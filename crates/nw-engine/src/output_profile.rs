@@ -23,7 +23,7 @@ impl OutputProfile {
             .map(str::to_ascii_lowercase)
             .as_deref()
         {
-            Some("mkv") => Ok(Self::Matroska),
+            Some("mkv" | "mka") => Ok(Self::Matroska),
             Some("wav") => Ok(Self::WavePcm),
             Some("mov") => Ok(Self::QuickTimeMpeg4),
             Some("mp4" | "m4v") => Ok(Self::IsoMp4Mpeg4),

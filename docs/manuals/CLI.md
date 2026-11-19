@@ -82,7 +82,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |
 | `streams report --asset ID --intent-file INTENT.json` | Inspect selection counts; repeat --asset for up to 64 assets. |
 | `streams clean --asset ID --out PATH --intent-file INTENT.json` | Prepare a cleanup plan for separate review and submission. |
-| `streams extract --asset ID --stream INDEX --out PATH.mkv` | Review packet-copy extraction of a single original video, audio or subtitle stream. Submit the reviewed plan separately. |
+| `streams extract --asset ID --stream INDEX --out PATH.mkv` | Review packet-copy extraction of one original video, audio or subtitle stream. Use `.mka` for audio-only output. Submit the reviewed plan separately. |
 | `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `streams extract-folder --file FOLDER-EXTRACTION.json` | Resolve one track type and ordinal per source in a retained folder snapshot, with derived Matroska destinations in a separate directory. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
