@@ -149,14 +149,29 @@ pub struct AudioObservationInput {
 
 impl AudioObservationInput {
     pub fn frames(&self) -> Result<u32> {
-        let frames = self.range.end.checked_sub(self.range.start).filter(|count| *count != 0)
-            .ok_or_else(|| DomainError::new("INVALID_RANGE", "Choose a nonempty half-open decoded sample interval"))?;
+        let frames = self
+            .range
+            .end
+            .checked_sub(self.range.start)
+            .filter(|count| *count != 0)
+            .ok_or_else(|| {
+                DomainError::new(
+                    "INVALID_RANGE",
+                    "Choose a nonempty half-open decoded sample interval",
+                )
+            })?;
         if !(8000..=192000).contains(&self.sample_rate) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Choose an original rate between 8000 and 192000 Hz"));
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Choose an original rate between 8000 and 192000 Hz",
+            ));
         }
         let pcm = u64::from(frames) * 2 * self.channels() as u64;
         if pcm > (MAX_INLINE_WAVE_BYTES - 44) as u64 {
-            return Err(DomainError::new("INLINE_BUDGET_EXCEEDED", "Choose a shorter sample interval for inline WAVE delivery"));
+            return Err(DomainError::new(
+                "INLINE_BUDGET_EXCEEDED",
+                "Choose a shorter sample interval for inline WAVE delivery",
+            ));
         }
         Ok(frames)
     }

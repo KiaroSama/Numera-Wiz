@@ -1357,15 +1357,26 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let output = directory.join(format!("scaled-{label}.mp4"));
         let legacy = format!(
             "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\ncrop=30,40,40,30\nresolution={resolution}\nvideo_look=90cw\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
-            path.display(), output.display(),
+            path.display(),
+            output.display(),
         );
-        let imported = cli.query("config.import.ffmwiz", json!({
-            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
-        })).await;
+        let imported = cli
+            .query(
+                "config.import.ffmwiz",
+                json!({
+                    "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
+                }),
+            )
+            .await;
         assert_eq!(imported["input_valid"], true, "{imported}");
-        let reviewed = cli.query("jobs.plan", json!({
-            "asset_id":original["id"],"job_document":imported["job"]
-        })).await;
+        let reviewed = cli
+            .query(
+                "jobs.plan",
+                json!({
+                    "asset_id":original["id"],"job_document":imported["job"]
+                }),
+            )
+            .await;
         let direct = cli.query("media.encode", json!({
             "asset_id":original["id"],"output":output,"settings":{
                 "video_stream":0,"container":"mp4","preset":"balanced",
@@ -2487,7 +2498,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         tree_input.clone(),
         json!({})
     );
-    assert_eq!(missing_child["error"]["code"], "OUTPUT_DIRECTORY_UNAVAILABLE");
+    assert_eq!(
+        missing_child["error"]["code"],
+        "OUTPUT_DIRECTORY_UNAVAILABLE"
+    );
     assert!(!tree_child.exists());
     #[cfg(unix)]
     {
@@ -2534,7 +2548,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let tree_plan = &tree_plan["plan"];
     assert_eq!(tree_cli["result"]["plan"]["hash"], tree_plan["hash"]);
     assert_eq!(tree_stdio["plan"]["hash"], tree_plan["hash"]);
-    let tree_paths = [tree_root.join("-first-فارسی (2).mkv"), tree_root.join(second_relative)];
+    let tree_paths = [
+        tree_root.join("-first-فارسی (2).mkv"),
+        tree_root.join(second_relative),
+    ];
     let tree_items = tree_plan["items"].as_array().unwrap();
     assert_eq!(tree_items.len(), 3);
     for (item, path) in tree_items.iter().zip(&tree_paths) {
@@ -2544,7 +2561,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     }
     let notes = tree_root.join("notes (2).txt");
     assert_eq!(tree_items[2]["output_path"], json!(notes));
-    assert_eq!(tree_items[2]["companion"]["snapshot_id"], clean_folder["id"]);
+    assert_eq!(
+        tree_items[2]["companion"]["snapshot_id"],
+        clean_folder["id"]
+    );
     let source_notes = intake.join("notes.txt");
     let original_notes = std::fs::read(&source_notes).unwrap();
     std::fs::write(&source_notes, b"changed since retained intake").unwrap();
@@ -2566,17 +2586,32 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     );
     let tree_result = finished!(http, tree_group["batch_id"]);
     assert_eq!(tree_result["succeeded"], 3);
-    assert_eq!(tree_result["items"][2]["companion"], tree_items[2]["companion"]);
+    assert_eq!(
+        tree_result["items"][2]["companion"],
+        tree_items[2]["companion"]
+    );
     let videos = [&media.source, &second];
-    let video_bytes: u64 = videos.iter().map(|path| std::fs::metadata(path).unwrap().len()).sum();
-    assert_eq!(tree_result["successful_video_input_bytes"], video_bytes.to_string());
-    assert_eq!(tree_result["successful_video_output_bytes"], video_bytes.to_string());
+    let video_bytes: u64 = videos
+        .iter()
+        .map(|path| std::fs::metadata(path).unwrap().len())
+        .sum();
+    assert_eq!(
+        tree_result["successful_video_input_bytes"],
+        video_bytes.to_string()
+    );
+    assert_eq!(
+        tree_result["successful_video_output_bytes"],
+        video_bytes.to_string()
+    );
     for (path, source) in tree_paths.iter().zip(videos) {
         assert_eq!(std::fs::read(path).unwrap(), std::fs::read(source).unwrap());
     }
     assert_eq!(std::fs::read(collision).unwrap(), b"existing destination");
     assert_eq!(std::fs::read(notes).unwrap(), original_notes);
-    assert_eq!(std::fs::read(companion_collision).unwrap(), b"existing companion destination");
+    assert_eq!(
+        std::fs::read(companion_collision).unwrap(),
+        b"existing companion destination"
+    );
     let extraction_root = media.directory.path().join("retained-folder-extraction");
     std::fs::create_dir(&extraction_root).unwrap();
     let folder_extraction = json!({

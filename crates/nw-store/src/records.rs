@@ -578,7 +578,9 @@ impl Store {
                 };
                 let rights = nw_domain::plans::validate_requirements(&child)?;
                 let child_companion = match &rights.source_read.purpose {
-                    nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source } => Some(source),
+                    nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source } => {
+                        Some(source)
+                    }
                     _ => None,
                 };
                 if child.hash != reference.hash

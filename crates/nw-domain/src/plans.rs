@@ -27,8 +27,12 @@ pub struct SourceRead {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SourcePurpose {
     NativeFile,
-    CreatorBoundManaged { principal: String },
-    RetainedFolderCompanion { source: crate::ingest::FolderCompanionSource },
+    CreatorBoundManaged {
+        principal: String,
+    },
+    RetainedFolderCompanion {
+        source: crate::ingest::FolderCompanionSource,
+    },
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -261,7 +265,9 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
             || !plan.argv_template.is_empty()
             || !plan.added_tracks.is_empty())
     {
-        return Err(invalid("Retained folder companions require an exact byte copy"));
+        return Err(invalid(
+            "Retained folder companions require an exact byte copy",
+        ));
     }
     Ok(rights)
 }

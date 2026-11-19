@@ -210,7 +210,11 @@ fn captured_companion(
         },
         asset: Asset {
             source_object: Some(entry.source_object.clone().ok_or_else(invalid)?),
-            display_name: path.file_name().and_then(|name| name.to_str()).ok_or_else(invalid)?.into(),
+            display_name: path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(invalid)?
+                .into(),
             id: format!("companion-{}-{}", snapshot.id, entry.index),
             creator: snapshot.creator.clone(),
             identity: identity.clone(),
@@ -279,7 +283,9 @@ impl Service {
                 "Folder enumeration was incomplete; inspect and rescan before review",
             ));
         }
-        if input.copy_companions && snapshot.input.companion_policy != CompanionIntakePolicy::Inventory {
+        if input.copy_companions
+            && snapshot.input.companion_policy != CompanionIntakePolicy::Inventory
+        {
             return Err(DomainError::new(
                 "COMPANION_INVENTORY_REQUIRED",
                 "Register the input folder with companion inventory before reviewing a companion copy",
@@ -423,7 +429,9 @@ impl Service {
             snapshot
                 .entries
                 .iter()
-                .filter(|entry| entry.outcome == FolderEntryOutcome::Registered || is_companion(entry))
+                .filter(|entry| {
+                    entry.outcome == FolderEntryOutcome::Registered || is_companion(entry)
+                })
                 .map(|entry| {
                     output
                         .path()
@@ -485,7 +493,9 @@ impl Service {
                     .join(folder_output_name(entry.index, &expected_path)?),
                 FolderOutputLayout::PreserveTree => {
                     let path = output.path().join(relative);
-                    let parent = path.parent().filter(|parent| parent.starts_with(output.path()));
+                    let parent = path
+                        .parent()
+                        .filter(|parent| parent.starts_with(output.path()));
                     let Some(parent) = parent else {
                         return Err(output_denied());
                     };
@@ -708,7 +718,9 @@ impl Service {
             cancel,
             companions,
             |item, _, _| {
-                let plan = if let Some(companion) = companions.and_then(|files| files.get(&item.asset_id)) {
+                let plan = if let Some(companion) =
+                    companions.and_then(|files| files.get(&item.asset_id))
+                {
                     self.prepare_captured_copy(
                         context,
                         companion.asset.clone(),

@@ -282,14 +282,22 @@ fn geometry(value: &str) -> Option<Setting> {
     if matches!(mode, ScaleMode::Stretch) {
         return None;
     }
-    if let Some(width) = body.strip_prefix("width=").or_else(|| body.strip_prefix('w')).or_else(|| body.strip_suffix('w')) {
+    if let Some(width) = body
+        .strip_prefix("width=")
+        .or_else(|| body.strip_prefix('w'))
+        .or_else(|| body.strip_suffix('w'))
+    {
         return Some(Setting::Geometry {
             mode: ScaleMode::Width,
             width: Some(integer(width, 1, 16384)?),
             height: None,
         });
     }
-    if let Some(height) = body.strip_prefix("height=").or_else(|| body.strip_prefix('h')).or_else(|| body.strip_suffix('h')) {
+    if let Some(height) = body
+        .strip_prefix("height=")
+        .or_else(|| body.strip_prefix('h'))
+        .or_else(|| body.strip_suffix('h'))
+    {
         return Some(Setting::Geometry {
             mode: ScaleMode::Height,
             width: None,

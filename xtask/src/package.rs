@@ -190,7 +190,8 @@ pub(crate) fn qualify_portable_export(
     let fixture = resources.join("examples/quickstart/clip.mkv");
     let fixture_digest = digest(&fixture)?;
     anyhow::ensure!(
-        fixture_digest["sha256"] == "9aff62348c868712df08ca9fc2c17cef2d7704b7c680922aafd1ae7c8d5892eb",
+        fixture_digest["sha256"]
+            == "9aff62348c868712df08ca9fc2c17cef2d7704b7c680922aafd1ae7c8d5892eb",
         "Unexpected portable walkthrough fixture"
     );
     let run = |step: &str, args: &[&str]| -> Result<Value> {
@@ -207,7 +208,9 @@ pub(crate) fn qualify_portable_export(
             .with_context(|| format!("Start the portable export step {step}"))?;
         response_file.seek(SeekFrom::Start(0))?;
         let mut bytes = Vec::new();
-        response_file.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+        response_file
+            .take(1024 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
         anyhow::ensure!(
             bytes.len() <= 1024 * 1024,
             "Oversized portable export response at {step}"
@@ -264,7 +267,9 @@ pub(crate) fn qualify_portable_export(
     )?;
     let plan_id = plan["id"].as_str().context("Portable plan ID")?;
     let reviewed = run("review", &["plans", "inspect", plan_id])?;
-    let hash = reviewed["hash"].as_str().context("Portable reviewed hash")?;
+    let hash = reviewed["hash"]
+        .as_str()
+        .context("Portable reviewed hash")?;
     anyhow::ensure!(
         plan["hash"] == hash,
         "Portable review changed the admitted plan"
@@ -289,8 +294,13 @@ pub(crate) fn qualify_portable_export(
         .context("Portable accepted job ID")?;
     let job = run("wait", &["jobs", "wait", job_id, "--timeout-seconds", "60"])?;
     let artifact = format!("job-{job_id}");
-    let manifest = run("manifest", &["artifacts", "manifest", "--artifact-id", &artifact])?;
-    let sha256 = manifest["sha256"].as_str().context("Portable artifact digest")?;
+    let manifest = run(
+        "manifest",
+        &["artifacts", "manifest", "--artifact-id", &artifact],
+    )?;
+    let sha256 = manifest["sha256"]
+        .as_str()
+        .context("Portable artifact digest")?;
     let saved = scratch.join("verified.mp4");
     run(
         "save",

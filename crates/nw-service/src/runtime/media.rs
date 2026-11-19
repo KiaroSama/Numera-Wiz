@@ -219,30 +219,53 @@ impl Service {
         cancel: CancellationToken,
     ) -> Result<nw_domain::preview::ObservationResult> {
         use nw_domain::preview::{
-            self, InlineObservation, ObservationMetadata, ObservationResult, ObserveInput, ObserveTarget,
+            self, InlineObservation, ObservationMetadata, ObservationResult, ObserveInput,
+            ObserveTarget,
         };
 
         let (target, frame_selection, source_policy, display_profile, fit, encoding, delivery) =
             match input {
                 ObserveInput::Still {
-                    target, frame_selection, source_policy, display_profile, fit, encoding, delivery,
-                } => (target, frame_selection, source_policy, display_profile, fit, encoding, delivery),
+                    target,
+                    frame_selection,
+                    source_policy,
+                    display_profile,
+                    fit,
+                    encoding,
+                    delivery,
+                } => (
+                    target,
+                    frame_selection,
+                    source_policy,
+                    display_profile,
+                    fit,
+                    encoding,
+                    delivery,
+                ),
                 ObserveInput::Audio(input) => {
-                    return self.observe_audio(context, input, cancel).map(ObservationResult::Audio);
+                    return self
+                        .observe_audio(context, input, cancel)
+                        .map(ObservationResult::Audio);
                 }
             };
         let file = match &target {
-            ObserveTarget::RegisteredSource { asset_id, stream_index, frame_index }
-                if frame_selection == preview::FrameSelection::DecodedIndex
-                    && display_profile == preview::DisplayProfile::SourceMonitorRgba8 =>
+            ObserveTarget::RegisteredSource {
+                asset_id,
+                stream_index,
+                frame_index,
+            } if frame_selection == preview::FrameSelection::DecodedIndex
+                && display_profile == preview::DisplayProfile::SourceMonitorRgba8 =>
             {
                 let (asset, source) = self.analysis_source(context, asset_id)?;
                 let engine = self.engine()?;
-                let observed = tokio::runtime::Handle::current().block_on(
-                    engine.observe_registered_png(
-                        &asset, source, *stream_index, *frame_index, cancel.clone(),
-                    ),
-                )?;
+                let observed =
+                    tokio::runtime::Handle::current().block_on(engine.observe_registered_png(
+                        &asset,
+                        source,
+                        *stream_index,
+                        *frame_index,
+                        cancel.clone(),
+                    ))?;
                 self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
                 StillFile {
                     bytes: observed.bytes,
@@ -254,22 +277,31 @@ impl Service {
                     timeline: None,
                 }
             }
-            ObserveTarget::TimelineFrame { project_id, sequence_id, revision, at }
-                if frame_selection == preview::FrameSelection::ExactSequenceGrid
-                    && display_profile == preview::DisplayProfile::TimelineMonitorRgba8 =>
+            ObserveTarget::TimelineFrame {
+                project_id,
+                sequence_id,
+                revision,
+                at,
+            } if frame_selection == preview::FrameSelection::ExactSequenceGrid
+                && display_profile == preview::DisplayProfile::TimelineMonitorRgba8 =>
             {
                 self.observe_timeline_frame(
-                    context, project_id,
+                    context,
+                    project_id,
                     preview::TimelineFrameInput {
-                        sequence_id: sequence_id.clone(), revision: *revision, at: *at,
+                        sequence_id: sequence_id.clone(),
+                        revision: *revision,
+                        at: *at,
                     },
                     cancel,
                 )?
             }
-            _ => return Err(DomainError::new(
-                "VALIDATION_ERROR",
-                "Choose the frame selection and display profile for this observation target",
-            )),
+            _ => {
+                return Err(DomainError::new(
+                    "VALIDATION_ERROR",
+                    "Choose the frame selection and display profile for this observation target",
+                ));
+            }
         };
         let metadata = ObservationMetadata {
             observation_id: Uuid::new_v4().to_string(),
@@ -318,7 +350,11 @@ impl Service {
         let (asset, source) = self.analysis_source(context, &input.target.asset_id)?;
         let engine = self.engine()?;
         let wave = tokio::runtime::Handle::current().block_on(engine.observe_pcm_wave(
-            &asset, source, &input, self.root.join("runtime").join("observe-audio"), cancel.clone(),
+            &asset,
+            source,
+            &input,
+            self.root.join("runtime").join("observe-audio"),
+            cancel.clone(),
         ))?;
         self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
         Ok(InlineAudioObservation {

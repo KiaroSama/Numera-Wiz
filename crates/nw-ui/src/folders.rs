@@ -632,9 +632,10 @@ impl WizApp {
             ui.label("This snapshot has no registered video to review.");
             return;
         }
-        let has_companions = snapshot.entries.iter().any(|entry| {
-            entry.outcome == FolderEntryOutcome::CompanionInventoried
-        });
+        let has_companions = snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == FolderEntryOutcome::CompanionInventoried);
         ui.label("Existing authorized engine directory in a separate tree");
         ui.add_enabled_ui(idle, |ui| {
             reveal_focus(
@@ -658,8 +659,13 @@ impl WizApp {
                     "Preserve source tree",
                 );
             });
-            if has_companions && self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree {
-                ui.checkbox(&mut self.folder.cleanup_copy_companions, "Copy inventoried companion files");
+            if has_companions
+                && self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree
+            {
+                ui.checkbox(
+                    &mut self.folder.cleanup_copy_companions,
+                    "Copy inventoried companion files",
+                );
             }
             self.batch_policy_controls(ui, true);
         });
@@ -686,7 +692,8 @@ impl WizApp {
             if review.clicked() {
                 let root = self.folder.batch_output_root.clone();
                 let layout = self.folder.cleanup_output_layout;
-                let companions = has_companions && self.folder.cleanup_copy_companions
+                let companions = has_companions
+                    && self.folder.cleanup_copy_companions
                     && layout == FolderOutputLayout::PreserveTree;
                 self.review_folder_batch(snapshot, &root, layout, companions, ui.ctx());
             }

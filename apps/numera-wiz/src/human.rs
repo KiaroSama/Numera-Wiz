@@ -772,7 +772,10 @@ pub fn prepare(command: Command) -> Result<Request> {
             ))?,
         ),
         Command::Previews(Previews::ObserveTimeline {
-            project, sequence, revision, at,
+            project,
+            sequence,
+            revision,
+            at,
         }) => {
             let input = nw_domain::preview::ObserveInput::timeline(
                 nw_domain::projects::ProjectId::parse(project)?,
@@ -780,28 +783,55 @@ pub fn prepare(command: Command) -> Result<Request> {
                 nw_domain::projects::Revision::parse(&revision)?,
                 projects::rational(&at)?,
             );
-            query(nw_domain::preview::OBSERVE_COMMAND, serde_json::to_value(input)?)
+            query(
+                nw_domain::preview::OBSERVE_COMMAND,
+                serde_json::to_value(input)?,
+            )
         }
         Command::Previews(Previews::ObserveAudio {
-            asset, stream, start_sample, end_sample, sample_rate, channel_layout,
+            asset,
+            stream,
+            start_sample,
+            end_sample,
+            sample_rate,
+            channel_layout,
         }) => {
-            use nw_domain::{media::AudioLayout, preview::{
-                AudioEncoding, AudioObservationInput, AudioTarget, Delivery, ObserveInput,
-                SampleRange, SourcePolicy, OBSERVE_COMMAND,
-            }};
+            use nw_domain::{
+                media::AudioLayout,
+                preview::{
+                    AudioEncoding, AudioObservationInput, AudioTarget, Delivery, OBSERVE_COMMAND,
+                    ObserveInput, SampleRange, SourcePolicy,
+                },
+            };
             let channel_layout = match channel_layout.as_str() {
                 "mono" => AudioLayout::Mono,
                 "stereo" => AudioLayout::Stereo,
-                _ => return Err(DomainError::new("VALIDATION_ERROR","Choose mono or stereo").into()),
+                _ => {
+                    return Err(
+                        DomainError::new("VALIDATION_ERROR", "Choose mono or stereo").into(),
+                    );
+                }
             };
             let input = AudioObservationInput {
-                target: AudioTarget { asset_id: asset, stream_index: stream },
-                range: SampleRange { start: start_sample, end: end_sample },
-                sample_rate, channel_layout, source_policy: SourcePolicy::OriginalRequired,
-                encoding: AudioEncoding::WavePcm16 {}, delivery: Delivery::Inline,
+                target: AudioTarget {
+                    asset_id: asset,
+                    stream_index: stream,
+                },
+                range: SampleRange {
+                    start: start_sample,
+                    end: end_sample,
+                },
+                sample_rate,
+                channel_layout,
+                source_policy: SourcePolicy::OriginalRequired,
+                encoding: AudioEncoding::WavePcm16 {},
+                delivery: Delivery::Inline,
             };
             input.frames()?;
-            query(OBSERVE_COMMAND, serde_json::to_value(ObserveInput::Audio(input))?)
+            query(
+                OBSERVE_COMMAND,
+                serde_json::to_value(ObserveInput::Audio(input))?,
+            )
         }
         Command::Media(Media::PreviewSegment {
             asset,

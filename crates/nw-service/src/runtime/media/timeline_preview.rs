@@ -2,7 +2,9 @@
 use super::*;
 use nw_domain::{
     media::{OccurrenceSource, bind_mixed_source, capture_mixed_frame, visible_occurrence},
-    preview::{self, FrameOrigin, FrameTiming, TimelineFrame, TimelineFrameInput, TimelineObservation},
+    preview::{
+        self, FrameOrigin, FrameTiming, TimelineFrame, TimelineFrameInput, TimelineObservation,
+    },
     projects::{EntityId, ProjectId},
     time::Rational,
 };
@@ -128,7 +130,8 @@ impl Service {
                         ),
                     )?;
                     if encode_png {
-                        original_source_pts = Some(binding.asset_origin.checked_add(clip.source_range.start)?);
+                        original_source_pts =
+                            Some(binding.asset_origin.checked_add(clip.source_range.start)?);
                     }
                     held_source = Some(source);
                     (
@@ -163,18 +166,24 @@ impl Service {
                 cancel.clone(),
             ))?;
             let graph = serde_json::to_vec(&(&capture, png.graph_sha256)).map_err(|_| {
-                DomainError::new("SERIALIZATION_FAILED", "Timeline observation graph identity is unavailable")
+                DomainError::new(
+                    "SERIALIZATION_FAILED",
+                    "Timeline observation graph identity is unavailable",
+                )
             })?;
             let observation = TimelineObservation {
                 interval: capture.range,
                 origin: origin.clone(),
                 original_source_pts,
             };
-            (png.bytes, Some(EncodedTimeline {
-                component_sha256: engine.ffmpeg.sha256.clone(),
-                graph_sha256: nw_domain::projects::hash(&graph),
-                observation,
-            }))
+            (
+                png.bytes,
+                Some(EncodedTimeline {
+                    component_sha256: engine.ffmpeg.sha256.clone(),
+                    graph_sha256: nw_domain::projects::hash(&graph),
+                    observation,
+                }),
+            )
         } else {
             (pixels, None)
         };
@@ -185,7 +194,11 @@ impl Service {
                 "Timeline preview cancelled before delivery",
             ));
         }
-        let command = if encode_png { preview::OBSERVE_COMMAND } else { "timeline.preview_frame" };
+        let command = if encode_png {
+            preview::OBSERVE_COMMAND
+        } else {
+            "timeline.preview_frame"
+        };
         if self
             .policy(context)?
             .as_ref()

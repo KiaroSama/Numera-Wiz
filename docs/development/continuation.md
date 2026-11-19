@@ -22,7 +22,7 @@ SHA-256, the application identity and executable architecture, FFmpeg and
 ffprobe identities, and the matching source archive. All 13 Rust CI jobs and
 Gitleaks passed on that exact source. The run exercised the real native and
 Chrome workspaces, both official MCP transports, and large-artifact HTTP
-publication, cancellation and revocation. [CI391 packages and results](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064) · [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505868812)
+publication, cancellation and revocation. [Verified packages and CI results](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064) · [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505868812)
 
 At the same source, the owner-batch report confirms the original packet
 digests for extracted tracks, preservation of missing-track and scan failures,

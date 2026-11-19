@@ -695,7 +695,9 @@ async fn journey(
         clips,
     };
     let baseline = checkpoint(&mut journey, &project, 3, None, None).await;
-    if tag.starts_with("http") && let Adapter::Sdk(client) = &journey.adapter {
+    if tag.starts_with("http")
+        && let Adapter::Sdk(client) = &journey.adapter
+    {
         let params = json!({
             "kind":"still","target":{"kind":"timeline_frame","project_id":project.id,
                 "sequence_id":project.sequence,"revision":"3","at":rational(1)},
@@ -703,8 +705,13 @@ async fn journey(
             "display_profile":"timeline_monitor_rgba8","fit":"contain","encoding":{"format":"png"},
             "delivery":"inline"
         });
-        let still = client.call_tool(CallToolRequestParams::new("previews.observe")
-            .with_arguments(rmcp::object!({"params":params}))).await.unwrap();
+        let still = client
+            .call_tool(
+                CallToolRequestParams::new("previews.observe")
+                    .with_arguments(rmcp::object!({"params":params})),
+            )
+            .await
+            .unwrap();
         let still = serde_json::to_value(still).unwrap();
         assert_eq!(still["structuredContent"]["ok"], true, "{still}");
         let image = &still["content"][0];

@@ -113,19 +113,56 @@ impl Engine {
         cancel: CancellationToken,
     ) -> Result<ObservedPng> {
         if pixels.len() != preview::RGBA_BYTES {
-            return Err(DomainError::new("FRAME_UNAVAILABLE", "Incomplete monitor frame"));
+            return Err(DomainError::new(
+                "FRAME_UNAVAILABLE",
+                "Incomplete monitor frame",
+            ));
         }
         let raster = format!("{}x{}", preview::WIDTH, preview::HEIGHT);
         let args = [
-            "-hide_banner", "-nostdin", "-v", "error", "-xerror", "-max_alloc", "67108864",
-            "-protocol_whitelist", "fd", "-f", "rawvideo", "-video_size", &raster,
-            "-pixel_format", "rgba", "-framerate", "1", "-i", "fd:",
-            "-map", "0:v:0", "-map_metadata", "-1", "-map_chapters", "-1",
-            "-frames:v", "1", "-c:v", "png", "-threads", "1", "-pix_fmt", "rgba",
-            "-f", "image2pipe", "pipe:1",
-        ].map(str::to_owned);
+            "-hide_banner",
+            "-nostdin",
+            "-v",
+            "error",
+            "-xerror",
+            "-max_alloc",
+            "67108864",
+            "-protocol_whitelist",
+            "fd",
+            "-f",
+            "rawvideo",
+            "-video_size",
+            &raster,
+            "-pixel_format",
+            "rgba",
+            "-framerate",
+            "1",
+            "-i",
+            "fd:",
+            "-map",
+            "0:v:0",
+            "-map_metadata",
+            "-1",
+            "-map_chapters",
+            "-1",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "png",
+            "-threads",
+            "1",
+            "-pix_fmt",
+            "rgba",
+            "-f",
+            "image2pipe",
+            "pipe:1",
+        ]
+        .map(str::to_owned);
         let graph = serde_json::to_vec(&args).map_err(|_| {
-            DomainError::new("INVALID_PLAN", "Monitor encoding graph identity is unavailable")
+            DomainError::new(
+                "INVALID_PLAN",
+                "Monitor encoding graph identity is unavailable",
+            )
         })?;
         let input = blocking(move || {
             let root = nw_platform::security::private_directory(&scratch)?;
@@ -133,7 +170,8 @@ impl Engine {
             file.write_all(&pixels).map_err(crate::io_error)?;
             file.rewind().map_err(crate::io_error)?;
             Ok(file)
-        }).await?;
+        })
+        .await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone()).await {
             return ticket.finish(Err(error));
@@ -145,7 +183,8 @@ impl Engine {
             preview::MAX_INLINE_PNG_BYTES,
             input,
             cancel.clone(),
-        ).await;
+        )
+        .await;
         let output = ticket.finish(result)?;
         verify_png(&output.stdout, &cancel)?;
         identities(self, cancel).await?;

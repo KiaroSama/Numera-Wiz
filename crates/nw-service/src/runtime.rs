@@ -752,11 +752,14 @@ impl Service {
             nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source } => {
                 let snapshot = self.read_folder(context, &source.snapshot_id)?;
                 let entry = snapshot.entries.get(source.index as usize);
-                if managed || snapshot.creator != plan.source.creator || !entry.is_some_and(|entry| {
-                    entry.outcome == nw_domain::ingest::FolderEntryOutcome::CompanionInventoried
-                        && entry.identity.as_ref() == Some(&plan.source.identity)
-                        && entry.source_object == plan.source.source_object
-                }) {
+                if managed
+                    || snapshot.creator != plan.source.creator
+                    || !entry.is_some_and(|entry| {
+                        entry.outcome == nw_domain::ingest::FolderEntryOutcome::CompanionInventoried
+                            && entry.identity.as_ref() == Some(&plan.source.identity)
+                            && entry.source_object == plan.source.source_object
+                    })
+                {
                     return Err(DomainError::new(
                         "INVALID_PLAN",
                         "Plan source differs from the retained folder companion",
