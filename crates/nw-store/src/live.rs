@@ -265,6 +265,7 @@ impl DatabaseSlot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use redb::ReadableTable;
     const TABLE: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("slot-unit");
     #[test]
     fn switch_refuses_live_read_or_write_and_preserves_the_original_commits() {

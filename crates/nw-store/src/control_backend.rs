@@ -20,29 +20,29 @@ impl BoundedBackend {
     }
 }
 impl StorageBackend for BoundedBackend {
-    fn len(&self) -> io::Result<u64> {
+    fn len(&self) -> std::result::Result<u64, BackendError> {
         let length = self.inner.len()?;
         self.range(length)?;
         Ok(length)
     }
-    fn read(&self, offset: u64, out: &mut [u8]) -> io::Result<()> {
+    fn read(&self, offset: u64, out: &mut [u8]) -> std::result::Result<(), BackendError> {
         self.inner.read(offset, out)
     }
-    fn set_len(&self, length: u64) -> io::Result<()> {
+    fn set_len(&self, length: u64) -> std::result::Result<(), BackendError> {
         self.range(length)?;
         self.inner.set_len(length)
     }
-    fn sync_data(&self) -> io::Result<()> {
+    fn sync_data(&self) -> std::result::Result<(), BackendError> {
         self.inner.sync_data()
     }
-    fn write(&self, offset: u64, data: &[u8]) -> io::Result<()> {
+    fn write(&self, offset: u64, data: &[u8]) -> std::result::Result<(), BackendError> {
         let end = offset
             .checked_add(data.len() as u64)
             .ok_or_else(|| io::Error::other("Generation write offset overflow"))?;
         self.range(end)?;
         self.inner.write(offset, data)
     }
-    fn close(&self) -> io::Result<()> {
+    fn close(&self) -> std::result::Result<(), BackendError> {
         self.inner.close()
     }
     fn try_lock_range(
@@ -141,12 +141,12 @@ fn open_backend(path: &Path, expected: &NativeObjectIdentity) -> Result<redb::Da
         expected,
     )?;
     let backend = BoundedBackend {
-        inner: redb::backends::FileBackend::new(file).map_err(versions::database_error)?,
+        inner: redb::backends::FileBackend::new(file),
         maximum: versions::MAX_GENERATION_BYTES,
     };
     backend.len().map_err(storage)?;
-    // redb4.4 exposes no open_with_backend. The verified existing handle and
-    // nonzero-length backend make its allow-create empty-file branch unreachable.
+    // The verified existing handle and nonzero-length backend rule out the
+    // shared create/open entry point's empty-file initialization path.
     redb::Database::builder()
         .set_cache_size(8 * 1024 * 1024)
         .create_with_backend(backend)
@@ -191,22 +191,22 @@ fn open_validated_backend(
 struct CaptureBackend(std::sync::Arc<BoundedBackend>);
 #[cfg(test)]
 impl StorageBackend for CaptureBackend {
-    fn len(&self) -> io::Result<u64> {
+    fn len(&self) -> std::result::Result<u64, BackendError> {
         self.0.len()
     }
-    fn read(&self, offset: u64, out: &mut [u8]) -> io::Result<()> {
+    fn read(&self, offset: u64, out: &mut [u8]) -> std::result::Result<(), BackendError> {
         self.0.read(offset, out)
     }
-    fn set_len(&self, length: u64) -> io::Result<()> {
+    fn set_len(&self, length: u64) -> std::result::Result<(), BackendError> {
         self.0.set_len(length)
     }
-    fn sync_data(&self) -> io::Result<()> {
+    fn sync_data(&self) -> std::result::Result<(), BackendError> {
         self.0.sync_data()
     }
-    fn write(&self, offset: u64, data: &[u8]) -> io::Result<()> {
+    fn write(&self, offset: u64, data: &[u8]) -> std::result::Result<(), BackendError> {
         self.0.write(offset, data)
     }
-    fn close(&self) -> io::Result<()> {
+    fn close(&self) -> std::result::Result<(), BackendError> {
         self.0.close()
     }
     fn try_lock_range(
@@ -277,7 +277,7 @@ impl Store {
         )
         .unwrap();
         let backend = std::sync::Arc::new(BoundedBackend {
-            inner: redb::backends::FileBackend::new(file).unwrap(),
+            inner: redb::backends::FileBackend::new(file),
             maximum: 32 * 1024 * 1024,
         });
         assert!(
@@ -339,7 +339,7 @@ pub(crate) fn exercise_bounded_existing_backend() {
         .unwrap();
     file.write_all(&[7u8; 16]).unwrap();
     let backend = BoundedBackend {
-        inner: redb::backends::FileBackend::new(file.try_clone().unwrap()).unwrap(),
+        inner: redb::backends::FileBackend::new(file.try_clone().unwrap()),
         maximum: 32,
     };
     assert_eq!(backend.len().unwrap(), 16);
@@ -376,7 +376,7 @@ pub(crate) fn exercise_bounded_existing_backend() {
         .open(directory.path().join("empty.bin"))
         .unwrap();
     let empty = BoundedBackend {
-        inner: redb::backends::FileBackend::new(empty).unwrap(),
+        inner: redb::backends::FileBackend::new(empty),
         maximum: 32,
     };
     assert!(
