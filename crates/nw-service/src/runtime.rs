@@ -1444,7 +1444,11 @@ impl Service {
             }
             "media.analyze.audio_tracks" => {
                 drop(guard);
-                let report = self.compare_source_audio(&context, commands::parse(params)?, cancellation.clone())?;
+                let report = self.compare_source_audio(
+                    &context,
+                    commands::parse(params)?,
+                    cancellation.clone(),
+                )?;
                 return Ok(Response::success(&request.request_id, value(&report)?).bounded());
             }
             "media.probe" => {
@@ -2352,29 +2356,72 @@ impl Service {
         input: CleanInput,
         now: u64,
     ) -> Result<Plan> {
-        self.prepare_native_copy(context, &input.asset_id, &input.output, input.execution_limits,
-            |engine, asset, output| engine.clean_plan_with_file_times_at(
-                asset, output, &input.intent, input.file_times, &context.principal, now,
-            ))
+        self.prepare_native_copy(
+            context,
+            &input.asset_id,
+            &input.output,
+            input.execution_limits,
+            |engine, asset, output| {
+                engine.clean_plan_with_file_times_at(
+                    asset,
+                    output,
+                    &input.intent,
+                    input.file_times,
+                    &context.principal,
+                    now,
+                )
+            },
+        )
     }
 
-    fn prepare_copy_review(&self, context: &Context, command: &str, params: Value, now: u64) -> Result<Plan> {
+    fn prepare_copy_review(
+        &self,
+        context: &Context,
+        command: &str,
+        params: Value,
+        now: u64,
+    ) -> Result<Plan> {
         let input = match command {
             "streams.extract" => {
                 let input: commands::ExtractInput = commands::parse(params)?;
-                return self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
-                    |engine, asset, output| engine.extract_plan_at(asset, output, input.stream_index, &context.principal, now));
+                return self.prepare_native_copy(
+                    context,
+                    &input.asset_id,
+                    &input.output,
+                    Default::default(),
+                    |engine, asset, output| {
+                        engine.extract_plan_at(
+                            asset,
+                            output,
+                            input.stream_index,
+                            &context.principal,
+                            now,
+                        )
+                    },
+                );
             }
-            "chapters.remove" => commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup(),
-            "chapters.import" => commands::parse::<nw_domain::chapters::ImportInput>(params)?.into_cleanup()?,
-            "disposition.patch" => commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup(),
-            "metadata.patch" => commands::parse::<nw_domain::metadata::PatchInput>(params)?.into_cleanup(),
+            "chapters.remove" => {
+                commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
+            }
+            "chapters.import" => {
+                commands::parse::<nw_domain::chapters::ImportInput>(params)?.into_cleanup()?
+            }
+            "disposition.patch" => {
+                commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup()
+            }
+            "metadata.patch" => {
+                commands::parse::<nw_domain::metadata::PatchInput>(params)?.into_cleanup()
+            }
             _ => commands::parse::<CleanInput>(params)?,
         };
         self.prepare_cleanup(context, input, now)
     }
 
-    fn prepare_native_copy(&self, context: &Context, asset_id: &str, output: &str,
+    fn prepare_native_copy(
+        &self,
+        context: &Context,
+        asset_id: &str,
+        output: &str,
         limits: nw_domain::execution::CleanupLimits,
         compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
     ) -> Result<Plan> {

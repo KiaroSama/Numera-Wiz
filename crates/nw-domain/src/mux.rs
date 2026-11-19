@@ -413,27 +413,58 @@ pub fn validate_intent(intent: &CleanIntent) -> Result<()> {
 
 pub fn extract_one(streams: &[Stream], index: u32) -> Result<CleanResolution> {
     if streams.is_empty() || streams.len() > 256 {
-        return Err(DomainError::new("RESOURCE_LIMIT", "At most 256 original streams are admitted"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "At most 256 original streams are admitted",
+        ));
     }
-    if streams.iter().map(|stream| stream.index).collect::<BTreeSet<_>>().len() != streams.len() {
-        return Err(DomainError::new("INVALID_PROBE", "Duplicate source stream index"));
-    }
-    let selected = streams.iter().find(|stream| stream.index == index).ok_or_else(|| {
-        DomainError::new("STREAM_NOT_FOUND", "The selected original stream does not exist")
-    })?;
-    if !matches!(selected.kind, StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle)
-        || selected.attached_picture()
+    if streams
+        .iter()
+        .map(|stream| stream.index)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != streams.len()
     {
-        return Err(DomainError::new("INCOMPATIBLE_PRESERVATION", "Select one ordinary video, audio or subtitle stream"));
+        return Err(DomainError::new(
+            "INVALID_PROBE",
+            "Duplicate source stream index",
+        ));
     }
-    let outcomes = streams.iter().map(|stream| {
-        let retained = stream.index == index;
-        StreamOutcome {
-            source_index: stream.index,
-            output_index: retained.then_some(0),
-            reason: if retained { "Explicitly selected extraction stream" } else { "Excluded by the extraction selection" }.into(),
-        }
-    }).collect();
+    let selected = streams
+        .iter()
+        .find(|stream| stream.index == index)
+        .ok_or_else(|| {
+            DomainError::new(
+                "STREAM_NOT_FOUND",
+                "The selected original stream does not exist",
+            )
+        })?;
+    if !matches!(
+        selected.kind,
+        StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle
+    ) || selected.attached_picture()
+    {
+        return Err(DomainError::new(
+            "INCOMPATIBLE_PRESERVATION",
+            "Select one ordinary video, audio or subtitle stream",
+        ));
+    }
+    let outcomes = streams
+        .iter()
+        .map(|stream| {
+            let retained = stream.index == index;
+            StreamOutcome {
+                source_index: stream.index,
+                output_index: retained.then_some(0),
+                reason: if retained {
+                    "Explicitly selected extraction stream"
+                } else {
+                    "Excluded by the extraction selection"
+                }
+                .into(),
+            }
+        })
+        .collect();
     Ok(CleanResolution {
         action: CleanAction::Remux,
         streams: vec![selected.clone()],

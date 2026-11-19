@@ -528,7 +528,8 @@ fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<
         64 * 1024 * 1024,
         &inputs,
         &system32.join("curl.exe"),
-    ).context("Stage the authenticated Windows compiler packages")?;
+    )
+    .context("Stage the authenticated Windows compiler packages")?;
     let tar = system32.join("tar.exe");
     unpack(
         &tar,
@@ -553,7 +554,8 @@ fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<
         compiler(&kit, &source_dir, &system32)?
             .arg("./configure")
             .args(OPTIONS),
-    ).context("Configure FFmpeg with the pinned Windows libraries")?;
+    )
+    .context("Configure FFmpeg with the pinned Windows libraries")?;
     ensure!(
         std::str::from_utf8(&configured.stdout)?.contains("License: GPL version 3 or later"),
         "Unexpected FFmpeg license"
@@ -622,7 +624,8 @@ fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<
             "status":"native_build_candidate",
         }))?,
     )?;
-    bundle_app(root, work, &output, &system32).context("Embed and verify the Windows desktop application")?;
+    bundle_app(root, work, &output, &system32)
+        .context("Embed and verify the Windows desktop application")?;
     tracing::info!(profile=%output.display(), "Staged the identified Windows component profile");
     Ok(())
 }

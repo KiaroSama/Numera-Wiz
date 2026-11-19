@@ -17,8 +17,16 @@ mod macports;
 const LOCK: &str = include_str!("../../components/macos-arm64-standard-input-lock.json");
 #[cfg(target_arch = "x86_64")]
 const LOCK: &str = include_str!("../../components/macos-x64-standard-input-lock.json");
-const TARGET: &str = if cfg!(target_arch = "aarch64") { "aarch64-apple-darwin" } else { "x86_64-apple-darwin" };
-const LABEL: &str = if cfg!(target_arch = "aarch64") { "macos-arm64" } else { "macos-x64" };
+const TARGET: &str = if cfg!(target_arch = "aarch64") {
+    "aarch64-apple-darwin"
+} else {
+    "x86_64-apple-darwin"
+};
+const LABEL: &str = if cfg!(target_arch = "aarch64") {
+    "macos-arm64"
+} else {
+    "macos-x64"
+};
 const APPS: [&str; 2] = ["ffmpeg", "ffprobe"];
 const FFMPEG: &str = "ffmpeg-9.0.2.tar.xz";
 const FONT: &str = "dejavu-sans-ttf-2.37.zip";
@@ -267,7 +275,10 @@ fn pkg_config_files(work: &Path, dependencies: &BuildInputs) -> Result<std::ffi:
                     .replace("/opt/homebrew/Cellar/", &format!("{cellar}/"))
                     .replace("/opt/homebrew/opt/", &format!("{prefix}/opt/"));
                 if let Some(prefix) = &dependencies.macports_prefix {
-                    relocated = relocated.replace("/opt/local", prefix.to_str().context("UTF-8 MacPorts prefix")?);
+                    relocated = relocated.replace(
+                        "/opt/local",
+                        prefix.to_str().context("UTF-8 MacPorts prefix")?,
+                    );
                 }
                 if relocated != contents {
                     fs::write(path, relocated)?;
@@ -541,9 +552,22 @@ struct BuildInputs {
 #[cfg(target_arch = "aarch64")]
 fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
     let libraries = package_kegs(lock, work)?;
-    let pkg_config = pkgconf(libraries.get("pkgconf").context("Missing pinned pkgconf keg")?)?;
-    let lame = libraries.get("lame").context("Missing pinned LAME keg")?.clone();
-    Ok(BuildInputs { libraries, pkg_config, lame, macports_prefix: None, assembler: None })
+    let pkg_config = pkgconf(
+        libraries
+            .get("pkgconf")
+            .context("Missing pinned pkgconf keg")?,
+    )?;
+    let lame = libraries
+        .get("lame")
+        .context("Missing pinned LAME keg")?
+        .clone();
+    Ok(BuildInputs {
+        libraries,
+        pkg_config,
+        lame,
+        macports_prefix: None,
+        assembler: None,
+    })
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -553,7 +577,13 @@ fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
     let assembler = prefix.join("bin/nasm");
     ensure!(assembler.is_file(), "Missing Intel NASM executable");
     let libraries = BTreeMap::from([("macports".into(), prefix.clone())]);
-    Ok(BuildInputs { libraries, pkg_config, lame: prefix.clone(), macports_prefix: Some(prefix), assembler: Some(assembler) })
+    Ok(BuildInputs {
+        libraries,
+        pkg_config,
+        lame: prefix.clone(),
+        macports_prefix: Some(prefix),
+        assembler: Some(assembler),
+    })
 }
 
 fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result<()> {
@@ -577,7 +607,10 @@ fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result
             "--extra-ldflags=-Wl,-headerpad_max_install_names -L{}/lib",
             lame.display()
         ))
-        .arg(format!("--pkg-config={}", dependencies.pkg_config.display()));
+        .arg(format!(
+            "--pkg-config={}",
+            dependencies.pkg_config.display()
+        ));
     if let Some(assembler) = &dependencies.assembler {
         configure.arg(format!("--x86asmexe={}", assembler.display()));
     }
@@ -708,7 +741,12 @@ fn sources(lock: &Value, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Resul
         .as_array()
         .context("Missing exact macOS corresponding sources")?;
     ensure!(
-        entries.len() == if cfg!(target_arch = "aarch64") { kegs.len() + 5 } else { 95 },
+        entries.len()
+            == if cfg!(target_arch = "aarch64") {
+                kegs.len() + 5
+            } else {
+                95
+            },
         "Incomplete macOS corresponding source lock"
     );
     for row in entries {
@@ -731,7 +769,10 @@ fn sources(lock: &Value, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Resul
         let recipes = root.join("macports-recipes");
         fs::rename(work.join("port-recipes"), &recipes)?;
         let commit = field(lock, "macports_key_commit")?;
-        ensure!(commit.len() == 40 && commit.bytes().all(|byte| byte.is_ascii_hexdigit()), "Unexpected MacPorts key commit");
+        ensure!(
+            commit.len() == 40 && commit.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "Unexpected MacPorts key commit"
+        );
         let key = json!({"url":format!("https://raw.githubusercontent.com/macports/macports-base/{commit}/keys/archives/macports-archives-2025.pub"),
             "bytes":95,"sha256":lock["macports_key_sha256"]});
         download(&key, &recipes.join("macports-archives-2025.pub"), None)?;
@@ -758,18 +799,24 @@ pub fn build(root: &Path) -> Result<()> {
 }
 
 fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<()> {
-    let dependencies = prepare_inputs(lock, work).context("Stage and identify the macOS compiler dependencies")?;
-    let sources = sources(lock, work, &dependencies.libraries).context("Stage the macOS corresponding sources")?;
-    unpack(&sources.join(FFMPEG), work, "ffmpeg-9.0.2").context("Unpack the verified FFmpeg release")?;
-    unpack(&sources.join(FONT), work, "dejavu-sans-ttf-2.37").context("Unpack the verified DejaVu font")?;
+    let dependencies =
+        prepare_inputs(lock, work).context("Stage and identify the macOS compiler dependencies")?;
+    let sources = sources(lock, work, &dependencies.libraries)
+        .context("Stage the macOS corresponding sources")?;
+    unpack(&sources.join(FFMPEG), work, "ffmpeg-9.0.2")
+        .context("Unpack the verified FFmpeg release")?;
+    unpack(&sources.join(FONT), work, "dejavu-sans-ttf-2.37")
+        .context("Unpack the verified DejaVu font")?;
     let source_dir = work.join("ffmpeg-9.0.2");
-    compile(&source_dir, work, &dependencies).context("Compile FFmpeg against the staged macOS dependencies")?;
+    compile(&source_dir, work, &dependencies)
+        .context("Compile FFmpeg against the staged macOS dependencies")?;
     let profile = work.join("profile");
     let bin = profile.join("bin");
     let fonts = profile.join("fonts");
     fs::create_dir_all(&bin)?;
     fs::create_dir(&fonts)?;
-    let imports = relocate(&source_dir, &bin, &dependencies.libraries).context("Relocate macOS private media libraries")?;
+    let imports = relocate(&source_dir, &bin, &dependencies.libraries)
+        .context("Relocate macOS private media libraries")?;
     let font = work.join("dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf");
     ensure!(
         digest(&font)?["sha256"] == lock["font_sha256"],
@@ -798,7 +845,8 @@ fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<
         profile.join("embed-profile.json"),
         serde_json::to_vec_pretty(&manifest)?,
     )?;
-    deliver(root, work, &profile, &source_dir, &manifest).context("Build and verify the macOS desktop application")
+    deliver(root, work, &profile, &source_dir, &manifest)
+        .context("Build and verify the macOS desktop application")
 }
 
 fn deliver(

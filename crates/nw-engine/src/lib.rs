@@ -273,7 +273,9 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
-        self.review_stream_copy(asset, output, file_times, creator, now, |streams| mux::resolve(streams, intent))
+        self.review_stream_copy(asset, output, file_times, creator, now, |streams| {
+            mux::resolve(streams, intent)
+        })
     }
 
     pub fn extract_plan_at(
@@ -284,11 +286,24 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
-        if !output.extension().and_then(|value| value.to_str()).is_some_and(|value| value.eq_ignore_ascii_case("mkv")) {
-            return Err(DomainError::new("CONTAINER_UNQUALIFIED", "Select a Matroska .mkv output for stream extraction"));
+        if !output
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case("mkv"))
+        {
+            return Err(DomainError::new(
+                "CONTAINER_UNQUALIFIED",
+                "Select a Matroska .mkv output for stream extraction",
+            ));
         }
-        self.review_stream_copy(asset, output, nw_domain::file_times::FileTimeRequest::default(), creator, now,
-            |streams| mux::extract_one(streams, stream_index))
+        self.review_stream_copy(
+            asset,
+            output,
+            nw_domain::file_times::FileTimeRequest::default(),
+            creator,
+            now,
+            |streams| mux::extract_one(streams, stream_index),
+        )
     }
 
     fn review_stream_copy(

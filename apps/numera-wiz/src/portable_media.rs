@@ -88,9 +88,14 @@ pub(super) fn installed(root: &Path) -> Result<PathBuf> {
     if destination.try_exists()? {
         return verify(&destination);
     }
-    let staging = tempfile::Builder::new()
-        .prefix(".component-")
-        .tempdir_in(parent)?;
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(".component-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o700));
+    }
+    let staging = builder.tempdir_in(parent)?;
     for group in ["bin", "fonts"] {
         security::private_directory(&staging.path().join(group))?;
     }

@@ -815,8 +815,9 @@ fn run_inner(root: &Path) -> Result<()> {
     let nasm = load_nasm(&capture)?;
     match std::env::args().skip(2).collect::<Vec<_>>().as_slice() {
         [worker] if worker == "--offline-install-worker" => {
-            return guest(&lock, &packages, &nasm)
-                .inspect_err(|error| retain_failure(Path::new(GUEST_FAILURE), error));
+            return guest(&lock, &packages, &nasm).inspect_err(|error| {
+                crate::package::retain_failure(Path::new(GUEST_FAILURE), error);
+            });
         }
         [] => {}
         _ => bail!("Unknown offline compiler argument"),

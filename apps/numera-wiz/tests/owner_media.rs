@@ -908,46 +908,105 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 
     {
-    let extraction = media.directory.path().join("extracted-primary-audio.mkv");
-    let (reviewed, exit) = cli.human(&["streams", "extract", "--asset", asset["id"].as_str().unwrap(),
-        "--stream", "1", "--out", extraction.to_str().unwrap()]).await;
-    assert_eq!(exit, 0, "{reviewed}");
-    let reviewed = &reviewed["result"];
-    assert_audio_extraction(reviewed);
-    assert!(!extraction.exists());
-    let accepted = cli.mutation(&scope, "extract-primary-audio", "jobs.submit",
-        json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
-    assert_eq!(accepted["ok"], true, "{accepted}");
-    let job = cli.completed(accepted["result"]["job_id"].as_str().unwrap()).await;
-    assert_eq!(job["state"], "succeeded", "{job}");
-    let output_probe = fixture::probe(&media.bin, &extraction).await;
-    let output_streams = output_probe["streams"].as_array().unwrap();
-    assert_eq!(output_streams.len(), 1);
-    assert_eq!(output_streams[0]["codec_name"], "pcm_s16le");
-    assert_eq!(output_streams[0]["tags"]["language"], "eng");
+        let extraction = media.directory.path().join("extracted-primary-audio.mkv");
+        let (reviewed, exit) = cli
+            .human(&[
+                "streams",
+                "extract",
+                "--asset",
+                asset["id"].as_str().unwrap(),
+                "--stream",
+                "1",
+                "--out",
+                extraction.to_str().unwrap(),
+            ])
+            .await;
+        assert_eq!(exit, 0, "{reviewed}");
+        let reviewed = &reviewed["result"];
+        assert_audio_extraction(reviewed);
+        assert!(!extraction.exists());
+        let accepted = cli
+            .mutation(
+                &scope,
+                "extract-primary-audio",
+                "jobs.submit",
+                json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]}),
+            )
+            .await;
+        assert_eq!(accepted["ok"], true, "{accepted}");
+        let job = cli
+            .completed(accepted["result"]["job_id"].as_str().unwrap())
+            .await;
+        assert_eq!(job["state"], "succeeded", "{job}");
+        let output_probe = fixture::probe(&media.bin, &extraction).await;
+        let output_streams = output_probe["streams"].as_array().unwrap();
+        assert_eq!(output_streams.len(), 1);
+        assert_eq!(output_streams[0]["codec_name"], "pcm_s16le");
+        assert_eq!(output_streams[0]["tags"]["language"], "eng");
     }
 
     {
         let reference = media.directory.path().join("duplicate-audio-tracks.mkv");
-        let helper = media.bin.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
+        let helper = media.bin.join(if cfg!(windows) {
+            "ffmpeg.exe"
+        } else {
+            "ffmpeg"
+        });
         let result = tokio::process::Command::new(helper)
             .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
             .arg(&media.source)
-            .args(["-map", "0:1", "-map", "0:2", "-map", "0:1", "-c", "copy", "-f", "matroska"])
-            .arg(&reference).output().await.unwrap();
-        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
-        let registered = cli.mutation(&scope, "register-decode-comparison", "assets.register", json!({"path":reference})).await;
+            .args([
+                "-map", "0:1", "-map", "0:2", "-map", "0:1", "-c", "copy", "-f", "matroska",
+            ])
+            .arg(&reference)
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let registered = cli
+            .mutation(
+                &scope,
+                "register-decode-comparison",
+                "assets.register",
+                json!({"path":reference}),
+            )
+            .await;
         assert_eq!(registered["ok"], true, "{registered}");
-        let (comparison, exit) = cli.human(&["media", "compare-audio", "--asset",
-            registered["result"]["id"].as_str().unwrap(), "--stream", "0", "--stream", "1", "--stream", "2"]).await;
+        let (comparison, exit) = cli
+            .human(&[
+                "media",
+                "compare-audio",
+                "--asset",
+                registered["result"]["id"].as_str().unwrap(),
+                "--stream",
+                "0",
+                "--stream",
+                "1",
+                "--stream",
+                "2",
+            ])
+            .await;
         assert_eq!(exit, 0, "{comparison}");
         let report = &comparison["result"];
-        assert_eq!(report["duplicate_groups"], json!([[0,2]]));
-        assert_eq!(report["source_sha256"], registered["result"]["identity"]["sha256"]);
+        assert_eq!(report["duplicate_groups"], json!([[0, 2]]));
+        assert_eq!(
+            report["source_sha256"],
+            registered["result"]["identity"]["sha256"]
+        );
         let tracks = report["tracks"].as_array().unwrap();
         assert_eq!(tracks.len(), 3);
-        assert_eq!(tracks[0]["decoded_pcm_sha256"], tracks[2]["decoded_pcm_sha256"]);
-        assert_ne!(tracks[0]["decoded_pcm_sha256"], tracks[1]["decoded_pcm_sha256"]);
+        assert_eq!(
+            tracks[0]["decoded_pcm_sha256"],
+            tracks[2]["decoded_pcm_sha256"]
+        );
+        assert_ne!(
+            tracks[0]["decoded_pcm_sha256"],
+            tracks[1]["decoded_pcm_sha256"]
+        );
     }
 
     let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
@@ -1054,12 +1113,21 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
-    let compared = call!(stdio, "media.analyze.audio_tracks",
-        json!({"asset_id":operator_asset["id"],"stream_indices":[1,2]}), json!({}));
+    let compared = call!(
+        stdio,
+        "media.analyze.audio_tracks",
+        json!({"asset_id":operator_asset["id"],"stream_indices":[1,2]}),
+        json!({})
+    );
     assert_eq!(compared["duplicate_groups"], json!([]));
     assert_eq!(compared["tracks"].as_array().unwrap().len(), 2);
-    assert_audio_extraction(&call!(stdio, "streams.extract", json!({"asset_id":operator_asset["id"],"stream_index":1,
-        "output":media.directory.path().join("stdio-extraction.mkv")}), json!({})));
+    assert_audio_extraction(&call!(
+        stdio,
+        "streams.extract",
+        json!({"asset_id":operator_asset["id"],"stream_index":1,
+        "output":media.directory.path().join("stdio-extraction.mkv")}),
+        json!({})
+    ));
     let volume = call!(
         stdio,
         "media.analyze.volume",
@@ -1642,12 +1710,21 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
-        let compared = call!(http, "media.analyze.audio_tracks",
-            json!({"asset_id":asset["id"],"stream_indices":[1,2]}), json!({}));
+        let compared = call!(
+            http,
+            "media.analyze.audio_tracks",
+            json!({"asset_id":asset["id"],"stream_indices":[1,2]}),
+            json!({})
+        );
         assert_eq!(compared["duplicate_groups"], json!([]));
         assert_eq!(compared["tracks"].as_array().unwrap().len(), 2);
-        assert_audio_extraction(&call!(http, "streams.extract", json!({"asset_id":asset["id"],"stream_index":1,
-            "output":media.directory.path().join(format!("http-extraction-{ordinal}.mkv"))}), json!({})));
+        assert_audio_extraction(&call!(
+            http,
+            "streams.extract",
+            json!({"asset_id":asset["id"],"stream_index":1,
+            "output":media.directory.path().join(format!("http-extraction-{ordinal}.mkv"))}),
+            json!({})
+        ));
         let volume = call!(
             http,
             "media.analyze.volume",

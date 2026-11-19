@@ -363,9 +363,14 @@ impl WizApp {
             self.source_preview = Default::default();
             self.volume_measurement = None;
             self.audio_track_report = None;
-            self.compare_audio_indices = asset.probe.streams.iter()
+            self.compare_audio_indices = asset
+                .probe
+                .streams
+                .iter()
                 .filter(|stream| stream.kind == nw_domain::mux::StreamKind::Audio)
-                .take(2).map(|stream| stream.index).collect();
+                .take(2)
+                .map(|stream| stream.index)
+                .collect();
             self.wave_cues = None;
         }
         self.selected = Some(asset.id.clone());
@@ -917,45 +922,73 @@ impl WizApp {
                 .show(ui, |ui| {
                     for stream in audio {
                         ui.horizontal(|ui| {
-                        if comparable {
-                            let mut selected = self.compare_audio_indices.contains(&stream.index);
-                            if ui.add_enabled(self.request_idle() && (selected || self.compare_audio_indices.len() < MAX_TRACKS),
-                                egui::Checkbox::new(&mut selected, format!("Compare {}", stream.index))).changed() {
-                                if selected { self.compare_audio_indices.insert(stream.index); }
-                                else { self.compare_audio_indices.remove(&stream.index); }
-                                self.audio_track_report = None;
+                            if comparable {
+                                let mut selected =
+                                    self.compare_audio_indices.contains(&stream.index);
+                                if ui
+                                    .add_enabled(
+                                        self.request_idle()
+                                            && (selected
+                                                || self.compare_audio_indices.len() < MAX_TRACKS),
+                                        egui::Checkbox::new(
+                                            &mut selected,
+                                            format!("Compare {}", stream.index),
+                                        ),
+                                    )
+                                    .changed()
+                                {
+                                    if selected {
+                                        self.compare_audio_indices.insert(stream.index);
+                                    } else {
+                                        self.compare_audio_indices.remove(&stream.index);
+                                    }
+                                    self.audio_track_report = None;
+                                }
                             }
-                        }
-                        if ui
-                            .add_enabled(
-                                self.request_idle(),
-                                egui::Button::new(format!("Measure stream {}", stream.index)),
-                            )
-                            .clicked()
-                        {
-                            self.volume_measurement = None;
-                            self.query(
-                                "media.analyze.volume",
-                                json!({"asset_id":asset.id,"stream_index":stream.index}),
-                                Action::VolumeMeasurement,
-                                ui.ctx(),
-                            );
-                        }
+                            if ui
+                                .add_enabled(
+                                    self.request_idle(),
+                                    egui::Button::new(format!("Measure stream {}", stream.index)),
+                                )
+                                .clicked()
+                            {
+                                self.volume_measurement = None;
+                                self.query(
+                                    "media.analyze.volume",
+                                    json!({"asset_id":asset.id,"stream_index":stream.index}),
+                                    Action::VolumeMeasurement,
+                                    ui.ctx(),
+                                );
+                            }
                         });
                     }
                 });
-            if comparable && ui.add_enabled(self.request_idle() && self.compare_audio_indices.len() >= 2,
-                egui::Button::new("Compare selected audio tracks")).clicked() {
+            if comparable
+                && ui
+                    .add_enabled(
+                        self.request_idle() && self.compare_audio_indices.len() >= 2,
+                        egui::Button::new("Compare selected audio tracks"),
+                    )
+                    .clicked()
+            {
                 self.audio_track_report = None;
-                self.query("media.analyze.audio_tracks", json!({"asset_id":asset.id,"stream_indices":self.compare_audio_indices}),
-                    Action::CompareAudio, ui.ctx());
+                self.query(
+                    "media.analyze.audio_tracks",
+                    json!({"asset_id":asset.id,"stream_indices":self.compare_audio_indices}),
+                    Action::CompareAudio,
+                    ui.ctx(),
+                );
             }
             if let Some(report) = &self.audio_track_report {
                 if report.duplicate_groups.is_empty() {
                     ui.label("No matching signals among streams with a known channel layout.");
                 }
                 for group in &report.duplicate_groups {
-                    let indices = group.iter().map(u32::to_string).collect::<Vec<_>>().join(", ");
+                    let indices = group
+                        .iter()
+                        .map(u32::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ");
                     ui.label(format!("Matching streams {indices}"));
                 }
             }

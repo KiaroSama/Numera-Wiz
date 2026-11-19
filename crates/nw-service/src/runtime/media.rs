@@ -68,15 +68,29 @@ impl Service {
         cancel: CancellationToken,
     ) -> Result<nw_domain::audio_analysis::AudioTrackReport> {
         let (asset, source) = self.analysis_source(context, &input.asset_id)?;
-        let result = tokio::runtime::Handle::current().block_on(self.engine()?.compare_audio_tracks(
-            &asset, source, &input.stream_indices, cancel.clone(),
-        ))?;
+        let result =
+            tokio::runtime::Handle::current().block_on(self.engine()?.compare_audio_tracks(
+                &asset,
+                source,
+                &input.stream_indices,
+                cancel.clone(),
+            ))?;
         let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Audio comparison cancelled before delivery"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Audio comparison cancelled before delivery",
+            ));
         }
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command("media.analyze.audio_tracks")) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Audio comparison grant changed during analysis"));
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command("media.analyze.audio_tracks"))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Audio comparison grant changed during analysis",
+            ));
         }
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;

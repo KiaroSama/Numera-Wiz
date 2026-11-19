@@ -226,11 +226,12 @@ fn result_schema(id: &str) -> Option<Value> {
                 .expect("schema"),
         ),
         "media.analyze.audio_tracks" => Some(
-            serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport)).expect("schema"),
+            serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
+                .expect("schema"),
         ),
-        "streams.extract" => Some(
-            serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"),
-        ),
+        "streams.extract" => {
+            Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
+        }
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }

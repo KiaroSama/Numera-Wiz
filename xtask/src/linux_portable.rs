@@ -135,8 +135,7 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
         root.join("THIRD-PARTY-NOTICES.md"),
         bundle.join("THIRD-PARTY-NOTICES.md"),
     )?;
-    let state = work.join("first-launch-state");
-    fs::create_dir(&state)?;
+    let state = nw_platform::security::private_directory(&work.join("first-launch-state"))?;
     let first_launch = crate::package::qualify_portable_application(
         Command::new(&executable)
             .current_dir(&bundle)
