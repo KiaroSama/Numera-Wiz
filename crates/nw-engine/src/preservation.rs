@@ -3,7 +3,7 @@ use crate::{Engine, ExecutionEvent, Observer, admission};
 use nw_domain::{
     DomainError, Result,
     records::{MediaProbe, Plan},
-    time::Rational,
+    time::{Rational, TimeRange},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -25,6 +25,7 @@ struct StreamDigest {
     hash: Sha256,
     packets: u64,
     bytes: u64,
+    first: Option<(Rational, bool)>,
 }
 
 /// Frame one bounded ffprobe JSON object at a time, including nested side data.
@@ -42,10 +43,11 @@ struct Ledger {
     records: ProbeRecords,
     clocks: BTreeMap<u32, Rational>,
     streams: BTreeMap<u32, StreamDigest>,
+    window: Option<TimeRange>,
 }
 
 impl Ledger {
-    fn new(probe: &MediaProbe) -> Result<Self> {
+    fn new(probe: &MediaProbe, window: Option<TimeRange>) -> Result<Self> {
         let clocks = probe
             .streams
             .iter()
@@ -74,6 +76,7 @@ impl Ledger {
             records: ProbeRecords::new(b"{\"packets\":["),
             clocks,
             streams: BTreeMap::new(),
+            window,
         })
     }
 
@@ -82,13 +85,15 @@ impl Ledger {
             records,
             clocks,
             streams,
+            window,
         } = self;
-        records.feed(bytes, |value| Self::packet(clocks, streams, value))
+        records.feed(bytes, |value| Self::packet(clocks, streams, *window, value))
     }
 
     fn packet(
         clocks: &BTreeMap<u32, Rational>,
         streams: &mut BTreeMap<u32, StreamDigest>,
+        window: Option<TimeRange>,
         value: Value,
     ) -> Result<()> {
         let index = value["stream_index"]
@@ -107,6 +112,15 @@ impl Ledger {
         let flags = value["flags"]
             .as_str()
             .ok_or_else(|| invalid("Missing packet flags"))?;
+        if let Some(window) = window {
+            let pts = pts.ok_or_else(|| invalid("Packet cuts require an original presentation timestamp"))?;
+            if !window.contains(pts) {
+                return Ok(());
+            }
+            if dts != Some(pts) {
+                return Err(DomainError::new("COPY_BOUNDARY_UNQUALIFIED", "This packet cut needs identical presentation and decode times"));
+            }
+        }
         let record = canonical(json!([
             hash,
             size.to_string(),
@@ -119,6 +133,9 @@ impl Ledger {
         let bytes =
             serde_json::to_vec(&record).map_err(|_| invalid("Packet digest encoding failed"))?;
         let stream = streams.entry(index).or_default();
+        if stream.packets == 0 {
+            stream.first = pts.map(|pts| (pts, flags.starts_with('K')));
+        }
         stream.packets = stream
             .packets
             .checked_add(1)
@@ -317,6 +334,7 @@ async fn scan(
     cancel: CancellationToken,
     observer: &Observer,
     deadline: nw_domain::execution::DeadlinePolicy,
+    window: Option<TimeRange>,
 ) -> Result<Ledger> {
     let source = path.to_owned();
     let admission_cancel = cancel.clone();
@@ -341,7 +359,7 @@ async fn scan(
     let mut prepared = vec![engine.ffprobe.path.clone()];
     prepared.extend(args.clone());
     observer(ExecutionEvent::Prepared(prepared)).await?;
-    let ledger = Arc::new(Mutex::new(Ledger::new(probe)?));
+    let ledger = Arc::new(Mutex::new(Ledger::new(probe, window)?));
     let consumer = ledger.clone();
     let ticket = engine.process_budget.acquire(&cancel).await?;
     let process = nw_platform::process::stream_readonly_with_policy(
@@ -367,6 +385,30 @@ async fn scan(
     Ok(ledger)
 }
 
+pub(super) async fn check_cut(
+    engine: &Engine,
+    source: &nw_domain::records::Asset,
+    window: TimeRange,
+    cancel: CancellationToken,
+) -> Result<()> {
+    let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
+    let ledger = scan(engine, Path::new(&source.identity.path), &source.probe,
+        cancel, &observer, nw_domain::execution::CleanupLimits::default().operation, Some(window)).await?;
+    validate_cut(&ledger, &source.probe, window)
+}
+
+fn validate_cut(ledger: &Ledger, probe: &MediaProbe, range: TimeRange) -> Result<()> {
+    for stream in &probe.streams {
+        if stream.kind == nw_domain::mux::StreamKind::Video && !stream.attached_picture()
+            && ledger.streams.get(&stream.index).and_then(|observed| observed.first)
+                != Some((range.start, true))
+        {
+            return Err(DomainError::new("COPY_BOUNDARY_UNQUALIFIED", "Start must match an original keyframe on each retained picture stream"));
+        }
+    }
+    Ok(())
+}
+
 pub async fn verify(
     engine: &Engine,
     plan: &Plan,
@@ -390,9 +432,13 @@ pub async fn verify(
     });
     let mut inputs = Vec::with_capacity(1 + additional_paths.len());
     for (source_path, probe, streams) in std::iter::once(primary).chain(additional) {
-        inputs.push((scan(engine, source_path, probe, cancel.clone(), observer, operation).await?, probe, streams));
+        let ledger = scan(engine, source_path, probe, cancel.clone(), observer, operation, plan.packet_cut).await?;
+        if let Some(range) = plan.packet_cut {
+            validate_cut(&ledger, probe, range)?;
+        }
+        inputs.push((ledger, probe, streams));
     }
-    let output = scan(engine, path, observed, cancel.clone(), observer, operation).await?;
+    let output = scan(engine, path, observed, cancel.clone(), observer, operation, None).await?;
     let mut packets = 0u64;
     let mut bytes = 0u64;
     let mut mapped_output = observed.streams.iter();
@@ -462,6 +508,7 @@ mod tests {
             records: ProbeRecords::new(b"{\"packets\":["),
             clocks: [(0, Rational::new(1, 1000).unwrap())].into(),
             streams: BTreeMap::new(),
+            window: None,
         }
     }
     #[test]

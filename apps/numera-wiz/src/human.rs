@@ -101,6 +101,19 @@ pub enum Media {
         #[command(flatten)]
         probe: ProbePolicy,
     },
+    /// Review an exact original-keyframe Matroska packet cut with chapters dropped.
+    Cut {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        start: String,
+        #[arg(long)]
+        end: String,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        drop_chapters: bool,
+    },
     /// Inspect and refresh FFmpeg capabilities.
     #[command(subcommand)]
     Capabilities(Capabilities),
@@ -591,6 +604,18 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             query("media.probe", params)
+        }
+        Command::Media(Media::Cut { asset, start, end, out, drop_chapters }) => {
+            if !drop_chapters {
+                return Err(anyhow::anyhow!("Select --drop-chapters for this packet-copy policy"));
+            }
+            let range = nw_domain::time::TimeRange {
+                start: projects::rational(&start)?, end: projects::rational(&end)?,
+            };
+            nw_domain::packet_cut::validate(range)?;
+            query("media.cut", json!(nw_domain::packet_cut::CutInput {
+                asset_id: asset, range, output: native_path(&out)?, chapters: nw_domain::packet_cut::ChapterPolicy::Drop,
+            }))
         }
         Command::Media(Media::PreviewFrame {
             asset,

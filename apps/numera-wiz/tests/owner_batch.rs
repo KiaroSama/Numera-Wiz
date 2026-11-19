@@ -1171,6 +1171,44 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         }
         assert_eq!(appended_packets[&(output as u64)], expected);
     }
+
+    let gop_source = media.directory.path().join("cut-keyframe-grid.mkv");
+    let mut gop_args = [
+        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+        "testsrc2=size=96x64:rate=8:duration=2", "-c:v", "ffv1", "-g", "4", "-f", "matroska",
+    ].map(str::to_owned).to_vec();
+    gop_args.push(gop_source.to_str().unwrap().into());
+    nw_platform::process::run(&media.bin.join("ffmpeg"), &gop_args, Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
+    let cut_source = call!(stdio, "assets.register", json!({"path":gop_source}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"register-cut-grid"}));
+    let cut_output = media.directory.path().join("verified-packet-cut.mkv");
+    let cut = json!({"asset_id":cut_source["id"], "output":cut_output, "chapters":"drop",
+        "range":{"start":{"num":"1","den":"2"},"end":{"num":"3","den":"2"}}});
+    let mut mid_gop = cut.clone();
+    mid_gop["range"]["start"] = json!({"num":"3","den":"4"});
+    let rejected_cut = sdk!(http, "media.cut", mid_gop, json!({}));
+    assert_eq!(rejected_cut["error"]["code"], "COPY_BOUNDARY_UNQUALIFIED");
+    assert!(!cut_output.exists());
+    let (typed_cut, code) = cli.human(&[
+        "--access-profile", "batch-operator", "media", "cut", "--asset", cut_source["id"].as_str().unwrap(),
+        "--start", "1/2", "--end", "3/2", "--out", cut_output.to_str().unwrap(), "--drop-chapters",
+    ]).await;
+    assert_eq!(code, 0, "{typed_cut}");
+    let stdio_cut = call!(stdio, "media.cut", cut.clone(), json!({}));
+    let http_cut = call!(http, "media.cut", cut.clone(), json!({}));
+    assert_eq!(http_cut["packet_cut"], cut["range"]);
+    assert_eq!(typed_cut["result"]["hash"], stdio_cut["hash"]);
+    assert_eq!(stdio_cut["hash"], http_cut["hash"]);
+    let cut_job = call!(http, "jobs.submit", json!({"plan_id":http_cut["id"],"plan_hash":http_cut["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"keyframe-copy-cut"}));
+    cli.completed(cut_job["job_id"].as_str().unwrap()).await;
+    let source_packets = packets(&media.bin, &gop_source).await;
+    let cut_packets = packets(&media.bin, &cut_output).await;
+    let expected_cut: Vec<_> = source_packets[&0].iter().filter(|packet| {
+        (500..1500).contains(&packet["pts"].as_i64().unwrap())
+    }).cloned().collect();
+    assert_eq!(expected_cut.len(), 8);
+    assert_eq!(cut_packets[&0], expected_cut);
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
@@ -1196,6 +1234,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             "intentional_exclusions":3,"no_replace":true,"copy_full_byte_equality":true},
         "track_append":{"job":append_job["job_id"],"kept_original_streams":3,"added_audio":2,"added_subtitles":2,
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
+        "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
         "scope":"Retained video-folder cleanup to a disjoint destination; companion copying, output trees, mixed audio/encode workflows, replacement and GUI batching remain separate qualification"});
     std::fs::write(
         evidence.join("batch-media-report.json"),

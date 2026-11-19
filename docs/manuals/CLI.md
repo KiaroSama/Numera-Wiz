@@ -244,6 +244,16 @@ output index of each group. Submit the returned plan ID and hash through
 `jobs submit`. The executor independently compares packet data, timing and codec
 parameters for each retained and appended stream before publishing.
 
+### Cut by original packet boundaries
+
+For a registered Matroska source, use
+`numera-wiz media cut --asset ID --start 1/2 --end 3/2 --out /absolute/new.mkv --drop-chapters`.
+The start must match an original keyframe on each ordinary picture stream.
+The end is exclusive. Original packet presentation times, decode times,
+durations and payloads are verified before the job publishes the output.
+Audio packets may extend across the end. This command keeps the source clock
+and drops chapters. Submit the reviewed plan with `jobs submit`.
+
 ### Command envelopes
 
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope

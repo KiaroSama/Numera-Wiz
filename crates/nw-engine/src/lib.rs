@@ -4,6 +4,7 @@ mod budget;
 mod capabilities;
 mod media;
 mod output_profile;
+mod packet_cut;
 mod preservation;
 mod progress;
 mod track_append;
@@ -422,6 +423,7 @@ impl Engine {
         }
         source_stamp.revalidate()?;
         let mut plan = Plan {
+            packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -487,14 +489,18 @@ impl Engine {
             }
         }
         track_append::validate_track_additions(plan, profile)?;
-        if plan.resolution.action == CleanAction::Remux
-            && plan.argv_template
-                != lower_with_additions(&plan.source, &plan.resolution, profile, &plan.added_tracks)?
-        {
-            return Err(DomainError::new(
-                "INVALID_PLAN",
-                "Review a fresh plan for the admitted held-file remux route",
-            ));
+        if plan.resolution.action == CleanAction::Remux {
+            let expected = if plan.packet_cut.is_some() {
+                packet_cut::invocation(plan, profile)?
+            } else {
+                lower_with_additions(&plan.source, &plan.resolution, profile, &plan.added_tracks)?
+            };
+            if plan.argv_template != expected {
+                return Err(DomainError::new(
+                    "INVALID_PLAN",
+                    "Review a fresh plan for the admitted held-file remux route",
+                ));
+            }
         }
         if plan.resolution.action != CleanAction::Remux && !plan.argv_template.is_empty() {
             return Err(DomainError::new(

@@ -240,7 +240,7 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
         ),
-        "streams.add" | "streams.extract" | "jobs.plan" => {
+        "media.cut" | "streams.add" | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
         "streams.extract.batch_plan" => Some(
@@ -849,6 +849,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Probe an explicitly authorized native input",
             Query,
             PathInput
+        ),
+        row!(
+            "media.cut",
+            "Review an original-keyframe packet copy cut of a registered Matroska source",
+            Query,
+            crate::packet_cut::CutInput
         ),
         row!(
             "capabilities.inspect",
@@ -1740,6 +1746,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.profiles.list",
     "access.credentials.issue",
     "media.probe",
+    "media.cut",
     "media.analyze.volume",
     "media.analyze.loudness",
     "media.analyze.reference",

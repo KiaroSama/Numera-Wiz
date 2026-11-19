@@ -621,6 +621,10 @@ impl WizApp {
                 );
                 ui.label("Destination");
                 ui.label(plan.output_path.as_deref().unwrap_or(&plan.output_name));
+                if let Some(range) = plan.packet_cut {
+                    ui.label(format!("Source packets from {}/{} to {}/{} seconds, end exclusive",
+                        range.start.numerator(), range.start.denominator(), range.end.numerator(), range.end.denominator()));
+                }
                 ui.separator();
                 for outcome in &plan.resolution.outcomes {
                     ui.label(match outcome.output_index {

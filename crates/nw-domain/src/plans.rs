@@ -73,6 +73,7 @@ fn invalid(message: &str) -> DomainError {
 pub fn digest(plan: &Plan) -> Result<String> {
     match plan.schema_version {
         1 if plan.required_rights.is_none()
+            && plan.packet_cut.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
@@ -109,6 +110,14 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     }
     if !plan.added_tracks.is_empty() {
         crate::track_append::validate_sources(&plan.source, &plan.added_tracks, &plan.output)?;
+    }
+    if let Some(range) = plan.packet_cut {
+        crate::packet_cut::validate(range)?;
+        if !plan.added_tracks.is_empty() || plan.resolution.preservation.chapters
+            || plan.resolution.chapter_import.is_some()
+        {
+            return Err(invalid("A packet cut requires one source and an explicit chapter drop policy"));
+        }
     }
     let rights = plan
         .required_rights
@@ -233,6 +242,7 @@ mod tests {
         };
         let output = "/exports/output.mkv".to_owned();
         let mut plan = Plan {
+            packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

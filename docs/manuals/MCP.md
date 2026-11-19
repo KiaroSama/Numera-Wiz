@@ -273,6 +273,14 @@ and its physical path, and a new `.mkv` destination. The review includes
 and `hash` and the ordinary durable replay identifiers. `jobs.inspect` exposes
 verification and artifact publication.
 
+## Packet copy cut
+
+`media.cut` takes `asset_id`, `output`, `chapters: "drop"`, and a `range` with
+exact rational `start` and `end` in seconds. The start must match an original
+keyframe on each ordinary picture stream. Packets whose original PTS is in
+the half-open interval are copied in their original clock. The review returns
+`packet_cut` with the accepted interval and a plan for `jobs.submit`.
+
 ## Cleanup selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI

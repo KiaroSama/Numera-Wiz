@@ -1109,6 +1109,7 @@ impl Service {
                 "timeline.render_mixed",
                 "timeline.preview_frame",
                 "media.probe",
+                "media.cut",
                 "media.analyze.volume",
                 "media.analyze.loudness",
                 "media.analyze.reference",
@@ -1807,6 +1808,42 @@ impl Service {
                     ));
                 }
                 value(&report.finish()?)?
+            }
+            "media.cut" => {
+                let input: nw_domain::packet_cut::CutInput = commands::parse(params)?;
+                let bound: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(&context, &bound.id, &bound.creator)?;
+                self.path(&context, Path::new(&bound.identity.path), false)?;
+                self.path(&context, Path::new(&input.output), true)?;
+                let permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+                    DomainError::new("RESOURCE_LIMIT", "Packet cut inspection capacity is full")
+                })?;
+                drop(guard);
+                let inspected = runtime.block_on(self.engine()?.inspect_packet_cut(
+                    &bound, input.range, cancellation.clone()))?;
+                let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+                if cancellation.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Packet cut review was cancelled"));
+                }
+                if self.policy(&context)?.is_some_and(|policy| !policy.allows_command("media.cut")) {
+                    return Err(DomainError::new("PERMISSION_DENIED", "Packet cut access changed during inspection"));
+                }
+                inspected.revalidate()?;
+                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output,
+                    Default::default(), |engine, current, output| {
+                        if current.identity != bound.identity || current.source_object != bound.source_object {
+                            return Err(DomainError::new("SOURCE_CHANGED", "Registered cut source changed during inspection"));
+                        }
+                        engine.packet_cut_plan_at(current, output, input.range, &context.principal, self.clock.now()?)
+                    })?;
+                inspected.revalidate()?;
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                if response.ok {
+                    self.store.put(&named("plan", &plan.id)?, &plan)?;
+                }
+                drop(permit);
+                return Ok(response);
             }
             "streams.clean" | "streams.add" | "streams.extract" | "jobs.plan" | "chapters.remove"
             | "chapters.import" | "disposition.patch" | "metadata.patch" => {
@@ -3492,6 +3529,7 @@ mod tests {
             },
         };
         let plan = Plan {
+            packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

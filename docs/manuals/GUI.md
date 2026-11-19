@@ -117,6 +117,14 @@ individual stream indices, language, title and disposition overrides. Choose
 **Review appended tracks**, inspect the input-to-output mapping, then submit
 the reviewed plan through the ordinary job controls.
 
+## Packet copy cut
+
+Select a registered Matroska video and enter a new `.mkv` destination. In
+**Cut at original packet boundaries**, enter the source start and exclusive end
+as integers or fractions of a second. The start must be an original keyframe
+on every ordinary picture stream. Choose **Review packet cut** and submit the
+reviewed plan. The output keeps the original clock and drops chapters.
+
 ## Dispositions
 
 Open **Disposition changes** in the Stream Cleanup form and select an original
