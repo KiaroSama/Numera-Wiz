@@ -77,11 +77,10 @@ async fn check_registered_stills(
         )
         .await
         .unwrap();
+    let (pixels, remainder) = pixels.as_chunks::<4>();
+    assert!(remainder.is_empty());
     assert_eq!(
-        pixels
-            .chunks_exact(4)
-            .filter(|pixel| pixel[0] > 245)
-            .count(),
+        pixels.iter().filter(|pixel| pixel[0] > 245).count(),
         nw_domain::preview::HEIGHT
     );
 

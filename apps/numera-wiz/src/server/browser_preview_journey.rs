@@ -72,7 +72,7 @@ function wait(target, event, operate) {
 pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evidence: &Path) {
     let components = std::env::var_os(COMPONENTS).expect("Same-source browser FFmpeg runtime");
     let fixture = fixture_with_components(COMPONENTS).await;
-    let source = fixture.root.path().join("assets/browser-playback.mkv");
+    let source = fixture.root.path().join("browser-playback.mkv");
     let program = Path::new(&components).join("ffmpeg");
     let mut args = [
         "-hide_banner",
@@ -117,31 +117,6 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
     .await
     .expect("Generate selected stereo source for Chrome playback");
 
-    let service = &fixture.owner.service;
-    let browser = service.profile_context("browser").unwrap();
-    let scope = service
-        .dispatch(
-            browser.clone(),
-            Request::query("access.replay_scope.create", json!({})),
-        )
-        .await;
-    assert!(scope.ok);
-    let mut registration = Request::query("assets.register", json!({"path":source}));
-    registration.replay_scope = Some(
-        scope.result.unwrap()["replay_scope"]
-            .as_str()
-            .unwrap()
-            .to_owned(),
-    );
-    registration.idempotency_key = Some("hosted-browser-playback-source".into());
-    let registered = service.dispatch(browser, registration).await;
-    assert!(
-        registered.ok,
-        "Registered preview source: {:?}",
-        registered.error
-    );
-    let asset = registered.result.unwrap();
-
     let paired = pairing(&fixture).await;
     let proof = paired
         .split_once("#pair=")
@@ -160,6 +135,38 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         .await
         .unwrap();
     let bearer = credential["bearer"].as_str().unwrap();
+    let source_bytes = std::fs::read(&source).unwrap();
+    let source_hash = nw_domain::projects::hash(&source_bytes);
+    let upload: nw_domain::ingest::UploadTicket = client
+        .post(format!("{}/api/v1/uploads", fixture.endpoint))
+        .bearer_auth(bearer)
+        .json(&nw_domain::ingest::UploadInput {
+            display_name: "browser-playback.mkv".into(),
+            bytes: source_bytes.len().to_string(),
+            sha256: Some(source_hash.clone()),
+        })
+        .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+    let completed: nw_domain::ingest::UploadTicket = client
+        .put(format!("{}/api/v1/uploads/{}", fixture.endpoint, upload.upload_id))
+        .bearer_auth(bearer)
+        .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+        .body(source_bytes)
+        .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+    assert_eq!(completed.upload_id, upload.upload_id);
+
+    let service = &fixture.owner.service;
+    let browser = service.profile_context("browser").unwrap();
+    let scope = service
+        .dispatch(browser.clone(), Request::query("access.replay_scope.create", json!({})))
+        .await;
+    assert!(scope.ok);
+    let mut registration = Request::query("assets.register", json!({"upload_id":completed.upload_id}));
+    registration.replay_scope = Some(scope.result.unwrap()["replay_scope"].as_str().unwrap().to_owned());
+    registration.idempotency_key = Some("hosted-browser-playback-source".into());
+    let registered = service.dispatch(browser, registration).await;
+    assert!(registered.ok, "Registered preview source: {:?}", registered.error);
+    let asset = registered.result.unwrap();
+    assert_eq!(asset["identity"]["sha256"], source_hash);
     driver(
         client,
         base,
@@ -208,7 +215,7 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
     );
     std::fs::OpenOptions::new()
         .append(true)
-        .open(&source)
+        .open(asset["identity"]["path"].as_str().unwrap())
         .unwrap()
         .write_all(b"changed")
         .unwrap();
