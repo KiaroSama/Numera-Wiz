@@ -11,6 +11,7 @@ use nw_domain::ingest::{
     CompanionIntakePolicy, FOLDER_COMPANION_FORMAT, FolderCompanionSource, FolderEntry,
     FolderEntryOutcome, FolderSnapshot,
 };
+use std::collections::BTreeMap;
 
 const FOLDER_BATCH_COMMAND: &str = "streams.clean.folder_batch_plan";
 

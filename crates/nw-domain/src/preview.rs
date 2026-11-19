@@ -341,15 +341,15 @@ pub struct InlineAudioObservation {
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ObservationResult {
-    Still(InlineObservation),
-    Audio(InlineAudioObservation),
+    Still(Box<InlineObservation>),
+    Audio(Box<InlineAudioObservation>),
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum MediaObservationMetadata {
-    Still(ObservationMetadata),
-    Audio(AudioObservationMetadata),
+    Still(Box<ObservationMetadata>),
+    Audio(Box<AudioObservationMetadata>),
 }
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]

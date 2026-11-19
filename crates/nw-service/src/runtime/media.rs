@@ -245,7 +245,7 @@ impl Service {
                 ObserveInput::Audio(input) => {
                     return self
                         .observe_audio(context, input, cancel)
-                        .map(ObservationResult::Audio);
+                        .map(|observation| ObservationResult::Audio(Box::new(observation)));
                 }
             };
         let file = match &target {
@@ -334,10 +334,10 @@ impl Service {
                 "Observation metadata exceeds its 64 KiB budget",
             ));
         }
-        Ok(ObservationResult::Still(InlineObservation {
+        Ok(ObservationResult::Still(Box::new(InlineObservation {
             metadata,
             png_base64: STANDARD.encode(&file.bytes),
-        }))
+        })))
     }
 
     fn observe_audio(

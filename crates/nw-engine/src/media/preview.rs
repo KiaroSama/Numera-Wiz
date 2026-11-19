@@ -158,7 +158,7 @@ impl Engine {
             "pipe:1",
         ]
         .map(str::to_owned);
-        let graph = serde_json::to_vec(&args).map_err(|_| {
+        let graph = serde_json::to_vec(&args[..]).map_err(|_| {
             DomainError::new(
                 "INVALID_PLAN",
                 "Monitor encoding graph identity is unavailable",
