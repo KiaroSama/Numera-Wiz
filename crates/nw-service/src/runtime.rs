@@ -2201,7 +2201,9 @@ impl Service {
             }
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params.clone())?;
-                let plan = if input.job_document.selects_picture_retime() {
+                let retime = input.job_document.selects_picture_retime();
+                let avc = input.job_document.selects_avc_encode();
+                let plan = if retime || avc {
                     let asset: Asset = self
                         .store
                         .get(&named("asset", &input.asset_id)?)?
@@ -2216,13 +2218,19 @@ impl Service {
                         )
                         .field("job_document.settings.input_path"));
                     }
-                    self.prepare_picture_retime(
-                        &context,
-                        input.job_document.picture_retime(&asset)?,
-                        "jobs.plan",
-                        &cancellation,
-                        &runtime,
-                    )?
+                    if retime {
+                        self.prepare_picture_retime(
+                            &context,
+                            input.job_document.picture_retime(&asset)?,
+                            "jobs.plan",
+                            &cancellation,
+                            &runtime,
+                        )?
+                    } else {
+                        self.batch_child_command(&context, "media.encode")?;
+                        let encode = input.job_document.avc_encode(&asset)?;
+                        self.prepare_copy_review(&context, "media.encode", value(&encode)?, now)?
+                    }
                 } else {
                     self.prepare_copy_review(&context, "jobs.plan", params, now)?
                 };

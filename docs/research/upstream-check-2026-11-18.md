@@ -146,3 +146,11 @@ return types and read-only range lifetimes. Numera currently uses redb
 4.6.0 across its store and prior-package trials. A major upgrade needs
 a verified prior-package open and handoff across the supported systems.
 [Craft Libraries change](https://github.com/storytold/craft-libs/commit/56c3c833bb869a140271e2aceec2112322cacc58) · [redb 5.0 changes](https://github.com/cberner/redb/releases/tag/v5.0.0)
+
+FFmWiz uses average bitrate for `quality_vbr` and `strict_size`. Its peak and
+buffer are two and four times the average for `quality_vbr`, and one and two
+times the average for `strict_size`. The Numera CPU AVC planner applies those
+controls for admitted H.264 configurations and retains their square-pixel
+output rule. An independent FFmpeg exercise verified both outputs at the six
+original variable presentation times.
+[FFmWiz bitrate lowering](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/L01_encode_opts.py#L105-L131)

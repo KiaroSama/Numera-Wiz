@@ -632,9 +632,19 @@ impl WizApp {
                 }
                 if let Some(encode) = &plan.avc_export {
                     ui.label(format!(
-                        "Picture {} to H.264 · CRF {} · {:?} preset",
-                        encode.video_stream, encode.crf, encode.preset
+                        "Picture {} to H.264 · {:?} preset",
+                        encode.video_stream, encode.preset
                     ));
+                    if let Some(crf) = encode.crf {
+                        ui.label(format!("Quality CRF {crf}"));
+                    }
+                    if let Some(bitrate) = encode.bitrate {
+                        let (peak, buffer) = bitrate.limits();
+                        ui.label(format!(
+                            "Average {} kbps · peak {peak} kbps · buffer {buffer} kbit",
+                            bitrate.average_kbps
+                        ));
+                    }
                     if let nw_domain::avc_export::Audio::Aac {
                         stream_index,
                         bitrate_kbps,

@@ -273,7 +273,15 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         "-c:v","libx264","-preset",preset,"-pix_fmt","yuv420p","-bf","0","-threads:v","2",
         "-fps_mode:v","passthrough","-enc_time_base:v",
     ].map(str::to_owned).to_vec();
-    export.extend([format!("1/{}", clock.denominator()), "-crf".into(), settings.crf.to_string()]);
+    export.push(format!("1/{}", clock.denominator()));
+    if let Some(crf) = settings.crf {
+        export.extend(["-crf".into(), crf.to_string()]);
+    }
+    if let Some(bitrate) = settings.bitrate {
+        let (peak, buffer) = bitrate.limits();
+        export.extend(["-b:v".into(), format!("{}k", bitrate.average_kbps),
+            "-maxrate:v".into(), format!("{peak}k"), "-bufsize:v".into(), format!("{buffer}k")]);
+    }
     let original = stream(&plan.source.probe, settings.video_stream)?;
     let (_, filters) = picture_filter(original, settings)?;
     if !filters.is_empty() {

@@ -16,12 +16,42 @@ pub struct EncodeInput {
 pub struct Encode {
     pub video_stream: u32,
     pub container: Container,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(range(min = 1, max = 51))]
-    pub crf: u8,
+    pub crf: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bitrate: Option<Bitrate>,
     pub preset: Preset,
     pub audio: Audio,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picture: Option<PictureTransform>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Bitrate {
+    #[schemars(range(min = 64, max = 100000))]
+    pub average_kbps: u32,
+    pub mode: RateMode,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RateMode {
+    #[default]
+    QualityVbr,
+    StrictSize,
+}
+
+impl Bitrate {
+    pub fn limits(self) -> (u32, u32) {
+        let scale = match self.mode {
+            RateMode::QualityVbr => 2,
+            RateMode::StrictSize => 1,
+        };
+        let peak = self.average_kbps.saturating_mul(scale);
+        (peak, peak.saturating_mul(2))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema)]
@@ -107,8 +137,10 @@ pub enum Audio {
 
 impl Encode {
     pub fn validate(&self) -> Result<()> {
-        if !(1..=51).contains(&self.crf) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Choose an AVC CRF from 1 to 51"));
+        match (self.crf, self.bitrate) {
+            (Some(crf), None) if (1..=51).contains(&crf) => {}
+            (None, Some(bitrate)) if (64..=100000).contains(&bitrate.average_kbps) => {}
+            _ => return Err(DomainError::new("VALIDATION_ERROR", "Choose one CRF from 1 to 51 or an average bitrate from 64 to 100000 kbps")),
         }
         if let Audio::Aac { bitrate_kbps, .. } = self.audio && !(48..=320).contains(&bitrate_kbps) {
             return Err(DomainError::new("VALIDATION_ERROR", "Choose an AAC bitrate from 48 to 320 kbps"));
@@ -173,7 +205,7 @@ impl FolderEncodeInput {
                 Audio::Aac { stream_index: track.index, bitrate_kbps }
             }
         };
-        let settings = Encode { video_stream: picture.index, container: self.container, crf: self.crf, preset: self.preset, audio, picture: None };
+        let settings = Encode { video_stream: picture.index, container: self.container, crf: Some(self.crf), bitrate: None, preset: self.preset, audio, picture: None };
         settings.validate()?;
         Ok(settings)
     }

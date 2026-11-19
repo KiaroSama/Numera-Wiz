@@ -2,7 +2,7 @@
 use super::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
-    avc_export::{Audio, Container, Crop, Encode, EncodeInput, PictureTransform, Preset, Resize, ResizeAspect, Rotation},
+    avc_export::{Audio, Bitrate, Container, Crop, Encode, EncodeInput, PictureTransform, Preset, RateMode, Resize, ResizeAspect, Rotation},
     mux::StreamKind,
     records::Asset,
 };
@@ -12,13 +12,15 @@ pub(super) struct AvcUi {
     audio: Option<u32>,
     bitrate: u16,
     crf: u8,
+    average_kbps: u32,
+    rate_mode: Option<RateMode>,
     preset: Preset,
     picture_transform: Option<PictureTransform>,
 }
 
 impl Default for AvcUi {
     fn default() -> Self {
-        Self { picture: None, audio: None, bitrate: 128, crf: 18, preset: Preset::Balanced, picture_transform: None }
+        Self { picture: None, audio: None, bitrate: 128, crf: 18, average_kbps: 2000, rate_mode: None, preset: Preset::Balanced, picture_transform: None }
     }
 }
 
@@ -48,8 +50,22 @@ impl WizApp {
                         }
                     });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Quality CRF");
-                    changed |= ui.add(egui::DragValue::new(&mut self.avc_export.crf).range(1..=51)).changed();
+                    egui::ComboBox::from_id_salt("avc-rate-mode")
+                        .selected_text(match self.avc_export.rate_mode {
+                            None => "Quality CRF",
+                            Some(RateMode::QualityVbr) => "Variable bitrate",
+                            Some(RateMode::StrictSize) => "Bitrate with peak cap",
+                        })
+                        .show_ui(ui, |ui| {
+                            changed |= ui.selectable_value(&mut self.avc_export.rate_mode, None, "Quality CRF").changed();
+                            changed |= ui.selectable_value(&mut self.avc_export.rate_mode, Some(RateMode::QualityVbr), "Variable bitrate").changed();
+                            changed |= ui.selectable_value(&mut self.avc_export.rate_mode, Some(RateMode::StrictSize), "Bitrate with peak cap").changed();
+                        });
+                    if self.avc_export.rate_mode.is_some() {
+                        changed |= ui.add(egui::DragValue::new(&mut self.avc_export.average_kbps).range(64..=100000).suffix(" kbps")).changed();
+                    } else {
+                        changed |= ui.add(egui::DragValue::new(&mut self.avc_export.crf).range(1..=51)).changed();
+                    }
                     egui::ComboBox::from_id_salt("avc-preset").selected_text(format!("{:?}",self.avc_export.preset))
                         .show_ui(ui, |ui| {
                             for preset in [Preset::Fast,Preset::Balanced,Preset::Slow] {
@@ -91,7 +107,8 @@ impl WizApp {
             let settings = Encode {
                 video_stream: self.avc_export.picture.expect("Registered picture stream"),
                 container: container.expect("Reviewed destination extension"),
-                crf: self.avc_export.crf,
+                crf: self.avc_export.rate_mode.is_none().then_some(self.avc_export.crf),
+                bitrate: self.avc_export.rate_mode.map(|mode| Bitrate { average_kbps: self.avc_export.average_kbps, mode }),
                 preset: self.avc_export.preset,
                 audio: self.avc_export.audio.map_or(Audio::Drop {},|stream_index| Audio::Aac {
                     stream_index, bitrate_kbps:self.avc_export.bitrate,

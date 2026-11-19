@@ -1002,6 +1002,16 @@ presentation times and dimensions. Selected AAC retains the original
 mono or stereo rate and verifies the coded timing. Review and submit
 the returned plan ID and hash.
 
+For an average bitrate, supply `"bitrate":{"average_kbps":2000,"mode":"quality_vbr"}`
+in `settings` and omit `crf`. `quality_vbr` uses twice the average as the peak
+and four times the average as the buffer. `strict_size` caps the peak at the
+average and uses twice the average as the buffer.
+
+`jobs.plan` also accepts a reviewed FFmWiz CPU H.264 profile with an explicit
+video bitrate, `use_gpu=n`, `keep_source_metadata=n` and `subtitle_tracks=none`.
+Choose `audio_tracks=none` or one original audio ordinal with AAC and an explicit
+audio bitrate. The imported profile preserves FFmWiz's square-pixel output rule.
+
 The optional `settings.picture` object accepts an even-coordinate crop,
 quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final
 `resize`. For example, set `resize` to

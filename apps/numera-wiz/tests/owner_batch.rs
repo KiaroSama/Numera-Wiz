@@ -1114,6 +1114,35 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     assert_eq!(actual_pts, [0, 512, 1920, 3584, 6016, 8192]);
     results.push(json!({"job":common_job["job_id"],"container":"mp4","reordered_original_packet_pts":original_pts,"verified_decoded_pts":actual_pts}));
 
+    for (mode, peak, buffer) in [("quality_vbr", "1400k", "2800k"), ("strict_size", "700k", "1400k")] {
+        let output = directory.join(format!("imported-{mode}.mp4"));
+        let legacy = format!(
+            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\nresolution=n\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            path.display(), output.display(),
+        );
+        let import = cli.query("config.import.ffmwiz", json!({"source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"})).await;
+        assert_eq!(import["input_valid"], true, "{import}");
+        let plan = cli.query("jobs.plan", json!({"asset_id": original["id"], "job_document":import["job"]})).await;
+        let direct = cli.query("media.encode", json!({"asset_id":original["id"],"output":output,"settings":{
+            "video_stream":0,"container":"mp4","bitrate":{"average_kbps":700,"mode":mode},"preset":"balanced",
+            "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128},
+            "picture":{"resize":{"width":320,"height":180,"aspect":"square_pixels"}}
+        }})).await;
+        assert_eq!(plan["hash"], direct["hash"]);
+        let options = plan["argv_template"].as_array().unwrap();
+        for (flag, expected) in [("-b:v", "700k"), ("-maxrate:v", peak), ("-bufsize:v", buffer)] {
+            assert!(options.windows(2).any(|pair| pair[0] == flag && pair[1] == expected));
+        }
+        let accepted = accepted(&cli, &scope, &format!("encode-import-{mode}"), "jobs.submit", json!({
+            "plan_id":plan["id"],"plan_hash":plan["hash"]
+        })).await;
+        succeeded(&cli, &accepted).await;
+        let probe = fixture::probe(&components, &output).await;
+        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], "1:1");
+        assert_eq!(probe["streams"][0]["codec_name"], "h264");
+        results.push(json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,"peak":peak,"buffer":buffer}));
+    }
+
     let intake = directory.join("encode-intake");
     let output_root = directory.join("encode-outputs");
     std::fs::create_dir_all(intake.join("second")).unwrap();
