@@ -3243,6 +3243,7 @@ impl Service {
         limits: nw_domain::execution::CleanupLimits,
         compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
     ) -> Result<Plan> {
+        self.admit_execution_limits(context, &limits)?;
         let asset: Asset = self
             .store
             .get(&named("asset", asset_id)?)?
@@ -3258,7 +3259,6 @@ impl Service {
         limits: nw_domain::execution::CleanupLimits,
         compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
     ) -> Result<Plan> {
-        self.admit_execution_limits(context, &limits)?;
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;
         let output = self.path(context, Path::new(output), true)?;
