@@ -28,6 +28,22 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
+        validate_sources(&primary, &additions, &files::path_text(output)?)?;
+        self.replace_tracks_plan_at(primary, additions, output, &CleanIntent::preserving_all(), creator, now)
+    }
+
+    pub fn replace_tracks_plan_at(
+        &self,
+        primary: Asset,
+        additions: Vec<AddedInput>,
+        output: &Path,
+        intent: &CleanIntent,
+        creator: &str,
+        now: u64,
+    ) -> Result<Plan> {
+        if additions.is_empty() {
+            return self.clean_plan_at(primary, output, intent, creator, now);
+        }
         let mut plan = self.review_stream_copy(
             primary,
             output,
@@ -35,7 +51,7 @@ impl Engine {
             creator,
             now,
             |streams| {
-                let mut resolution = mux::resolve(streams, &CleanIntent::preserving_all())?;
+                let mut resolution = mux::resolve(streams, intent)?;
                 resolution.action = CleanAction::Remux;
                 resolution.reasons.push(
                     "Append the reviewed external audio and subtitles without conversion".into(),
@@ -67,11 +83,15 @@ pub(super) fn validate_track_additions(plan: &Plan, profile: OutputProfile) -> R
         || crate::admission::frozen_demuxer(&plan.source.probe.format)? != "matroska"
         || plan.resolution.action != CleanAction::Remux
         || plan.resolution.chapter_import.is_some()
-        || plan.resolution.streams != plan.source.probe.streams
+        || plan.resolution.streams.iter().any(|selected| {
+            !plan.source.probe.streams.iter().any(|source| {
+                selected.index == source.index && selected.kind == source.kind && selected.codec == source.codec
+            })
+        })
     {
         return Err(DomainError::new(
             "INCOMPATIBLE_PRESERVATION",
-            "Strict track addition requires an unchanged Matroska primary stream manifest and a new .mkv destination",
+            "Strict track replacement requires original Matroska stream codecs and a new .mkv destination",
         ));
     }
     for input in &plan.added_tracks {

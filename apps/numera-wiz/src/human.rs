@@ -360,6 +360,11 @@ pub enum Streams {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review strict-copy removal, replacement or global metadata stripping.
+    Replace {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review a single original stream's packet-copy extraction into Matroska.
     Extract {
         #[arg(long)]
@@ -803,6 +808,12 @@ pub fn prepare(command: Command) -> Result<Request> {
                 commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("streams.add", serde_json::to_value(input)?)
+        }
+        Command::Streams(Streams::Replace { file }) => {
+            let mut input: nw_domain::track_append::ReplaceInput = commands::parse(document(&file)?)?;
+            input.validate()?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("streams.replace", serde_json::to_value(input)?)
         }
         Command::Streams(Streams::Extract { asset, stream, out }) => query(
             "streams.extract",

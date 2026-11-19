@@ -244,6 +244,13 @@ output index of each group. Submit the returned plan ID and hash through
 `jobs submit`. The executor independently compares packet data, timing and codec
 parameters for each retained and appended stream before publishing.
 
+Use `streams replace --file replace.json` with the same `target`, `output` and
+`conversion` fields to combine removals and additions. `remove` accepts
+`{"kind":"original_index","index":2}` or
+`{"kind":"type_ordinal","track_kind":"audio","ordinal":1}` for the second
+audio stream. `metadata` accepts `preserve` or `strip_global`. Omit `remove`
+and `additions` for a metadata-only job with `strip_global`.
+
 ### Cut by original packet boundaries
 
 For a registered Matroska source, use

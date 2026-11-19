@@ -111,11 +111,12 @@ highest visible opaque layer at that frame and shows black in uncovered gaps.
 ## Append audio and subtitles
 
 Register the original MKV and each external source. Select the original MKV,
-set a new `.mkv` destination, then open **Add audio and subtitle tracks**.
+set a new `.mkv` destination, then open **Add or replace audio and subtitles**.
 Choose the external sources in order. Use **Explicit track selectors** for
 individual stream indices, language, title and disposition overrides. Choose
-**Review appended tracks**, inspect the input-to-output mapping, then submit
-the reviewed plan through the ordinary job controls.
+**Review track changes**, inspect the input-to-output mapping, then submit the
+reviewed plan. **Remove original tracks** selects audio or subtitle streams to
+drop. **Strip global metadata** can be used by itself or with the track changes.
 
 ## Packet copy cut
 

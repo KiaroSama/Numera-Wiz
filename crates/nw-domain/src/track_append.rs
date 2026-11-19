@@ -22,6 +22,87 @@ pub struct AppendInput {
     pub conversion: Conversion,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReplaceInput {
+    pub target: String,
+    #[serde(default)]
+    #[schemars(length(max = 32))]
+    pub remove: Vec<Removal>,
+    #[serde(default)]
+    #[schemars(length(max = 4))]
+    pub additions: Vec<Addition>,
+    pub metadata: Metadata,
+    pub output: String,
+    pub conversion: Conversion,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Metadata {
+    Preserve,
+    StripGlobal,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RemovableTrack {
+    Audio,
+    Subtitle,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Removal {
+    OriginalIndex { index: u32 },
+    TypeOrdinal { track_kind: RemovableTrack, ordinal: usize },
+}
+
+impl ReplaceInput {
+    pub fn validate(&self) -> Result<()> {
+        if self.remove.len() > MAX_ADDED_TRACKS || self.additions.len() > MAX_ADDED_INPUTS {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Replacement exceeds the admitted track or input bound"));
+        }
+        if self.remove.is_empty() && self.additions.is_empty() && matches!(self.metadata, Metadata::Preserve) {
+            return Err(invalid("Select removals, additions or a metadata change"));
+        }
+        Ok(())
+    }
+
+    pub fn primary_intent(&self, streams: &[Stream]) -> Result<crate::mux::CleanIntent> {
+        self.validate()?;
+        let mut remove = BTreeSet::new();
+        for removal in &self.remove {
+            let source = match removal {
+                Removal::OriginalIndex { index } => streams.iter().find(|stream| stream.index == *index && eligible(stream)),
+                Removal::TypeOrdinal { track_kind, ordinal } => {
+                    let kind = match track_kind {
+                        RemovableTrack::Audio => StreamKind::Audio,
+                        RemovableTrack::Subtitle => StreamKind::Subtitle,
+                    };
+                    streams.iter().filter(|stream| stream.kind == kind).nth(*ordinal)
+                }
+            }.ok_or_else(|| invalid("Removal does not resolve to an original audio or subtitle track"))?;
+            if !remove.insert(source.index) {
+                return Err(invalid("Two removal selectors address the same source track"));
+            }
+        }
+        let retained = |kind| {
+            let values = streams.iter().filter(|stream| stream.kind == kind && !remove.contains(&stream.index))
+                .map(|stream| stream.index).collect::<Vec<_>>();
+            crate::mux::Selection {
+                selector: if values.is_empty() { crate::mux::Selector::None } else { crate::mux::Selector::SourceIndices { values } },
+                no_match: crate::mux::NoMatch::AllowEmpty,
+            }
+        };
+        let mut intent = crate::mux::CleanIntent::preserving_all();
+        intent.audio_selection = retained(StreamKind::Audio);
+        intent.subtitle_selection = retained(StreamKind::Subtitle);
+        intent.preservation.global_tags = matches!(self.metadata, Metadata::Preserve);
+        Ok(intent)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Conversion {

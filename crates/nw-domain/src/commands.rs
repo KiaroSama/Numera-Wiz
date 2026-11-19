@@ -240,7 +240,7 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
         ),
-        "media.cut" | "streams.add" | "streams.extract" | "jobs.plan" => {
+        "media.cut" | "streams.add" | "streams.replace" | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
         "streams.extract.batch_plan" => Some(
@@ -1019,6 +1019,12 @@ pub fn registry() -> Vec<Descriptor> {
             crate::track_append::AppendInput
         ),
         row!(
+            "streams.replace",
+            "Review original audio or subtitle removal, replacement and global metadata stripping",
+            Query,
+            crate::track_append::ReplaceInput
+        ),
+        row!(
             "streams.extract.batch_plan",
             "Review distinct video, audio and subtitle outputs by per-file track ordinal",
             Query,
@@ -1773,6 +1779,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "assets.output_suggest",
     "streams.clean",
     "streams.add",
+    "streams.replace",
     "streams.extract",
     "streams.extract.batch_plan",
     "plans.inspect",

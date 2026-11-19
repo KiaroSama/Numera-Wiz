@@ -273,6 +273,12 @@ and its physical path, and a new `.mkv` destination. The review includes
 and `hash` and the ordinary durable replay identifiers. `jobs.inspect` exposes
 verification and artifact publication.
 
+`streams.replace` uses the same execution path and accepts original-index or
+type-relative audio and subtitle removals, optional additions, and an explicit
+global metadata policy. A request with `metadata: "strip_global"` can omit both
+track arrays. The review reports one output position for each retained or added
+stream and no output position for a dropped track.
+
 ## Packet copy cut
 
 `media.cut` takes `asset_id`, `output`, `chapters: "drop"`, and a `range` with

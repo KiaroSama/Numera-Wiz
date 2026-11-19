@@ -1142,6 +1142,7 @@ impl Service {
                 "assets.register_folder",
                 "streams.clean",
                 "streams.add",
+                "streams.replace",
                 "streams.extract",
                 "streams.extract.batch_plan",
                 "streams.clean.batch_plan",
@@ -1898,7 +1899,7 @@ impl Service {
                 drop(permit);
                 return Ok(response);
             }
-            "streams.clean" | "streams.add" | "streams.extract" | "jobs.plan"
+            "streams.clean" | "streams.add" | "streams.replace" | "streams.extract" | "jobs.plan"
             | "chapters.remove" | "chapters.import" | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
@@ -2586,19 +2587,7 @@ impl Service {
                         "Add 1–4 external audio or subtitle inputs",
                     ));
                 }
-                let inputs = input
-                    .additions
-                    .into_iter()
-                    .map(|addition| {
-                        let source: Asset = self
-                            .store
-                            .get(&named("asset", &addition.asset_id)?)?
-                            .ok_or_else(DomainError::object_not_found)?;
-                        self.object(context, &source.id, &source.creator)?;
-                        self.path(context, Path::new(&source.identity.path), false)?;
-                        addition.resolve(source)
-                    })
-                    .collect::<Result<Vec<_>>>()?;
+                let inputs = self.resolve_additions(context, &input.additions)?;
                 return self.prepare_native_copy(
                     context,
                     &input.target,
@@ -2614,6 +2603,16 @@ impl Service {
                         )
                     },
                 );
+            }
+            "streams.replace" => {
+                let input: nw_domain::track_append::ReplaceInput = commands::parse(params)?;
+                input.validate()?;
+                let additions = self.resolve_additions(context, &input.additions)?;
+                return self.prepare_native_copy(context, &input.target, &input.output, Default::default(),
+                    |engine, primary, output| {
+                        let intent = input.primary_intent(&primary.probe.streams)?;
+                        engine.replace_tracks_plan_at(primary, additions, output, &intent, &context.principal, now)
+                    });
             }
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params)?;
@@ -2681,6 +2680,20 @@ impl Service {
             _ => commands::parse::<CleanInput>(params)?,
         };
         self.prepare_cleanup(context, input, now)
+    }
+
+    fn resolve_additions(
+        &self,
+        context: &Context,
+        additions: &[nw_domain::track_append::Addition],
+    ) -> Result<Vec<nw_domain::track_append::AddedInput>> {
+        additions.iter().cloned().map(|addition| {
+            let source: Asset = self.store.get(&named("asset", &addition.asset_id)?)?
+                .ok_or_else(DomainError::object_not_found)?;
+            self.object(context, &source.id, &source.creator)?;
+            self.path(context, Path::new(&source.identity.path), false)?;
+            addition.resolve(source)
+        }).collect()
     }
 
     fn prepare_native_copy(

@@ -1292,6 +1292,50 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         .collect();
     assert_eq!(expected_cut.len(), 8);
     assert_eq!(cut_packets[&0], expected_cut);
+
+    let replacement_output = media.directory.path().join("track-replacement.mkv");
+    let replacement = json!({"target":sdk_assets[0]["id"],"output":replacement_output,"conversion":"forbid",
+        "metadata":"strip_global","remove":[{"kind":"type_ordinal","track_kind":"audio","ordinal":1}],
+        "additions":[{"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
+            {"stream_index":1,"title":"Alternate mix","language":"fas","disposition":[]}
+        ]}}]});
+    let replacement_document = media.directory.path().join("track-replacement.json");
+    std::fs::write(&replacement_document, serde_json::to_vec(&replacement).unwrap()).unwrap();
+    let (typed_replace, code) = cli.human(&[
+        "--access-profile", "batch-operator", "streams", "replace", "--file", replacement_document.to_str().unwrap(),
+    ]).await;
+    assert_eq!(code, 0, "{typed_replace}");
+    let stdio_replace = call!(stdio, "streams.replace", replacement.clone(), json!({}));
+    let http_replace = call!(http, "streams.replace", replacement, json!({}));
+    assert_eq!(typed_replace["result"]["hash"], stdio_replace["hash"]);
+    assert_eq!(stdio_replace["hash"], http_replace["hash"]);
+    assert!(http_replace["resolution"]["outcomes"][2]["output_index"].is_null());
+    assert_eq!(http_replace["added_tracks"][0]["first_output_index"], 2);
+    let replace_job = call!(http, "jobs.submit", json!({"plan_id":http_replace["id"],"plan_hash":http_replace["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-track-replacement"}));
+    cli.completed(replace_job["job_id"].as_str().unwrap()).await;
+    let replacement_probe = fixture::probe(&media.bin, &replacement_output).await;
+    assert!(replacement_probe["format"]["tags"]["title"].is_null());
+    assert_eq!(replacement_probe["streams"][2]["tags"]["title"], "Alternate mix");
+    assert_eq!(replacement_probe["streams"][2]["tags"]["language"], "fas");
+    let replacement_packets = packets(&media.bin, &replacement_output).await;
+    assert_eq!(replacement_packets[&0], original_packets[&0]);
+    assert_eq!(replacement_packets[&1], original_packets[&1]);
+    let mut expected_replacement = original_packets[&1].clone();
+    for packet in &mut expected_replacement {
+        packet["stream_index"] = json!(2);
+    }
+    assert_eq!(replacement_packets[&2], expected_replacement);
+
+    let strip_output = media.directory.path().join("metadata-only.mkv");
+    let strip = call!(http, "streams.replace", json!({"target":sdk_assets[0]["id"],
+        "output":strip_output,"conversion":"forbid","metadata":"strip_global"}), json!({}));
+    assert_eq!(strip["resolution"]["action"], "remux");
+    let strip_job = call!(http, "jobs.submit", json!({"plan_id":strip["id"],"plan_hash":strip["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-metadata-only"}));
+    cli.completed(strip_job["job_id"].as_str().unwrap()).await;
+    assert!(fixture::probe(&media.bin, &strip_output).await["format"]["tags"]["title"].is_null());
+    assert_eq!(packets(&media.bin, &strip_output).await, original_packets);
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
@@ -1318,6 +1362,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "track_append":{"job":append_job["job_id"],"kept_original_streams":3,"added_audio":2,"added_subtitles":2,
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
+        "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "scope":"Retained video-folder cleanup to a disjoint destination; companion copying, output trees, mixed audio/encode workflows, replacement and GUI batching remain separate qualification"});
     std::fs::write(
         evidence.join("batch-media-report.json"),
