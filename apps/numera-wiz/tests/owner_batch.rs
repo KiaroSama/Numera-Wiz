@@ -15,7 +15,13 @@ use rmcp::{
     },
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, path::Path, process::Stdio, time::Duration};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::Duration,
+};
 use tokio_util::sync::CancellationToken;
 
 macro_rules! sdk {
@@ -189,6 +195,9 @@ async fn caption_burn(parent: &Path) -> Value {
         } else {
             ("bt709", "bt709", "yuv420p")
         };
+        let filter = format!(
+            "setsar=4/3,format={pixel_format},setparams=range=limited:color_primaries={primaries}:color_trc={transfer}:colorspace={matrix}"
+        );
         let args = [
             "-v",
             "error",
@@ -217,7 +226,7 @@ async fn caption_burn(parent: &Path) -> Value {
             "-map",
             "3:s",
             "-vf",
-            "setsar=4/3",
+            &filter,
             "-c:v",
             "ffv1",
             "-pix_fmt",
@@ -248,6 +257,16 @@ async fn caption_burn(parent: &Path) -> Value {
         )
         .await
         .unwrap();
+        let original_probe = fixture::probe(&components, &input).await;
+        let original_picture = &original_probe["streams"][0];
+        assert_eq!(
+            original_picture["color_transfer"], transfer,
+            "{original_picture}"
+        );
+        assert_eq!(original_picture["color_primaries"], primaries);
+        assert_eq!(original_picture["color_space"], matrix);
+        assert_eq!(original_picture["color_range"], "tv");
+        assert_eq!(original_picture["pix_fmt"], pixel_format);
         let registered = accepted(
             &cli,
             &scope,
@@ -303,7 +322,6 @@ async fn caption_burn(parent: &Path) -> Value {
         assert_eq!(video["sample_aspect_ratio"], "4:3");
         assert_eq!(video["pix_fmt"], "yuv420p");
         assert_eq!(video["color_range"], "tv");
-        let original_probe = fixture::probe(&components, &input).await;
         for key in ["color_primaries", "color_space", "color_transfer"] {
             if hdr {
                 assert_eq!(video[key], "bt709");
@@ -1118,15 +1136,65 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     json!({"single":results,"folder":{"batch":id,"verified_h264_outputs":2,"companions_excluded":1}})
 }
 
+async fn run_media_fixture<Fut>(
+    parent: &Path,
+    name: &str,
+    exercise: impl FnOnce(PathBuf) -> Fut + Send + 'static,
+) -> Option<Value>
+where
+    Fut: Future<Output = Value> + Send + 'static,
+{
+    let parent = parent.to_owned();
+    match tokio::spawn(async move { exercise(parent).await }).await {
+        Ok(proof) => Some(proof),
+        Err(_) => {
+            eprintln!("Hosted media fixture failed: {name}");
+            None
+        }
+    }
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
     let media = fixture::generate().await;
-    let caption_facts = caption_burn(media.directory.path()).await;
-    let sample_edit_facts = multirange_audio_edits(media.directory.path()).await;
-    let join_facts = packet_join(media.directory.path()).await;
-    let retime_facts = variable_picture_retime(media.directory.path()).await;
-    let avc_facts = cpu_avc_export(media.directory.path()).await;
+    let evidence = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
+    std::fs::create_dir_all(&evidence).unwrap();
+    let parent = media.directory.path();
+    let caption_facts =
+        run_media_fixture(parent, "caption burn", |path| async move { caption_burn(&path).await })
+            .await;
+    let sample_edit_facts = run_media_fixture(parent, "PCM range edit", |path| async move {
+        multirange_audio_edits(&path).await
+    })
+    .await;
+    let join_facts =
+        run_media_fixture(parent, "packet join", |path| async move { packet_join(&path).await })
+            .await;
+    let retime_facts = run_media_fixture(parent, "variable-rate retime", |path| async move {
+        variable_picture_retime(&path).await
+    })
+    .await;
+    let avc_facts = run_media_fixture(parent, "CPU AVC export", |path| async move {
+        cpu_avc_export(&path).await
+    })
+    .await;
+    let cases = [
+        ("caption_burn", &caption_facts),
+        ("sample_edit", &sample_edit_facts),
+        ("packet_join", &join_facts),
+        ("picture_retime", &retime_facts),
+        ("cpu_avc_export", &avc_facts),
+    ];
+    let completed: BTreeMap<_, _> = cases
+        .iter()
+        .map(|(name, facts)| (*name, facts.is_some()))
+        .collect();
+    std::fs::write(
+        evidence.join("independent-media-cases.json"),
+        serde_json::to_vec_pretty(&completed).unwrap(),
+    )
+    .unwrap();
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -1970,8 +2038,6 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let bind = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = bind.local_addr().unwrap().port();
     drop(bind);
-    let evidence = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
-    std::fs::create_dir_all(&evidence).unwrap();
     let token_file = media.directory.path().join("auth/batch-http-token");
     let server_log = evidence.join("batch-http-controller-stderr.log");
     let mut server = cli
@@ -2642,4 +2708,5 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     .unwrap();
     println!("NW_BATCH_MEDIA_REPORT={report}");
     lost_ack::verify(&media, Some(&second)).await;
+    assert!(completed.values().all(|passed| *passed), "{completed:?}");
 }
