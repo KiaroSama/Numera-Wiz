@@ -206,6 +206,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.render"
         | "timeline.preview_frame"
         | crate::preview::PROGRAM_SEGMENT_COMMAND
+        | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => ProjectContextRule::RequiredRead,
         "sequences.create"
@@ -283,9 +284,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "previews.source_segment" => {
             Some(serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"))
         }
-        crate::preview::PROGRAM_SEGMENT_COMMAND => {
-            Some(serde_json::to_value(schema_for!(crate::preview::ProgramSegment)).expect("schema"))
-        }
+        crate::preview::PROGRAM_SEGMENT_COMMAND => Some(
+            serde_json::to_value(schema_for!(crate::preview::ProgramSegment)).expect("schema"),
+        ),
+        crate::preview::PROGRAM_PLAYBACK_COMMAND => Some(
+            serde_json::to_value(schema_for!(crate::preview::ProgramPlaybackManifest)).expect("schema"),
+        ),
         "timeline.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }
@@ -1017,6 +1021,12 @@ fn build_registry() -> Vec<Descriptor> {
         row!(
             "previews.program_segment",
             "Prepare a bounded browser playback window from the selected project revision",
+            Query,
+            crate::preview::ProgramSegmentInput
+        ),
+        row!(
+            "previews.program_playback",
+            "Describe the authenticated continuous program stream at a committed project revision",
             Query,
             crate::preview::ProgramSegmentInput
         ),
@@ -1943,6 +1953,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     crate::preview::OBSERVE_COMMAND,
     "previews.source_segment",
     crate::preview::PROGRAM_SEGMENT_COMMAND,
+    crate::preview::PROGRAM_PLAYBACK_COMMAND,
     "capabilities.inspect",
     "capabilities.refresh",
     "capabilities.clear",

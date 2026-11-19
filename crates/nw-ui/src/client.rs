@@ -13,6 +13,8 @@ pub trait CommandClient: Send + Sync {
         label: &'static str,
     );
     #[cfg(target_arch = "wasm32")]
+    fn open_browser_program(&self, request: nw_domain::preview::ProgramPlaybackRequest);
+    #[cfg(target_arch = "wasm32")]
     fn close_browser_playback(&self);
     #[cfg(not(target_arch = "wasm32"))]
     fn supports_native_picture(&self) -> bool {

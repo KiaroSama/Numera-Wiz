@@ -10,7 +10,7 @@ mod stream_observations;
 pub(super) mod verification;
 mod volume;
 use super::{Engine, blocking};
-pub use browser_preview::BrowserSegment;
+pub use browser_preview::{BrowserMp4Part, BrowserSegment, browser_mp4_stream};
 use nw_domain::{
     DomainError, Result,
     media::{ComponentIdentity, ENCODERS, FILTERS, MUXERS, MediaTools},

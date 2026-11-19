@@ -182,7 +182,7 @@ fn range(header: Option<&str>, total: u64) -> nw_domain::Result<(u64, u64)> {
     }
     Ok((start, end))
 }
-fn rejected(error: DomainError) -> Response {
+pub(super) fn rejected(error: DomainError) -> Response {
     let status = match error.code.as_str() {
         "OBJECT_NOT_FOUND" | "ARTIFACT_UNAVAILABLE" => StatusCode::NOT_FOUND,
         "ARTIFACT_CHANGED" => StatusCode::PRECONDITION_FAILED,

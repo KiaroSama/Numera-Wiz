@@ -339,6 +339,24 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         "{peaks:?}"
     );
 
+    let playback_url = format!("{}/api/v1/previews/program", fixture.endpoint);
+    let playback_input = json!({"project_id":selected.project,"selection":{
+        "sequence_id":selected.sequence,"revision":"4","range":{"start":t(0,1),"end":t(6,1)}
+    }});
+    assert_eq!(client.post(&playback_url).json(&playback_input).send().await.unwrap().status(), reqwest::StatusCode::UNAUTHORIZED);
+    let streamed = client.post(&playback_url).bearer_auth(bearer).json(&playback_input).send().await.unwrap().error_for_status().unwrap();
+    assert!(streamed.headers()[reqwest::header::CONTENT_TYPE].to_str().unwrap().contains("avc1."));
+    let streamed = streamed.bytes().await.unwrap();
+    assert!((1..=2 * 1024 * 1024).contains(&streamed.len()));
+    let long = fixture.root.path().join("checked-browser-continuous.mp4");
+    std::fs::write(&long, &streamed).unwrap();
+    let mut extract_late = ["-hide_banner", "-nostdin", "-v", "error", "-i"].map(str::to_owned).to_vec();
+    extract_late.push(long.to_str().unwrap().into());
+    extract_late.extend(["-map", "0:v:0", "-vf", "select=eq(n\\,132)", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"].map(str::to_owned));
+    let late = nw_platform::process::run(&program, &extract_late, Duration::from_secs(10), 320 * 180 * 3, CancellationToken::new()).await.unwrap().stdout;
+    assert_eq!(late.len(), 320 * 180 * 3);
+    assert!(late.iter().all(|channel| *channel <= 8), "The gap at 5.5 seconds must decode as black");
+
     let revision = project_edit(
         service,
         &browser,
@@ -368,6 +386,8 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         stale.json::<Value>().await.unwrap()["error"]["code"],
         "STALE_REVISION"
     );
+    let stale_stream = client.post(&playback_url).bearer_auth(bearer).json(&playback_input).send().await.unwrap();
+    assert_eq!(stale_stream.json::<Value>().await.unwrap()["error"]["code"], "STALE_REVISION");
 
     let last = reports.last().unwrap();
     let segment = format!(
@@ -400,7 +420,8 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         evidence.join("source-preview-chrome.json"),
         serde_json::to_vec_pretty(
             &json!({"cases":reports,"missing_bearer_denied":true,"changed_source_denied":true,
-                    "program":{"chrome":program_report,"decoded_audio_window_peaks":peaks,"stale_revision_denied":true}}),
+                    "program":{"chrome":program_report,"decoded_audio_window_peaks":peaks,"stale_revision_denied":true,
+                        "continuous":{"bytes":streamed.len(),"verified_frame_index":132,"stale_revision_denied":true}}}),
         )
         .unwrap(),
     )

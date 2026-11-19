@@ -4,7 +4,7 @@ use nw_domain::{
     commands::{self, Empty, IdInput, Request, ResolveInput, Response},
 };
 mod runtime;
-pub use runtime::{ArtifactTransfer, Context, NativePreviewTrack, NativePreviewTransfer, Service};
+pub use runtime::{ArtifactTransfer, BrowserProgramTransfer, Context, NativePreviewTrack, NativePreviewTransfer, Service};
 
 pub use nw_domain::commands::ACTIVE_COMMANDS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -549,6 +549,7 @@ mod tests {
             "timeline.render",
             "timeline.preview_frame",
             nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
+            nw_domain::preview::PROGRAM_PLAYBACK_COMMAND,
         ] {
             assert_eq!(
                 result["commands"]
@@ -569,6 +570,7 @@ mod tests {
                 "timeline.render"
                     | "timeline.preview_frame"
                     | nw_domain::preview::PROGRAM_SEGMENT_COMMAND
+                    | nw_domain::preview::PROGRAM_PLAYBACK_COMMAND
                     | "timeline.render_mixed"
                     | "markers.wave_projection"
                     | "interchange.edl.export"

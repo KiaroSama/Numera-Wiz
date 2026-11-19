@@ -2,14 +2,15 @@
 use super::{Deadline, js_error};
 use js_sys::{Promise, Reflect, Uint8Array};
 use nw_domain::preview::{
-    MAX_SOURCE_SEGMENT_BYTES, MAX_SOURCE_SEGMENT_FRAGMENTS, SegmentBytes, SegmentPlayback,
+    MAX_PROGRAM_PLAYBACK_BYTES, MAX_SOURCE_SEGMENT_BYTES, MAX_SOURCE_SEGMENT_FRAGMENTS,
+    ProgramPlaybackRequest, SegmentBytes, SegmentPlayback,
 };
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     AbortController, AbortSignal, Event, EventTarget, HtmlVideoElement, MediaSource,
-    ReadableStreamDefaultReader, Request, RequestInit, RequestMode, RequestRedirect, Response, Url,
+    ReadableStreamDefaultReader, Request, RequestCredentials, RequestInit, RequestMode, RequestRedirect, Response, SourceBuffer, Url,
 };
 
 struct Listener {
@@ -64,6 +65,16 @@ struct Session {
     id: Rc<()>,
     controller: AbortController,
     playback: Option<Playback>,
+}
+
+enum PreviewRequest {
+    Segment(SegmentPlayback),
+    Program(ProgramPlaybackRequest),
+}
+
+enum PlaybackBytes {
+    Segment { bytes: Vec<u8>, manifest: SegmentPlayback },
+    Program { reader: ReadableStreamDefaultReader, duration: f64 },
 }
 
 impl Drop for Session {
@@ -217,10 +228,78 @@ async fn fetch_segment(
     Ok(bytes)
 }
 
+async fn fetch_program(
+    window: &web_sys::Window, origin: &str, bearer: &str,
+    input: ProgramPlaybackRequest, signal: &AbortSignal,
+) -> Result<(String, PlaybackBytes), JsValue> {
+    if window.location().origin()? != origin {
+        return Err(JsValue::from_str("Foreign program playback origin"));
+    }
+    let duration = input.selection.range.end.checked_sub(input.selection.range.start)
+        .map_err(|error| JsValue::from_str(&error.message))?;
+    let duration = duration.numerator() as f64 / duration.denominator() as f64;
+    let data = serde_json::to_vec(&input).map_err(|_| JsValue::from_str("Could not serialize the program range"))?;
+    let body = Uint8Array::from(data.as_slice());
+    let options = RequestInit::new();
+    options.set_method("POST");
+    options.set_mode(RequestMode::SameOrigin);
+    options.set_redirect(RequestRedirect::Error);
+    options.set_credentials(RequestCredentials::Omit);
+    options.set_signal(Some(signal));
+    options.set_body(Some(body.as_ref()));
+    let request = Request::new_with_str_and_init(&format!("{origin}/api/v1/previews/program"), &options)?;
+    request.headers().set("Authorization", &format!("Bearer {bearer}"))?;
+    request.headers().set("Content-Type", "application/json")?;
+    let response: Response = JsFuture::from(window.fetch_with_request(&request)).await?.dyn_into()?;
+    if !response.ok() {
+        return Err(JsValue::from_str(&format!("Program playback returned HTTP {}", response.status())));
+    }
+    let mime = response.headers().get("Content-Type")?
+        .filter(|mime| mime.starts_with("video/mp4; codecs=\"avc1.") && mime.ends_with(", mp4a.40.2\"") && mime.len() < 100)
+        .ok_or_else(|| JsValue::from_str("The owner did not return the admitted program media profile"))?;
+    let reader = response.body().ok_or_else(|| JsValue::from_str("Program media stream is missing"))?
+        .get_reader().dyn_into().map_err(JsValue::from)?;
+    Ok((mime, PlaybackBytes::Program { reader, duration }))
+}
+
+async fn stream_program(
+    reader: ReadableStreamDefaultReader, video: &HtmlVideoElement, buffer: &SourceBuffer,
+    signal: &AbortSignal, ready: impl FnOnce(),
+) -> Result<(), JsValue> {
+    let mut received = 0u64;
+    let mut ready = Some(ready);
+    loop {
+        let position = video.current_time();
+        let ranges = buffer.buffered()?;
+        if ranges.length() > 0 && position - ranges.start(0)? > 12.0 {
+            transition(buffer.unchecked_ref(), "updateend", "error", signal,
+                || buffer.remove(0.0, position - 8.0)).await?;
+        }
+        if ranges.length() > 0 && ranges.end(ranges.length() - 1)? - position >= 4.0 {
+            transition(video.unchecked_ref(), "timeupdate", "error", signal, || Ok(())).await?;
+            continue;
+        }
+        let chunk = JsFuture::from(reader.read()).await?;
+        if Reflect::get(&chunk, &JsValue::from_str("done"))?.as_bool() == Some(true) {
+            break;
+        }
+        let data = Reflect::get(&chunk, &JsValue::from_str("value"))?.dyn_into::<Uint8Array>()?;
+        received += u64::from(data.length());
+        if received > MAX_PROGRAM_PLAYBACK_BYTES || data.length() as usize > MAX_SOURCE_SEGMENT_BYTES {
+            return Err(JsValue::from_str("Program playback exceeded the browser byte budget"));
+        }
+        let mut bytes = data.to_vec();
+        transition(buffer.unchecked_ref(), "updateend", "error", signal,
+            || buffer.append_buffer_with_u8_array(&mut bytes)).await?;
+        if video.ready_state() >= 2 && let Some(ready) = ready.take() { ready(); }
+    }
+    Ok(())
+}
+
 async fn play(
     origin: &str,
     bearer: &str,
-    manifest: SegmentPlayback,
+    source: PreviewRequest,
     label: &'static str,
     controller: AbortController,
     id: Rc<()>,
@@ -230,16 +309,13 @@ async fn play(
     let document = window
         .document()
         .ok_or_else(|| JsValue::from_str("Browser document is unavailable"))?;
-    if !supported() || !MediaSource::is_type_supported(&manifest.mime_type) {
+    if !supported() {
         return Err(JsValue::from_str(
             "This browser does not admit the selected AVC and AAC preview profile",
         ));
     }
     if document.hidden() || !is_active(&id) {
         return Err(JsValue::from_str("Browser preview was closed"));
-    }
-    if !(1..=MAX_SOURCE_SEGMENT_FRAGMENTS).contains(&manifest.fragments.len()) {
-        return Err(JsValue::from_str("Invalid MP4 fragment count"));
     }
     let panel = document.create_element("section")?;
     panel.set_attribute("aria-label", label)?;
@@ -263,7 +339,7 @@ async fn play(
     let callback = Closure::new(move || stop.abort());
     let timer = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         callback.as_ref().unchecked_ref(),
-        20000,
+        25000,
     )?;
     let mut deadline = Deadline {
         window: window.clone(),
@@ -300,7 +376,19 @@ async fn play(
         .body()
         .ok_or_else(|| JsValue::from_str("Browser body is unavailable"))?
         .append_child(&panel)?;
-    let mut bytes = fetch_segment(&window, origin, bearer, &manifest, &signal).await?;
+    let (mime, delivery) = match source {
+        PreviewRequest::Segment(manifest) => {
+            if !(1..=MAX_SOURCE_SEGMENT_FRAGMENTS).contains(&manifest.fragments.len()) {
+                return Err(JsValue::from_str("Invalid MP4 fragment count"));
+            }
+            let bytes = fetch_segment(&window, origin, bearer, &manifest, &signal).await?;
+            (manifest.mime_type.clone(), PlaybackBytes::Segment { bytes, manifest })
+        }
+        PreviewRequest::Program(request) => fetch_program(&window, origin, bearer, request, &signal).await?,
+    };
+    if !MediaSource::is_type_supported(&mime) {
+        return Err(JsValue::from_str("This browser does not admit the selected AVC and AAC preview profile"));
+    }
     transition(
         media.unchecked_ref(),
         "sourceopen",
@@ -312,7 +400,21 @@ async fn play(
         },
     )
     .await?;
-    let buffer = media.add_source_buffer(&manifest.mime_type)?;
+    let buffer = media.add_source_buffer(&mime)?;
+    let (mut bytes, manifest) = match delivery {
+        PlaybackBytes::Segment { bytes, manifest } => (bytes, manifest),
+        PlaybackBytes::Program { reader, duration } => {
+            Reflect::set(media.as_ref(), &JsValue::from_str("duration"), &JsValue::from_f64(duration))?;
+            stream_program(reader, &video, &buffer, &signal, || {
+                deadline.complete();
+                status.remove();
+            }).await?;
+            media.end_of_stream()?;
+            deadline.complete();
+            status.remove();
+            return Ok(playback);
+        }
+    };
     let mut expected = 0;
     for SegmentBytes { offset, length } in
         std::iter::once(manifest.initialization).chain(manifest.fragments)
@@ -346,6 +448,14 @@ async fn play(
 }
 
 pub(super) fn open(origin: &str, bearer: &str, manifest: SegmentPlayback, label: &'static str) {
+    start(origin, bearer, PreviewRequest::Segment(manifest), label);
+}
+
+pub(super) fn open_program(origin: &str, bearer: &str, request: ProgramPlaybackRequest) {
+    start(origin, bearer, PreviewRequest::Program(request), "Program playback");
+}
+
+fn start(origin: &str, bearer: &str, source: PreviewRequest, label: &'static str) {
     let Ok(controller) = AbortController::new() else {
         return;
     };
@@ -360,7 +470,7 @@ pub(super) fn open(origin: &str, bearer: &str, manifest: SegmentPlayback, label:
     drop(previous);
     let (origin, bearer) = (origin.to_owned(), bearer.to_owned());
     wasm_bindgen_futures::spawn_local(async move {
-        let result = play(&origin, &bearer, manifest, label, controller, id.clone()).await;
+        let result = play(&origin, &bearer, source, label, controller, id.clone()).await;
         if !is_active(&id) {
             return;
         }

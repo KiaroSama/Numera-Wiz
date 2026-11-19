@@ -267,6 +267,22 @@ position is inside an editable clip. Backspace or Delete lifts the selected
 clip. Edit fields retain their keyboard input. If the browser captures the
 split shortcut, **Split selected clip** accepts the same exact time.
 
+## Play a continuous range
+
+Set the visible range and choose **Timeline frame → Play visible range**.
+One local FFmpeg process produces the selected picture and sound. The desktop
+monitor starts playback immediately and accepts up to two minutes. In a browser,
+click Play in the monitor. It accepts up to ten minutes at once, keeps a few
+seconds buffered and releases older frames. Close the monitor or select a new
+range to start at a different position. Playback follows the selected project
+revision and source permissions.
+
+`timeline preview-segment --continuous` and MCP `previews.program_playback`
+return the request for a selected project revision. An authenticated
+`POST /api/v1/previews/program` returns the AVC/AAC fragmented MP4 stream.
+Grant `previews.program_segment` to the paired reader and
+`previews.program_playback` to clients that request the stream description.
+
 ## Export a CMX 3600 cut list
 
 Select an enabled picture track in a sequence at 24, 25 or 30 fps. Set an

@@ -92,6 +92,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.render"
         | "timeline.preview_frame"
         | crate::preview::PROGRAM_SEGMENT_COMMAND
+            | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => Some(ProjectAction::Read),
         "sequences.create"
@@ -129,6 +130,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         "timeline.render"
             | "timeline.preview_frame"
             | crate::preview::PROGRAM_SEGMENT_COMMAND
+            | crate::preview::PROGRAM_PLAYBACK_COMMAND
             | "timeline.render_mixed"
             | "markers.wave_projection"
             | "interchange.edl.export"

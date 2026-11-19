@@ -268,6 +268,28 @@ fn composition_invocation(
     Ok((graph, args))
 }
 
+fn browser_program_invocation(
+    workspace: &DirectoryStamp,
+    staged: &[StagedMixedInput],
+    mut script: String,
+    streaming: bool,
+) -> Result<(tempfile::NamedTempFile, Vec<String>)> {
+    script.push_str(concat!(
+        ";\n[outv]scale=320:180:force_original_aspect_ratio=decrease:force_divisible_by=2:",
+        "flags=lanczos:out_color_matrix=bt709:in_range=full:out_range=limited,format=yuv420p,",
+        "pad=320:180:(ow-iw)/2:(oh-ih)/2:black,setsar=1,",
+        "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709[viewv]",
+    ));
+    let (sidecar, mut args) = composition_invocation(workspace, staged, &script)?;
+    args.extend(["-map", "[viewv]", "-map", "[outa]"].map(str::to_owned));
+    append_browser_audio(&mut args);
+    if streaming {
+        args.extend(["-maxrate:v", "2M", "-bufsize:v", "2M"].map(str::to_owned));
+    }
+    append_browser_output(&mut args);
+    Ok((sidecar, args))
+}
+
 impl Engine {
     pub async fn qualify_mixed_compiler(
         &self,
@@ -478,22 +500,10 @@ impl Engine {
         }
         let graph = compile_mixed_graph(capture)?;
         validate_staged_inputs(sources, assets, &staged, &cancel).await?;
-        let MixedFiltergraph {
-            mut script,
-            audio_extents,
-        } = compose_filtergraph(capture, &graph, sources, assets)?;
-        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel)
-            .await?;
-        script.push_str(concat!(
-            ";\n[outv]scale=320:180:force_original_aspect_ratio=decrease:force_divisible_by=2:",
-            "flags=lanczos:out_color_matrix=bt709:in_range=full:out_range=limited,format=yuv420p,",
-            "pad=320:180:(ow-iw)/2:(oh-ih)/2:black,setsar=1,",
-            "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709[viewv]",
-        ));
-        let (sidecar, mut args) = composition_invocation(workspace, &staged, &script)?;
-        args.extend(["-map", "[viewv]", "-map", "[outa]"].map(str::to_owned));
-        append_browser_audio(&mut args);
-        append_browser_output(&mut args);
+        let MixedFiltergraph { script, audio_extents } =
+            compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let (sidecar, args) = browser_program_invocation(workspace, &staged, script, false)?;
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
@@ -522,6 +532,53 @@ impl Engine {
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
         BrowserSegment::verify(output.stdout, true)
+    }
+
+    /// Produce an uninterrupted encoded picture and sound stream on one media clock.
+    pub async fn stream_browser_program(
+        &self,
+        capture: &MixedCapture,
+        sources: &[BoundSource],
+        assets: &[&Asset],
+        staged: Vec<StagedMixedInput>,
+        sink: Box<dyn AsyncChunkSink>,
+        limits: MixedProcessLimits<'_>,
+    ) -> Result<()> {
+        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let started = Instant::now();
+        let remaining = || deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
+            .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Program playback exceeded its complete deadline"));
+        let duration = capture.range.end.checked_sub(capture.range.start)?;
+        if duration > Rational::new(nw_domain::preview::PROGRAM_PLAYBACK_MAX_SECONDS, 1)?
+            || capture.settings.width > 1920 || capture.settings.height > 1080
+        {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Program playback exceeds its range or raster budget"));
+        }
+        let graph = compile_mixed_graph(capture)?;
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        let MixedFiltergraph { script, audio_extents } = compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let (sidecar, args) = browser_program_invocation(workspace, &staged, script, true)?;
+        workspace.revalidate()?;
+        identities(self, cancel.clone()).await?;
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let left = match remaining() {
+            Ok(left) => left,
+            Err(error) => return ticket.finish(Err(error)),
+        };
+        let result = process::stream_with_sink(
+            Path::new(&self.ffmpeg.path), &args, left,
+            StreamLimits { stdout_bytes: max_bytes, stderr_bytes: 4096 }, sink, cancel.clone(),
+        ).await;
+        if let Err(error) = ticket.finish(result) {
+            if uncertain(&error) {
+                retain_preview_inputs(sidecar, staged);
+            }
+            return Err(error);
+        }
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        workspace.revalidate()?;
+        identities(self, cancel).await
     }
 
     /// Feed native presentation from the same exact sequence composition.

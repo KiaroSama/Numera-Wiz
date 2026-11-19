@@ -20,6 +20,10 @@ impl CommandClient for BrowserClient {
         source_segment::open(&self.origin, &self.bearer, segment, label);
     }
 
+    fn open_browser_program(&self, request: nw_domain::preview::ProgramPlaybackRequest) {
+        source_segment::open_program(&self.origin, &self.bearer, request);
+    }
+
     fn close_browser_playback(&self) {
         source_segment::close();
     }

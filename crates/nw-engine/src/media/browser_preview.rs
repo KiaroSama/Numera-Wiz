@@ -1,4 +1,6 @@
 //! Bound a generated fragmented MP4 and expose its appendable browser units.
+mod stream;
+pub use stream::{BrowserMp4Part, browser_mp4_stream};
 use super::identities;
 use crate::{Engine, admission, blocking, preservation};
 use nw_domain::{
@@ -201,6 +203,29 @@ fn codec_list(mut movie: &[u8], sound_expected: bool) -> Result<String> {
     Ok(format!("video/mp4; codecs=\"{video}{suffix}\""))
 }
 
+fn verify_initialization(file: &BoxRef<'_>, movie: &BoxRef<'_>, sound_expected: bool) -> Result<String> {
+    if file.kind != *b"ftyp" || file.payload.len() < 8 || movie.kind != *b"moov" {
+        return Err(invalid("Preview MP4 initialization requires ftyp and moov"));
+    }
+    child(movie.payload, *b"mvex")?;
+    codec_list(movie.payload, sound_expected)
+}
+
+fn verify_fragment(fragment: &BoxRef<'_>, media: &BoxRef<'_>, ordinal: u32) -> Result<()> {
+    if fragment.kind != *b"moof" || fragment.payload.len() > MAX_FRAGMENT_HEADERS
+        || media.kind != *b"mdat" || media.payload.is_empty()
+    {
+        return Err(invalid("Unexpected preview MP4 fragment layout"));
+    }
+    let sequence = child(fragment.payload, *b"mfhd")?;
+    if sequence.len() != 8 || sequence[..4] != [0, 0, 0, 0]
+        || u32::from_be_bytes(sequence[4..].try_into().expect("MP4 fragment sequence")) != ordinal
+    {
+        return Err(invalid("Preview MP4 fragment sequence differs"));
+    }
+    Ok(())
+}
+
 impl BrowserSegment {
     pub fn verify(bytes: Vec<u8>, sound_expected: bool) -> Result<Self> {
         if bytes.len() > MAX_SOURCE_SEGMENT_BYTES {
@@ -212,15 +237,11 @@ impl BrowserSegment {
         let mut remaining = bytes.as_slice();
         let file = take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 file type"))?;
         let movie = take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 movie header"))?;
-        if file.kind != *b"ftyp" || file.payload.len() < 8 || movie.kind != *b"moov" {
-            return Err(invalid("Preview MP4 initialization requires ftyp and moov"));
-        }
         let initialization = 0..bytes.len() - remaining.len();
         if initialization.len() > MAX_INIT_BYTES {
             return Err(invalid("Preview MP4 initialization exceeds 64 KiB"));
         }
-        child(movie.payload, *b"mvex")?;
-        let mime_type = codec_list(movie.payload, sound_expected)?;
+        let mime_type = verify_initialization(&file, &movie, sound_expected)?;
         let mut fragments = Vec::new();
         while !remaining.is_empty() {
             let start = bytes.len() - remaining.len();
@@ -228,22 +249,10 @@ impl BrowserSegment {
                 take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment header"))?;
             let media =
                 take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment payload"))?;
-            if fragments.len() >= MAX_SOURCE_SEGMENT_FRAGMENTS
-                || fragment.kind != *b"moof"
-                || fragment.payload.len() > MAX_FRAGMENT_HEADERS
-                || media.kind != *b"mdat"
-                || media.payload.is_empty()
-            {
+            if fragments.len() >= MAX_SOURCE_SEGMENT_FRAGMENTS {
                 return Err(invalid("Unexpected preview MP4 fragment layout"));
             }
-            let sequence = child(fragment.payload, *b"mfhd")?;
-            if sequence.len() != 8
-                || sequence[..4] != [0, 0, 0, 0]
-                || u32::from_be_bytes(sequence[4..].try_into().expect("MP4 fragment sequence"))
-                    != fragments.len() as u32 + 1
-            {
-                return Err(invalid("Preview MP4 fragment sequence differs"));
-            }
+            verify_fragment(&fragment, &media, fragments.len() as u32 + 1)?;
             fragments.push(start..bytes.len() - remaining.len());
         }
         if fragments.is_empty() {

@@ -7,7 +7,7 @@ use nw_domain::{
 };
 use std::time::{Duration, Instant};
 
-mod browser_segment;
+pub(super) mod browser_segment;
 pub(super) mod mixed;
 pub(super) use browser_segment::BrowserSegmentLease;
 mod timeline_preview;

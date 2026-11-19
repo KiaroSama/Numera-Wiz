@@ -74,6 +74,9 @@ pub enum Timeline {
         start: String,
         #[arg(long)]
         end: String,
+        /// Return the continuous playback request for the visible range.
+        #[arg(long)]
+        continuous: bool,
     },
     /// Review a lossless FFV1/PCM export.
     Render {
@@ -165,6 +168,7 @@ impl Timeline {
                 sequence,
                 start,
                 end,
+                continuous,
             } => {
                 model::validate_id(&project)?;
                 let input = nw_domain::preview::ProgramSegmentInput {
@@ -176,10 +180,12 @@ impl Timeline {
                     },
                 };
                 input.range.validate()?;
-                let mut request = query(
-                    nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
-                    serde_json::to_value(input)?,
-                );
+                let id = if continuous {
+                    nw_domain::preview::PROGRAM_PLAYBACK_COMMAND
+                } else {
+                    nw_domain::preview::PROGRAM_SEGMENT_COMMAND
+                };
+                let mut request = query(id, serde_json::to_value(input)?);
                 request.project = Some(commands::ProjectRef {
                     id: project,
                     expected_revision: None,

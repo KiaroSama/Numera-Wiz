@@ -15,7 +15,7 @@ mod subtitle_burn;
 mod track_append;
 mod video_retime;
 mod wave_cues;
-pub use media::BrowserSegment;
+pub use media::{BrowserMp4Part, BrowserSegment, browser_mp4_stream};
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
 pub use media::mixed_ffmpeg::{
     MixedProcessLimits, MixedPublishRequest, MixedSignalProof, NativePreviewOutput, StagedMixedInput,

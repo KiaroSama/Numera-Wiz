@@ -3,17 +3,20 @@ use super::*;
 use nw_domain::{
     media::{MixedCapture, OccurrenceSource, capture_mixed},
     preview::{
-        MAX_SOURCE_SEGMENT_BYTES, PROGRAM_SEGMENT_COMMAND, ProgramSegment, ProgramSegmentInput,
-        SOURCE_SEGMENT_SECONDS, SegmentBytes, SegmentPlayback, SourceSegment, SourceSegmentInput,
+        MAX_PROGRAM_PLAYBACK_BYTES, MAX_SOURCE_SEGMENT_BYTES, PROGRAM_PLAYBACK_MAX_SECONDS, PROGRAM_SEGMENT_COMMAND, ProgramPlaybackManifest, ProgramPlaybackRequest, ProgramSegment, ProgramSegmentInput,
+        SOURCE_SEGMENT_SECONDS,
+        SegmentBytes, SegmentPlayback, SourceSegment, SourceSegmentInput,
     },
     time::{Rational, TimeRange},
 };
+use nw_engine::{BrowserMp4Part, MixedProcessLimits};
 use std::{collections::BTreeSet, ops::Range};
 
 const SOURCE_COMMAND: &str = "previews.source_segment";
 const PROGRAM_ORIGINALS: usize = 4;
 const PROGRAM_STAGE_BYTES: u64 = 128 * 1024 * 1024;
 const PROGRAM_DEADLINE: Duration = Duration::from_secs(16);
+const PLAYBACK_DEADLINE: Duration = Duration::from_secs(PROGRAM_PLAYBACK_MAX_SECONDS as u64 + 35);
 const MAX_SEGMENTS: usize = 4;
 const TIME_TO_LIVE: u32 = 45;
 
@@ -23,6 +26,45 @@ pub(in crate::runtime) struct BrowserSegmentLease {
     expires: Instant,
     segment: Arc<nw_engine::BrowserSegment>,
     authority: SegmentAuthority,
+}
+
+pub struct BrowserProgramTransfer {
+    service: Arc<Service>,
+    context: Context,
+    authority: SegmentAuthority,
+    receive: tokio::sync::mpsc::Receiver<BrowserMp4Part>,
+    worker: Option<tokio::task::JoinHandle<Result<()>>>,
+    cancel: CancellationToken,
+}
+
+impl BrowserProgramTransfer {
+    pub async fn next_part(&mut self) -> Result<Option<BrowserMp4Part>> {
+        let part = tokio::select! {
+            biased;
+            _ = self.cancel.cancelled() => return Err(DomainError::new("CANCELLED", "Program playback stopped")),
+            part = self.receive.recv() => part,
+        };
+        if part.is_none() {
+            if let Some(worker) = self.worker.take() {
+                worker.await.map_err(|_| DomainError::new("WORKER_FAILED", "Program playback worker failed"))??;
+            }
+            return Ok(None);
+        }
+        let service = Arc::clone(&self.service);
+        let context = self.context.clone();
+        let authority = self.authority.clone();
+        tokio::task::spawn_blocking(move || {
+            let _publication = service.mutation.lock().map_err(|_| lock_error())?;
+            service.recheck_program_segment(&context, &authority)
+        }).await.map_err(|_| DomainError::new("WORKER_FAILED", "Program playback authorization worker failed"))??;
+        Ok(part)
+    }
+}
+
+impl Drop for BrowserProgramTransfer {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
 }
 
 #[derive(Clone)]
@@ -58,6 +100,54 @@ fn no_space() -> DomainError {
 }
 
 impl Service {
+    pub(in crate::runtime) fn browser_playback_manifest(
+        &self, context: &Context, project: &str, selection: ProgramSegmentInput,
+    ) -> Result<ProgramPlaybackManifest> {
+        check_playback_range(selection.range)?;
+        self.check_browser_program_permission(context)?;
+        let capture = self.browser_program_capture(context, project, &selection)?;
+        program_source_count(&capture)?;
+        Ok(ProgramPlaybackManifest { request: ProgramPlaybackRequest { project_id: capture.project_id, selection },
+            path: "/api/v1/previews/program", method: "POST" })
+    }
+
+    pub async fn open_browser_program(
+        self: &Arc<Self>, context: Context, input: ProgramPlaybackRequest, listener: CancellationToken,
+    ) -> Result<BrowserProgramTransfer> {
+        let service = Arc::clone(self);
+        let cancellation = listener.child_token();
+        let startup = cancellation.clone().drop_guard();
+        let preparation_cancel = cancellation.clone();
+        let preparation_context = context.clone();
+        let prepared = tokio::task::spawn_blocking(move || {
+            service.check_browser_program_permission(&preparation_context)?;
+            let permit = service.browser_capture_slot(&preparation_context)?;
+            let project = input.project_id.as_str();
+            let selection = input.selection;
+            check_playback_range(selection.range)?;
+            let capture = service.browser_program_capture(&preparation_context, project, &selection)?;
+            let (originals, workspace) = service.prepare_program_originals(&preparation_context, &capture, &preparation_cancel)?;
+            let authority = SegmentAuthority::Program {
+                project: project.to_owned(), selection, capture_sha256: capture_fingerprint(&capture)?, originals: Arc::clone(&originals),
+            };
+            let engine = service.engine()?.clone();
+            let _publication = service.mutation.lock().map_err(|_| lock_error())?;
+            service.recheck_program_segment(&preparation_context, &authority)?;
+            Ok::<_, DomainError>((permit, authority, capture, originals, workspace, engine))
+        }).await.map_err(|_| DomainError::new("WORKER_FAILED", "Program playback preparation failed"))??;
+        let (permit, authority, capture, originals, workspace, engine) = prepared;
+        let (sink, receive) = nw_engine::browser_mp4_stream();
+        let cancel = cancellation.clone();
+        let worker = tokio::spawn(async move {
+            let _permit = permit;
+            let (assets, staged) = stage_program_originals(&engine, &originals, &workspace, Instant::now(), PROGRAM_DEADLINE, &cancel).await?;
+            engine.stream_browser_program(&capture, &originals.bindings, &assets, staged, sink, MixedProcessLimits {
+                workspace: &workspace, max_bytes: MAX_PROGRAM_PLAYBACK_BYTES, deadline: PLAYBACK_DEADLINE, cancel,
+            }).await
+        });
+        Ok(BrowserProgramTransfer { service: Arc::clone(self), context, authority, receive, worker: Some(worker), cancel: startup.disarm() })
+    }
+
     fn browser_capture_slot(&self, context: &Context) -> Result<tokio::sync::OwnedSemaphorePermit> {
         let capacity = self
             .browser_captures
@@ -134,81 +224,17 @@ impl Service {
             ));
         }
         let capture = self.browser_program_capture(context, project, &selection)?;
-        let clips = || capture.tracks.iter().flat_map(|track| &track.clips);
-        let asset_count = clips()
-            .filter_map(|clip| match &clip.source {
-                OccurrenceSource::Registered { asset_id, .. } => Some(asset_id.as_str()),
-                OccurrenceSource::SolidColor { .. } => None,
-            })
-            .collect::<BTreeSet<_>>()
-            .len();
-        if asset_count > PROGRAM_ORIGINALS
-            || capture.settings.width > 1920
-            || capture.settings.height > 1080
-            || capture.settings.frame_rate > Rational::new(60, 1)?
-        {
-            return Err(DomainError::new(
-                "RESOURCE_LIMIT",
-                "Program preview exceeds its source count, raster or frame rate limit",
-            ));
-        }
-        let originals = Arc::new(self.bind_mixed_inputs(context, clips(), &cancel)?);
+        let (originals, workspace) = self.prepare_program_originals(context, &capture, &cancel)?;
         let capture_sha256 = capture_fingerprint(&capture)?;
-        let path = nw_platform::security::private_directory(
-            &self.root.join("runtime").join("browser-program"),
-        )?;
-        self.store
-            .require_media_space(&path, PROGRAM_STAGE_BYTES * asset_count as u64)?;
-        let workspace = files::DirectoryStamp::capture_resolved(&path)?;
         let engine = self.engine()?;
-        let limits = |max_bytes| {
-            let deadline = PROGRAM_DEADLINE
-                .checked_sub(started.elapsed())
-                .filter(|left| !left.is_zero())
-                .ok_or_else(|| {
-                    DomainError::new(
-                        "PROCESS_TIMEOUT",
-                        "Program preview preparation exceeded its deadline",
-                    )
-                })?;
-            Ok::<_, DomainError>(nw_engine::MixedProcessLimits {
-                workspace: &workspace,
-                max_bytes,
-                deadline,
-                cancel: cancel.clone(),
-            })
-        };
         let segment = tokio::runtime::Handle::current().block_on(async {
-            let mut assets = Vec::with_capacity(asset_count);
-            let mut staged = Vec::with_capacity(asset_count);
-            for held in originals.originals.values() {
-                let asset = &held.asset;
-                let source = files::SourceStamp::capture_open_resolved(
-                    Path::new(&asset.identity.path),
-                    held.stamp.try_clone_file()?,
-                )?;
-                let streams = originals
-                    .bindings
-                    .iter()
-                    .filter(|binding| binding.asset_id == asset.id)
-                    .cloned()
-                    .collect::<Vec<_>>();
-                staged.push(
-                    engine
-                        .stage_mixed_original(asset, source, &streams, limits(PROGRAM_STAGE_BYTES)?)
-                        .await?,
-                );
-                assets.push(asset);
-            }
-            engine
-                .browser_program_segment(
-                    &capture,
-                    &originals.bindings,
-                    &assets,
-                    staged,
-                    limits(MAX_SOURCE_SEGMENT_BYTES as u64)?,
-                )
-                .await
+            let (assets, staged) = stage_program_originals(&engine, &originals, &workspace, started, PROGRAM_DEADLINE, &cancel).await?;
+            engine.browser_program_segment(
+                &capture, &originals.bindings, &assets, staged, MixedProcessLimits {
+                    workspace: &workspace, max_bytes: MAX_SOURCE_SEGMENT_BYTES as u64,
+                    deadline: program_time_left(started, PROGRAM_DEADLINE)?, cancel: cancel.clone(),
+                },
+            ).await
         })?;
         let authority = SegmentAuthority::Program {
             project: project.into(),
@@ -231,6 +257,17 @@ impl Service {
             capture_sha256,
             playback,
         })
+    }
+
+    fn prepare_program_originals(
+        &self, context: &Context, capture: &MixedCapture, cancel: &CancellationToken,
+    ) -> Result<(Arc<super::mixed::MixedInputs>, files::DirectoryStamp)> {
+        let asset_count = program_source_count(capture)?;
+        let clips = capture.tracks.iter().flat_map(|track| &track.clips);
+        let originals = Arc::new(self.bind_mixed_inputs(context, clips, cancel)?);
+        let path = nw_platform::security::private_directory(&self.root.join("runtime").join("browser-program"))?;
+        self.store.require_media_space(&path, PROGRAM_STAGE_BYTES * asset_count as u64)?;
+        Ok((originals, files::DirectoryStamp::capture_resolved(&path)?))
     }
 
     fn browser_program_capture(
@@ -263,16 +300,7 @@ impl Service {
         else {
             return Err(DomainError::object_not_found());
         };
-        if self
-            .policy(context)?
-            .as_ref()
-            .is_some_and(|policy| !policy.allows_command(PROGRAM_SEGMENT_COMMAND))
-        {
-            return Err(DomainError::new(
-                "PERMISSION_DENIED",
-                "Program preview access changed",
-            ));
-        }
+        self.check_browser_program_permission(context)?;
         let current = self.browser_program_capture(context, project, selection)?;
         if capture_fingerprint(&current)? != *capture_sha256 {
             return Err(DomainError::new(
@@ -281,6 +309,16 @@ impl Service {
             ));
         }
         originals.revalidate(self, context)
+    }
+
+    fn check_browser_program_permission(&self, context: &Context) -> Result<()> {
+        if self.execution_quarantined.load(Ordering::Acquire) {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Program playback capacity remains quarantined"));
+        }
+        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(PROGRAM_SEGMENT_COMMAND)) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Program preview access changed"));
+        }
+        Ok(())
     }
 
     fn retain_browser_segment(
@@ -367,6 +405,54 @@ impl Service {
         }
         Ok(segment)
     }
+}
+
+fn check_playback_range(range: TimeRange) -> Result<()> {
+    range.validate()?;
+    if range.end.checked_sub(range.start)? > Rational::new(PROGRAM_PLAYBACK_MAX_SECONDS, 1)? {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Choose at most ten minutes of program playback"));
+    }
+    Ok(())
+}
+
+fn program_source_count(capture: &MixedCapture) -> Result<usize> {
+    let asset_count = capture.tracks.iter().flat_map(|track| &track.clips).filter_map(|clip| match &clip.source {
+        OccurrenceSource::Registered { asset_id, .. } => Some(asset_id.as_str()),
+        OccurrenceSource::SolidColor { .. } => None,
+    }).collect::<BTreeSet<_>>().len();
+    if asset_count > PROGRAM_ORIGINALS || capture.settings.width > 1920
+        || capture.settings.height > 1080 || capture.settings.frame_rate > Rational::new(60, 1)?
+    {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Program preview exceeds its source count, raster or frame rate limit"));
+    }
+    Ok(asset_count)
+}
+
+fn program_time_left(start: Instant, budget: Duration) -> Result<Duration> {
+    budget.checked_sub(start.elapsed()).filter(|remaining| !remaining.is_zero())
+        .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Program preview preparation exceeded its deadline"))
+}
+
+async fn stage_program_originals<'a>(
+    engine: &nw_engine::Engine,
+    originals: &'a super::mixed::MixedInputs,
+    workspace: &files::DirectoryStamp,
+    started: Instant,
+    budget: Duration,
+    cancel: &CancellationToken,
+) -> Result<(Vec<&'a Asset>, Vec<nw_engine::StagedMixedInput>)> {
+    let mut assets = Vec::with_capacity(originals.originals.len());
+    let mut staged = Vec::with_capacity(originals.originals.len());
+    for held in originals.originals.values() {
+        let asset = &held.asset;
+        let source = files::SourceStamp::capture_open_resolved(Path::new(&asset.identity.path), held.stamp.try_clone_file()?)?;
+        let streams = originals.bindings.iter().filter(|binding| binding.asset_id == asset.id).cloned().collect::<Vec<_>>();
+        staged.push(engine.stage_mixed_original(asset, source, &streams, MixedProcessLimits {
+            workspace, max_bytes: PROGRAM_STAGE_BYTES, deadline: program_time_left(started, budget)?, cancel: cancel.clone(),
+        }).await?);
+        assets.push(asset);
+    }
+    Ok((assets, staged))
 }
 
 fn capture_fingerprint(capture: &MixedCapture) -> Result<String> {

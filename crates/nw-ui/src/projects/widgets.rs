@@ -850,13 +850,13 @@ impl WizApp {
         ui.add_enabled(idle && !playing, egui::Checkbox::new(
             &mut self.projects.forms.native_preview_sound, "Sound",
         ));
+        let short = ui.add_enabled(idle && !playing, egui::Button::new("Play timeline window")).clicked();
+        let visible = ui.add_enabled(idle && !playing, egui::Button::new("Play visible range")).clicked();
         if playing && ui.button("Stop playback").clicked() {
             self.projects.native_picture = None;
-        } else if !playing
-            && ui.add_enabled(idle, egui::Button::new("Play timeline window")).clicked()
-        {
+        } else if short || visible {
             use nw_domain::{preview::{native_wire::OpenRequest, program_window}, projects::{EntityId, ProjectId, Revision}};
-            let prepare = || -> Result<OpenRequest, String> {
+            let prepare = || -> Result<(OpenRequest, Rational), String> {
                 let settings = &group.sequence.as_ref().ok_or("Select a sequence")?.settings;
                 let start = self.projects.forms.preview_at.value()?;
                 let audio = self.projects.forms.native_preview_sound;
@@ -870,20 +870,23 @@ impl WizApp {
                 } else {
                     sample_rate
                 };
-                let range = program_window(start, settings.frame_rate, common_sample_grid)
-                    .map_err(|error| error.message)?;
-                Ok(OpenRequest {
+                let range = if visible {
+                    group.view.range
+                } else {
+                    program_window(start, settings.frame_rate, common_sample_grid)
+                        .map_err(|error| error.message)?
+                };
+                Ok((OpenRequest {
                     project_id: ProjectId::parse(group.key.project.clone()).map_err(|error| error.message)?,
                     sequence_id: EntityId::parse(sequence).map_err(|error| error.message)?,
                     revision: Revision::parse(&group.key.revision).map_err(|error| error.message)?,
                     range,
                     width: 320, height: 180, audio,
-                })
+                }, start))
             };
             match prepare() {
-                Ok(request) => {
+                Ok((request, requested_time)) => {
                     let mailbox = crate::NativePictureMailbox::default();
-                    let requested_time = request.range.start;
                     self.client.play_native_picture(request, mailbox.clone(), ui.ctx().clone());
                     self.projects.preview_frame = None;
                     self.projects.native_picture = Some(NativePictureView {
@@ -996,6 +999,19 @@ impl WizApp {
                         );
                     }
                     Err(error) => self.error = Some(error),
+                }
+            }
+            #[cfg(target_arch = "wasm32")]
+            if crate::web::source_segment::supported()
+                && ui.add_enabled(idle && group.sequence.is_some(), egui::Button::new("Play visible range")).clicked()
+            {
+                let input = nw_domain::commands::parse::<nw_domain::preview::ProgramPlaybackRequest>(json!({
+                    "project_id":group.key.project,
+                    "selection":{"sequence_id":sequence,"revision":group.key.revision,"range":group.view.range},
+                }));
+                match input {
+                    Ok(input) => self.client.open_browser_program(input),
+                    Err(error) => self.error = Some(error.message),
                 }
             }
             if let Some((at, texture)) = &self.projects.preview_frame

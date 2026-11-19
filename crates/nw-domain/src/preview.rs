@@ -362,6 +362,24 @@ pub struct SourceSegmentInput {
 }
 
 pub const PROGRAM_SEGMENT_COMMAND: &str = "previews.program_segment";
+pub const PROGRAM_PLAYBACK_COMMAND: &str = "previews.program_playback";
+pub const PROGRAM_PLAYBACK_MAX_SECONDS: i64 = 600;
+pub const MAX_PROGRAM_PLAYBACK_BYTES: u64 = 256 * 1024 * 1024;
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramPlaybackRequest {
+    pub project_id: ProjectId,
+    pub selection: ProgramSegmentInput,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramPlaybackManifest {
+    pub request: ProgramPlaybackRequest,
+    pub path: &'static str,
+    pub method: &'static str,
+}
 pub const SOURCE_SEGMENT_SECONDS: i64 = 2;
 pub const MAX_SOURCE_SEGMENT_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_SOURCE_SEGMENT_FRAGMENTS: usize = 8;

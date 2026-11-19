@@ -4,6 +4,7 @@ mod artifacts;
 mod browser;
 mod listener;
 mod native_preview;
+mod program_preview;
 mod uploads;
 use anyhow::{Context as _, Result};
 use axum::{
@@ -307,6 +308,8 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         900
     } else if auth.private && request.uri().path().starts_with("/internal/native-previews/") {
         155
+    } else if request.uri().path() == "/api/v1/previews/program" {
+        nw_domain::preview::PROGRAM_PLAYBACK_MAX_SECONDS as u64 + 65
     } else {
         130
     };
@@ -518,6 +521,7 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
         )
         .route("/api/v1/artifacts/{id}/bytes", get(artifacts::receive))
         .route("/api/v1/previews/{id}/mp4", get(artifacts::preview_segment))
+        .route("/api/v1/previews/program", post(program_preview::open))
         .route("/api/v1/uploads", post(uploads::create))
         .route("/api/v1/uploads/{id}", axum::routing::put(uploads::receive))
         .route("/api/v1/lease", post(lease))
