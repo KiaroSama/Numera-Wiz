@@ -616,6 +616,14 @@ pub async fn run_owner(
     components: Option<PathBuf>,
     logging_binding: nw_platform::logging::OwnerLoggingBinding,
 ) -> Result<()> {
+    #[cfg(feature = "embedded-media")]
+    let components = match components {
+        Some(path) => Some(path),
+        None => {
+            let root = root.clone();
+            Some(tokio::task::spawn_blocking(move || crate::portable_media::installed(&root)).await??)
+        }
+    };
     let binaries = components.map(|path| {
         (
             path.join(if cfg!(windows) {

@@ -2,8 +2,11 @@
 mod access;
 mod artifacts_cli;
 mod client;
+mod config_cli;
 mod human;
 mod install_root;
+#[cfg(feature = "embedded-media")]
+mod portable_media;
 mod mcp;
 mod server;
 mod web_assets;
@@ -45,6 +48,11 @@ enum Mode {
     Artifacts {
         #[command(subcommand)]
         command: artifacts_cli::Command,
+    },
+    /// Import settings from a legacy FFmWiz configuration.
+    Config {
+        #[command(subcommand)]
+        command: config_cli::Command,
     },
     Projects {
         #[command(subcommand)]
@@ -332,6 +340,7 @@ async fn run() -> Result<()> {
                     access::run(&client, command).await
                 }
                 Some(Mode::Artifacts { command }) => artifacts_cli::run(&client, command).await,
+                Some(Mode::Config { command }) => config_cli::run(&client, command).await,
                 Some(Mode::Projects { command }) => {
                     human::run(&client, human::Command::Projects(command)).await
                 }

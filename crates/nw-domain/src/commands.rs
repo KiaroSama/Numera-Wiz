@@ -218,6 +218,9 @@ fn descriptor_schema_version_default() -> u32 {
 fn result_schema(id: &str) -> Option<Value> {
     use crate::projects::contracts::{self, EditResult};
     match id {
+        "config.import.ffmwiz" => Some(
+            serde_json::to_value(schema_for!(crate::config_import::ImportReport)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -816,6 +819,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Resolve MuxCls selection without I/O",
             Query,
             ResolveInput
+        ),
+        row!(
+            "config.import.ffmwiz",
+            "Import a bounded FFmWiz configuration and report typed settings and diagnostics",
+            Query,
+            crate::config_import::ImportRequest
         ),
         row!(
             "chapters.inspect",
@@ -1574,6 +1583,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "commands.list",
     "commands.schema",
     "streams.clean.resolve",
+    "config.import.ffmwiz",
     "streams.clean.report",
     "access.replay_scope.create",
     "access.profiles.put",

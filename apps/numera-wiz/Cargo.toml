@@ -10,6 +10,7 @@ workspace = true
 default = []
 desktop = ["dep:nw-ui", "dep:eframe", "dep:rfd"]
 embedded-web = []
+embedded-media = []
 [dependencies]
 nw-domain.workspace = true
 nw-platform.workspace = true

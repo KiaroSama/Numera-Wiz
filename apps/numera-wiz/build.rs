@@ -1,7 +1,10 @@
 //! Embed only verified same-source UI assets, never arbitrary runtime files.
 use sha2::{Digest, Sha256};
 use std::{env, fs, path::PathBuf};
+mod media_build;
+
 fn main() {
+    media_build::generate();
     println!("cargo:rerun-if-env-changed=NW_EMBED_WEB_DIR");
     let destination =
         PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR")).join("embedded_web.rs");

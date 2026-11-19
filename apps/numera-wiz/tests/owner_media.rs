@@ -89,6 +89,8 @@ mod project_render;
 #[path = "support/project_topology.rs"]
 mod project_topology;
 
+const FFM_WIZ_CONFIG: &str = "input_path=source.mkv\noutput_path=converted.mkv\noutput_format=n\nvideo_codec=H265\nuse_gpu=y\ncrop=n\ncrop_top=0\ncrop_left=0\ncrop_right=0\ncrop_bottom=0\nvideo_bitrate_kbps=n\nvideo_bitrate_mode=quality_vbr\nresolution=n\nfps=n\nvideo_look=90cw,bright=-0.25,fadein=1.5\nvideo_quick=n\naudio_volume=n\nraw_ffmpeg_args=n\nraw_ffmpeg_valued_args=n\naudio_tracks=de\naudio_codec=aac\naudio_bitrate_kbps=n\naudio_sample_rate=n\nkeep_source_metadata=y\nsubtitle_tracks=none\nkeep_embedded_attachments=n\ndetect_duplicate_audio=y\nloudnorm=off\nloudnorm_target_i=-16\nnvenc_multipass=disabled\ncpu_two_pass=n\ncolor_range=source\nvideo_speed=n\nreverse_video=n\naudio_speed=n\nreverse_audio=n\nlogging_enabled=y\nlog_retention_days=0\nlog_level=debug\ngui_engine=classic\n";
+
 #[tokio::test]
 #[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
 async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
@@ -99,6 +101,22 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         components: media.bin.clone(),
         request_timeout: Duration::from_secs(40),
     };
+    let config_directory = media.directory.path().canonicalize().unwrap();
+    let config_file = config_directory.join("ffmwiz.env");
+    let config_output = config_directory.join("imported-config.json");
+    std::fs::write(&config_file, FFM_WIZ_CONFIG).unwrap();
+    let (imported, exit) = cli.human(&[
+        "config", "import-ffmwiz", "--input", config_file.to_str().unwrap(),
+        "--out", config_output.to_str().unwrap(),
+    ]).await;
+    assert_eq!(exit, 0, "{imported}");
+    let imported = imported["result"].clone();
+    assert_eq!(imported["input_valid"], true);
+    assert_eq!(imported["job"]["settings"].as_object().unwrap().len(), 40);
+    assert_eq!(imported["job"]["settings"]["video_look"]["value"]["value"][1]["amount"], json!({"num":"-1","den":"4"}));
+    assert_eq!(imported["job"]["settings"]["audio_tracks"]["value"]["selection"], json!({"kind":"analyze","duplicates":true,"silence":true}));
+    assert_eq!(serde_json::from_slice::<Value>(&std::fs::read(&config_output).unwrap()).unwrap(), imported);
+    let config_import = json!({"source":FFM_WIZ_CONFIG,"base_directory":config_directory,"compatibility_profile":"ffmwiz_v1"});
     let (scope, exit) = cli
         .human(&["access", "replay-scope", "create", "--json"])
         .await;
@@ -835,7 +853,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","capabilities.inspect","capabilities.refresh","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -849,6 +867,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "operator"]);
     let stdio = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
+    assert_eq!(call!(stdio, "config.import.ffmwiz", config_import.clone(), json!({})), imported);
+    let mut blocked = config_import.clone();
+    blocked["source"] = json!(format!("{FFM_WIZ_CONFIG}raw_ffmpeg_args=-i unexpected.mkv\n"));
+    let blocked = call!(stdio, "config.import.ffmwiz", blocked, json!({}));
+    assert_eq!(blocked["input_valid"], false);
+    assert_eq!(blocked["diagnostics"].as_array().unwrap().last().unwrap()["code"], "expert_options_require_typed_review");
+
     assert_eq!(
         &call!(stdio, "capabilities.refresh", json!({}), json!({})),
         capabilities
@@ -1455,6 +1480,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
                 .auth_header(&token),
         );
         let http = ().serve_with_lifecycle(transport, lifecycle).await.unwrap();
+        assert_eq!(call!(http, "config.import.ffmwiz", config_import.clone(), json!({})), imported);
+
         assert_eq!(
             &call!(http, "capabilities.refresh", json!({}), json!({})),
             capabilities

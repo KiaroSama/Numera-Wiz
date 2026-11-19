@@ -237,9 +237,8 @@ jobs:
         os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     # Preserve the Apple Silicon lane and previous-package artifact key.
     runs-on: ${{ matrix.os == 'macos-15' && 'macos-26' || matrix.os }}
-    # A complete ordinary regression run on the Intel host can take 14 minutes
-    # after build, package, platform and service checks have already run.
-    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 45 || 30 }}
+    # Allow for the Intel regression run and the separate Windows media build.
+    timeout-minutes: ${{ (matrix.os == 'macos-15-intel' || matrix.os == 'windows-2025') && 45 || 30 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -431,6 +430,20 @@ jobs:
             target/source-language-report.json
           if-no-files-found: error
 
+      - name: Build the Windows CPU component, embed it and verify first launch
+        id: windows-portable
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
+        env:
+          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
+        run: cargo run --locked -p xtask -- build-standard-windows-profile
+      - name: Retain the portable Windows executable with corresponding sources
+        if: ${{ !cancelled() && steps.windows-portable.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: numera-wiz-portable-windows-x64
+          path: target/windows-component/build-*/delivery/
+          if-no-files-found: error
+          compression-level: 0
       - name: Save reusable compiler outputs even after a test failure
         # Archive compression exhausted the macOS Intel job budget after verification passed.
         if: always() && !cancelled() && runner.os != 'macOS' && steps.rust-cache.outputs.cache-hit != 'true'

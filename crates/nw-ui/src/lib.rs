@@ -3,6 +3,7 @@ mod batches;
 mod capabilities;
 mod cleanup;
 pub mod client;
+mod config_import;
 mod folders;
 mod jobs;
 mod preview;
@@ -37,6 +38,7 @@ enum Action {
     Cancel,
     Inspect,
     Capabilities,
+    ImportConfig,
     SourcePreview,
     WaveCues,
     ClearCapabilities,
@@ -132,6 +134,7 @@ pub struct WizApp {
     stream_page: usize,
     inspect: String,
     capability_report: Option<nw_domain::capabilities::CapabilityReport>,
+    config_import: config_import::ConfigImportUi,
     source_preview: preview::SourcePreview,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
@@ -315,6 +318,7 @@ impl WizApp {
             stream_page: 0,
             inspect: String::new(),
             capability_report: None,
+            config_import: Default::default(),
             source_preview: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
@@ -791,6 +795,7 @@ impl WizApp {
                     self.capability_report =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
+                Action::ImportConfig => self.config_import.report = Some(result),
                 Action::SourcePreview => self.accept_source_preview(result, ctx)?,
                 Action::WaveCues => {
                     let cues: nw_domain::chapters::WaveCueInventory =
@@ -1304,6 +1309,7 @@ impl eframe::App for WizApp {
                 egui::ScrollArea::vertical().max_height(180.0).show(ui,|ui| { ui.add(egui::TextEdit::multiline(&mut self.inspect).code_editor().interactive(false).desired_width(f32::INFINITY)); });
             });
             self.capability_panel(ui);
+            self.config_import_panel(ui);
         });
         if !self.folder.open {
             self.batch_window(ui.ctx());

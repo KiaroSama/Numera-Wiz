@@ -1424,6 +1424,9 @@ impl Service {
                     policy.is_none(),
                     cancellation.clone(),
                 )?,
+            "config.import.ffmwiz" => {
+                value(&nw_domain::config_import::import(commands::parse(params)?)?)?
+            }
             "media.preview_frame" => {
                 drop(guard);
                 let frame =

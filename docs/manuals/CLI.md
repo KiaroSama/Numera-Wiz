@@ -142,6 +142,28 @@ cover encoding on the default device and are measured again on every request.
 Clear accepts the exact fingerprint from a report and affects only that
 in-memory component entry. Restarting the owner resets the cache.
 
+## Import FFmWiz settings
+
+```text
+numera-wiz config import-ffmwiz --input config.env --out imported-job.json
+```
+
+The command reads up to 64 KiB of UTF-8 and resolves relative media paths
+against the configuration file's directory. The report contains the versioned
+settings and any malformed, unknown, duplicate or unresolved assignments with
+their line numbers. The shipped FFmWiz template leaves its two paths blank.
+The `input_valid` field records whether the import has line or path errors.
+The `--out` option creates a new report file.
+
+The desktop and browser workspaces also have an **Import FFmWiz settings** panel
+in Stream Cleanup. Paste the configuration and enter its directory on the media
+engine to review the same settings and line diagnostics.
+
+Agents can call `config.import.ffmwiz` with an inline `source`, an absolute
+`base_directory` and `compatibility_profile` set to `ffmwiz_v1`. Import returns a
+versioned settings document. Native job planning handles authorization, media
+probing and execution.
+
 ## Canonical operations
 
 `media preview-frame` addresses the original stream index and a zero-based
