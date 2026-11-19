@@ -425,6 +425,9 @@ impl Service {
                     "clips.split" => {
                         ProjectEditIntent::Split(commands::parse(request.params.clone())?)
                     }
+                    "clips.trim" => {
+                        ProjectEditIntent::Trim(commands::parse(request.params.clone())?)
+                    }
                     "clips.remove" => {
                         ProjectEditIntent::Remove(commands::parse(request.params.clone())?)
                     }
@@ -445,7 +448,7 @@ impl Service {
             }
             let (patch, created, history_action) = if let Some(intent) = intent {
                 let id_budget = match &intent {
-                    ProjectEditIntent::Unlink(_) => 0,
+                    ProjectEditIntent::Unlink(_) | ProjectEditIntent::Trim(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
                     _ => MAX_CHANGES * 2,
                 };

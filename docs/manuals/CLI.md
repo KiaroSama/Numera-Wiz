@@ -90,8 +90,14 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `artifacts read-chunk --artifact-id ID --expected-sha256 SHA` | Read a bounded base64 chunk; optional --offset and --length. |
 | `logs status` | Inspect owner log health under current owner authority. |
 | `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
-| `clips place/move/link/unlink/split/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
+| `clips place/move/link/unlink/split/trim/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
 | `markers wave-projection --project ID --clip ID --revision N` | Read original WAVE cues at their exact positions in a committed audio clip. |
+
+`clips trim --clip ID --head 1/4 --tail 0/1` removes a quarter second from the
+start of the selected clip and every linked clip. Use the usual project,
+expected revision, replay scope and idempotency options. The trim amounts must
+land on every affected track's time grid and leave each clip with a positive
+duration. Undo restores the original source ranges and positions.
 
 See the [project command guide](PROJECTS.md) for exact fractions, expected
 revisions, typed examples, source rights and bounded snapshot/history behavior.

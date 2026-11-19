@@ -41,6 +41,7 @@ pub enum ProjectEditIntent {
     Link(LinkInput),
     Unlink(UnlinkInput),
     Split(SplitInput),
+    Trim(TrimInput),
     Remove(RemoveInput),
 }
 pub struct AllocatedIds(pub VecDeque<EntityId>);
@@ -645,6 +646,33 @@ pub fn resolve_edit<R: ProjectRead>(
                 edit.insert(entity)?;
             }
             json!({"clip_ids":right_ids,"no_change":right_ids.is_empty()})
+        }
+        ProjectEditIntent::Trim(input) => {
+            if input.head < Rational::ZERO || input.tail < Rational::ZERO {
+                return Err(invalid("Trim head and tail must be nonnegative"));
+            }
+            if input.clip_ids.iter().collect::<BTreeSet<_>>().len() != input.clip_ids.len() {
+                return Err(invalid("Duplicate clip IDs are not allowed"));
+            }
+            let selected = match input.link_policy {
+                LinkPolicy::Expand => expand_links(read, &input.clip_ids)?,
+            };
+            if input.head == Rational::ZERO && input.tail == Rational::ZERO {
+                validate_unchanged(read, &selected)?;
+                return edit.finish(json!({}));
+            }
+            for mut entity in selected {
+                let mut clip: Clip = entity.payload("clip")?;
+                edit.clip_context(&clip)?;
+                clip.sequence_start = clip.sequence_start.checked_add(input.head)?;
+                clip.source_range.start = clip.source_range.start.checked_add(input.head)?;
+                clip.source_range.end = clip.source_range.end.checked_sub(input.tail)?;
+                clip.duration = clip.source_range.duration()?;
+                edit.clip_context(&clip)?;
+                entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({})
         }
         ProjectEditIntent::Remove(input) => {
             if input.mode != "lift" || input.link_policy != "expand" {

@@ -594,7 +594,7 @@ mod tests {
                 assert_eq!(&catalog_fields(&schema.result.unwrap()), row);
                 continue;
             }
-            if matches!(id, "markers.place" | "markers.remove") {
+            if matches!(id, "markers.place" | "markers.remove" | "clips.trim") {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
                 assert_eq!(requirement["project_action"], "edit");
@@ -701,6 +701,7 @@ mod tests {
             "clips.link",
             "clips.unlink",
             "clips.split",
+            "clips.trim",
             "clips.remove",
             "markers.place",
             "markers.remove",
@@ -1273,6 +1274,7 @@ mod tests {
             ("clips.link", vec!["link_group_id", "clip_ids"], true),
             ("clips.unlink", vec!["clip_ids"], true),
             ("clips.split", vec!["clip_ids", "no_change"], true),
+            ("clips.trim", vec![], true),
             ("clips.remove", vec![], false),
             ("markers.place", vec!["marker_id"], false),
             ("markers.remove", vec![], false),

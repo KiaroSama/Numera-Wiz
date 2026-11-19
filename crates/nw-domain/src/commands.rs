@@ -207,7 +207,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
+        | "clips.split" | "clips.trim" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
         | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
@@ -312,7 +312,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "clips.move" => Some(contracts::edit(EditResult::Move)),
+        "clips.move" | "clips.trim" => Some(contracts::edit(EditResult::Move)),
         "clips.link" => Some(contracts::edit(EditResult::Link)),
         "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
         "clips.split" => Some(contracts::edit(EditResult::Split)),
@@ -541,6 +541,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Split exact source and sequence intervals",
             DurableMutation,
             crate::projects::SplitInput
+        ),
+        row!(
+            "clips.trim",
+            "Trim the beginning or end of a complete linked clip selection",
+            DurableMutation,
+            crate::projects::TrimInput
         ),
         row!(
             "clips.remove",
@@ -1752,6 +1758,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.link",
     "clips.unlink",
     "clips.split",
+    "clips.trim",
     "clips.remove",
     "markers.place",
     "markers.remove",

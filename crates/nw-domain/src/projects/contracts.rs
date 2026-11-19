@@ -172,7 +172,7 @@ fn query_definitions() -> Map<String, Value> {
                 "clips.place" => "ProjectPlaceAction",
                 "history.undo" | "history.redo" => "ProjectHistoryAction",
                 "sequences.create" | "clips.move" | "clips.link" | "clips.unlink"
-                | "clips.split" | "clips.remove" => "ProjectEditAction",
+                | "clips.split" | "clips.trim" | "clips.remove" => "ProjectEditAction",
                 _ => unreachable!("Unknown project target schema"),
             };
             json!({"allOf":[reference(class),{"properties":{"command_id":{"const":command}}}]})
@@ -184,7 +184,7 @@ fn query_definitions() -> Map<String, Value> {
         ("observed_project_revision", reference("Revision")),
         ("current_read", reference("ProjectCurrentRead")),
         ("current_edit", reference("ProjectCurrentEdit")),
-        ("actions", json!({"type":"array","prefixItems":actions,"items":false,"minItems":11,"maxItems":11})),
+        ("actions", json!({"type":"array","prefixItems":actions,"items":false,"minItems":PROJECT_TARGET_COMMANDS.len(),"maxItems":PROJECT_TARGET_COMMANDS.len()})),
     ]));
     defs
 }

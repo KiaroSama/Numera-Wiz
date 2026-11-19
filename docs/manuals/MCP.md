@@ -505,6 +505,11 @@ commands; these adapters never widen grants. Existing native/Chrome project-edit
 journeys have their own qualification; mixed A/V controls, checkpoint files and
 general decoded render/preview remain unfinished.
 
+`clips.trim` uses the same project context with `clip_ids`, exact rational
+`head` and `tail` amounts, and `link_policy: "expand"`. Head and tail remove time
+from all linked clips. Later clips keep their sequence positions. An accepted
+trim can be reverted through `history.undo`.
+
 `timeline.render_mixed` reviews a committed range with `contract_kind:
 "media_v2"`, a sequence ID, revision, range, and explicit
 Matroska/FFV1/PCM download output. Pass the project ID in the tool context.

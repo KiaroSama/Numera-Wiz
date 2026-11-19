@@ -535,6 +535,18 @@ impl WizApp {
                     Err(error)=>self.error=Some(error),
                 }
             }
+            ui.collapsing("Trim linked clips", |ui| {
+                rational(ui, "Trim from beginning (seconds)", &mut self.projects.forms.trim_head);
+                rational(ui, "Trim from end (seconds)", &mut self.projects.forms.trim_tail);
+                if ui.button("Apply trim").clicked() {
+                    match (self.projects.forms.trim_head.value(), self.projects.forms.trim_tail.value()) {
+                        (Ok(head), Ok(tail)) => self.mutate_project("clips.trim", json!({
+                            "clip_ids":[group.view.clip],"head":head,"tail":tail,"link_policy":"expand"
+                        }), ui.ctx()),
+                        (Err(error), _) | (_, Err(error)) => self.error = Some(error),
+                    }
+                }
+            });
             if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
         });
         self.project_link_controls(ui, &group);

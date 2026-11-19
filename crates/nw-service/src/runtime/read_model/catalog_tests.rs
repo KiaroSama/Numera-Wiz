@@ -2266,6 +2266,7 @@ fn assert_command_metadata(auth: &Value, profile: &AccessProfile, edit: bool, li
         "clips.link",
         "clips.unlink",
         "clips.split",
+        "clips.trim",
         "clips.remove",
         "history.undo",
         "history.redo",

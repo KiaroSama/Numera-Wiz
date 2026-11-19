@@ -271,6 +271,11 @@ the normal projection reload. After a denied or stale request, explicitly Refres
 and review before another edit. An existing browser profile needs owner-reviewed
 `clips.link` and `clips.unlink` allowlist entries; the workspace never adds them.
 
+Inspect a timeline clip and open **Trim linked clips** to shorten its beginning,
+end or both. Enter exact seconds using a numerator and denominator, then select
+**Apply trim**. The edit applies to every linked clip and can be undone in the
+project history. It leaves a gap where the removed time had been.
+
 The new controls and appended real native/Chrome pointer/keyboard journey await
 hosted qualification for this source. The journey places two finite solid-color
 clips and independently checks Link/Unlink, exact-group Undo/Redo, unchanged

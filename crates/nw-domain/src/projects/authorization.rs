@@ -67,7 +67,7 @@ pub struct AuthorizationRequirements {
     pub request_gates: Vec<RequestGate>,
 }
 
-pub const PROJECT_TARGET_COMMANDS: [&str; 11] = [
+pub const PROJECT_TARGET_COMMANDS: [&str; 12] = [
     "projects.inspect",
     "sequences.create",
     "sequences.inspect",
@@ -76,6 +76,7 @@ pub const PROJECT_TARGET_COMMANDS: [&str; 11] = [
     "clips.link",
     "clips.unlink",
     "clips.split",
+    "clips.trim",
     "clips.remove",
     "history.undo",
     "history.redo",
@@ -92,7 +93,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
+        | "clips.split" | "clips.trim" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
         | "history.redo" => Some(ProjectAction::Edit),
         _ => return None,
     };
@@ -181,7 +182,7 @@ pub struct ProjectAuthorization {
     pub observed_project_revision: String,
     pub current_read: CurrentRight,
     pub current_edit: CurrentRight,
-    #[schemars(length(min = 11, max = 11))]
+    #[schemars(length(min = 12, max = 12))]
     pub actions: Vec<ActionAvailability>,
 }
 
