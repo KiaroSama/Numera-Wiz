@@ -124,13 +124,16 @@ fn audio_format(probe: &MediaProbe, index: u32) -> Result<(u32, u64)> {
 fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> {
     let mut resolved = nw_domain::mux::extract_one(streams, settings.video_stream)?;
     let picture = &resolved.streams[0];
-    if picture.kind != StreamKind::Video || picture.attached_picture() || picture.codec != "ffv1" {
-        return Err(unavailable("Choose an original SDR FFV1 picture"));
+    if picture.kind != StreamKind::Video || picture.attached_picture()
+        || !matches!(picture.codec.as_str(), "ffv1" | "h264")
+    {
+        return Err(unavailable("Choose an original SDR FFV1 or H.264 picture"));
     }
     if let Audio::Aac { stream_index, .. } = settings.audio {
         let audio = streams.iter()
-            .find(|track| track.index == stream_index && track.kind == StreamKind::Audio && track.codec == "pcm_s16le")
-            .ok_or_else(|| unavailable("Choose an original PCM s16le audio stream for AAC"))?;
+            .find(|track| track.index == stream_index && track.kind == StreamKind::Audio
+                && matches!(track.codec.as_str(), "pcm_s16le" | "aac"))
+            .ok_or_else(|| unavailable("Choose a PCM s16le or AAC audio stream"))?;
         resolved.streams.push(audio.clone());
     }
     resolved.outcomes = streams.iter().map(|original| {
@@ -153,24 +156,26 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
 }
 
 pub(super) fn admit(source: &Asset, resolved: &CleanResolution) -> Result<()> {
-    if crate::admission::frozen_demuxer(&source.probe.format)? != "matroska"
+    if !matches!(crate::admission::frozen_demuxer(&source.probe.format)?, "matroska" | "mov")
         || resolved.preservation.chapters || resolved.preservation.global_tags
         || resolved.preservation.stream_tags || resolved.preservation.dispositions
         || resolved.action != CleanAction::Remux
     {
-        return Err(unavailable("This AVC route takes registered Matroska and publishes the selected picture and audio"));
+        return Err(unavailable("The AVC route takes registered Matroska or self-contained MP4/MOV and publishes the selected picture and audio"));
     }
     let picture = resolved.streams.first().ok_or_else(|| unavailable("AVC export requires a picture stream"))?;
     let details = stream(&source.probe, picture.index)?;
     let even = |key: &str, max| details[key].as_u64().is_some_and(|value| {
         (2..=max).contains(&value) && value.is_multiple_of(2)
     });
-    if details["pix_fmt"] != "yuv420p" || details["time_base"] != "1/1000"
+    let clock = crate::preservation::stream_clock(&source.probe, picture.index)?;
+    if details["pix_fmt"] != "yuv420p" || clock.numerator() != 1 || clock.denominator() > i64::from(i32::MAX)
         || !even("width",4096) || !even("height",2160)
+        || details["field_order"].as_str().is_some_and(|order| !matches!(order, "unknown" | "progressive"))
         || details["side_data_list"].as_array().is_some_and(|rows| !rows.is_empty())
         || details["color_transfer"].as_str().is_some_and(|tag| !matches!(tag, "unknown" | "bt709" | "iec61966-2-1" | "smpte170m"))
     {
-        return Err(unavailable("Use an ordinary yuv420p SDR picture through 4096×2160 on the admitted millisecond clock"));
+        return Err(unavailable("Use a progressive yuv420p SDR picture through 4096×2160 on an exact representable stream clock"));
     }
     if let Some(track) = resolved.streams.get(1) {
         audio_format(&source.probe, track.index)?;
@@ -251,6 +256,10 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         return Err(unavailable("The AVC output container or selected source stream map changed"));
     }
     admit(&plan.source, &plan.resolution)?;
+    let clock = crate::preservation::stream_clock(&plan.source.probe, settings.video_stream)?;
+    if settings.container == Container::Matroska && 1000 % clock.denominator() != 0 {
+        return Err(unavailable("Use MP4 for original stream timestamps that may require sub-millisecond precision"));
+    }
     let preset = match settings.preset {
         Preset::Fast => "fast",
         Preset::Balanced => "medium",
@@ -262,9 +271,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     let end = args.len() - 3;
     let mut export = [
         "-c:v","libx264","-preset",preset,"-pix_fmt","yuv420p","-bf","0","-threads:v","2",
-        "-fps_mode:v","passthrough","-enc_time_base:v","1/1000","-crf",
+        "-fps_mode:v","passthrough","-enc_time_base:v",
     ].map(str::to_owned).to_vec();
-    export.push(settings.crf.to_string());
+    export.extend([format!("1/{}", clock.denominator()), "-crf".into(), settings.crf.to_string()]);
     let original = stream(&plan.source.probe, settings.video_stream)?;
     let (_, filters) = picture_filter(original, settings)?;
     if !filters.is_empty() {
@@ -275,6 +284,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     }
     if settings.container == Container::Mp4 {
         export.extend(["-movflags".into(), "+faststart".into()]);
+        if clock.denominator() != 1000 {
+            export.extend(["-video_track_timescale".into(), clock.denominator().to_string()]);
+        }
     }
     args.splice(end..end, export);
     Ok(args)

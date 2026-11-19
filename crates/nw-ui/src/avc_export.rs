@@ -25,9 +25,9 @@ impl Default for AvcUi {
 impl WizApp {
     pub(super) fn avc_export_panel(&mut self, ui: &mut egui::Ui, source: &Asset) {
         let pictures: Vec<_> = source.probe.streams.iter().filter(|item| {
-            item.kind == StreamKind::Video && item.codec == "ffv1" && !item.attached_picture()
+            item.kind == StreamKind::Video && matches!(item.codec.as_str(), "ffv1" | "h264") && !item.attached_picture()
         }).collect();
-        if pictures.is_empty() || !source.probe.format.split(',').any(|format| format == "matroska") {
+        if pictures.is_empty() || !source.probe.format.split(',').any(|format| matches!(format, "matroska" | "mov")) {
             return;
         }
         let container = match std::path::Path::new(&self.output).extension().and_then(|value| value.to_str()) {
@@ -61,7 +61,7 @@ impl WizApp {
                     self.avc_export.audio.map_or_else(|| "No audio".to_owned(),|index| format!("Encode audio {index} as AAC"))
                 ).show_ui(ui, |ui| {
                     changed |= ui.selectable_value(&mut self.avc_export.audio,None,"No audio").changed();
-                    for item in source.probe.streams.iter().filter(|item| item.kind==StreamKind::Audio && item.codec=="pcm_s16le") {
+                    for item in source.probe.streams.iter().filter(|item| item.kind==StreamKind::Audio && matches!(item.codec.as_str(), "pcm_s16le" | "aac")) {
                         changed |= ui.selectable_value(&mut self.avc_export.audio,Some(item.index),
                             format!("Audio {}",item.index)).changed();
                     }
@@ -89,7 +89,7 @@ impl WizApp {
         }
         if review {
             let settings = Encode {
-                video_stream: self.avc_export.picture.expect("Registered FFV1 stream"),
+                video_stream: self.avc_export.picture.expect("Registered picture stream"),
                 container: container.expect("Reviewed destination extension"),
                 crf: self.avc_export.crf,
                 preset: self.avc_export.preset,

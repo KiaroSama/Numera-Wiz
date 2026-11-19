@@ -1085,6 +1085,35 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
             "picture":"h264","audio":"aac","sample_aspect_ratio":expected_aspect,"geometry_transformed":transform}));
     }
+    let common = directory.join("registered-h264-with-b-frames.mp4");
+    let generate_common = [
+        "-v", "error", "-i", path.to_str().unwrap(), "-map", "0:v:0", "-map", "0:a:0",
+        "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p", "-bf", "2",
+        "-fps_mode", "passthrough", "-enc_time_base:v", "1/1000", "-c:a", "aac",
+        "-b:a", "128k", common.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &generate_common,
+        Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
+    let pts = |packets: &[Value]| packets.iter().map(|packet| packet["pts"].as_i64().unwrap()).collect::<Vec<_>>();
+    let original_pts = pts(&packets(&components, &common).await[&0]);
+    assert!(original_pts.windows(2).any(|times| times[0] > times[1]));
+    let common_asset = accepted(&cli, &scope, "register-avc-reordered", "assets.register", json!({"path":common})).await;
+    let destination = directory.join("reordered-export.mp4");
+    let common_plan = cli.query("media.encode", json!({"asset_id":common_asset["id"],"output":destination,"settings":{
+        "video_stream":0,"container":"mp4","crf":20,"preset":"balanced",
+        "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
+    }})).await;
+    let common_job = accepted(&cli, &scope, "run-avc-reordered", "jobs.submit", json!({
+        "plan_id":common_plan["id"],"plan_hash":common_plan["hash"]
+    })).await;
+    succeeded(&cli, &common_job).await;
+    let actual = fixture::probe(&components, &destination).await;
+    assert_eq!(actual["streams"][0]["time_base"], "1/16000");
+    assert_eq!(actual["streams"][1]["codec_name"], "aac");
+    let actual_pts = pts(&packets(&components, &destination).await[&0]);
+    assert_eq!(actual_pts, [0, 512, 1920, 3584, 6016, 8192]);
+    results.push(json!({"job":common_job["job_id"],"container":"mp4","reordered_original_packet_pts":original_pts,"verified_decoded_pts":actual_pts}));
+
     let intake = directory.join("encode-intake");
     let output_root = directory.join("encode-outputs");
     std::fs::create_dir_all(intake.join("second")).unwrap();

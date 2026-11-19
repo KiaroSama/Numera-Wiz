@@ -978,7 +978,9 @@ Fields outside the picture-only profile receive field-specific errors.
 ### Encode H.264 with optional AAC
 
 Use `numera-wiz media encode --file export.json` with a registered
-SDR Matroska FFV1 picture. Choose a new MP4 or Matroska destination.
+SDR FFV1 or H.264 picture in Matroska or self-contained MP4/MOV. Choose a
+new MP4 or Matroska destination. Use MP4 when the original clock may
+contain sub-millisecond timestamps.
 
 ```json
 {

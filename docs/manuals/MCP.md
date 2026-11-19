@@ -594,7 +594,7 @@ lossless picture retime as `media.retime`. Grant both commands to that
 profile.
 
 
-`media.encode` reviews an SDR FFV1 source for verified H.264 export
+`media.encode` reviews an SDR FFV1 or H.264 source for verified H.264 export
 with optional AAC in MP4 or Matroska. Set the preset and CRF in
 `settings`. Use `commands.schema` for the complete contract and
 `jobs.submit` to run the reviewed plan.

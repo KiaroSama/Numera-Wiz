@@ -355,7 +355,8 @@ tempo and playback direction. Review the output frame count and
 presentation clock before running the job.
 
 
-Use **Encode H.264 video** on a registered SDR Matroska FFV1 asset.
+Use **Encode H.264 video** on a registered SDR FFV1 or H.264 asset in
+Matroska or self-contained MP4/MOV.
 Choose the picture, optional AAC audio, quality and CPU preset. Enter a
 new MP4 or Matroska destination, then review and run the job.
 
