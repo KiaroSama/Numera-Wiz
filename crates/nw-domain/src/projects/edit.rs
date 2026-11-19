@@ -813,7 +813,10 @@ pub fn resolve_edit<R: ProjectRead>(
                 let mut tracks = BTreeMap::new();
                 for entity in selected {
                     let clip = entity.payload::<Clip>("clip")?;
-                    if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+                    if tracks
+                        .insert(clip.track_id.clone(), (entity, clip))
+                        .is_some()
+                    {
                         return Err(boundary_error());
                     }
                 }

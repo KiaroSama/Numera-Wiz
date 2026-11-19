@@ -584,11 +584,12 @@ impl Service {
             };
             let header = read.header().clone();
             let expected_header = Some(read.header_raw().to_owned());
-            let source_checks = if matches!(request.command.id.as_str(), "clips.slip" | "clips.roll") {
-                source_window_checks(&read, &patch)?
-            } else {
-                Vec::new()
-            };
+            let source_checks =
+                if matches!(request.command.id.as_str(), "clips.slip" | "clips.roll") {
+                    source_window_checks(&read, &patch)?
+                } else {
+                    Vec::new()
+                };
             drop(read);
             if !source_checks.is_empty() {
                 held = self.prepare_window_sources(context, source_checks, cancel)?;
