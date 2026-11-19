@@ -655,7 +655,16 @@ pub(super) async fn verify_avc_timing(
         None,
     )
     .await?;
-    let output = scan(engine, path, observed, cancel, observer, deadline, None).await?;
+    let output = scan(
+        engine,
+        path,
+        observed,
+        cancel.clone(),
+        observer,
+        deadline,
+        None,
+    )
+    .await?;
     let (input_picture, output_picture) = source
         .streams
         .get(&encode.video_stream)
