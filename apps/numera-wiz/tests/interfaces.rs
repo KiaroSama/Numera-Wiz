@@ -478,6 +478,8 @@ fn project_mcp_output_contract(pages: &[rmcp::model::ListToolsResult]) {
         "clips.unlink",
         "clips.split",
         "clips.trim",
+        "clips.slip",
+        "tracks.set_enabled",
         "clips.remove",
         "history.undo",
         "history.redo",

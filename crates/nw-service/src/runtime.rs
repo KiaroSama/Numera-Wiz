@@ -677,7 +677,7 @@ impl Service {
         };
         let readable = match request.command.id.as_str() {
             "projects.create" | "sequences.create" | "clips.place" | "clips.move"
-            | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim" | "clips.remove"
+            | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove"
             | "tracks.set_enabled"
             | "history.undo" | "history.redo" | "markers.place" | "markers.remove" => {
                 self.project_receipt_readable(context, &response)?
@@ -1266,7 +1266,7 @@ impl Service {
             )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
             | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split"
-            | "clips.trim" | "clips.remove" | "tracks.set_enabled" | "markers.place" | "markers.remove"
+            | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled" | "markers.place" | "markers.remove"
             | "history.undo" | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);

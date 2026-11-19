@@ -561,6 +561,17 @@ impl WizApp {
                     }
                 }
             });
+            ui.collapsing("Slip linked clips", |ui| {
+                rational(ui, "Source offset (seconds)", &mut self.projects.forms.slip_delta);
+                if ui.button("Apply slip").clicked() {
+                    match self.projects.forms.slip_delta.value() {
+                        Ok(delta) => self.mutate_project("clips.slip", json!({
+                            "clip_ids":[group.view.clip],"delta":delta,"link_policy":"expand"
+                        }), ui.ctx()),
+                        Err(error) => self.error = Some(error),
+                    }
+                }
+            });
         });
     }
 

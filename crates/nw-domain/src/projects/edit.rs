@@ -42,6 +42,7 @@ pub enum ProjectEditIntent {
     Unlink(UnlinkInput),
     Split(SplitInput),
     Trim(TrimInput),
+    Slip(SlipInput),
     SetTrackEnabled(SetTrackEnabledInput),
     Remove(RemoveInput),
 }
@@ -670,6 +671,33 @@ pub fn resolve_edit<R: ProjectRead>(
                 clip.source_range.end = clip.source_range.end.checked_sub(input.tail)?;
                 clip.duration = clip.source_range.duration()?;
                 edit.clip_context(&clip)?;
+                entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({})
+        }
+        ProjectEditIntent::Slip(input) => {
+            if input.clip_ids.iter().collect::<BTreeSet<_>>().len() != input.clip_ids.len() {
+                return Err(invalid("Duplicate clip IDs are not allowed"));
+            }
+            let selected = match input.link_policy {
+                LinkPolicy::Expand => expand_links(read, &input.clip_ids)?,
+            };
+            if input.delta == Rational::ZERO {
+                validate_unchanged(read, &selected)?;
+                return edit.finish(json!({}));
+            }
+            let magnitude = if input.delta < Rational::ZERO {
+                Rational::ZERO.checked_sub(input.delta)?
+            } else {
+                input.delta
+            };
+            for mut entity in selected {
+                let mut clip: Clip = entity.payload("clip")?;
+                let track = edit.clip_context(&clip)?;
+                grid_tick(magnitude, track.grid)?;
+                clip.source_range.start = clip.source_range.start.checked_add(input.delta)?;
+                clip.source_range.end = clip.source_range.end.checked_add(input.delta)?;
                 entity.update(&clip)?;
                 edit.set(entity)?;
             }

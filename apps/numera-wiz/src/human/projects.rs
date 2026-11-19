@@ -358,6 +358,15 @@ pub enum Clips {
         #[arg(long, default_value = "0/1")]
         tail: String,
     },
+    /// Shift the selected source windows on the frame or sample grid.
+    Slip {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long = "clip", required = true)]
+        clips: Vec<String>,
+        #[arg(long, allow_hyphen_values = true)]
+        delta: String,
+    },
     Remove {
         #[command(flatten)]
         context: WriteContext,
@@ -386,6 +395,7 @@ impl Clips {
             Self::Move { context, clips, delta } => context.request("clips.move", json!({"clip_ids":clips,"delta":rational(&delta)?,"collision":"reject","link_policy":"expand"})),
             Self::Split { context, clip, at } => context.request("clips.split", json!({"clip_id":clip,"at_sequence":rational(&at)?,"link_policy":"expand"})),
             Self::Trim { context, clips, head, tail } => context.request("clips.trim", json!({"clip_ids":clips,"head":rational(&head)?,"tail":rational(&tail)?,"link_policy":"expand"})),
+            Self::Slip { context, clips, delta } => context.request("clips.slip", json!({"clip_ids":clips,"delta":rational(&delta)?,"link_policy":"expand"})),
             Self::Remove { context, clips } => context.request("clips.remove", json!({"clip_ids":clips,"mode":"lift","link_policy":"expand"})),
         }
     }

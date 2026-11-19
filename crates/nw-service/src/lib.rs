@@ -594,22 +594,26 @@ mod tests {
                 assert_eq!(&catalog_fields(&schema.result.unwrap()), row);
                 continue;
             }
-            if matches!(id, "markers.place" | "markers.remove" | "clips.trim" | "tracks.set_enabled") {
+            if matches!(
+                id,
+                "markers.place" | "markers.remove" | "clips.trim" | "clips.slip" | "tracks.set_enabled"
+            ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
                 assert_eq!(requirement["project_action"], "edit");
-                assert_eq!(
-                    requirement["request_gates"],
-                    serde_json::json!([
-                        "current_policy",
-                        "project_context",
-                        "project_rights",
-                        "request_parameters",
-                        "expected_revision",
-                        "writer_lease",
-                        "affected_scope"
-                    ])
-                );
+                let mut gates = vec![
+                    "current_policy",
+                    "project_context",
+                    "project_rights",
+                    "request_parameters",
+                    "expected_revision",
+                    "writer_lease",
+                    "affected_scope",
+                ];
+                if id == "clips.slip" {
+                    gates.extend(["source_object_rights", "source_path_and_identity"]);
+                }
+                assert_eq!(requirement["request_gates"], serde_json::json!(gates));
                 continue;
             }
             if !family.contains(id) {
@@ -702,6 +706,8 @@ mod tests {
             "clips.unlink",
             "clips.split",
             "clips.trim",
+            "clips.slip",
+            "tracks.set_enabled",
             "clips.remove",
             "markers.place",
             "markers.remove",
@@ -1275,6 +1281,8 @@ mod tests {
             ("clips.unlink", vec!["clip_ids"], true),
             ("clips.split", vec!["clip_ids", "no_change"], true),
             ("clips.trim", vec![], true),
+            ("clips.slip", vec![], true),
+            ("tracks.set_enabled", vec![], true),
             ("clips.remove", vec![], false),
             ("markers.place", vec!["marker_id"], false),
             ("markers.remove", vec![], false),

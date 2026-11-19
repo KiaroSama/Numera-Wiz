@@ -808,6 +808,43 @@ pub(in crate::runtime) async fn linked_edits() {
     for (id, raw) in right_ids.iter().zip(before) {
         assert_eq!(fixture.raw(id), raw);
     }
+    let before_slip: Vec<_> = right_ids.iter().map(|id| fixture.raw(id)).collect();
+    let slip = |num: &str, den: &str| json!({
+        "clip_ids":[right_ids[0]],"delta":{"num":num,"den":den},"link_policy":"expand"
+    });
+    for (key, offset, error) in [
+        ("slip-before-source", slip("-1", "1"), "VALIDATION_ERROR"),
+        ("slip-off-grid", slip("1", "8"), "OFF_GRID"),
+    ] {
+        fixture
+            .reject_unchanged(fixture.request("clips.slip", key, offset), error)
+            .await;
+    }
+    let slipped = fixture
+        .accept(fixture.request("clips.slip", "slip-linked-back", slip("-1", "4")))
+        .await;
+    assert_eq!(slipped["changed_ids"].as_array().unwrap().len(), 2);
+    for (id, raw) in right_ids.iter().zip(&before_slip) {
+        let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
+        let original: Clip = original.payload("clip").unwrap();
+        let current: Clip = fixture.entity(id).payload("clip").unwrap();
+        assert_eq!(current.source_range.start, quarter);
+        assert_eq!(current.source_range.end, nw_domain::time::Rational::new(3, 4).unwrap());
+        assert_eq!(current.sequence_start, original.sequence_start);
+        assert_eq!(current.duration, original.duration);
+        assert_eq!(current.occurrence_id, original.occurrence_id);
+        assert_eq!(current.link_group_id, original.link_group_id);
+    }
+    let no_slip = fixture
+        .accept(fixture.request("clips.slip", "slip-zero", slip("0", "1")))
+        .await;
+    assert_eq!(no_slip["no_change"], true);
+    fixture
+        .accept(fixture.request("history.undo", "slip-undo", json!({})))
+        .await;
+    for (id, raw) in right_ids.iter().zip(before_slip) {
+        assert_eq!(fixture.raw(id), raw);
+    }
     let track_fixture = Fixture::new().await;
     let clip: Clip = track_fixture.entity(&track_fixture.clips[0]).payload("clip").unwrap();
     let original_track = track_fixture.raw(&clip.track_id);

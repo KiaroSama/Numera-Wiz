@@ -207,7 +207,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.trim" | "clips.remove" | "tracks.set_enabled"
+        | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove"
         | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
@@ -316,7 +316,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "clips.move" | "clips.trim" | "tracks.set_enabled" => Some(contracts::edit(EditResult::Move)),
+        "clips.move" | "clips.trim" | "clips.slip" | "tracks.set_enabled" => {
+            Some(contracts::edit(EditResult::Move))
+        }
         "clips.link" => Some(contracts::edit(EditResult::Link)),
         "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
         "clips.split" => Some(contracts::edit(EditResult::Split)),
@@ -551,6 +553,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Trim the beginning or end of a complete linked clip selection",
             DurableMutation,
             crate::projects::TrimInput
+        ),
+        row!(
+            "clips.slip",
+            "Shift the source windows of linked clips while retaining their timeline positions",
+            DurableMutation,
+            crate::projects::SlipInput
         ),
         row!(
             "tracks.set_enabled",
@@ -1787,6 +1795,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.unlink",
     "clips.split",
     "clips.trim",
+    "clips.slip",
     "tracks.set_enabled",
     "clips.remove",
     "markers.place",

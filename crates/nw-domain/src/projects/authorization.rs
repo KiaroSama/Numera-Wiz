@@ -93,7 +93,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.trim" | "clips.remove" | "tracks.set_enabled"
+        | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove"
         | "history.undo" | "history.redo" => Some(ProjectAction::Edit),
         _ => return None,
@@ -129,6 +129,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     if matches!(
         command,
         "clips.place"
+            | "clips.slip"
             | "timeline.preview_frame"
             | "timeline.render_mixed"
             | "markers.wave_projection"

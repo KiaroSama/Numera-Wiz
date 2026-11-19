@@ -25,6 +25,8 @@ solid-color binding here does not produce a video file.
 | `clips.link` | `clips link` | Expand complete clip topology and assign one shared opaque group. |
 | `clips.unlink` | `clips unlink` | Expand complete clip topology and clear its groups and known link references. |
 | `clips.split` | `clips split` | Split the selected/link-expanded clips at an exact sequence time. |
+| `clips.trim` | `clips trim` | Shorten linked clips from the beginning or end. |
+| `clips.slip` | `clips slip` | Move linked source windows while retaining timeline positions and durations. |
 | `clips.remove` | `clips remove` | Lift clips without moving neighboring material. |
 | `history.undo` | `history undo` | Apply the retained original inverse at a new revision. |
 | `history.redo` | `history redo` | Reapply the retained original at a new revision. |
@@ -170,6 +172,24 @@ accepted, replayable receipt with `no_change:true` and empty `changed_ids`, whil
 revision, raw project/entity bytes, history and redo remain unchanged. Retrying a
 lost response uses the exact original identity, expected revision and parameters,
 including for no-change; it is different from the fresh second Link above.
+
+## Slip a source window
+
+In Projects, inspect a clip, open **Slip linked clips**, and enter a signed
+source offset in seconds. A positive offset selects later source material.
+Source windows move together across linked tracks. Timeline ranges, clip IDs
+and link groups retain their identities. Undo restores the original windows.
+
+```text
+numera-wiz clips slip --clip CLIP --delta -1/4 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key slip-clip
+```
+
+MCP uses `clips.slip` with `clip_ids`, a rational `delta` and
+`link_policy: "expand"`. The offset must land on every affected track's grid.
+Slip accepts finite solid colors and up to eight distinct registered streams
+in one edit. Each registered stream needs a probe-declared interval. The
+engine checks the resulting range, current access and the registered source
+identity before committing the edit. A zero offset returns a no-change receipt.
 
 ## Track participation
 

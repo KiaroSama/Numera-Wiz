@@ -353,7 +353,7 @@ impl Service {
         // Preserve preparation errors until replay is rechecked under the acceptance mutex.
         let preparation = (|| -> Result<_> {
             let mut held = Vec::new();
-            let source_permit = if request.command.id == "clips.place" {
+            let source_permit = if matches!(request.command.id.as_str(), "clips.place" | "clips.slip") {
                 Some(
                     self.batch_preflights
                         .clone()
@@ -398,11 +398,13 @@ impl Service {
                                 source
                             }
                         };
-                        if let Some(held_source) = held.last() {
+                        if let (Some(held_source), PlaceSource::Registered { stream_index, .. }) =
+                            (held.last(), &input.source)
+                        {
                             validate_declared_source_extent(
                                 &held_source.asset,
                                 &input.source_range,
-                                &input.source,
+                                *stream_index,
                             )?;
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
@@ -428,6 +430,9 @@ impl Service {
                     "clips.trim" => {
                         ProjectEditIntent::Trim(commands::parse(request.params.clone())?)
                     }
+                    "clips.slip" => {
+                        ProjectEditIntent::Slip(commands::parse(request.params.clone())?)
+                    }
                     "tracks.set_enabled" => {
                         ProjectEditIntent::SetTrackEnabled(commands::parse(request.params.clone())?)
                     }
@@ -451,7 +456,9 @@ impl Service {
             }
             let (patch, created, history_action) = if let Some(intent) = intent {
                 let id_budget = match &intent {
-                    ProjectEditIntent::Unlink(_) | ProjectEditIntent::Trim(_)
+                    ProjectEditIntent::Unlink(_)
+                    | ProjectEditIntent::Trim(_)
+                    | ProjectEditIntent::Slip(_)
                     | ProjectEditIntent::SetTrackEnabled(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
                     _ => MAX_CHANGES * 2,
@@ -494,9 +501,20 @@ impl Service {
                     },
                 )
             };
+            let header = read.header().clone();
+            let expected_header = Some(read.header_raw().to_owned());
+            let slip_checks = if request.command.id == "clips.slip" {
+                slip_source_checks(&read, &patch)?
+            } else {
+                Vec::new()
+            };
+            drop(read);
+            if !slip_checks.is_empty() {
+                held = self.prepare_slip_sources(context, slip_checks, cancel)?;
+            }
             let prepared = ProjectCommit {
-                header: read.header().clone(),
-                expected_header: Some(read.header_raw().to_owned()),
+                header,
+                expected_header,
                 patch,
                 operation_id: OperationId::parse(Uuid::new_v4().to_string())?,
                 history_action,
@@ -511,7 +529,6 @@ impl Service {
                     })
                     .collect(),
             };
-            drop(read);
             Ok((prepared, held, source_permit))
         })();
         let guard = self.mutation.lock().map_err(|_| lock_error())?;
@@ -567,6 +584,71 @@ impl Service {
         }
         Ok(response)
     }
+
+    fn prepare_slip_sources(
+        &self,
+        context: &Context,
+        checks: Vec<(SourceBinding, SourceSpan)>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<HeldSource>> {
+        let mut held = BTreeMap::new();
+        for (binding, range) in checks {
+            let SourceBinding::Registered {
+                asset_id,
+                content_sha256,
+                probe_sha256,
+                stream_index,
+                ..
+            } = binding else {
+                continue;
+            };
+            let (verified, source) = match held.entry((asset_id.clone(), stream_index)) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => entry.insert(
+                    self.registered_project_source(context, &asset_id, stream_index, cancel)?,
+                ),
+            };
+            if !matches!(
+                verified,
+                SourceBinding::Registered { content_sha256: content, probe_sha256: probe, .. }
+                    if *content == content_sha256 && *probe == probe_sha256
+            ) {
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Registered source differs from the committed clip binding",
+                ));
+            }
+            if !validate_declared_source_extent(&source.asset, &range, stream_index)? {
+                return Err(DomainError::new(
+                    "SOURCE_EXTENT_UNAVAILABLE",
+                    "Slip requires a declared interval for the registered stream",
+                ));
+            }
+        }
+        Ok(held.into_values().map(|(_, source)| source).collect())
+    }
+}
+
+fn slip_source_checks(
+    read: &ProjectReadSnapshot,
+    patch: &ProjectPatch,
+) -> Result<Vec<(SourceBinding, SourceSpan)>> {
+    let mut checks = Vec::new();
+    let mut streams = std::collections::BTreeSet::new();
+    for after in patch.changes.iter().filter_map(|change| change.after.as_ref()) {
+        let entity: EntityEnvelope =
+            serde_json::from_str(after).map_err(|error| domain::invalid(error.to_string()))?;
+        let clip: Clip = entity.payload("clip")?;
+        let bound: SourceBinding = read.entity(&clip.source_id)?.payload("source_binding")?;
+        if let SourceBinding::Registered { asset_id, stream_index, .. } = &bound {
+            streams.insert((asset_id.clone(), *stream_index));
+            if streams.len() > 8 {
+                return Err(domain::limit("Slip requires at most eight registered streams"));
+            }
+            checks.push((bound, clip.source_range));
+        }
+    }
+    Ok(checks)
 }
 
 #[cfg(test)]
@@ -577,13 +659,10 @@ pub(super) mod tests;
 fn validate_declared_source_extent(
     asset: &Asset,
     range: &SourceSpan,
-    source: &PlaceSource,
-) -> Result<()> {
-    let PlaceSource::Registered { stream_index, .. } = source else {
-        return Ok(());
-    };
-    let Some(details) = asset.probe.stream_details.get(stream_index) else {
-        return Ok(());
+    stream_index: u32,
+) -> Result<bool> {
+    let Some(details) = asset.probe.stream_details.get(&stream_index) else {
+        return Ok(false);
     };
     let integer = |name: &str| {
         details[name]
@@ -594,17 +673,17 @@ fn validate_declared_source_extent(
         .as_str()
         .and_then(|s| s.split_once('/'))
     else {
-        return Ok(());
+        return Ok(false);
     };
     let (Ok(numerator), Ok(denominator)) = (numerator.parse::<i64>(), denominator.parse::<i64>())
     else {
-        return Ok(());
+        return Ok(false);
     };
     let (Some(start), Some(duration)) = (integer("start_pts"), integer("duration_ts")) else {
-        return Ok(());
+        return Ok(false);
     };
     if duration <= 0 {
-        return Ok(());
+        return Ok(false);
     }
     let grid = nw_domain::time::Rational::new(numerator, denominator)?;
     if grid <= nw_domain::time::Rational::ZERO {
@@ -617,7 +696,7 @@ fn validate_declared_source_extent(
             "Requested source span exceeds established probe-declared bounds",
         ));
     }
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]

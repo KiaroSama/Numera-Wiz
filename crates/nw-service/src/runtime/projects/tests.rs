@@ -622,7 +622,9 @@ pub(in crate::runtime) async fn held_source_current_grants() {
                 tags: Default::default(),
                 dispositions: Default::default(),
             }],
-            stream_details: Default::default(),
+            stream_details: [(7, json!({"time_base":"1/4","start_pts":-4,"duration_ts":16}))]
+                .into_iter()
+                .collect(),
             format: "model-only-no-decoder".into(),
             container_duration: None,
             global_tags: Default::default(),
@@ -737,6 +739,27 @@ pub(in crate::runtime) async fn held_source_current_grants() {
         service.dispatch(actor.clone(), different).await,
         "IDEMPOTENCY_CONFLICT",
     );
+    let slip = |num: &str, den: &str| {
+        json!({"clip_ids":[clip],"delta":{"num":num,"den":den},"link_policy":"expand"})
+    };
+    failed(
+        write(&service, &actor, &scope, Some((project, "2")), "clips.slip", "held-slip-outside", slip("-1", "4")).await,
+        "VALIDATION_ERROR",
+    );
+    let slipped = good(
+        write(&service, &actor, &scope, Some((project, "2")), "clips.slip", "held-slip-later", slip("1", "4")).await,
+    );
+    assert_eq!(slipped["changed_ids"], json!([clip]));
+    {
+        let read = service.store.project_read(project).unwrap();
+        let clip: Clip = read.entity(&EntityId::parse(clip.to_owned()).unwrap()).unwrap().payload("clip").unwrap();
+        assert_eq!(clip.source_range.start, nw_domain::time::Rational::new(-3, 4).unwrap());
+        assert_eq!(clip.source_range.end, nw_domain::time::Rational::new(1, 4).unwrap());
+        assert_eq!(clip.sequence_start, nw_domain::time::Rational::ZERO);
+    }
+    good(
+        write(&service, &actor, &scope, Some((project, "3")), "history.undo", "held-slip-undo", json!({})).await,
+    );
     good(
         conformance.capture(
             4,
@@ -745,7 +768,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
                 &service,
                 &actor,
                 &scope,
-                Some((project, "2")),
+                Some((project, "4")),
                 "clips.remove",
                 "held-remove",
                 json!({"clip_ids":[clip],"mode":"lift","link_policy":"expand"}),
@@ -766,7 +789,7 @@ pub(in crate::runtime) async fn held_source_current_grants() {
                 &service,
                 &actor,
                 &scope,
-                Some((project, "3")),
+                Some((project, "5")),
                 "history.undo",
                 "held-undo",
                 json!({}),
