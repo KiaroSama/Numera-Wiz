@@ -151,6 +151,7 @@ impl ImportedJob {
         match name.as_str() {
             "h264" | "libx264" => Some(VideoCodec::H264),
             "hevc" | "libx265" => Some(VideoCodec::Hevc),
+            "av1" | "libsvtav1" => Some(VideoCodec::Av1),
             _ => None,
         }
     }
@@ -354,7 +355,7 @@ impl ImportedJob {
         else {
             return Err(DomainError::new(
                 "INVALID_JOB_DOCUMENT",
-                "Use a version 1 FFmWiz profile with CPU H.264 or HEVC",
+                "Use a version 1 FFmWiz profile with CPU H.264, HEVC or AV1",
             ));
         };
         let source = self.imported_source()?;

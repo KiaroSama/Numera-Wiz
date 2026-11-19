@@ -712,6 +712,7 @@ impl WizApp {
                 ui.horizontal_wrapped(|ui| {
                     ui.radio_value(&mut self.folder.encode_codec, VideoCodec::H264, "H.264");
                     ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Hevc, "HEVC");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Av1, "AV1");
                     ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
                     ui.radio_value(
                         &mut self.folder.encode_container,

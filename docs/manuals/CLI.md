@@ -86,7 +86,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `streams extract-folder --file FOLDER-EXTRACTION.json` | Resolve one track type and ordinal per source in a retained folder snapshot, with derived Matroska destinations in a separate directory. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
-| `jobs plan --asset ID --file IMPORT.json` | Review an admitted FFmWiz packet-copy, FFV1 retime, H.264 or HEVC job against its registered source. |
+| `jobs plan --asset ID --file IMPORT.json` | Review an admitted FFmWiz packet-copy, FFV1 retime, H.264, HEVC or AV1 job against its registered source. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
 | `jobs cancel ID --replay-scope SCOPE --idempotency-key KEY` | Request cancellation of the selected accepted job. |
@@ -1007,10 +1007,10 @@ For an imported FFmWiz FFV1 picture job, set `audio_tracks=none` and
 Fields outside the picture-only profile receive field-specific errors.
 
 
-### Encode H.264 or HEVC with optional AAC
+### Encode H.264, HEVC or AV1 with optional AAC
 
 Use `numera-wiz media encode --file export.json` with a registered
-SDR FFV1, H.264 or HEVC picture in Matroska or self-contained MP4/MOV. Choose a
+SDR FFV1, H.264, HEVC or AV1 picture in Matroska or self-contained MP4/MOV. Choose a
 new MP4 or Matroska destination. Use MP4 when the original clock may
 contain sub-millisecond timestamps.
 
@@ -1034,16 +1034,18 @@ presentation times and dimensions. Selected AAC retains the original
 mono or stereo rate and verifies the coded timing. Review and submit
 the returned plan ID and hash.
 
-The default codec is H.264. Set `"codec":"hevc"` in `settings` to use
-`libx265`. HEVC MP4 verifies the `hvc1` sample entry. For folder jobs, place
-`codec` next to `container` in the request.
+The default codec is H.264. Set `"codec":"hevc"` for `libx265` or
+`"codec":"av1"` for `libsvtav1`. MP4 verifies the `hvc1` or `av01` sample
+entry, respectively. AV1 takes an output raster of at least 64 × 64 and
+admits quality CRF or variable bitrate. For folder jobs, place `codec` next
+to `container` in the request.
 
 For an average bitrate, supply `"bitrate":{"average_kbps":2000,"mode":"quality_vbr"}`
 in `settings` and omit `crf`. `quality_vbr` uses twice the average as the peak
 and four times the average as the buffer. `strict_size` caps the peak at the
 average and uses twice the average as the buffer.
 
-`jobs.plan` also accepts a reviewed FFmWiz CPU H.264 or HEVC profile with an explicit
+`jobs.plan` also accepts a reviewed FFmWiz CPU H.264, HEVC or AV1 profile with an explicit
 video bitrate, `use_gpu=n`, `keep_source_metadata=n` and `subtitle_tracks=none`.
 Choose `audio_tracks=none` or one original audio ordinal with AAC and an explicit
 audio bitrate. Specify crop margins as `crop=top,left,right,bottom` or with

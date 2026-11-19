@@ -1,4 +1,4 @@
-//! Reviewable CPU AVC export without untyped encoder options.
+//! Reviewable CPU video export without untyped encoder options.
 use crate::{DomainError, Result, time::Rational};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,7 @@ pub enum VideoCodec {
     #[default]
     H264,
     Hevc,
+    Av1,
 }
 
 impl VideoCodec {
@@ -46,6 +47,7 @@ impl VideoCodec {
         match self {
             Self::H264 => "libx264",
             Self::Hevc => "libx265",
+            Self::Av1 => "libsvtav1",
         }
     }
 
@@ -53,6 +55,7 @@ impl VideoCodec {
         match self {
             Self::H264 => "h264",
             Self::Hevc => "hevc",
+            Self::Av1 => "av1",
         }
     }
 }
@@ -213,6 +216,14 @@ impl Encode {
                     "Choose one CRF from 1 to 51 or an average bitrate from 64 to 100000 kbps",
                 ));
             }
+        }
+        if self.codec == VideoCodec::Av1
+            && self.bitrate.is_some_and(|bitrate| bitrate.mode == RateMode::StrictSize)
+        {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "AV1 uses quality CRF or variable bitrate in the admitted SVT-AV1 profile",
+            ));
         }
         if let Audio::Aac { bitrate_kbps, .. } = self.audio
             && !(48..=320).contains(&bitrate_kbps)

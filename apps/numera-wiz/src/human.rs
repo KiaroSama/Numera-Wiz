@@ -114,7 +114,7 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
-    /// Review H.264 or HEVC CPU export with optional AAC.
+    /// Review H.264, HEVC or AV1 CPU export with optional AAC.
     Encode {
         #[arg(long)]
         file: PathBuf,
@@ -511,7 +511,7 @@ pub enum Batches {
         #[arg(long)]
         file: PathBuf,
     },
-    /// Review H.264 or HEVC CPU encoding from a retained folder snapshot.
+    /// Review H.264, HEVC or AV1 CPU encoding from a retained folder snapshot.
     EncodeFolder {
         #[arg(long)]
         file: PathBuf,

@@ -647,6 +647,7 @@ pub(super) async fn verify_avc_timing(
     let codec = match encode.codec {
         nw_domain::avc_export::VideoCodec::H264 => "AVC",
         nw_domain::avc_export::VideoCodec::Hevc => "HEVC",
+        nw_domain::avc_export::VideoCodec::Av1 => "AV1",
     };
     let deadline = plan.execution_limits.clone().unwrap_or_default().operation;
     let source = scan(

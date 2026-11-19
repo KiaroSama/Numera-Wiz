@@ -16,11 +16,13 @@ use tokio_util::sync::CancellationToken;
 
 pub(super) const SCOPE: &str = "Verify source and AVC output picture counts and presentation clocks, raster, aspect and observed SDR signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
 const HEVC_SCOPE: &str = "Verify source and HEVC output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies hvc1 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
+const AV1_SCOPE: &str = "Verify source and AV1 output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies av01 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
 
 pub(super) fn scope(codec: VideoCodec) -> &'static str {
     match codec {
         VideoCodec::H264 => SCOPE,
         VideoCodec::Hevc => HEVC_SCOPE,
+        VideoCodec::Av1 => AV1_SCOPE,
     }
 }
 
@@ -248,10 +250,10 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
     let picture = &resolved.streams[0];
     if picture.kind != StreamKind::Video
         || picture.attached_picture()
-        || !matches!(picture.codec.as_str(), "ffv1" | "h264" | "hevc")
+        || !matches!(picture.codec.as_str(), "ffv1" | "h264" | "hevc" | "av1")
     {
         return Err(unavailable(
-            "Choose an original SDR FFV1, H.264 or HEVC picture",
+            "Choose an original SDR FFV1, H.264, HEVC or AV1 picture",
         ));
     }
     if let Audio::Aac { stream_index, .. } = settings.audio {
@@ -402,10 +404,9 @@ impl Engine {
         let source_picture = stream(&plan.source.probe, encode.video_stream)?;
         let output_picture = stream(observed, primary.index)?;
         let original_is_compressed =
-            matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc");
-        if encode.codec == VideoCodec::Hevc
-            && encode.container == Container::Mp4
-            && output_picture["codec_tag_string"] != "hvc1"
+            matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc" | "av1");
+        if let Some(tag) = mp4_codec_tag(encode)
+            && output_picture["codec_tag_string"] != tag
         {
             return Err(invalid());
         }
@@ -429,7 +430,7 @@ impl Engine {
             // AVC defaults an absent video_full_range_flag to limited.
             // MP4 and Matroska can expose the same range differently.
             let implicit_limited_range = field == "color_range"
-                && (expected == "tv" || original_is_compressed && missing(expected))
+                && (expected == "tv" || (original_is_compressed || encode.codec == VideoCodec::Av1) && missing(expected))
                 && (actual == "tv" || missing(actual));
             if !(expected == actual
                 || missing(expected) && missing(actual)
@@ -456,6 +457,25 @@ impl Engine {
     }
 }
 
+fn mp4_codec_tag(settings: &Encode) -> Option<&'static str> {
+    match (settings.container, settings.codec) {
+        (Container::Mp4, VideoCodec::Hevc) => Some("hvc1"),
+        (Container::Mp4, VideoCodec::Av1) => Some("av01"),
+        _ => None,
+    }
+}
+
+fn svt_parameters(original: &serde_json::Value) -> String {
+    // SVT needs a nominal rate for its encoder model. Keep the exact PTS grid
+    // independent, including irregular sources with a 1 kHz guessed rate.
+    let (num, den) = ["avg_frame_rate", "r_frame_rate"].into_iter().find_map(|key| {
+        let (num, den) = original[key].as_str()?.split_once('/')?;
+        let (num, den) = (num.parse::<u32>().ok()?, den.parse::<u32>().ok()?);
+        (num > 0 && (1..=1001).contains(&den) && num <= 240 * den).then_some((num, den))
+    }).unwrap_or((25, 1));
+    format!("lp=1:fps-num={num}:fps-denom={den}")
+}
+
 pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<Vec<String>> {
     let settings = plan
         .avc_export
@@ -476,11 +496,16 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
             "Use MP4 for original stream timestamps that may require sub-millisecond precision",
         ));
     }
-    let preset = match settings.preset {
-        Preset::Fast => "fast",
-        Preset::Balanced => "medium",
-        Preset::Slow => "slow",
+    let preset = match (settings.codec, settings.preset) {
+        (VideoCodec::Av1, Preset::Fast) => "10",
+        (VideoCodec::Av1, Preset::Balanced) => "8",
+        (VideoCodec::Av1, Preset::Slow) => "6",
+        (_, Preset::Fast) => "fast",
+        (_, Preset::Balanced) => "medium",
+        (_, Preset::Slow) => "slow",
     };
+    let original = stream(&plan.source.probe, settings.video_stream)?;
+    let (raster, filters) = picture_filter(original, settings)?;
     let mut args = lower_remux(&plan.source, &plan.resolution, output_profile)?;
     let input = args
         .iter()
@@ -498,22 +523,30 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         preset,
         "-pix_fmt",
         "yuv420p",
-        "-bf",
-        "0",
+    ].map(str::to_owned).to_vec();
+    if settings.codec != VideoCodec::Av1 {
+        export.extend(["-bf".into(), "0".into()]);
+    }
+    export.extend([
         "-threads:v",
         "2",
         "-fps_mode:v",
         "passthrough",
         "-enc_time_base:v",
     ]
-    .map(str::to_owned)
-    .to_vec();
+    .map(str::to_owned));
     export.push(format!("1/{}", clock.denominator()));
     if settings.codec == VideoCodec::Hevc {
         export.extend([
             "-x265-params".into(),
             "bframes=0:pools=none:frame-threads=2:log-level=error".into(),
         ]);
+    }
+    if settings.codec == VideoCodec::Av1 {
+        if raster.width < 64 || raster.height < 64 {
+            return Err(unavailable("SVT-AV1 needs an encoded raster of at least 64×64"));
+        }
+        export.extend(["-svtav1-params".into(), svt_parameters(original)]);
     }
     if let Some(crf) = settings.crf {
         export.extend(["-crf".into(), crf.to_string()]);
@@ -529,8 +562,6 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
             format!("{buffer}k"),
         ]);
     }
-    let original = stream(&plan.source.probe, settings.video_stream)?;
-    let (_, filters) = picture_filter(original, settings)?;
     if !filters.is_empty() {
         export.extend(["-filter:v".into(), filters.join(",")]);
     }
@@ -543,8 +574,8 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         ]);
     }
     if settings.container == Container::Mp4 {
-        if settings.codec == VideoCodec::Hevc {
-            export.extend(["-tag:v".into(), "hvc1".into()]);
+        if let Some(tag) = mp4_codec_tag(settings) {
+            export.extend(["-tag:v".into(), tag.into()]);
         }
         export.extend(["-movflags".into(), "+faststart".into()]);
         if clock.denominator() != 1000 {
