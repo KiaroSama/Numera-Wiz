@@ -219,6 +219,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "clips.slip"
         | "clips.remove"
         | "tracks.set_enabled"
+        | "tracks.set_locked"
         | "markers.place"
         | "markers.remove"
         | "timeline.remove_gap"
@@ -343,6 +344,7 @@ fn result_schema(id: &str) -> Option<Value> {
         | "clips.trim"
         | "clips.slip"
         | "tracks.set_enabled"
+        | "tracks.set_locked"
         | "timeline.remove_gap"
         | "mixer.set_track_gain" => Some(contracts::edit(EditResult::Move)),
         "clips.link" => Some(contracts::edit(EditResult::Link)),
@@ -621,6 +623,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Set a committed audio or video track's participation in preview and render",
             DurableMutation,
             crate::projects::SetTrackEnabledInput
+        ),
+        row!(
+            "tracks.set_locked",
+            "Set the current track edit lock and retain its inverse",
+            DurableMutation,
+            crate::projects::SetTrackLockedInput
         ),
         row!(
             "clips.remove",
@@ -1863,6 +1871,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.trim",
     "clips.slip",
     "tracks.set_enabled",
+    "tracks.set_locked",
     "mixer.set_track_gain",
     "clips.remove",
     "markers.place",

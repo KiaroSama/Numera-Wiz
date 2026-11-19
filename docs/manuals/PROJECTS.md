@@ -19,6 +19,7 @@ continuous playback, general export and the complete editor remain required work
 | `sequences.create` | `sequences create` | Create explicit sequence settings and video/audio tracks. |
 | `sequences.inspect` | `sequences inspect` | Read sequence detail, tracks or a bounded clip viewport. |
 | `tracks.set_enabled` | `tracks set-enabled` | Include or exclude one track from preview and render at the expected revision. |
+| `tracks.set_locked` | `tracks set-locked` | Prevent track and clip edits until the track is unlocked. |
 | `clips.place` | `clips place` | Place a registered physical stream or finite solid-color source. |
 | `clips.move` | `clips move` | Move the selected/link-expanded clips by one exact delta. |
 | `clips.link` | `clips link` | Expand complete clip topology and assign one shared opaque group. |
@@ -239,6 +240,20 @@ numera-wiz tracks set-enabled TRACK --enabled false --project PROJECT --expected
 MCP exposes the same edit as `tracks.set_enabled` with `track_id` and
 `enabled` parameters. Use its ordinary project write context. The
 `sequences.inspect` track page includes each track's committed `enabled` state.
+
+## Lock a track
+
+Select a track and choose **Lock track**. The track stays visible and audible
+according to its existing settings. The owner refuses moves, trims, placement
+and track settings changes that affect the locked track. Choose **Unlock track**
+or Undo to restore editability. A locked sequence protects its tracks.
+
+```text
+numera-wiz tracks set-locked TRACK --locked true --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key lock-track
+```
+
+The MCP command is `tracks.set_locked` with `track_id` and `locked`.
+The track page includes `locked: true` for a committed lock.
 
 ## Export a CMX 3600 cut list
 

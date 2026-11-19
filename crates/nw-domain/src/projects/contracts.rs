@@ -497,6 +497,7 @@ pub fn inspect(sequence_only: bool) -> Value {
             ("clip_count", count()),
         ]);
         track["properties"]["enabled"] = boolean();
+        track["properties"]["locked"] = boolean();
         track["properties"]["gain_centidb"] =
             json!({"type":"integer","minimum":-9600,"maximum":2400});
         defs.insert("TrackSummary".into(), track);

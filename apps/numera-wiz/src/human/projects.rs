@@ -420,6 +420,14 @@ pub enum Tracks {
         #[arg(long, allow_hyphen_values = true)]
         centidb: i16,
     },
+    /// Lock or unlock a track at the expected project revision.
+    SetLocked {
+        #[command(flatten)]
+        context: WriteContext,
+        track: String,
+        #[arg(long, action = clap::ArgAction::Set)]
+        locked: bool,
+    },
     /// Enable or mute a track at the expected project revision.
     SetEnabled {
         #[command(flatten)]
@@ -441,6 +449,12 @@ impl Tracks {
                 "tracks.set_enabled",
                 json!({"track_id":track,"enabled":enabled}),
             ),
+            Self::SetLocked { context, track, locked } => {
+                context.request("tracks.set_locked", json!({"track_id":track,"locked":locked}))
+            }
+            Self::SetEnabled { context, track, enabled } => {
+                context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
+            }
             Self::SetGain {
                 context,
                 track,

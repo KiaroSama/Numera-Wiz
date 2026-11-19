@@ -610,6 +610,7 @@ mod tests {
                     | "clips.trim"
                     | "clips.slip"
                     | "tracks.set_enabled"
+                    | "tracks.set_locked"
                     | "timeline.remove_gap"
                     | "mixer.set_track_gain"
                     | "clips.join_through_edit"
@@ -726,6 +727,7 @@ mod tests {
             "clips.trim",
             "clips.slip",
             "tracks.set_enabled",
+            "tracks.set_locked",
             "timeline.remove_gap",
             "mixer.set_track_gain",
             "clips.remove",
@@ -1084,7 +1086,7 @@ mod tests {
                                 root,
                                 item,
                                 &required,
-                                &["enabled", "gain_centidb"],
+                                &["enabled", "gain_centidb", "locked"],
                             );
                             assert!(permits_keys(root, item, &required));
                             assert!(permits_keys(
@@ -1092,6 +1094,10 @@ mod tests {
                                 item,
                                 &["id", "kind", "name", "order", "clip_count", "enabled"]
                             ));
+                            assert_eq!(
+                                resolve(root, item)["properties"]["locked"]["type"],
+                                "boolean"
+                            );
                             assert_eq!(
                                 resolve(root, item)["properties"]["enabled"]["type"],
                                 "boolean"
@@ -1329,6 +1335,7 @@ mod tests {
             ("clips.trim", vec![], true),
             ("clips.slip", vec![], true),
             ("tracks.set_enabled", vec![], true),
+            ("tracks.set_locked", vec![], true),
             ("timeline.remove_gap", vec![], true),
             ("mixer.set_track_gain", vec![], true),
             ("clips.remove", vec![], false),

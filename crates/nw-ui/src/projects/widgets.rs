@@ -290,17 +290,25 @@ impl WizApp {
             } else {
                 "Enable track"
             };
-            if ui.add_enabled(ready, egui::Button::new(label)).clicked() {
+            if ui.add_enabled(ready && !track.locked, egui::Button::new(label)).clicked() {
                 self.mutate_project(
                     "tracks.set_enabled",
                     json!({"track_id":track.id,"enabled":!track.enabled}),
                     ui.ctx(),
                 );
             }
+            let lock_label = if track.locked { "Unlock track" } else { "Lock track" };
+            if ui.add_enabled(ready, egui::Button::new(lock_label)).clicked() {
+                self.mutate_project(
+                    "tracks.set_locked",
+                    json!({"track_id":track.id,"locked":!track.locked}),
+                    ui.ctx(),
+                );
+            }
             if track.kind == TrackKind::Audio {
                 ui.collapsing("Track gain", |ui| {
                     ui.label(format!("Committed gain {:.2} dB", f64::from(track.gain_centidb) / 100.0));
-                    ui.add_enabled_ui(ready, |ui| {
+                    ui.add_enabled_ui(ready && !track.locked, |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.label("Hundredths of a dB");
                             ui.add(egui::DragValue::new(&mut self.projects.forms.track_gain_centidb)
@@ -346,7 +354,8 @@ impl WizApp {
             ui.horizontal(|ui| {
                 if ui
                     .add_enabled(
-                        group.sequence.is_some() && group.track.is_some(),
+                        group.sequence.is_some()
+                            && group.track.as_ref().is_some_and(|track| !track.locked),
                         egui::Button::new("Place source…"),
                     )
                     .clicked()

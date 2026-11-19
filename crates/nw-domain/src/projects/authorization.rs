@@ -105,6 +105,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "clips.slip"
         | "clips.remove"
         | "tracks.set_enabled"
+        | "tracks.set_locked"
         | "markers.place"
         | "markers.remove"
         | "timeline.remove_gap"

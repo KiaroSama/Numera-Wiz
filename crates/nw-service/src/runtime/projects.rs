@@ -480,6 +480,9 @@ impl Service {
                     "mixer.set_track_gain" => {
                         ProjectEditIntent::SetTrackGain(commands::parse(request.params.clone())?)
                     }
+                    "tracks.set_locked" => {
+                        ProjectEditIntent::SetTrackLocked(commands::parse(request.params.clone())?)
+                    }
                     "tracks.set_enabled" => {
                         ProjectEditIntent::SetTrackEnabled(commands::parse(request.params.clone())?)
                     }
@@ -509,7 +512,8 @@ impl Service {
                     | ProjectEditIntent::Slip(_)
                     | ProjectEditIntent::RemoveGap(_)
                     | ProjectEditIntent::SetTrackGain(_)
-                    | ProjectEditIntent::SetTrackEnabled(_) => 0,
+                    | ProjectEditIntent::SetTrackEnabled(_)
+                    | ProjectEditIntent::SetTrackLocked(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
                     ProjectEditIntent::ImportEdl { placements, .. } => placements.len() * 3,
                     _ => MAX_CHANGES * 2,

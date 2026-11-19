@@ -58,6 +58,7 @@ pub enum ProjectEditIntent {
     Slip(SlipInput),
     RemoveGap(RemoveGapInput),
     SetTrackEnabled(SetTrackEnabledInput),
+    SetTrackLocked(SetTrackLockedInput),
     SetTrackGain(SetTrackGainInput),
     Remove(RemoveInput),
 }
@@ -936,6 +937,24 @@ pub fn resolve_edit<R: ProjectRead>(
             }
             json!({})
         }
+        ProjectEditIntent::SetTrackLocked(input) => {
+            let mut entity = edit.get(&input.track_id)?;
+            entity.semantics()?;
+            let mut track: Track = entity.payload("track")?;
+            let sequence = edit.get(&track.sequence_id)?;
+            if entity.owner_id.as_ref() != Some(&sequence.id) {
+                return Err(invalid("Track ownership differs from its sequence"));
+            }
+            if sequence.payload::<Sequence>("sequence")?.locked {
+                return Err(DomainError::new("ENTITY_LOCKED", "The sequence is locked"));
+            }
+            if track.locked != input.locked {
+                track.locked = input.locked;
+                entity.update(&track)?;
+                edit.set(entity)?;
+            }
+            json!({})
+        }
         ProjectEditIntent::SetTrackGain(input) => {
             validate_track_gain(input.gain_centidb)?;
             let mut entity = edit.get(&input.track_id)?;
@@ -994,9 +1013,36 @@ fn validate_unchanged<R: ProjectRead>(read: &R, selected: &[EntityEnvelope]) -> 
     check_compatibility(read, &patch)?;
     validate_patch_clips(read, &patch)
 }
+/// A lock change may pass its own track's lock check only when it changes
+/// exactly that bit. Inverse patches satisfy the same rule without a command
+/// name exception, so a replay or undo cannot hide another change in the track.
+fn track_lock_transition(patch: &ProjectPatch) -> Result<Option<&EntityId>> {
+    let [change] = patch.changes.as_slice() else {
+        return Ok(None);
+    };
+    let (Some(before), Some(after)) = (&change.before, &change.after) else {
+        return Ok(None);
+    };
+    let mut before: EntityEnvelope = serde_json::from_str(before).map_err(|error| invalid(error.to_string()))?;
+    let mut after: EntityEnvelope = serde_json::from_str(after).map_err(|error| invalid(error.to_string()))?;
+    if before.kind != "track" || after.kind != "track" || !before.known() || !after.known() {
+        return Ok(None);
+    }
+    let old: Track = before.payload("track")?;
+    let mut updated: Track = after.payload("track")?;
+    if old.locked == updated.locked {
+        return Ok(None);
+    }
+    updated.locked = old.locked;
+    before.update(&old)?;
+    after.update(&updated)?;
+    Ok((before.bytes()? == after.bytes()?).then_some(&change.id))
+}
+
 /// Check both images of the affected closure. Ownership visits ancestors, never siblings.
 pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Result<()> {
     read.header().writable()?;
+    let lock_transition = track_lock_transition(patch)?;
     let mut queue: VecDeque<_> = patch.changes.iter().map(|c| c.id.clone()).collect();
     queue.push_back(read.header().root_bin_id.clone());
     let mut seen = BTreeSet::new();
@@ -1059,7 +1105,7 @@ pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Re
             } else {
                 false
             };
-            if locked {
+            if locked && lock_transition != Some(&id) {
                 return Err(DomainError::new(
                     "ENTITY_LOCKED",
                     "Affected ownership/semantic closure contains a locked entity",
@@ -1090,6 +1136,7 @@ pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Re
     Ok(())
 }
 pub fn validate_patch_clips<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Result<()> {
+    let lock_transition = track_lock_transition(patch)?;
     let edit = Edit {
         read,
         changes: patch
@@ -1124,7 +1171,7 @@ pub fn validate_patch_clips<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> R
                 }
                 "track" => {
                     let t: Track = entity.payload("track")?;
-                    if t.locked {
+                    if t.locked && lock_transition != Some(&change.id) {
                         return Err(DomainError::new("ENTITY_LOCKED", "Track is locked"));
                     }
                 }

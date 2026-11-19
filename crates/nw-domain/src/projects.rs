@@ -881,6 +881,13 @@ pub struct SetTrackEnabledInput {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct SetTrackLockedInput {
+    pub track_id: EntityId,
+    pub locked: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RemoveInput {
     pub clip_ids: Vec<EntityId>,
     pub mode: String,
