@@ -238,8 +238,7 @@ fn recover_archive(
 ) -> Result<()> {
     if offset == 0 || offset >= size {
         fs::remove_file(partial)?;
-        return fetch_archive(url, partial, size, deadline, allow_https_redirect, None)?
-            .success();
+        return fetch_archive(url, partial, size, deadline, allow_https_redirect, None)?.success();
     }
     let tail = partial.with_extension("remaining");
     let remaining = size - offset;
@@ -291,13 +290,9 @@ fn download(
             staged_bytes = offset,
             "Locked archive transfer timed out, recovering once"
         );
-        recover_archive(url, &partial, size, offset, deadline, allow_https_redirect)
-            .with_context(|| {
-                format!(
-                    "Recover {}; initial transfer: {initial}",
-                    output.display()
-                )
-            })?;
+        recover_archive(url, &partial, size, offset, deadline, allow_https_redirect).with_context(
+            || format!("Recover {}; initial transfer: {initial}", output.display()),
+        )?;
     } else {
         response
             .success()
