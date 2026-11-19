@@ -88,6 +88,12 @@ lifetimes. Use `jobs.cancel` to control an accepted job before its publication f
 Domain failures are structured tool errors. Invalid protocol envelopes use SDK
 protocol errors. No custom MCP wire parser or lifecycle implementation is used.
 
+`media.analyze.volume` accepts `asset_id` and the original `stream_index` of a
+registered audio stream. It measures the selected decoded signal through FFmpeg
+and reports peak and RMS to six decimal places as integer millionths of a dBFS.
+A silent signal is represented as `{"kind":"silence"}`. The response includes
+the registered source digest and a decimal-string sample count per channel.
+
 ## Engine capability reports
 
 Grant `capabilities.inspect`, `capabilities.refresh` or `capabilities.clear`

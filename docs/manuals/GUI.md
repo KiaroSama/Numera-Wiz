@@ -243,3 +243,8 @@ clips and independently checks Link/Unlink, exact-group Undo/Redo, unchanged
 geometry/source bindings and reopening. It does not qualify mixed registered
 video/audio, full C_M1, decoded preview or the full editor. Broader project editing,
 playback, resources/fault coverage and full version 1 remain required.
+## Audio levels
+
+Select a registered file in Stream Cleanup and expand **Audio levels**. Choose
+the original audio stream to measure. Numera Wiz displays its decoded peak,
+RMS, and sample count per channel from FFmpeg.

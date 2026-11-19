@@ -57,6 +57,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media preview-frame --asset ID --stream INDEX --frame N` | Decode the selected video frame into a bounded 160 × 90 RGBA preview. |
 | `timeline preview-frame --project PROJECT --sequence SEQUENCE --revision REV --at TIME` | Decode the visible picture at one exact sequence-frame boundary, with `TIME` as an integer or fraction. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
+| `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
 | `media capabilities clear --fingerprint SHA` | Clear the matching component report from owner memory. |

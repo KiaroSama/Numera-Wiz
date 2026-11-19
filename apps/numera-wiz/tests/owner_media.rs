@@ -39,6 +39,15 @@ fn legacy_catalog_fields(row: &Value) -> Value {
     legacy
 }
 
+fn assert_volume(result: &Value, asset: &Value) {
+    assert_eq!(result["asset_id"], asset["id"]);
+    assert_eq!(result["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(result["stream_index"], 1);
+    assert_eq!(result["samples_per_channel"], "48000");
+    assert_eq!(result["peak"], json!({"kind":"finite","micro_db":-18063656}));
+    assert_eq!(result["rms"], json!({"kind":"finite","micro_db":-21073778}));
+}
+
 macro_rules! call {
     ($client:expr, $id:expr, $params:expr, $context:expr) => {{
         let args = json!({"params":$params,"context":$context});
@@ -448,6 +457,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
+    let (volume, exit) = cli.human(&[
+        "media", "analyze-volume", "--asset", asset["id"].as_str().unwrap(), "--stream", "1",
+    ]).await;
+    assert_eq!(exit, 0, "{}", volume["error"]);
+    assert_volume(&volume["result"], &asset);
     let (source_preview, exit) = cli
         .human(&[
             "media",
@@ -868,7 +882,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -972,6 +986,12 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
+    let volume = call!(stdio, "media.analyze.volume", json!({"asset_id":operator_asset["id"],"stream_index":1}), json!({}));
+    assert_volume(&volume, &operator_asset);
+    let wrong_stream = stdio.call_tool(CallToolRequestParams::new("media.analyze.volume").with_arguments(
+        rmcp::object!({"params":{"asset_id":operator_asset["id"],"stream_index":0}}),
+    )).await.unwrap();
+    assert_eq!(serde_json::to_value(wrong_stream).unwrap()["structuredContent"]["error"]["code"], "INPUT_DENIED");
     let stdio_preview = call!(
         stdio,
         "media.preview_frame",
@@ -1535,6 +1555,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
+        let volume = call!(http, "media.analyze.volume", json!({"asset_id":asset["id"],"stream_index":1}), json!({}));
+        assert_volume(&volume, &asset);
         let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));
         assert_eq!(http_project_semantics, cli_project_semantics);
         let http_preview = call!(

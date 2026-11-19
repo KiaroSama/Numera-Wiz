@@ -11,6 +11,7 @@ mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
+    audio_analysis::{Decibels, VolumeMeasurement},
     commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
@@ -40,6 +41,7 @@ enum Action {
     Capabilities,
     ImportConfig,
     SourcePreview,
+    VolumeMeasurement,
     WaveCues,
     ClearCapabilities,
     ArtifactManifest,
@@ -136,6 +138,7 @@ pub struct WizApp {
     capability_report: Option<nw_domain::capabilities::CapabilityReport>,
     config_import: config_import::ConfigImportUi,
     source_preview: preview::SourcePreview,
+    volume_measurement: Option<VolumeMeasurement>,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -320,6 +323,7 @@ impl WizApp {
             capability_report: None,
             config_import: Default::default(),
             source_preview: Default::default(),
+            volume_measurement: None,
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -351,6 +355,7 @@ impl WizApp {
             self.chapter_document.clear();
             self.chapter_global_tags = false;
             self.source_preview = Default::default();
+            self.volume_measurement = None;
             self.wave_cues = None;
         }
         self.selected = Some(asset.id.clone());
@@ -797,6 +802,15 @@ impl WizApp {
                 }
                 Action::ImportConfig => self.config_import.report = Some(result),
                 Action::SourcePreview => self.accept_source_preview(result, ctx)?,
+                Action::VolumeMeasurement => {
+                    let measurement: VolumeMeasurement =
+                        serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    if self.selected_asset().is_some_and(|asset| {
+                        asset.id == measurement.asset_id && asset.identity.sha256 == measurement.source_sha256
+                    }) {
+                        self.volume_measurement = Some(measurement);
+                    }
+                }
                 Action::WaveCues => {
                     let cues: nw_domain::chapters::WaveCueInventory =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -845,6 +859,33 @@ impl WizApp {
             self.refresh_jobs(ctx);
         }
     }
+    fn volume_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
+        use nw_domain::mux::StreamKind;
+        let mut audio = asset.probe.streams.iter().filter(|stream| stream.kind == StreamKind::Audio).peekable();
+        if audio.peek().is_none() {
+            return;
+        }
+        egui::CollapsingHeader::new("Audio levels").show(ui, |ui| {
+            egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                for stream in audio {
+                    if ui.add_enabled(self.request_idle(), egui::Button::new(format!("Measure stream {}", stream.index))).clicked() {
+                        self.volume_measurement = None;
+                        self.query("media.analyze.volume", json!({"asset_id":asset.id,"stream_index":stream.index}),
+                            Action::VolumeMeasurement, ui.ctx());
+                    }
+                }
+            });
+            if let Some(measurement) = &self.volume_measurement {
+                let display = |level: &Decibels| match level {
+                    Decibels::Finite { micro_db } => format!("{:.2} dBFS", *micro_db as f64 / 1_000_000.0),
+                    Decibels::Silence => "Silence".to_owned(),
+                };
+                ui.label(format!("Stream {} · Peak {} · RMS {} · {} samples per channel", measurement.stream_index,
+                    display(&measurement.peak), display(&measurement.rms), measurement.samples_per_channel));
+            }
+        });
+    }
+
     fn catalog(&mut self, ui: &mut egui::Ui) {
         ui.heading("Media");
         ui.horizontal(|ui| {
@@ -1310,6 +1351,7 @@ impl eframe::App for WizApp {
             });
             self.capability_panel(ui);
             self.config_import_panel(ui);
+            if let Some(asset) = self.selected_asset() { self.volume_panel(ui, &asset); }
         });
         if !self.folder.open {
             self.batch_window(ui.ctx());

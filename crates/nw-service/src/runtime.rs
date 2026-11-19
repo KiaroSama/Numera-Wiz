@@ -1080,6 +1080,7 @@ impl Service {
                 "timeline.render_mixed",
                 "timeline.preview_frame",
                 "media.probe",
+                "media.analyze.volume",
                 "media.preview_frame",
                 "capabilities.refresh",
                 "chapters.remove",
@@ -1432,6 +1433,11 @@ impl Service {
                 let frame =
                     self.source_preview(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
+            }
+            "media.analyze.volume" => {
+                drop(guard);
+                let volume = self.source_volume(&context, commands::parse(params)?, cancellation.clone())?;
+                return Ok(Response::success(&request.request_id, value(&volume)?).bounded());
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;

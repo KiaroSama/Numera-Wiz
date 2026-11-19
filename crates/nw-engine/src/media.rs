@@ -4,6 +4,7 @@ pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;
 mod preview;
 pub(super) mod verification;
+mod volume;
 use super::{Engine, blocking};
 use nw_domain::{
     DomainError, Result,

@@ -221,6 +221,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "config.import.ffmwiz" => Some(
             serde_json::to_value(schema_for!(crate::config_import::ImportReport)).expect("schema"),
         ),
+        "media.analyze.volume" => Some(
+            serde_json::to_value(schema_for!(crate::audio_analysis::VolumeMeasurement)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -783,6 +786,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Decode one bounded frame from a registered video stream",
             Query,
             crate::preview::FrameInput
+        ),
+        row!(
+            "media.analyze.volume",
+            "Measure peak and RMS for an explicitly selected registered audio stream",
+            Query,
+            crate::audio_analysis::VolumeInput
         ),
         row!(
             "capabilities.refresh",
@@ -1595,6 +1604,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.profiles.list",
     "access.credentials.issue",
     "media.probe",
+    "media.analyze.volume",
     "media.preview_frame",
     "capabilities.inspect",
     "capabilities.refresh",

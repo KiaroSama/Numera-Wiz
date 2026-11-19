@@ -113,6 +113,13 @@ pub enum Media {
         #[arg(long, default_value_t = 0)]
         frame: u32,
     },
+    /// Measure peak and RMS for one registered audio stream.
+    AnalyzeVolume {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+    },
 }
 #[derive(Subcommand)]
 pub enum Capabilities {
@@ -488,6 +495,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         }) => query(
             "media.preview_frame",
             json!({"asset_id":asset,"stream_index":stream,"frame":frame}),
+        ),
+        Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
+            "media.analyze.volume",
+            json!({"asset_id":asset,"stream_index":stream}),
         ),
         Command::Media(Media::Capabilities(Capabilities::Inspect)) => {
             query("capabilities.inspect", json!({"scope":"components"}))
