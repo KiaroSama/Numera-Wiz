@@ -924,7 +924,10 @@ pub fn prepare(command: Command) -> Result<Request> {
                 commands::parse(document(&file)?)?;
             input.validate()?;
             input.output_root = native_path(Path::new(&input.output_root))?;
-            query("streams.extract.folder_batch_plan", serde_json::to_value(input)?)
+            query(
+                "streams.extract.folder_batch_plan",
+                serde_json::to_value(input)?,
+            )
         }
         Command::Streams(Streams::Report {
             assets,

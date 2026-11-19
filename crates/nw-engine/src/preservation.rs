@@ -170,13 +170,17 @@ impl Ledger {
 }
 
 pub(super) fn stream_clock(probe: &MediaProbe, index: u32) -> Result<Rational> {
-    let (num, den) = probe.stream_details.get(&index)
+    let (num, den) = probe
+        .stream_details
+        .get(&index)
         .and_then(|row| row["time_base"].as_str())
         .and_then(|clock| clock.split_once('/'))
         .ok_or_else(|| invalid("A frozen stream time base is required"))?;
     let clock = Rational::new(
-        num.parse().map_err(|_| invalid("Invalid clock numerator"))?,
-        den.parse().map_err(|_| invalid("Invalid clock denominator"))?,
+        num.parse()
+            .map_err(|_| invalid("Invalid clock numerator"))?,
+        den.parse()
+            .map_err(|_| invalid("Invalid clock denominator"))?,
     )?;
     if clock <= Rational::ZERO {
         return Err(invalid("A positive stream time base is required"));
@@ -557,15 +561,21 @@ struct FrameClock {
 }
 
 async fn decoded_picture_clock(
-    engine: &Engine, path: &Path, probe: &MediaProbe, index: u32, cancel: CancellationToken,
-    observer: &Observer, deadline: nw_domain::execution::DeadlinePolicy,
+    engine: &Engine,
+    path: &Path,
+    probe: &MediaProbe,
+    index: u32,
+    cancel: CancellationToken,
+    observer: &Observer,
+    deadline: nw_domain::execution::DeadlinePolicy,
 ) -> Result<(u64, sha2::digest::Output<Sha256>)> {
     let clock = stream_clock(probe, index)?;
     let source = path.to_owned();
     let admission_cancel = cancel.clone();
     let input = crate::blocking(move || admission::open(&source, &admission_cancel)).await?;
     let mut args = ["-v", "error", "-max_alloc", "67108864", "-select_streams"]
-        .map(str::to_owned).to_vec();
+        .map(str::to_owned)
+        .to_vec();
     args.push(index.to_string());
     args.extend(["-threads", "1", "-show_frames", "-show_entries",
         "frame=stream_index,pts:frame_tags=:frame_side_data_list=:frame_side_data=:frame_side_data_components=:frame_side_data_component=:frame_side_data_pieces=:frame_side_data_piece=",
@@ -575,18 +585,28 @@ async fn decoded_picture_clock(
     let mut prepared = vec![engine.ffprobe.path.clone()];
     prepared.extend(args.clone());
     observer(ExecutionEvent::Prepared(prepared)).await?;
-    let state = Arc::new(Mutex::new((ProbeRecords::new(b"{\"frames\":["), FrameClock::default())));
+    let state = Arc::new(Mutex::new((
+        ProbeRecords::new(b"{\"frames\":["),
+        FrameClock::default(),
+    )));
     let consumer = state.clone();
     let ticket = engine.process_budget.acquire(&cancel).await?;
     let output = nw_platform::process::stream_readonly_with_policy(
-        Path::new(&engine.ffprobe.path), &args, deadline, input.file, Box::new(move |bytes| {
-            let mut state = consumer.lock().map_err(|_| invalid("Decoded picture clock lock poisoned"))?;
+        Path::new(&engine.ffprobe.path),
+        &args,
+        deadline,
+        input.file,
+        Box::new(move |bytes| {
+            let mut state = consumer
+                .lock()
+                .map_err(|_| invalid("Decoded picture clock lock poisoned"))?;
             let (parser, frames) = &mut *state;
             parser.feed(bytes, |record| {
                 if record["stream_index"].as_u64() != Some(u64::from(index)) {
                     return Err(invalid("Unexpected decoded picture stream"));
                 }
-                let time = timestamp(&record["pts"], clock)?.ok_or_else(|| invalid("Missing decoded picture presentation time"))?;
+                let time = timestamp(&record["pts"], clock)?
+                    .ok_or_else(|| invalid("Missing decoded picture presentation time"))?;
                 if frames.last.is_some_and(|last| last >= time) {
                     return Err(invalid("Decoded picture timestamps must strictly increase"));
                 }
@@ -596,15 +616,21 @@ async fn decoded_picture_clock(
                 frames.hash.update(time.denominator().to_be_bytes());
                 Ok(())
             })
-        }), cancel,
-    ).await;
+        }),
+        cancel,
+    )
+    .await;
     if ticket.finish(output)?.diagnostic_bytes != 0 {
-        return Err(invalid("ffprobe reported errors while verifying the decoded picture clock"));
+        return Err(invalid(
+            "ffprobe reported errors while verifying the decoded picture clock",
+        ));
     }
     let (parser, frames) = take_observation(state)?;
     parser.finish()?;
     if frames.count == 0 {
-        return Err(invalid("The reviewed video stream produced no decoded pictures"));
+        return Err(invalid(
+            "The reviewed video stream produced no decoded pictures",
+        ));
     }
     Ok((frames.count, frames.hash.finalize()))
 }
@@ -637,19 +663,34 @@ pub(super) async fn verify_avc_timing(
         .ok_or_else(|| invalid("Missing original or exported picture clock"))?;
     let picture = &plan.resolution.streams[0];
     let picture_count = if picture.codec == "ffv1" {
-        if input_picture.packets != output_picture.packets || input_picture.first.is_none() || output_picture.first.is_none()
-            || input_picture.presentation.clone().finalize() != output_picture.presentation.clone().finalize()
+        if input_picture.packets != output_picture.packets
+            || input_picture.first.is_none()
+            || output_picture.first.is_none()
+            || input_picture.presentation.clone().finalize()
+                != output_picture.presentation.clone().finalize()
         {
-            return Err(invalid("AVC encoding changed the source frame presentation times"));
+            return Err(invalid(
+                "AVC encoding changed the source frame presentation times",
+            ));
         }
         input_picture.packets
     } else {
-        let original = decoded_picture_clock(engine, Path::new(&plan.source.identity.path),
-            &plan.source.probe, encode.video_stream, cancel.clone(), observer, deadline).await?;
-        let rendered = decoded_picture_clock(engine, path, observed, 0,
-            cancel, observer, deadline).await?;
+        let original = decoded_picture_clock(
+            engine,
+            Path::new(&plan.source.identity.path),
+            &plan.source.probe,
+            encode.video_stream,
+            cancel.clone(),
+            observer,
+            deadline,
+        )
+        .await?;
+        let rendered =
+            decoded_picture_clock(engine, path, observed, 0, cancel, observer, deadline).await?;
         if original != rendered {
-            return Err(invalid("AVC encoding changed the source decoded frame presentation times"));
+            return Err(invalid(
+                "AVC encoding changed the source decoded frame presentation times",
+            ));
         }
         original.0
     };
@@ -673,7 +714,9 @@ pub(super) async fn verify_avc_timing(
             ));
         }
     }
-    Ok(format!("Verified {picture_count} original picture presentation times across the AVC output."))
+    Ok(format!(
+        "Verified {picture_count} original picture presentation times across the AVC output."
+    ))
 }
 
 pub(super) async fn check_join_clock(

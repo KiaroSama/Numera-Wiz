@@ -1080,32 +1080,86 @@ async fn cpu_avc_export(parent: &Path) -> Value {
                 let value = packet["pts"].as_i64().unwrap() * numerator * 1000;
                 assert_eq!(value % denominator, 0);
                 value / denominator
-            }).collect();
-        assert_eq!(clock, [0,32,120,224,376,512]);
+            })
+            .collect();
+        assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
         results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
             "picture":"h264","audio":"aac","sample_aspect_ratio":expected_aspect,"geometry_transformed":transform}));
     }
     let common = directory.join("registered-h264-with-b-frames.mp4");
     let generate_common = [
-        "-v", "error", "-i", path.to_str().unwrap(), "-map", "0:v:0", "-map", "0:a:0",
-        "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p", "-bf", "2",
-        "-fps_mode", "passthrough", "-enc_time_base:v", "1/1000", "-c:a", "aac",
-        "-b:a", "128k", common.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &generate_common,
-        Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
-    let pts = |packets: &[Value]| packets.iter().map(|packet| packet["pts"].as_i64().unwrap()).collect::<Vec<_>>();
+        "-v",
+        "error",
+        "-i",
+        path.to_str().unwrap(),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-pix_fmt",
+        "yuv420p",
+        "-bf",
+        "2",
+        "-fps_mode",
+        "passthrough",
+        "-enc_time_base:v",
+        "1/1000",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        common.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &generate_common,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let pts = |packets: &[Value]| {
+        packets
+            .iter()
+            .map(|packet| packet["pts"].as_i64().unwrap())
+            .collect::<Vec<_>>()
+    };
     let original_pts = pts(&packets(&components, &common).await[&0]);
     assert!(original_pts.windows(2).any(|times| times[0] > times[1]));
-    let common_asset = accepted(&cli, &scope, "register-avc-reordered", "assets.register", json!({"path":common})).await;
+    let common_asset = accepted(
+        &cli,
+        &scope,
+        "register-avc-reordered",
+        "assets.register",
+        json!({"path":common}),
+    )
+    .await;
     let destination = directory.join("reordered-export.mp4");
-    let common_plan = cli.query("media.encode", json!({"asset_id":common_asset["id"],"output":destination,"settings":{
-        "video_stream":0,"container":"mp4","crf":20,"preset":"balanced",
-        "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
-    }})).await;
-    let common_job = accepted(&cli, &scope, "run-avc-reordered", "jobs.submit", json!({
-        "plan_id":common_plan["id"],"plan_hash":common_plan["hash"]
-    })).await;
+    let common_plan = cli
+        .query(
+            "media.encode",
+            json!({"asset_id":common_asset["id"],"output":destination,"settings":{
+                "video_stream":0,"container":"mp4","crf":20,"preset":"balanced",
+                "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
+            }}),
+        )
+        .await;
+    let common_job = accepted(
+        &cli,
+        &scope,
+        "run-avc-reordered",
+        "jobs.submit",
+        json!({
+            "plan_id":common_plan["id"],"plan_hash":common_plan["hash"]
+        }),
+    )
+    .await;
     succeeded(&cli, &common_job).await;
     let actual = fixture::probe(&components, &destination).await;
     assert_eq!(actual["streams"][0]["time_base"], "1/16000");
@@ -1116,27 +1170,66 @@ async fn cpu_avc_export(parent: &Path) -> Value {
 
     let millisecond_source = directory.join("registered-millisecond-avc.mp4");
     let remux_clock = [
-        "-v", "error", "-copyts", "-avoid_negative_ts", "disabled", "-i",
-        common.to_str().unwrap(), "-map", "0", "-c", "copy", "-video_track_timescale", "1000",
+        "-v",
+        "error",
+        "-copyts",
+        "-avoid_negative_ts",
+        "disabled",
+        "-i",
+        common.to_str().unwrap(),
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-video_track_timescale",
+        "1000",
         millisecond_source.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &remux_clock,
-        Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
-    let registered = accepted(&cli, &scope, "register-millisecond-avc", "assets.register",
-        json!({"path":millisecond_source})).await;
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &remux_clock,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let registered = accepted(
+        &cli,
+        &scope,
+        "register-millisecond-avc",
+        "assets.register",
+        json!({"path":millisecond_source}),
+    )
+    .await;
     let source = fixture::probe(&components, &millisecond_source).await;
     assert_eq!(source["streams"][0]["time_base"], "1/1000");
     assert!(source["streams"][0]["color_range"].is_null());
     let destination = directory.join("avc-range-signal.mkv");
-    let reviewed = cli.query("media.encode", json!({"asset_id":registered["id"],"output":destination,
+    let reviewed = cli
+        .query(
+            "media.encode",
+            json!({"asset_id":registered["id"],"output":destination,
         "settings":{"video_stream":0,"container":"matroska","crf":20,"preset":"balanced",
-        "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}}})).await;
-    let job = accepted(&cli, &scope, "run-millisecond-avc", "jobs.submit",
-        json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
+        "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}}}),
+        )
+        .await;
+    let job = accepted(
+        &cli,
+        &scope,
+        "run-millisecond-avc",
+        "jobs.submit",
+        json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]}),
+    )
+    .await;
     succeeded(&cli, &job).await;
     let observed = fixture::probe(&components, &destination).await;
     assert_eq!(observed["streams"][0]["color_range"], "tv");
-    assert_eq!(pts(&packets(&components, &destination).await[&0]), [0, 32, 120, 224, 376, 512]);
+    assert_eq!(
+        pts(&packets(&components, &destination).await[&0]),
+        [0, 32, 120, 224, 376, 512]
+    );
     results.push(json!({"job":job["job_id"],"container":"matroska","range":"limited"}));
 
     for (mode, peak, buffer, crop, resize) in [
@@ -1158,15 +1251,22 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         };
         let legacy = format!(
             "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\n{crop}\nresolution={resolution}\nvideo_look={look}\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
-            path.display(), output.display(),
+            path.display(),
+            output.display(),
         );
         let import = cli.query("config.import.ffmwiz", json!({"source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"})).await;
         assert_eq!(import["input_valid"], true, "{import}");
-        let plan = cli.query("jobs.plan", json!({"asset_id": original["id"], "job_document":import["job"]})).await;
+        let plan = cli
+            .query(
+                "jobs.plan",
+                json!({"asset_id": original["id"], "job_document":import["job"]}),
+            )
+            .await;
         let mut picture = json!({"crop":{"width":240,"height":120,"x":40,"y":30}});
         if resize {
             picture["resize"] = json!({"width":160,"height":120,"aspect":"fit"});
-            picture["look"] = json!({"denoise":"light","detail":{"kind":"blur","strength":"medium"}});
+            picture["look"] =
+                json!({"denoise":"light","detail":{"kind":"blur","strength":"medium"}});
         } else {
             picture["flip_horizontal"] = json!(true);
             picture["look"] = json!({"grayscale":true,"denoise":"medium",
@@ -1180,22 +1280,45 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         }})).await;
         assert_eq!(plan["hash"], direct["hash"]);
         let options = plan["argv_template"].as_array().unwrap();
-        for (flag, expected) in [("-b:v", "700k"), ("-maxrate:v", peak), ("-bufsize:v", buffer)] {
-            assert!(options.windows(2).any(|pair| pair[0] == flag && pair[1] == expected));
+        for (flag, expected) in [
+            ("-b:v", "700k"),
+            ("-maxrate:v", peak),
+            ("-bufsize:v", buffer),
+        ] {
+            assert!(
+                options
+                    .windows(2)
+                    .any(|pair| pair[0] == flag && pair[1] == expected)
+            );
         }
-        let graph = options.windows(2).find(|pair| pair[0] == "-filter:v").unwrap()[1]
-            .as_str().unwrap();
+        let graph = options
+            .windows(2)
+            .find(|pair| pair[0] == "-filter:v")
+            .unwrap()[1]
+            .as_str()
+            .unwrap();
         let expected_filters = if resize {
-            assert!(graph.contains("force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1"));
+            assert!(
+                graph.contains(
+                    "force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1"
+                )
+            );
             assert!(graph.contains("pad=160:120:(ow-iw)/2:(oh-ih)/2"));
             "hqdn3d=2:1.5:3:2.25,boxblur=5:1"
         } else {
             "eq=brightness=1/16:contrast=9/8:saturation=0/1:gamma=5/4,hqdn3d=4:3:6:4.5,unsharp=5:5:0.5:5:5:0.0"
         };
         assert!(graph.ends_with(expected_filters), "{graph}");
-        let accepted = accepted(&cli, &scope, &format!("encode-import-{mode}"), "jobs.submit", json!({
-            "plan_id":plan["id"],"plan_hash":plan["hash"]
-        })).await;
+        let accepted = accepted(
+            &cli,
+            &scope,
+            &format!("encode-import-{mode}"),
+            "jobs.submit",
+            json!({
+                "plan_id":plan["id"],"plan_hash":plan["hash"]
+            }),
+        )
+        .await;
         succeeded(&cli, &accepted).await;
         let probe = fixture::probe(&components, &output).await;
         let (width, aspect) = if resize { (160, "1:1") } else { (240, "4:3") };
@@ -1208,15 +1331,21 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         if resize {
             let center = 60 * width * 3;
             assert!(rgb[..width * 3].iter().all(|&byte| byte <= 8));
-            assert!(rgb[center..center + width * 3].iter().any(|&byte| byte > 32));
+            assert!(
+                rgb[center..center + width * 3]
+                    .iter()
+                    .any(|&byte| byte > 32)
+            );
         } else {
             assert!(rgb.chunks_exact(3).all(|pixel| {
                 // A few codes of chroma rounding survive the lossy CPU profile.
                 pixel.iter().max().unwrap() - pixel.iter().min().unwrap() <= 8
             }));
         }
-        results.push(json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,
-            "peak":peak,"buffer":buffer,"width":width,"sample_aspect_ratio":aspect}));
+        results.push(
+            json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,
+            "peak":peak,"buffer":buffer,"width":width,"sample_aspect_ratio":aspect}),
+        );
     }
 
     let intake = directory.join("encode-intake");
@@ -2327,11 +2456,18 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let mut reject_intake = folder_extraction.clone();
     reject_intake["failure_policy"] = json!("reject_all");
     assert_eq!(
-        sdk!(stdio, "streams.extract.folder_batch_plan", reject_intake, json!({}))
-            ["error"]["code"],
+        sdk!(
+            stdio,
+            "streams.extract.folder_batch_plan",
+            reject_intake,
+            json!({})
+        )["error"]["code"],
         "FOLDER_INTAKE_FAILED"
     );
-    let extraction_document = media.directory.path().join("retained-folder-extraction.json");
+    let extraction_document = media
+        .directory
+        .path()
+        .join("retained-folder-extraction.json");
     std::fs::write(
         &extraction_document,
         serde_json::to_vec(&folder_extraction).unwrap(),
@@ -2361,20 +2497,30 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         json!({})
     );
     let folder_extract_plan = &folder_extraction_http["plan"];
-    assert_eq!(folder_extract_plan["hash"], folder_extraction_stdio["plan"]["hash"]);
+    assert_eq!(
+        folder_extract_plan["hash"],
+        folder_extraction_stdio["plan"]["hash"]
+    );
     assert_eq!(
         folder_extract_plan["hash"],
         typed_folder_extraction["result"]["plan"]["hash"]
     );
     assert_eq!(folder_extract_plan["items"].as_array().unwrap().len(), 2);
-    assert_eq!(folder_extract_plan["items"][0]["extraction"]["source_index"], 2);
+    assert_eq!(
+        folder_extract_plan["items"][0]["extraction"]["source_index"],
+        2
+    );
     assert_eq!(
         folder_extract_plan["items"][1]["error"]["code"],
         "STREAM_NOT_FOUND"
     );
-    assert!(folder_extraction_http["excluded"].as_array().unwrap().iter().any(
-        |entry| entry["outcome"] == "probe_failed"
-    ));
+    assert!(
+        folder_extraction_http["excluded"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["outcome"] == "probe_failed")
+    );
     assert_eq!(std::fs::read_dir(&extraction_root).unwrap().count(), 0);
     let folder_extract_batch = call!(
         http,
@@ -2386,7 +2532,9 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(extraction_result["succeeded"], 1);
     assert_eq!(extraction_result["failed"], 1);
     let extracted = extraction_root.join(
-        folder_extract_plan["items"][0]["output_name"].as_str().unwrap(),
+        folder_extract_plan["items"][0]["output_name"]
+            .as_str()
+            .unwrap(),
     );
     let mut expected_audio = packets(&media.bin, &media.source).await[&2].clone();
     for packet in &mut expected_audio {

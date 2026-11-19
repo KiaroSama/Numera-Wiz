@@ -105,7 +105,10 @@ fn validate_folder_destination(
 ) -> Result<()> {
     let rights = nw_domain::plans::validate_requirements(plan)?;
     let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
-        DomainError::new("INVALID_PLAN", "Folder batch child has no reviewed output parent")
+        DomainError::new(
+            "INVALID_PLAN",
+            "Folder batch child has no reviewed output parent",
+        )
     })?;
     output.require_object(parent)?;
     if plan.output != item.output {
@@ -628,9 +631,16 @@ impl Service {
                 "Folder enumeration was incomplete; inspect and rescan before review",
             ));
         }
-        let _preflight = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("RESOURCE_LIMIT", "Folder extraction review capacity is full")
-        })?;
+        let _preflight = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new(
+                    "RESOURCE_LIMIT",
+                    "Folder extraction review capacity is full",
+                )
+            })?;
         let FolderTargets {
             source,
             output,

@@ -142,7 +142,11 @@ impl ImportedJob {
             _ => return Err(unsupported("video_look")),
         };
         for effect in value {
-            let effect = (effect.name.as_str(), effect.amount, effect.strength.as_deref());
+            let effect = (
+                effect.name.as_str(),
+                effect.amount,
+                effect.strength.as_deref(),
+            );
             match effect {
                 ("90cw", None, None) => picture.rotation = Rotation::Clockwise,
                 ("90ccw", None, None) => picture.rotation = Rotation::Counterclockwise,
@@ -187,14 +191,25 @@ impl ImportedJob {
         Ok(())
     }
 
-    pub fn avc_encode(&self, asset: &crate::records::Asset) -> Result<crate::avc_export::EncodeInput> {
-        use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode, Resize, ResizeAspect};
+    pub fn avc_encode(
+        &self,
+        asset: &crate::records::Asset,
+    ) -> Result<crate::avc_export::EncodeInput> {
+        use crate::avc_export::{
+            Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode, Resize, ResizeAspect,
+        };
         if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_avc_encode() {
-            return Err(DomainError::new("INVALID_JOB_DOCUMENT", "Use a version 1 FFmWiz profile with CPU H.264"));
+            return Err(DomainError::new(
+                "INVALID_JOB_DOCUMENT",
+                "Use a version 1 FFmWiz profile with CPU H.264",
+            ));
         }
         let source = self.imported_source()?;
         let output = self.path("output_path")?;
-        let extension = output.extension().and_then(|ext| ext.to_str()).ok_or_else(|| missing("output_path"))?;
+        let extension = output
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .ok_or_else(|| missing("output_path"))?;
         let container = match extension.to_ascii_lowercase().as_str() {
             "mp4" => Container::Mp4,
             "mkv" => Container::Matroska,
@@ -203,27 +218,69 @@ impl ImportedJob {
         for (name, field) in &self.settings {
             let name = name.as_str();
             if !FIELDS.contains(&name) || !(1..=super::MAX_LINES).contains(&field.line) {
-                return Err(field_error("INVALID_JOB_DOCUMENT",name,"Unknown field or invalid imported line number"));
+                return Err(field_error(
+                    "INVALID_JOB_DOCUMENT",
+                    name,
+                    "Unknown field or invalid imported line number",
+                ));
             }
             let supported = match (name, &field.value) {
-                ("input_path" | "output_path" | "video_codec" | "video_bitrate_kbps" | "video_bitrate_mode"
-                    | "audio_tracks" | "audio_codec" | "audio_bitrate_kbps", _) => true,
+                (
+                    "input_path" | "output_path" | "video_codec" | "video_bitrate_kbps"
+                    | "video_bitrate_mode" | "audio_tracks" | "audio_codec" | "audio_bitrate_kbps",
+                    _,
+                ) => true,
                 ("output_format", Setting::Source) => same_extension(source, output),
-                ("output_format", Setting::Choice { value }) => value.eq_ignore_ascii_case(extension),
-                ("use_gpu" | "cpu_two_pass" | "reverse_video" | "reverse_audio"
-                    | "keep_source_metadata" | "keep_embedded_attachments" | "detect_duplicate_audio", Setting::Enabled { value: false }) => true,
+                ("output_format", Setting::Choice { value }) => {
+                    value.eq_ignore_ascii_case(extension)
+                }
+                (
+                    "use_gpu"
+                    | "cpu_two_pass"
+                    | "reverse_video"
+                    | "reverse_audio"
+                    | "keep_source_metadata"
+                    | "keep_embedded_attachments"
+                    | "detect_duplicate_audio",
+                    Setting::Enabled { value: false },
+                ) => true,
                 ("crop", Setting::Enabled { .. } | Setting::CropMargins { .. })
-                | ("crop_top" | "crop_left" | "crop_bottom" | "crop_right", Setting::Integer { .. }) => true,
-                ("subtitle_tracks", Setting::Tracks { selection: TrackChoice::None }) => true,
-                ("resolution" | "fps" | "color_range" | "audio_sample_rate" | "video_speed" | "audio_speed", Setting::Source) => true,
-                ("resolution", Setting::Geometry {
-                    mode: super::ScaleMode::Stretch | super::ScaleMode::Fit,
-                    width: Some(_), height: Some(_),
-                }) => true,
-                ("video_speed" | "audio_speed", Setting::Scalar { value }) => value.numerator() == value.denominator(),
+                | (
+                    "crop_top" | "crop_left" | "crop_bottom" | "crop_right",
+                    Setting::Integer { .. },
+                ) => true,
+                (
+                    "subtitle_tracks",
+                    Setting::Tracks {
+                        selection: TrackChoice::None,
+                    },
+                ) => true,
+                (
+                    "resolution" | "fps" | "color_range" | "audio_sample_rate" | "video_speed"
+                    | "audio_speed",
+                    Setting::Source,
+                ) => true,
+                (
+                    "resolution",
+                    Setting::Geometry {
+                        mode: super::ScaleMode::Stretch | super::ScaleMode::Fit,
+                        width: Some(_),
+                        height: Some(_),
+                    },
+                ) => true,
+                ("video_speed" | "audio_speed", Setting::Scalar { value }) => {
+                    value.numerator() == value.denominator()
+                }
                 ("audio_speed", Setting::Choice { value }) => value == "match_video",
                 ("video_look", Setting::Effects { .. }) => true,
-                ("video_look" | "video_quick" | "audio_volume" | "raw_ffmpeg_args" | "raw_ffmpeg_valued_args", Setting::Disabled) => true,
+                (
+                    "video_look"
+                    | "video_quick"
+                    | "audio_volume"
+                    | "raw_ffmpeg_args"
+                    | "raw_ffmpeg_valued_args",
+                    Setting::Disabled,
+                ) => true,
                 ("loudnorm", Setting::Choice { value }) => value == "off",
                 ("logging_enabled", Setting::Enabled { .. })
                 | ("log_retention_days", Setting::Integer { .. })
@@ -240,7 +297,12 @@ impl ImportedJob {
                 return Err(missing(name));
             }
         }
-        if !matches!(self.get("subtitle_tracks"), Some(Setting::Tracks { selection: TrackChoice::None })) {
+        if !matches!(
+            self.get("subtitle_tracks"),
+            Some(Setting::Tracks {
+                selection: TrackChoice::None
+            })
+        ) {
             return Err(missing("subtitle_tracks"));
         }
         let average_kbps = match self.get("video_bitrate_kbps") {
@@ -253,58 +315,103 @@ impl ImportedJob {
             Some(Setting::Choice { value }) if value == "strict_size" => RateMode::StrictSize,
             _ => return Err(unsupported("video_bitrate_mode")),
         };
-        let mut pictures = asset.probe.streams.iter().filter(|stream| stream.kind == StreamKind::Video && !stream.attached_picture());
+        let mut pictures = asset
+            .probe
+            .streams
+            .iter()
+            .filter(|stream| stream.kind == StreamKind::Video && !stream.attached_picture());
         let picture = pictures.next().ok_or_else(|| unsupported("video_codec"))?;
         if pictures.next().is_some() {
             return Err(unsupported("video_codec"));
         }
-        let details = asset.probe.stream_details.get(&picture.index).ok_or_else(|| missing("input_path"))?;
+        let details = asset
+            .probe
+            .stream_details
+            .get(&picture.index)
+            .ok_or_else(|| missing("input_path"))?;
         let crop = self.avc_crop(details)?;
         let resize = match self.get("resolution") {
-            Some(Setting::Geometry { mode, width: Some(width), height: Some(height) }) => {
-                Some(Resize {
-                    width: *width,
-                    height: *height,
-                    aspect: match mode {
-                        super::ScaleMode::Fit => ResizeAspect::Fit,
-                        _ => ResizeAspect::SquarePixels,
-                    },
-                })
-            }
+            Some(Setting::Geometry {
+                mode,
+                width: Some(width),
+                height: Some(height),
+            }) => Some(Resize {
+                width: *width,
+                height: *height,
+                aspect: match mode {
+                    super::ScaleMode::Fit => ResizeAspect::Fit,
+                    _ => ResizeAspect::SquarePixels,
+                },
+            }),
             _ => None,
         };
         let audio = match self.get("audio_tracks") {
-            Some(Setting::Tracks { selection: TrackChoice::None }) => Audio::Drop {},
+            Some(Setting::Tracks {
+                selection: TrackChoice::None,
+            }) => Audio::Drop {},
             Some(Setting::Tracks { selection }) => {
-                let mut tracks: Vec<_> = asset.probe.streams.iter().filter(|track| track.kind == StreamKind::Audio).collect();
+                let mut tracks: Vec<_> = asset
+                    .probe
+                    .streams
+                    .iter()
+                    .filter(|track| track.kind == StreamKind::Audio)
+                    .collect();
                 tracks.sort_unstable_by_key(|track| track.index);
                 let track = match selection {
                     TrackChoice::All if tracks.len() == 1 => Some(tracks[0]),
-                    TrackChoice::Ordinals { values } if values.len() == 1 => tracks.get(values[0] as usize).copied(),
+                    TrackChoice::Ordinals { values } if values.len() == 1 => {
+                        tracks.get(values[0] as usize).copied()
+                    }
                     _ => None,
-                }.ok_or_else(|| unsupported("audio_tracks"))?;
-                if !matches!(self.get("audio_codec"), Some(Setting::Encoder { name }) if name == "aac") {
+                }
+                .ok_or_else(|| unsupported("audio_tracks"))?;
+                if !matches!(self.get("audio_codec"), Some(Setting::Encoder { name }) if name == "aac")
+                {
                     return Err(unsupported("audio_codec"));
                 }
                 let bitrate_kbps = match self.get("audio_bitrate_kbps") {
-                    Some(Setting::Integer { value }) => u16::try_from(*value).map_err(|_| unsupported("audio_bitrate_kbps"))?,
+                    Some(Setting::Integer { value }) => {
+                        u16::try_from(*value).map_err(|_| unsupported("audio_bitrate_kbps"))?
+                    }
                     _ => return Err(missing("audio_bitrate_kbps")),
                 };
-                Audio::Aac { stream_index: track.index, bitrate_kbps }
+                Audio::Aac {
+                    stream_index: track.index,
+                    bitrate_kbps,
+                }
             }
             _ => return Err(missing("audio_tracks")),
         };
-        let mut transform = PictureTransform { crop, resize, ..Default::default() };
+        let mut transform = PictureTransform {
+            crop,
+            resize,
+            ..Default::default()
+        };
         self.apply_avc_look(&mut transform)?;
-        let changed = crop.is_some() || resize.is_some()
-            || transform.rotation != Rotation::None || transform.flip_horizontal
-            || transform.flip_vertical || transform.look.is_some();
-        let settings = Encode { video_stream: picture.index, container, crf: None,
-            bitrate: Some(Bitrate { average_kbps, mode }), preset: Preset::Balanced, audio,
+        let changed = crop.is_some()
+            || resize.is_some()
+            || transform.rotation != Rotation::None
+            || transform.flip_horizontal
+            || transform.flip_vertical
+            || transform.look.is_some();
+        let settings = Encode {
+            video_stream: picture.index,
+            container,
+            crf: None,
+            bitrate: Some(Bitrate { average_kbps, mode }),
+            preset: Preset::Balanced,
+            audio,
             picture: changed.then_some(transform),
         };
         settings.validate()?;
-        Ok(EncodeInput { asset_id: asset.id.clone(), output: output.to_str().ok_or_else(|| missing("output_path"))?.to_owned(), settings })
+        Ok(EncodeInput {
+            asset_id: asset.id.clone(),
+            output: output
+                .to_str()
+                .ok_or_else(|| missing("output_path"))?
+                .to_owned(),
+            settings,
+        })
     }
 
     pub fn imported_source(&self) -> Result<&Path> {

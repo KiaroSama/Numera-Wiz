@@ -248,7 +248,8 @@ fn result_schema(id: &str) -> Option<Value> {
         "streams.extract.batch_plan" | "media.split_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
         ),
-        "media.encode_folder_plan" | "streams.clean.folder_batch_plan"
+        "media.encode_folder_plan"
+        | "streams.clean.folder_batch_plan"
         | "streams.extract.folder_batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
         ),

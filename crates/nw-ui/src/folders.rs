@@ -3,7 +3,10 @@ use crate::{Action, WizApp, batches::FolderBatchKind};
 use eframe::egui;
 use nw_domain::{
     avc_export::{Container, FolderAudio, FolderEncodeInput, Preset},
-    batches::{CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector, FolderBatchReview},
+    batches::{
+        CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector,
+        FolderBatchReview,
+    },
     commands::Request,
     ingest::{
         CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits,
@@ -236,17 +239,32 @@ impl WizApp {
             "media.encode_folder_plan" => {
                 let input: FolderEncodeInput = serde_json::from_value(request.params.clone())
                     .map_err(|error| error.to_string())?;
-                (FolderBatchKind::Encode, input.snapshot_id, input.snapshot_hash, input.output_root)
+                (
+                    FolderBatchKind::Encode,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
             }
             "streams.extract.folder_batch_plan" => {
                 let input: ExtractFolderBatchInput = serde_json::from_value(request.params.clone())
                     .map_err(|error| error.to_string())?;
-                (FolderBatchKind::Extract, input.snapshot_id, input.snapshot_hash, input.output_root)
+                (
+                    FolderBatchKind::Extract,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
             }
             "streams.clean.folder_batch_plan" => {
                 let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone())
                     .map_err(|error| error.to_string())?;
-                (FolderBatchKind::Cleanup, input.snapshot_id, input.snapshot_hash, input.output_root)
+                (
+                    FolderBatchKind::Cleanup,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
             }
             _ => return Err("Unexpected folder batch request".into()),
         };
@@ -632,7 +650,9 @@ impl WizApp {
         if intake_failed && self.batch.failure == nw_domain::batches::FailurePolicy::RejectAll {
             ui.label("Resolve failed intake or allow the registered files to proceed.");
         } else {
-            ui.small("The current cleanup stream selection, file times and execution limits apply.");
+            ui.small(
+                "The current cleanup stream selection, file times and execution limits apply.",
+            );
             let review = ui.add_enabled(
                 idle && !self.folder.batch_output_root.is_empty(),
                 egui::Button::new("Review folder cleanup batch"),
@@ -715,12 +735,19 @@ impl WizApp {
                     ui.radio_value(&mut selector.kind, ExtractKind::Video, "Video");
                     ui.radio_value(&mut selector.kind, ExtractKind::Audio, "Audio");
                     ui.radio_value(&mut selector.kind, ExtractKind::Subtitle, "Subtitle");
-                    ui.add(egui::DragValue::new(&mut selector.ordinal).range(1..=256).prefix("Track "));
+                    ui.add(
+                        egui::DragValue::new(&mut selector.ordinal)
+                            .range(1..=256)
+                            .prefix("Track "),
+                    );
                 });
-                if ui.add_enabled(
-                    !self.folder.batch_output_root.is_empty(),
-                    egui::Button::new("Review folder extraction"),
-                ).clicked() {
+                if ui
+                    .add_enabled(
+                        !self.folder.batch_output_root.is_empty(),
+                        egui::Button::new("Review folder extraction"),
+                    )
+                    .clicked()
+                {
                     let input = ExtractFolderBatchInput {
                         snapshot_id: snapshot.id.clone(),
                         snapshot_hash: snapshot.hash.clone(),
