@@ -103,3 +103,19 @@ Craft Libraries `3b8e426a`. EffectCraft delegates PSD brightness and exposure
 block writes to `027416ac` and exposes one-, two-, and four-view selection in
 the composition viewer. The application and dependency changes inform the
 remaining image-format and viewer work. [FilmCraft change](https://github.com/storytold/filmcraft/commit/3d37c0f1f1bfd937f76d8fc929f1b2ef828ebf2c) · [EffectCraft changes](https://github.com/storytold/effectcraft/compare/851642f6ec395c47a1843b6f6cf435c08de4f4eb...686fb3fa0485ab4af74c60e343203572fc37138f) · [PSD writers](https://github.com/storytold/craft-libs/commit/027416ac9f36b60229c595f942d36bf74f0ed4d2)
+
+The next FFmpeg Skill change compares the requested source in-point with a
+separately selected position in the output. Numera's reference comparison
+accepts distinct original frame positions for the two files. Its hosted
+regression now prepares a separate lossless cut, aligns its first two frames
+with the original in-point and checks both metrics. An independent FFmpeg
+check matched all decoded bytes for that alignment. The hosted regression
+still needs to run on the comparison implementation. [FFmpeg Skill change](https://github.com/kajisho5/ffmpeg-skill/commit/b8fbd1ce844883ecf678be2386ce1ad92692de1d)
+
+FilmCraft moves AAF, timeline and caption dependencies to Craft Libraries
+`3b8e426a`. The caption adapter converts exact tick and frame-rate types at the
+project boundary and preserves the sidecar's export-relative interval.
+EffectCraft moves OpenEXR scanline writing to `craft-exr` and moves PSD hue and
+levels block construction to `craft-psd`, with byte-level writer regressions.
+These changes inform the pending interchange and image workflows. FFmWiz and
+MuxCls remain at the previously reviewed revisions. [FilmCraft change](https://github.com/storytold/filmcraft/commit/f67d38b35cc5af6853ef5a6921ccba014512694b) · [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/686fb3fa0485ab4af74c60e343203572fc37138f...665bfac0b33904b1dcda6de889f43f43a94ad3f8)

@@ -101,14 +101,14 @@ a failure. [The review PR checks](https://github.com/KiaroSama/Numera-Wiz/pull/2
 show each check for the latest review commit.
 
 Development packages include the executable, manuals, source/dependency records
-and SHA-256 manifests. They are unsigned review artifacts; the standard bundled
-FFmpeg profile and full offline portable qualification are still required. They
-are not a finished release download. Ordinary compilation and media tests run
-in hosted CI. Owner hardware qualification uses matching prebuilt artifacts.
+and SHA-256 manifests. Ordinary compilation and media tests run in hosted CI.
+Owner hardware qualification uses matching prebuilt artifacts.
 
 The [Linux x64 CPU component build](docs/development/linux-cpu-component.md)
 produces a separate relocatable FFmpeg/ffprobe package with private libraries,
 offline fonts, matching source archives and executable qualification evidence.
+The [Linux x64 standalone CI artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14496316587)
+passed its first-launch FFV1 round trip with the exact embedded media executables.
 
 The macOS app bundle stores application state in
 `~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another

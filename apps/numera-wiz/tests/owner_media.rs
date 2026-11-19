@@ -650,6 +650,34 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     ]).await;
     assert_eq!(exit, 0, "{quality}");
     assert_identical_video(&quality["result"], &asset);
+    let cut_path = media.directory.path().join("reference-cut.mkv");
+    let cut = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-nostdin", "-i"])
+        .arg(&media.source)
+        .args([
+            "-map", "0:v:0", "-vf", "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
+            "-c:v", "ffv1", "-threads", "1",
+        ])
+        .arg(&cut_path)
+        .output()
+        .await
+        .unwrap();
+    assert!(cut.status.success(), "{}", String::from_utf8_lossy(&cut.stderr));
+    let cut_asset = cli.mutation(
+        &scope, "register-reference-cut", "assets.register", json!({"path":cut_path}),
+    ).await["result"].clone();
+    let cut_alignment = cli.query("media.analyze.reference", json!({
+        "reference":{"asset_id":asset["id"],"stream_index":0,"start_frame":1},
+        "candidate":{"asset_id":cut_asset["id"],"stream_index":0,"start_frame":0},
+        "frame_count":2,
+    })).await;
+    assert_ne!(cut_alignment["reference"]["source_sha256"], cut_alignment["candidate"]["source_sha256"]);
+    assert_eq!(cut_alignment["frames"][0]["reference_frame"], 1);
+    assert_eq!(cut_alignment["frames"][0]["candidate_frame"], 0);
+    assert_eq!(cut_alignment["frames"][1]["offset"], json!({"num":"1","den":"4"}));
+    assert!(cut_alignment["frames"].as_array().unwrap().iter().all(|row| {
+        row["psnr"]["kind"] == "identical" && row["ssim_millionths"] == 1_000_000
+    }));
     let mut shifted = reference_input(&asset);
     shifted["candidate"]["start_frame"] = 1.into();
     shifted["frame_count"] = 2.into();

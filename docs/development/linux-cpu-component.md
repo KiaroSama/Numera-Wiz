@@ -30,7 +30,14 @@ installed packages. It collects the exact upstream files in the separate
 corresponding-source archive. The CI component artifact includes both archives
 with their byte counts and SHA-256 digests in the build inventory.
 
-The component qualification covers Linux x64 in the recorded Ubuntu 24.04 base.
-Application assembly and offline launch, Windows and macOS component closures,
-installer/signing, complete distribution evidence and owner-GPU qualification
-remain release gates.
+The Linux x64 application in CI367 assembled the verified component and the
+same-source browser assets. The standalone executable attached to a fresh
+protected owner and exercised FFV1 encode and decode on its first launch.
+Independent verification matched the ZIP, ELF executable and corresponding
+source archive to their digests, and both helper hashes to the capability
+receipt. The source was `4db81a61634d0f24db4d705354df173afd63e67c`.
+[Exact CI artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14496316587)
+
+The recorded Ubuntu 24.04 x64 base defines the verified Linux CPU environment.
+Full distribution, installer signing and owner hardware qualification remain
+release gates.
