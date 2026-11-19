@@ -622,9 +622,9 @@ lossless picture retime as `media.retime`. Grant both commands to that
 profile.
 
 
-`media.encode` reviews an SDR FFV1, H.264, HEVC or AV1 source for H.264, HEVC or AV1 export
+`media.encode` reviews an SDR FFV1, H.264, HEVC, AV1 or VP9 source for export
 with optional AAC in MP4 or Matroska. The `settings.codec` field selects
-`h264`, `hevc` or `av1`. Set the preset and choose `crf` or `bitrate` in `settings`.
+`h264`, `hevc`, `av1` or `vp9`. Set the preset and choose `crf` or `bitrate` in `settings`.
 AV1 requires a raster of at least 64 × 64 and uses low-delay CBR for `strict_size`.
 Use `commands.schema` for the complete contract and
 `jobs.submit` to run the reviewed plan.

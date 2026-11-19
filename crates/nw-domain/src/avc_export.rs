@@ -36,6 +36,7 @@ pub enum VideoCodec {
     H264,
     Hevc,
     Av1,
+    Vp9,
 }
 
 impl VideoCodec {
@@ -48,6 +49,7 @@ impl VideoCodec {
             Self::H264 => "libx264",
             Self::Hevc => "libx265",
             Self::Av1 => "libsvtav1",
+            Self::Vp9 => "libvpx-vp9",
         }
     }
 
@@ -56,6 +58,7 @@ impl VideoCodec {
             Self::H264 => "h264",
             Self::Hevc => "hevc",
             Self::Av1 => "av1",
+            Self::Vp9 => "vp9",
         }
     }
 }

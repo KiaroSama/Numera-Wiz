@@ -1296,6 +1296,23 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             "mp4",
             "strict_size",
         ),
+        (
+            "vp9",
+            "libvpx-vp9",
+            Some("vp09"),
+            "mp4",
+            "mp4",
+            "quality_vbr",
+        ),
+        ("vp9", "libvpx-vp9", None, "matroska", "mkv", "quality_vbr"),
+        (
+            "vp9",
+            "libvpx-vp9",
+            Some("vp09"),
+            "mp4",
+            "mp4",
+            "strict_size",
+        ),
     ] {
         let output = directory.join(format!("{codec}-export-{mode}.{extension}"));
         let settings = json!({
