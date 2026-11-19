@@ -702,6 +702,8 @@ mod tests {
             "clips.unlink",
             "clips.split",
             "clips.remove",
+            "markers.place",
+            "markers.remove",
             "history.undo",
             "history.redo",
         ];
@@ -904,8 +906,11 @@ mod tests {
                     .iter()
                     .all(|key| keys.contains(&key.as_str().expect("required key")))
         }
-        let schema =
-            |id: &str| -> &Value { result_schemas.get(id).expect("published result schema") };
+        let schema = |id: &str| -> &Value {
+            result_schemas
+                .get(id)
+                .unwrap_or_else(|| panic!("Missing published schema for {id}"))
+        };
         let catalog = schema("projects.list");
         fields(
             catalog,
