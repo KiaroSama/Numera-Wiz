@@ -16,6 +16,19 @@ packager runs the same typed CLI sequence with the shipped media sample. It
 records the reviewed plan hash and independently compares the published and
 downloaded files. Hosted qualification for the extended walkthrough is pending.
 
+All four standalone packages from `aed3798` passed the CPU FFV1 first launch
+on their target runners. Download verification matched the GitHub archive
+SHA-256, the application identity and executable architecture, FFmpeg and
+ffprobe identities, and the matching source archive. The exact source also
+passed native regressions, the real Chrome journey and both official MCP
+transports. [CI391 packages and results](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064)
+
+At the same source, the owner-batch report confirms the original packet
+digests for extracted tracks, preservation of missing-track and scan failures,
+and matching reviews across the three CLI and MCP entry points. Reordered
+H.264 input retained its original decoded presentation times in the export.
+[Owner-batch evidence](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064/artifacts/14520063769)
+
 At `a7f01b5`, Windows x64, Linux x64, macOS Apple Silicon and macOS Intel
 passed their native regressions and each standalone package's first-launch
 CPU FFV1 exercise. Each archive was checked against its GitHub digest,

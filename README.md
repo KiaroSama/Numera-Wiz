@@ -120,16 +120,16 @@ Owner hardware qualification uses matching prebuilt artifacts.
 The [Linux x64 CPU component build](docs/development/linux-cpu-component.md)
 produces a separate relocatable FFmpeg/ffprobe package with private libraries,
 offline fonts, matching source archives and executable qualification evidence.
-The standalone development packages from `a7f01b5` passed their first-launch
+The standalone development packages from `aed3798` passed their first-launch
 FFV1 round trip. The application, FFmpeg and ffprobe digests were checked in
 each downloaded archive.
 
 | Target | Standalone CI artifact |
 | --- | --- |
-| Linux x64 | [Linux package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/artifacts/14513294492) |
-| Windows x64 | [Windows package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/artifacts/14514883008) |
-| macOS Apple Silicon | [Apple Silicon package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/artifacts/14515360948) |
-| macOS Intel | [Intel package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/artifacts/14515339678) |
+| Linux x64 | [Linux package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064/artifacts/14520352238) |
+| Windows x64 | [Windows package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064/artifacts/14521741114) |
+| macOS Apple Silicon | [Apple Silicon package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064/artifacts/14522302095) |
+| macOS Intel | [Intel package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064/artifacts/14524016851) |
 
 The macOS app bundle stores application state in
 `~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another
