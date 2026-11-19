@@ -115,7 +115,10 @@ impl DatabaseSlot {
         Lease(self.active.clone())
     }
     pub(super) fn begin_read(&self) -> std::result::Result<Read, TransactionError> {
-        let state = self.database.read().map_err(StorageError::from)?;
+        let state = self
+            .database
+            .read()
+            .map_err(|_| StorageError::LockPoisoned(std::panic::Location::caller()))?;
         let database = state
             .database
             .as_ref()
@@ -136,7 +139,10 @@ impl DatabaseSlot {
     fn begin_write_kind(&self, adopting: bool) -> std::result::Result<Write, TransactionError> {
         // Read guards permit readers and concurrent writer admission to progress.
         // The redb writer remains the sole transaction serialization authority.
-        let state = self.database.read().map_err(StorageError::from)?;
+        let state = self
+            .database
+            .read()
+            .map_err(|_| StorageError::LockPoisoned(std::panic::Location::caller()))?;
         let database = state
             .database
             .as_ref()

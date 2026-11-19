@@ -6,6 +6,7 @@ use nw_domain::{
     projects::{EntityId, Track, views::TrackSummary},
     time::TimeRange,
 };
+use redb::ReadableTable;
 use std::collections::BTreeSet;
 
 impl RenderRead for ProjectReadSnapshot {
