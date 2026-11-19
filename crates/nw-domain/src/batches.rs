@@ -109,7 +109,11 @@ impl CleanFolderBatchInput {
     }
 }
 
-pub fn validate_folder_reference(snapshot_id: &str, snapshot_hash: &str, output_root: &str) -> Result<()> {
+pub fn validate_folder_reference(
+    snapshot_id: &str,
+    snapshot_hash: &str,
+    output_root: &str,
+) -> Result<()> {
     if !identifier(snapshot_id) || !sha(snapshot_hash) {
         return Err(DomainError::new(
             "VALIDATION_ERROR",

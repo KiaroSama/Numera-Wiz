@@ -988,9 +988,14 @@ pub fn prepare(command: Command) -> Result<Request> {
             query("streams.clean.batch_plan", serde_json::to_value(input)?)
         }
         Command::Batches(Batches::EncodeFolder { file }) => {
-            let mut input: nw_domain::avc_export::FolderEncodeInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::avc_export::FolderEncodeInput =
+                commands::parse(document(&file)?)?;
             input.output_root = native_path(Path::new(&input.output_root))?;
-            nw_domain::batches::validate_folder_reference(&input.snapshot_id, &input.snapshot_hash, &input.output_root)?;
+            nw_domain::batches::validate_folder_reference(
+                &input.snapshot_id,
+                &input.snapshot_hash,
+                &input.output_root,
+            )?;
             query("media.encode_folder_plan", serde_json::to_value(input)?)
         }
         Command::Batches(Batches::PlanFolder { file }) => {

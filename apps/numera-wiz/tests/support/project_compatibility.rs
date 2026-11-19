@@ -1014,19 +1014,29 @@ fn legacy_owner_filesystem_error(diagnostics: &str) -> Option<u32> {
         }
         let (_, suffix) = line.rsplit_once("(os error ")?;
         let code = suffix.strip_suffix(')')?;
-        code.bytes().all(|byte| byte.is_ascii_digit()).then_some(code)?.parse().ok()
+        code.bytes()
+            .all(|byte| byte.is_ascii_digit())
+            .then_some(code)?
+            .parse()
+            .ok()
     })
 }
 
 // Independent literal formatter records exercise the same pure helper used by
 // Owner::start. These are part of the existing package entry, never new tests.
 fn owner_stderr_diagnostic_cases() {
-    assert_eq!(legacy_owner_filesystem_error(
-        "[2026-11-19T00:00:00.000Z] [ERROR] Operation failed code=FILESYSTEM_ERROR error=FILESYSTEM_ERROR: Synthetic I/O failure (os error 32)\r\n"
-    ), Some(32));
-    assert_eq!(legacy_owner_filesystem_error(
-        "[2026-11-19T00:00:00.000Z] [WARN] Other message (os error 32)\n"
-    ), None);
+    assert_eq!(
+        legacy_owner_filesystem_error(
+            "[2026-11-19T00:00:00.000Z] [ERROR] Operation failed code=FILESYSTEM_ERROR error=FILESYSTEM_ERROR: Synthetic I/O failure (os error 32)\r\n"
+        ),
+        Some(32)
+    );
+    assert_eq!(
+        legacy_owner_filesystem_error(
+            "[2026-11-19T00:00:00.000Z] [WARN] Other message (os error 32)\n"
+        ),
+        None
+    );
     let project = |bytes: &[u8]| {
         owner_stderr_diagnostic(
             &Captured {

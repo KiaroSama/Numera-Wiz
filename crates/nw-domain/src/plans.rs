@@ -116,12 +116,20 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     }
     if let Some(encode) = &plan.avc_export {
         encode.validate()?;
-        if plan.resolution.action != crate::mux::CleanAction::Remux || plan.video_retime.is_some()
-            || plan.media_join.is_some() || plan.subtitle_burn.is_some() || plan.audio_edit.is_some()
-            || plan.packet_cut.is_some() || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
-            || plan.resolution.chapter_import.is_some() || plan.resolution.metadata_patch.is_some()
+        if plan.resolution.action != crate::mux::CleanAction::Remux
+            || plan.video_retime.is_some()
+            || plan.media_join.is_some()
+            || plan.subtitle_burn.is_some()
+            || plan.audio_edit.is_some()
+            || plan.packet_cut.is_some()
+            || !plan.audio_normalization.is_empty()
+            || !plan.added_tracks.is_empty()
+            || plan.resolution.chapter_import.is_some()
+            || plan.resolution.metadata_patch.is_some()
         {
-            return Err(invalid("AVC export requires a separate reviewed render and output verification"));
+            return Err(invalid(
+                "AVC export requires a separate reviewed render and output verification",
+            ));
         }
     }
     if let Some(retime) = &plan.video_retime {
@@ -451,7 +459,8 @@ mod tests {
             source: Box::new(source),
         };
         let wire = serde_json::to_value(&subtitle).unwrap();
-        let read: crate::subtitle_burn::SubtitleSource = serde_json::from_value(wire.clone()).unwrap();
+        let read: crate::subtitle_burn::SubtitleSource =
+            serde_json::from_value(wire.clone()).unwrap();
         assert_eq!(read.external().unwrap().probe.stream_details[&7], details);
         assert_eq!(serde_json::to_value(read).unwrap(), wire);
     }

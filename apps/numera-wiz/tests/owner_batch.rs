@@ -102,7 +102,10 @@ async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
 async fn accepted(cli: &Cli, scope: &str, key: &str, command: &str, params: Value) -> Value {
     let response = cli.mutation(scope, key, command, params).await;
     assert_eq!(response["ok"], true, "{command}/{key}: {response}");
-    assert!(response["receipt_id"].is_string(), "{command}/{key}: {response}");
+    assert!(
+        response["receipt_id"].is_string(),
+        "{command}/{key}: {response}"
+    );
     response["result"].clone()
 }
 
@@ -935,56 +938,113 @@ async fn variable_picture_retime(parent: &Path) -> Value {
 }
 
 async fn cpu_avc_export(parent: &Path) -> Value {
-    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
-        .expect("Hosted AVC export needs the authenticated FFmpeg CPU tools"));
+    let components = std::path::PathBuf::from(
+        std::env::var_os("NW_CAPTION_COMPONENTS")
+            .expect("Hosted AVC export needs the authenticated FFmpeg CPU tools"),
+    );
     let directory = parent.join("cpu-avc-export");
     std::fs::create_dir(&directory).unwrap();
-    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
-    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let cli = Cli {
+        data: directory.join("state"),
+        components: components.clone(),
+        request_timeout: Duration::from_secs(60),
+    };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let path = directory.join("original-vfr-export.mkv");
     let generate = [
-        "-v","error","-f","lavfi","-i","testsrc2=size=320x180:rate=1000:d=0.520",
-        "-f","lavfi","-i","sine=frequency=800:sample_rate=48000:d=0.52",
-        "-map","0:v:0","-map","1:a:0","-vf",r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512),setsar=4/3",
-        "-fps_mode","passthrough","-enc_time_base:v","1/1000","-c:v","ffv1","-c:a","pcm_s16le",path.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"),&generate,Duration::from_secs(30),4096,CancellationToken::new())
-        .await.unwrap();
-    let original = accepted(&cli,&scope,"register-avc-source","assets.register",json!({"path":path})).await;
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=320x180:rate=1000:d=0.520",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=800:sample_rate=48000:d=0.52",
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-vf",
+        r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512),setsar=4/3",
+        "-fps_mode",
+        "passthrough",
+        "-enc_time_base:v",
+        "1/1000",
+        "-c:v",
+        "ffv1",
+        "-c:a",
+        "pcm_s16le",
+        path.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &generate,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let original = accepted(
+        &cli,
+        &scope,
+        "register-avc-source",
+        "assets.register",
+        json!({"path":path}),
+    )
+    .await;
     let mut results = Vec::new();
-    for (container, extension) in [("mp4","mp4"),("matroska","mkv")] {
+    for (container, extension) in [("mp4", "mp4"), ("matroska", "mkv")] {
         let output = directory.join(format!("avc-export.{extension}"));
         let input = json!({"asset_id":original["id"],"output":output,"settings":{
             "video_stream":0,"container":container,"crf":18,"preset":"balanced",
             "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
         }});
-        let plan = cli.query("media.encode",input.clone()).await;
+        let plan = cli.query("media.encode", input.clone()).await;
         let document = directory.join(format!("avc-{container}.json"));
-        std::fs::write(&document,serde_json::to_vec(&input).unwrap()).unwrap();
-        let (typed, code) = cli.human(&["media","encode","--file",document.to_str().unwrap()]).await;
-        assert_eq!(code,0,"{typed}");
-        assert_eq!(typed["result"]["hash"],plan["hash"]);
-        let job = accepted(&cli,&scope,&format!("run-avc-{container}"),"jobs.submit",
-            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
-        succeeded(&cli,&job).await;
-        let probe = fixture::probe(&components,&output).await;
-        assert_eq!(probe["streams"][0]["codec_name"],"h264");
-        assert_eq!(probe["streams"][0]["sample_aspect_ratio"],"4:3");
-        assert_eq!(probe["streams"][1]["codec_name"],"aac");
-        assert_eq!(probe["streams"][1]["sample_rate"],"48000");
+        std::fs::write(&document, serde_json::to_vec(&input).unwrap()).unwrap();
+        let (typed, code) = cli
+            .human(&["media", "encode", "--file", document.to_str().unwrap()])
+            .await;
+        assert_eq!(code, 0, "{typed}");
+        assert_eq!(typed["result"]["hash"], plan["hash"]);
+        let job = accepted(
+            &cli,
+            &scope,
+            &format!("run-avc-{container}"),
+            "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        )
+        .await;
+        succeeded(&cli, &job).await;
+        let probe = fixture::probe(&components, &output).await;
+        assert_eq!(probe["streams"][0]["codec_name"], "h264");
+        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], "4:3");
+        assert_eq!(probe["streams"][1]["codec_name"], "aac");
+        assert_eq!(probe["streams"][1]["sample_rate"], "48000");
         let time_base = probe["streams"][0]["time_base"].as_str().unwrap();
         let (numerator, denominator) = time_base.split_once('/').unwrap();
         let numerator: i64 = numerator.parse().unwrap();
         let denominator: i64 = denominator.parse().unwrap();
-        let clock: Vec<_> = packets(&components,&output).await[&0].iter()
+        let clock: Vec<_> = packets(&components, &output).await[&0]
+            .iter()
             .map(|packet| {
                 let value = packet["pts"].as_i64().unwrap() * numerator * 1000;
                 assert_eq!(value % denominator, 0);
                 value / denominator
-            }).collect();
-        assert_eq!(clock, [0,32,120,224,376,512]);
-        results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
-            "picture":"h264","audio":"aac","sample_aspect_ratio":"4:3"}));
+            })
+            .collect();
+        assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
+        results.push(
+            json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
+            "picture":"h264","audio":"aac","sample_aspect_ratio":"4:3"}),
+        );
     }
     let intake = directory.join("encode-intake");
     let output_root = directory.join("encode-outputs");
@@ -993,10 +1053,17 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     std::fs::copy(&path, intake.join("first.mkv")).unwrap();
     std::fs::copy(&path, intake.join("second/first.mkv")).unwrap();
     std::fs::write(intake.join("notes.txt"), b"Inventory only").unwrap();
-    let snapshot = accepted(&cli, &scope, "capture-encode-folder", "assets.register_folder", json!({
-        "path":intake,"recursive":true,"exclude_relative":[],"companion_policy":"inventory",
-        "probe_timeout":{"mode":"finite","seconds":30}
-    })).await;
+    let snapshot = accepted(
+        &cli,
+        &scope,
+        "capture-encode-folder",
+        "assets.register_folder",
+        json!({
+            "path":intake,"recursive":true,"exclude_relative":[],"companion_policy":"inventory",
+            "probe_timeout":{"mode":"finite","seconds":30}
+        }),
+    )
+    .await;
     assert_eq!(snapshot["complete"], true);
     let input = json!({"snapshot_id":snapshot["id"],"snapshot_hash":snapshot["hash"],
         "output_root":output_root,"container":"mp4","crf":18,"preset":"balanced",
@@ -1004,23 +1071,40 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     let review = cli.query("media.encode_folder_plan", input.clone()).await;
     let document = directory.join("folder-encode.json");
     std::fs::write(&document, serde_json::to_vec(&input).unwrap()).unwrap();
-    let (typed, code) = cli.human(&["batches", "encode-folder", "--file", document.to_str().unwrap()]).await;
+    let (typed, code) = cli
+        .human(&[
+            "batches",
+            "encode-folder",
+            "--file",
+            document.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(code, 0, "{typed}");
     assert_eq!(typed["result"]["plan"]["hash"], review["plan"]["hash"]);
     assert_eq!(review["excluded"].as_array().unwrap().len(), 1);
     assert_eq!(review["excluded"][0]["outcome"], "companion_inventoried");
     let candidates = review["plan"]["items"].as_array().unwrap();
     assert_eq!(candidates.len(), 2);
-    let outputs: Vec<_> = candidates.iter().map(|item| {
-        let output = Path::new(item["output_path"].as_str().unwrap());
-        assert!(output.starts_with(&output_root) && !output.exists());
-        assert!(item["plan"].is_object(), "{item}");
-        output
-    }).collect();
+    let outputs: Vec<_> = candidates
+        .iter()
+        .map(|item| {
+            let output = Path::new(item["output_path"].as_str().unwrap());
+            assert!(output.starts_with(&output_root) && !output.exists());
+            assert!(item["plan"].is_object(), "{item}");
+            output
+        })
+        .collect();
     assert_ne!(outputs[0], outputs[1]);
-    let batch = accepted(&cli, &scope, "run-folder-encode", "batches.submit", json!({
-        "plan_id":review["plan"]["id"],"plan_hash":review["plan"]["hash"]
-    })).await;
+    let batch = accepted(
+        &cli,
+        &scope,
+        "run-folder-encode",
+        "batches.submit",
+        json!({
+            "plan_id":review["plan"]["id"],"plan_hash":review["plan"]["hash"]
+        }),
+    )
+    .await;
     let id = batch["batch_id"].as_str().unwrap();
     let (finished, code) = cli.human(&["batches", "wait", id]).await;
     assert_eq!(code, 0, "{finished}");

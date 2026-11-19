@@ -187,9 +187,12 @@ impl Service {
                     "Folder intake and batch preflight capacity is full",
                 )
             })?;
-        let FolderTargets { source, output, items, excluded } = self.folder_targets(
-            context, &snapshot, &input.output_root, None, cancel,
-        )?;
+        let FolderTargets {
+            source,
+            output,
+            items,
+            excluded,
+        } = self.folder_targets(context, &snapshot, &input.output_root, None, cancel)?;
         let plan = self.prepare_cleanup_batch(
             context,
             CleanBatchInput {
@@ -215,8 +218,12 @@ impl Service {
     }
 
     fn folder_targets(
-        &self, context: &Context, snapshot: &FolderSnapshot, output_root: &str,
-        extension: Option<&str>, cancel: &CancellationToken,
+        &self,
+        context: &Context,
+        snapshot: &FolderSnapshot,
+        output_root: &str,
+        extension: Option<&str>,
+        cancel: &CancellationToken,
     ) -> Result<FolderTargets> {
         let output = Path::new(output_root);
         let output_denied = || {
@@ -292,13 +299,23 @@ impl Service {
                 ));
             }
             self.root_authority(context, &expected_path, false)?;
-            let mut target = output.path().join(folder_output_name(entry.index, &expected_path)?);
+            let mut target = output
+                .path()
+                .join(folder_output_name(entry.index, &expected_path)?);
             if let Some(extension) = extension {
                 target.set_extension(extension);
             }
-            items.push(ItemInput { asset_id: id.into(), output: files::path_text(&target)? });
+            items.push(ItemInput {
+                asset_id: id.into(),
+                output: files::path_text(&target)?,
+            });
         }
-        Ok(FolderTargets { source, output, items, excluded })
+        Ok(FolderTargets {
+            source,
+            output,
+            items,
+            excluded,
+        })
     }
 
     pub(super) fn prepare_folder_encode(
@@ -313,57 +330,116 @@ impl Service {
         validate_folder_reference(&input.snapshot_id, &input.snapshot_hash, &input.output_root)?;
         self.batch_child_command(context, "assets.folder_inspect")?;
         self.batch_child_command(context, "media.encode")?;
-        let revision = self.policy(context)?.as_ref().map_or(0, |policy| policy.revision);
+        let revision = self
+            .policy(context)?
+            .as_ref()
+            .map_or(0, |policy| policy.revision);
         let snapshot = self.read_folder(context, &input.snapshot_id)?;
         if snapshot.hash != input.snapshot_hash {
-            return Err(DomainError::new("FOLDER_SNAPSHOT_MISMATCH", "Folder snapshot hash differs from the retained intake"));
+            return Err(DomainError::new(
+                "FOLDER_SNAPSHOT_MISMATCH",
+                "Folder snapshot hash differs from the retained intake",
+            ));
         }
         if !snapshot.complete {
-            return Err(DomainError::new("FOLDER_INTAKE_INCOMPLETE", "Folder enumeration was incomplete; inspect and rescan before encode review"));
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_INCOMPLETE",
+                "Folder enumeration was incomplete; inspect and rescan before encode review",
+            ));
         }
-        let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("RESOURCE_LIMIT", "Folder encode review capacity is full")
-        })?;
+        let _permit = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new("RESOURCE_LIMIT", "Folder encode review capacity is full")
+            })?;
         let extension = match input.container {
             Container::Matroska => "mkv",
             Container::Mp4 => "mp4",
         };
-        let FolderTargets { source, output, items, excluded } = self.folder_targets(
-            context, &snapshot, &input.output_root, Some(extension), cancel,
+        let FolderTargets {
+            source,
+            output,
+            items,
+            excluded,
+        } = self.folder_targets(
+            context,
+            &snapshot,
+            &input.output_root,
+            Some(extension),
+            cancel,
         )?;
         if items.is_empty() {
-            return Err(DomainError::new("FOLDER_EMPTY", "Folder intake retained no eligible registered pictures"));
+            return Err(DomainError::new(
+                "FOLDER_EMPTY",
+                "Folder intake retained no eligible registered pictures",
+            ));
         }
         if items.len() > nw_domain::batches::MAX_BATCH_ITEMS {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Folder encode review admits at most sixty-four registered sources"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Folder encode review admits at most sixty-four registered sources",
+            ));
         }
-        if input.failure_policy == FailurePolicy::RejectAll && excluded.iter().any(|entry| matches!(
-            entry.outcome, FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
-        )) {
-            return Err(DomainError::new("FOLDER_INTAKE_FAILED", "Review failed intake entries before a reject-all folder encode"));
+        if input.failure_policy == FailurePolicy::RejectAll
+            && excluded.iter().any(|entry| {
+                matches!(
+                    entry.outcome,
+                    FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+                )
+            })
+        {
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_FAILED",
+                "Review failed intake entries before a reject-all folder encode",
+            ));
         }
-        let items = self.review_batch_items(context, items.iter().map(|item| (item, None)), cancel, |item, _, _| {
-            let plan = self.prepare_native_copy(context, &item.asset_id, &item.output, Default::default(),
-                |engine, source, path| {
-                    let settings = input.settings_for(&source.probe.streams)?;
-                    engine.avc_plan_at(source, path, settings, &context.principal, now)
+        let items = self.review_batch_items(
+            context,
+            items.iter().map(|item| (item, None)),
+            cancel,
+            |item, _, _| {
+                let plan = self.prepare_native_copy(
+                    context,
+                    &item.asset_id,
+                    &item.output,
+                    Default::default(),
+                    |engine, source, path| {
+                        let settings = input.settings_for(&source.probe.streams)?;
+                        engine.avc_plan_at(source, path, settings, &context.principal, now)
+                    },
+                )?;
+                let rights = nw_domain::plans::validate_requirements(&plan)?;
+                let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
+                    DomainError::new(
+                        "INVALID_PLAN",
+                        "Folder encode child has no reviewed output parent",
+                    )
                 })?;
-            let rights = nw_domain::plans::validate_requirements(&plan)?;
-            let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
-                DomainError::new("INVALID_PLAN", "Folder encode child has no reviewed output parent")
-            })?;
-            output.require_object(parent)?;
-            if plan.output != item.output {
-                return Err(DomainError::new("TARGET_CHANGED", "Folder encode child resolved outside its derived destination"));
-            }
-            Ok(plan)
-        })?;
+                output.require_object(parent)?;
+                if plan.output != item.output {
+                    return Err(DomainError::new(
+                        "TARGET_CHANGED",
+                        "Folder encode child resolved outside its derived destination",
+                    ));
+                }
+                Ok(plan)
+            },
+        )?;
         source.revalidate()?;
         output.revalidate()?;
         self.root_authority(context, source.path(), false)?;
         self.root_authority(context, output.path(), true)?;
         self.confirm_batch_policy(context, revision, COMMAND)?;
-        let plan = self.retain_batch_plan(context, now, input.failure_policy, UnresolvedPolicy::Reject, Vec::new(), items)?;
+        let plan = self.retain_batch_plan(
+            context,
+            now,
+            input.failure_policy,
+            UnresolvedPolicy::Reject,
+            Vec::new(),
+            items,
+        )?;
         Ok(FolderBatchReview {
             snapshot_id: snapshot.id,
             snapshot_hash: snapshot.hash,

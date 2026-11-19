@@ -677,8 +677,8 @@ impl Service {
         };
         let readable = match request.command.id.as_str() {
             "projects.create" | "sequences.create" | "clips.place" | "clips.move"
-            | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim" | "clips.remove" | "history.undo"
-            | "history.redo" | "markers.place" | "markers.remove" => {
+            | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim" | "clips.remove"
+            | "history.undo" | "history.redo" | "markers.place" | "markers.remove" => {
                 self.project_receipt_readable(context, &response)?
             }
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
@@ -1246,9 +1246,9 @@ impl Service {
                 &cancellation,
             )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
-            | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim"
-            | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
-            | "history.redo" => {
+            | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split"
+            | "clips.trim" | "clips.remove" | "markers.place" | "markers.remove"
+            | "history.undo" | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);
             }
@@ -2257,7 +2257,10 @@ impl Service {
                 value(&self.batch_review(&context, &plan)?)?
             }
             "media.encode_folder_plan" => value(&self.prepare_folder_encode(
-                &context, commands::parse(params)?, now, &cancellation,
+                &context,
+                commands::parse(params)?,
+                now,
+                &cancellation,
             )?)?,
             "streams.clean.folder_batch_plan" => value(&self.prepare_folder_batch(
                 &context,
@@ -2930,8 +2933,15 @@ impl Service {
         let input = match command {
             "media.encode" => {
                 let input: nw_domain::avc_export::EncodeInput = commands::parse(params)?;
-                return self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
-                    |engine, source, output| engine.avc_plan_at(source, output, input.settings, &context.principal, now));
+                return self.prepare_native_copy(
+                    context,
+                    &input.asset_id,
+                    &input.output,
+                    Default::default(),
+                    |engine, source, output| {
+                        engine.avc_plan_at(source, output, input.settings, &context.principal, now)
+                    },
+                );
             }
             "subtitles.burn" => {
                 use nw_domain::subtitle_burn::{BurnInput, SubtitleInput, SubtitleSource};

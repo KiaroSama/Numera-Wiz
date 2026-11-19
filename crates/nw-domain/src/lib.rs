@@ -1,8 +1,8 @@
 //! Shared, display-independent command and media contracts.
 pub mod audio_analysis;
-pub mod avc_export;
 pub mod audio_edit;
 pub mod audio_normalization;
+pub mod avc_export;
 pub mod capabilities;
 pub mod chapters;
 pub mod commands;

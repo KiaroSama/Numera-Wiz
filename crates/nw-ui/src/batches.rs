@@ -307,9 +307,18 @@ impl WizApp {
             Err(error) => self.error = Some(error),
         }
     }
-    pub(super) fn review_folder_encoding(&mut self, settings: nw_domain::avc_export::FolderEncodeInput, ctx: &egui::Context) {
+    pub(super) fn review_folder_encoding(
+        &mut self,
+        settings: nw_domain::avc_export::FolderEncodeInput,
+        ctx: &egui::Context,
+    ) {
         if self.cleanup_actions_allowed(ctx) {
-            self.query("media.encode_folder_plan", json!(settings), Action::FolderBatchPlan(self.batch.generation), ctx);
+            self.query(
+                "media.encode_folder_plan",
+                json!(settings),
+                Action::FolderBatchPlan(self.batch.generation),
+                ctx,
+            );
         }
     }
     pub(super) fn open_folder_batch(
@@ -590,7 +599,11 @@ impl WizApp {
         }
         let mut open = true;
         let folder_mode = self.batch.is_folder_review();
-        let folder_encode = self.batch.folder.as_ref().is_some_and(|folder| folder.encode);
+        let folder_encode = self
+            .batch
+            .folder
+            .as_ref()
+            .is_some_and(|folder| folder.encode);
         let split_mode = self.batch.packet_split;
         let title = if folder_encode {
             "Folder H.264 export"

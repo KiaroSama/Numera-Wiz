@@ -207,8 +207,8 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.preview_frame"
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.trim" | "clips.remove" | "markers.place" | "markers.remove" | "history.undo"
-        | "history.redo" => ProjectContextRule::RequiredWrite,
+        | "clips.split" | "clips.trim" | "clips.remove" | "markers.place" | "markers.remove"
+        | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
 }
@@ -241,8 +241,8 @@ fn result_schema(id: &str) -> Option<Value> {
                 .expect("schema"),
         ),
         "media.encode" | "media.retime" | "media.join" | "audio.edit" | "audio.normalize"
-        | "subtitles.burn" | "media.cut" | "streams.add" | "streams.replace" | "streams.extract"
-        | "jobs.plan" => {
+        | "subtitles.burn" | "media.cut" | "streams.add" | "streams.replace"
+        | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
         "streams.extract.batch_plan" | "media.split_plan" => Some(

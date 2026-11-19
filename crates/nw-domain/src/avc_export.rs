@@ -51,10 +51,18 @@ pub enum Audio {
 impl Encode {
     pub fn validate(&self) -> Result<()> {
         if !(1..=51).contains(&self.crf) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Choose an AVC CRF from 1 to 51"));
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Choose an AVC CRF from 1 to 51",
+            ));
         }
-        if let Audio::Aac { bitrate_kbps, .. } = self.audio && !(48..=320).contains(&bitrate_kbps) {
-            return Err(DomainError::new("VALIDATION_ERROR", "Choose an AAC bitrate from 48 to 320 kbps"));
+        if let Audio::Aac { bitrate_kbps, .. } = self.audio
+            && !(48..=320).contains(&bitrate_kbps)
+        {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Choose an AAC bitrate from 48 to 320 kbps",
+            ));
         }
         Ok(())
     }
@@ -89,21 +97,54 @@ pub enum FolderAudio {
 impl FolderEncodeInput {
     pub fn settings_for(&self, streams: &[crate::mux::Stream]) -> Result<Encode> {
         use crate::mux::StreamKind;
-        let picture = streams.iter().find(|stream| stream.kind == StreamKind::Video && !stream.attached_picture())
-            .ok_or_else(|| DomainError::new("STREAM_NOT_FOUND", "The folder member has no original picture"))?;
+        let picture = streams
+            .iter()
+            .find(|stream| stream.kind == StreamKind::Video && !stream.attached_picture())
+            .ok_or_else(|| {
+                DomainError::new(
+                    "STREAM_NOT_FOUND",
+                    "The folder member has no original picture",
+                )
+            })?;
         let audio = match self.audio {
             FolderAudio::Drop {} => Audio::Drop {},
-            FolderAudio::Aac { ordinal, bitrate_kbps } => {
-                let index = (1..=32).contains(&ordinal).then_some(ordinal.saturating_sub(1) as usize)
-                    .ok_or_else(|| DomainError::new("VALIDATION_ERROR", "Choose an audio track ordinal from 1 to 32"))?;
-                let mut audio: Vec<_> = streams.iter().filter(|stream| stream.kind == StreamKind::Audio).collect();
+            FolderAudio::Aac {
+                ordinal,
+                bitrate_kbps,
+            } => {
+                let index = (1..=32)
+                    .contains(&ordinal)
+                    .then_some(ordinal.saturating_sub(1) as usize)
+                    .ok_or_else(|| {
+                        DomainError::new(
+                            "VALIDATION_ERROR",
+                            "Choose an audio track ordinal from 1 to 32",
+                        )
+                    })?;
+                let mut audio: Vec<_> = streams
+                    .iter()
+                    .filter(|stream| stream.kind == StreamKind::Audio)
+                    .collect();
                 audio.sort_unstable_by_key(|stream| stream.index);
-                let track = audio.get(index)
-                    .ok_or_else(|| DomainError::new("STREAM_NOT_FOUND", "This folder member has no audio at the selected ordinal"))?;
-                Audio::Aac { stream_index: track.index, bitrate_kbps }
+                let track = audio.get(index).ok_or_else(|| {
+                    DomainError::new(
+                        "STREAM_NOT_FOUND",
+                        "This folder member has no audio at the selected ordinal",
+                    )
+                })?;
+                Audio::Aac {
+                    stream_index: track.index,
+                    bitrate_kbps,
+                }
             }
         };
-        let settings = Encode { video_stream: picture.index, container: self.container, crf: self.crf, preset: self.preset, audio };
+        let settings = Encode {
+            video_stream: picture.index,
+            container: self.container,
+            crf: self.crf,
+            preset: self.preset,
+            audio,
+        };
         settings.validate()?;
         Ok(settings)
     }

@@ -763,14 +763,16 @@ pub(in crate::runtime) async fn linked_edits() {
         .await;
     assert_eq!(incoming["changed_ids"].as_array().unwrap().len(), 2);
     different.reject_unchanged(different.request("clips.split","linked-non-interior",json!({"clip_id":different.clips[0],"at_sequence":{"num":"1","den":"1"},"link_policy":"expand"})),"VALIDATION_ERROR").await;
-    let input = |head, tail| {
-        json!({"clip_ids":[right_ids[0]],"head":head,"tail":tail,"link_policy":"expand"})
-    };
+    let input = |head, tail| json!({"clip_ids":[right_ids[0]],"head":head,"tail":tail,"link_policy":"expand"});
     let quarter = nw_domain::time::Rational::new(1, 4).unwrap();
     let zero = nw_domain::time::Rational::ZERO;
     fixture
         .reject_unchanged(
-            fixture.request("clips.trim", "consumes-linked-clips", input(quarter, quarter)),
+            fixture.request(
+                "clips.trim",
+                "consumes-linked-clips",
+                input(quarter, quarter),
+            ),
             "VALIDATION_ERROR",
         )
         .await;
@@ -783,8 +785,14 @@ pub(in crate::runtime) async fn linked_edits() {
         let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
         let original: Clip = original.payload("clip").unwrap();
         let actual: Clip = fixture.entity(id).payload("clip").unwrap();
-        assert_eq!(actual.sequence_start, original.sequence_start.checked_add(quarter).unwrap());
-        assert_eq!(actual.source_range.start, original.source_range.start.checked_add(quarter).unwrap());
+        assert_eq!(
+            actual.sequence_start,
+            original.sequence_start.checked_add(quarter).unwrap()
+        );
+        assert_eq!(
+            actual.source_range.start,
+            original.source_range.start.checked_add(quarter).unwrap()
+        );
         assert_eq!(actual.source_range.end, original.source_range.end);
         assert_eq!(actual.duration, quarter);
         assert_eq!(actual.occurrence_id, original.occurrence_id);

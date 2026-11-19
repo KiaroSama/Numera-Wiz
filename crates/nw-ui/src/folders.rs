@@ -229,10 +229,12 @@ impl WizApp {
     ) -> Result<(), String> {
         let encode = request.command.id == "media.encode_folder_plan";
         let (snapshot_id, snapshot_hash, output_root) = if encode {
-            let input: FolderEncodeInput = serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+            let input: FolderEncodeInput = serde_json::from_value(request.params.clone())
+                .map_err(|error| error.to_string())?;
             (input.snapshot_id, input.snapshot_hash, input.output_root)
         } else {
-            let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+            let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone())
+                .map_err(|error| error.to_string())?;
             (input.snapshot_id, input.snapshot_hash, input.output_root)
         };
         let review: FolderBatchReview =
@@ -241,9 +243,7 @@ impl WizApp {
             .folder
             .review
             .clone()
-            .filter(|snapshot| {
-                snapshot.id == snapshot_id && snapshot.hash == snapshot_hash
-            })
+            .filter(|snapshot| snapshot.id == snapshot_id && snapshot.hash == snapshot_hash)
             .ok_or("Folder batch review requires the captured snapshot")?;
         if review.snapshot_id != snapshot.id || review.snapshot_hash != snapshot.hash {
             return Err("Folder batch proposed a different snapshot".into());
@@ -637,24 +637,51 @@ impl WizApp {
             ui.add_enabled_ui(idle, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
-                    ui.radio_value(&mut self.folder.encode_container, Container::Matroska, "Matroska");
+                    ui.radio_value(
+                        &mut self.folder.encode_container,
+                        Container::Matroska,
+                        "Matroska",
+                    );
                     ui.label("Quality CRF");
                     ui.add(egui::DragValue::new(&mut self.folder.encode_crf).range(1..=51));
                     egui::ComboBox::from_id_salt("folder-encode-preset")
                         .selected_text(format!("{:?}", self.folder.encode_preset))
                         .show_ui(ui, |ui| {
                             for preset in [Preset::Fast, Preset::Balanced, Preset::Slow] {
-                                ui.selectable_value(&mut self.folder.encode_preset, preset, format!("{preset:?}"));
+                                ui.selectable_value(
+                                    &mut self.folder.encode_preset,
+                                    preset,
+                                    format!("{preset:?}"),
+                                );
                             }
                         });
                 });
-                ui.checkbox(&mut self.folder.encode_audio, "Encode the first audio track as AAC");
-                if ui.add_enabled(!self.folder.batch_output_root.is_empty(), egui::Button::new("Review folder encode")).clicked() {
+                ui.checkbox(
+                    &mut self.folder.encode_audio,
+                    "Encode the first audio track as AAC",
+                );
+                if ui
+                    .add_enabled(
+                        !self.folder.batch_output_root.is_empty(),
+                        egui::Button::new("Review folder encode"),
+                    )
+                    .clicked()
+                {
                     let settings = FolderEncodeInput {
-                        snapshot_id: snapshot.id.clone(), snapshot_hash: snapshot.hash.clone(),
-                        output_root: self.folder.batch_output_root.clone(), container: self.folder.encode_container,
-                        crf: self.folder.encode_crf, preset: self.folder.encode_preset,
-                        audio: if self.folder.encode_audio { FolderAudio::Aac { ordinal: 1, bitrate_kbps: 128 } } else { FolderAudio::Drop {} },
+                        snapshot_id: snapshot.id.clone(),
+                        snapshot_hash: snapshot.hash.clone(),
+                        output_root: self.folder.batch_output_root.clone(),
+                        container: self.folder.encode_container,
+                        crf: self.folder.encode_crf,
+                        preset: self.folder.encode_preset,
+                        audio: if self.folder.encode_audio {
+                            FolderAudio::Aac {
+                                ordinal: 1,
+                                bitrate_kbps: 128,
+                            }
+                        } else {
+                            FolderAudio::Drop {}
+                        },
                         failure_policy: nw_domain::batches::FailurePolicy::RejectAll,
                     };
                     self.review_folder_encoding(settings, ui.ctx());

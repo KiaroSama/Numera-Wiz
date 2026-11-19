@@ -84,7 +84,9 @@ pub enum Quality {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SubtitleSource {
-    Embedded { stream_index: u32 },
+    Embedded {
+        stream_index: u32,
+    },
     External {
         #[serde(deserialize_with = "deserialize_registered_asset")]
         source: Box<Asset>,

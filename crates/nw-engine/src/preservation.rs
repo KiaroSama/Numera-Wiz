@@ -563,20 +563,40 @@ pub(super) async fn verify_avc_timing(
 ) -> Result<String> {
     let encode = plan.avc_export.as_ref().expect("Reviewed AVC export");
     let deadline = plan.execution_limits.clone().unwrap_or_default().operation;
-    let source = scan(engine, Path::new(&plan.source.identity.path), &plan.source.probe, cancel.clone(),
-        observer, deadline, None).await?;
+    let source = scan(
+        engine,
+        Path::new(&plan.source.identity.path),
+        &plan.source.probe,
+        cancel.clone(),
+        observer,
+        deadline,
+        None,
+    )
+    .await?;
     let output = scan(engine, path, observed, cancel, observer, deadline, None).await?;
-    let (input_picture, output_picture) = source.streams.get(&encode.video_stream).zip(output.streams.get(&0))
+    let (input_picture, output_picture) = source
+        .streams
+        .get(&encode.video_stream)
+        .zip(output.streams.get(&0))
         .ok_or_else(|| invalid("Missing original or exported picture clock"))?;
-    if input_picture.packets != output_picture.packets || input_picture.first.is_none() || output_picture.first.is_none()
-        || input_picture.presentation.clone().finalize() != output_picture.presentation.clone().finalize()
+    if input_picture.packets != output_picture.packets
+        || input_picture.first.is_none()
+        || output_picture.first.is_none()
+        || input_picture.presentation.clone().finalize()
+            != output_picture.presentation.clone().finalize()
     {
-        return Err(invalid("AVC encoding changed the source frame presentation times"));
+        return Err(invalid(
+            "AVC encoding changed the source frame presentation times",
+        ));
     }
     if let nw_domain::avc_export::Audio::Aac { stream_index, .. } = encode.audio {
-        let first = |ledger: &Ledger, index: u32| ledger.streams.get(&index)
-            .and_then(|entry| entry.first.map(|(time, _)| time).zip(entry.last_end))
-            .ok_or_else(|| invalid("Missing original or encoded audio clock"));
+        let first = |ledger: &Ledger, index: u32| {
+            ledger
+                .streams
+                .get(&index)
+                .and_then(|entry| entry.first.map(|(time, _)| time).zip(entry.last_end))
+                .ok_or_else(|| invalid("Missing original or encoded audio clock"))
+        };
         let (input_start, input_end) = first(&source, stream_index)?;
         let (output_start, output_end) = first(&output, 1)?;
         let tolerance = Rational::new(64, 1000)?;
@@ -584,10 +604,15 @@ pub(super) async fn verify_avc_timing(
             Ok(input.max(output).checked_sub(input.min(output))? <= tolerance)
         };
         if !within(input_start, output_start)? || !within(input_end, output_end)? {
-            return Err(invalid("AAC timing differs beyond the reviewed encoder delay tolerance"));
+            return Err(invalid(
+                "AAC timing differs beyond the reviewed encoder delay tolerance",
+            ));
         }
     }
-    Ok(format!("Verified {} original picture presentation times across the AVC output.", input_picture.packets))
+    Ok(format!(
+        "Verified {} original picture presentation times across the AVC output.",
+        input_picture.packets
+    ))
 }
 
 pub(super) async fn check_join_clock(
