@@ -36,6 +36,9 @@ export and continuous preview remain in development.
   Cleanup plans, reports and batches resolve the positions for each file.
 - Inspect FFmpeg component declarations and verify a CPU FFV1 round trip.
   An explicit native-owner request can check H.264 and HEVC NVENC encoding.
+- Import FFmWiz settings into a typed, versioned document with field diagnostics.
+- Measure peak, RMS and decoded sample count for a selected audio stream in the
+  shared GUI, CLI and MCP interface.
 - Inspect exact chapter ranges, exchange FFmetadata and review chapter
   replacement or removal in a stream-copy plan.
 - Inspect original RIFF and RF64 cue offsets, region lengths and labels.

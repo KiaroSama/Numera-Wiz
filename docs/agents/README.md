@@ -159,7 +159,8 @@ Read the client's supported header/secret facility before configuring it.
 ## Authority and workflows
 
 The default `agent` remains discovery-only. Tool enumeration comes from the
-shared active registry; it does not confer any execution right. An owner must
+shared active registry. Clients enumerate every `tools/list` page by following
+`nextCursor` until the last page. An owner must
 create an operating profile, inspect its complete grants and explicitly select
 it in the local client. See the packaged
 [access workflow](../../integrations/numera-wiz/skills/numera-wiz/references/access.md).
