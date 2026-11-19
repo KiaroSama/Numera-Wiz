@@ -597,8 +597,10 @@ pub fn resolve_edit<R: ProjectRead>(
             match target {
                 CutTrack::Edl(frame_rate) => {
                     let sequence = edit.get(&sequence_id)?.payload::<Sequence>("sequence")?;
-                    if track.sequence_id != sequence_id || track.kind != TrackKind::Video
-                        || sequence.settings.frame_rate != frame_rate || track.grid != frame_rate
+                    if track.sequence_id != sequence_id
+                        || track.kind != TrackKind::Video
+                        || sequence.settings.frame_rate != frame_rate
+                        || track.grid != frame_rate
                     {
                         return Err(DomainError::new(
                             "EDL_GRID_MISMATCH",
@@ -608,13 +610,22 @@ pub fn resolve_edit<R: ProjectRead>(
                 }
                 CutTrack::Otio { kind, range } => {
                     if track.sequence_id != sequence_id || track.kind != kind {
-                        return Err(DomainError::new("OTIO_TRACK_MISMATCH", "OTIO and destination track kinds must match"));
+                        return Err(DomainError::new(
+                            "OTIO_TRACK_MISMATCH",
+                            "OTIO and destination track kinds must match",
+                        ));
                     }
                     range.validate()?;
                     grid_tick(range.start, track.grid)?;
                     grid_tick(range.end, track.grid)?;
-                    if !read.intersecting(&sequence_id, &track_id, range.start, range.end, MAX_CHANGES)?.is_empty() {
-                        return Err(DomainError::new("CLIP_COLLISION", "The OTIO destination range must be empty"));
+                    if !read
+                        .intersecting(&sequence_id, &track_id, range.start, range.end, MAX_CHANGES)?
+                        .is_empty()
+                    {
+                        return Err(DomainError::new(
+                            "CLIP_COLLISION",
+                            "The OTIO destination range must be empty",
+                        ));
                     }
                 }
             }

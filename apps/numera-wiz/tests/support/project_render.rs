@@ -468,7 +468,10 @@ async fn sequence_markers(cli: &Cli, project: &str, sequence: &str) {
 }
 
 async fn verify_slipped_registered_picture(
-    cli: &Cli, scope: &str, media: &super::fixture::Media, wave_asset: &str,
+    cli: &Cli,
+    scope: &str,
+    media: &super::fixture::Media,
+    wave_asset: &str,
 ) {
     let original = media.directory.path().join("slip-nonzero-clock.mp4");
     let args = [
@@ -786,12 +789,26 @@ async fn verify_slipped_registered_picture(
             assert_eq!(result["reels"], edl["reels"]);
         }
     }
-    otio_round_trip(cli, scope, project, film_id, film_track, media.directory.path(), wave_asset).await;
+    otio_round_trip(
+        cli,
+        scope,
+        project,
+        film_id,
+        film_track,
+        media.directory.path(),
+        wave_asset,
+    )
+    .await;
 }
 
 async fn otio_round_trip(
-    cli: &Cli, scope: &str, project: &str, film: &str, picture: &str,
-    directory: &std::path::Path, wave_asset: &str,
+    cli: &Cli,
+    scope: &str,
+    project: &str,
+    film: &str,
+    picture: &str,
+    directory: &std::path::Path,
+    wave_asset: &str,
 ) {
     let target = edit(cli, scope, project, "10", "otio-target", "sequences.create", json!({
         "name":"Imported OTIO", "settings":{"width":64,"height":48,"frame_rate":{"num":"24","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
@@ -802,14 +819,32 @@ async fn otio_round_trip(
     let audio = target["created"]["tracks"][1]["id"].as_str().unwrap();
     let file = directory.join("timeline.otio");
     let bindings = directory.join("otio-sources.json");
-    let (exported, status) = cli.human(&["timeline", "export-otio", "--project", project,
-        "--revision", "11", "--sequence", film, "--track", picture, "--end", "3/2",
-        "--out", file.to_str().unwrap()]).await;
+    let (exported, status) = cli
+        .human(&[
+            "timeline",
+            "export-otio",
+            "--project",
+            project,
+            "--revision",
+            "11",
+            "--sequence",
+            film,
+            "--track",
+            picture,
+            "--end",
+            "3/2",
+            "--out",
+            file.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(status, 0, "{exported}");
     let exported = &exported["result"];
     let text = exported["document"].as_str().unwrap();
     assert_eq!(std::fs::read(&file).unwrap(), text.as_bytes());
-    assert_eq!(exported["document_sha256"], nw_domain::projects::hash(text.as_bytes()));
+    assert_eq!(
+        exported["document_sha256"],
+        nw_domain::projects::hash(text.as_bytes())
+    );
     let document: Value = serde_json::from_str(text).unwrap();
     let items = &document["tracks"]["children"][0]["children"];
     assert_eq!(items[0]["OTIO_SCHEMA"], "Gap.1");
@@ -817,9 +852,28 @@ async fn otio_round_trip(
     assert_eq!(items[2]["OTIO_SCHEMA"], "Gap.1");
     assert_eq!(items[1]["source_range"]["start_time"]["value"], 24);
     let import = |revision: &'static str, key: &'static str| {
-        ["timeline", "import-otio", "--project", project, "--expected-revision", revision,
-            "--sequence", sequence, "--track", video, "--start", "2", "--file", file.to_str().unwrap(),
-            "--sources", bindings.to_str().unwrap(), "--replay-scope", scope, "--idempotency-key", key]
+        [
+            "timeline",
+            "import-otio",
+            "--project",
+            project,
+            "--expected-revision",
+            revision,
+            "--sequence",
+            sequence,
+            "--track",
+            video,
+            "--start",
+            "2",
+            "--file",
+            file.to_str().unwrap(),
+            "--sources",
+            bindings.to_str().unwrap(),
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            key,
+        ]
     };
     let mut invalid = exported["sources"].clone();
     invalid[0]["content_sha256"] = json!("0".repeat(64));
@@ -830,21 +884,64 @@ async fn otio_round_trip(
     std::fs::write(&bindings, serde_json::to_vec(&exported["sources"]).unwrap()).unwrap();
     let (imported, status) = cli.human(&import("11", "otio-import")).await;
     assert_eq!(status, 0, "{imported}");
-    assert_eq!(imported["result"]["created"]["clip_ids"].as_array().unwrap().len(), 1);
-    assert_eq!(imported["result"]["created"]["document_sha256"], exported["document_sha256"]);
+    assert_eq!(
+        imported["result"]["created"]["clip_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        imported["result"]["created"]["document_sha256"],
+        exported["document_sha256"]
+    );
     let (refused, status) = cli.human(&import("12", "otio-overlap")).await;
     assert_ne!(status, 0);
     assert_eq!(refused["error"]["code"], "CLIP_COLLISION");
-    edit(cli, scope, project, "12", "otio-undo", "history.undo", json!({})).await;
+    edit(
+        cli,
+        scope,
+        project,
+        "12",
+        "otio-undo",
+        "history.undo",
+        json!({}),
+    )
+    .await;
     for revision in ["13", "14"] {
         if revision == "14" {
-            edit(cli, scope, project, "13", "otio-redo", "history.redo", json!({})).await;
+            edit(
+                cli,
+                scope,
+                project,
+                "13",
+                "otio-redo",
+                "history.redo",
+                json!({}),
+            )
+            .await;
         }
-        let (view, status) = cli.human(&["timeline", "export-otio", "--project", project,
-            "--revision", revision, "--sequence", sequence, "--track", video, "--start", "2",
-            "--end", "7/2"]).await;
+        let (view, status) = cli
+            .human(&[
+                "timeline",
+                "export-otio",
+                "--project",
+                project,
+                "--revision",
+                revision,
+                "--sequence",
+                sequence,
+                "--track",
+                video,
+                "--start",
+                "2",
+                "--end",
+                "7/2",
+            ])
+            .await;
         assert_eq!(status, 0, "{view}");
-        let view: Value = serde_json::from_str(view["result"]["document"].as_str().unwrap()).unwrap();
+        let view: Value =
+            serde_json::from_str(view["result"]["document"].as_str().unwrap()).unwrap();
         let children = &view["tracks"]["children"][0]["children"];
         if revision == "13" {
             assert_eq!(children.as_array().unwrap().len(), 1);
@@ -854,36 +951,105 @@ async fn otio_round_trip(
         }
     }
 
-    edit(cli, scope, project, "14", "otio-audio-source", "clips.place", json!({
-        "sequence_id":sequence,"track_id":audio,
-        "source":{"kind":"registered","asset_id":wave_asset,"stream_index":0},
-        "source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"48000"}},
-        "sequence_start":{"num":"1","den":"48000"},"collision":"reject"
-    })).await;
-    let (exported_audio, status) = cli.human(&["timeline", "export-otio", "--project", project,
-        "--revision", "15", "--sequence", sequence, "--track", audio, "--end", "1/24"]).await;
+    edit(
+        cli,
+        scope,
+        project,
+        "14",
+        "otio-audio-source",
+        "clips.place",
+        json!({
+            "sequence_id":sequence,"track_id":audio,
+            "source":{"kind":"registered","asset_id":wave_asset,"stream_index":0},
+            "source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"48000"}},
+            "sequence_start":{"num":"1","den":"48000"},"collision":"reject"
+        }),
+    )
+    .await;
+    let (exported_audio, status) = cli
+        .human(&[
+            "timeline",
+            "export-otio",
+            "--project",
+            project,
+            "--revision",
+            "15",
+            "--sequence",
+            sequence,
+            "--track",
+            audio,
+            "--end",
+            "1/24",
+        ])
+        .await;
     assert_eq!(status, 0, "{exported_audio}");
     let exported_audio = &exported_audio["result"];
     let audio_text = exported_audio["document"].as_str().unwrap();
     let audio_document: Value = serde_json::from_str(audio_text).unwrap();
     let audio_track = &audio_document["tracks"]["children"][0];
     assert_eq!(audio_track["kind"], "Audio");
-    assert_eq!(audio_track["children"][1]["source_range"]["duration"]["rate"], 48000.0);
-    assert_eq!(audio_track["children"][1]["source_range"]["duration"]["value"], 1);
-    let imported_audio = edit(cli, scope, project, "15", "otio-audio-import", "interchange.otio.import", json!({
-        "sequence_id":sequence,"track_id":audio,"start":{"num":"1","den":"24"},
-        "document":audio_text,"sources":exported_audio["sources"]
-    })).await;
-    assert_eq!(imported_audio["created"]["clip_ids"].as_array().unwrap().len(), 1);
-    let (audio_round_trip, status) = cli.human(&["timeline", "export-otio", "--project", project,
-        "--revision", "16", "--sequence", sequence, "--track", audio, "--start", "1/24", "--end", "1/12"]).await;
+    assert_eq!(
+        audio_track["children"][1]["source_range"]["duration"]["rate"],
+        48000.0
+    );
+    assert_eq!(
+        audio_track["children"][1]["source_range"]["duration"]["value"],
+        1
+    );
+    let imported_audio = edit(
+        cli,
+        scope,
+        project,
+        "15",
+        "otio-audio-import",
+        "interchange.otio.import",
+        json!({
+            "sequence_id":sequence,"track_id":audio,"start":{"num":"1","den":"24"},
+            "document":audio_text,"sources":exported_audio["sources"]
+        }),
+    )
+    .await;
+    assert_eq!(
+        imported_audio["created"]["clip_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let (audio_round_trip, status) = cli
+        .human(&[
+            "timeline",
+            "export-otio",
+            "--project",
+            project,
+            "--revision",
+            "16",
+            "--sequence",
+            sequence,
+            "--track",
+            audio,
+            "--start",
+            "1/24",
+            "--end",
+            "1/12",
+        ])
+        .await;
     assert_eq!(status, 0, "{audio_round_trip}");
-    let audio_round_trip: Value = serde_json::from_str(audio_round_trip["result"]["document"].as_str().unwrap()).unwrap();
+    let audio_round_trip: Value =
+        serde_json::from_str(audio_round_trip["result"]["document"].as_str().unwrap()).unwrap();
     assert_eq!(&audio_round_trip["tracks"]["children"][0], audio_track);
     if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
         let evidence_dir = std::path::PathBuf::from(evidence_dir);
-        std::fs::write(evidence_dir.join("picture-round-trip.otio"), text.as_bytes()).unwrap();
-        std::fs::write(evidence_dir.join("audio-round-trip.otio"), audio_text.as_bytes()).unwrap();
+        std::fs::write(
+            evidence_dir.join("picture-round-trip.otio"),
+            text.as_bytes(),
+        )
+        .unwrap();
+        std::fs::write(
+            evidence_dir.join("audio-round-trip.otio"),
+            audio_text.as_bytes(),
+        )
+        .unwrap();
     }
 }
 

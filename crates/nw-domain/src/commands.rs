@@ -350,7 +350,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "interchange.edl.import" | "interchange.otio.import" => Some(contracts::edit(EditResult::ImportCuts)),
+        "interchange.edl.import" | "interchange.otio.import" => {
+            Some(contracts::edit(EditResult::ImportCuts))
+        }
         "clips.move"
         | "clips.trim"
         | "clips.slip"

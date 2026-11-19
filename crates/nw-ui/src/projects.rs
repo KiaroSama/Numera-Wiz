@@ -1109,7 +1109,10 @@ impl WizApp {
                     || otio.range != group.view.range
                     || nw_domain::projects::hash(otio.document.as_bytes()) != otio.document_sha256
                 {
-                    return Err("OTIO differs from the displayed revision, track, range or accepted digest".into());
+                    return Err(
+                        "OTIO differs from the displayed revision, track, range or accepted digest"
+                            .into(),
+                    );
                 }
                 self.projects.otio = Some(otio);
                 return Ok(());

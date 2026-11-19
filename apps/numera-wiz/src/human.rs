@@ -1158,7 +1158,9 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
         return wait_batch(client, id).await;
     }
     let interchange_destination = match &command {
-        Command::Timeline(Timeline::ExportEdl(args) | Timeline::ExportOtio(args)) => args.out.clone(),
+        Command::Timeline(Timeline::ExportEdl(args) | Timeline::ExportOtio(args)) => {
+            args.out.clone()
+        }
         _ => None,
     };
     match prepare(command) {

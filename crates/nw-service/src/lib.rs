@@ -637,7 +637,13 @@ mod tests {
                     "writer_lease",
                     "affected_scope",
                 ];
-                if matches!(id, "clips.slip" | "clips.roll" | "interchange.edl.import" | "interchange.otio.import") {
+                if matches!(
+                    id,
+                    "clips.slip"
+                        | "clips.roll"
+                        | "interchange.edl.import"
+                        | "interchange.otio.import"
+                ) {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }
                 assert_eq!(requirement["request_gates"], serde_json::json!(gates));

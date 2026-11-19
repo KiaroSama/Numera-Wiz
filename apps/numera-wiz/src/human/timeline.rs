@@ -187,9 +187,21 @@ impl Timeline {
                 };
                 context.request("interchange.edl.import", serde_json::to_value(input)?)
             }
-            Self::ImportOtio { context, sequence, track, start, file, sources } => {
-                let read_otio = |path| read_cut_file(path, nw_domain::interchange::MAX_OTIO_BYTES,
-                    "OTIO input file exceeds 96 KiB");
+            Self::ImportOtio {
+                context,
+                sequence,
+                track,
+                start,
+                file,
+                sources,
+            } => {
+                let read_otio = |path| {
+                    read_cut_file(
+                        path,
+                        nw_domain::interchange::MAX_OTIO_BYTES,
+                        "OTIO input file exceeds 96 KiB",
+                    )
+                };
                 let sources = if let Some(path) = sources {
                     commands::parse(commands::decode_json(&read_otio(path)?)?)?
                 } else {
@@ -295,7 +307,11 @@ impl Timeline {
 }
 
 fn read_cmx_file(path: PathBuf) -> Result<Vec<u8>> {
-    read_cut_file(path, nw_domain::interchange::MAX_DOCUMENT_BYTES, "EDL input file exceeds 16 KiB")
+    read_cut_file(
+        path,
+        nw_domain::interchange::MAX_DOCUMENT_BYTES,
+        "EDL input file exceeds 16 KiB",
+    )
 }
 
 fn read_cut_file(path: PathBuf, limit: usize, message: &'static str) -> Result<Vec<u8>> {
@@ -309,20 +325,23 @@ fn read_cut_file(path: PathBuf, limit: usize, message: &'static str) -> Result<V
     Ok(bytes)
 }
 
-pub(super) async fn save_interchange(client: &NativeClient, request: Request, path: &Path) -> Result<()> {
+pub(super) async fn save_interchange(
+    client: &NativeClient,
+    request: Request,
+    path: &Path,
+) -> Result<()> {
     let response = client.request(&request).await?;
     if response.ok {
         let saved: Result<(), DomainError> = (|| {
-            let value = response
-                .result
-                .as_ref()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange result is missing"))?;
-            let text = value["document"]
-                .as_str()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange document is missing"))?;
-            let digest = value["document_sha256"]
-                .as_str()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange digest is missing"))?;
+            let value = response.result.as_ref().ok_or_else(|| {
+                DomainError::new("INVALID_RESPONSE", "Interchange result is missing")
+            })?;
+            let text = value["document"].as_str().ok_or_else(|| {
+                DomainError::new("INVALID_RESPONSE", "Interchange document is missing")
+            })?;
+            let digest = value["document_sha256"].as_str().ok_or_else(|| {
+                DomainError::new("INVALID_RESPONSE", "Interchange digest is missing")
+            })?;
             nw_platform::download::save_verified_document(path, text.as_bytes(), digest)
         })();
         if let Err(error) = saved {
