@@ -499,7 +499,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     ).await;
     assert_eq!(ordinary["hash"], config_plan["hash"]);
     assert_eq!(config_plan["resolution"]["streams"].as_array().unwrap().iter()
-        .map(|stream| stream["index"].as_u64().unwrap()).collect::<Vec<_>>(), [0, 2, 1]);
+        .map(|stream| stream["index"].as_u64().unwrap()).collect::<Vec<_>>(), [0_u64, 2, 1]);
     let mut incomplete = declarative["job"].clone();
     incomplete["settings"].as_object_mut().unwrap().remove("output_path");
     let (incomplete, _) = cli.raw_with_exit(&Request::query("jobs.plan",

@@ -275,7 +275,8 @@ impl Store {
     ) -> Result<()> {
         use nw_domain::batches::MAX_BATCH_ITEMS;
         batch.validate_hash()?;
-        if children.len() > MAX_BATCH_ITEMS
+        if batch.data_root != self.root_id()
+            || children.len() > MAX_BATCH_ITEMS
             || !batch.items.iter().filter_map(|item| item.plan.as_ref()).map(|reference| {
                 (reference.id.as_str(), reference.hash.as_str())
             }).eq(children.iter().map(|plan| (plan.id.as_str(), plan.hash.as_str())))

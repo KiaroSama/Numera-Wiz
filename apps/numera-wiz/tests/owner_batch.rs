@@ -646,7 +646,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(extract_result["result"]["failed"], 1);
     assert!(!extract_outputs[2].exists());
     let source_packets = packets(&media.bin, &media.source).await;
-    for (output, original) in extract_outputs.iter().zip([0, 2]) {
+    for (output, original) in extract_outputs.iter().zip([0_u64, 2]) {
         let copied = packets(&media.bin, output).await;
         assert_eq!(copied.len(), 1);
         let mut expected = source_packets[&original].clone();
