@@ -355,7 +355,7 @@ impl Service {
             let mut held = Vec::new();
             let source_permit = if matches!(
                 request.command.id.as_str(),
-                "clips.place" | "clips.slip" | "interchange.edl.import"
+                "clips.place" | "clips.slip" | "clips.roll" | "interchange.edl.import"
             ) {
                 Some(
                     self.batch_preflights
@@ -496,6 +496,9 @@ impl Service {
                     "clips.slip" => {
                         ProjectEditIntent::Slip(commands::parse(request.params.clone())?)
                     }
+                    "clips.roll" => {
+                        ProjectEditIntent::Roll(commands::parse(request.params.clone())?)
+                    }
                     "timeline.remove_gap" => {
                         ProjectEditIntent::RemoveGap(commands::parse(request.params.clone())?)
                     }
@@ -532,6 +535,7 @@ impl Service {
                     | ProjectEditIntent::Trim(_)
                     | ProjectEditIntent::JoinThroughEdit(_)
                     | ProjectEditIntent::Slip(_)
+                    | ProjectEditIntent::Roll(_)
                     | ProjectEditIntent::RemoveGap(_)
                     | ProjectEditIntent::SetTrackGain(_)
                     | ProjectEditIntent::SetTrackEnabled(_)
@@ -580,14 +584,14 @@ impl Service {
             };
             let header = read.header().clone();
             let expected_header = Some(read.header_raw().to_owned());
-            let slip_checks = if request.command.id == "clips.slip" {
-                slip_source_checks(&read, &patch)?
+            let source_checks = if matches!(request.command.id.as_str(), "clips.slip" | "clips.roll") {
+                source_window_checks(&read, &patch)?
             } else {
                 Vec::new()
             };
             drop(read);
-            if !slip_checks.is_empty() {
-                held = self.prepare_slip_sources(context, slip_checks, cancel)?;
+            if !source_checks.is_empty() {
+                held = self.prepare_window_sources(context, source_checks, cancel)?;
             }
             let prepared = ProjectCommit {
                 header,
@@ -662,7 +666,7 @@ impl Service {
         Ok(response)
     }
 
-    fn prepare_slip_sources(
+    fn prepare_window_sources(
         &self,
         context: &Context,
         checks: Vec<(SourceBinding, SourceSpan)>,
@@ -701,12 +705,12 @@ impl Service {
                     .ok_or_else(|| {
                         DomainError::new(
                             "SOURCE_EXTENT_UNAVAILABLE",
-                            "Slip requires a declared interval for the registered stream",
+                            "Extending the source window requires a declared stream interval",
                         )
                     })?;
             if range.start < bounds.start || range.end > bounds.end {
                 return Err(domain::invalid(
-                    "Slipped source span exceeds the declared stream interval",
+                    "The new source window exceeds the declared stream interval",
                 ));
             }
         }
@@ -714,20 +718,23 @@ impl Service {
     }
 }
 
-fn slip_source_checks(
+fn source_window_checks(
     read: &ProjectReadSnapshot,
     patch: &ProjectPatch,
 ) -> Result<Vec<(SourceBinding, SourceSpan)>> {
     let mut checks = Vec::new();
     let mut streams = std::collections::BTreeSet::new();
-    for after in patch
-        .changes
-        .iter()
-        .filter_map(|change| change.after.as_ref())
-    {
-        let entity: EntityEnvelope =
-            serde_json::from_str(after).map_err(|error| domain::invalid(error.to_string()))?;
-        let clip: Clip = entity.payload("clip")?;
+    for change in &patch.changes {
+        let parse_clip = |raw: &Option<String>| -> Result<Clip> {
+            let raw = raw.as_deref().ok_or_else(|| domain::invalid("A source-window edit must update an existing clip"))?;
+            let entity: EntityEnvelope = serde_json::from_str(raw).map_err(|error| domain::invalid(error.to_string()))?;
+            entity.payload("clip")
+        };
+        let before = parse_clip(&change.before)?;
+        let clip = parse_clip(&change.after)?;
+        if clip.source_range.start >= before.source_range.start && clip.source_range.end <= before.source_range.end {
+            continue;
+        }
         let bound: SourceBinding = read.entity(&clip.source_id)?.payload("source_binding")?;
         if let SourceBinding::Registered {
             asset_id,
@@ -738,7 +745,7 @@ fn slip_source_checks(
             streams.insert((asset_id.clone(), *stream_index));
             if streams.len() > 8 {
                 return Err(domain::limit(
-                    "Slip requires at most eight registered streams",
+                    "A source-window edit can extend at most eight registered streams",
                 ));
             }
             checks.push((bound, clip.source_range));

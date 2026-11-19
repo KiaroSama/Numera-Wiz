@@ -92,7 +92,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.render"
         | "timeline.preview_frame"
         | crate::preview::PROGRAM_SEGMENT_COMMAND
-        | crate::preview::PROGRAM_PLAYBACK_COMMAND
+            | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => Some(ProjectAction::Read),
         "sequences.create"
@@ -104,6 +104,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "clips.join_through_edit"
         | "clips.trim"
         | "clips.slip"
+        | "clips.roll"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
@@ -152,6 +153,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         "clips.place"
             | "interchange.edl.import"
             | "clips.slip"
+            | "clips.roll"
             | "timeline.preview_frame"
             | crate::preview::PROGRAM_SEGMENT_COMMAND
             | "timeline.render_mixed"

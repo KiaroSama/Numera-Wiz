@@ -615,6 +615,7 @@ mod tests {
                     | "markers.remove"
                     | "clips.trim"
                     | "clips.slip"
+                    | "clips.roll"
                     | "tracks.set_enabled"
                     | "tracks.set_locked"
                     | "timeline.remove_gap"
@@ -634,7 +635,7 @@ mod tests {
                     "writer_lease",
                     "affected_scope",
                 ];
-                if matches!(id, "clips.slip" | "interchange.edl.import") {
+                if matches!(id, "clips.slip" | "clips.roll" | "interchange.edl.import") {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }
                 assert_eq!(requirement["request_gates"], serde_json::json!(gates));
@@ -732,6 +733,7 @@ mod tests {
             "clips.join_through_edit",
             "clips.trim",
             "clips.slip",
+            "clips.roll",
             "tracks.set_enabled",
             "tracks.set_locked",
             "timeline.remove_gap",
@@ -1341,6 +1343,7 @@ mod tests {
             ("clips.split", vec!["clip_ids", "no_change"], true),
             ("clips.trim", vec![], true),
             ("clips.slip", vec![], true),
+            ("clips.roll", vec![], true),
             ("tracks.set_enabled", vec![], true),
             ("tracks.set_locked", vec![], true),
             ("timeline.remove_gap", vec![], true),

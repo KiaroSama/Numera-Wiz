@@ -54,6 +54,7 @@ pub enum ProjectEditIntent {
     Unlink(UnlinkInput),
     Split(SplitInput),
     JoinThroughEdit(JoinThroughEditInput),
+    Roll(RollInput),
     Trim(TrimInput),
     Slip(SlipInput),
     RemoveGap(RemoveGapInput),
@@ -795,6 +796,57 @@ pub fn resolve_edit<R: ProjectRead>(
                 edit.set(entity)?;
                 edit.delete(&following_entity.id)?;
                 edit.count(&track, -1)?;
+            }
+            json!({})
+        }
+        ProjectEditIntent::Roll(input) => {
+            let boundary_error = || DomainError::new(
+                "ROLL_BOUNDARY_REQUIRED",
+                "Select one adjacent clip pair on every linked track",
+            );
+            let side = |seed| -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
+                let selected = match input.link_policy {
+                    LinkPolicy::Expand => expand_links(read, std::slice::from_ref(seed))?,
+                };
+                let mut tracks = BTreeMap::new();
+                for entity in selected {
+                    let clip = entity.payload::<Clip>("clip")?;
+                    if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+                        return Err(boundary_error());
+                    }
+                }
+                Ok(tracks)
+            };
+            let left = side(&input.left_id)?;
+            let mut right = side(&input.right_id)?;
+            if left.keys().ne(right.keys()) {
+                return Err(boundary_error());
+            }
+            if left.len() > MAX_CHANGES / 2 {
+                return Err(limit("Roll exceeds the paired clip change budget"));
+            }
+            for (track, (mut left_entity, mut left_clip)) in left {
+                let (mut right_entity, mut right_clip) = right.remove(&track).ok_or_else(boundary_error)?;
+                edit.clip_context(&left_clip)?;
+                edit.clip_context(&right_clip)?;
+                if left_clip.sequence_id != right_clip.sequence_id || left_clip.end()? != right_clip.sequence_start {
+                    return Err(boundary_error());
+                }
+                if input.delta == Rational::ZERO {
+                    validate_unchanged(read, &[left_entity, right_entity])?;
+                    continue;
+                }
+                left_clip.source_range.end = left_clip.source_range.end.checked_add(input.delta)?;
+                left_clip.duration = left_clip.source_range.duration()?;
+                right_clip.sequence_start = left_clip.end()?;
+                right_clip.source_range.start = right_clip.source_range.start.checked_add(input.delta)?;
+                right_clip.duration = right_clip.source_range.duration()?;
+                edit.clip_context(&left_clip)?;
+                edit.clip_context(&right_clip)?;
+                left_entity.update(&left_clip)?;
+                right_entity.update(&right_clip)?;
+                edit.set(left_entity)?;
+                edit.set(right_entity)?;
             }
             json!({})
         }

@@ -759,6 +759,25 @@ impl WizApp {
                     }
                 }
             });
+            if let (Some(left_id), Some(left)) = (&group.view.clip, &group.clip)
+                && !left.locked
+                && let Ok(boundary) = left.end()
+                && let Some(right) = group.viewport.items.iter().find(|clip| {
+                    clip.track_id == left.track_id && clip.sequence_start == boundary
+                })
+            {
+                ui.collapsing("Roll cut to next clip", |ui| {
+                    rational(ui, "Move the cut by (seconds)", &mut self.projects.forms.roll_delta);
+                    if ui.button("Apply roll").clicked() {
+                        match self.projects.forms.roll_delta.value() {
+                            Ok(delta) => self.mutate_project("clips.roll", json!({
+                                "left_id":left_id,"right_id":right.id,"delta":delta,"link_policy":"expand"
+                            }), ui.ctx()),
+                            Err(error) => self.error = Some(error),
+                        }
+                    }
+                });
+            }
         });
     }
 

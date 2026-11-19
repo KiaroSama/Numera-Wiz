@@ -218,6 +218,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "clips.join_through_edit"
         | "clips.trim"
         | "clips.slip"
+        | "clips.roll"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
@@ -348,6 +349,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "clips.move"
         | "clips.trim"
         | "clips.slip"
+        | "clips.roll"
         | "tracks.set_enabled"
         | "tracks.set_locked"
         | "timeline.remove_gap"
@@ -598,6 +600,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Shift the source windows of linked clips while retaining their timeline positions",
             DurableMutation,
             crate::projects::SlipInput
+        ),
+        row!(
+            "clips.roll",
+            "Move an exact cut while retaining both linked clips and their combined timeline extent",
+            DurableMutation,
+            crate::projects::RollInput
         ),
         row!(
             "interchange.edl.export",
@@ -1881,6 +1889,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.join_through_edit",
     "clips.trim",
     "clips.slip",
+    "clips.roll",
     "tracks.set_enabled",
     "tracks.set_locked",
     "mixer.set_track_gain",

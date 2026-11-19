@@ -895,6 +895,36 @@ pub(in crate::runtime) async fn linked_edits() {
         .chain(right_ids.iter())
         .map(|id| (id.clone(), through.raw(id)))
         .collect();
+    let roll = |num: &str, den: &str| json!({
+        "left_id":first_ids[0],"right_id":right,"delta":{"num":num,"den":den},"link_policy":"expand"
+    });
+    through.reject_unchanged(through.request("clips.roll", "roll-off-grid", roll("1", "8")), "OFF_GRID").await;
+    let unchanged = through.accept(through.request("clips.roll", "roll-zero", roll("0", "1"))).await;
+    assert_eq!(unchanged["no_change"], true);
+    let rolled = through.accept(through.request("clips.roll", "roll-linked-cut", roll("1", "4"))).await;
+    assert_eq!(rolled["changed_ids"].as_array().unwrap().len(), 4);
+    let cut = nw_domain::time::Rational::new(3, 4).unwrap();
+    for (id, raw) in &split_images {
+        let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
+        let original: Clip = original.payload("clip").unwrap();
+        let current: Clip = through.entity(id).payload("clip").unwrap();
+        assert_eq!(current.source_id, original.source_id);
+        assert_eq!(current.occurrence_id, original.occurrence_id);
+        assert_eq!(current.link_group_id, original.link_group_id);
+        if first_ids.contains(&id) {
+            assert_eq!(current.sequence_start, original.sequence_start);
+            assert_eq!(current.end().unwrap(), cut);
+            assert_eq!(current.source_range.end, cut);
+        } else {
+            assert_eq!(current.sequence_start, cut);
+            assert_eq!(current.end().unwrap(), original.end().unwrap());
+            assert_eq!(current.source_range.start, cut);
+        }
+    }
+    through.accept(through.request("history.undo", "undo-linked-roll", json!({}))).await;
+    for (id, raw) in &split_images {
+        assert_eq!(through.raw(id), *raw);
+    }
     let joined = through
         .accept(through.request(
             "clips.join_through_edit",

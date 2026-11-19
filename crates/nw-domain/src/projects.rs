@@ -839,6 +839,15 @@ pub struct JoinThroughEditInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct RollInput {
+    pub left_id: EntityId,
+    pub right_id: EntityId,
+    pub delta: Rational,
+    pub link_policy: LinkPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TrimInput {
     #[schemars(length(min = 1, max = 128), extend("uniqueItems" = true))]
     pub clip_ids: Vec<EntityId>,

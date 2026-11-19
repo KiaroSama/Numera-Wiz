@@ -255,6 +255,20 @@ numera-wiz tracks set-locked TRACK --locked true --project PROJECT --expected-re
 The MCP command is `tracks.set_locked` with `track_id` and `locked`.
 The track page includes `locked: true` for a committed lock.
 
+## Roll a cut between adjacent clips
+
+Select the clip before the cut and open **Roll cut to next clip**. Enter a
+signed offset on the track's exact clock. The two clips retain their IDs and
+combined timeline extent. The longer side uses more of its original source.
+Every linked track must have a corresponding adjacent pair. Undo restores
+the whole cut.
+
+```text
+numera-wiz clips roll --left LEFT --right RIGHT --delta 1/24 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key roll-cut
+```
+
+MCP `clips.roll` uses `left_id`, `right_id`, `delta` and `link_policy:"expand"`.
+
 ## Project keyboard shortcuts
 
 Use Command on macOS and Ctrl on Windows or Linux. Command/Ctrl+Z undoes
