@@ -107,6 +107,13 @@ grids must agree. Each score has the exact relative time and both original
 frame indices. PSNR is in hundredths of a dB or `{"kind":"identical"}`.
 SSIM is reported in millionths. The scores describe decoded 8-bit RGB.
 
+`media.analyze.stream` takes `asset_id`, `stream_index`, `kind` (`packets` or
+`frames`), zero-based `first` and a `limit` from one to 64. The owner scans the
+selected stream through ffprobe, returning the complete count as a decimal
+string plus the requested rows. Times are exact rationals on the registered
+stream clock. Packet hashes are SHA-256 of the original payloads. A scan that
+reaches a processing limit returns a typed error.
+
 `media.analyze.audio_tracks` accepts `asset_id` and two to sixteen distinct
 original audio indices in `stream_indices`. It compares SHA-256 measurements
 over packed `pcm_f64le` samples, sample rate and channel layout. The response

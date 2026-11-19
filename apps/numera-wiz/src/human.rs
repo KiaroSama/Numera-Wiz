@@ -127,6 +127,19 @@ pub enum Media {
         #[arg(long)]
         stream: u32,
     },
+    /// Inspect measured packet or decoded frame observations for a registered stream.
+    AnalyzeStream {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+        #[arg(long, value_enum)]
+        kind: ObservationKind,
+        #[arg(long, default_value_t = 0)]
+        first: u32,
+        #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(1..=64))]
+        limit: u32,
+    },
     /// Compare matched video frame windows and report PSNR and SSIM.
     CompareVideo {
         #[arg(long)]
@@ -152,6 +165,12 @@ pub enum Media {
         streams: Vec<u32>,
     },
 }
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum ObservationKind {
+    Packets,
+    Frames,
+}
+
 #[derive(Subcommand)]
 pub enum Capabilities {
     /// Read current component fingerprints and cached observations.
@@ -556,6 +575,16 @@ pub fn prepare(command: Command) -> Result<Request> {
             "media.analyze.loudness",
             json!({"asset_id":asset,"stream_index":stream}),
         ),
+        Command::Media(Media::AnalyzeStream { asset, stream, kind, first, limit }) => {
+            use nw_domain::stream_observations::{Input, Kind};
+            let kind = match kind {
+                ObservationKind::Packets => Kind::Packets,
+                ObservationKind::Frames => Kind::Frames,
+            };
+            query("media.analyze.stream", serde_json::to_value(Input {
+                asset_id: asset, stream_index: stream, kind, first, limit,
+            })?)
+        }
         Command::Media(Media::CompareVideo {
             reference, reference_stream, reference_start, candidate, candidate_stream, candidate_start, frames,
         }) => {

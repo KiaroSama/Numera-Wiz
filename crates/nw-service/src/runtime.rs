@@ -1084,6 +1084,7 @@ impl Service {
                 "media.analyze.volume",
                 "media.analyze.loudness",
                 "media.analyze.reference",
+                "media.analyze.stream",
                 "media.analyze.audio_tracks",
                 "media.preview_frame",
                 "capabilities.refresh",
@@ -1458,6 +1459,15 @@ impl Service {
                     &context, commands::parse(params)?, cancellation.clone(),
                 )?;
                 return Ok(Response::success(&request.request_id, value(&comparison)?).bounded());
+            }
+            "media.analyze.stream" => {
+                drop(guard);
+                let report = self.observe_source_stream(
+                    &context,
+                    commands::parse(params)?,
+                    cancellation.clone(),
+                )?;
+                return Ok(Response::success(&request.request_id, value(&report)?).bounded());
             }
             "media.analyze.audio_tracks" => {
                 drop(guard);

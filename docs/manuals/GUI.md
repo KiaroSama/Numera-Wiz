@@ -258,6 +258,11 @@ choose **Use stream as reference**. Open the candidate file, set its matching
 start and frame count, and choose its video stream. Each result row identifies
 the corresponding original frames and reports PSNR and SSIM.
 
+Expand **Packets and decoded frames**, select the original stream, choose the
+first row and select **Scan stream**. The result shows the complete observed
+count and up to 16 rows. Packet rows include payload size and SHA-256. Decoded
+frame rows show video dimensions or the audio sample count where available.
+
 ## Extract a stream
 
 Choose a registered source, enter a new `.mkv` output path and expand

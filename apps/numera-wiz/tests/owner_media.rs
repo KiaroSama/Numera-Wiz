@@ -61,6 +61,25 @@ fn assert_loudness(result: &Value, asset: &Value) {
     assert_eq!(result["gate_centi_lufs"], -3175);
 }
 
+fn frame_observation_input(asset: &Value) -> Value {
+    json!({"asset_id":asset["id"],"stream_index":0,"kind":"frames","first":1,"limit":2})
+}
+
+fn assert_frame_observations(report: &Value, asset: &Value) {
+    assert_eq!(report["selection"], frame_observation_input(asset));
+    assert_eq!(report["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(report["time_base"], json!({"num":"1","den":"1000"}));
+    assert_eq!(report["observed"], "4");
+    let rows = report["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["ordinal"], "1");
+    assert_eq!(rows[0]["pts"], json!({"num":"1","den":"4"}));
+    assert_eq!(rows[0]["detail"]["width"], 64);
+    assert_eq!(rows[0]["detail"]["height"], 48);
+    assert_eq!(rows[0]["detail"]["kind"], "frame");
+    assert_eq!(rows[1]["pts"], json!({"num":"1","den":"2"}));
+}
+
 fn reference_input(asset: &Value) -> Value {
     let selection = json!({"asset_id":asset["id"],"stream_index":0,"start_frame":0});
     json!({"reference":selection,"candidate":selection,"frame_count":4})
@@ -603,6 +622,28 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{loudness}");
     assert_loudness(&loudness["result"], &asset);
     let asset_id = asset["id"].as_str().unwrap();
+    let (packets, exit) = cli.human(&[
+        "media", "analyze-stream", "--asset", asset_id, "--stream", "0", "--kind", "packets",
+        "--first", "1", "--limit", "2",
+    ]).await;
+    assert_eq!(exit, 0, "{packets}");
+    let packet_report = &packets["result"];
+    assert_eq!(packet_report["observed"], "4");
+    let rows = packet_report["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    let independent = tokio::process::Command::new(media.bin.join("ffprobe"))
+        .args(["-v", "error", "-select_streams", "0", "-show_packets", "-show_data_hash", "sha256", "-of", "json"])
+        .arg(&media.source).output().await.unwrap();
+    assert!(independent.status.success());
+    let original: Value = serde_json::from_slice(&independent.stdout).unwrap();
+    for (index, row) in rows.iter().enumerate() {
+        let packet = &original["packets"][index + 1];
+        assert_eq!(row["ordinal"], (index + 1).to_string());
+        assert_eq!(row["detail"]["bytes"], packet["size"]);
+        assert_eq!(row["detail"]["data_sha256"], packet["data_hash"].as_str().unwrap().strip_prefix("SHA256:").unwrap());
+    }
+    let frames = cli.query("media.analyze.stream", frame_observation_input(&asset)).await;
+    assert_frame_observations(&frames, &asset);
     let (quality, exit) = cli.human(&[
         "media", "compare-video", "--reference", asset_id, "--reference-stream", "0",
         "--candidate", asset_id, "--candidate-stream", "0", "--frames", "4",
@@ -1145,7 +1186,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
     }
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -1291,6 +1332,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_identical_video(
         &call!(stdio, "media.analyze.reference", reference_input(&operator_asset), json!({})),
+        &operator_asset,
+    );
+    assert_frame_observations(
+        &call!(stdio, "media.analyze.stream", frame_observation_input(&operator_asset), json!({})),
         &operator_asset,
     );
     let wrong_stream = stdio
@@ -1910,6 +1955,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
         assert_identical_video(
             &call!(http, "media.analyze.reference", reference_input(&asset), json!({})),
+            &asset,
+        );
+        assert_frame_observations(
+            &call!(http, "media.analyze.stream", frame_observation_input(&asset), json!({})),
             &asset,
         );
         let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));

@@ -4,6 +4,7 @@ pub(super) mod execution;
 pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;
 mod preview;
+mod stream_observations;
 pub(super) mod verification;
 mod volume;
 use super::{Engine, blocking};

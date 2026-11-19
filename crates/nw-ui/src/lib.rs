@@ -6,6 +6,7 @@ pub mod client;
 mod config_import;
 mod folders;
 mod jobs;
+mod observations;
 mod preview;
 mod projects;
 mod reference;
@@ -49,6 +50,7 @@ enum Action {
     LoudnessMeasurement,
     CompareAudio,
     CompareVideo,
+    StreamObservations,
     WaveCues,
     ClearCapabilities,
     ArtifactManifest,
@@ -150,6 +152,7 @@ pub struct WizApp {
     compare_audio_indices: BTreeSet<u32>,
     audio_track_report: Option<AudioTrackReport>,
     reference_metrics: reference::ReferenceUi,
+    observations: observations::ObservationUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -339,6 +342,7 @@ impl WizApp {
             compare_audio_indices: BTreeSet::new(),
             audio_track_report: None,
             reference_metrics: Default::default(),
+            observations: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -374,6 +378,7 @@ impl WizApp {
             self.loudness_measurement = None;
             self.audio_track_report = None;
             self.reference_metrics.result = None;
+            self.observations = Default::default();
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -862,6 +867,7 @@ impl WizApp {
                     }
                 }
                 Action::CompareVideo => self.accept_reference_result(result)?,
+                Action::StreamObservations => self.accept_stream_observations(result)?,
                 Action::WaveCues => {
                     let cues: nw_domain::chapters::WaveCueInventory =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -1538,6 +1544,7 @@ impl eframe::App for WizApp {
                 self.volume_panel(ui, &asset);
                 self.extraction_panel(ui, &asset);
                 self.reference_panel(ui, &asset);
+                self.observations_panel(ui, &asset);
             }
         });
         if !self.folder.open {

@@ -13,6 +13,7 @@ pub mod metadata;
 pub mod mux;
 pub mod preview;
 pub mod reference_metrics;
+pub mod stream_observations;
 pub mod time;
 
 use schemars::JsonSchema;

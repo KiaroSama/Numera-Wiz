@@ -59,6 +59,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
 | `media analyze-loudness --asset ID --stream INDEX` | Measure integrated loudness, true peak, range and gating for a registered audio stream. |
+| `media analyze-stream --asset ID --stream INDEX --kind packets --first N --limit COUNT` | Scan the stream and read up to 64 rows of exact packet observations. Use `--kind frames` to inspect decoded video or audio frames. |
 | `media compare-video --reference ID --reference-stream INDEX --candidate ID --candidate-stream INDEX --frames COUNT` | Measure PSNR and SSIM for aligned decoded video windows. |
 | `media compare-audio --asset ID --stream INDEX --stream INDEX` | Compare two to sixteen original audio tracks for matching decoded samples and formats. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |

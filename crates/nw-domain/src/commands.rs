@@ -232,6 +232,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "media.analyze.reference" => Some(
             serde_json::to_value(schema_for!(crate::reference_metrics::Comparison)).expect("schema"),
         ),
+        "media.analyze.stream" => Some(
+            serde_json::to_value(schema_for!(crate::stream_observations::Report)).expect("schema"),
+        ),
         "media.analyze.audio_tracks" => Some(
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
@@ -829,6 +832,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Measure RGB PSNR and SSIM for aligned windows from two registered video streams",
             Query,
             crate::reference_metrics::CompareInput
+        ),
+        row!(
+            "media.analyze.stream",
+            "Read a page of packet or decoded frame observations from a registered stream",
+            Query,
+            crate::stream_observations::Input
         ),
         row!(
             "media.analyze.audio_tracks",
@@ -1668,6 +1677,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.analyze.volume",
     "media.analyze.loudness",
     "media.analyze.reference",
+    "media.analyze.stream",
     "media.analyze.audio_tracks",
     "media.preview_frame",
     "capabilities.inspect",

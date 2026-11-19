@@ -125,6 +125,20 @@ impl Service {
         Ok(result)
     }
 
+    pub(super) fn observe_source_stream(
+        &self,
+        context: &Context,
+        input: nw_domain::stream_observations::Input,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::stream_observations::Report> {
+        let (asset, source) = self.analysis_source(context, &input.asset_id)?;
+        let report = tokio::runtime::Handle::current().block_on(
+            self.engine()?.observe_stream(&asset, source, input, cancel.clone()),
+        )?;
+        self.complete_analysis(context, &[&asset], "media.analyze.stream", &cancel)?;
+        Ok(report)
+    }
+
     pub(super) fn source_preview(
         &self,
         context: &Context,
