@@ -861,10 +861,11 @@ impl WizApp {
             let idle=self.request_idle();
             egui::ScrollArea::vertical().id_salt("project-place-source").max_height(560.0).show(ui,|ui| {
                 ui.add_enabled_ui(idle,|ui| {
-                    ui.horizontal(|ui| {
-                        ui.selectable_value(&mut self.projects.forms.registered,false,"Finite solid");
+                    let focus_solid = ui.horizontal(|ui| {
+                        let clicked = ui.selectable_value(&mut self.projects.forms.registered,false,"Finite solid").clicked();
                         ui.selectable_value(&mut self.projects.forms.registered,true,"Registered media");
-                    });
+                        clicked
+                    }).inner;
                     if self.projects.forms.registered {
                         ui.label("Use a source already registered in Cleanup under this session.");
                         if ui.button("Refresh registered sources").clicked() {
@@ -889,7 +890,8 @@ impl WizApp {
                         }
                     } else {
                         ui.label("RGBA — four finite channels between zero and one");
-                        ui.add(egui::TextEdit::singleline(&mut self.projects.forms.rgba).char_limit(128).desired_width(320.0));
+                        let rgba = ui.add(egui::TextEdit::singleline(&mut self.projects.forms.rgba).char_limit(128).desired_width(320.0));
+                        if focus_solid { rgba.request_focus(); }
                         rational(ui,"Finite source duration (seconds)",&mut self.projects.forms.duration);
                     }
                     rational(ui,"Source start (seconds)",&mut self.projects.forms.source_start);

@@ -769,8 +769,8 @@ pub async fn run<D: Driver>(driver: &mut D, name: &str) {
 }
 async fn place_group_solid<D: Driver>(driver: &mut D, start: &str) -> Observation {
     driver.click(318, 100).await;
-    driver.click(325, 134).await; // Explicit Finite solid source variant.
-    driver.click(450, 176).await;
+    driver.click(316, 140).await; // Selecting Finite solid focuses the RGBA input.
+    driver.screenshot("group-solid-focused").await;
     driver.replace("0.7, 0.3, 0.2, 1").await;
     for value in ["1", "1", "0", "1", "1", "1", start, "1"] {
         field(driver, value).await;
