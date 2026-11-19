@@ -165,3 +165,8 @@ Grayscale overrides saturation. The importer and direct typed export share
 the same normalization and plan.
 [FFmWiz filter order](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/wizard_build_filters.py#L121-L161)
 [FFmWiz filter strengths](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/core/constants_look.py#L23-L52)
+
+The FFmWiz H.264 importer accepts explicit width, height, size presets,
+fit boxes and stretch boxes. It uses nearest-even rounding and calculates
+the display dimensions after crop and orientation. Presets choose the
+closest displayed edge. [FFmWiz size resolution](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/ext00c.py#L168-L247)

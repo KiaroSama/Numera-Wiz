@@ -270,25 +270,26 @@ fn scalar(value: &str, low: f64, high: f64) -> Option<Rational> {
 fn geometry(value: &str) -> Option<Setting> {
     let (body, mode) = value
         .strip_prefix("stretch:")
+        .or_else(|| value.strip_prefix("exact:"))
         .map_or((value, ScaleMode::Fit), |body| (body, ScaleMode::Stretch));
     if let Some((width, height)) = body.split_once('x') {
         return Some(Setting::Geometry {
             mode,
-            width: Some(integer(width, 1, 16384)?),
-            height: Some(integer(height, 1, 16384)?),
+            width: Some(integer(width.trim(), 1, 16384)?),
+            height: Some(integer(height.trim(), 1, 16384)?),
         });
     }
     if matches!(mode, ScaleMode::Stretch) {
         return None;
     }
-    if let Some(width) = body.strip_prefix('w').or_else(|| body.strip_suffix('w')) {
+    if let Some(width) = body.strip_prefix("width=").or_else(|| body.strip_prefix('w')).or_else(|| body.strip_suffix('w')) {
         return Some(Setting::Geometry {
             mode: ScaleMode::Width,
             width: Some(integer(width, 1, 16384)?),
             height: None,
         });
     }
-    if let Some(height) = body.strip_prefix('h').or_else(|| body.strip_suffix('h')) {
+    if let Some(height) = body.strip_prefix("height=").or_else(|| body.strip_prefix('h')).or_else(|| body.strip_suffix('h')) {
         return Some(Setting::Geometry {
             mode: ScaleMode::Height,
             width: None,

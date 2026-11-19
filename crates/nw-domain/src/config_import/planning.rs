@@ -1,8 +1,8 @@
 //! Compile the admitted FFmWiz packet-copy settings into the ordinary stream plan.
-use super::{FIELDS, ImportedJob, Setting, TrackChoice};
+use super::{FIELDS, ImportedJob, ScaleMode, Setting, TrackChoice};
 use crate::{
     DomainError, Result,
-    avc_export::{Crop, Detail, PictureTransform, Rotation, Strength},
+    avc_export::{Crop, Detail, PictureTransform, Resize, ResizeAspect, Rotation, Strength},
     mux::{CleanIntent, NoMatch, Selection, Selector, Stream, StreamKind},
 };
 use schemars::JsonSchema;
@@ -60,6 +60,42 @@ fn even_crop_axis(extent: u32, near: u32, far: u32) -> Option<(u32, u32)> {
             )
         })
         .map(|(left, right)| (left, extent - left - right))
+}
+
+fn nearest_even(num: u64, den: u64) -> u64 {
+    // The donor rounds half to even on the half-dimension, then doubles it.
+    let quotient = num / (den * 2);
+    let remainder = num % (den * 2);
+    let up = remainder > den || (remainder == den && !quotient.is_multiple_of(2));
+    ((quotient + up as u64) * 2).max(2)
+}
+
+fn cropped_display_size(details: &serde_json::Value, picture: &PictureTransform) -> Result<(u64, u64)> {
+    let dimension = |field: &str| {
+        details[field].as_u64().filter(|value| (2..=4096).contains(value))
+            .ok_or_else(|| unsupported("resolution"))
+    };
+    let (width, height) = if let Some(crop) = picture.crop {
+        (u64::from(crop.width), u64::from(crop.height))
+    } else {
+        (dimension("width")?, dimension("height")?)
+    };
+    let aspect = match details["sample_aspect_ratio"].as_str() {
+        None | Some("0:1" | "N/A") => (1, 1),
+        Some(aspect) => {
+            let (num, den) = aspect.split_once(':').ok_or_else(|| unsupported("resolution"))?;
+            let integer = |value: &str| value.parse::<u16>().ok().filter(|value| *value != 0)
+                .map(u64::from).ok_or_else(|| unsupported("resolution"));
+            (integer(num)?, integer(den)?)
+        }
+    };
+    let width = nearest_even(width * aspect.0, aspect.1);
+    let height = nearest_even(height, 1);
+    Ok(if matches!(picture.rotation, Rotation::Clockwise | Rotation::Counterclockwise) {
+        (height, width)
+    } else {
+        (width, height)
+    })
 }
 
 impl ImportedJob {
@@ -191,13 +227,77 @@ impl ImportedJob {
         Ok(())
     }
 
+    fn avc_resize(&self, details: &serde_json::Value, picture: &PictureTransform) -> Result<Option<Resize>> {
+        let (mode, width, height) = match self.get("resolution") {
+            None | Some(Setting::Source) => return Ok(None),
+            Some(Setting::Geometry { mode, width, height }) => (*mode, *width, *height),
+            _ => return Err(unsupported("resolution")),
+        };
+        if !matches!(
+            (mode, width, height),
+            (ScaleMode::Fit | ScaleMode::Stretch, Some(_), Some(_))
+                | (ScaleMode::Width, Some(_), None)
+                | (ScaleMode::Height | ScaleMode::ClosestEdge, None, Some(_))
+        ) {
+            return Err(unsupported("resolution"));
+        }
+        let required = |value: Option<u32>| value.filter(|value| (1..=16384).contains(value))
+            .map(u64::from).ok_or_else(|| unsupported("resolution"));
+        let (width, height) = match mode {
+            ScaleMode::Fit | ScaleMode::Stretch => (
+                nearest_even(required(width)?, 1),
+                nearest_even(required(height)?, 1),
+            ),
+            _ => {
+                let (display_width, display_height) = cropped_display_size(details, picture)?;
+                let with_width = |width| {
+                    let width = nearest_even(width, 1);
+                    (width, nearest_even(width * display_height, display_width))
+                };
+                let with_height = |height| {
+                    let height = nearest_even(height, 1);
+                    (nearest_even(height * display_width, display_height), height)
+                };
+                match mode {
+                    ScaleMode::Width => with_width(required(width)?),
+                    ScaleMode::Height => with_height(required(height)?),
+                    ScaleMode::ClosestEdge => {
+                        let (mut target_width, mut target_height) = match required(height)? {
+                            144 => (256, 144), 240 => (426, 240), 360 => (640, 360),
+                            480 => (720, 480), 576 => (720, 576), 720 => (1280, 720),
+                            1080 => (1920, 1080), 1440 => (2560, 1440),
+                            2160 => (3840, 2160), 4320 => (7680, 4320),
+                            _ => return Err(unsupported("resolution")),
+                        };
+                        if display_width < display_height {
+                            std::mem::swap(&mut target_width, &mut target_height);
+                        }
+                        if display_width.abs_diff(target_width) <= display_height.abs_diff(target_height) {
+                            with_width(target_width)
+                        } else {
+                            with_height(target_height)
+                        }
+                    }
+                    _ => unreachable!("Only aspect-preserving scale modes need a source raster"),
+                }
+            }
+        };
+        Ok(Some(Resize {
+            width: u32::try_from(width).map_err(|_| unsupported("resolution"))?,
+            height: u32::try_from(height).map_err(|_| unsupported("resolution"))?,
+            aspect: if matches!(mode, ScaleMode::Stretch) {
+                ResizeAspect::SquarePixels
+            } else {
+                ResizeAspect::Fit
+            },
+        }))
+    }
+
     pub fn avc_encode(
         &self,
         asset: &crate::records::Asset,
     ) -> Result<crate::avc_export::EncodeInput> {
-        use crate::avc_export::{
-            Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode, Resize, ResizeAspect,
-        };
+        use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode};
         if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_avc_encode() {
             return Err(DomainError::new(
                 "INVALID_JOB_DOCUMENT",
@@ -260,14 +360,7 @@ impl ImportedJob {
                     | "audio_speed",
                     Setting::Source,
                 ) => true,
-                (
-                    "resolution",
-                    Setting::Geometry {
-                        mode: super::ScaleMode::Stretch | super::ScaleMode::Fit,
-                        width: Some(_),
-                        height: Some(_),
-                    },
-                ) => true,
+                ("resolution", Setting::Geometry { .. }) => true,
                 ("video_speed" | "audio_speed", Setting::Scalar { value }) => {
                     value.numerator() == value.denominator()
                 }
@@ -330,21 +423,6 @@ impl ImportedJob {
             .get(&picture.index)
             .ok_or_else(|| missing("input_path"))?;
         let crop = self.avc_crop(details)?;
-        let resize = match self.get("resolution") {
-            Some(Setting::Geometry {
-                mode,
-                width: Some(width),
-                height: Some(height),
-            }) => Some(Resize {
-                width: *width,
-                height: *height,
-                aspect: match mode {
-                    super::ScaleMode::Fit => ResizeAspect::Fit,
-                    _ => ResizeAspect::SquarePixels,
-                },
-            }),
-            _ => None,
-        };
         let audio = match self.get("audio_tracks") {
             Some(Setting::Tracks {
                 selection: TrackChoice::None,
@@ -384,12 +462,12 @@ impl ImportedJob {
         };
         let mut transform = PictureTransform {
             crop,
-            resize,
             ..Default::default()
         };
         self.apply_avc_look(&mut transform)?;
+        transform.resize = self.avc_resize(details, &transform)?;
         let changed = crop.is_some()
-            || resize.is_some()
+            || transform.resize.is_some()
             || transform.rotation != Rotation::None
             || transform.flip_horizontal
             || transform.flip_vertical

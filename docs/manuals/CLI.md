@@ -1030,6 +1030,9 @@ the original sample aspect with `resolution=n`. An explicit
 `stretch:WIDTHxHEIGHT` emits square pixels.
 Without the `stretch:` prefix, `WIDTHxHEIGHT` fits the original display
 aspect into a square-pixel frame and adds padding where needed.
+Use `width=WIDTH`, `height=HEIGHT` or a preset such as `720p` to size from
+the display aspect after crop and rotation. The reviewed plan records the
+codec-aligned even dimensions.
 The CPU profile imports the admitted `video_look` rotation, flips, grayscale,
 color adjustments, denoise, and one of sharpen or blur.
 

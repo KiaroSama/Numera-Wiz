@@ -1348,6 +1348,35 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         );
     }
 
+    for (label, resolution, width, height, aspect) in [
+        ("width", "width=81", 80, 214, "fit"),
+        ("height", "height=321", 120, 320, "fit"),
+        ("preset", "144p", 144, 384, "fit"),
+        ("stretch", "exact:161x121", 160, 120, "square_pixels"),
+    ] {
+        let output = directory.join(format!("scaled-{label}.mp4"));
+        let legacy = format!(
+            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\ncrop=30,40,40,30\nresolution={resolution}\nvideo_look=90cw\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            path.display(), output.display(),
+        );
+        let imported = cli.query("config.import.ffmwiz", json!({
+            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
+        })).await;
+        assert_eq!(imported["input_valid"], true, "{imported}");
+        let reviewed = cli.query("jobs.plan", json!({
+            "asset_id":original["id"],"job_document":imported["job"]
+        })).await;
+        let direct = cli.query("media.encode", json!({
+            "asset_id":original["id"],"output":output,"settings":{
+                "video_stream":0,"container":"mp4","preset":"balanced",
+                "bitrate":{"average_kbps":700,"mode":"quality_vbr"},"audio":{"kind":"drop"},
+                "picture":{"crop":{"width":240,"height":120,"x":40,"y":30},"rotation":"clockwise",
+                    "resize":{"width":width,"height":height,"aspect":aspect}}
+            }
+        })).await;
+        assert_eq!(reviewed["hash"], direct["hash"], "{label}");
+    }
+
     let intake = directory.join("encode-intake");
     let output_root = directory.join("encode-outputs");
     std::fs::create_dir_all(intake.join("second")).unwrap();
