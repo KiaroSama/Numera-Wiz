@@ -691,6 +691,32 @@ impl ProjectReadSnapshot {
             owner.member_count,
         )
     }
+    pub fn bin_search_page(
+        &self,
+        bin: &EntityId,
+        after: Option<&str>,
+        limit: usize,
+        budget: usize,
+        query: &str,
+    ) -> Result<IndexedPage> {
+        domain::label(query)?;
+        let mut page = self.bin_page(bin, after, limit, budget)?;
+        let needle = query.to_lowercase();
+        // Keep the original next key even when the scanned page has no match.
+        for item in std::mem::take(&mut page.items) {
+            let name = item["name"].as_str().ok_or_else(|| {
+                DomainError::new("PROJECT_CORRUPT", "Bin index is missing a display name")
+            })?;
+            if name.to_lowercase().contains(&needle) {
+                page.items.push(item);
+            }
+        }
+        page.total_count = page.items.len();
+        if page.next_key.is_some() {
+            page.count_accuracy = "lower_bound".into();
+        }
+        Ok(page)
+    }
     pub fn track_page(
         &self,
         sequence: &EntityId,

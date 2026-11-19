@@ -120,6 +120,7 @@ pub(crate) fn controller_cases() {
     captured_scope_and_retry();
     malformed_scope_retains_intent();
     coherent_load_and_retirement();
+    filtered_bin_pages_keep_the_captured_query();
     changed_ticket_is_tracked();
     expired_staged_publication();
     cleanup_guards();
@@ -132,6 +133,38 @@ pub(crate) fn controller_cases() {
     sequence_history_and_external_removal_recover();
     selection_recovery_rejects_other_failures();
     clip_group_selection_and_requests();
+}
+fn filtered_bin_pages_keep_the_captured_query() {
+    let (mut app, port, ctx) = ready();
+    app.project_search_bin(Some("ÉDiT".into()), &ctx);
+    assert_eq!(port.complete(catalog()).params["replace_snapshot"], TICKET);
+    app.receive(&ctx);
+    let new_ticket = "10000000-0000-4000-8000-000000000099";
+    assert_eq!(port.complete(summary(new_ticket, "0")).params["revision"], "0");
+    app.receive(&ctx);
+    let mut first = bin(new_ticket, "0");
+    first["next_cursor"] = json!("bin-search-continuation");
+    first["count_accuracy"] = json!("lower_bound");
+    let request = port.complete(first);
+    assert_eq!(request.params["query"], "ÉDiT");
+    assert_eq!(request.params["bin_id"], BIN);
+    app.receive(&ctx);
+    assert!(app.project_ready());
+    app.project_next_page(Phase::NextBin, &ctx);
+    let next = port.complete(bin(new_ticket, "0"));
+    assert_eq!(next.params["query"], "ÉDiT");
+    assert_eq!(next.params["cursor"], "bin-search-continuation");
+    assert_eq!(next.params["revision"], "0");
+    app.receive(&ctx);
+    assert!(app.project_ready());
+    app.project_search_bin(None, &ctx);
+    assert_eq!(port.complete(catalog()).params["replace_snapshot"], new_ticket);
+    app.receive(&ctx);
+    port.complete(summary(TICKET, "0"));
+    app.receive(&ctx);
+    assert!(port.complete(bin(TICKET, "0")).params.get("query").is_none());
+    app.receive(&ctx);
+    assert!(app.project_ready() && app.projects.bin_query_input.is_empty());
 }
 fn creation_and_terminal_denial() {
     let (mut app, port, ctx) = boot();

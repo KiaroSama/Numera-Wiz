@@ -755,6 +755,21 @@ query fields and limit. A live ticket captures one revision for 30 seconds and
 supports eight query bindings. Project and inventory tickets share 32 global/four
 per-principal limits and a 16 MiB metadata/serialization reserve.
 
+To search the direct children of a bin by display name, use **Search** in the
+project bin panel or set `query` on the `bin_page` projection. Matching uses a
+case-insensitive substring and preserves label/ID ordering. The query accepts
+1–128 UTF-8 bytes without control characters. **Clear search** restores browsing.
+
+```sh
+numera-wiz --data-dir DATA projects inspect --project PROJECT --projection bin_page --bin BIN --query "assembly"
+```
+
+A filtered page can be empty while a cursor remains. Each request examines at
+most `limit` bin summaries within the existing byte budget, plus one index entry
+to detect the next page. Follow the cursor with the same query and limit until
+`next_cursor` is null. Search totals are cumulative lower bounds until the last
+page reports the exact count.
+
 Use the same captured `--revision` for coherent projections. For project/sequence
 inspection, `--replace-snapshot`
 can retire an owned same-project ticket before a fresh capture. Expired cursors

@@ -33,6 +33,7 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         json!({"projection":"summary","entity_id":null,"bin_id":null,"cursor":null,"replace_snapshot":ID}),
         json!({"projection":"entity","entity_id":ID}),
         json!({"projection":"bin_page","bin_id":ID,"cursor":"opaque","replace_snapshot":null,"limit":512}),
+        json!({"projection":"bin_page","bin_id":ID,"query":"ÉDiT"}),
     ] {
         add("projects.inspect", params, true);
     }
@@ -43,6 +44,10 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         json!({"projection":"entity","entity_id":null}),
         json!({"projection":"bin_page","bin_id":null}),
         json!({"projection":"summary","entity_id":ID}),
+        json!({"projection":"summary","query":"edit"}),
+        json!({"projection":"bin_page","bin_id":ID,"query":""}),
+        json!({"projection":"bin_page","bin_id":ID,"query":"x".repeat(129)}),
+        json!({"projection":"bin_page","bin_id":ID,"query":"bad\nname"}),
         json!({"projection":"entity","entity_id":ID,"cursor":"opaque"}),
         json!({"projection":"summary","sort":"name"}),
         json!({"projection":"summary","replace_snapshot":"old"}),
@@ -210,7 +215,7 @@ pub(crate) fn literal_cases() -> Vec<(&'static str, Value, bool)> {
         add(command, json!({}), true);
         add(command, json!({"unexpected":true}), false);
     }
-    assert_eq!(cases.len(), 94, "R1_LITERAL_INPUT_CASE_SET_CHANGED");
+    assert_eq!(cases.len(), 99, "R1_LITERAL_INPUT_CASE_SET_CHANGED");
     cases
 }
 
@@ -222,7 +227,7 @@ pub(super) fn run() {
         .unwrap()
         .1
         .clone();
-    let expected: Vec<_> = (1..=94).collect();
+    let expected: Vec<_> = (1..=99).collect();
     let schemas = schema_validation::COMMANDS
         .into_iter()
         .map(|id| {

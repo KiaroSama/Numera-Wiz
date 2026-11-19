@@ -85,6 +85,7 @@ struct View {
     project: String,
     revision: Option<String>,
     bin: Option<String>,
+    bin_query: Option<String>,
     sequence: Option<String>,
     track: Option<String>,
     clip: Option<String>,
@@ -96,6 +97,7 @@ impl View {
             project,
             revision: None,
             bin: None,
+            bin_query: None,
             sequence: None,
             track: None,
             clip: None,
@@ -104,6 +106,13 @@ impl View {
                 end: Rational::new(8, 1).expect("Constant rational"),
             },
         }
+    }
+    fn bin_page_params(&self) -> Value {
+        let mut params = json!({"projection":"bin_page","bin_id":self.bin,"limit":PAGE});
+        if let Some(query) = &self.bin_query {
+            params["query"] = json!(query);
+        }
+        params
     }
 }
 #[derive(Clone)]
@@ -226,6 +235,7 @@ pub(super) struct ProjectsUi {
     pub(super) terminal_failure: bool,
     handles: Vec<Handle>,
     forms: Forms,
+    bin_query_input: String,
     assets: Vec<AssetSummary>,
     assets_cursor: Option<String>,
     assets_snapshot: Option<String>,
@@ -449,6 +459,10 @@ impl WizApp {
             self.error = Some(error);
             return;
         }
+        self.projects.bin_query_input = match &target {
+            Navigation::Open(view) => view.bin_query.clone().unwrap_or_default(),
+            _ => String::new(),
+        };
         if matches!(target, Navigation::Catalog | Navigation::Cleanup) {
             self.projects.sequence_form = false;
             self.projects.source_form = false;
@@ -497,6 +511,24 @@ impl WizApp {
             view.revision = Some(group.key.revision.clone());
         }
         self.project_navigate(Navigation::Open(view), ctx);
+    }
+    fn project_search_bin(&mut self, query: Option<String>, ctx: &egui::Context) {
+        if !self.project_ready() {
+            return;
+        }
+        if let Some(query) = query.as_deref()
+            && let Err(error) = nw_domain::projects::label(query)
+        {
+            self.error = Some(error.message);
+            return;
+        }
+        let mut view = self.projects.group.as_ref().expect("Ready group").view.clone();
+        if view.bin_query != query {
+            view.bin_query = query;
+            self.project_reselect(view, ctx);
+        } else if query.is_none() {
+            self.projects.bin_query_input.clear();
+        }
     }
     fn project_ready(&self) -> bool {
         self.projects.active
@@ -1300,7 +1332,7 @@ impl WizApp {
             if view.bin.is_none() {
                 view.bin = Some(root);
             }
-            let bin = view.bin.clone();
+            let bin_params = view.bin_page_params();
             let first_seen = self
                 .projects
                 .handles
@@ -1333,12 +1365,7 @@ impl WizApp {
                 .as_mut()
                 .expect("Staging retained")
                 .group = Some(group);
-            return self.project_query(
-                Phase::Bin,
-                "projects.inspect",
-                json!({"projection":"bin_page","bin_id":bin,"limit":PAGE}),
-                ctx,
-            );
+            return self.project_query(Phase::Bin, "projects.inspect", bin_params, ctx);
         }
         let group = self
             .projects
@@ -1505,10 +1532,12 @@ impl WizApp {
         }
         let group = self.projects.group.as_ref().expect("Ready group");
         let (command, params) = match phase {
-            Phase::NextBin => (
-                "projects.inspect",
-                json!({"projection":"bin_page","bin_id":group.view.bin,"limit":PAGE,"cursor":group.bins.next,"revision":group.key.revision}),
-            ),
+            Phase::NextBin => {
+                let mut params = group.view.bin_page_params();
+                params["cursor"] = json!(group.bins.next);
+                params["revision"] = json!(group.key.revision);
+                ("projects.inspect", params)
+            }
             Phase::NextTracks => (
                 "sequences.inspect",
                 json!({"projection":"track_page","sequence_id":group.view.sequence,"limit":PAGE,"cursor":group.tracks.next,"revision":group.key.revision}),

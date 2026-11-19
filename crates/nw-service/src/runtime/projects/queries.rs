@@ -58,6 +58,7 @@ struct Query {
     limit: usize,
     entity: Option<EntityId>,
     bin: Option<EntityId>,
+    bin_query: Option<String>,
     sequence: Option<EntityId>,
     tracks: Vec<EntityId>,
     range: Option<nw_domain::time::TimeRange>,
@@ -74,10 +75,12 @@ impl Query {
                 "summary"
                     if input.entity_id.is_none()
                         && input.bin_id.is_none()
+                        && input.query.is_none()
                         && input.cursor.is_none() => {}
                 "entity"
                     if input.entity_id.is_some()
                         && input.bin_id.is_none()
+                        && input.query.is_none()
                         && input.cursor.is_none() => {}
                 "bin_page" if input.bin_id.is_some() && input.entity_id.is_none() => {}
                 _ => {
@@ -85,6 +88,9 @@ impl Query {
                         "Invalid project projection or projection-specific fields",
                     ));
                 }
+            }
+            if let Some(query) = input.query.as_deref() {
+                domain::label(query)?;
             }
             Self {
                 projection: input.projection,
@@ -94,6 +100,7 @@ impl Query {
                 limit: input.limit,
                 entity: input.entity_id,
                 bin: input.bin_id,
+                bin_query: input.query,
                 sequence: None,
                 tracks: Vec::new(),
                 range: None,
@@ -134,6 +141,7 @@ impl Query {
                 limit: input.limit,
                 entity: None,
                 bin: None,
+                bin_query: None,
                 sequence: Some(input.sequence_id),
                 tracks,
                 range: input.range,
@@ -152,7 +160,11 @@ impl Query {
                 "Invalid project page size, cursor or replacement",
             ));
         }
-        query.binding = serde_json::to_string(&json!({"command":request.command.id,"projection":query.projection,"limit":query.limit,"entity":query.entity,"bin":query.bin,"sequence":query.sequence,"tracks":query.tracks,"range":query.range,"sort":"label_or_track_order_exact_grid"})).map_err(|e| domain::invalid(e.to_string()))?;
+        let mut binding = json!({"command":request.command.id,"projection":query.projection,"limit":query.limit,"entity":query.entity,"bin":query.bin,"sequence":query.sequence,"tracks":query.tracks,"range":query.range,"sort":"label_or_track_order_exact_grid"});
+        if let Some(name) = &query.bin_query {
+            binding["query"] = json!(name);
+        }
+        query.binding = serde_json::to_string(&binding).map_err(|e| domain::invalid(e.to_string()))?;
         if query.binding.len() > 8192 {
             return Err(domain::limit("Project query binding exceeds 8 KiB"));
         }
@@ -199,14 +211,17 @@ impl Query {
             }
             _ => {
                 let page = match self.projection.as_str() {
-                    "bin_page" => read.bin_page(
-                        self.bin
+                    "bin_page" => {
+                        let bin = self.bin
                             .as_ref()
-                            .ok_or_else(|| domain::invalid("Bin identity required"))?,
-                        after,
-                        self.limit,
-                        MAX_PAGE_BYTES - 8192,
-                    )?,
+                            .ok_or_else(|| domain::invalid("Bin identity required"))?;
+                        let budget = MAX_PAGE_BYTES - 8192;
+                        if let Some(query) = self.bin_query.as_deref() {
+                            read.bin_search_page(bin, after, self.limit, budget, query)?
+                        } else {
+                            read.bin_page(bin, after, self.limit, budget)?
+                        }
+                    }
                     "track_page" => read.track_page(
                         self.sequence
                             .as_ref()
@@ -245,7 +260,7 @@ impl Query {
                         .as_ref()
                         .map(|key| ticket.cursor(id, binding, key, count))
                 );
-                result["total_count"] = json!(if matches!(
+                result["total_count"] = json!(if self.bin_query.is_some() || matches!(
                     self.projection.as_str(),
                     "viewport" | "marker_page"
                 ) {
@@ -618,7 +633,7 @@ pub(super) fn input_contract_parser_controls() {
         );
         observed += 1;
     }
-    assert_eq!(observed, 34, "R1_QUERY_PARSER_CASE_SET_CHANGED");
+    assert_eq!(observed, 39, "R1_QUERY_PARSER_CASE_SET_CHANGED");
 }
 
 #[cfg(test)]
@@ -644,7 +659,7 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
     let sequence = |revision: u64| {
         let mut request = Request::query(
             "sequences.create",
-            json!({"name":format!("Sequence {revision}"),"settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),
+            json!({"name":format!("Sequence Édit {revision}"),"settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),
         );
         request.project = Some(ProjectRef {
             id: project.into(),
@@ -669,7 +684,7 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
     let page_request = |cursor: Option<Value>| {
         let mut request = Request::query(
             "projects.inspect",
-            json!({"projection":"bin_page","bin_id":bin,"limit":1,"cursor":cursor}),
+            json!({"projection":"bin_page","bin_id":bin,"limit":1,"cursor":cursor,"query":"éDIT"}),
         );
         request.project = Some(ProjectRef {
             id: project.into(),
@@ -680,6 +695,9 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
     let first = service.dispatch(context.clone(), page_request(None)).await;
     assert!(first.ok, "{:?}", first.error);
     let first = first.result.unwrap();
+    assert_eq!(first["items"][0]["name"], "Sequence Édit 0");
+    assert_eq!(first["total_count"], 1);
+    assert_eq!(first["count_accuracy"], "lower_bound");
     let ticket = first["snapshot_id"].as_str().unwrap().to_owned();
     assert_eq!(
         service
@@ -691,6 +709,10 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
     );
     let moved = service.dispatch(context.clone(), sequence(2)).await;
     assert!(moved.ok, "{:?}", moved.error);
+    let mut wrong_query = page_request(Some(first["next_cursor"].clone()));
+    wrong_query.params["query"] = json!("different");
+    let rejected = service.dispatch(context.clone(), wrong_query).await;
+    assert_eq!(rejected.error.unwrap().code, "SNAPSHOT_EXPIRED");
     let old_page = service
         .dispatch(
             context.clone(),
@@ -701,6 +723,9 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
     let old_page = old_page.result.unwrap();
     assert_eq!(old_page["project_revision"], "2");
     assert_eq!(old_page["total_count"], 2);
+    assert_eq!(old_page["items"][0]["name"], "Sequence Édit 1");
+    assert_eq!(old_page["count_accuracy"], "exact");
+    assert!(old_page["next_cursor"].is_null());
     assert_eq!(
         service
             .store

@@ -276,7 +276,7 @@ impl WizApp {
         let ready = self.project_ready();
         ui.heading(group.summary["name"].as_str().unwrap_or("Project"));
         ui.small(format!("Revision {}", group.key.revision));
-        ui.horizontal(|ui| {
+        let query = ui.horizontal(|ui| {
             if ui
                 .add_enabled(idle, egui::Button::new("Projects catalog"))
                 .clicked()
@@ -286,16 +286,53 @@ impl WizApp {
             if ui.add_enabled(idle, egui::Button::new("Refresh")).clicked() {
                 self.project_refresh(ui.ctx());
             }
-        });
+            ui.add_enabled_ui(ready, |ui| {
+                ui.menu_button("Search", |ui| {
+                    let input = ui.add(
+                        egui::TextEdit::singleline(&mut self.projects.bin_query_input)
+                            .hint_text("Search names in this bin")
+                            .desired_width(160.0)
+                            .char_limit(128),
+                    );
+                    let enter = input.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                    if ui.button("Apply").clicked() || enter {
+                        ui.close();
+                        return Some(self.projects.bin_query_input.clone());
+                    }
+                    if ui.add_enabled(group.view.bin_query.is_some() || !self.projects.bin_query_input.is_empty(), egui::Button::new("Clear search")).clicked() {
+                        ui.close();
+                        return Some(String::new());
+                    }
+                    None
+                }).inner.flatten()
+            }).inner
+        }).inner;
+        if let Some(query) = query {
+            self.project_search_bin((!query.is_empty()).then_some(query), ui.ctx());
+            return;
+        }
         ui.separator();
         ui.strong("Bins and sequences");
+        if let Some(query) = &group.view.bin_query {
+            ui.small(format!("Matching names: {query}"));
+        }
         ui.small(page_label(&group.bins));
+        if group.view.bin_query.is_some() && group.bins.items.is_empty() {
+            ui.small(if group.bins.next.is_some() {
+                "No matching names on this page."
+            } else if group.bins.total == 0 {
+                "No matching names."
+            } else {
+                "No more matching names."
+            });
+        }
         if ui
             .add_enabled(ready, egui::Button::new("Root bin"))
             .clicked()
         {
             let mut view = group.view.clone();
             view.bin = None;
+            view.bin_query = None;
             self.project_reselect(view, ui.ctx());
         }
         let mut selection = None;
@@ -322,6 +359,7 @@ impl WizApp {
             let mut view = group.view.clone();
             if kind == "bin" {
                 view.bin = Some(id);
+                view.bin_query = None;
             } else {
                 view.sequence = Some(id);
                 view.track = None;

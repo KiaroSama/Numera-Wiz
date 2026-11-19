@@ -76,9 +76,12 @@ fn inspect(schema: &mut Value, sequence: bool) {
     } else {
         enumeration(schema, "projection", &["summary", "entity", "bin_page"]);
         enumeration(schema, "sort", &["label"]);
+        let query = field(schema, "query");
+        label(query);
+        query["description"] = json!("A 1–128 UTF-8 byte case-insensitive display-name substring without controls, for bin_page only.");
         schema["oneOf"] = json!([
-            {"properties":{"projection":{"const":"summary"},"entity_id":{"type":"null"},"bin_id":{"type":"null"},"cursor":{"type":"null"}}},
-            {"required":["entity_id"],"properties":{"projection":{"const":"entity"},"entity_id":{"not":{"type":"null"}},"bin_id":{"type":"null"},"cursor":{"type":"null"}}},
+            {"properties":{"projection":{"const":"summary"},"entity_id":{"type":"null"},"bin_id":{"type":"null"},"cursor":{"type":"null"},"query":{"type":"null"}}},
+            {"required":["entity_id"],"properties":{"projection":{"const":"entity"},"entity_id":{"not":{"type":"null"}},"bin_id":{"type":"null"},"cursor":{"type":"null"},"query":{"type":"null"}}},
             {"required":["bin_id"],"properties":{"projection":{"const":"bin_page"},"bin_id":{"not":{"type":"null"}},"entity_id":{"type":"null"}}}
         ]);
     }

@@ -147,6 +147,12 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             .bin_page(&EntityId::parse(bin).unwrap(), None, 128, 240 * 1024)
             .unwrap();
         assert!(page.scanned <= 129);
+        let sparse = indexed
+            .bin_search_page(&EntityId::parse(bin).unwrap(), None, 128, 256, "never matches")
+            .unwrap();
+        assert!(sparse.items.is_empty() && sparse.next_key.is_some());
+        assert_eq!(sparse.count_accuracy, "lower_bound");
+        assert!(sparse.scanned < 10);
         let late = indexed
             .clip_range(
                 &EntityId::parse(sequence_id).unwrap(),

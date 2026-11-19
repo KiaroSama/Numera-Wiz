@@ -62,6 +62,9 @@ pub struct InspectInput {
     pub entity_id: Option<EntityId>,
     #[serde(default)]
     pub bin_id: Option<EntityId>,
+    /// Case-insensitive display-name substring for the selected bin's direct children.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
     #[serde(default = "limit_default")]
     pub limit: usize,
     #[serde(default)]

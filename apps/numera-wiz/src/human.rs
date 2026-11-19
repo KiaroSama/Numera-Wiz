@@ -1443,6 +1443,15 @@ mod tests {
                 .get("expected_revision")
                 .is_none()
         );
+        let filtered = ProjectCli::try_parse_from([
+            "test", "inspect", "--project", id, "--projection", "bin_page", "--bin", id,
+            "--query", "ÉDiT",
+        ])
+        .unwrap();
+        let filtered = prepare(Command::Projects(filtered.command)).unwrap();
+        assert_eq!(filtered.command.id, "projects.inspect");
+        assert_eq!(filtered.params["query"], "ÉDiT");
+        assert_eq!(filtered.params["bin_id"], id);
         #[derive(Parser)]
         struct ClipCli {
             #[command(subcommand)]

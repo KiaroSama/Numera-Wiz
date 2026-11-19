@@ -74,6 +74,9 @@ pub enum Projects {
         entity: Option<String>,
         #[arg(long)]
         bin: Option<String>,
+        /// Match a case-insensitive display-name substring in a bin page.
+        #[arg(long, requires = "bin")]
+        query: Option<String>,
         #[arg(long, default_value_t = 128)]
         limit: usize,
         #[arg(long)]
@@ -95,13 +98,20 @@ impl Projects {
                 projection,
                 entity,
                 bin,
+                query,
                 limit,
                 cursor,
-            } => read_request(
-                context,
-                "projects.inspect",
-                json!({"projection":projection,"entity_id":entity,"bin_id":bin,"limit":limit,"cursor":cursor}),
-            ),
+            } => {
+                let mut params = json!({"projection":projection,"entity_id":entity,"bin_id":bin,"limit":limit,"cursor":cursor});
+                if let Some(query) = query {
+                    if projection != "bin_page" {
+                        return Err(model::invalid("A name query requires the bin_page projection"));
+                    }
+                    model::label(&query)?;
+                    params["query"] = json!(query);
+                }
+                read_request(context, "projects.inspect", params)
+            }
         }
     }
 }
