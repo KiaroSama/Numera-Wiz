@@ -115,8 +115,14 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     let tools = client.list_all_tools().await.unwrap();
     let paged: Vec<_> = pages.iter().flat_map(|page| &page.tools).collect();
     assert_eq!(
-        tools.iter().map(|tool| tool.name.as_ref()).collect::<Vec<_>>(),
-        paged.iter().map(|tool| tool.name.as_ref()).collect::<Vec<_>>()
+        tools
+            .iter()
+            .map(|tool| tool.name.as_ref())
+            .collect::<Vec<_>>(),
+        paged
+            .iter()
+            .map(|tool| tool.name.as_ref())
+            .collect::<Vec<_>>()
     );
     assert!(tools.iter().any(|tool| tool.name == "jobs.submit"));
     assert!(!tools.iter().any(|tool| tool.name == "shell.execute"));
@@ -441,12 +447,17 @@ async fn reject_ambiguous_owner_bridge() {
 fn project_mcp_output_contract(pages: &[rmcp::model::ListToolsResult]) {
     use serde_json::Value;
     use std::collections::BTreeSet;
-    assert!(pages.len() > 1, "MCP_TOOL_PAGINATION_REGRESSION_NOT_EXERCISED");
+    assert!(
+        pages.len() > 1,
+        "MCP_TOOL_PAGINATION_REGRESSION_NOT_EXERCISED"
+    );
     for (index, page) in pages.iter().enumerate() {
         assert!(!page.tools.is_empty());
         assert_eq!(page.next_cursor.is_some(), index + 1 < pages.len());
-        assert!(serde_json::to_vec(page).unwrap().len() <= nw_domain::commands::MAX_RESULT_BYTES,
-            "MCP_TOOL_PAGE_BYTE_BOUND");
+        assert!(
+            serde_json::to_vec(page).unwrap().len() <= nw_domain::commands::MAX_RESULT_BYTES,
+            "MCP_TOOL_PAGE_BYTE_BOUND"
+        );
     }
     let tools: Vec<_> = pages.iter().flat_map(|page| &page.tools).collect();
     let actual: BTreeSet<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();

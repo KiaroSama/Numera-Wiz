@@ -3,8 +3,8 @@ use crate::{Engine, blocking, media};
 use nw_domain::{
     DomainError, Result,
     capabilities::{
-        AdvertisedComponents, BuildLicense, CapabilityReport, ClearResult, NvencObservations, Observation,
-        RefreshInput,
+        AdvertisedComponents, BuildLicense, CapabilityReport, ClearResult, NvencObservations,
+        Observation, RefreshInput,
     },
     media::ComponentIdentity,
     records::FileIdentity,
@@ -35,14 +35,22 @@ impl VideoProbe {
 }
 
 fn declared_license(notice: &str) -> Option<BuildLicense> {
-    let notice = notice.split_ascii_whitespace().collect::<Vec<_>>().join(" ");
+    let notice = notice
+        .split_ascii_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     if notice.contains("has nonfree parts compiled in.") {
         return Some(BuildLicense::Nonfree);
     }
     let (_, terms) = notice.split_once("under the terms of the GNU ")?;
-    let (lesser, terms) = terms.strip_prefix("Lesser ").map_or((false, terms), |terms| (true, terms));
-    let terms = terms.strip_prefix("General Public License as published by the Free Software Foundation; either version ")?;
-    let (version, _) = terms.split_once(" of the License, or (at your option) any later version.")?;
+    let (lesser, terms) = terms
+        .strip_prefix("Lesser ")
+        .map_or((false, terms), |terms| (true, terms));
+    let terms = terms.strip_prefix(
+        "General Public License as published by the Free Software Foundation; either version ",
+    )?;
+    let (version, _) =
+        terms.split_once(" of the License, or (at your option) any later version.")?;
     match (lesser, version) {
         (false, "2") => Some(BuildLicense::Gpl2),
         (false, "3") => Some(BuildLicense::Gpl3),
@@ -157,15 +165,27 @@ impl Engine {
         Ok(report)
     }
 
-    async fn observe_build_license(&self, cancel: CancellationToken) -> Result<Option<BuildLicense>> {
+    async fn observe_build_license(
+        &self,
+        cancel: CancellationToken,
+    ) -> Result<Option<BuildLicense>> {
         let ticket = self.process_budget.acquire(&cancel).await?;
         let args = ["-hide_banner", "-L"].map(str::to_owned);
-        let output = process::run_with_output_limits(Path::new(&self.ffmpeg.path), &args,
-            Duration::from_secs(3), 8192, 8192, cancel).await;
+        let output = process::run_with_output_limits(
+            Path::new(&self.ffmpeg.path),
+            &args,
+            Duration::from_secs(3),
+            8192,
+            8192,
+            cancel,
+        )
+        .await;
         match ticket.finish(output) {
             Ok(output) => Ok(declared_license(&String::from_utf8_lossy(&output.stdout))
                 .or_else(|| declared_license(&output.stderr_tail))),
-            Err(error) if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") => Ok(None),
+            Err(error) if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") => {
+                Ok(None)
+            }
             Err(error) => Err(error),
         }
     }

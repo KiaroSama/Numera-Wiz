@@ -24,12 +24,16 @@ fn admitted(target: &str, group: &str, name: &str) -> bool {
     }
     match group {
         "bin" => match target {
-            "x86_64-pc-windows-msvc" => matches!(name, "ffmpeg.exe" | "ffprobe.exe") || extension == "dll",
+            "x86_64-pc-windows-msvc" => {
+                matches!(name, "ffmpeg.exe" | "ffprobe.exe") || extension == "dll"
+            }
             "aarch64-apple-darwin" | "x86_64-apple-darwin" => {
                 matches!(name, "ffmpeg" | "ffprobe") || extension == "dylib"
             }
             "x86_64-unknown-linux-gnu" => {
-                matches!(name, "ffmpeg" | "ffprobe") || name.ends_with(".so") || name.contains(".so.")
+                matches!(name, "ffmpeg" | "ffprobe")
+                    || name.ends_with(".so")
+                    || name.contains(".so.")
             }
             _ => false,
         },
@@ -77,8 +81,14 @@ pub fn generate() {
         let (group, name) = path
             .split_once('/')
             .expect("media asset directory and name");
-        assert!(admitted(&target, group, name), "Invalid embedded media filename: {path:?}");
-        assert!(paths.insert(path.to_ascii_lowercase()), "Duplicate embedded media path: {path:?}");
+        assert!(
+            admitted(&target, group, name),
+            "Invalid embedded media filename: {path:?}"
+        );
+        assert!(
+            paths.insert(path.to_ascii_lowercase()),
+            "Duplicate embedded media path: {path:?}"
+        );
         let sha = asset["sha256"].as_str().expect("media SHA-256");
         let bytes = asset["bytes"].as_u64().expect("media file size");
         assert!((1..=96 * 1024 * 1024).contains(&bytes));
@@ -96,7 +106,11 @@ pub fn generate() {
             "EmbeddedFile {{ group: {group:?}, name: {name:?}, sha256: {sha:?}, bytes: include_bytes!({file:?}) }},\n"
         ));
     }
-    let suffix = if target == "x86_64-pc-windows-msvc" { ".exe" } else { "" };
+    let suffix = if target == "x86_64-pc-windows-msvc" {
+        ".exe"
+    } else {
+        ""
+    };
     for tool in ["ffmpeg", "ffprobe"] {
         assert!(paths.contains(&format!("bin/{tool}{suffix}")));
     }

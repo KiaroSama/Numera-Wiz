@@ -806,7 +806,8 @@ impl WizApp {
                     let measurement: VolumeMeasurement =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
                     if self.selected_asset().is_some_and(|asset| {
-                        asset.id == measurement.asset_id && asset.identity.sha256 == measurement.source_sha256
+                        asset.id == measurement.asset_id
+                            && asset.identity.sha256 == measurement.source_sha256
                     }) {
                         self.volume_measurement = Some(measurement);
                     }
@@ -861,27 +862,51 @@ impl WizApp {
     }
     fn volume_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
         use nw_domain::mux::StreamKind;
-        let mut audio = asset.probe.streams.iter().filter(|stream| stream.kind == StreamKind::Audio).peekable();
+        let mut audio = asset
+            .probe
+            .streams
+            .iter()
+            .filter(|stream| stream.kind == StreamKind::Audio)
+            .peekable();
         if audio.peek().is_none() {
             return;
         }
         egui::CollapsingHeader::new("Audio levels").show(ui, |ui| {
-            egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
-                for stream in audio {
-                    if ui.add_enabled(self.request_idle(), egui::Button::new(format!("Measure stream {}", stream.index))).clicked() {
-                        self.volume_measurement = None;
-                        self.query("media.analyze.volume", json!({"asset_id":asset.id,"stream_index":stream.index}),
-                            Action::VolumeMeasurement, ui.ctx());
+            egui::ScrollArea::vertical()
+                .max_height(150.0)
+                .show(ui, |ui| {
+                    for stream in audio {
+                        if ui
+                            .add_enabled(
+                                self.request_idle(),
+                                egui::Button::new(format!("Measure stream {}", stream.index)),
+                            )
+                            .clicked()
+                        {
+                            self.volume_measurement = None;
+                            self.query(
+                                "media.analyze.volume",
+                                json!({"asset_id":asset.id,"stream_index":stream.index}),
+                                Action::VolumeMeasurement,
+                                ui.ctx(),
+                            );
+                        }
                     }
-                }
-            });
+                });
             if let Some(measurement) = &self.volume_measurement {
                 let display = |level: &Decibels| match level {
-                    Decibels::Finite { micro_db } => format!("{:.2} dBFS", *micro_db as f64 / 1_000_000.0),
+                    Decibels::Finite { micro_db } => {
+                        format!("{:.2} dBFS", *micro_db as f64 / 1_000_000.0)
+                    }
                     Decibels::Silence => "Silence".to_owned(),
                 };
-                ui.label(format!("Stream {} · Peak {} · RMS {} · {} samples per channel", measurement.stream_index,
-                    display(&measurement.peak), display(&measurement.rms), measurement.samples_per_channel));
+                ui.label(format!(
+                    "Stream {} · Peak {} · RMS {} · {} samples per channel",
+                    measurement.stream_index,
+                    display(&measurement.peak),
+                    display(&measurement.rms),
+                    measurement.samples_per_channel
+                ));
             }
         });
     }

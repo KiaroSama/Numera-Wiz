@@ -1436,7 +1436,8 @@ impl Service {
             }
             "media.analyze.volume" => {
                 drop(guard);
-                let volume = self.source_volume(&context, commands::parse(params)?, cancellation.clone())?;
+                let volume =
+                    self.source_volume(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&volume)?).bounded());
             }
             "media.probe" => {

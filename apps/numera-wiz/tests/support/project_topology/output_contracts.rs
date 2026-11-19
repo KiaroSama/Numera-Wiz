@@ -29,14 +29,14 @@ async fn documents(client: &RunningService<RoleClient, ()>) -> Vec<Value> {
         .expect("MCP_OUTPUT_DISCOVERY_FAILED");
     let ids: BTreeSet<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
     assert!(
-        ids.len() == tools.len()
-            && ids == nw_service::ACTIVE_COMMANDS.iter().copied().collect(),
+        ids.len() == tools.len() && ids == nw_service::ACTIVE_COMMANDS.iter().copied().collect(),
         "MCP_OUTPUT_ACTIVE_IDS"
     );
     schema_validation::COMMANDS
         .into_iter()
         .map(|id| {
-            let tool = tools.iter()
+            let tool = tools
+                .iter()
                 .find(|tool| tool.name == id)
                 .expect("MCP_OUTPUT_TOOL_MISSING");
             Value::Object(

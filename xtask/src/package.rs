@@ -82,7 +82,10 @@ pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<s
         .arg(&target)
         .args(["--", "-C", "strip=debuginfo"])
         .status()?;
-    anyhow::ensure!(status.success(), "Build the application with the same-source media component");
+    anyhow::ensure!(
+        status.success(),
+        "Build the application with the same-source media component"
+    );
     let suffix = std::env::consts::EXE_SUFFIX;
     Ok(target.join("debug").join(format!("numera-wiz{suffix}")))
 }
@@ -146,7 +149,10 @@ fn summary(message: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn macos_bundle(package: &Path, identifier: &str) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
+pub(crate) fn macos_bundle(
+    package: &Path,
+    identifier: &str,
+) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
     let contents = package.join("Numera Wiz.app/Contents");
     fs::create_dir_all(contents.join("MacOS"))?;
     fs::create_dir_all(contents.join("Resources"))?;

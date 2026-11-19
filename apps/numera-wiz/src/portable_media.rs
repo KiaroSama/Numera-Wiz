@@ -60,8 +60,10 @@ fn verify(profile: &Path) -> Result<PathBuf> {
             #[cfg(unix)]
             if helper(entry) {
                 use std::os::unix::fs::PermissionsExt;
-                ensure!(fs::metadata(&path)?.permissions().mode() & 0o777 == 0o700,
-                    "The installed media helper is not owner-executable");
+                ensure!(
+                    fs::metadata(&path)?.permissions().mode() & 0o777 == 0o700,
+                    "The installed media helper is not owner-executable"
+                );
             }
             let identity = files::identity(&path, &CancellationToken::new())?;
             ensure!(

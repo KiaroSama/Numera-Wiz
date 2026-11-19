@@ -17,20 +17,35 @@ impl Service {
         input: nw_domain::audio_analysis::VolumeInput,
         cancel: CancellationToken,
     ) -> Result<nw_domain::audio_analysis::VolumeMeasurement> {
-        let asset: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+        let asset: Asset = self
+            .store
+            .get(&named("asset", &input.asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
         self.object(context, &asset.id, &asset.creator)?;
         let path = self.path(context, Path::new(&asset.identity.path), false)?;
         let source = files::SourceStamp::capture_resolved(&path)?;
         let result = tokio::runtime::Handle::current().block_on(self.engine()?.measure_volume(
-            &asset, source, input.stream_index, cancel.clone(),
+            &asset,
+            source,
+            input.stream_index,
+            cancel.clone(),
         ))?;
         let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Volume measurement cancelled before delivery"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Volume measurement cancelled before delivery",
+            ));
         }
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command("media.analyze.volume")) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Volume measurement grant changed during analysis"));
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command("media.analyze.volume"))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Volume measurement grant changed during analysis",
+            ));
         }
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;
