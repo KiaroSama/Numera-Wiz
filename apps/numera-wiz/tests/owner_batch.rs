@@ -570,6 +570,20 @@ async fn variable_picture_retime(parent: &Path) -> Value {
         let params=json!({"asset_id":original["id"],"output":output,"range":range,
             "video_stream":0,"tempo_hundredths":tempo,"reverse":reverse,"audio":"drop"});
         let plan=cli.query("media.retime",params.clone()).await;
+        let legacy_speed = format!("{}.{:02}", tempo / 100, tempo % 100);
+        let legacy = format!(
+            "input_path={}\noutput_path={}\noutput_format=mkv\nvideo_codec=ffv1\naudio_tracks=none\nsubtitle_tracks=none\nvideo_speed={legacy_speed}\nreverse_video={}\n",
+            path.display(),
+            output.display(),
+            if reverse { "y" } else { "n" },
+        );
+        let imported = cli.query("config.import.ffmwiz", json!({
+            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1",
+        })).await;
+        assert_eq!(imported["input_valid"], true, "{imported}");
+        let compiled = cli.query("jobs.plan", json!({"asset_id":original["id"],"job_document":imported["job"]})).await;
+        assert_eq!(compiled["hash"],plan["hash"]);
+
         let doc=directory.join(format!("retime-{tempo}-{reverse}.json"));
         std::fs::write(&doc,serde_json::to_vec(&params).unwrap()).unwrap();
         let (typed,status)=cli.human(&["media","retime","--file",doc.to_str().unwrap()]).await;

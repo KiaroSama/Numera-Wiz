@@ -960,3 +960,10 @@ and enter the exclusive end.
 The output verifies every decoded FFV1 picture and its retimed,
 variable-rate millisecond timestamp. Audio and chapters are dropped.
 Review the clock before submitting the plan ID and hash.
+
+
+For an imported FFmWiz FFV1 picture job, set `audio_tracks=none` and
+`subtitle_tracks=none` explicitly. Use `video_speed` and
+`reverse_video` to review the registered whole clip through
+`jobs plan`. The imported input path must match the registered asset.
+Fields outside the picture-only profile receive field-specific errors.

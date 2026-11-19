@@ -56,6 +56,85 @@ impl ImportedJob {
         }
     }
 
+    pub fn selects_picture_retime(&self) -> bool {
+        matches!(self.get("video_codec"), Some(Setting::Encoder { name }) if name == "ffv1")
+    }
+
+    pub fn imported_source(&self) -> Result<&Path> {
+        self.path("input_path")
+    }
+
+    pub fn picture_retime(&self, asset: &crate::records::Asset) -> Result<crate::video_retime::RetimeInput> {
+        use crate::{time::{Rational, TimeRange}, video_retime::{AudioPolicy, RetimeInput}};
+        if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_picture_retime() {
+            return Err(DomainError::new("INVALID_JOB_DOCUMENT", "Use a version 1 FFmWiz profile with the FFV1 encoder"));
+        }
+        let source = self.imported_source()?;
+        let output = self.path("output_path")?;
+        if !output.extension().and_then(|value| value.to_str()).is_some_and(|value| value.eq_ignore_ascii_case("mkv")) {
+            return Err(unsupported("output_path"));
+        }
+        for name in ["audio_tracks", "subtitle_tracks"] {
+            if !matches!(self.get(name), Some(Setting::Tracks { selection: TrackChoice::None })) {
+                return Err(field_error("JOB_PROFILE_UNSUPPORTED", name, "This lossless picture job requires an explicit none selection"));
+            }
+        }
+        for (name, field) in &self.settings {
+            let name = name.as_str();
+            if !FIELDS.contains(&name) || !(1..=super::MAX_LINES).contains(&field.line) {
+                return Err(field_error("INVALID_JOB_DOCUMENT", name, "Unknown field or invalid imported line number"));
+            }
+            let qualified = match (name, &field.value) {
+                ("input_path" | "output_path" | "video_codec" | "video_speed", _) => true,
+                ("audio_tracks" | "subtitle_tracks", Setting::Tracks { selection: TrackChoice::None }) => true,
+                ("reverse_video" | "logging_enabled", Setting::Enabled { .. }) => true,
+                ("output_format", Setting::Source) => same_extension(source, output),
+                ("output_format", Setting::Choice { value }) => value.eq_ignore_ascii_case("mkv"),
+                ("use_gpu" | "crop" | "cpu_two_pass" | "reverse_audio" | "keep_embedded_attachments",
+                    Setting::Enabled { value: false }) => true,
+                ("video_look" | "video_quick" | "raw_ffmpeg_args" | "raw_ffmpeg_valued_args" | "audio_volume",
+                    Setting::Disabled) => true,
+                ("fps" | "resolution" | "color_range" | "audio_sample_rate" | "video_bitrate_kbps" | "audio_bitrate_kbps",
+                    Setting::Source) => true,
+                ("loudnorm", Setting::Choice { value }) => value == "off",
+                ("audio_codec", Setting::Copy) => true,
+                ("log_retention_days", Setting::Integer { .. }) | ("log_level", Setting::Choice { .. })
+                    | ("gui_engine", Setting::LegacyPolicy { .. }) => true,
+                _ => false,
+            };
+            if !qualified {
+                return Err(unsupported(name));
+            }
+        }
+        let tempo_hundredths = match self.get("video_speed") {
+            None | Some(Setting::Source) => 100,
+            Some(Setting::Scalar { value }) => {
+                let value = value.checked_mul(Rational::new(100, 1)?)?;
+                u16::try_from(value.numerator()).ok()
+                    .filter(|tempo| value.denominator() == 1 && (10..=800).contains(tempo))
+                    .ok_or_else(|| unsupported("video_speed"))?
+            }
+            _ => return Err(unsupported("video_speed")),
+        };
+        let mut pictures = asset.probe.streams.iter().filter(|stream| stream.kind == StreamKind::Video && !stream.attached_picture());
+        let picture = pictures.next().ok_or_else(|| unsupported("video_codec"))?;
+        if pictures.next().is_some() {
+            return Err(field_error("JOB_PROFILE_UNSUPPORTED", "video_codec", "The imported speed and reverse profile needs one ordinary source picture"));
+        }
+        let end = asset.probe.container_duration.ok_or_else(|| missing("input_path"))?;
+        let range = TimeRange { start: Rational::ZERO, end };
+        range.validate()?;
+        Ok(RetimeInput {
+            asset_id: asset.id.clone(),
+            output: output.to_str().ok_or_else(|| missing("output_path"))?.to_owned(),
+            video_stream: picture.index,
+            range,
+            tempo_hundredths,
+            reverse: matches!(self.get("reverse_video"), Some(Setting::Enabled { value: true })),
+            audio: AudioPolicy::Drop,
+        })
+    }
+
     pub fn copy_paths(&self) -> Result<(&Path, &Path)> {
         if self.version != 1 || self.settings.len() > FIELDS.len() {
             return Err(DomainError::new(

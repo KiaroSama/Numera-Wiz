@@ -1981,34 +1981,7 @@ impl Service {
             }
             "media.retime" => {
                 let input: nw_domain::video_retime::RetimeInput = commands::parse(params)?;
-                let frozen: Asset = self.store.get(&named("asset", &input.asset_id)?)?
-                    .ok_or_else(DomainError::object_not_found)?;
-                self.object(&context, &frozen.id, &frozen.creator)?;
-                self.path(&context, Path::new(&frozen.identity.path), false)?;
-                self.path(&context, Path::new(&input.output), true)?;
-                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-                    DomainError::new("RESOURCE_LIMIT", "Picture retime review capacity is full")
-                })?;
-                drop(guard);
-                let (stamp, retime) = runtime.block_on(self.engine()?.inspect_video_retime(
-                    &frozen, &input, cancellation.clone(),
-                ))?;
-                let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
-                if cancellation.is_cancelled() {
-                    return Err(DomainError::new("CANCELLED", "Picture retime review cancelled"));
-                }
-                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("media.retime")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Picture retime access changed during observation"));
-                }
-                stamp.revalidate()?;
-                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output, Default::default(),
-                    |engine, current, output| {
-                        if current.identity != frozen.identity || current.source_object != frozen.source_object {
-                            return Err(DomainError::new("SOURCE_CHANGED", "Original retime input changed during observation"));
-                        }
-                        engine.video_retime_plan_at(current, output, retime, &context.principal, self.clock.now()?)
-                    })?;
-                stamp.revalidate()?;
+                let plan = self.prepare_picture_retime(&context, input, "media.retime", &cancellation, &runtime)?;
                 let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
@@ -2131,8 +2104,31 @@ impl Service {
                 drop(permit);
                 return Ok(response);
             }
+            "jobs.plan" => {
+                let input: nw_domain::config_import::PlanInput = commands::parse(params.clone())?;
+                let plan = if input.job_document.selects_picture_retime() {
+                    let asset: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                        .ok_or_else(DomainError::object_not_found)?;
+                    self.object(&context, &asset.id, &asset.creator)?;
+                    let declared = self.path(&context, input.job_document.imported_source()?, false)?;
+                    if declared != Path::new(&asset.identity.path) {
+                        return Err(DomainError::new("JOB_SOURCE_MISMATCH", "The job must use its registered original input path")
+                            .field("job_document.settings.input_path"));
+                    }
+                    self.prepare_picture_retime(
+                        &context, input.job_document.picture_retime(&asset)?, "jobs.plan", &cancellation, &runtime,
+                    )?
+                } else {
+                    self.prepare_copy_review(&context, "jobs.plan", params, now)?
+                };
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                if response.ok {
+                    self.store.put(&named("plan", &plan.id)?, &plan)?;
+                }
+                return Ok(response);
+            }
             "streams.clean" | "streams.add" | "streams.replace" | "streams.extract"
-            | "subtitles.burn" | "jobs.plan" | "chapters.remove" | "chapters.import"
+            | "subtitles.burn" | "chapters.remove" | "chapters.import"
             | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
@@ -2992,6 +2988,45 @@ impl Service {
                 addition.resolve(source)
             })
             .collect()
+    }
+
+    fn prepare_picture_retime(
+        &self, context: &Context, input: nw_domain::video_retime::RetimeInput, command: &str,
+        cancel: &CancellationToken, runtime: &tokio::runtime::Handle,
+    ) -> Result<Plan> {
+        let access = || -> Result<()> {
+            if self.policy(context)?.is_some_and(|profile| {
+                !profile.allows_command(command) || !profile.allows_command("media.retime")
+            }) {
+                return Err(DomainError::new("PERMISSION_DENIED", "Picture-retime review requires current media.retime access"));
+            }
+            Ok(())
+        };
+        access()?;
+        let frozen: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+            .ok_or_else(DomainError::object_not_found)?;
+        self.object(context, &frozen.id, &frozen.creator)?;
+        self.path(context, Path::new(&frozen.identity.path), false)?;
+        self.path(context, Path::new(&input.output), true)?;
+        let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+            DomainError::new("RESOURCE_LIMIT", "Picture retime review capacity is full")
+        })?;
+        let (stamp, retime) = runtime.block_on(self.engine()?.inspect_video_retime(&frozen, &input, cancel.clone()))?;
+        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Picture retime review cancelled"));
+        }
+        access()?;
+        stamp.revalidate()?;
+        let plan = self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
+            |engine, current, output| {
+                if current.identity != frozen.identity || current.source_object != frozen.source_object {
+                    return Err(DomainError::new("SOURCE_CHANGED", "Original retime input changed during observation"));
+                }
+                engine.video_retime_plan_at(current, output, retime, &context.principal, self.clock.now()?)
+            })?;
+        stamp.revalidate()?;
+        Ok(plan)
     }
 
     fn registered_join_inputs(&self, context: &Context, ids: &[String]) -> Result<Vec<Asset>> {

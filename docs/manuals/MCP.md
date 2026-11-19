@@ -580,3 +580,10 @@ individual source durations and offsets before `jobs.submit`. Use
 source range, and tempo from 10 to 800 percent. Set `reverse: true`
 to reverse the frame order and `audio: "drop"` for this picture-only
 profile. The verified result retains the exact variable frame clock.
+
+
+`jobs.plan` accepts a typed FFmWiz job returned by
+`config.import.ffmwiz`. A job selecting FFV1, no audio or subtitle
+tracks, and the supported speed/reverse settings compiles to the same
+lossless picture retime as `media.retime`. Grant both commands to that
+profile.
