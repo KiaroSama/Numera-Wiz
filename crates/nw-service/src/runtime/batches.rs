@@ -3,8 +3,9 @@ use super::*;
 use nw_domain::batches::{
     Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, CleanFolderBatchInput,
     ExtractBatchInput, ExtractFolderBatchInput, ExtractSelector, FailurePolicy,
-    FolderBatchExclusion, FolderBatchReview, ItemInput, ItemResult, PlanReference, PlannedItem,
-    PlannedItemView, ReviewedExtraction, UnresolvedIndex, UnresolvedPolicy,
+    FolderBatchExclusion, FolderBatchReview, FolderOutputLayout, ItemInput, ItemResult,
+    PlanReference, PlannedItem, PlannedItemView, ReviewedExtraction, UnresolvedIndex,
+    UnresolvedPolicy,
 };
 use nw_domain::ingest::{FolderEntryOutcome, FolderSnapshot};
 
@@ -104,20 +105,66 @@ fn validate_folder_destination(
     plan: &Plan,
 ) -> Result<()> {
     let rights = nw_domain::plans::validate_requirements(plan)?;
-    let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
+    let parent_identity = rights.output_create.parent_object.as_ref().ok_or_else(|| {
         DomainError::new(
             "INVALID_PLAN",
             "Folder batch child has no reviewed output parent",
         )
     })?;
-    output.require_object(parent)?;
-    if plan.output != item.output {
+    let destination = Path::new(&item.output);
+    if plan.output != item.output || !destination.starts_with(output.path()) {
         return Err(DomainError::new(
             "TARGET_CHANGED",
             "Folder batch child resolved outside its derived destination",
         ));
     }
+    let parent = destination.parent().ok_or_else(|| {
+        DomainError::new("INVALID_PLAN", "Folder batch child has no output directory")
+    })?;
+    if parent == output.path() {
+        output.require_object(parent_identity)?;
+    } else {
+        files::DirectoryStamp::capture_resolved(parent)?.require_object(parent_identity)?;
+        output.revalidate()?;
+    }
     Ok(())
+}
+
+fn available_folder_name(
+    target: PathBuf,
+    original: &BTreeSet<PathBuf>,
+    selected: &mut BTreeSet<PathBuf>,
+) -> Result<PathBuf> {
+    let stem = target.file_stem().and_then(|name| name.to_str());
+    let extension = target.extension().and_then(|name| name.to_str());
+    let (Some(stem), Some(extension)) = (stem, extension) else {
+        return Err(DomainError::new(
+            "INVALID_RECORD",
+            "Folder output needs a representable filename and extension",
+        ));
+    };
+    for number in 1..=128 {
+        let candidate = if number == 1 {
+            target.clone()
+        } else {
+            target.with_file_name(format!("{stem} ({number}).{extension}"))
+        };
+        if selected.contains(&candidate) || number > 1 && original.contains(&candidate) {
+            continue;
+        }
+        match std::fs::symlink_metadata(&candidate) {
+            Ok(_) => continue,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                selected.insert(candidate.clone());
+                return Ok(candidate);
+            }
+            Err(error) => return Err(files::io_error(error)),
+        }
+    }
+    Err(DomainError::new(
+        "OUTPUT_EXISTS",
+        "No available name among the original and 127 numbered folder outputs",
+    ))
 }
 
 impl Service {
@@ -214,7 +261,14 @@ impl Service {
             output,
             items,
             excluded,
-        } = self.folder_targets(context, &snapshot, &input.output_root, None, cancel)?;
+        } = self.folder_targets(
+            context,
+            &snapshot,
+            &input.output_root,
+            None,
+            input.output_layout,
+            cancel,
+        )?;
         let plan = self.prepare_cleanup_batch(
             context,
             CleanBatchInput {
@@ -245,6 +299,7 @@ impl Service {
         snapshot: &FolderSnapshot,
         output_root: &str,
         extension: Option<&str>,
+        layout: FolderOutputLayout,
         cancel: &CancellationToken,
     ) -> Result<FolderTargets> {
         let output = Path::new(output_root);
@@ -285,6 +340,21 @@ impl Service {
         }
         let mut items = Vec::new();
         let mut excluded = Vec::new();
+        let original = if layout == FolderOutputLayout::PreserveTree {
+            snapshot
+                .entries
+                .iter()
+                .filter(|entry| entry.outcome == FolderEntryOutcome::Registered)
+                .map(|entry| {
+                    output
+                        .path()
+                        .join(entry.relative_path.split('/').collect::<PathBuf>())
+                })
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+        let mut selected = BTreeSet::new();
         for entry in &snapshot.entries {
             if cancel.is_cancelled() {
                 return Err(DomainError::new(
@@ -307,8 +377,8 @@ impl Service {
                 .get(&named("asset", id)?)?
                 .ok_or_else(DomainError::object_not_found)?;
             self.object(context, id, &asset.creator)?;
-            let expected_path =
-                source_root.join(entry.relative_path.split('/').collect::<PathBuf>());
+            let relative = entry.relative_path.split('/').collect::<PathBuf>();
+            let expected_path = source_root.join(&relative);
             if asset.id != id
                 || asset.creator != snapshot.creator
                 || Some(&asset.identity) != entry.identity.as_ref()
@@ -321,9 +391,34 @@ impl Service {
                 ));
             }
             self.root_authority(context, &expected_path, false)?;
-            let mut target = output
-                .path()
-                .join(folder_output_name(entry.index, &expected_path)?);
+            let mut target = match layout {
+                FolderOutputLayout::Indexed => output
+                    .path()
+                    .join(folder_output_name(entry.index, &expected_path)?),
+                FolderOutputLayout::PreserveTree => {
+                    let path = output.path().join(relative);
+                    let parent = path.parent().filter(|parent| parent.starts_with(output.path()));
+                    let Some(parent) = parent else {
+                        return Err(output_denied());
+                    };
+                    let parent = files::DirectoryStamp::capture_resolved(parent).map_err(|_| {
+                        DomainError::new(
+                            "OUTPUT_DIRECTORY_UNAVAILABLE",
+                            "Use an existing ordinary output subdirectory for each retained source folder",
+                        )
+                        .field("output_root")
+                    })?;
+                    if contains_directory(&source, &parent)? {
+                        return Err(DomainError::new(
+                            "SOURCE_OUTPUT_ALIAS",
+                            "Folder output subdirectory is inside the original input tree",
+                        ));
+                    }
+                    self.root_authority(context, parent.path(), true)?;
+                    self.check_media_namespace(parent.path(), true)?;
+                    available_folder_name(path, &original, &mut selected)?
+                }
+            };
             if let Some(extension) = extension {
                 target.set_extension(extension);
             }
@@ -390,6 +485,7 @@ impl Service {
             &snapshot,
             &input.output_root,
             Some(extension),
+            FolderOutputLayout::Indexed,
             cancel,
         )?;
         if items.is_empty() {
@@ -646,7 +742,14 @@ impl Service {
             output,
             items,
             excluded,
-        } = self.folder_targets(context, &snapshot, &input.output_root, Some("mkv"), cancel)?;
+        } = self.folder_targets(
+            context,
+            &snapshot,
+            &input.output_root,
+            Some("mkv"),
+            FolderOutputLayout::Indexed,
+            cancel,
+        )?;
         if items.is_empty() || items.len() > nw_domain::batches::MAX_BATCH_ITEMS {
             return Err(DomainError::new(
                 "VALIDATION_ERROR",

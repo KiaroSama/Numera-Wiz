@@ -97,11 +97,22 @@ pub struct CleanFolderBatchInput {
     pub snapshot_id: String,
     pub snapshot_hash: String,
     pub output_root: String,
+    /// Preserve the snapshot's relative paths within the existing output tree.
+    #[serde(default)]
+    pub output_layout: FolderOutputLayout,
     pub intent: CleanIntent,
     pub file_times: FileTimeRequest,
     pub execution_limits: CleanupLimits,
     pub failure_policy: FailurePolicy,
     pub unresolved_policy: UnresolvedPolicy,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FolderOutputLayout {
+    #[default]
+    Indexed,
+    PreserveTree,
 }
 impl CleanFolderBatchInput {
     pub fn validate(&self) -> Result<()> {

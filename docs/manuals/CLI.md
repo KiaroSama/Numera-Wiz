@@ -754,7 +754,10 @@ Use returned registered asset IDs with `streams report`, `streams clean` and
 explicit batch planning. For a complete snapshot with successful intake, use
 `batches plan-folder --file folder-batch.json` to derive a cleanup batch for an
 existing separate output directory. Review the exclusions and submit the
-returned `plan.id` and `plan.hash` through the ordinary batch commands. The
+returned `plan.id` and `plan.hash` through the ordinary batch commands. Set
+`"output_layout": "preserve_tree"` to mirror the registered source paths under
+precreated output subdirectories. An occupied filename gets an available
+numbered suffix. The
 [folder batch contract](../development/cleanup-batches.md#cleanup-from-a-retained-folder-snapshot)
 describes the document and its limits.
 

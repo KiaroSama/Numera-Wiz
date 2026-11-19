@@ -103,6 +103,14 @@ filename per registered video from the snapshot row number and a bounded
 portable stem, keeping the original extension. Name collisions with an
 existing file or directory become ordinary `OUTPUT_COLLISION` rows.
 
+Set `output_layout` to `preserve_tree` to maintain the registered files' relative
+paths. Create the corresponding ordinary subdirectories under `output_root`
+before review. The planner checks each output parent and selects a numbered
+filename when a name is occupied. It tries the original and up to 127 numbered
+names, reserving the registered files' original names. The existing no-replace
+execution checks protect the reviewed names when another process creates a file
+after review.
+
 The folder review requires complete enumeration and at least one registered
 source. `reject_all` refuses a snapshot with failed intake rows.
 `continue_with_rejected` reviews the registered sources and retains failed
@@ -115,9 +123,9 @@ the full intake inventory. Review creates no directories or media files.
 The shared native/browser Folder intake window can also review a complete
 snapshot into the batch window. That mode shows frozen member decisions and
 excluded snapshot rows, and uses the ordinary Run and retry controls.
-Output-tree reproduction and in-source output exclusion, companion copying,
-and mixed audio and encode workflows remain
-open. This slice awaits hosted transport and GUI qualification on its source.
+Automatic directory creation, in-source output exclusion, companion copying,
+and mixed audio and encode workflows remain open. This slice awaits hosted
+transport and GUI qualification on its source.
 
 The new records currently use the development schema-2 root. Stopped-generation
 compatibility, downgrade rejection and migration remain mandatory before release.

@@ -283,6 +283,7 @@ impl WizApp {
         &mut self,
         snapshot: &FolderReview,
         output_root: &str,
+        output_layout: nw_domain::batches::FolderOutputLayout,
         ctx: &egui::Context,
     ) {
         if !self.cleanup_actions_allowed(ctx) {
@@ -293,6 +294,7 @@ impl WizApp {
                 snapshot_id: snapshot.id.clone(),
                 snapshot_hash: snapshot.hash.clone(),
                 output_root: output_root.into(),
+                output_layout,
                 intent,
                 file_times: self.file_times,
                 execution_limits: self.execution_limits.clone(),

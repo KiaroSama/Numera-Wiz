@@ -129,6 +129,13 @@ FFmpeg's newest stable release remains 9.0.2. The observed development
 head includes RTP AV1 reassembly work. Numera's held local-file media
 routes use the stable tools. [FFmpeg development head](https://github.com/FFmpeg/FFmpeg/commit/4da74f951349f82e77cebc00be64423ccf8f6844)
 
+The MuxCls folder output preserves each file's path relative to the input
+root and adds a parenthesized number before the extension when needed. The
+Rust cleanup planner now offers that layout for existing output directories,
+including the original Unicode names and bounded collision handling. Hosted
+qualification for the new layout is pending.
+[MuxCls folder naming](https://github.com/KiaroSama/MuxCls/blob/1269bd71712466469d539fbf279432659ccaa6a2/muxcls/output.py#L83-L168)
+
 FFmpeg Skill's latest changes cover Chinese phrase wrapping, observed
 picture geometry and right-to-left caption punctuation. Numera's
 SubRip route lets libass determine reading order across each whole

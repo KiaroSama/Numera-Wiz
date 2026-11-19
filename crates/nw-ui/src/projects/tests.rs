@@ -681,12 +681,18 @@ fn folder_batch_review_and_submit() {
     port.complete(snapshot.clone());
     app.receive(&ctx);
     let snapshot = serde_json::from_value(snapshot).unwrap();
-    app.review_folder_batch(&snapshot, output, &ctx);
+    app.review_folder_batch(
+        &snapshot,
+        output,
+        nw_domain::batches::FolderOutputLayout::PreserveTree,
+        &ctx,
+    );
     let (review, reply) = port.pop();
     assert_eq!(review.command.id, "streams.clean.folder_batch_plan");
     assert_eq!(review.params["snapshot_id"], "folder");
     assert_eq!(review.params["snapshot_hash"], folder_hash);
     assert_eq!(review.params["output_root"], output);
+    assert_eq!(review.params["output_layout"], "preserve_tree");
     assert!(review.replay_scope.is_none() && review.idempotency_key.is_none());
     assert!(port.empty(), "Folder review must not submit a batch");
     let plan_hash = "cd".repeat(32);

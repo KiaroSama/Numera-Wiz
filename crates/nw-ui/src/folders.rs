@@ -5,7 +5,7 @@ use nw_domain::{
     avc_export::{Container, FolderAudio, FolderEncodeInput, Preset},
     batches::{
         CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector,
-        FolderBatchReview,
+        FolderBatchReview, FolderOutputLayout,
     },
     commands::Request,
     ingest::{
@@ -26,6 +26,7 @@ pub(super) struct FolderUi {
     inventory_companions: bool,
     snapshot_id: String,
     batch_output_root: String,
+    cleanup_output_layout: FolderOutputLayout,
     encode_container: Container,
     encode_crf: u8,
     encode_preset: Preset,
@@ -59,6 +60,7 @@ impl Default for FolderUi {
             inventory_companions: true,
             snapshot_id: String::new(),
             batch_output_root: String::new(),
+            cleanup_output_layout: FolderOutputLayout::Indexed,
             encode_container: Container::Mp4,
             encode_crf: 18,
             encode_preset: Preset::Balanced,
@@ -639,6 +641,18 @@ impl WizApp {
                         .hint_text("Absolute output directory"),
                 ),
             );
+            ui.horizontal_wrapped(|ui| {
+                ui.radio_value(
+                    &mut self.folder.cleanup_output_layout,
+                    FolderOutputLayout::Indexed,
+                    "Indexed filenames",
+                );
+                ui.radio_value(
+                    &mut self.folder.cleanup_output_layout,
+                    FolderOutputLayout::PreserveTree,
+                    "Preserve source tree",
+                );
+            });
             self.batch_policy_controls(ui, true);
         });
         let intake_failed = snapshot.entries.iter().any(|entry| {
@@ -653,6 +667,9 @@ impl WizApp {
             ui.small(
                 "The current cleanup stream selection, file times and execution limits apply.",
             );
+            if self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree {
+                ui.small("Create the matching output subdirectories before review.");
+            }
             let review = ui.add_enabled(
                 idle && !self.folder.batch_output_root.is_empty(),
                 egui::Button::new("Review folder cleanup batch"),
@@ -660,7 +677,7 @@ impl WizApp {
             self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
             if review.clicked() {
                 let root = self.folder.batch_output_root.clone();
-                self.review_folder_batch(snapshot, &root, ui.ctx());
+                self.review_folder_batch(snapshot, &root, self.folder.cleanup_output_layout, ui.ctx());
             }
         }
         if !intake_failed {
