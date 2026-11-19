@@ -134,7 +134,8 @@ The macOS app bundle stores application state in
 `~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another
 writable location for the native GUI, CLI or MCP bridge.
 
-See the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
+Run the [first export walkthrough](docs/manuals/QUICKSTART.md) with the bundled
+one-second sample, then see the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
 [MCP manual](docs/manuals/MCP.md) and [agent setup](docs/agents/README.md).
 The CLI exposes `commands list`, `commands schema <id>`, `media probe`, `media capabilities`,
 `assets register-folder`, `streams clean`, `jobs submit`, `jobs wait`,

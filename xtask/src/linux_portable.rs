@@ -150,16 +150,21 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
         root.join("THIRD-PARTY-NOTICES.md"),
         bundle.join("THIRD-PARTY-NOTICES.md"),
     )?;
+    crate::package::install_portable_guides(root, &bundle)?;
     let state = nw_platform::security::private_directory(&work.join("first-launch-state"))?;
-    let first_launch = crate::package::qualify_portable_application(
-        Command::new(&executable)
+    let command = || {
+        let mut command = Command::new(&executable);
+        command
             .current_dir(&bundle)
             .env_clear()
             .env("PATH", "/usr/bin:/bin")
             .env("HOME", work)
             .arg("--data-dir")
-            .arg(&state)
-            .args(["media", "capabilities", "refresh", "--force"]),
+            .arg(&state);
+        command
+    };
+    let first_launch = crate::package::qualify_portable_application(
+        command().args(["media", "capabilities", "refresh", "--force"]),
         work,
     )?;
     for name in TOOLS {
@@ -169,6 +174,7 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
             "The application used a different Linux media helper"
         );
     }
+    let first_export = crate::package::qualify_portable_export(&bundle, work, command)?;
     let archive = delivery.join("numera-wiz-linux-x64.tar.gz");
     output(
         Command::new("/usr/bin/tar")
@@ -179,7 +185,8 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
     )?;
     fs::copy(input.join(CORRESPONDING), delivery.join(CORRESPONDING))?;
     let receipt = json!({"source":app_source,"target":TARGET,"executable":digest(&executable)?,
-        "application_archive":digest(&archive)?,"component":proof,"first_launch":first_launch,"release_ready":false});
+        "application_archive":digest(&archive)?,"component":proof,"first_launch":first_launch,
+        "first_export":first_export,"release_ready":false});
     fs::write(
         delivery.join("linux-portable-package.json"),
         serde_json::to_vec_pretty(&receipt)?,

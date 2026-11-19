@@ -901,15 +901,18 @@ fn deliver(
         work.join("dejavu-sans-ttf-2.37/LICENSE"),
         resources.join("DejaVuSans.LICENSE.txt"),
     )?;
+    crate::package::install_portable_guides(root, &resources)?;
     let app = delivery.join("Numera Wiz.app");
     sign(&app)?;
     let home = work.join("first-launch-home");
     fs::create_dir(&home)?;
+    let command = || {
+        let mut command = clean_process(&executable, &home);
+        command.arg("--data-dir").arg(home.join("state"));
+        command
+    };
     let receipt = crate::package::qualify_portable_application(
-        clean_process(&executable, &home)
-            .arg("--data-dir")
-            .arg(home.join("state"))
-            .args(["media", "capabilities", "refresh", "--force"]),
+        command().args(["media", "capabilities", "refresh", "--force"]),
         work,
     )?;
     let files = manifest["files"]
@@ -926,6 +929,7 @@ fn deliver(
             "First launch used a different media helper"
         );
     }
+    let first_export = crate::package::qualify_portable_export(&resources, work, command)?;
     let archive = delivery.join(format!("{LABEL}-corresponding-source.tar.gz"));
     execute(
         Command::new("/usr/bin/tar")
@@ -947,6 +951,7 @@ fn deliver(
     let package = json!({"source":manifest["app_source"], "target":TARGET,
         "executable":digest(&executable)?, "application_archive":digest(&packaged_app)?,
         "source_archive":digest(&archive)?, "component":manifest, "first_launch":receipt,
+        "first_export":first_export,
         "signing":"ad-hoc", "notarized":false, "release_ready":false});
     fs::write(
         delivery.join("macos-portable-package.json"),

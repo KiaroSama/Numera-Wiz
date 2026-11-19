@@ -161,6 +161,165 @@ pub(crate) fn qualify_portable_application(command: &mut Command, work: &Path) -
     );
 }
 
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(crate) fn install_portable_guides(root: &Path, resources: &Path) -> Result<()> {
+    for directory in ["docs/manuals", "docs/agents", "integrations", "examples"] {
+        copy_tree(&root.join(directory), &resources.join(directory))?;
+    }
+    Ok(())
+}
+
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(crate) fn qualify_portable_export(
+    resources: &Path,
+    work: &Path,
+    command: impl Fn() -> Command,
+) -> Result<Value> {
+    use std::io::{Seek, SeekFrom};
+
+    let scratch = work.join("first export");
+    fs::create_dir(&scratch)?;
+    let fixture = resources.join("examples/quickstart/clip.mkv");
+    let fixture_digest = digest(&fixture)?;
+    anyhow::ensure!(
+        fixture_digest["sha256"] == "9aff62348c868712df08ca9fc2c17cef2d7704b7c680922aafd1ae7c8d5892eb",
+        "Unexpected portable walkthrough fixture"
+    );
+    let run = |step: &str, args: &[&str]| -> Result<Value> {
+        let mut response_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(scratch.join(format!("{step}.json")))?;
+        let process = command()
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(response_file.try_clone()?)
+            .output()
+            .with_context(|| format!("Start the portable export step {step}"))?;
+        response_file.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::new();
+        response_file.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+        anyhow::ensure!(
+            bytes.len() <= 1024 * 1024,
+            "Oversized portable export response at {step}"
+        );
+        let response: Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("Read the portable export response at {step}"))?;
+        anyhow::ensure!(
+            process.status.success() && response["ok"] == true,
+            "Portable export step {step} failed ({}): {}",
+            process.status,
+            response["error"]["code"]
+        );
+        response
+            .get("result")
+            .cloned()
+            .context("Portable result missing")
+    };
+
+    let scope = run("scope", &["access", "replay-scope", "create", "--json"])?;
+    let scope = scope["replay_scope"]
+        .as_str()
+        .context("Portable replay scope")?;
+    let asset = run(
+        "register",
+        &[
+            "assets",
+            "register",
+            fixture.to_str().context("Portable fixture path")?,
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "quickstart-register",
+        ],
+    )?;
+    let asset = asset["id"].as_str().context("Portable registered asset")?;
+    let output = scratch.join("output.mp4");
+    let document = scratch.join("encode.json");
+    fs::write(
+        &document,
+        serde_json::to_vec_pretty(&json!({
+            "asset_id":asset,"output":output,"settings":{
+                "video_stream":0,"container":"mp4","crf":18,"preset":"balanced","audio":{"kind":"none"}
+            }
+        }))?,
+    )?;
+    let plan = run(
+        "plan",
+        &[
+            "media",
+            "encode",
+            "--file",
+            document.to_str().context("Portable request path")?,
+        ],
+    )?;
+    let plan_id = plan["id"].as_str().context("Portable plan ID")?;
+    let reviewed = run("review", &["plans", "inspect", plan_id])?;
+    let hash = reviewed["hash"].as_str().context("Portable reviewed hash")?;
+    anyhow::ensure!(
+        plan["hash"] == hash,
+        "Portable review changed the admitted plan"
+    );
+    let accepted = run(
+        "submit",
+        &[
+            "jobs",
+            "submit",
+            "--plan",
+            plan_id,
+            "--plan-hash",
+            hash,
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "quickstart-export",
+        ],
+    )?;
+    let job_id = accepted["job_id"]
+        .as_str()
+        .context("Portable accepted job ID")?;
+    let job = run("wait", &["jobs", "wait", job_id, "--timeout-seconds", "60"])?;
+    let artifact = format!("job-{job_id}");
+    let manifest = run("manifest", &["artifacts", "manifest", "--artifact-id", &artifact])?;
+    let sha256 = manifest["sha256"].as_str().context("Portable artifact digest")?;
+    let saved = scratch.join("verified.mp4");
+    run(
+        "save",
+        &[
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact,
+            "--expected-sha256",
+            sha256,
+            "--out",
+            saved.to_str().context("Portable client output path")?,
+        ],
+    )?;
+    let observed = digest(&saved)?;
+    anyhow::ensure!(
+        job["state"] == "succeeded"
+            && job["artifact"]["sha256"] == sha256
+            && manifest["suggested_name"] == "output.mp4"
+            && manifest["plan_id"] == plan_id
+            && observed["sha256"] == sha256
+            && observed == digest(&output)?,
+        "Portable export did not finish with matching verified media"
+    );
+    Ok(json!({
+        "fixture":fixture_digest,"plan_hash":hash,"job_state":job["state"],"output":observed
+    }))
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) fn retain_failure(path: &Path, failure: &anyhow::Error) {
     let cause = format!("{failure:#}");

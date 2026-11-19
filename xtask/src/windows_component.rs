@@ -437,14 +437,19 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
     fs::create_dir(&delivery)?;
     let executable = delivery.join("numera-wiz.exe");
     fs::copy(binary, &executable)?;
+    crate::package::install_portable_guides(root, &delivery)?;
     let isolated_state = work.join("first-launch-state");
-    let smoke = crate::package::qualify_portable_application(
-        Command::new(&executable)
+    let command = || {
+        let mut command = Command::new(&executable);
+        command
             .current_dir(&delivery)
             .env("PATH", system32)
             .arg("--data-dir")
-            .arg(&isolated_state)
-            .args(["media", "capabilities", "refresh", "--force"]),
+            .arg(&isolated_state);
+        command
+    };
+    let smoke = crate::package::qualify_portable_application(
+        command().args(["media", "capabilities", "refresh", "--force"]),
         work,
     )?;
     let profile_manifest: Value =
@@ -463,6 +468,7 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
             "Portable owner resolved a different media executable"
         );
     }
+    let first_export = crate::package::qualify_portable_export(&delivery, work, command)?;
     fs::write(
         delivery.join("portable-first-launch.json"),
         serde_json::to_vec_pretty(&smoke)?,
@@ -486,7 +492,8 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
     )?;
     let manifest = json!({"source":profile_manifest["app_source"], "target":TARGET,
         "executable":digest(&executable)?,"source_archive":digest(&delivery.join(archive))?,
-        "component":profile_manifest,"cpu_first_launch":smoke["result"]["cpu_round_trip"]});
+        "component":profile_manifest,"cpu_first_launch":smoke["result"]["cpu_round_trip"],
+        "first_export":first_export});
     fs::write(
         delivery.join("portable-package.json"),
         serde_json::to_vec_pretty(&manifest)?,

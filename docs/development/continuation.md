@@ -10,6 +10,12 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Verified package checkpoint
 
+The [first-export walkthrough](../manuals/QUICKSTART.md) includes a generated
+four-frame source and Linux, macOS and PowerShell examples. Each standalone
+packager runs the same typed CLI sequence with the shipped media sample. It
+records the reviewed plan hash and independently compares the published and
+downloaded files. Hosted qualification for the extended walkthrough is pending.
+
 At `a7f01b5`, Windows x64, Linux x64, macOS Apple Silicon and macOS Intel
 passed their native regressions and each standalone package's first-launch
 CPU FFV1 exercise. Each archive was checked against its GitHub digest,
