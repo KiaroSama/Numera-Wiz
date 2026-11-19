@@ -223,8 +223,18 @@
     {
       "subject_id": "F04",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "retained_folder_copy_batch",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Disjoint-output cleanup from a frozen folder scan",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The native CLI and official MCP transports matched the review. Both files published byte-identical copies, with three exclusions and no replacement."
+        }
+      ]
     },
     {
       "subject_id": "F05",
@@ -246,7 +256,17 @@
       "subject_id": "F06",
       "subject_kind": "workflow",
       "status": "in_progress",
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "matroska_selected_stream_extraction",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Independent selected-stream outputs",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "Two outputs kept packet timing and bytes. Stdio and HTTP matched the review. The report retained one unmatched selector."
+        }
+      ]
     },
     {
       "subject_id": "F07",
@@ -281,20 +301,50 @@
     {
       "subject_id": "F10",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "ffv1_variable_clock_retime",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Lossless video-only retime at 10%, 100% and 800%, plus reversal",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "All four independent output clocks matched their exact timeline maps and decoded pictures matched the original frames."
+        }
+      ]
     },
     {
       "subject_id": "F11",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "pcm_multichannel_retention_and_tempo",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Sample-domain editing and tempo extremes",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The 5.1 output matched the exact 6588 expected PCM samples. Separate 10% and 800% cases retained the observed tone frequency within 1 Hz."
+        }
+      ]
     },
     {
       "subject_id": "F12",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "matroska_ordered_packet_join",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Ordered original-clock Matroska join with audio copy and audio omission",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "Both selected stream layouts verified original packet timing and payloads. The engine rejected a sample-aspect-ratio mismatch."
+        }
+      ]
     },
     {
       "subject_id": "F13",
@@ -312,7 +362,17 @@
       "subject_id": "F15",
       "subject_kind": "workflow",
       "status": "in_progress",
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "matroska_track_replacement_and_pcm_normalization",
+          "commit": "d2a4853d1ff1839d7d2b0816f25421bc45093a2b",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44487922129/job/135444699155",
+          "artifact_sha256": "54a68cdf7e1a5eabb90d9c4c1d7bd950a67110006a1777c035925585f72c6540",
+          "asserted_domain": "Relative track replacement and independently normalized PCM audio",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The owner published a replacement job and a metadata-only job. Two selected signals measured -16.05 and -15.95 LUFS independently. PCM counts and the unselected streams were preserved."
+        }
+      ]
     },
     {
       "subject_id": "CD01",
