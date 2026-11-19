@@ -158,3 +158,10 @@ original variable presentation times.
 [FFmWiz bitrate lowering](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/L01_encode_opts.py#L105-L131)
 [FFmWiz crop alignment](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/L00_filters.py#L147-L201)
 [FFmWiz CPU resize and aspect policy](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/wizard_build_filters.py#L190-L289)
+
+The H.264 export lowers color and detail adjustments after raster transforms.
+It applies denoise before sharpen or blur, using the reviewed strength values.
+Grayscale overrides saturation. The importer and direct typed export share
+the same normalization and plan.
+[FFmWiz filter order](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/wizard_build_filters.py#L121-L161)
+[FFmWiz filter strengths](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/core/constants_look.py#L23-L52)

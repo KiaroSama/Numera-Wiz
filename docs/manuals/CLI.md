@@ -1016,6 +1016,8 @@ audio bitrate. Specify crop margins as `crop=top,left,right,bottom` or with
 settings. The importer aligns the crop to the 4:2:0 grid. The output retains
 the original sample aspect with `resolution=n`. An explicit
 `stretch:WIDTHxHEIGHT` emits square pixels.
+The CPU profile imports the admitted `video_look` rotation, flips, grayscale,
+color adjustments, denoise, and one of sharpen or blur.
 
 The optional `settings.picture` object accepts an even-coordinate crop,
 quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final
@@ -1024,6 +1026,11 @@ quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final
 display aspect through sample aspect signaling. Use `square_pixels` to
 make the specified width and height the display aspect. Operations run in
 crop, rotation, flip and resize order. Original frame timestamps are verified.
+To adjust the resulting picture, add a `look` object under `settings.picture`.
+Brightness, contrast, saturation and gamma use rational values such as
+`{"num":"1","den":"16"}` for brightness. Denoise and detail each offer light,
+medium and heavy strengths. For example,
+`"detail":{"kind":"sharpen","strength":"light"}` selects a light sharpen.
 
 ### Encode a registered folder
 

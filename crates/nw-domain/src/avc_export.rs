@@ -1,5 +1,5 @@
 //! Reviewable CPU AVC export without untyped encoder options.
-use crate::{DomainError, Result};
+use crate::{DomainError, Result, time::Rational};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -67,6 +67,42 @@ pub struct PictureTransform {
     pub flip_vertical: bool,
     #[serde(default)]
     pub resize: Option<Resize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<PictureLook>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PictureLook {
+    #[serde(default)]
+    pub grayscale: bool,
+    #[serde(default)]
+    pub brightness: Option<Rational>,
+    #[serde(default)]
+    pub contrast: Option<Rational>,
+    #[serde(default)]
+    pub saturation: Option<Rational>,
+    #[serde(default)]
+    pub gamma: Option<Rational>,
+    #[serde(default)]
+    pub denoise: Option<Strength>,
+    #[serde(default)]
+    pub detail: Option<Detail>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Strength {
+    Light,
+    Medium,
+    Heavy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Detail {
+    Sharpen { strength: Strength },
+    Blur { strength: Strength },
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -156,6 +192,21 @@ impl Encode {
                 !even(resize.width, 2, 4096) || !even(resize.height, 2, 2160)
             }) {
                 return Err(DomainError::new("VALIDATION_ERROR", "Picture coordinates and dimensions require even 4:2:0 alignment"));
+            }
+            if let Some(look) = picture.look {
+                for (field, value, lower, upper) in [
+                    ("brightness", look.brightness, Rational::new(-1, 1)?, Rational::new(1, 1)?),
+                    ("contrast", look.contrast, Rational::ZERO, Rational::new(3, 1)?),
+                    ("saturation", look.saturation, Rational::ZERO, Rational::new(3, 1)?),
+                    ("gamma", look.gamma, Rational::new(1, 10)?, Rational::new(10, 1)?),
+                ] {
+                    if value.is_some_and(|value| !(lower..=upper).contains(&value)) {
+                        return Err(DomainError::new(
+                            "VALIDATION_ERROR",
+                            "Color adjustment is outside its admitted range",
+                        ).field(format!("settings.picture.look.{field}")));
+                    }
+                }
             }
         }
         Ok(())

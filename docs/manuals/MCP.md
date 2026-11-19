@@ -608,6 +608,8 @@ with optional AAC in MP4 or Matroska. Set the preset and choose `crf` or
 `jobs.submit` to run the reviewed plan.
 
 Set `settings.picture` to request an ordered crop, rotation, flip and resize.
+Its optional `look` applies color adjustments, denoise and one detail filter
+after resizing.
 The job verifies the final dimensions and sample aspect alongside its original
 frame timestamps.
 

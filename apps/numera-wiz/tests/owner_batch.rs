@@ -1126,8 +1126,13 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     ] {
         let output = directory.join(format!("imported-{mode}.mp4"));
         let resolution = if resize { "stretch:160x120" } else { "n" };
+        let look = if resize {
+            "denoise=light,blur=medium"
+        } else {
+            "hflip,gray,bright=0.0625,contrast=1.125,gamma=1.25,denoise=medium,sharpen=light"
+        };
         let legacy = format!(
-            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\n{crop}\nresolution={resolution}\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\n{crop}\nresolution={resolution}\nvideo_look={look}\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
             path.display(), output.display(),
         );
         let import = cli.query("config.import.ffmwiz", json!({"source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"})).await;
@@ -1136,6 +1141,12 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let mut picture = json!({"crop":{"width":240,"height":120,"x":40,"y":30}});
         if resize {
             picture["resize"] = json!({"width":160,"height":120,"aspect":"square_pixels"});
+            picture["look"] = json!({"denoise":"light","detail":{"kind":"blur","strength":"medium"}});
+        } else {
+            picture["flip_horizontal"] = json!(true);
+            picture["look"] = json!({"grayscale":true,"denoise":"medium",
+                "brightness":{"num":"1","den":"16"},"contrast":{"num":"9","den":"8"},
+                "gamma":{"num":"5","den":"4"},"detail":{"kind":"sharpen","strength":"light"}});
         }
         let direct = cli.query("media.encode", json!({"asset_id":original["id"],"output":output,"settings":{
             "video_stream":0,"container":"mp4","bitrate":{"average_kbps":700,"mode":mode},"preset":"balanced",
@@ -1147,6 +1158,14 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         for (flag, expected) in [("-b:v", "700k"), ("-maxrate:v", peak), ("-bufsize:v", buffer)] {
             assert!(options.windows(2).any(|pair| pair[0] == flag && pair[1] == expected));
         }
+        let graph = options.windows(2).find(|pair| pair[0] == "-filter:v").unwrap()[1]
+            .as_str().unwrap();
+        let expected_filters = if resize {
+            "hqdn3d=2:1.5:3:2.25,boxblur=5:1"
+        } else {
+            "eq=brightness=1/16:contrast=9/8:saturation=0/1:gamma=5/4,hqdn3d=4:3:6:4.5,unsharp=5:5:0.5:5:5:0.0"
+        };
+        assert!(graph.ends_with(expected_filters), "{graph}");
         let accepted = accepted(&cli, &scope, &format!("encode-import-{mode}"), "jobs.submit", json!({
             "plan_id":plan["id"],"plan_hash":plan["hash"]
         })).await;
@@ -1157,6 +1176,14 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         assert_eq!(probe["streams"][0]["height"], 120);
         assert_eq!(probe["streams"][0]["sample_aspect_ratio"], aspect);
         assert_eq!(probe["streams"][0]["codec_name"], "h264");
+        if !resize {
+            let rgb = caption_frame(&components, &output, "0.120").await;
+            assert_eq!(rgb.len(), width * 120 * 3);
+            assert!(rgb.chunks_exact(3).all(|pixel| {
+                // A few codes of chroma rounding survive the lossy CPU profile.
+                pixel.iter().max().unwrap() - pixel.iter().min().unwrap() <= 8
+            }));
+        }
         results.push(json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,
             "peak":peak,"buffer":buffer,"width":width,"sample_aspect_ratio":aspect}));
     }

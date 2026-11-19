@@ -355,8 +355,9 @@ fn effects(value: &str) -> Option<Setting> {
                 (None, None)
             }
             "bright" => (Some(scalar(parameter, -1.0, 1.0)?), None),
-            "contrast" => (Some(scalar(parameter, -2.0, 2.0)?), None),
+            "contrast" => (Some(scalar(parameter, 0.0, 3.0)?), None),
             "sat" => (Some(scalar(parameter, 0.0, 3.0)?), None),
+            "gamma" => (Some(scalar(parameter, 0.1, 10.0)?), None),
             "fadein" | "fadeout" => (Some(scalar(parameter, 0.001, 600.0)?), None),
             "denoise" | "sharpen" | "blur"
                 if matches!(parameter, "" | "light" | "medium" | "heavy") =>

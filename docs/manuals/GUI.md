@@ -367,7 +367,8 @@ new MP4 or Matroska destination, then review and run the job.
 
 Enable **Transform the picture** for crop, rotation, horizontal or vertical
 flip and resize. For resize, choose whether to preserve the display aspect
-or use square pixels at the new dimensions.
+or use square pixels at the new dimensions. **Adjust color and detail**
+opens grayscale, color, denoise, and sharpen or blur controls.
 
 For a registered folder, open **Encode the folder as H.264** in the folder
 review. Set an existing destination outside the intake folder, choose the

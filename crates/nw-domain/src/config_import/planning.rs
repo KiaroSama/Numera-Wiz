@@ -2,7 +2,7 @@
 use super::{FIELDS, ImportedJob, Setting, TrackChoice};
 use crate::{
     DomainError, Result,
-    avc_export::Crop,
+    avc_export::{Crop, Detail, PictureTransform, Rotation, Strength},
     mux::{CleanIntent, NoMatch, Selection, Selector, Stream, StreamKind},
 };
 use schemars::JsonSchema;
@@ -34,7 +34,7 @@ fn unsupported(field: &str) -> DomainError {
     field_error(
         "JOB_PROFILE_UNSUPPORTED",
         field,
-        "This setting requires a media profile beyond packet copy",
+        "This setting requires a different media profile",
     )
 }
 
@@ -135,8 +135,60 @@ impl ImportedJob {
         }))
     }
 
+    fn apply_avc_look(&self, picture: &mut PictureTransform) -> Result<()> {
+        let value = match self.get("video_look") {
+            None | Some(Setting::Disabled) => return Ok(()),
+            Some(Setting::Effects { value }) if (1..=32).contains(&value.len()) => value,
+            _ => return Err(unsupported("video_look")),
+        };
+        for effect in value {
+            let effect = (effect.name.as_str(), effect.amount, effect.strength.as_deref());
+            match effect {
+                ("90cw", None, None) => picture.rotation = Rotation::Clockwise,
+                ("90ccw", None, None) => picture.rotation = Rotation::Counterclockwise,
+                ("180", None, None) => picture.rotation = Rotation::HalfTurn,
+                ("hflip", None, None) => picture.flip_horizontal = true,
+                ("vflip", None, None) => picture.flip_vertical = true,
+                ("gray", None, None) => picture.look.get_or_insert_default().grayscale = true,
+                ("bright", Some(value), None) => {
+                    picture.look.get_or_insert_default().brightness = Some(value);
+                }
+                ("contrast", Some(value), None) => {
+                    picture.look.get_or_insert_default().contrast = Some(value);
+                }
+                ("sat", Some(value), None) => {
+                    picture.look.get_or_insert_default().saturation = Some(value);
+                }
+                ("gamma", Some(value), None) => {
+                    picture.look.get_or_insert_default().gamma = Some(value);
+                }
+                (name @ ("denoise" | "sharpen" | "blur"), None, Some(strength)) => {
+                    let strength = match strength {
+                        "light" => Strength::Light,
+                        "medium" => Strength::Medium,
+                        "heavy" => Strength::Heavy,
+                        _ => return Err(unsupported("video_look")),
+                    };
+                    let look = picture.look.get_or_insert_default();
+                    match name {
+                        "denoise" => look.denoise = Some(strength),
+                        "sharpen" if !matches!(look.detail, Some(Detail::Blur { .. })) => {
+                            look.detail = Some(Detail::Sharpen { strength });
+                        }
+                        "blur" if !matches!(look.detail, Some(Detail::Sharpen { .. })) => {
+                            look.detail = Some(Detail::Blur { strength });
+                        }
+                        _ => return Err(unsupported("video_look")),
+                    }
+                }
+                _ => return Err(unsupported("video_look")),
+            }
+        }
+        Ok(())
+    }
+
     pub fn avc_encode(&self, asset: &crate::records::Asset) -> Result<crate::avc_export::EncodeInput> {
-        use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, PictureTransform, Preset, RateMode, Resize, ResizeAspect};
+        use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode, Resize, ResizeAspect};
         if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_avc_encode() {
             return Err(DomainError::new("INVALID_JOB_DOCUMENT", "Use a version 1 FFmWiz profile with CPU H.264"));
         }
@@ -167,6 +219,7 @@ impl ImportedJob {
                 ("resolution", Setting::Geometry { mode: super::ScaleMode::Stretch, width: Some(_), height: Some(_) }) => true,
                 ("video_speed" | "audio_speed", Setting::Scalar { value }) => value.numerator() == value.denominator(),
                 ("audio_speed", Setting::Choice { value }) => value == "match_video",
+                ("video_look", Setting::Effects { .. }) => true,
                 ("video_look" | "video_quick" | "audio_volume" | "raw_ffmpeg_args" | "raw_ffmpeg_valued_args", Setting::Disabled) => true,
                 ("loudnorm", Setting::Choice { value }) => value == "off",
                 ("logging_enabled", Setting::Enabled { .. })
@@ -233,10 +286,14 @@ impl ImportedJob {
             }
             _ => return Err(missing("audio_tracks")),
         };
+        let mut transform = PictureTransform { crop, resize, ..Default::default() };
+        self.apply_avc_look(&mut transform)?;
+        let changed = crop.is_some() || resize.is_some()
+            || transform.rotation != Rotation::None || transform.flip_horizontal
+            || transform.flip_vertical || transform.look.is_some();
         let settings = Encode { video_stream: picture.index, container, crf: None,
             bitrate: Some(Bitrate { average_kbps, mode }), preset: Preset::Balanced, audio,
-            picture: (crop.is_some() || resize.is_some())
-                .then_some(PictureTransform { crop, resize, ..Default::default() }),
+            picture: changed.then_some(transform),
         };
         settings.validate()?;
         Ok(EncodeInput { asset_id: asset.id.clone(), output: output.to_str().ok_or_else(|| missing("output_path"))?.to_owned(), settings })

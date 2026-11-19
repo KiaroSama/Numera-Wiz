@@ -3,7 +3,7 @@ use crate::{Engine, Result, lower_remux, plan_digest};
 use crate::output_profile::OutputProfile;
 use nw_domain::{
     DomainError,
-    avc_export::{Audio, Container, Encode, Preset, ResizeAspect, Rotation},
+    avc_export::{Audio, Container, Detail, Encode, PictureLook, Preset, ResizeAspect, Rotation, Strength},
     mux::{CleanAction, CleanResolution, Stream, StreamKind, StreamOutcome},
     records::{Asset, MediaProbe, Plan},
     time::Rational,
@@ -33,6 +33,53 @@ struct Raster {
     width: u64,
     height: u64,
     sar: Rational,
+}
+
+fn append_look(filters: &mut Vec<String>, look: PictureLook, raster: &Raster) -> Result<()> {
+    let mut color = Vec::new();
+    for (field, value) in [
+        ("brightness", look.brightness),
+        ("contrast", look.contrast),
+        ("saturation", if look.grayscale { Some(Rational::ZERO) } else { look.saturation }),
+        ("gamma", look.gamma),
+    ] {
+        if let Some(value) = value {
+            color.push(format!("{field}={}/{}", value.numerator(), value.denominator()));
+        }
+    }
+    if !color.is_empty() {
+        filters.push(format!("eq={}", color.join(":")));
+    }
+    if let Some(strength) = look.denoise {
+        filters.push(match strength {
+            Strength::Light => "hqdn3d=2:1.5:3:2.25",
+            Strength::Medium => "hqdn3d=4:3:6:4.5",
+            Strength::Heavy => "hqdn3d=8:6:12:9",
+        }.into());
+    }
+    match look.detail {
+        Some(Detail::Sharpen { strength }) => {
+            let amount = match strength {
+                Strength::Light => "0.5",
+                Strength::Medium => "1.0",
+                Strength::Heavy => "1.5",
+            };
+            filters.push(format!("unsharp=5:5:{amount}:5:5:0.0"));
+        }
+        Some(Detail::Blur { strength }) => {
+            let radius = match strength {
+                Strength::Light => 2,
+                Strength::Medium => 5,
+                Strength::Heavy => 10,
+            };
+            if raster.width.min(raster.height) < 4 * radius {
+                return Err(unavailable("The reviewed output picture is too small for this blur strength"));
+            }
+            filters.push(format!("boxblur={radius}:1"));
+        }
+        None => {}
+    }
+    Ok(())
 }
 
 fn raster(facts: &serde_json::Value) -> Result<Raster> {
@@ -108,6 +155,9 @@ fn picture_filter(facts: &serde_json::Value, settings: &Encode) -> Result<(Raste
     }
     if !filters.is_empty() {
         filters.push(format!("setsar={}/{}:max=65535", output.sar.numerator(), output.sar.denominator()));
+    }
+    if let Some(look) = picture.look {
+        append_look(&mut filters, look, &output)?;
     }
     Ok((output, filters))
 }

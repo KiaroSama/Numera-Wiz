@@ -2,9 +2,10 @@
 use super::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
-    avc_export::{Audio, Bitrate, Container, Crop, Encode, EncodeInput, PictureTransform, Preset, RateMode, Resize, ResizeAspect, Rotation},
+    avc_export::{Audio, Bitrate, Container, Crop, Detail, Encode, EncodeInput, PictureLook, PictureTransform, Preset, RateMode, Resize, ResizeAspect, Rotation, Strength},
     mux::StreamKind,
     records::Asset,
+    time::Rational,
 };
 
 pub(super) struct AvcUi {
@@ -165,6 +166,74 @@ fn picture_controls(ui: &mut egui::Ui, picture: &mut PictureTransform, original:
             changed |= ui.radio_value(&mut resize.aspect, ResizeAspect::PreserveDisplay, "Preserve display aspect").changed();
             changed |= ui.radio_value(&mut resize.aspect, ResizeAspect::SquarePixels, "Square pixels").changed();
         });
+    }
+    let mut look = picture.look.is_some();
+    if ui.checkbox(&mut look, "Adjust color and detail").changed() {
+        picture.look = look.then(PictureLook::default);
+        changed = true;
+    }
+    if let Some(look) = &mut picture.look {
+        changed |= look_controls(ui, look);
+    }
+    changed
+}
+
+fn look_controls(ui: &mut egui::Ui, look: &mut PictureLook) -> bool {
+    let mut changed = false;
+    ui.horizontal_wrapped(|ui| {
+        changed |= ui.checkbox(&mut look.grayscale, "Grayscale").changed();
+        changed |= adjustment(ui, "Brightness", &mut look.brightness, 0.0, -1.0..=1.0);
+        changed |= adjustment(ui, "Contrast", &mut look.contrast, 1.0, 0.0..=3.0);
+        ui.add_enabled_ui(!look.grayscale, |ui| {
+            changed |= adjustment(ui, "Saturation", &mut look.saturation, 1.0, 0.0..=3.0);
+        });
+        changed |= adjustment(ui, "Gamma", &mut look.gamma, 1.0, 0.1..=10.0);
+    });
+    ui.horizontal_wrapped(|ui| {
+        egui::ComboBox::from_id_salt("avc-denoise")
+            .selected_text(look.denoise.map_or_else(|| "Denoise off".into(), |level| format!("Denoise {level:?}")))
+            .show_ui(ui, |ui| {
+                changed |= ui.selectable_value(&mut look.denoise, None, "Denoise off").changed();
+                for strength in [Strength::Light, Strength::Medium, Strength::Heavy] {
+                    changed |= ui.selectable_value(&mut look.denoise, Some(strength), format!("{strength:?}")).changed();
+                }
+            });
+        egui::ComboBox::from_id_salt("avc-detail")
+            .selected_text(match look.detail {
+                None => "Detail unchanged".into(),
+                Some(Detail::Sharpen { strength }) => format!("Sharpen {strength:?}"),
+                Some(Detail::Blur { strength }) => format!("Blur {strength:?}"),
+            })
+            .show_ui(ui, |ui| {
+                changed |= ui.selectable_value(&mut look.detail, None, "Detail unchanged").changed();
+                for strength in [Strength::Light, Strength::Medium, Strength::Heavy] {
+                    changed |= ui.selectable_value(&mut look.detail, Some(Detail::Sharpen { strength }), format!("Sharpen {strength:?}")).changed();
+                    changed |= ui.selectable_value(&mut look.detail, Some(Detail::Blur { strength }), format!("Blur {strength:?}")).changed();
+                }
+            });
+    });
+    changed
+}
+
+fn adjustment(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut Option<Rational>,
+    neutral: f64,
+    bounds: std::ops::RangeInclusive<f64>,
+) -> bool {
+    ui.label(label);
+    let mut scale = value.map_or(neutral, |value| {
+        value.numerator() as f64 / value.denominator() as f64
+    });
+    let changed = ui.add(egui::DragValue::new(&mut scale).range(bounds).speed(0.01)).changed();
+    if changed {
+        let numerator = (scale * 1000.0).round() as i64;
+        *value = if numerator == (neutral * 1000.0) as i64 {
+            None
+        } else {
+            Some(Rational::new(numerator, 1000).expect("Fixed UI precision denominator"))
+        };
     }
     changed
 }
