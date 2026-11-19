@@ -1,5 +1,7 @@
 //! A bounded decoded frame from an explicitly selected registered source stream.
 use crate::{
+    DomainError, Result,
+    media::AudioLayout,
     projects::{EntityId, ProjectId, Revision},
     time::{Rational, TimeRange},
 };
@@ -12,9 +14,11 @@ pub const RGBA_BYTES: usize = WIDTH * HEIGHT * 4;
 pub const MAX_FRAME: u32 = 1_000_000;
 pub const OBSERVE_COMMAND: &str = "previews.observe";
 pub const MAX_INLINE_PNG_BYTES: usize = 96 * 1024;
+pub const MAX_INLINE_WAVE_BYTES: usize = 96 * 1024;
 pub const MAX_OBSERVATION_METADATA_BYTES: usize = 64 * 1024;
 pub const MAX_MCP_OBSERVATION_BYTES: usize = 768 * 1024;
 pub const PNG_MIME_TYPE: &str = "image/png";
+pub const WAVE_MIME_TYPE: &str = "audio/wav";
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -88,6 +92,7 @@ pub enum ObserveInput {
         encoding: Encoding,
         delivery: Delivery,
     },
+    Audio(AudioObservationInput),
 }
 impl ObserveInput {
     pub fn source(asset_id: String, stream_index: u32, frame_index: u32) -> Self {
@@ -127,6 +132,61 @@ impl ObserveInput {
             delivery: Delivery::Inline,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AudioObservationInput {
+    pub target: AudioTarget,
+    pub range: SampleRange,
+    #[schemars(range(min = 8000, max = 192000))]
+    pub sample_rate: u32,
+    pub channel_layout: AudioLayout,
+    pub source_policy: SourcePolicy,
+    pub encoding: AudioEncoding,
+    pub delivery: Delivery,
+}
+
+impl AudioObservationInput {
+    pub fn frames(&self) -> Result<u32> {
+        let frames = self.range.end.checked_sub(self.range.start).filter(|count| *count != 0)
+            .ok_or_else(|| DomainError::new("INVALID_RANGE", "Choose a nonempty half-open decoded sample interval"))?;
+        if !(8000..=192000).contains(&self.sample_rate) {
+            return Err(DomainError::new("VALIDATION_ERROR", "Choose an original rate between 8000 and 192000 Hz"));
+        }
+        let pcm = u64::from(frames) * 2 * self.channels() as u64;
+        if pcm > (MAX_INLINE_WAVE_BYTES - 44) as u64 {
+            return Err(DomainError::new("INLINE_BUDGET_EXCEEDED", "Choose a shorter sample interval for inline WAVE delivery"));
+        }
+        Ok(frames)
+    }
+
+    pub fn channels(&self) -> usize {
+        match self.channel_layout {
+            AudioLayout::Mono => 1,
+            AudioLayout::Stereo => 2,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AudioTarget {
+    pub asset_id: String,
+    pub stream_index: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SampleRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "format", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AudioEncoding {
+    WavePcm16 {},
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -233,6 +293,48 @@ pub struct InlineObservation {
     pub metadata: ObservationMetadata,
     #[schemars(length(min = 1, max = 131072))]
     pub png_base64: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AudioObservationMetadata {
+    pub observation_id: String,
+    pub target: AudioTarget,
+    pub range: SampleRange,
+    pub sample_rate: u32,
+    pub channel_layout: AudioLayout,
+    pub frames: u32,
+    pub source_sha256: String,
+    pub component_sha256: String,
+    pub graph_sha256: String,
+    pub source_policy: SourcePolicy,
+    pub encoding: AudioEncoding,
+    pub delivery: Delivery,
+    pub mime_type: String,
+    pub encoded_byte_count: usize,
+    pub encoded_sha256: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InlineAudioObservation {
+    pub metadata: AudioObservationMetadata,
+    #[schemars(length(min = 1, max = 131072))]
+    pub audio_base64: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ObservationResult {
+    Still(InlineObservation),
+    Audio(InlineAudioObservation),
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum MediaObservationMetadata {
+    Still(ObservationMetadata),
+    Audio(AudioObservationMetadata),
 }
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]

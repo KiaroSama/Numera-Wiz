@@ -90,6 +90,31 @@ fn still_observation_input(asset: &Value) -> Value {
     })
 }
 
+fn audio_observation_input(asset: &Value) -> Value {
+    json!({
+        "kind":"audio","target":{"asset_id":asset["id"],"stream_index":1},
+        "range":{"start":155,"end":4151},"sample_rate":48000,"channel_layout":"mono",
+        "source_policy":"original_required","encoding":{"format":"wave_pcm16"},"delivery":"inline"
+    })
+}
+
+fn assert_mcp_audio(result: Value, asset: &Value, expected: &Value) {
+    let response = &result["structuredContent"];
+    assert_eq!(response["ok"], true, "{}", response["error"]);
+    let content = result["content"].as_array().unwrap();
+    assert_eq!(content.len(), 1);
+    assert_eq!(content[0]["type"], "audio");
+    assert_eq!(content[0]["mimeType"], "audio/wav");
+    assert!(content[0]["data"] == expected["audio_base64"]);
+    let metadata = &response["result"];
+    assert_eq!(metadata["target"]["asset_id"], asset["id"]);
+    for field in ["sample_rate","channel_layout","range","frames","source_sha256",
+        "graph_sha256","encoded_sha256","encoded_byte_count"]
+    {
+        assert_eq!(metadata[field], expected["metadata"][field]);
+    }
+}
+
 fn assert_mcp_still(result: Value, asset: &Value, expected: &Value) {
     let response = &result["structuredContent"];
     assert_eq!(response["ok"], true, "{}", response["error"]);
@@ -702,6 +727,28 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{loudness}");
     assert_loudness(&loudness["result"], &asset);
     let asset_id = asset["id"].as_str().unwrap();
+    let (audio, exit) = cli.human(&[
+        "previews","observe-audio","--asset",asset_id,"--stream","1",
+        "--start-sample","155","--end-sample","4151","--sample-rate","48000",
+        "--channel-layout","mono",
+    ]).await;
+    assert_eq!(exit, 0, "{}", audio["error"]);
+    let audio = &audio["result"];
+    assert_eq!(audio["metadata"]["frames"], 3996);
+    assert_eq!(audio["metadata"]["source_sha256"], asset["identity"]["sha256"]);
+    let wave = STANDARD.decode(audio["audio_base64"].as_str().unwrap()).unwrap();
+    assert_eq!(audio["metadata"]["encoded_sha256"], nw_domain::projects::hash(&wave));
+    let decoded = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v","error","-i"]).arg(&media.source)
+        .args(["-map","0:1","-c:a","pcm_s16le","-f","s16le","pipe:1"])
+        .output().await.unwrap();
+    assert!(decoded.status.success(), "{}", String::from_utf8_lossy(&decoded.stderr));
+    assert_eq!(wave.len(), 44+3996*2);
+    assert!(wave[44..] == decoded.stdout[155*2..4151*2], "WAVE changes original PCM samples");
+    let mut oversized = audio_observation_input(&asset);
+    oversized["range"]["end"] = json!(50000);
+    let rejected_audio = cli.raw(&Request::query("previews.observe", oversized)).await;
+    assert_eq!(rejected_audio["error"]["code"], "INLINE_BUDGET_EXCEEDED");
     let (packets, exit) = cli
         .human(&[
             "media",
@@ -1704,6 +1751,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         &operator_asset,
         observed_still,
     );
+    let stdio_audio = stdio.call_tool(CallToolRequestParams::new("previews.observe")
+        .with_arguments(rmcp::object!({"params":audio_observation_input(&operator_asset)})))
+        .await.unwrap();
+    assert_mcp_audio(serde_json::to_value(stdio_audio).unwrap(), &operator_asset, audio);
     for (ordinal, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
         let still = call!(
             stdio,
@@ -2356,6 +2407,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             &asset,
             observed_still,
         );
+        let http_audio = http.call_tool(CallToolRequestParams::new("previews.observe")
+            .with_arguments(rmcp::object!({"params":audio_observation_input(&asset)})))
+            .await.unwrap();
+        assert_mcp_audio(serde_json::to_value(http_audio).unwrap(), &asset, audio);
         for (index, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
             let still = call!(
                 http,

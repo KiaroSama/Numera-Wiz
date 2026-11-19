@@ -1544,8 +1544,8 @@ impl Service {
             }
             nw_domain::preview::OBSERVE_COMMAND => {
                 drop(guard);
-                let still = self.observe_still(&context, commands::parse(params)?, cancellation)?;
-                return Ok(Response::success(&request.request_id, value(&still)?).bounded());
+                let media = self.observe_media(&context, commands::parse(params)?, cancellation)?;
+                return Ok(Response::success(&request.request_id, value(&media)?).bounded());
             }
             "previews.source_segment" => {
                 drop(guard);

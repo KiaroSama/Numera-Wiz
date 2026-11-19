@@ -265,6 +265,15 @@ settings. The response identifies the sequence interval, active source or
 generator, and the original source presentation time when available.
 Project and source access apply to the captured revision.
 
+For a short PCM observation, set `kind: "audio"` and provide the original
+`asset_id` and `stream_index` in `target`. Set `range` to the half-open
+decoded sample indices `start` and `end`. Supply the original `sample_rate`
+and `channel_layout` of `mono` or `stereo`, with
+`source_policy: "original_required"`, `encoding: {"format":"wave_pcm16"}`
+and `delivery: "inline"`. The tool returns a standard `audio` block carrying
+`audio/wav`. The structured result reports the sample grid and byte digest.
+An interval above the 96 KiB inline budget returns `INLINE_BUDGET_EXCEEDED`.
+
 `previews.source_segment` takes `asset_id`, `video_stream` and optional
 `audio_stream`. It produces a manifest for the first two seconds of a zero-origin
 limited BT.709 video stream with optional zero-origin stereo 48 kHz audio. The

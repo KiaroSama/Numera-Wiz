@@ -57,6 +57,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media preview-frame --asset ID --stream INDEX --frame N` | Decode the selected video frame into a bounded 160 × 90 RGBA preview. |
 | `previews observe --asset ID --stream INDEX --frame N` | Return an inline PNG from the registered source monitor with exact observation metadata. |
 | `previews observe-timeline --project ID --revision REV --sequence ID --at NUM/DEN` | Return the selected committed timeline frame as an inline PNG with sequence and source timing. |
+| `previews observe-audio --asset ID --stream INDEX --start-sample START --end-sample END --sample-rate RATE --channel-layout mono` | Return a half-open interval of an original PCM track as inline WAVE with its original sample rate and layout. |
 | `media preview-segment --asset ID --video-stream INDEX [--audio-stream INDEX]` | Prepare a temporary two-second browser preview and return its delivery manifest. |
 | `timeline preview-frame --project PROJECT --sequence SEQUENCE --revision REV --at TIME` | Decode the visible picture at one exact sequence-frame boundary, with `TIME` as an integer or fraction. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
@@ -225,6 +226,11 @@ padding. Each response carries up to 96 KiB of PNG bytes before base64.
 monitor at an exact sequence-grid position. The result identifies the captured
 revision and interval, the visible clip, solid color or gap, and the original
 source presentation time where applicable.
+
+`previews observe-audio` returns `audio_base64` and matching metadata for a
+registered PCM s16le source. The requested rate and mono or stereo layout
+must match the original. Sample indices refer to the decoded track, with the
+end index excluded. Inline WAVE delivery is limited to 96 KiB.
 
 `disposition patch` addresses an original global stream index. Repeat `--add`
 and `--remove` for individual FFmpeg flags such as `comment`, `original` or

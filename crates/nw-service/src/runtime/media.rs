@@ -212,25 +212,25 @@ impl Service {
         })
     }
 
-    pub(super) fn observe_still(
+    pub(super) fn observe_media(
         &self,
         context: &Context,
         input: nw_domain::preview::ObserveInput,
         cancel: CancellationToken,
-    ) -> Result<nw_domain::preview::InlineObservation> {
+    ) -> Result<nw_domain::preview::ObservationResult> {
         use nw_domain::preview::{
-            self, InlineObservation, ObservationMetadata, ObserveInput, ObserveTarget,
+            self, InlineObservation, ObservationMetadata, ObservationResult, ObserveInput, ObserveTarget,
         };
 
-        let ObserveInput::Still {
-            target,
-            frame_selection,
-            source_policy,
-            display_profile,
-            fit,
-            encoding,
-            delivery,
-        } = input;
+        let (target, frame_selection, source_policy, display_profile, fit, encoding, delivery) =
+            match input {
+                ObserveInput::Still {
+                    target, frame_selection, source_policy, display_profile, fit, encoding, delivery,
+                } => (target, frame_selection, source_policy, display_profile, fit, encoding, delivery),
+                ObserveInput::Audio(input) => {
+                    return self.observe_audio(context, input, cancel).map(ObservationResult::Audio);
+                }
+            };
         let file = match &target {
             ObserveTarget::RegisteredSource { asset_id, stream_index, frame_index }
                 if frame_selection == preview::FrameSelection::DecodedIndex
@@ -302,9 +302,44 @@ impl Service {
                 "Observation metadata exceeds its 64 KiB budget",
             ));
         }
-        Ok(InlineObservation {
+        Ok(ObservationResult::Still(InlineObservation {
             metadata,
             png_base64: STANDARD.encode(&file.bytes),
+        }))
+    }
+
+    fn observe_audio(
+        &self,
+        context: &Context,
+        input: nw_domain::preview::AudioObservationInput,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::preview::InlineAudioObservation> {
+        use nw_domain::preview::{self, AudioObservationMetadata, InlineAudioObservation};
+        let (asset, source) = self.analysis_source(context, &input.target.asset_id)?;
+        let engine = self.engine()?;
+        let wave = tokio::runtime::Handle::current().block_on(engine.observe_pcm_wave(
+            &asset, source, &input, self.root.join("runtime").join("observe-audio"), cancel.clone(),
+        ))?;
+        self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
+        Ok(InlineAudioObservation {
+            metadata: AudioObservationMetadata {
+                observation_id: Uuid::new_v4().to_string(),
+                target: input.target,
+                range: input.range,
+                sample_rate: input.sample_rate,
+                channel_layout: input.channel_layout,
+                frames: wave.frames,
+                source_sha256: asset.identity.sha256,
+                component_sha256: engine.ffmpeg.sha256.clone(),
+                graph_sha256: wave.graph_sha256,
+                source_policy: input.source_policy,
+                encoding: input.encoding,
+                delivery: input.delivery,
+                mime_type: preview::WAVE_MIME_TYPE.into(),
+                encoded_byte_count: wave.bytes.len(),
+                encoded_sha256: nw_domain::projects::hash(&wave.bytes),
+            },
+            audio_base64: STANDARD.encode(wave.bytes),
         })
     }
 

@@ -113,7 +113,7 @@ fn tool(name: &str) -> Option<Tool> {
         Arc::new(schema.as_object()?.clone()),
     );
     let result_schema = if name == preview::OBSERVE_COMMAND {
-        Some(serde_json::to_value(schemars::schema_for!(preview::ObservationMetadata)).ok()?)
+        Some(serde_json::to_value(schemars::schema_for!(preview::MediaObservationMetadata)).ok()?)
     } else {
         descriptor.result_schema
     };
@@ -394,16 +394,33 @@ fn observation_result(
     context: &RequestContext<RoleServer>,
 ) -> Result<CallToolResult, ErrorData> {
     let invalid = || ErrorData::internal_error("Invalid inline observation result", None);
-    let still: preview::InlineObservation =
+    let media: preview::ObservationResult =
         commands::parse(response.result.take().ok_or_else(invalid)?).map_err(|_| invalid())?;
-    let bytes = still.metadata.encoded_byte_count;
-    if !(1..=preview::MAX_INLINE_PNG_BYTES).contains(&bytes)
-        || still.png_base64.len() != bytes.div_ceil(3) * 4
-        || still.metadata.mime_type != preview::PNG_MIME_TYPE
+    let (metadata, data, bytes, advertised_mime, mime, ceiling) = match media {
+        preview::ObservationResult::Still(still) => (
+            serde_json::to_value(&still.metadata),
+            still.png_base64,
+            still.metadata.encoded_byte_count,
+            still.metadata.mime_type,
+            preview::PNG_MIME_TYPE,
+            preview::MAX_INLINE_PNG_BYTES,
+        ),
+        preview::ObservationResult::Audio(audio) => (
+            serde_json::to_value(&audio.metadata),
+            audio.audio_base64,
+            audio.metadata.encoded_byte_count,
+            audio.metadata.mime_type,
+            preview::WAVE_MIME_TYPE,
+            preview::MAX_INLINE_WAVE_BYTES,
+        ),
+    };
+    if !(1..=ceiling).contains(&bytes)
+        || data.len() != bytes.div_ceil(3) * 4
+        || advertised_mime != mime
     {
         return Err(invalid());
     }
-    response.result = Some(serde_json::to_value(&still.metadata).map_err(|_| invalid())?);
+    response.result = Some(metadata.map_err(|_| invalid())?);
     let structured = serde_json::to_value(&response).map_err(|_| invalid())?;
     if serde_json::to_vec(&structured)
         .map_err(|_| invalid())?
@@ -413,10 +430,11 @@ fn observation_result(
         return Err(invalid());
     }
     let mut result = CallToolResult::structured(structured);
-    result.content = vec![ContentBlock::image(
-        still.png_base64,
-        preview::PNG_MIME_TYPE,
-    )];
+    result.content = vec![if mime == preview::WAVE_MIME_TYPE {
+        ContentBlock::audio(data, mime)
+    } else {
+        ContentBlock::image(data, mime)
+    }];
     let envelope = serde_json::json!({"jsonrpc":"2.0","id":&context.id,"result":&result});
     if serde_json::to_vec(&envelope).map_err(|_| invalid())?.len()
         >= preview::MAX_MCP_OBSERVATION_BYTES

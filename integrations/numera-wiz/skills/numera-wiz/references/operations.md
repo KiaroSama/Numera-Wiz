@@ -14,7 +14,7 @@ to each operation/media/transport/package boundary separately.
 | `media.analyze.reference`, `media.analyze.stream` | Measure PSNR and SSIM on aligned video frames or inspect original packets and decoded frames with exact timestamps. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
-| `previews.observe` | Read a lossless image from an authorized source or exact committed sequence frame with timing and origin metadata. |
+| `previews.observe` | Read a lossless image from an authorized source or exact committed sequence frame, or a short original PCM audio interval. |
 | `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |
 | `timeline.render_mixed` | Review a committed sequence range for a mixed FFV1/PCM export on an enabled MediaV2 generation. |
 | `clips.place`, `clips.move`, `clips.link`, `clips.unlink`, `clips.split`, `clips.trim`, `clips.remove` | Edit exact project clips at the reviewed revision. Trim shortens each linked clip at its start, end or both and keeps later clips at their positions. |

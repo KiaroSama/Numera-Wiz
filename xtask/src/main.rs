@@ -266,7 +266,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-protocol=file,pipe,fd",
         "--enable-zlib",
         "--enable-demuxer=matroska,mov,wav,srt,nut,rawvideo,ffmetadata,image_png_pipe,image_jpeg_pipe",
-        "--enable-muxer=matroska,mov,mp4,null,rawvideo,pcm_s16le,nut,streamhash,image2pipe",
+        "--enable-muxer=matroska,mov,mp4,null,rawvideo,pcm_s16le,nut,wav,streamhash,image2pipe",
         "--enable-encoder=ffv1,mpeg4,pcm_s16le,pcm_f32le,pcm_f64le,rawvideo,png,mjpeg",
         "--enable-decoder=ffv1,mpeg4,pcm_s16le,pcm_f32le,subrip,wrapped_avframe,rawvideo,png,mjpeg",
         "--enable-bsf=pcm_rechunk",

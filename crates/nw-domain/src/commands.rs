@@ -257,7 +257,7 @@ fn result_schema(id: &str) -> Option<Value> {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
         crate::preview::OBSERVE_COMMAND => Some(
-            serde_json::to_value(schema_for!(crate::preview::InlineObservation)).expect("schema"),
+            serde_json::to_value(schema_for!(crate::preview::ObservationResult)).expect("schema"),
         ),
         "previews.source_segment" => {
             Some(serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"))
@@ -925,7 +925,7 @@ fn build_registry() -> Vec<Descriptor> {
         ),
         row!(
             "previews.observe",
-            "Observe one lossless inline PNG from an authorized source or committed timeline",
+            "Observe a lossless inline frame or original PCM audio interval",
             Query,
             crate::preview::ObserveInput
         ),

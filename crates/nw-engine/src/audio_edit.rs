@@ -18,7 +18,7 @@ fn unavailable(message: &str) -> DomainError {
     DomainError::new("AUDIO_EDIT_UNQUALIFIED", message)
 }
 
-fn format(probe: &MediaProbe, index: u32) -> Result<(u32, u8, &str)> {
+pub(super) fn format(probe: &MediaProbe, index: u32) -> Result<(u32, u8, &str)> {
     if probe.streams.iter().all(|track| {
         track.index != index || track.kind != StreamKind::Audio || track.codec != "pcm_s16le"
     }) {

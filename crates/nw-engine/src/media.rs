@@ -5,6 +5,7 @@ pub(super) mod execution;
 pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;
 pub(super) mod preview;
+mod preview_audio;
 mod stream_observations;
 pub(super) mod verification;
 mod volume;
