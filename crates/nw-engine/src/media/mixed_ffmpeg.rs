@@ -169,10 +169,12 @@ fn retain_candidate_on_error<T>(
 }
 
 impl Engine {
-    pub async fn qualify_mixed_compiler(&self, cancel: CancellationToken) -> Result<MixedTools> {
+    pub async fn qualify_mixed_compiler(&self, gain_required: bool, cancel: CancellationToken) -> Result<MixedTools> {
         let qualified = self.qualify_media_compiler(cancel.clone()).await?;
         let available = listing(self, "-filters", Listing::Filters, cancel.clone()).await?;
-        if MIXED_FILTERS.iter().any(|name| !available.contains(*name)) {
+        if MIXED_FILTERS.iter().any(|name| !available.contains(*name))
+            || (gain_required && !available.contains("volume"))
+        {
             return Err(DomainError::new(
                 "COMPONENT_UNAVAILABLE",
                 "Selected FFmpeg lacks a required mixed composition filter",
@@ -183,6 +185,9 @@ impl Engine {
         for name in MIXED_FILTERS {
             profile.extend_from_slice(name.as_bytes());
             profile.push(0);
+        }
+        if gain_required {
+            profile.extend_from_slice(b"volume\0");
         }
         Ok(MixedTools {
             ffmpeg: qualified.ffmpeg,
@@ -354,7 +359,8 @@ impl Engine {
                     )
                 })
         };
-        let current = self.qualify_mixed_compiler(cancel.clone()).await?;
+        let gain_required = plan.payload.graph.audio.iter().any(|span| span.gain_centidb != 0);
+        let current = self.qualify_mixed_compiler(gain_required, cancel.clone()).await?;
         if current != plan.payload.tools
             || max_bytes == 0
             || current.ffmpeg.sha256 != self.ffmpeg.sha256
@@ -1117,7 +1123,14 @@ fn mixed_filtergraph(plan: &MediaPlanV2, assets: &[&Asset]) -> Result<MixedFilte
         let delay = &span.start_sample;
         let count = &span.sample_count;
         let label = format!("[a{ordinal}]");
-        chains.push(format!("[{input}:{index}]atrim=start_sample={start}:end_sample={end},asetpts=N/SR/TB,aresample={sample_rate},aformat=sample_fmts=s16:channel_layouts={layout},atrim=end_sample={count},adelay={delay}S:all=1{label}"));
+        let gain = span.gain_centidb;
+        let mut volume = String::new();
+        if gain != 0 {
+            let magnitude = gain.unsigned_abs();
+            let sign = if gain < 0 { "-" } else { "" };
+            volume = format!("volume={sign}{}.{:02}dB:precision=float,", magnitude / 100, magnitude % 100);
+        }
+        chains.push(format!("[{input}:{index}]atrim=start_sample={start}:end_sample={end},asetpts=N/SR/TB,aresample={sample_rate},aformat=sample_fmts=s16:channel_layouts={layout},atrim=end_sample={count},{volume}adelay={delay}S:all=1{label}"));
         audio_labels.push_str(&label);
     }
     chains.push(format!("{audio_labels}amix=inputs={}:normalize=0:dropout_transition=0:duration=longest,atrim=end_sample={output_samples},aformat=sample_fmts=s16,asetpts=N/SR/TB[outa]", graph.audio.len() + 1));

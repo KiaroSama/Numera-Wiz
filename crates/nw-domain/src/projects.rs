@@ -488,6 +488,22 @@ impl<'de> Deserialize<'de> for EntityEnvelope {
         deserializer.deserialize_map(RecordVisitor)
     }
 }
+const TRACK_GAIN_EXTENSION: &str = "numera_track_gain_centidb";
+
+pub const MIN_TRACK_GAIN_CENTIDB: i16 = -9600;
+pub const MAX_TRACK_GAIN_CENTIDB: i16 = 2400;
+
+pub fn is_unity_gain(gain: &i16) -> bool {
+    *gain == 0
+}
+
+pub fn validate_track_gain(gain: i16) -> Result<()> {
+    if !(MIN_TRACK_GAIN_CENTIDB..=MAX_TRACK_GAIN_CENTIDB).contains(&gain) {
+        return Err(invalid("Track gain must be between -96.00 and +24.00 dB"));
+    }
+    Ok(())
+}
+
 impl EntityEnvelope {
     pub fn new(
         project: &ProjectId,
@@ -542,8 +558,36 @@ impl EntityEnvelope {
     }
     pub fn known(&self) -> bool {
         self.envelope_version == 1
-            && self.kind_version == 1
+            && (self.kind_version == 1 || self.gain_track_codec())
             && KNOWN_ENTITY_KINDS.contains(&self.kind.as_str())
+    }
+    fn gain_track_codec(&self) -> bool {
+        self.kind == "track"
+            && self.kind_version == 2
+            && self.extensions.contains_key(TRACK_GAIN_EXTENSION)
+    }
+    pub fn track_gain_centidb(&self) -> Result<i16> {
+        if !self.gain_track_codec() {
+            return Ok(0);
+        }
+        let raw = &self.extensions[TRACK_GAIN_EXTENSION];
+        let gain = serde_json::from_str::<i16>(raw.get()).map_err(|_| invalid("Invalid track gain field"))?;
+        validate_track_gain(gain)?;
+        if gain == 0 {
+            return Err(invalid("Unity gain uses the original track codec"));
+        }
+        Ok(gain)
+    }
+    pub fn set_track_gain(&mut self, gain: i16) -> Result<()> {
+        validate_track_gain(gain)?;
+        if gain == 0 {
+            self.kind_version = 1;
+            self.extensions.remove(TRACK_GAIN_EXTENSION);
+        } else {
+            self.kind_version = 2;
+            self.extensions.insert(TRACK_GAIN_EXTENSION.into(), serde_json::value::to_raw_value(&gain).map_err(|error| invalid(error.to_string()))?);
+        }
+        Ok(())
     }
     pub fn envelope_semantics_supported(&self) -> bool {
         self.envelope_version == 1
@@ -560,6 +604,9 @@ impl EntityEnvelope {
                 "Unsupported envelope reference/scope semantics",
             ));
         }
+        if self.gain_track_codec() {
+            self.track_gain_centidb()?;
+        }
         if self.enabled && !self.known() && self.semantic_scope != "annotation" {
             return Err(DomainError::new(
                 "UNSUPPORTED_SEMANTIC_NODE",
@@ -570,7 +617,7 @@ impl EntityEnvelope {
     }
     pub fn payload<T: DeserializeOwned>(&self, kind: &str) -> Result<T> {
         self.validate()?;
-        if self.envelope_version != 1 || self.kind_version != 1 || self.kind != kind {
+        if self.envelope_version != 1 || (self.kind_version != 1 && !self.gain_track_codec()) || self.kind != kind {
             return Err(DomainError::new(
                 "UNSUPPORTED_SEMANTIC_NODE",
                 "A supported entity codec is required",
@@ -801,6 +848,14 @@ pub struct RemoveGapInput {
     #[schemars(length(min = 1, max = 16), extend("uniqueItems" = true))]
     pub track_ids: Vec<EntityId>,
     pub range: crate::time::TimeRange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetTrackGainInput {
+    pub track_id: EntityId,
+    #[schemars(range(min = -9600, max = 2400))]
+    pub gain_centidb: i16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

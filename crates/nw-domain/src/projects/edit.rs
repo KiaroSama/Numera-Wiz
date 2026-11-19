@@ -52,6 +52,7 @@ pub enum ProjectEditIntent {
     Slip(SlipInput),
     RemoveGap(RemoveGapInput),
     SetTrackEnabled(SetTrackEnabledInput),
+    SetTrackGain(SetTrackGainInput),
     Remove(RemoveInput),
 }
 pub struct AllocatedIds(pub VecDeque<EntityId>);
@@ -784,6 +785,27 @@ pub fn resolve_edit<R: ProjectRead>(
             }
             if entity.enabled != input.enabled {
                 entity.enabled = input.enabled;
+                edit.set(entity)?;
+            }
+            json!({})
+        }
+        ProjectEditIntent::SetTrackGain(input) => {
+            validate_track_gain(input.gain_centidb)?;
+            let mut entity = edit.get(&input.track_id)?;
+            entity.semantics()?;
+            let track: Track = entity.payload("track")?;
+            if track.kind != TrackKind::Audio {
+                return Err(invalid("Gain applies to an audio track"));
+            }
+            let sequence = edit.get(&track.sequence_id)?;
+            if entity.owner_id.as_ref() != Some(&sequence.id) {
+                return Err(invalid("Track ownership differs from its sequence"));
+            }
+            if track.locked || sequence.payload::<Sequence>("sequence")?.locked {
+                return Err(DomainError::new("ENTITY_LOCKED", "Edit touches a locked track or sequence"));
+            }
+            if entity.track_gain_centidb()? != input.gain_centidb {
+                entity.set_track_gain(input.gain_centidb)?;
                 edit.set(entity)?;
             }
             json!({})

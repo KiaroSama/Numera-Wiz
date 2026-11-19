@@ -102,6 +102,8 @@ pub struct TrackSummary {
     pub clip_count: usize,
     #[serde(default = "enabled_by_default")]
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "super::is_unity_gain")]
+    pub gain_centidb: i16,
 }
 
 fn enabled_by_default() -> bool {

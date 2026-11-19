@@ -297,6 +297,23 @@ impl WizApp {
                     ui.ctx(),
                 );
             }
+            if track.kind == TrackKind::Audio {
+                ui.collapsing("Track gain", |ui| {
+                    ui.label(format!("Committed gain {:.2} dB", f64::from(track.gain_centidb) / 100.0));
+                    ui.add_enabled_ui(ready, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("Hundredths of a dB");
+                            ui.add(egui::DragValue::new(&mut self.projects.forms.track_gain_centidb)
+                                .range(nw_domain::projects::MIN_TRACK_GAIN_CENTIDB..=nw_domain::projects::MAX_TRACK_GAIN_CENTIDB));
+                            if ui.button("Set track gain").clicked() {
+                                self.mutate_project("mixer.set_track_gain", json!({
+                                    "track_id":track.id,"gain_centidb":self.projects.forms.track_gain_centidb
+                                }), ui.ctx());
+                            }
+                        });
+                    });
+                });
+            }
         }
     }
     fn project_timeline(&mut self, ui: &mut egui::Ui) {

@@ -21,6 +21,8 @@ pub struct CapturedTrack {
     pub id: EntityId,
     pub kind: TrackKind,
     pub order: u32,
+    #[serde(default, skip_serializing_if = "projects::is_unity_gain")]
+    pub gain_centidb: i16,
     pub clips: Vec<CapturedOccurrence>,
 }
 
@@ -276,12 +278,13 @@ fn capture_mixed_range<R: RenderRead>(
             }
             closure.queue(clip_id)?;
         }
-        tracks.push((id, track, clip_ids));
+        let gain_centidb = entity.track_gain_centidb()?;
+        tracks.push((id, track, clip_ids, gain_centidb));
     }
     drain_and_check_root(&mut closure, header)?;
     let enabled_tracks = tracks
         .iter()
-        .map(|(id, _, _)| id.clone())
+        .map(|(id, _, _, _)| id.clone())
         .collect::<BTreeSet<_>>();
     for entity in closure
         .entities
@@ -302,7 +305,7 @@ fn capture_mixed_range<R: RenderRead>(
     }
     let mut occurrences = BTreeSet::new();
     let mut captured = Vec::new();
-    for (id, track, clip_ids) in tracks {
+    for (id, track, clip_ids, gain_centidb) in tracks {
         let mut clips = Vec::new();
         for clip_id in clip_ids {
             if let Some(value) = occurrence(
@@ -336,6 +339,7 @@ fn capture_mixed_range<R: RenderRead>(
             id,
             kind: track.kind,
             order: track.order,
+            gain_centidb,
             clips,
         });
     }

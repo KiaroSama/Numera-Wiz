@@ -437,6 +437,9 @@ impl Service {
                     "timeline.remove_gap" => {
                         ProjectEditIntent::RemoveGap(commands::parse(request.params.clone())?)
                     }
+                    "mixer.set_track_gain" => {
+                        ProjectEditIntent::SetTrackGain(commands::parse(request.params.clone())?)
+                    }
                     "tracks.set_enabled" => {
                         ProjectEditIntent::SetTrackEnabled(commands::parse(request.params.clone())?)
                     }
@@ -464,6 +467,7 @@ impl Service {
                     | ProjectEditIntent::Trim(_)
                     | ProjectEditIntent::Slip(_)
                     | ProjectEditIntent::RemoveGap(_)
+                    | ProjectEditIntent::SetTrackGain(_)
                     | ProjectEditIntent::SetTrackEnabled(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
                     _ => MAX_CHANGES * 2,

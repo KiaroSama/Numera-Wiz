@@ -602,6 +602,7 @@ mod tests {
                     | "clips.slip"
                     | "tracks.set_enabled"
                     | "timeline.remove_gap"
+                    | "mixer.set_track_gain"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
@@ -1065,7 +1066,7 @@ mod tests {
                         "bin_page" => fields(root, item, &["id", "kind", "name"]),
                         "track_page" => {
                             let required = ["id", "kind", "name", "order", "clip_count"];
-                            fields_with_optional(root, item, &required, &["enabled"]);
+                            fields_with_optional(root, item, &required, &["enabled", "gain_centidb"]);
                             assert!(permits_keys(root, item, &required));
                             assert!(permits_keys(
                                 root,
@@ -1076,6 +1077,11 @@ mod tests {
                                 resolve(root, item)["properties"]["enabled"]["type"],
                                 "boolean"
                             );
+                            assert_eq!(
+                                resolve(root, item)["properties"]["gain_centidb"],
+                                serde_json::json!({"type":"integer","minimum":-9600,"maximum":2400})
+                            );
+
                             assert_eq!(
                                 resolve(root, item)["properties"]["kind"]["enum"],
                                 serde_json::json!(["video", "audio"])
@@ -1305,6 +1311,7 @@ mod tests {
             ("clips.slip", vec![], true),
             ("tracks.set_enabled", vec![], true),
             ("timeline.remove_gap", vec![], true),
+            ("mixer.set_track_gain", vec![], true),
             ("clips.remove", vec![], false),
             ("markers.place", vec!["marker_id"], false),
             ("markers.remove", vec![], false),

@@ -469,6 +469,7 @@ fn index_rows(
                 order: track.order,
                 clip_count: track.clip_count,
                 enabled: entity.enabled,
+                gain_centidb: entity.track_gain_centidb()?,
             })?,
         ));
     }

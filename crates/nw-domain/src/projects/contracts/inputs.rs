@@ -97,6 +97,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
                 | "clips.slip"
                 | "tracks.set_enabled"
                 | "timeline.remove_gap"
+                | "mixer.set_track_gain"
         )
     {
         return schema;
@@ -166,7 +167,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
             enumeration(&mut schema, "link_policy", &["expand"]);
         }
         "clips.link" | "clips.unlink" | "clips.trim" | "clips.slip" | "tracks.set_enabled"
-        | "timeline.remove_gap" => {} // Typed parameters.
+        | "timeline.remove_gap" | "mixer.set_track_gain" => {} // Typed parameters.
         "clips.split" => enumeration(&mut schema, "link_policy", &["expand"]),
         "clips.remove" => {
             bounded_array(&mut schema, "clip_ids", 1, 128);

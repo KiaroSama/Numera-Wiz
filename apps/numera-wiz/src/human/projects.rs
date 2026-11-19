@@ -402,6 +402,14 @@ impl Clips {
 }
 #[derive(Subcommand)]
 pub enum Tracks {
+    /// Set the audio track gain in hundredths of a decibel before mixing.
+    SetGain {
+        #[command(flatten)]
+        context: WriteContext,
+        track: String,
+        #[arg(long, allow_hyphen_values = true)]
+        centidb: i16,
+    },
     /// Enable or mute a track at the expected project revision.
     SetEnabled {
         #[command(flatten)]
@@ -414,15 +422,15 @@ pub enum Tracks {
 
 impl Tracks {
     pub(super) fn prepare(self) -> Result<Request> {
-        let Self::SetEnabled {
-            context,
-            track,
-            enabled,
-        } = self;
-        context.request(
-            "tracks.set_enabled",
-            json!({"track_id":track,"enabled":enabled}),
-        )
+        match self {
+            Self::SetEnabled { context, track, enabled } => {
+                context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
+            }
+            Self::SetGain { context, track, centidb } => {
+                model::validate_track_gain(centidb)?;
+                context.request("mixer.set_track_gain", json!({"track_id":track,"gain_centidb":centidb}))
+            }
+        }
     }
 }
 

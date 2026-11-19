@@ -883,6 +883,35 @@ pub(in crate::runtime) async fn linked_edits() {
     for (id, raw) in gap_fixture.clips[1..3].iter().zip(before) {
         assert_eq!(gap_fixture.raw(id), raw);
     }
+    let mixer = Fixture::new().await;
+    let sequence = mixer.accept(mixer.request("sequences.create", "setup-audio-gain", json!({
+        "name":"Gain fixture","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
+        "tracks":[{"kind":"audio","name":"Bus"},{"kind":"video","name":"Video"}]
+    }))).await;
+    let audio = EntityId::parse(sequence["created"]["tracks"][0]["id"].as_str().unwrap().to_owned()).unwrap();
+    let picture = &sequence["created"]["tracks"][1]["id"];
+    let original = mixer.raw(&audio);
+    mixer.reject_unchanged(mixer.request("mixer.set_track_gain", "reject-picture-gain", json!({"track_id":picture,"gain_centidb":600})), "VALIDATION_ERROR").await;
+    mixer.reject_unchanged(mixer.request("mixer.set_track_gain", "reject-overgain", json!({"track_id":audio,"gain_centidb":3000})), "VALIDATION_ERROR").await;
+    let adjusted = mixer.accept(mixer.request("mixer.set_track_gain", "attenuate-bus", json!({"track_id":audio,"gain_centidb":-2000}))).await;
+    assert_eq!(adjusted["changed_ids"], json!([audio]));
+    let track = mixer.entity(&audio);
+    assert_eq!(track.kind_version, 2);
+    assert_eq!(track.track_gain_centidb().unwrap(), -2000);
+    {
+        let payload: Track = track.payload("track").unwrap();
+        let read = mixer.service.store.project_read(mixer.project.as_str()).unwrap();
+        let rows = read.track_page(&payload.sequence_id, None, 16, 65536).unwrap();
+        let projected = rows.items.iter().find(|row| row["id"] == audio.as_str()).unwrap();
+        assert_eq!(projected["gain_centidb"], -2000);
+    }
+    let changed = mixer.raw(&audio);
+    mixer.accept(mixer.request("history.undo", "restore-unity-gain", json!({}))).await;
+    assert_eq!(mixer.raw(&audio), original);
+    mixer.accept(mixer.request("history.redo", "restore-track-attenuation", json!({}))).await;
+    assert_eq!(mixer.raw(&audio), changed);
+    mixer.accept(mixer.request("mixer.set_track_gain", "reset-track-level", json!({"track_id":audio,"gain_centidb":0}))).await;
+    assert_eq!(mixer.raw(&audio), original);
     let track_fixture = Fixture::new().await;
     let clip: Clip = track_fixture
         .entity(&track_fixture.clips[0])

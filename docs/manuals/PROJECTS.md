@@ -224,6 +224,22 @@ MCP exposes the same edit as `tracks.set_enabled` with `track_id` and
 `enabled` parameters. Use its ordinary project write context. The
 `sequences.inspect` track page includes each track's committed `enabled` state.
 
+## Audio track gain
+
+Select an audio track and open **Track gain**. Set the gain in hundredths of a
+decibel. For example, `-600` is −6.00 dB and `0` restores unity. The committed
+value affects all clips on the track before overlapping audio is mixed for
+export. Undo restores the original gain.
+
+```text
+numera-wiz tracks set-gain TRACK --centidb -600 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key attenuate-track
+```
+
+MCP uses `mixer.set_track_gain` with `track_id` and `gain_centidb`, from −9,600
+to +2,400. The track page includes the gain for tracks with an adjustment.
+Current mixed exports use the FFmpeg `volume` filter for an adjusted track.
+The track record carries a codec version that requires gain support from the reader.
+
 ## Timeline markers
 
 Select a sequence and open **Timeline markers** in Projects to add or remove

@@ -25,6 +25,8 @@ pub struct AudioSpan {
     pub start_sample: String,
     pub sample_count: String,
     pub window: OriginalWindow,
+    #[serde(default, skip_serializing_if = "projects::is_unity_gain")]
+    pub gain_centidb: i16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -88,6 +90,10 @@ fn validate_capture(capture: &MixedCapture) -> Result<()> {
     let mut last_order = None;
     let audio_grid = Rational::new(i64::from(capture.settings.sample_rate), 1)?;
     for track in &capture.tracks {
+        projects::validate_track_gain(track.gain_centidb)?;
+        if track.kind != TrackKind::Audio && track.gain_centidb != 0 {
+            return Err(invalid("Gain requires an audio track"));
+        }
         if !facts.contains(&track.id)
             || !seen.insert(&track.id)
             || last_order.is_some_and(|order| order >= track.order)
@@ -220,13 +226,14 @@ pub fn compile_mixed_graph(capture: &MixedCapture) -> Result<MixedGraph> {
         .tracks
         .iter()
         .filter(|track| track.kind == TrackKind::Audio)
-        .flat_map(|track| &track.clips)
-        .map(|clip| {
+        .flat_map(|track| track.clips.iter().map(move |clip| (track.gain_centidb, clip)))
+        .map(|(gain_centidb, clip)| {
             let range = clip.sequence_range;
             Ok(AudioSpan {
                 start_sample: offset(range.start, capture.range.start, audio_grid)?.to_string(),
                 sample_count: offset(range.end, range.start, audio_grid)?.to_string(),
                 window: original_window(clip, range)?,
+                gain_centidb,
             })
         })
         .collect::<Result<_>>()?;
