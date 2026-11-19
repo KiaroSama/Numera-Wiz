@@ -259,7 +259,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-encoder=ffv1,mpeg4,pcm_s16le,pcm_f64le,rawvideo",
         "--enable-decoder=ffv1,mpeg4,pcm_s16le,subrip,wrapped_avframe,rawvideo",
         "--enable-indev=lavfi",
-        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm",
+        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm,split,psnr,ssim",
         "--enable-swscale",
         "--enable-swresample",
     ];

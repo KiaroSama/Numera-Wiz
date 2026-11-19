@@ -1083,6 +1083,7 @@ impl Service {
                 "media.probe",
                 "media.analyze.volume",
                 "media.analyze.loudness",
+                "media.analyze.reference",
                 "media.analyze.audio_tracks",
                 "media.preview_frame",
                 "capabilities.refresh",
@@ -1450,6 +1451,13 @@ impl Service {
                 let measurement =
                     self.source_loudness(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&measurement)?).bounded());
+            }
+            "media.analyze.reference" => {
+                drop(guard);
+                let comparison = self.compare_source_video(
+                    &context, commands::parse(params)?, cancellation.clone(),
+                )?;
+                return Ok(Response::success(&request.request_id, value(&comparison)?).bounded());
             }
             "media.analyze.audio_tracks" => {
                 drop(guard);

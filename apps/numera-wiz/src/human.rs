@@ -127,6 +127,23 @@ pub enum Media {
         #[arg(long)]
         stream: u32,
     },
+    /// Compare matched video frame windows and report PSNR and SSIM.
+    CompareVideo {
+        #[arg(long)]
+        reference: String,
+        #[arg(long)]
+        reference_stream: u32,
+        #[arg(long, default_value_t = 0)]
+        reference_start: u64,
+        #[arg(long)]
+        candidate: String,
+        #[arg(long)]
+        candidate_stream: u32,
+        #[arg(long, default_value_t = 0)]
+        candidate_start: u64,
+        #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..=8))]
+        frames: u32,
+    },
     /// Compare decoded signal signatures for two or more original audio tracks.
     CompareAudio {
         #[arg(long)]
@@ -539,6 +556,18 @@ pub fn prepare(command: Command) -> Result<Request> {
             "media.analyze.loudness",
             json!({"asset_id":asset,"stream_index":stream}),
         ),
+        Command::Media(Media::CompareVideo {
+            reference, reference_stream, reference_start, candidate, candidate_stream, candidate_start, frames,
+        }) => {
+            use nw_domain::reference_metrics::{CompareInput, Window};
+            let input = CompareInput {
+                reference: Window { asset_id: reference, stream_index: reference_stream, start_frame: reference_start },
+                candidate: Window { asset_id: candidate, stream_index: candidate_stream, start_frame: candidate_start },
+                frame_count: frames,
+            };
+            input.frame_ranges()?;
+            query("media.analyze.reference", serde_json::to_value(input)?)
+        }
         Command::Media(Media::CompareAudio { asset, streams }) => query(
             "media.analyze.audio_tracks",
             json!({"asset_id":asset,"stream_indices":streams}),

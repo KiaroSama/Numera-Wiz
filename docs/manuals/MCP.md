@@ -100,6 +100,13 @@ integrated loudness and gate in hundredths of a LUFS, true peak in hundredths
 of a dBTP and range in hundredths of an LU. The integrated value is null below
 the measurement gate. Digital silence returns a null true peak.
 
+`media.analyze.reference` takes `reference` and `candidate` windows with
+`asset_id`, `stream_index` and zero-based `start_frame`, plus `frame_count`
+from one to eight. The registered video geometry and the decoded presentation
+grids must agree. Each score has the exact relative time and both original
+frame indices. PSNR is in hundredths of a dB or `{"kind":"identical"}`.
+SSIM is reported in millionths. The scores describe decoded 8-bit RGB.
+
 `media.analyze.audio_tracks` accepts `asset_id` and two to sixteen distinct
 original audio indices in `stream_indices`. It compares SHA-256 measurements
 over packed `pcm_f64le` samples, sample rate and channel layout. The response

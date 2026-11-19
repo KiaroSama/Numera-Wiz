@@ -26,10 +26,10 @@ impl Service {
         Ok((asset, source))
     }
 
-    fn complete_audio_analysis(
+    fn complete_analysis(
         &self,
         context: &Context,
-        asset: &Asset,
+        assets: &[&Asset],
         command: &str,
         cancel: &CancellationToken,
     ) -> Result<()> {
@@ -37,7 +37,7 @@ impl Service {
         if cancel.is_cancelled() {
             return Err(DomainError::new(
                 "CANCELLED",
-                "Audio analysis cancelled before delivery",
+                "Media analysis cancelled before delivery",
             ));
         }
         if self
@@ -47,11 +47,13 @@ impl Service {
         {
             return Err(DomainError::new(
                 "PERMISSION_DENIED",
-                "The audio analysis grant changed during measurement",
+                "The media analysis grant changed during measurement",
             ));
         }
-        self.object(context, &asset.id, &asset.creator)?;
-        self.path(context, Path::new(&asset.identity.path), false)?;
+        for asset in assets {
+            self.object(context, &asset.id, &asset.creator)?;
+            self.path(context, Path::new(&asset.identity.path), false)?;
+        }
         Ok(())
     }
 
@@ -68,7 +70,7 @@ impl Service {
             input.stream_index,
             cancel.clone(),
         ))?;
-        self.complete_audio_analysis(context, &asset, "media.analyze.volume", &cancel)?;
+        self.complete_analysis(context, &[&asset], "media.analyze.volume", &cancel)?;
         Ok(result)
     }
 
@@ -83,7 +85,7 @@ impl Service {
             self.engine()?
                 .measure_loudness(&asset, source, input.stream_index, cancel.clone()),
         )?;
-        self.complete_audio_analysis(context, &asset, "media.analyze.loudness", &cancel)?;
+        self.complete_analysis(context, &[&asset], "media.analyze.loudness", &cancel)?;
         Ok(result)
     }
 
@@ -101,7 +103,25 @@ impl Service {
                 &input.stream_indices,
                 cancel.clone(),
             ))?;
-        self.complete_audio_analysis(context, &asset, "media.analyze.audio_tracks", &cancel)?;
+        self.complete_analysis(context, &[&asset], "media.analyze.audio_tracks", &cancel)?;
+        Ok(result)
+    }
+
+    pub(super) fn compare_source_video(
+        &self,
+        context: &Context,
+        input: nw_domain::reference_metrics::CompareInput,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::reference_metrics::Comparison> {
+        input.frame_ranges()?;
+        let (reference, reference_stamp) = self.analysis_source(context, &input.reference.asset_id)?;
+        let (candidate, candidate_stamp) = self.analysis_source(context, &input.candidate.asset_id)?;
+        let assets = [&reference, &candidate];
+        let result = tokio::runtime::Handle::current().block_on(self.engine()?.compare_video_windows(
+            &input, assets, [reference_stamp, candidate_stamp],
+            self.root.join("scratch").join("reference-quality"), cancel.clone(),
+        ))?;
+        self.complete_analysis(context, &assets, "media.analyze.reference", &cancel)?;
         Ok(result)
     }
 

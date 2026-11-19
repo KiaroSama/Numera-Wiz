@@ -12,6 +12,7 @@ pub mod media_v2_execution;
 pub mod metadata;
 pub mod mux;
 pub mod preview;
+pub mod reference_metrics;
 pub mod time;
 
 use schemars::JsonSchema;

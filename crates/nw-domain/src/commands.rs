@@ -229,6 +229,9 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::LoudnessMeasurement))
                 .expect("schema"),
         ),
+        "media.analyze.reference" => Some(
+            serde_json::to_value(schema_for!(crate::reference_metrics::Comparison)).expect("schema"),
+        ),
         "media.analyze.audio_tracks" => Some(
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
@@ -820,6 +823,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Measure EBU R128 integrated loudness, true peak, range and gate on one registered audio stream",
             Query,
             crate::audio_analysis::VolumeInput
+        ),
+        row!(
+            "media.analyze.reference",
+            "Measure RGB PSNR and SSIM for aligned windows from two registered video streams",
+            Query,
+            crate::reference_metrics::CompareInput
         ),
         row!(
             "media.analyze.audio_tracks",
@@ -1658,6 +1667,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.probe",
     "media.analyze.volume",
     "media.analyze.loudness",
+    "media.analyze.reference",
     "media.analyze.audio_tracks",
     "media.preview_frame",
     "capabilities.inspect",

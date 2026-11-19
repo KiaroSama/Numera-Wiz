@@ -8,6 +8,7 @@ mod folders;
 mod jobs;
 mod preview;
 mod projects;
+mod reference;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
@@ -47,6 +48,7 @@ enum Action {
     VolumeMeasurement,
     LoudnessMeasurement,
     CompareAudio,
+    CompareVideo,
     WaveCues,
     ClearCapabilities,
     ArtifactManifest,
@@ -147,6 +149,7 @@ pub struct WizApp {
     loudness_measurement: Option<LoudnessMeasurement>,
     compare_audio_indices: BTreeSet<u32>,
     audio_track_report: Option<AudioTrackReport>,
+    reference_metrics: reference::ReferenceUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -335,6 +338,7 @@ impl WizApp {
             loudness_measurement: None,
             compare_audio_indices: BTreeSet::new(),
             audio_track_report: None,
+            reference_metrics: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -369,6 +373,7 @@ impl WizApp {
             self.volume_measurement = None;
             self.loudness_measurement = None;
             self.audio_track_report = None;
+            self.reference_metrics.result = None;
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -856,6 +861,7 @@ impl WizApp {
                         self.audio_track_report = Some(report);
                     }
                 }
+                Action::CompareVideo => self.accept_reference_result(result)?,
                 Action::WaveCues => {
                     let cues: nw_domain::chapters::WaveCueInventory =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -1531,6 +1537,7 @@ impl eframe::App for WizApp {
             if let Some(asset) = self.selected_asset() {
                 self.volume_panel(ui, &asset);
                 self.extraction_panel(ui, &asset);
+                self.reference_panel(ui, &asset);
             }
         });
         if !self.folder.open {

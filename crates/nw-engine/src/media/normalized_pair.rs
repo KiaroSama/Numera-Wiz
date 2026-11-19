@@ -1,4 +1,5 @@
 //! Bounded NUT candidates for registered windows and verified input pairs.
+mod reference;
 use super::{identities, verification::ratio};
 use crate::{Engine, admission, blocking, preservation};
 use nw_domain::{DomainError, Result, mux::StreamKind, records::Asset, time::Rational};
@@ -37,6 +38,19 @@ impl Engine {
         source: SourceStamp,
         stream_index: u32,
         window: NormalizedWindow,
+        cancel: CancellationToken,
+    ) -> Result<Vec<u8>> {
+        self.normalize_window(asset, source, stream_index, window, CANDIDATE_LIMIT, cancel)
+            .await
+    }
+
+    async fn normalize_window(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        stream_index: u32,
+        window: NormalizedWindow,
+        output_limit: usize,
         cancel: CancellationToken,
     ) -> Result<Vec<u8>> {
         let (range, kind, filter_flag, filter, encoding) = match &window {
@@ -135,7 +149,7 @@ impl Engine {
             Path::new(&self.ffmpeg.path),
             &args,
             Duration::from_secs(30),
-            CANDIDATE_LIMIT,
+            output_limit,
             input.file,
             cancel.clone(),
         )

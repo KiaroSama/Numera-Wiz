@@ -11,6 +11,7 @@ to each operation/media/transport/package boundary separately.
 | `access.replay_scope.create` | Bootstrap own durable retry identity. |
 | `media.probe` | Inspect authorized native media with a finite probe budget. |
 | `media.analyze.volume`, `media.analyze.loudness`, `media.analyze.audio_tracks` | Measure peak, RMS or EBU R128 loudness, or compare decoded signals across selected original tracks. |
+| `media.analyze.reference` | Measure PSNR and SSIM for two authorized video windows on the same decoded frame grid. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
 | `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |

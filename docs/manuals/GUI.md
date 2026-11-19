@@ -253,6 +253,11 @@ gate for the selected original track without changing the media.
 Select at least two tracks in the same panel to compare their decoded signals.
 The result groups matching streams by their original indices.
 
+Expand **Compare video quality** on the reference file, set its start frame and
+choose **Use stream as reference**. Open the candidate file, set its matching
+start and frame count, and choose its video stream. Each result row identifies
+the corresponding original frames and reports PSNR and SSIM.
+
 ## Extract a stream
 
 Choose a registered source, enter a new `.mkv` output path and expand

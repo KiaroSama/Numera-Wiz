@@ -59,6 +59,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
 | `media analyze-loudness --asset ID --stream INDEX` | Measure integrated loudness, true peak, range and gating for a registered audio stream. |
+| `media compare-video --reference ID --reference-stream INDEX --candidate ID --candidate-stream INDEX --frames COUNT` | Measure PSNR and SSIM for aligned decoded video windows. |
 | `media compare-audio --asset ID --stream INDEX --stream INDEX` | Compare two to sixteen original audio tracks for matching decoded samples and formats. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |
@@ -180,6 +181,12 @@ Missing fields and settings that require an encode or analysis profile return
 a field error immediately. Import itself continues to describe all 40 fields.
 
 ## Canonical operations
+
+`media compare-video` accepts one to eight frames. Use `--reference-start`
+and `--candidate-start` for zero-based positions in the original video
+streams. Choose matching dimensions, aspect ratio, color fields and frame
+timing. Each decoded input window has an 8 MiB bound. The result identifies
+both sources and reports per-frame PSNR and SSIM in decoded 8-bit RGB.
 
 `media preview-frame` addresses the original stream index and a zero-based
 decoded frame index. The JSON result includes the selected asset and content
