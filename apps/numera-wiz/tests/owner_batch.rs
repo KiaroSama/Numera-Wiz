@@ -1114,6 +1114,31 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     assert_eq!(actual_pts, [0, 512, 1920, 3584, 6016, 8192]);
     results.push(json!({"job":common_job["job_id"],"container":"mp4","reordered_original_packet_pts":original_pts,"verified_decoded_pts":actual_pts}));
 
+    let millisecond_source = directory.join("registered-millisecond-avc.mp4");
+    let remux_clock = [
+        "-v", "error", "-copyts", "-avoid_negative_ts", "disabled", "-i",
+        common.to_str().unwrap(), "-map", "0", "-c", "copy", "-video_track_timescale", "1000",
+        millisecond_source.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &remux_clock,
+        Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
+    let registered = accepted(&cli, &scope, "register-millisecond-avc", "assets.register",
+        json!({"path":millisecond_source})).await;
+    let source = fixture::probe(&components, &millisecond_source).await;
+    assert_eq!(source["streams"][0]["time_base"], "1/1000");
+    assert!(source["streams"][0]["color_range"].is_null());
+    let destination = directory.join("avc-range-signal.mkv");
+    let reviewed = cli.query("media.encode", json!({"asset_id":registered["id"],"output":destination,
+        "settings":{"video_stream":0,"container":"matroska","crf":20,"preset":"balanced",
+        "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}}})).await;
+    let job = accepted(&cli, &scope, "run-millisecond-avc", "jobs.submit",
+        json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
+    succeeded(&cli, &job).await;
+    let observed = fixture::probe(&components, &destination).await;
+    assert_eq!(observed["streams"][0]["color_range"], "tv");
+    assert_eq!(pts(&packets(&components, &destination).await[&0]), [0, 32, 120, 224, 376, 512]);
+    results.push(json!({"job":job["job_id"],"container":"matroska","range":"limited"}));
+
     for (mode, peak, buffer, crop, resize) in [
         ("quality_vbr", "1400k", "2800k", "crop=31,41,39,29", false),
         (

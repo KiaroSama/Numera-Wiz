@@ -267,6 +267,7 @@ impl Engine {
         }
         let source_picture = stream(&plan.source.probe, encode.video_stream)?;
         let output_picture = stream(observed, primary.index)?;
+        let original_is_avc = plan.resolution.streams[0].codec == "h264";
         let (expected, _) = picture_filter(source_picture, encode)?;
         let actual = raster(output_picture)?;
         if (expected.width, expected.height, expected.sar) != (actual.width, actual.height, actual.sar) {
@@ -276,12 +277,11 @@ impl Engine {
             let expected = &source_picture[field];
             let actual = &output_picture[field];
             let missing = |value: &serde_json::Value| value.is_null() || value == "unknown";
-            // MP4 can omit the optional color box and AVC defaults an absent
-            // video_full_range_flag to limited. Full range must be signaled.
+            // AVC defaults an absent video_full_range_flag to limited.
+            // MP4 and Matroska can expose the same range differently.
             let implicit_limited_range = field == "color_range"
-                && encode.container == Container::Mp4
-                && expected == "tv"
-                && missing(actual);
+                && (expected == "tv" || original_is_avc && missing(expected))
+                && (actual == "tv" || missing(actual));
             if !(expected == actual
                 || missing(expected) && missing(actual)
                 || implicit_limited_range)
