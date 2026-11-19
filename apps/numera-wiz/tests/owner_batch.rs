@@ -99,6 +99,18 @@ async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
     }
     grouped
 }
+async fn accepted(cli: &Cli, scope: &str, key: &str, command: &str, params: Value) -> Value {
+    let response = cli.mutation(scope, key, command, params).await;
+    assert_eq!(response["ok"], true, "{command}: {response}");
+    assert!(response["receipt_id"].is_string(), "{command}: {response}");
+    response["result"].clone()
+}
+
+async fn succeeded(cli: &Cli, job: &Value) {
+    let result = cli.completed(job["job_id"].as_str().unwrap()).await;
+    assert_eq!(result["state"], "succeeded", "{result}");
+}
+
 async fn caption_frame(components: &Path, path: &Path, time: &str) -> Vec<u8> {
     let arguments = [
         "-v",
@@ -156,14 +168,14 @@ async fn caption_burn(parent: &Path) -> Value {
         .as_str()
         .unwrap()
         .to_owned();
-    let external = cli
-        .mutation(
-            &scope,
-            "register-external-caption",
-            "assets.register",
-            json!({"path":subtitles}),
-        )
-        .await;
+    let external = accepted(
+        &cli,
+        &scope,
+        "register-external-caption",
+        "assets.register",
+        json!({"path":subtitles}),
+    )
+    .await;
     let mut cases = Vec::new();
     for transfer in ["bt709", "smpte2084", "arib-std-b67"] {
         let hdr = transfer != "bt709";
@@ -233,14 +245,14 @@ async fn caption_burn(parent: &Path) -> Value {
         )
         .await
         .unwrap();
-        let registered = cli
-            .mutation(
-                &scope,
-                &format!("register-caption-{transfer}"),
-                "assets.register",
-                json!({"path":input}),
-            )
-            .await;
+        let registered = accepted(
+            &cli,
+            &scope,
+            &format!("register-caption-{transfer}"),
+            "assets.register",
+            json!({"path":input}),
+        )
+        .await;
         let subtitle = if hdr {
             json!({"kind":"embedded","stream_index":3})
         } else {
@@ -273,15 +285,15 @@ async fn caption_burn(parent: &Path) -> Value {
                 .len(),
             64
         );
-        let job = cli
-            .mutation(
-                &scope,
-                &format!("burn-caption-{transfer}"),
-                "jobs.submit",
-                json!({"plan_id":review["id"],"plan_hash":review["hash"]}),
-            )
-            .await;
-        cli.completed(job["job_id"].as_str().unwrap()).await;
+        let job = accepted(
+            &cli,
+            &scope,
+            &format!("burn-caption-{transfer}"),
+            "jobs.submit",
+            json!({"plan_id":review["id"],"plan_hash":review["hash"]}),
+        )
+        .await;
+        succeeded(&cli, &job).await;
         let probe = fixture::probe(&components, &output).await;
         assert_eq!(probe["streams"].as_array().unwrap().len(), 3);
         let video = &probe["streams"][0];
