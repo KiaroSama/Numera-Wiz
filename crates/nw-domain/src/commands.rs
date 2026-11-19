@@ -432,7 +432,16 @@ pub enum SubmissionInput {
     Legacy(SubmitInput),
     MediaV1(MediaSubmitInput),
 }
+fn registered_descriptors() -> &'static [Descriptor] {
+    static DESCRIPTORS: std::sync::OnceLock<Vec<Descriptor>> = std::sync::OnceLock::new();
+    DESCRIPTORS.get_or_init(build_registry)
+}
+
 pub fn registry() -> Vec<Descriptor> {
+    registered_descriptors().to_vec()
+}
+
+fn build_registry() -> Vec<Descriptor> {
     macro_rules! row {
         ($id:literal,$label:literal,$class:ident,$params:ty) => {
             Descriptor {
@@ -1075,7 +1084,13 @@ pub fn registry() -> Vec<Descriptor> {
     ]
 }
 pub fn descriptor(id: &str) -> Option<Descriptor> {
-    registry().into_iter().find(|d| d.id == id)
+    registered_descriptors()
+        .iter()
+        .find(|entry| entry.id == id)
+        .cloned()
+}
+pub fn is_registered(id: &str) -> bool {
+    registered_descriptors().iter().any(|entry| entry.id == id)
 }
 pub fn parse<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
     serde_json::from_value(value).map_err(|e| DomainError::new("VALIDATION_ERROR", e.to_string()))
@@ -1804,9 +1819,10 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "jobs.cancel",
 ];
 pub fn active_registry() -> Vec<Descriptor> {
-    registry()
-        .into_iter()
+    registered_descriptors()
+        .iter()
         .filter(|descriptor| ACTIVE_COMMANDS.contains(&descriptor.id.as_str()))
+        .cloned()
         .collect()
 }
 pub fn registry_fingerprint() -> String {

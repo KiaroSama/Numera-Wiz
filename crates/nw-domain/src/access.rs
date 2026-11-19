@@ -112,7 +112,7 @@ impl ProfileInput {
             || self.read_roots.len() > 32
             || self.write_roots.len() > 32
             || self.allowed_command_ids.iter().any(|id| {
-                commands::descriptor(id).is_none()
+                !commands::is_registered(id)
                     || id.starts_with("access.profiles")
                     || id.starts_with("access.tokens")
                     || id == "access.credentials.issue"
