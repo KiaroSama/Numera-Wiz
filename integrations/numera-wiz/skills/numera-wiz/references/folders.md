@@ -42,11 +42,20 @@ requires the authorized `snapshot_id`, exact `snapshot_hash`, an existing
 `output_root` in a disjoint tree, and the ordinary cleanup intent, file-time,
 execution-limit, failure and unresolved-index policies. The corresponding
 CLI is `batches plan-folder --file folder-batch.json`. This query refuses
-incomplete intake, failed entries and empty registered sets. Its `excluded`
+incomplete intake and empty registered sets. Use `continue_with_rejected`
+after reviewing failed intake rows to process the retained registered subset.
+Its `excluded`
 rows refer to the retained snapshot's zero-based indices, including inventory
 and explicit exclusions. Review those rows and the generated names and child
 decisions in `plan`; use that exact plan ID/hash for separately authorized
 submission with `batches.submit`.
+
+Set `output_layout` to `preserve_tree` to keep the source relative paths in
+matching existing output subdirectories. Set `copy_companions` to `true` to
+include inventoried companion bytes. Use each reported snapshot index to
+identify its source. The review allocates a numbered name when a destination
+is occupied. Each accepted copy verifies the original bytes and publishes its
+own artifact. Batch video size statistics use successful video rows.
 
 For a user-selected set of individual assets, use `streams.clean.batch_plan`
 with explicit destinations. Repeating the original durable folder identity

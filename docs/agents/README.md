@@ -183,18 +183,54 @@ trim. Inspect live tool schemas for the media and project contract.
 [Packaged route map](../../integrations/numera-wiz/skills/numera-wiz/references/operations.md)
 
 Bounded folder intake uses durable `assets.register_folder` and immutable
-`assets.folder_inspect`, with per-file probe failures and inventory-only or
-excluded companions. Its 32-entry manifest limit and partial-snapshot facts
-remain explicit. CLI `assets register-folder` / `assets folder-inspect` expose
-that same contract. CLI `jobs wait ID --timeout-seconds 1800` adds a finite
-1-86400 second observer over `jobs.inspect`; timeout/Ctrl+C stops observation
-without cancelling accepted work. These operations do not promise the complete
-donor folder/companion workflow.
+`assets.folder_inspect`. It retains per-file failures and inventoried companion
+identities within a 32-entry manifest. The cleanup review can preserve the
+relative paths and include the inventoried companions as verified byte copies.
+Read the retained snapshot and the exclusions before submitting its plan.
+[Folder workflow](../../integrations/numera-wiz/skills/numera-wiz/references/folders.md)
 
 Durable calls retain command, params, scope, key and request ID across uncertain
 responses. Observe accepted work through jobs/batches; cancelling the MCP call
 or observation is not job cancellation. A completed FFmpeg progress stream
 does not prove verified publication. Use actual terminal job/artifact facts.
+
+## First export through MCP
+
+Use the generated `examples/quickstart/clip.mkv` from the standalone package.
+Use the selected client's stdio or loopback HTTP setup above. The owner grants
+read access to the sample directory and write access to a separate output
+directory. Grant the required command and object actions to the same profile.
+[Human walkthrough](../manuals/QUICKSTART.md) · [Access grants](../../integrations/numera-wiz/skills/numera-wiz/references/access.md)
+
+1. Enumerate `tools/list`. Read the `media.encode` schema with `commands.schema`.
+2. Call `access.replay_scope.create`. Register the sample with `assets.register`
+   and retain the returned asset `id`, scope and registration key.
+3. Call `media.encode` with the asset ID and an absent output inside the write
+   grant. Use the following settings to encode the single picture stream.
+
+   ```json
+   {
+     "video_stream": 0,
+     "container": "mp4",
+     "crf": 18,
+     "preset": "balanced",
+     "audio": {"kind": "drop"}
+   }
+   ```
+
+4. Call `plans.inspect` with the returned plan ID and review its selected stream,
+   destination and hash. Pass that ID and hash as `plan_id` and `plan_hash` to
+   `jobs.submit` with a new operation key under the retained scope.
+5. Poll `jobs.inspect` with the returned `job_id` until it reports a terminal
+   state. For `succeeded`, read `artifacts.manifest` with `artifact_id` formed by
+   prefixing the job ID with `job-`. Read the published bytes using
+   `artifacts.read_chunk` with the manifest SHA-256 as `expected_sha256` and
+   advance the decimal-string offset through the remaining bytes. Verify the
+   decoded bytes against the manifest before reporting success. For a failed or
+   interrupted job, report its retained error.
+
+Retain the exact original submit request if its response is lost. The same
+scope, key and parameters recover the accepted job. [Call envelopes](../../integrations/numera-wiz/skills/numera-wiz/references/calls.md)
 
 ## Validation and remaining qualification
 
