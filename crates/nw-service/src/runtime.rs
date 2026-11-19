@@ -705,7 +705,8 @@ impl Service {
             | "markers.remove"
             | "timeline.remove_gap"
             | "mixer.set_track_gain"
-            | "interchange.edl.import" => self.project_receipt_readable(context, &response)?,
+            | "interchange.edl.import"
+            | "interchange.otio.import" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1264,10 +1265,10 @@ impl Service {
                 )?;
                 return Ok(Response::success(&request.request_id, plan).bounded());
             }
-            "interchange.edl.export" => {
+            "interchange.edl.export" | "interchange.otio.export" => {
                 let input: nw_domain::interchange::EdlInput = commands::parse(params)?;
                 let project = request.project.as_ref().ok_or_else(|| {
-                    DomainError::new("VALIDATION_ERROR", "EDL export requires a project context")
+                    DomainError::new("VALIDATION_ERROR", "Interchange export requires a project context")
                 })?;
                 let read = self.read_project(&context, &project.id, ObjectAction::Read)?;
                 let capture = nw_domain::media::capture_mixed(
@@ -1276,10 +1277,11 @@ impl Service {
                     input.revision,
                     input.range,
                 )?;
-                value(&nw_domain::interchange::export_cmx3600(
-                    &capture,
-                    &input.track_id,
-                )?)?
+                if request.command.id == "interchange.edl.export" {
+                    value(&nw_domain::interchange::export_cmx3600(&capture, &input.track_id)?)?
+                } else {
+                    value(&nw_domain::interchange::export_otio(&capture, &input.track_id)?)?
+                }
             }
             "timeline.preview_frame" => {
                 drop(guard);
@@ -1356,6 +1358,7 @@ impl Service {
             | "timeline.remove_gap"
             | "mixer.set_track_gain"
             | "interchange.edl.import"
+            | "interchange.otio.import"
             | "history.undo"
             | "history.redo" => {
                 drop(guard);

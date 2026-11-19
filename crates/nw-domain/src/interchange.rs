@@ -1,5 +1,6 @@
-//! Bounded CMX 3600 cut lists for one committed picture track.
+//! Bounded interchange documents for committed project tracks.
 mod import;
+mod otio;
 use crate::{
     DomainError, Result,
     media::{MixedCapture, OccurrenceSource},
@@ -7,9 +8,18 @@ use crate::{
     time::{Rational, TimeRange},
 };
 pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600};
+pub use otio::{
+    ImportedOtio, MAX_OTIO_BYTES, OtioExport, OtioImportInput, OtioSource, export_otio, parse_otio,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Write};
+
+#[derive(Clone, Copy)]
+pub enum CutTrack {
+    Edl(Rational),
+    Otio { kind: TrackKind, range: TimeRange },
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

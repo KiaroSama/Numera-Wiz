@@ -2611,3 +2611,19 @@ The HEVC tests preserved all six original presentation times in MP4 and
 Matroska. The registered sample edit matched all 6,588 original 5.1 PCM sample
 frames in WAVE and decoded FLAC. The actual Chrome and desktop workspaces and
 both official MCP transports passed. [Media report](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14537983513) · [Chrome](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135621836372) · [Desktop](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135647881278) · [MCP transports](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135621836272)
+
+## OpenTimelineIO track exchange
+
+The OTIO workflow shares the existing revisioned edit, held source validation
+and verified client document save. It covers one video or audio track on the
+current project grid with cuts, gaps and explicit registered media bindings.
+The existing owner media journey now exercises both track kinds, including a
+one-sample audio cut, and checks digest rejection, Undo and Redo for the video
+import. The scope follows the published OTIO v0.18.1 serialized schema. CD20
+still includes the remaining interchange formats and project tools.
+[OTIO schema](https://opentimelineio.readthedocs.io/en/v0.18.1/tutorials/otio-serialized-schema.html)
+
+The reviewed FFmpeg Skill 3.15.1 update adds CI checks for regressions in
+earlier fixes. Numera retains the original hosted test entry points and
+keeps the prior CMX cut-list journey beside the new OTIO checks.
+[FFmpeg Skill 3.15.1 changes](https://github.com/kajisho5/ffmpeg-skill/compare/5055a42...364f2d5210870987dacddfea887787038a6f54ac)

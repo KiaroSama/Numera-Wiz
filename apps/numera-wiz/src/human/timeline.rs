@@ -2,6 +2,47 @@
 use super::*;
 use nw_domain::{projects as model, time::TimeRange};
 
+#[derive(Args)]
+pub struct TrackExport {
+    #[arg(long)]
+    project: String,
+    #[arg(long)]
+    revision: String,
+    #[arg(long)]
+    sequence: String,
+    #[arg(long)]
+    track: String,
+    #[arg(long, default_value = "0")]
+    start: String,
+    #[arg(long)]
+    end: String,
+    /// Save the verified cut list to a new client-side file.
+    #[arg(long)]
+    pub(super) out: Option<PathBuf>,
+}
+
+impl TrackExport {
+    fn prepare(self, command: &str) -> Result<Request> {
+        model::validate_id(&self.project)?;
+        let input = nw_domain::interchange::EdlInput {
+            sequence_id: model::EntityId::parse(self.sequence)?,
+            track_id: model::EntityId::parse(self.track)?,
+            revision: model::Revision::parse(&self.revision)?,
+            range: TimeRange {
+                start: super::projects::rational(&self.start)?,
+                end: super::projects::rational(&self.end)?,
+            },
+        };
+        input.range.validate()?;
+        let mut request = query(command, serde_json::to_value(input)?);
+        request.project = Some(commands::ProjectRef {
+            id: self.project,
+            expected_revision: None,
+        });
+        Ok(request)
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Timeline {
     /// Close an empty range on the selected tracks and move the later clips left.
@@ -18,23 +59,9 @@ pub enum Timeline {
         end: String,
     },
     /// Export one selected picture track as a CMX 3600 cut list.
-    ExportEdl {
-        #[arg(long)]
-        project: String,
-        #[arg(long)]
-        revision: String,
-        #[arg(long)]
-        sequence: String,
-        #[arg(long)]
-        track: String,
-        #[arg(long, default_value = "0")]
-        start: String,
-        #[arg(long)]
-        end: String,
-        /// Save the verified cut list to a new client-side file.
-        #[arg(long)]
-        out: Option<PathBuf>,
-    },
+    ExportEdl(TrackExport),
+    /// Export one selected video or audio track as OpenTimelineIO.
+    ExportOtio(TrackExport),
     /// Import a UTF-8 CMX 3600 cut list as one reversible edit.
     ImportEdl {
         #[command(flatten)]
@@ -50,6 +77,22 @@ pub enum Timeline {
         /// JSON array binding every non-black reel to a registered asset, stream and digest.
         #[arg(long)]
         reels: Option<PathBuf>,
+    },
+    /// Import one OpenTimelineIO track as one reversible edit.
+    ImportOtio {
+        #[command(flatten)]
+        context: super::projects::WriteContext,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        track: String,
+        #[arg(long, default_value = "0")]
+        start: String,
+        #[arg(long)]
+        file: PathBuf,
+        /// JSON array binding each media URL to a registered asset, stream and digest.
+        #[arg(long)]
+        sources: Option<PathBuf>,
     },
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
@@ -118,33 +161,8 @@ impl Timeline {
                 }))?;
                 context.request("timeline.remove_gap", serde_json::to_value(input)?)
             }
-            Self::ExportEdl {
-                project,
-                revision,
-                sequence,
-                track,
-                start,
-                end,
-                out: _,
-            } => {
-                model::validate_id(&project)?;
-                let input = nw_domain::interchange::EdlInput {
-                    sequence_id: model::EntityId::parse(sequence)?,
-                    track_id: model::EntityId::parse(track)?,
-                    revision: model::Revision::parse(&revision)?,
-                    range: TimeRange {
-                        start: super::projects::rational(&start)?,
-                        end: super::projects::rational(&end)?,
-                    },
-                };
-                input.range.validate()?;
-                let mut request = query("interchange.edl.export", serde_json::to_value(input)?);
-                request.project = Some(commands::ProjectRef {
-                    id: project,
-                    expected_revision: None,
-                });
-                Ok(request)
-            }
+            Self::ExportEdl(args) => args.prepare("interchange.edl.export"),
+            Self::ExportOtio(args) => args.prepare("interchange.otio.export"),
             Self::ImportEdl {
                 context,
                 sequence,
@@ -168,6 +186,25 @@ impl Timeline {
                     reels,
                 };
                 context.request("interchange.edl.import", serde_json::to_value(input)?)
+            }
+            Self::ImportOtio { context, sequence, track, start, file, sources } => {
+                let read_otio = |path| read_cut_file(path, nw_domain::interchange::MAX_OTIO_BYTES,
+                    "OTIO input file exceeds 96 KiB");
+                let sources = if let Some(path) = sources {
+                    commands::parse(commands::decode_json(&read_otio(path)?)?)?
+                } else {
+                    Vec::new()
+                };
+                let document = String::from_utf8(read_otio(file)?)
+                    .map_err(|_| DomainError::new("OTIO_INVALID", "OTIO document must be UTF-8"))?;
+                let input = nw_domain::interchange::OtioImportInput {
+                    sequence_id: model::EntityId::parse(sequence)?,
+                    track_id: model::EntityId::parse(track)?,
+                    start: Some(super::projects::rational(&start)?),
+                    document,
+                    sources,
+                };
+                context.request("interchange.otio.import", serde_json::to_value(input)?)
             }
             Self::PreviewSegment {
                 project,
@@ -258,31 +295,34 @@ impl Timeline {
 }
 
 fn read_cmx_file(path: PathBuf) -> Result<Vec<u8>> {
-    let limit = nw_domain::interchange::MAX_DOCUMENT_BYTES;
+    read_cut_file(path, nw_domain::interchange::MAX_DOCUMENT_BYTES, "EDL input file exceeds 16 KiB")
+}
+
+fn read_cut_file(path: PathBuf, limit: usize, message: &'static str) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
         .take((limit + 1) as u64)
         .read_to_end(&mut bytes)?;
     if bytes.len() > limit {
-        return Err(DomainError::new("RESOURCE_LIMIT", "EDL input file exceeds 16 KiB").into());
+        return Err(DomainError::new("RESOURCE_LIMIT", message).into());
     }
     Ok(bytes)
 }
 
-pub(super) async fn save_edl(client: &NativeClient, request: Request, path: &Path) -> Result<()> {
+pub(super) async fn save_interchange(client: &NativeClient, request: Request, path: &Path) -> Result<()> {
     let response = client.request(&request).await?;
     if response.ok {
         let saved: Result<(), DomainError> = (|| {
             let value = response
                 .result
                 .as_ref()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL result is missing"))?;
+                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange result is missing"))?;
             let text = value["document"]
                 .as_str()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL document is missing"))?;
+                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange document is missing"))?;
             let digest = value["document_sha256"]
                 .as_str()
-                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL digest is missing"))?;
+                .ok_or_else(|| DomainError::new("INVALID_RESPONSE", "Interchange digest is missing"))?;
             nw_platform::download::save_verified_document(path, text.as_bytes(), digest)
         })();
         if let Err(error) = saved {

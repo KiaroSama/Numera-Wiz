@@ -43,6 +43,7 @@ pub(super) enum Phase {
     #[cfg(target_arch = "wasm32")]
     ProgramSegment,
     EdlExport,
+    OtioExport,
     MixedReview,
     MixedSubmit,
     Markers,
@@ -217,6 +218,7 @@ pub(super) struct ProjectsUi {
     #[cfg(not(target_arch = "wasm32"))]
     native_picture: Option<NativePictureView>,
     edl: Option<nw_domain::interchange::EdlExport>,
+    otio: Option<nw_domain::interchange::OtioExport>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
     wave_projection: Option<nw_domain::projects::wave_projection::Projection>,
@@ -240,6 +242,9 @@ impl ProjectsUi {
         self.edl = None;
         self.forms.edl_document.clear();
         self.forms.edl_reels.clear();
+        self.otio = None;
+        self.forms.otio_document.clear();
+        self.forms.otio_sources.clear();
         self.mixed_review = None;
         self.marker_page = None;
         self.wave_projection = None;
@@ -681,6 +686,7 @@ impl WizApp {
             Action::Project(ProjectAction {
                 phase: Phase::PreviewFrame
                     | Phase::EdlExport
+                    | Phase::OtioExport
                     | Phase::MixedReview
                     | Phase::MixedSubmit
                     | Phase::Markers
@@ -1086,6 +1092,26 @@ impl WizApp {
                     );
                 }
                 self.projects.edl = Some(edl);
+                return Ok(());
+            }
+            Phase::OtioExport => {
+                let otio: nw_domain::interchange::OtioExport =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed sequence for the OTIO export")?;
+                if otio.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(otio.sequence_id.as_str())
+                    || group.view.track.as_deref() != Some(otio.track_id.as_str())
+                    || otio.revision.to_string() != group.key.revision
+                    || otio.range != group.view.range
+                    || nw_domain::projects::hash(otio.document.as_bytes()) != otio.document_sha256
+                {
+                    return Err("OTIO differs from the displayed revision, track, range or accepted digest".into());
+                }
+                self.projects.otio = Some(otio);
                 return Ok(());
             }
             Phase::MixedReview => {

@@ -336,6 +336,44 @@ the `reels` array directly, along with the destination sequence, track and frame
 rate. The receipt includes the document digest and the created clip IDs in cut
 order.
 
+## Exchange a track with OpenTimelineIO
+
+Select an enabled video or audio track at unity gain and open
+**OpenTimelineIO**. Prepare the visible range, then copy the OTIO document
+and its media bindings. Paste both values on a matching destination track
+and choose **Import at range start**. A single Undo or Redo covers the import.
+
+```text
+numera-wiz timeline export-otio --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 8 --out timeline.otio
+numera-wiz timeline import-otio --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --start 0 --file timeline.otio --sources sources.json --replay-scope SCOPE --idempotency-key import-otio
+```
+
+The export returns the document, its SHA-256 digest and a `sources` array.
+Save the array as `sources.json`. The CLI verifies the document digest before
+saving it to a new file. MCP offers the same operations through
+`interchange.otio.export` and `interchange.otio.import`.
+
+Every external reference needs a binding from the exact `target_url` to an
+authorized registered asset, its physical stream index and content SHA-256.
+Numera exports opaque `urn:numera-wiz:asset:` references so an interchange
+file carries no local paths. Bind or relink these references in another editor.
+Import resolves the explicit binding and checks the held media digest. The URL
+itself is treated as an identifier throughout import.
+
+The supported subset includes a `Timeline.1` with one flat video or audio
+track, `Clip.1` or `Clip.2` cuts, `Gap.1` and the Numera Wiz solid-color
+generator. It accepts integer ticks and positive integer or standard
+24000/1001, 30000/1001, 60000/1001 and 120000/1001 rates. Cuts and the full
+destination interval must align to the destination track grid. The interval
+must be empty, including its gaps. The `--start` option sets the destination
+offset. OTIO's `global_start_time` is timecode metadata. Use the exported
+range length when selecting a range that includes trailing empty space.
+
+Each import admits up to 63 cuts and a 96 KiB document. Nested tracks,
+transitions, effects, markers, alternate references and unresolved media
+require separate conversion. The format follows the official OTIO schema.
+[OpenTimelineIO schema](https://opentimelineio.readthedocs.io/en/v0.18.1/tutorials/otio-serialized-schema.html)
+
 ## Audio track gain
 
 Select an audio track and open **Track gain**. Set the gain in hundredths of a

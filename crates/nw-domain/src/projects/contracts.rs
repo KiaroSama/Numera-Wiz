@@ -576,7 +576,7 @@ pub enum EditResult {
     Sequence,
     Marker,
     Place,
-    ImportEdl,
+    ImportCuts,
     Move,
     Link,
     Unlink,
@@ -607,7 +607,7 @@ pub fn edit(kind: EditResult) -> Value {
                 json!({"type":"array","items":reference("Id"),"minItems":1,"maxItems":1}),
             ),
         ]),
-        EditResult::ImportEdl => object([
+        EditResult::ImportCuts => object([
             (
                 "document_sha256",
                 json!({"type":"string","pattern":"^[0-9a-f]{64}$"}),

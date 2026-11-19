@@ -578,6 +578,7 @@ mod tests {
                     | "timeline.render_mixed"
                     | "markers.wave_projection"
                     | "interchange.edl.export"
+                    | "interchange.otio.export"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["schema_version"], 1);
@@ -622,6 +623,7 @@ mod tests {
                     | "mixer.set_track_gain"
                     | "clips.join_through_edit"
                     | "interchange.edl.import"
+                    | "interchange.otio.import"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
@@ -635,7 +637,7 @@ mod tests {
                     "writer_lease",
                     "affected_scope",
                 ];
-                if matches!(id, "clips.slip" | "clips.roll" | "interchange.edl.import") {
+                if matches!(id, "clips.slip" | "clips.roll" | "interchange.edl.import" | "interchange.otio.import") {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }
                 assert_eq!(requirement["request_gates"], serde_json::json!(gates));
@@ -739,6 +741,7 @@ mod tests {
             "timeline.remove_gap",
             "mixer.set_track_gain",
             "interchange.edl.import",
+            "interchange.otio.import",
             "clips.remove",
             "markers.place",
             "markers.remove",
@@ -1350,6 +1353,11 @@ mod tests {
             ("mixer.set_track_gain", vec![], true),
             (
                 "interchange.edl.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
+            (
+                "interchange.otio.import",
                 vec!["document_sha256", "source_ids", "clip_ids"],
                 false,
             ),

@@ -1157,14 +1157,14 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     if let Command::Batches(Batches::Wait { id }) = &command {
         return wait_batch(client, id).await;
     }
-    let edl_destination = match &command {
-        Command::Timeline(Timeline::ExportEdl { out, .. }) => out.clone(),
+    let interchange_destination = match &command {
+        Command::Timeline(Timeline::ExportEdl(args) | Timeline::ExportOtio(args)) => args.out.clone(),
         _ => None,
     };
     match prepare(command) {
         Ok(request) => {
-            if let Some(path) = edl_destination {
-                return timeline::save_edl(client, request, &path).await;
+            if let Some(path) = interchange_destination {
+                return timeline::save_interchange(client, request, &path).await;
             }
             print_response(client, request).await
         }

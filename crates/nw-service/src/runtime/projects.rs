@@ -355,7 +355,7 @@ impl Service {
             let mut held = Vec::new();
             let source_permit = if matches!(
                 request.command.id.as_str(),
-                "clips.place" | "clips.slip" | "clips.roll" | "interchange.edl.import"
+                "clips.place" | "clips.slip" | "clips.roll" | "interchange.edl.import" | "interchange.otio.import"
             ) {
                 Some(
                     self.batch_preflights
@@ -410,13 +410,19 @@ impl Service {
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
                     }
-                    "interchange.edl.import" => {
-                        let import = nw_domain::interchange::parse_cmx3600(commands::parse(
-                            request.params.clone(),
-                        )?)?;
+                    "interchange.edl.import" | "interchange.otio.import" => {
+                        use nw_domain::interchange::{CutTrack, parse_cmx3600, parse_otio};
+                        let params = request.params.clone();
+                        let (target, document_sha256, cuts) = if request.command.id == "interchange.edl.import" {
+                            let import = parse_cmx3600(commands::parse(params)?)?;
+                            (CutTrack::Edl(import.frames_per_second), import.document_sha256, import.cuts)
+                        } else {
+                            let import = parse_otio(commands::parse(params)?)?;
+                            (CutTrack::Otio { kind: import.kind, range: import.range }, import.document_sha256, import.cuts)
+                        };
                         let mut bindings = BTreeMap::new();
-                        let mut placements = Vec::with_capacity(import.cuts.len());
-                        for (input, expected_sha256) in import.cuts {
+                        let mut placements = Vec::with_capacity(cuts.len());
+                        for (input, expected_sha256) in cuts {
                             let source = match &input.source {
                                 PlaceSource::SolidColor { rgba, duration } => {
                                     SourceBinding::SolidColor {
@@ -450,7 +456,7 @@ impl Service {
                                     {
                                         return Err(DomainError::new(
                                             "SOURCE_CHANGED",
-                                            "EDL reel digest differs from the registered media",
+                                            "Interchange source digest differs from the registered media",
                                         ));
                                     }
                                     validate_declared_source_extent(
@@ -463,9 +469,9 @@ impl Service {
                             };
                             placements.push((input, source));
                         }
-                        ProjectEditIntent::ImportEdl {
-                            frame_rate: import.frames_per_second,
-                            document_sha256: import.document_sha256,
+                        ProjectEditIntent::ImportCuts {
+                            target,
+                            document_sha256,
                             placements,
                         }
                     }
@@ -541,7 +547,7 @@ impl Service {
                     | ProjectEditIntent::SetTrackEnabled(_)
                     | ProjectEditIntent::SetTrackLocked(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
-                    ProjectEditIntent::ImportEdl { placements, .. } => placements.len() * 3,
+                    ProjectEditIntent::ImportCuts { placements, .. } => placements.len() * 3,
                     _ => MAX_CHANGES * 2,
                 };
                 let ids = (0..id_budget)

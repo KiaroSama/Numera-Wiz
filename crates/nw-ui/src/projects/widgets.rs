@@ -1183,6 +1183,60 @@ impl WizApp {
                 }
             }
         }
+        if let Some(track) = &group.view.track {
+            ui.collapsing("OpenTimelineIO", |ui| {
+                let ready = self.project_ready();
+                if ui.add_enabled(ready, egui::Button::new("Prepare track export")).clicked() {
+                    self.projects.otio = None;
+                    self.query_with_project(
+                        "interchange.otio.export",
+                        json!({"sequence_id":sequence,"track_id":track,"revision":group.key.revision,"range":group.view.range}),
+                        Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                        self.project_action(Phase::OtioExport),
+                        ui.ctx(),
+                    );
+                }
+                if let Some(otio) = &self.projects.otio {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.button("Copy OTIO").clicked() {
+                            ui.ctx().copy_text(otio.document.clone());
+                        }
+                        if ui.button("Copy media bindings").clicked() {
+                            match serde_json::to_string_pretty(&otio.sources) {
+                                Ok(text) => ui.ctx().copy_text(text),
+                                Err(error) => self.error = Some(error.to_string()),
+                            }
+                        }
+                    });
+                }
+                let forms = &mut self.projects.forms;
+                let limit = nw_domain::interchange::MAX_OTIO_BYTES;
+                ui.add(egui::TextEdit::multiline(&mut forms.otio_document)
+                    .hint_text("OpenTimelineIO JSON").desired_rows(5).char_limit(limit));
+                ui.add(egui::TextEdit::multiline(&mut forms.otio_sources)
+                    .hint_text("JSON media bindings for external clips").desired_rows(3).char_limit(limit));
+                let can_apply = ready && !forms.otio_document.trim().is_empty();
+                if ui.add_enabled(can_apply, egui::Button::new("Import at range start")).clicked() {
+                    if forms.otio_document.len().max(forms.otio_sources.len()) > limit {
+                        self.error = Some("OTIO input exceeds 96 KiB".into());
+                        return;
+                    }
+                    let sources = if forms.otio_sources.trim().is_empty() {
+                        Ok(json!([]))
+                    } else {
+                        nw_domain::commands::decode_json(forms.otio_sources.as_bytes())
+                    };
+                    match sources {
+                        Ok(sources) => {
+                            let input = json!({"sequence_id":sequence,"track_id":track,
+                                "start":group.view.range.start,"document":forms.otio_document,"sources":sources});
+                            self.mutate_project("interchange.otio.import", input, ui.ctx());
+                        }
+                        Err(error) => self.error = Some(error.message),
+                    }
+                }
+            });
+        }
         ui.collapsing("Export timeline range", |ui| {
             let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
             ui.label(format!("{}–{} seconds · FFV1 / PCM", exact(group.view.range.start), exact(group.view.range.end)));

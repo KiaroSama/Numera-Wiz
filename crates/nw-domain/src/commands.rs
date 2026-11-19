@@ -208,7 +208,8 @@ fn project_context(id: &str) -> ProjectContextRule {
         | crate::preview::PROGRAM_SEGMENT_COMMAND
         | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
-        | "interchange.edl.export" => ProjectContextRule::RequiredRead,
+        | "interchange.edl.export"
+        | "interchange.otio.export" => ProjectContextRule::RequiredRead,
         "sequences.create"
         | "clips.place"
         | "clips.move"
@@ -227,6 +228,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.remove_gap"
         | "mixer.set_track_gain"
         | "interchange.edl.import"
+        | "interchange.otio.import"
         | "history.undo"
         | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
@@ -275,6 +277,9 @@ fn result_schema(id: &str) -> Option<Value> {
         ),
         "interchange.edl.export" => {
             Some(serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"))
+        }
+        "interchange.otio.export" => {
+            Some(serde_json::to_value(schema_for!(crate::interchange::OtioExport)).expect("schema"))
         }
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
@@ -345,7 +350,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "interchange.edl.import" => Some(contracts::edit(EditResult::ImportEdl)),
+        "interchange.edl.import" | "interchange.otio.import" => Some(contracts::edit(EditResult::ImportCuts)),
         "clips.move"
         | "clips.trim"
         | "clips.slip"
@@ -618,6 +623,18 @@ fn build_registry() -> Vec<Descriptor> {
             "Apply a non-drop CMX 3600 picture cut list as one reversible project edit",
             DurableMutation,
             crate::interchange::EdlImportInput
+        ),
+        row!(
+            "interchange.otio.export",
+            "Export one committed track as an OpenTimelineIO cut list with media bindings",
+            Query,
+            crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.otio.import",
+            "Apply one OpenTimelineIO track as a reversible edit with explicit media bindings",
+            DurableMutation,
+            crate::interchange::OtioImportInput
         ),
         row!(
             "timeline.remove_gap",
@@ -1881,6 +1898,8 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "timeline.remove_gap",
     "interchange.edl.export",
     "interchange.edl.import",
+    "interchange.otio.export",
+    "interchange.otio.import",
     "clips.place",
     "clips.move",
     "clips.link",

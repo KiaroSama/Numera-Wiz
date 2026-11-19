@@ -71,6 +71,8 @@ pub(super) struct Forms {
     pub preview_at: ExactForm,
     pub edl_document: String,
     pub edl_reels: String,
+    pub otio_document: String,
+    pub otio_sources: String,
     #[cfg(not(target_arch = "wasm32"))]
     pub native_preview_sound: bool,
     pub marker_name: String,
@@ -108,6 +110,8 @@ impl Default for Forms {
             preview_at: ExactForm::new("0", "1"),
             edl_document: String::new(),
             edl_reels: String::new(),
+            otio_document: String::new(),
+            otio_sources: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             native_preview_sound: true,
             marker_name: String::new(),

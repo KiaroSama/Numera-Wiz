@@ -1,5 +1,6 @@
 //! Pure bounded resolvers over indexed project facts; no service or filesystem authority here.
 use super::*;
+use crate::interchange::CutTrack;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -44,8 +45,8 @@ pub enum ProjectEditIntent {
     Marker(SequenceMarkerInput),
     RemoveMarker(SequenceMarkerTarget),
     Place(Box<PlaceInput>, SourceBinding),
-    ImportEdl {
-        frame_rate: Rational,
+    ImportCuts {
+        target: CutTrack,
         document_sha256: String,
         placements: Vec<(PlaceInput, SourceBinding)>,
     },
@@ -582,33 +583,46 @@ pub fn resolve_edit<R: ProjectRead>(
             let (source_id, clip_id) = edit.place(*input, source, &root, &mut ids)?;
             json!({"source_id":source_id,"clip_ids":[clip_id]})
         }
-        ProjectEditIntent::ImportEdl {
-            frame_rate,
+        ProjectEditIntent::ImportCuts {
+            target,
             document_sha256,
             placements,
         } => {
             let (first, _) = placements
                 .first()
-                .ok_or_else(|| invalid("EDL has no cuts"))?;
+                .ok_or_else(|| invalid("Interchange document has no cuts"))?;
             let sequence_id = first.sequence_id.clone();
             let track_id = first.track_id.clone();
-            let sequence = edit.get(&sequence_id)?.payload::<Sequence>("sequence")?;
             let track = edit.get(&track_id)?.payload::<Track>("track")?;
-            if track.sequence_id != sequence_id
-                || track.kind != TrackKind::Video
-                || sequence.settings.frame_rate != frame_rate
-                || track.grid != frame_rate
-            {
-                return Err(DomainError::new(
-                    "EDL_GRID_MISMATCH",
-                    "EDL requires a picture track on the matching frame grid",
-                ));
+            match target {
+                CutTrack::Edl(frame_rate) => {
+                    let sequence = edit.get(&sequence_id)?.payload::<Sequence>("sequence")?;
+                    if track.sequence_id != sequence_id || track.kind != TrackKind::Video
+                        || sequence.settings.frame_rate != frame_rate || track.grid != frame_rate
+                    {
+                        return Err(DomainError::new(
+                            "EDL_GRID_MISMATCH",
+                            "EDL requires a picture track on the matching frame grid",
+                        ));
+                    }
+                }
+                CutTrack::Otio { kind, range } => {
+                    if track.sequence_id != sequence_id || track.kind != kind {
+                        return Err(DomainError::new("OTIO_TRACK_MISMATCH", "OTIO and destination track kinds must match"));
+                    }
+                    range.validate()?;
+                    grid_tick(range.start, track.grid)?;
+                    grid_tick(range.end, track.grid)?;
+                    if !read.intersecting(&sequence_id, &track_id, range.start, range.end, MAX_CHANGES)?.is_empty() {
+                        return Err(DomainError::new("CLIP_COLLISION", "The OTIO destination range must be empty"));
+                    }
+                }
             }
             let mut source_ids = Vec::with_capacity(placements.len());
             let mut clip_ids = Vec::with_capacity(placements.len());
             for (input, source) in placements {
                 if input.sequence_id != sequence_id || input.track_id != track_id {
-                    return Err(invalid("EDL cuts must share one picture track"));
+                    return Err(invalid("Imported cuts must share one track"));
                 }
                 let (source_id, clip_id) = edit.place(input, source, &root, &mut ids)?;
                 source_ids.push(source_id);
