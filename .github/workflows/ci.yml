@@ -1,7 +1,8 @@
 name: Rust CI
 on:
   push:
-    branches: [main, rewrite/rust-completion]
+    branches: [main]
+  # Each review-branch update is checked through its pull request event.
   pull_request:
   workflow_dispatch:
 permissions:
