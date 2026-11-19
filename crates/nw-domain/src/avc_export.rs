@@ -217,14 +217,6 @@ impl Encode {
                 ));
             }
         }
-        if self.codec == VideoCodec::Av1
-            && self.bitrate.is_some_and(|bitrate| bitrate.mode == RateMode::StrictSize)
-        {
-            return Err(DomainError::new(
-                "VALIDATION_ERROR",
-                "AV1 uses quality CRF or variable bitrate in the admitted SVT-AV1 profile",
-            ));
-        }
         if let Audio::Aac { bitrate_kbps, .. } = self.audio
             && !(48..=320).contains(&bitrate_kbps)
         {

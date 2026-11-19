@@ -1036,14 +1036,15 @@ the returned plan ID and hash.
 
 The default codec is H.264. Set `"codec":"hevc"` for `libx265` or
 `"codec":"av1"` for `libsvtav1`. MP4 verifies the `hvc1` or `av01` sample
-entry, respectively. AV1 takes an output raster of at least 64 × 64 and
-admits quality CRF or variable bitrate. For folder jobs, place `codec` next
+entry, respectively. AV1 takes an output raster of at least 64 × 64.
+For folder jobs, place `codec` next
 to `container` in the request.
 
 For an average bitrate, supply `"bitrate":{"average_kbps":2000,"mode":"quality_vbr"}`
 in `settings` and omit `crf`. `quality_vbr` uses twice the average as the peak
 and four times the average as the buffer. `strict_size` caps the peak at the
-average and uses twice the average as the buffer.
+average and uses twice the average as the buffer. AV1 uses SVT's low-delay
+CBR mode for `strict_size`.
 
 `jobs.plan` also accepts a reviewed FFmWiz CPU H.264, HEVC or AV1 profile with an explicit
 video bitrate, `use_gpu=n`, `keep_source_metadata=n` and `subtitle_tracks=none`.

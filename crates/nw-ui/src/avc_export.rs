@@ -84,11 +84,6 @@ impl WizApp {
                         .radio_value(&mut self.avc_export.codec, VideoCodec::Av1, "AV1")
                         .changed();
                 });
-                let av1 = self.avc_export.codec == VideoCodec::Av1;
-                if av1 && self.avc_export.rate_mode == Some(RateMode::StrictSize) {
-                    self.avc_export.rate_mode = Some(RateMode::QualityVbr);
-                    changed = true;
-                }
                 let chosen = self.avc_export.picture.get_or_insert(pictures[0].index);
                 egui::ComboBox::from_id_salt("avc-picture")
                     .selected_text(format!("Picture {chosen}"))
@@ -125,15 +120,13 @@ impl WizApp {
                                     "Variable bitrate",
                                 )
                                 .changed();
-                            if !av1 {
-                                changed |= ui
-                                    .selectable_value(
-                                        &mut self.avc_export.rate_mode,
-                                        Some(RateMode::StrictSize),
-                                        "Bitrate with peak cap",
-                                    )
-                                    .changed();
-                            }
+                            changed |= ui
+                                .selectable_value(
+                                    &mut self.avc_export.rate_mode,
+                                    Some(RateMode::StrictSize),
+                                    "Bitrate with peak cap",
+                                )
+                                .changed();
                         });
                     if self.avc_export.rate_mode.is_some() {
                         changed |= ui

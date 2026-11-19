@@ -1276,16 +1276,17 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     );
     results.push(json!({"job":job["job_id"],"container":"matroska","range":"limited"}));
 
-    for (codec, encoder, tag, container, extension) in [
-        ("hevc", "libx265", Some("hvc1"), "mp4", "mp4"),
-        ("hevc", "libx265", None, "matroska", "mkv"),
-        ("av1", "libsvtav1", Some("av01"), "mp4", "mp4"),
-        ("av1", "libsvtav1", None, "matroska", "mkv"),
+    for (codec, encoder, tag, container, extension, mode) in [
+        ("hevc", "libx265", Some("hvc1"), "mp4", "mp4", "quality_vbr"),
+        ("hevc", "libx265", None, "matroska", "mkv", "quality_vbr"),
+        ("av1", "libsvtav1", Some("av01"), "mp4", "mp4", "quality_vbr"),
+        ("av1", "libsvtav1", None, "matroska", "mkv", "quality_vbr"),
+        ("av1", "libsvtav1", Some("av01"), "mp4", "mp4", "strict_size"),
     ] {
-        let output = directory.join(format!("{codec}-export.{extension}"));
+        let output = directory.join(format!("{codec}-export-{mode}.{extension}"));
         let settings = json!({
             "video_stream":0,"container":container,"codec":codec,"preset":"balanced",
-            "bitrate":{"average_kbps":700,"mode":"quality_vbr"},"audio":{"kind":"drop"}
+            "bitrate":{"average_kbps":700,"mode":mode},"audio":{"kind":"drop"}
         });
         let plan = cli
             .query(
@@ -1296,7 +1297,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             )
             .await;
         let legacy = format!(
-            "input_path={}\noutput_path={}\noutput_format={extension}\nvideo_codec={encoder}\nuse_gpu=n\nvideo_bitrate_kbps=700\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            "input_path={}\noutput_path={}\noutput_format={extension}\nvideo_codec={encoder}\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
             path.display(),
             output.display(),
         );
@@ -1321,7 +1322,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let accepted = accepted(
             &cli,
             &scope,
-            &format!("run-{codec}-{extension}"),
+            &format!("run-{codec}-{extension}-{mode}"),
             "jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
         )
@@ -1338,7 +1339,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let clock = video_milliseconds(picture, &packets(&components, &output).await[&0]);
         assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
         results.push(
-            json!({"job":accepted["job_id"],"container":container,"codec":codec,
+            json!({"job":accepted["job_id"],"container":container,"codec":codec,"rate_mode":mode,
           "presentation_ms":clock,"matching_import_plan":true}),
         );
     }
