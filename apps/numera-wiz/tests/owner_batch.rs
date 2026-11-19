@@ -1053,6 +1053,34 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             std::fs::read(source).unwrap()
         );
     }
+    let destination_entries = || {
+        std::fs::read_dir(&folder_destination)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                let kind = entry.file_type().unwrap();
+                (entry.file_name().into_string().unwrap(), kind)
+            })
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    let published = destination_entries();
+    let output_names: std::collections::BTreeSet<_> = folder_items
+        .iter()
+        .map(|item| item["output_name"].as_str().unwrap())
+        .collect();
+    assert_eq!(published.len(), output_names.len() * 2);
+    for (name, kind) in &published {
+        if output_names.contains(name.as_str()) {
+            assert!(kind.is_file(), "Published output must be a regular file");
+        } else {
+            assert!(kind.is_dir());
+            assert!(
+                name.strip_prefix(".numera-job-")
+                    .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()),
+                "Unexpected output-directory entry {name}"
+            );
+        }
+    }
     let destination_collision = call!(
         http,
         "streams.clean.folder_batch_plan",
@@ -1066,7 +1094,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             .iter()
             .all(|item| item["error"]["code"] == "OUTPUT_COLLISION" && item["plan"].is_null())
     );
-    assert_eq!(std::fs::read_dir(&folder_destination).unwrap().count(), 2);
+    assert_eq!(destination_entries(), published);
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
