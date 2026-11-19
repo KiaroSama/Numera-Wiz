@@ -427,7 +427,8 @@ impl Clips {
 #[derive(Subcommand)]
 pub enum Tracks {
     /// Set the audio track gain in hundredths of a decibel before mixing.
-    SetGain {
+    #[command(name = "set-gain")]
+    Gain {
         #[command(flatten)]
         context: WriteContext,
         track: String,
@@ -435,7 +436,8 @@ pub enum Tracks {
         centidb: i16,
     },
     /// Lock or unlock a track at the expected project revision.
-    SetLocked {
+    #[command(name = "set-locked")]
+    Locked {
         #[command(flatten)]
         context: WriteContext,
         track: String,
@@ -443,7 +445,8 @@ pub enum Tracks {
         locked: bool,
     },
     /// Enable or mute a track at the expected project revision.
-    SetEnabled {
+    #[command(name = "set-enabled")]
+    Enabled {
         #[command(flatten)]
         context: WriteContext,
         track: String,
@@ -455,7 +458,7 @@ pub enum Tracks {
 impl Tracks {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::SetEnabled {
+            Self::Enabled {
                 context,
                 track,
                 enabled,
@@ -463,7 +466,7 @@ impl Tracks {
                 "tracks.set_enabled",
                 json!({"track_id":track,"enabled":enabled}),
             ),
-            Self::SetLocked {
+            Self::Locked {
                 context,
                 track,
                 locked,
@@ -471,7 +474,7 @@ impl Tracks {
                 "tracks.set_locked",
                 json!({"track_id":track,"locked":locked}),
             ),
-            Self::SetGain {
+            Self::Gain {
                 context,
                 track,
                 centidb,
