@@ -26,7 +26,7 @@ fn selected_picture(probe: &MediaProbe, index: u32) -> Result<(u64, u64)> {
         .filter(|track| track.kind == StreamKind::Video && !track.attached_picture() && track.codec == "ffv1")
         .ok_or_else(|| unavailable("Choose an ordinary original FFV1 picture"))?;
     let facts = probe.stream_details.get(&track.index).ok_or_else(|| unavailable("Missing original picture format"))?;
-    let dimensions = |field: &str, max| facts[field].as_u64().filter(|value| (2..=max).contains(value) && value % 2 == 0);
+    let dimensions = |field: &str, max| facts[field].as_u64().filter(|value| (2..=max).contains(value) && value.is_multiple_of(2));
     if facts["time_base"] != "1/1000" || facts["pix_fmt"] != "yuv420p"
         || facts["side_data_list"].as_array().is_some_and(|rows| !rows.is_empty())
     {

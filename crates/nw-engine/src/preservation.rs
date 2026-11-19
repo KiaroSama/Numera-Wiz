@@ -153,9 +153,10 @@ impl Ledger {
         if stream.packets == 0 {
             stream.first = pts.map(|pts| (pts, flags.starts_with('K')));
         }
-        if let Some((pts, end)) = pts.zip(duration).and_then(|(pts, duration)| {
-            (duration > Rational::ZERO).then(|| pts.checked_add(duration).ok().map(|end| (pts, end))).flatten()
-        }) {
+        if let Some((pts, end)) = pts.zip(duration)
+            .filter(|(_, duration)| *duration > Rational::ZERO)
+            .and_then(|(pts, duration)| pts.checked_add(duration).ok().map(|end| (pts, end)))
+        {
             stream.irregular_clock |= dts != Some(pts)
                 || stream.last_pts.is_some_and(|last| pts <= last);
             stream.last_pts = Some(pts);
