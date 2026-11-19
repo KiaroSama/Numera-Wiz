@@ -351,7 +351,7 @@ async fn caption_burn(parent: &Path) -> Value {
     ].map(str::to_owned);
     nw_platform::process::run(&components.join("ffmpeg"), &generate, Duration::from_secs(30),
         4096, CancellationToken::new()).await.unwrap();
-    let picture = cli.mutation(&scope, "register-punctuation-reference", "assets.register", json!({"path":black})).await;
+    let picture = accepted(&cli, &scope, "register-punctuation-reference", "assets.register", json!({"path":black})).await;
     for (language, caption, mark) in [
         ("fa", "سلام این آزمون است؟", '\u{200f}'),
         ("he", "שלום זה מבחן?", '\u{200f}'),
@@ -360,16 +360,16 @@ async fn caption_burn(parent: &Path) -> Value {
         let sidecar = directory.join(format!("reading-order-{language}.srt"));
         let content = format!("1\n00:00:00,000 --> 00:00:00,950\n{caption}\n\n2\n00:00:01,000 --> 00:00:01,950\n{mark}{caption}{mark}\n");
         std::fs::write(&sidecar, content).unwrap();
-        let captions = cli.mutation(&scope, &format!("register-punctuation-{language}"),
+        let captions = accepted(&cli, &scope, &format!("register-punctuation-{language}"),
             "assets.register", json!({"path":sidecar})).await;
         let output = directory.join(format!("reading-order-{language}.mkv"));
         let params = json!({"asset_id":picture["id"],"video_stream":0,"output":output,
             "subtitle":{"kind":"external","asset_id":captions["id"]},"audio":{"kind":"none"},
             "color":{"kind":"preserve_sdr"},"quality":"lossless_ffv1"});
         let plan = cli.query("subtitles.burn", params).await;
-        let job = cli.mutation(&scope, &format!("render-punctuation-{language}"), "jobs.submit",
+        let job = accepted(&cli, &scope, &format!("render-punctuation-{language}"), "jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
-        cli.completed(job["job_id"].as_str().unwrap()).await;
+        succeeded(&cli, &job).await;
         let plain = caption_frame(&components, &output, "0.5").await;
         let explicit = caption_frame(&components, &output, "1.5").await;
         let black_frame = caption_frame(&components, &black, "0.5").await;
@@ -401,7 +401,7 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
         4096, CancellationToken::new()).await.unwrap();
     let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
-    let registered = cli.mutation(&scope, "register-sample-order", "assets.register", json!({"path":original})).await;
+    let registered = accepted(&cli, &scope, "register-sample-order", "assets.register", json!({"path":original})).await;
     let pieces = [(120,2560,false),(5700,9801,true),(11000,11047,false)];
     let params = json!({"asset_id":registered["id"],"output":output,"stream_index":0,
         "pieces":pieces.iter().map(|(start,end,reverse)| json!({"start_sample":start,"end_sample":end,
@@ -414,9 +414,9 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     let (checked, code) = cli.human(&["media", "edit-audio", "--file", document.to_str().unwrap()]).await;
     assert_eq!(code, 0, "{checked}");
     assert_eq!(checked["result"]["hash"], review["hash"]);
-    let job = cli.mutation(&scope, "execute-numbered-sample-edit", "jobs.submit",
+    let job = accepted(&cli, &scope, "execute-numbered-sample-edit", "jobs.submit",
         json!({"plan_id":review["id"],"plan_hash":review["hash"]})).await;
-    cli.completed(job["job_id"].as_str().unwrap()).await;
+    succeeded(&cli, &job).await;
     let decoded = [
         "-v", "error", "-i", output.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
     ].map(str::to_owned);
@@ -443,16 +443,16 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     ].map(str::to_owned);
     nw_platform::process::run(&components.join("ffmpeg"), &make_tone, Duration::from_secs(30),
         4096, CancellationToken::new()).await.unwrap();
-    let tone_asset = cli.mutation(&scope, "register-tone-original", "assets.register", json!({"path":tone})).await;
+    let tone_asset = accepted(&cli, &scope, "register-tone-original", "assets.register", json!({"path":tone})).await;
     let mut tempo_facts = Vec::new();
     for percent in [10u16, 800] {
         let target = directory.join(format!("tone-{percent}.wav"));
         let params = json!({"asset_id":tone_asset["id"],"output":target,"stream_index":0,
             "pieces":[{"start_sample":0,"end_sample":96000,"reverse":true,"tempo_hundredths":percent}]});
         let reviewed = cli.query("audio.edit", params).await;
-        let tempo_job = cli.mutation(&scope, &format!("execute-tempo-{percent}"), "jobs.submit",
+        let tempo_job = accepted(&cli, &scope, &format!("execute-tempo-{percent}"), "jobs.submit",
             json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
-        cli.completed(tempo_job["job_id"].as_str().unwrap()).await;
+        succeeded(&cli, &tempo_job).await;
         let decoded = [
             "-v", "error", "-i", target.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
         ].map(str::to_owned);
@@ -493,7 +493,7 @@ async fn packet_join(parent: &Path) -> Value {
         ].map(str::to_owned);
         nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
             4096, CancellationToken::new()).await.unwrap();
-        let asset = cli.mutation(&scope, &format!("register-join-part-{index}"), "assets.register",
+        let asset = accepted(&cli, &scope, &format!("register-join-part-{index}"), "assets.register",
             json!({"path":input})).await;
         paths.push(input);
         assets.push(asset);
@@ -518,9 +518,9 @@ async fn packet_join(parent: &Path) -> Value {
         let (checked, code) = cli.human(&["media","join","--file",document.to_str().unwrap()]).await;
         assert_eq!(code,0,"{checked}");
         assert_eq!(checked["result"]["hash"],plan["hash"]);
-        let job = cli.mutation(&scope,&format!("publish-join-{audio}"),"jobs.submit",
+        let job = accepted(&cli, &scope,&format!("publish-join-{audio}"),"jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
-        cli.completed(job["job_id"].as_str().unwrap()).await;
+        succeeded(&cli, &job).await;
         let joined = packets(&components,&output).await;
         assert_eq!(joined.len(), if audio=="copy_all" {2} else {1});
         for (stream, packets) in joined {
@@ -554,7 +554,7 @@ async fn variable_picture_retime(parent: &Path) -> Value {
     ].map(str::to_owned);
     nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
         4096, CancellationToken::new()).await.unwrap();
-    let original = cli.mutation(&scope,"register-vfr-original","assets.register",json!({"path":path})).await;
+    let original = accepted(&cli, &scope,"register-vfr-original","assets.register",json!({"path":path})).await;
     let decode = |path: &Path| {
         ["-v","error","-i",path.to_str().unwrap(),"-map","0:v:0","-fps_mode","passthrough",
          "-pix_fmt","yuv420p","-c:v","rawvideo","-threads","1","-f","rawvideo","pipe:1"].map(str::to_owned)
@@ -575,9 +575,9 @@ async fn variable_picture_retime(parent: &Path) -> Value {
         let (typed,status)=cli.human(&["media","retime","--file",doc.to_str().unwrap()]).await;
         assert_eq!(status,0,"{typed}");
         assert_eq!(typed["result"]["hash"],plan["hash"]);
-        let job=cli.mutation(&scope,&format!("run-retime-{tempo}-{reverse}"),"jobs.submit",
+        let job=accepted(&cli, &scope,&format!("run-retime-{tempo}-{reverse}"),"jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
-        cli.completed(job["job_id"].as_str().unwrap()).await;
+        succeeded(&cli, &job).await;
         let picture=packets(&components,&output).await;
         let observed:Vec<_>=picture[&0].iter().map(|packet|packet["pts"].as_i64().unwrap()).collect();
         let expected = if reverse {
