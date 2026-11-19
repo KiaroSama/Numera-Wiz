@@ -49,6 +49,14 @@ them. Linux portable qualification now runs with its verified media input and
 the same-source web bundle. The fixture-dependent test jobs keep their own
 results when portable packaging fails.
 
+The Windows and Intel macOS packages each started their embedded application.
+The application attached to its local owner and the first command exited
+successfully on both runners. The packaging verifier could not read an
+usable capability envelope from standard output. It now owns a temporary
+response file, checks the file's byte limit and JSON envelope, and still
+requires a verified FFV1 round trip using the exact embedded tools.
+[Windows](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44440612517/job/135281407252) · [Intel macOS](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44440612517/job/135281407264)
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original
