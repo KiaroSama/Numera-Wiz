@@ -1,0 +1,1193 @@
+{
+  "schema_version": 1,
+  "target": "x86_64-apple-darwin",
+  "ffmpeg_source_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "font_sha256": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954",
+  "macports_key_commit": "7bafac2c229fe9cb78da915452ef36d7bde69044",
+  "macports_key_sha256": "a718639b87b7a1eb8bacec8e34c0453ab87d01df0ee5d3a03de53f4f5aaa6e4c",
+  "archives": [
+    {
+      "name": "brotli",
+      "filename": "brotli-1.2.1_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/brotli/brotli-1.2.1_0.darwin_24.x86_64.tbz2",
+      "bytes": 407029,
+      "sha256": "86678305db101bc354b5487cda58e036ffd46f5a905f3fcf80a86287c50e6da0",
+      "signature_sha256": "60c6601f443e936a8250f399999ff8f31a2f394e3259534bed3f8e8d2093630c",
+      "portfile_sha256": "6b3069bb6b3a285cdd08ab03defeeef95b67b73deb45ac11399d42a06994b6e0",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "bzip2",
+      "filename": "bzip2-1.0.8_1.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/bzip2/bzip2-1.0.8_1.darwin_24.x86_64.tbz2",
+      "bytes": 156885,
+      "sha256": "5a0fc85b0d20243173d20449534062c696e24f973ac8adda57ae90a5ac36ba03",
+      "signature_sha256": "4071ba9c681e6c5e2642dbd2c0ba8b6041caae6b048b643a73393ac38a465742",
+      "portfile_sha256": "3d789c7ea9d056995fbc1478d2f78a9e6c6ee4090430404c0aebfd79081b1d78",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "cairo",
+      "filename": "cairo-1.18.6_0+quartz+x11.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/cairo/cairo-1.18.6_0%2Bquartz%2Bx11.darwin_24.x86_64.tbz2",
+      "bytes": 4146579,
+      "sha256": "45d2e2fafff0857c2ad998f285cbb7314b67924b4b7b35ebb62b6f9d5f5c7252",
+      "signature_sha256": "3a0770226cc3503f418d729f325cbd06e7f0476175e52c303f4caa1168f2c651",
+      "portfile_sha256": "7a7b3e1e5d69bf1b7780f8b4e5cc9b76dccb02d287071dcca1cba3ba4aaf416c",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "dav1d",
+      "filename": "dav1d-1.5.4_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/dav1d/dav1d-1.5.4_0.darwin_24.x86_64.tbz2",
+      "bytes": 859998,
+      "sha256": "9af1093d8db9d5d490ee86d706cdf900914e9155624c52b0300be0632c33ddb1",
+      "signature_sha256": "9ecf1ac965418d816067df9f70d44172b19aa77a5a4272937d8ea8d89802b71c",
+      "portfile_sha256": "46fa37de1edd7900f555fbbf340c335d6ec9be771808572bb8b6b0d6d427a07a",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "dbus",
+      "filename": "dbus-1.16.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/dbus/dbus-1.16.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 392514,
+      "sha256": "2a27878c9f3bd245daf28ec0aaea03ec9b458ea5f5c68e73daf10f952ed1da0a",
+      "signature_sha256": "da97bb147d713ada0bea5f4fc16e6242afc5bd4338e6a35fb0b45afcee39e744",
+      "portfile_sha256": "dea024403f8e916f258e67308090e03c0b52137e0c16f9386c96cc2869d89b0c"
+    },
+    {
+      "name": "expat",
+      "filename": "expat-2.10.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/expat/expat-2.10.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 223469,
+      "sha256": "19e5afac85b2ba7fdf7acd3a7032e717d5204fade2a2c07e3c2e75ca5310ac05",
+      "signature_sha256": "61724c5bbfe1f7127778302dd25a30c0283fd7f844f9d7eb1788563112b67b97",
+      "portfile_sha256": "d528e2dea8d7c1043f553823ed4f1823e9201141c08eee648d099f53016d7ad1",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "flac",
+      "filename": "flac-1.5.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/flac/flac-1.5.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 351713,
+      "sha256": "f353730ce978f0ddf9c1bb082d3fa300f497dad8a6786155731cb1f69b3a43d6",
+      "signature_sha256": "733ac0e4346f4619d04c3b0113003bf6bfeb2f70b88de743f8f36be8fedddea4",
+      "portfile_sha256": "1ccf83eca09888a6878ccba90f33102ac1f7fc38912efc6f5bd4e1735fa35962"
+    },
+    {
+      "name": "fontconfig",
+      "filename": "fontconfig-2.18.3_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/fontconfig/fontconfig-2.18.3_0.darwin_24.x86_64.tbz2",
+      "bytes": 936662,
+      "sha256": "dee743c341a6d1b4a5c8fdcc2b37b21bb3e26cda4866cf6f1f79aead0e0e0d6e",
+      "signature_sha256": "e414f88742e8b1b0e74bcec656180eae8b97f8860601243d9ba54715e0457092",
+      "portfile_sha256": "89c2719a7160af49b37f4990cf31a61f72d3b5d26c7f0da450fd7cb713ebc13d",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "freetype",
+      "filename": "freetype-2.15.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/freetype/freetype-2.15.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 2044496,
+      "sha256": "71561be79deed9055e01ee9188303fb8e2bd73504815fdd473598ee1cf0598ce",
+      "signature_sha256": "40b92fc8773bcd93885129fefffe6e9cff5e351e941f24489c6e3eb7c4d8ab8e",
+      "portfile_sha256": "d231003bb88b19f44b86e668a96777f71ef3dd33fc080e6874e099ba1a4d55c9",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "fribidi",
+      "filename": "fribidi-1.0.18_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/fribidi/fribidi-1.0.18_0.darwin_24.x86_64.tbz2",
+      "bytes": 114616,
+      "sha256": "2a141db46c03eb901853cde0e39ca2b74024b7e309927fdc45a71f05a1469ebc",
+      "signature_sha256": "44272aeaa0e78927de183c1d59e4acbf587fc8d9d64bb04c5565e35efc45688d",
+      "portfile_sha256": "206d2e151b818f229feb7ba77ad83441cdef61bd58ac9acd7eadb60fc66d9a7f",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "gettext",
+      "filename": "gettext-1.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/gettext/gettext-1.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 7145848,
+      "sha256": "0610331b9b26c254c4cab59c94a6b28b5fca26e4f4bbfc026e5117ed76c13e48",
+      "signature_sha256": "e107e71b85bed71a286445b3dced547e1eb9823cd6b53b8477208e89ea056258",
+      "portfile_sha256": "5d526bc74343a1bb5b823ef1d6b6dab83c6735a92f55f34de5a8394a90572ee6"
+    },
+    {
+      "name": "gettext-runtime",
+      "filename": "gettext-runtime-1.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/gettext-runtime/gettext-runtime-1.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 220539,
+      "sha256": "9477631444724274e83b45a0eed420971f9686e74bd447869509abd3b775b0ee",
+      "signature_sha256": "c11e58470386e8c60cf0e76b2edb6d68993a4a96232c9e1dbd63609b19345f23",
+      "portfile_sha256": "5d526bc74343a1bb5b823ef1d6b6dab83c6735a92f55f34de5a8394a90572ee6",
+      "source_recipe_commit": "24c1a4825e4de9e86296ac87cdc73f936dc56eec"
+    },
+    {
+      "name": "gettext-tools-libs",
+      "filename": "gettext-tools-libs-1.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/gettext-tools-libs/gettext-tools-libs-1.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 2629117,
+      "sha256": "b5ef838794e178c381deb3064abd8a684312774830d4ce74d738a6cdab173937",
+      "signature_sha256": "7926eb5f6acbc125a833063b14bd2c2acb917da07d87bc5e760218770bd0c860",
+      "portfile_sha256": "5d526bc74343a1bb5b823ef1d6b6dab83c6735a92f55f34de5a8394a90572ee6"
+    },
+    {
+      "name": "glib2",
+      "filename": "glib2-2.88.3_2+dbus+x11.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/glib2/glib2-2.88.3_2%2Bdbus%2Bx11.darwin_24.x86_64.tbz2",
+      "bytes": 13110007,
+      "sha256": "f13954552d7baa65d5dd25c800d3fdb9bde4b541ebcb9ee939f01bccdae9d189",
+      "signature_sha256": "ea3267424d2f98881f8c135c0fe1c252f6d760a2a6307060fc0a4824abb37ed8",
+      "portfile_sha256": "917ac8e7d8ac1222d76b889b96f74d9cdbf333cfd2c83dc4d2dad42c74a6fe1b",
+      "source_recipe_commit": "a702f9b726d2a48092eed32bec5191d4499c74ff"
+    },
+    {
+      "name": "graphite2",
+      "filename": "graphite2-1.3.15_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/graphite2/graphite2-1.3.15_0.darwin_24.x86_64.tbz2",
+      "bytes": 79611,
+      "sha256": "65d0e0fa98995c8447c704a97f4fcca11b1504c2cd53945fc01d30bfb5712eb7",
+      "signature_sha256": "3294f4885b68111a1660e4e6f15230ab64b56711e23ed5ae583aa89d2397ca54",
+      "portfile_sha256": "6fd0a8609e692cbba47a17509bd193ed9252d82cec19855365415f55512ad0e5",
+      "source_recipe_commit": "1cec05da78b2537e27e312ed289a857c67911096"
+    },
+    {
+      "name": "harfbuzz",
+      "filename": "harfbuzz-15.1.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/harfbuzz/harfbuzz-15.1.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 1843240,
+      "sha256": "2c0f8422d9353171d850af926d37dab55b8060a24001fbfbc397fe2cb3efc324",
+      "signature_sha256": "e669ac00e4e54cb72350d60eaaadbfc20c410c1f9ec9e2726f99314a3b533b36",
+      "portfile_sha256": "c11309695929b66a58d0565c7a053dca0e90c6f557dd3ebb35b2e7c69e1838f0",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "icu",
+      "filename": "icu-78.3_1.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/icu/icu-78.3_1.darwin_24.x86_64.tbz2",
+      "bytes": 28345525,
+      "sha256": "0428891a36899024ec4cea789d5e5bb2e36c20568090dc4308b34e2509a5e1dd",
+      "signature_sha256": "70c6b28a2171bae2c3a8f37967ef2860322bd88c2cda87852a4be6b651c35b77",
+      "portfile_sha256": "b741b1ab7114a578806bc3d6896868b8b4b1d7bc935b82a09394cefeeee80e71"
+    },
+    {
+      "name": "lame",
+      "filename": "lame-4.0_0+simd.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/lame/lame-4.0_0%2Bsimd.darwin_24.x86_64.tbz2",
+      "bytes": 403190,
+      "sha256": "ba89ebe55d448934a6b9940c67c59776f247cd528a5b79add2346eae8249700d",
+      "signature_sha256": "73b35a5d421da818731af1d8dca5c8a78d357e1f5c2ebd0c32539cf4dcce28d6",
+      "portfile_sha256": "c8fbb445f3b09040cb0beed33e0823904ae9a2f69bff4ffb96da4a6e5da6cbbf",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libass",
+      "filename": "libass-0.17.5_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libass/libass-0.17.5_0.darwin_24.x86_64.tbz2",
+      "bytes": 195160,
+      "sha256": "268232326cf633df5c260010f844fc32c152141963173a2ff71a6eae6b7bc56b",
+      "signature_sha256": "8db6e31946174ef9a108b6308b212208fd6855447b98bbb1bb2b5fb504c2efda",
+      "portfile_sha256": "098f5ebee448af1670261d0c8f49dc95e6e30280ffeec3f226fdba3570e21789",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libedit",
+      "filename": "libedit-20260512-3.1_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libedit/libedit-20260512-3.1_0.darwin_24.x86_64.tbz2",
+      "bytes": 155115,
+      "sha256": "dd8625cc2ffda3e7034550e43936ec08d648cbdd1e4c51ef58f352475f1f96d8",
+      "signature_sha256": "ad35fe78a0a84c9bf14518688cf09b57b99a0c33b1285edaf8f9559e17714574",
+      "portfile_sha256": "c0b406ce981ad3da0fafd18e4c46185e22e33165e3d205ae75738e3b18855007"
+    },
+    {
+      "name": "libelf",
+      "filename": "libelf-0.8.13_6.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libelf/libelf-0.8.13_6.darwin_24.x86_64.tbz2",
+      "bytes": 59774,
+      "sha256": "dca41441aee18e8a2f90cf8c028caa6642917f25251850030a7f1fb74b9cbe0d",
+      "signature_sha256": "a58da5a382aae2d5515e82bdf026c4ae0f631a37909b92e1165d44a810f90a4e",
+      "portfile_sha256": "17e7f6c5a5a8490cd351d77eff848fbbaf209ba625cabcb714985d21b13ac467"
+    },
+    {
+      "name": "libffi",
+      "filename": "libffi-3.6.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libffi/libffi-3.6.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 52360,
+      "sha256": "d5feb74304bcecaf26faa88f837bd1dec56eb847adf12a68786329fc6b9bfb7f",
+      "signature_sha256": "769472d96831377cdef7aa1331fbf028f52a12ebb2762ee92d53f023347c4495",
+      "portfile_sha256": "a541740dece5337c70831026aeb3a7897b6afb96ff60cb7ba65518882faf29a2"
+    },
+    {
+      "name": "libiconv",
+      "filename": "libiconv-1.19_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libiconv/libiconv-1.19_0.darwin_24.x86_64.tbz2",
+      "bytes": 1572814,
+      "sha256": "24628071e8eefbbe6363b777da91b4eff8ecb1ee3436212262a13379c01d5614",
+      "signature_sha256": "cfb4b9e329900e022603476cfbb1a5b9a7a5caa749ae557c22f07c7c62bdc20a",
+      "portfile_sha256": "ba405ae1694d1d28c4789152b4af14be29d557bfab09e36d8ecce0316bc811f8",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libogg",
+      "filename": "libogg-1.3.6_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libogg/libogg-1.3.6_0.darwin_24.x86_64.tbz2",
+      "bytes": 212357,
+      "sha256": "779a978747ae7a493bb76ddd96d7735aa3ab1edb7308282122851c1a5f58f6b8",
+      "signature_sha256": "fac58a1642c7374002152ad39e7ba0749ba4534cefb9101d0d9f8ede19382768",
+      "portfile_sha256": "c2ca9bc991391bc5b7d89e1ead99a94909782c1d687de64f9b8fb04c686f0820"
+    },
+    {
+      "name": "libopus",
+      "filename": "libopus-1.6.1_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libopus/libopus-1.6.1_0.darwin_24.x86_64.tbz2",
+      "bytes": 346795,
+      "sha256": "65e9d0866c3cf4946836d02e647ab4d7b421c792b562e3875be94b6107cac3ea",
+      "signature_sha256": "a2b45475c5825cdb43cf9b8826f86c3af036d03f452b51ef4d88acc77fcb5553",
+      "portfile_sha256": "3faaa0aa96e16bb180a29234448a17478e714921b68a09d199fa371ca70f020a",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libpixman",
+      "filename": "libpixman-0.46.4_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libpixman/libpixman-0.46.4_0.darwin_24.x86_64.tbz2",
+      "bytes": 248983,
+      "sha256": "ae9d2b16e6a8a1111093b92bd55b604c64b3e70c5ce183bb0657ad17ca5d9e8f",
+      "signature_sha256": "ee341b231e8e20ad94db2cf44274a56b1813f6b201629d395c5ba48a66069b38",
+      "portfile_sha256": "4cf358da158b8034662c53801f6bfcefbaedf30efbceebe31abc661dab4f4e1a",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libpng",
+      "filename": "libpng-1.6.59_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libpng/libpng-1.6.59_0.darwin_24.x86_64.tbz2",
+      "bytes": 394359,
+      "sha256": "be6252b6cd8bb4ee5462e312e5043057432a67942cfdfadef0d4a603e71c2e02",
+      "signature_sha256": "f8a5f25c6b9ed921aa2e9dec1a46df315c7b41e0bfa487a526630c02cae676a1",
+      "portfile_sha256": "f6037c22e565301c1ea6da252fdd3fd590bb40ae6421d9c26dbbb5085db0ff1b",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libsamplerate",
+      "filename": "libsamplerate-0.2.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libsamplerate/libsamplerate-0.2.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 1507474,
+      "sha256": "a4203030d27592c2408eebacfd8ea647758229b7b160ad0af9ba202cab32b70d",
+      "signature_sha256": "c233e30bcfae3d3f4031811a6ec87d3f5c3a1d831662fe0c43d965aca2b11c00",
+      "portfile_sha256": "2fc872e0e9497a8ac91ec8bcde61a412958a32184ed0a785d5470872d7ca2642",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libsndfile",
+      "filename": "libsndfile-1.2.2_2.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libsndfile/libsndfile-1.2.2_2.darwin_24.x86_64.tbz2",
+      "bytes": 313069,
+      "sha256": "54a9224ecd8bcc9d704026826f629f26aca6a61501a35600874b122ae002375d",
+      "signature_sha256": "0113782c31ae86a71d430a0f019e23583763488ee94460e426d9be83349af85e",
+      "portfile_sha256": "e5893c4a78dc9dac8e9133fafdc0216d652e6a8a66f90d274d552a360732dbc6"
+    },
+    {
+      "name": "libtextstyle",
+      "filename": "libtextstyle-1.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libtextstyle/libtextstyle-1.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 567507,
+      "sha256": "b1afe3f45b3c02f91866704737dfaa151c1bb773ee291e8049658a17c2ac2b0b",
+      "signature_sha256": "e3ba5d01e39db40281724c3cbd4c8e035f81f9ceb3c87179c6675bf5e4513307",
+      "portfile_sha256": "5d526bc74343a1bb5b823ef1d6b6dab83c6735a92f55f34de5a8394a90572ee6"
+    },
+    {
+      "name": "libtool",
+      "filename": "libtool-2.6.2_1.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libtool/libtool-2.6.2_1.darwin_24.x86_64.tbz2",
+      "bytes": 859758,
+      "sha256": "5b09f03e15d67b86ea674d38efeca653dba552f5eaabe4d8e011e5dce9815fd5",
+      "signature_sha256": "f89c09c8b52f49051e0fc029488b9ebd5ba4f707599104d29303883765a1b9cf",
+      "portfile_sha256": "38bef193f0c6c547cfea5a46f3169be1d845e303a32b69aa4dc3a08020053828"
+    },
+    {
+      "name": "libvidstab",
+      "filename": "libvidstab-1.1.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libvidstab/libvidstab-1.1.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 89297,
+      "sha256": "261ebbc8e64634f10ad7d032dc24046e67500efe3ee582248878d8b57b5d17be",
+      "signature_sha256": "b4a3bb39a8e6f2fa80c78cf76c95214ab2574002586ce2000cdeb2a621f4ef2e",
+      "portfile_sha256": "c8df02cd99452d5159e5e37c399a24cd88438e36f24cbbd45a5ae9f15a4a803a",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libvorbis",
+      "filename": "libvorbis-1.3.7_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libvorbis/libvorbis-1.3.7_0.darwin_24.x86_64.tbz2",
+      "bytes": 779753,
+      "sha256": "c76c1c700f47a6fbcf131631c49dcab062cf25ea245cebd43511d0cf5d2cf673",
+      "signature_sha256": "6b08dbf710fc1fd863bbba8dedc290546113b73e5e6aaa03740cfa23e8446270",
+      "portfile_sha256": "3350ba85ca015cbf471cc5c865dd81f1cefff717e0c2de671f2891445555a215"
+    },
+    {
+      "name": "libvpx",
+      "filename": "libvpx-1.17.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libvpx/libvpx-1.17.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 2902731,
+      "sha256": "59e629c2aee9d27f47adb720c95ab81efd63318302bbaa5dcdada6c99242b62b",
+      "signature_sha256": "5dc09a66ded06af5b35f14aab85c30fb3de0a3438083571aacebab2ffa7505f2",
+      "portfile_sha256": "541877ee0748cd4b2d4a2000f0fbedb29f8fe093c7d6524a9e8ed7eb79f5a3e2",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "libxml2",
+      "filename": "libxml2-2.15.4_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/libxml2/libxml2-2.15.4_0.darwin_24.x86_64.tbz2",
+      "bytes": 1064877,
+      "sha256": "518b4998c2c81a1780f622ac250560fdb77e2289b8206c8397d4c1e2ef8b368c",
+      "signature_sha256": "9779c516f97a913d7e7131252674cb6abd4e5b09e089f03cff1184c2af9ed769",
+      "portfile_sha256": "452bf31c5f303b2fa99acd197958c1030079fdc3a1e7ea93695ad7b2853954ac"
+    },
+    {
+      "name": "lz4",
+      "filename": "lz4-1.10.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/lz4/lz4-1.10.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 176737,
+      "sha256": "9dc24daaffa94241516697077243b12e23bc13d56bbf19d0aea41e77ad5c0f45",
+      "signature_sha256": "fb23475b8fb9501f6952c1aeecbee3be0b38e0c6d3d63c081b3300e6e7bdc316",
+      "portfile_sha256": "eba9811705631065bd4556e4886c54a567efdfa8e8e8d82452533ace6acbed41"
+    },
+    {
+      "name": "lzo2",
+      "filename": "lzo2-2.10_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/lzo2/lzo2-2.10_0.darwin_24.x86_64.tbz2",
+      "bytes": 103685,
+      "sha256": "c79882b4271eee5a4b808c7d883e7250a94c854a10f81185e664fad7e8b0f284",
+      "signature_sha256": "fa9c924572ec66e454442588859275023cca60884f23055706970acb659220f4",
+      "portfile_sha256": "9b723b5b0d5d25c3959599f307a018e9c749effbaf8a5cf271e696a6d2afae4f"
+    },
+    {
+      "name": "m4",
+      "filename": "m4-1.4.21_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/m4/m4-1.4.21_0.darwin_24.x86_64.tbz2",
+      "bytes": 378055,
+      "sha256": "2d17e7b6c7c8176d67e8201922b07bbb32563b507cd32af3b7e0accfe1be3715",
+      "signature_sha256": "73d76633232d92029c020b4a690302b24ad5cf870c39fc7be5e4b967ccba92ed",
+      "portfile_sha256": "4c20787b81e7e58c90c58ee83aa3f3dad403f9523340d57541002b806362c743"
+    },
+    {
+      "name": "mpdecimal",
+      "filename": "mpdecimal-4.0.1_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/mpdecimal/mpdecimal-4.0.1_0.darwin_24.x86_64.tbz2",
+      "bytes": 141989,
+      "sha256": "702e03ba822d4ac3f23cee77d5376c04bb79dd4ef52225fc57ee031374aca457",
+      "signature_sha256": "bf605c68f5e08c176cc07163becbdad3a390b0e5e0cc0ea2fbca881f88721e25",
+      "portfile_sha256": "076702511f8f10f318b8adae638c31667d8f34d991a0b3f384641cdbfa9ed713"
+    },
+    {
+      "name": "mpg123",
+      "filename": "mpg123-1.33.7_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/mpg123/mpg123-1.33.7_0.darwin_24.x86_64.tbz2",
+      "bytes": 352907,
+      "sha256": "135304c70c1fb3ffc9b1552805f76e687cbbdead3296cfcd9a63d2e7d7c4c8d5",
+      "signature_sha256": "c9cd2103718a0fca54fad139b54f0c288e5bcefc2357484d86bbe74214957974",
+      "portfile_sha256": "ff94b2e8ee075337c8b80c3c50a24b787614fbf38575294634e42b5dee6e6775",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "nasm",
+      "filename": "nasm-3.02_1.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/nasm/nasm-3.02_1.darwin_24.x86_64.tbz2",
+      "bytes": 622634,
+      "sha256": "fe961176672345995e9cfa9c41caaca57302dd1cca29b52e2e6e475784577991",
+      "signature_sha256": "39d027bb16455d64795cabb9c6f481ba8417d06933d7f4e421f9616e511f8465",
+      "portfile_sha256": "fccd6244b6da2c18656a2b2e2ef9e847e8f14729d6207a5349354e8b8c661d18",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "ncurses",
+      "filename": "ncurses-6.6_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/ncurses/ncurses-6.6_0.darwin_24.x86_64.tbz2",
+      "bytes": 1463808,
+      "sha256": "cdd5f6040625ae77d5795ef9f0bc053468214a8c5939d2dc2d25b1fc80996f31",
+      "signature_sha256": "6b57d8653577a52bfb40f42215dfb8d2788e8099a2143319cf4fa68cdaf6b144",
+      "portfile_sha256": "124bc8876268bae621e908cc62e13e5ae4680f7ee6e26970aded91103073edb8"
+    },
+    {
+      "name": "openssl",
+      "filename": "openssl-3_33.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/openssl/openssl-3_33.darwin_24.x86_64.tbz2",
+      "bytes": 137282,
+      "sha256": "1498077ed012fe9a4581f0d09bbc57ac325a8a26a4f2258a97494996b39b9226",
+      "signature_sha256": "e589d10a9f8afe6433af0a37ff7e6d79777f932afd327d5d66d7793a26fd92d3",
+      "portfile_sha256": "47493906b651255b4422e4ab135eccbd513fa2c39c59e21bc96ede18e2f1eb4f"
+    },
+    {
+      "name": "openssl3",
+      "filename": "openssl3-3.6.5_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/openssl3/openssl3-3.6.5_0.darwin_24.x86_64.tbz2",
+      "bytes": 8596894,
+      "sha256": "2c41972243c27fc89323b818e5abf9ef38f32e2d8df397db9ec2699905181a36",
+      "signature_sha256": "a59d9d0e3ce36ad30c05e8afe7c1c8f137f767fadd962bbc192ef898f43316db",
+      "portfile_sha256": "c2b31a9b6711605a596f7efe80e6c1c0b75ff6cb7bb0075a55194d9941f59d08"
+    },
+    {
+      "name": "pcre2",
+      "filename": "pcre2-10.49_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/pcre2/pcre2-10.49_0.darwin_24.x86_64.tbz2",
+      "bytes": 2190937,
+      "sha256": "5520f8859da4d28c2488a91a4da54a8461246612d2c2752d49135c83077c16f0",
+      "signature_sha256": "6f7fcc014b8c6344197622e925b5bf0ab556ba730ee63a2e9acea88578d74af5",
+      "portfile_sha256": "1fd65596069b2f44d2a1a3444b2f9c21e031fb83f7ec8de80d70f43efc4beda5",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "pkgconfig",
+      "filename": "pkgconfig-0.29.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/pkgconfig/pkgconfig-0.29.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 262306,
+      "sha256": "5e34f25a88f916ca6a75ec072f03f68922ba11d4327b50cbb1b648a9dc1000f5",
+      "signature_sha256": "c2b8f3e6d3f7120eac2b4f407446df0ef7d0bf6e72058d08f2567f4da387ea5e",
+      "portfile_sha256": "677ba022ffa40ea6642b68951fc2422ebf9a966224178524a7b3f0c5e7269d32",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "rubberband",
+      "filename": "rubberband-3.3.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/rubberband/rubberband-3.3.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 384847,
+      "sha256": "1866bec213a6d63d8a56388503036218a043f0e65d0b54d561691e1665d82af9",
+      "signature_sha256": "67099043d2f596b466176a875cb2468d5814c8510f754af6ba3e6a0baca7a678",
+      "portfile_sha256": "38cc81b50802810700d0c6cfd7332512b67a9de1def4f340b5663c06946d035f",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "sqlite3",
+      "filename": "sqlite3-3.54.1_1.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/sqlite3/sqlite3-3.54.1_1.darwin_24.x86_64.tbz2",
+      "bytes": 2334708,
+      "sha256": "328f15354a27c2030b1472ed3ea1124e45d68acfcd9e757356ae4e235a523096",
+      "signature_sha256": "3f7c7418e20304ee69ee62915bf4e1e2bab79c85f50beb16c35ea6c905f1a757",
+      "portfile_sha256": "eda9ba0946076fadefb1fdf548b50a62ea07fbed71f24882f3c93bb9ed02a5d7"
+    },
+    {
+      "name": "svt-av1",
+      "filename": "svt-av1-4.3.0_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/svt-av1/svt-av1-4.3.0_0.darwin_24.x86_64.tbz2",
+      "bytes": 1890034,
+      "sha256": "6bda021f655773174b35907e194c891aa08bb07b0e5551807a827cbae0541901",
+      "signature_sha256": "dce1b4e0087296816099e0b5aac5bfd0ea0e61080c09a0275c470f22f5e7c193",
+      "portfile_sha256": "5eb533b14fe411312cf9d19eb8cd94a6cee4434c6ec8bb8d7fa62320a8bdfb02",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "x264",
+      "filename": "x264-0.165.3222_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/x264/x264-0.165.3222_0.darwin_24.x86_64.tbz2",
+      "bytes": 2818862,
+      "sha256": "1bc5df85da2c101bbed3106f52411c1d05741a48fbc9c2f31a7a9b67236775d9",
+      "signature_sha256": "682602754bf897168b26afcf15f6d467a65e6a07543478b60a5717db8dbf68cf",
+      "portfile_sha256": "6d050a7cead85e96b29d2b987f916345e8a4005aae3479e3e694679792ce84f3",
+      "source_recipe_commit": "44604c833d8d3ef6900c2cd3798d0f7c46fd0818"
+    },
+    {
+      "name": "x265",
+      "filename": "x265-4.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/x265/x265-4.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 1944807,
+      "sha256": "71c42231fa0078f5544c53b0eb100206275764608d01f66b7b754f0191aff812",
+      "signature_sha256": "44c37f09e6b548c1cb32a83b4d0fbb5349115238b9a73a35167960fe5c35fef5",
+      "portfile_sha256": "09856c96f83bf1f16f713c0edfc91224d39b114c5447dc578662f65f5d61bef2",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "xorg-libX11",
+      "filename": "xorg-libX11-1.8.12_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-libX11/xorg-libX11-1.8.12_0.darwin_24.x86_64.tbz2",
+      "bytes": 2407128,
+      "sha256": "719de1fb3fe37d0a115152379bfd19bfca5cf18ebcb418696c67655561542d3f",
+      "signature_sha256": "88fe8aaa0fd26249ecf28d903d7cbe95145b5d249526a680822831adb52fadf2",
+      "portfile_sha256": "32179a198f9689be4695e91b83e5d8f22a9d9770e7cc5b307982781944ed80e3",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "xorg-libXau",
+      "filename": "xorg-libXau-1.0.12_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-libXau/xorg-libXau-1.0.12_0.darwin_24.x86_64.tbz2",
+      "bytes": 13044,
+      "sha256": "8acc2431dd7fef0a2628d6e70b40a9c7b41448af01b23a03acc5d8200aef5954",
+      "signature_sha256": "387652eefb2ddaa09485c3155c02a7d92f70756d702cdce9279ca0172ed969a4",
+      "portfile_sha256": "9b2287444821a90c5424292dd62ecb62cbd0fb8953c114e8cb4bca096ec80e1d",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "xorg-libXdmcp",
+      "filename": "xorg-libXdmcp-1.1.5_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-libXdmcp/xorg-libXdmcp-1.1.5_0.darwin_24.x86_64.tbz2",
+      "bytes": 15564,
+      "sha256": "f94bbdf89a89375e64daca18b2f932ec41a4dc6b5fb29b5caac9003390995b35",
+      "signature_sha256": "51af0c5ab49f783251811d60d29498bfd20f07a6d52ec7668973fe5a69516681",
+      "portfile_sha256": "789c9aa0529b539afcafed57f001eef981f8044ad3b09e5f05ea273514d31f95",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "xorg-libXext",
+      "filename": "xorg-libXext-1.3.6_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-libXext/xorg-libXext-1.3.6_0.darwin_24.x86_64.tbz2",
+      "bytes": 102372,
+      "sha256": "8186524c54b9cae1129a3935c7f4099ca96dbc98e2515b0a02941cc1bed6177a",
+      "signature_sha256": "3e202cd280d71e20c591af9ee5321568e15295ae89f979f1ea63e8572cba620b",
+      "portfile_sha256": "2f3b0bf58fc2227cbc8a4d838867d52e27853c856c6a08994d65201150612ff4"
+    },
+    {
+      "name": "xorg-libxcb",
+      "filename": "xorg-libxcb-1.17.0_0+python314.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-libxcb/xorg-libxcb-1.17.0_0%2Bpython314.darwin_24.x86_64.tbz2",
+      "bytes": 1236320,
+      "sha256": "0a1afdfdac6f59761a831ef57f10d3e99e7dc73ecc832aae883a13f4a4678bde",
+      "signature_sha256": "8fe269d3d864af38122d2ebbd1c881c9a70b7eac90eccd88292ccfa68935cd3a",
+      "portfile_sha256": "fb8f3f42c1fa6ec4dc9a7b307af7a42f626cb8975b2eb6aa48c193eb84ef7322",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "xorg-xcb-proto",
+      "filename": "xorg-xcb-proto-1.17.0_0+python314.darwin_any.noarch.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-xcb-proto/xorg-xcb-proto-1.17.0_0%2Bpython314.darwin_any.noarch.tbz2",
+      "bytes": 157057,
+      "sha256": "c85deca39e0c48c072e6b5b1f9a62427d96dde541e367a2d15bdc32594bcfcce",
+      "signature_sha256": "3d723a831f29ce3132e473266704bf57f7faaff8ba96603dbcb86ec6d907fd5e",
+      "portfile_sha256": "bf949d8f631e7f806c3197648c5d8fbccf2b8b1e4f605039f4cc2190f7a02d99"
+    },
+    {
+      "name": "xorg-xcb-util",
+      "filename": "xorg-xcb-util-0.4.1_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-xcb-util/xorg-xcb-util-0.4.1_0.darwin_24.x86_64.tbz2",
+      "bytes": 14227,
+      "sha256": "cb473af4eecd8a2e824a0ec004b09a3bbbeb2b8e077c9e687deec5e36e2ad28d",
+      "signature_sha256": "019c0414ea73d619dccd4173b0c4e3dad45ee0464663a7fee446535892db5f0b",
+      "portfile_sha256": "a4ea7b5b1b7693bf886b2af5f951e811e82be811fe08e5bacb03632d539768c6"
+    },
+    {
+      "name": "xorg-xorgproto",
+      "filename": "xorg-xorgproto-2024.1_0.darwin_any.noarch.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xorg-xorgproto/xorg-xorgproto-2024.1_0.darwin_any.noarch.tbz2",
+      "bytes": 284190,
+      "sha256": "52f6db1807d5e9b64ea7a1cb6a8f651c1971a7720f3cdf89d80357fdcd3f3363",
+      "signature_sha256": "0974ca612c03cec7ef5d12efe784a6c9ecbde1df4a8d1e9575f40e95e5c31423",
+      "portfile_sha256": "ef85d4805e96e73d07562f14dff4bf0e37ee91d9025112fe9501d8398fd69eb4"
+    },
+    {
+      "name": "xrender",
+      "filename": "xrender-0.9.12_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xrender/xrender-0.9.12_0.darwin_24.x86_64.tbz2",
+      "bytes": 45421,
+      "sha256": "fa92d4c0e561c41a020993580d30d108c65871eba5d6e943474e417ad6bb80ef",
+      "signature_sha256": "3186999dde406ad5fb7e7f939f604633bd05adb0e6d416263548975756ddcdbd",
+      "portfile_sha256": "c55084712bbb40ccf96cbfb8f1c1c77c670a37e189f4accb8ada691aea18d1ef"
+    },
+    {
+      "name": "xz",
+      "filename": "xz-5.8.4_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/xz/xz-5.8.4_0.darwin_24.x86_64.tbz2",
+      "bytes": 723869,
+      "sha256": "d262409c47e27f162564403f3b75fd463abb0f53d643751a5dc47de507f79f6d",
+      "signature_sha256": "49372d77699853b6a866f1291e5a4badd695f464f88e82cb7db4cb92090c2dc6",
+      "portfile_sha256": "372f0f488aef464eb0b514fadb6bb7ed2faea059ae3e3c7681afae6e6c8e00c8"
+    },
+    {
+      "name": "zimg",
+      "filename": "zimg-3.0.6_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/zimg/zimg-3.0.6_0.darwin_24.x86_64.tbz2",
+      "bytes": 504609,
+      "sha256": "cbfbe1f4223948a35206f0aee482da01ecce76d26b79f2ba82360030d7ee7702",
+      "signature_sha256": "695994276a7ece7eb618eb35e5674740ce2aef58a715546013082dd904eb6df2",
+      "portfile_sha256": "4be9836b41cfb9933641c2c46a339a0e9015bd14d7dbcf3d970f90d710e74bba",
+      "source_recipe_commit": "d178b41b2ecdaaf275c6b196412af61fffe82be1"
+    },
+    {
+      "name": "zlib",
+      "filename": "zlib-1.3.2_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/zlib/zlib-1.3.2_0.darwin_24.x86_64.tbz2",
+      "bytes": 208791,
+      "sha256": "5dae3b165cbe87f3d77e7e380159b26f2e69867fd0d1458dee5799f1bbdd2327",
+      "signature_sha256": "7f0faf08e2a5a6e84691f08b7026ce9a8efee76fe399891330372dc464cd1167",
+      "portfile_sha256": "de474aaca08c210225ef92c0ddb8b3712a03fff3385f1f87b5b145d7af4c1f54",
+      "source_recipe_commit": "0320cd2bb6e5df05cda3f82822b54aad01f8e296"
+    },
+    {
+      "name": "zstd",
+      "filename": "zstd-1.5.7_0.darwin_24.x86_64.tbz2",
+      "url": "https://mirrors.mit.edu/macports/packages/zstd/zstd-1.5.7_0.darwin_24.x86_64.tbz2",
+      "bytes": 944055,
+      "sha256": "fc9ef62c6fa9c6ba5bc0f31ccb6bbf23f3dc4219a8d7ea002e69d322ca3645dc",
+      "signature_sha256": "b4687949449af8dbbbf1e8c7ffce4d7c1a021375b0e8bdecb61ec04927b87325",
+      "portfile_sha256": "71b0e2bc72e4e1ea524e2b3276ff09de7cc7a81164f1f6bcb57699fb8a2d747f"
+    }
+  ],
+  "sources": [
+    {
+      "filename": "brotli--brotli-1.2.1.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/brotli/brotli-1.2.1.tar.gz",
+      "bytes": 646598,
+      "sha256": "98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f"
+    },
+    {
+      "filename": "bzip2--bzip2-1.0.8.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/bzip2/bzip2-1.0.8.tar.gz",
+      "bytes": 810029,
+      "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+    },
+    {
+      "filename": "cairo--cairo-1.18.6.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/cairo/cairo-1.18.6.tar.xz",
+      "bytes": 32725456,
+      "sha256": "1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4"
+    },
+    {
+      "filename": "dav1d--dav1d-1.5.4.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/dav1d/dav1d-1.5.4.tar.xz",
+      "bytes": 1038852,
+      "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5"
+    },
+    {
+      "filename": "expat--expat-2.10.0.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/expat/expat-2.10.0.tar.bz2",
+      "bytes": 695706,
+      "sha256": "44e0139015f1c9908d0876b5516235136f16b14932d8f6634a16737a12742f53"
+    },
+    {
+      "filename": "fontconfig--fontconfig-2.18.3.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/fontconfig/fontconfig-2.18.3.tar.xz",
+      "bytes": 1172016,
+      "sha256": "4f7b554a38cdf78c033f666c8871f3749e14a094f65a07f630c91ed0b43d35e3"
+    },
+    {
+      "filename": "freetype--freetype-2.15.0.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/freetype/freetype-2.15.0.tar.xz",
+      "bytes": 2716928,
+      "sha256": "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5"
+    },
+    {
+      "filename": "freetype--freetype-doc-2.15.0.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/freetype/freetype-doc-2.15.0.tar.xz",
+      "bytes": 2173764,
+      "sha256": "151b3f0a221b39775a0b2aa8e5893a60c4ef5ed7081371c5cce27250808bdff5"
+    },
+    {
+      "filename": "fribidi--fribidi-1.0.18.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/fribidi/fribidi-1.0.18.tar.xz",
+      "bytes": 1222656,
+      "sha256": "1de5e8073d035388b71d0b2d452b1da1f8caeea8a7702997b401fe1b6250727f"
+    },
+    {
+      "filename": "gettext-runtime--gettext-1.0.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/gettext/gettext-1.0.tar.xz",
+      "bytes": 10721600,
+      "sha256": "71132a3fb71e68245b8f2ac4e9e97137d3e5c02f415636eb508ae607bc01add7"
+    },
+    {
+      "filename": "glib2--glib-2.88.3.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/glib2/glib-2.88.3.tar.xz",
+      "bytes": 5794356,
+      "sha256": "ab24d24e698dfa1e408b7bcdb508f4aafc906185a8b8ce72fdf79bbbdc9b383b"
+    },
+    {
+      "filename": "graphite2--graphite2-1.3.15.tgz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/graphite2/graphite2-1.3.15.tgz",
+      "bytes": 13674849,
+      "sha256": "c6bc8b4252724665297f7cad0c55897285c673f9b8e6db3522ace833593fe0b1"
+    },
+    {
+      "filename": "harfbuzz--harfbuzz-15.1.0.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/harfbuzz/harfbuzz-15.1.0.tar.xz",
+      "bytes": 20515628,
+      "sha256": "0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d"
+    },
+    {
+      "filename": "lame--lame-4.0.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/lame/lame-4.0.tar.gz",
+      "bytes": 1496810,
+      "sha256": "3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb"
+    },
+    {
+      "filename": "libass--libass-0.17.5.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libass/libass-0.17.5.tar.gz",
+      "bytes": 351516,
+      "sha256": "fa286fc9ee1ba3b932703a3df7b8474d01dc8abe29ec69b6fa68781dc4bf7acc"
+    },
+    {
+      "filename": "libiconv--libiconv-1.19.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libiconv/libiconv-1.19.tar.gz",
+      "bytes": 5921103,
+      "sha256": "88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6"
+    },
+    {
+      "filename": "libopus--opus-1.6.1.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libopus/opus-1.6.1.tar.gz",
+      "bytes": 10472813,
+      "sha256": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
+    },
+    {
+      "filename": "libpixman--pixman-0.46.4.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/pixman/pixman-0.46.4.tar.xz",
+      "bytes": 660536,
+      "sha256": "a098c33924754ad43f981b740f6d576c70f9ed1006e12221b1845431ebce1239"
+    },
+    {
+      "filename": "libpng--libpng-1.6.59.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libpng/libpng-1.6.59.tar.xz",
+      "bytes": 1074540,
+      "sha256": "d80dd2a38a37f803cb9b6ac7b14bd6e74ddc3b654780a8380bdf93523fdb4389"
+    },
+    {
+      "filename": "libsamplerate--libsamplerate-0.2.2.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libsamplerate/libsamplerate-0.2.2.tar.gz",
+      "bytes": 3954784,
+      "sha256": "16e881487f184250deb4fcb60432d7556ab12cb58caea71ef23960aec6c0405a"
+    },
+    {
+      "filename": "libvidstab--vid.stab-1.1.2.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/libvidstab/vid.stab-1.1.2.tar.gz",
+      "bytes": 131556,
+      "sha256": "96db34d48a9e3aa13736a48744b56dfb76731ac9bb5193c716de8534c9fd709d"
+    },
+    {
+      "filename": "libvpx--libvpx-6df3ec34557879fff673706f4a1d9fbd0f3a6f0e.tar.gz",
+      "url": "https://codeload.github.com/webmproject/libvpx/tar.gz/6df3ec34557879fff673706f4a1d9fbd0f3a6f0e",
+      "bytes": 5675704,
+      "sha256": "073bd6202e4c55c8cb759abbb123aecd4cc8d99f52ba27af790178cfb1108423"
+    },
+    {
+      "filename": "mpg123--mpg123-1.33.7.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/mpg123/mpg123-1.33.7.tar.bz2",
+      "bytes": 1126376,
+      "sha256": "31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee"
+    },
+    {
+      "filename": "nasm--nasm-3.02.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/nasm/nasm-3.02.tar.bz2",
+      "bytes": 2032006,
+      "sha256": "ce7ed93281615379e4a9d4e76503c64a79c1d5ca696dbe148f16cf0b93e239af"
+    },
+    {
+      "filename": "pcre2--pcre2-10.49.tar.bz2",
+      "url": "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.bz2",
+      "bytes": 2185271,
+      "sha256": "53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384"
+    },
+    {
+      "filename": "pkgconfig--pkg-config-0.29.2.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/pkgconfig/pkg-config-0.29.2.tar.gz",
+      "bytes": 2016830,
+      "sha256": "6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591"
+    },
+    {
+      "filename": "rubberband--rubberband-3.3.0.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/rubberband/rubberband-3.3.0.tar.bz2",
+      "bytes": 223408,
+      "sha256": "d9ef89e2b8ef9f85b13ac3c2faec30e20acf2c9f3a9c8c45ce637f2bc95e576c"
+    },
+    {
+      "filename": "svt-av1--SVT-AV1-4.3.0.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/svt-av1/SVT-AV1-4.3.0.tar.bz2",
+      "bytes": 10420586,
+      "sha256": "49e6a628a371c1afdf29be27d279a2d09b0feff501c33c9319c76752c04113be"
+    },
+    {
+      "filename": "x264--x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2",
+      "url": "https://mirrors.mit.edu/macports/distfiles/x264/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2",
+      "bytes": 848719,
+      "sha256": "6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224"
+    },
+    {
+      "filename": "x265--x265_4.2.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/x265/x265_4.2.tar.gz",
+      "bytes": 1833442,
+      "sha256": "40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210"
+    },
+    {
+      "filename": "xorg-libX11--libX11-1.8.12.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/xorg-libX11/libX11-1.8.12.tar.xz",
+      "bytes": 1895256,
+      "sha256": "fa026f9bb0124f4d6c808f9aef4057aad65e7b35d8ff43951cef0abe06bb9a9a"
+    },
+    {
+      "filename": "xorg-libXau--libXau-1.0.12.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/xorg-libXau/libXau-1.0.12.tar.xz",
+      "bytes": 282624,
+      "sha256": "74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb"
+    },
+    {
+      "filename": "xorg-libXdmcp--libXdmcp-1.1.5.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/xorg-libXdmcp/libXdmcp-1.1.5.tar.xz",
+      "bytes": 297596,
+      "sha256": "d8a5222828c3adab70adf69a5583f1d32eb5ece04304f7f8392b6a353aa2228c"
+    },
+    {
+      "filename": "xorg-libxcb--libxcb-1.17.0.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/xorg-libxcb/libxcb-1.17.0.tar.xz",
+      "bytes": 455208,
+      "sha256": "599ebf9996710fea71622e6e184f3a8ad5b43d0e5fa8c4e407123c88a59a6d55"
+    },
+    {
+      "filename": "zimg--zimg-3.0.6.tar.gz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/zimg/zimg-3.0.6.tar.gz",
+      "bytes": 326725,
+      "sha256": "be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577"
+    },
+    {
+      "filename": "zlib--zlib-1.3.2.tar.xz",
+      "url": "https://mirrors.mit.edu/macports/distfiles/zlib/zlib-1.3.2.tar.xz",
+      "bytes": 1320064,
+      "sha256": "d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3"
+    },
+    {
+      "filename": "brotli--c89.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/brotli/files/c89.patch",
+      "bytes": 449,
+      "sha256": "f4e42f15718f3f6c35405bdf84a97407f25f23d0d0277c23f3ac29d025fdec0e"
+    },
+    {
+      "filename": "brotli--patch-disable-cmake-ver-check-CmakeLists.txt.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/brotli/files/patch-disable-cmake-ver-check-CmakeLists.txt.diff",
+      "bytes": 468,
+      "sha256": "820fd1160459559bde980474b1577d015459913bb0d51cba25d0b567a71a8172"
+    },
+    {
+      "filename": "bzip2--patch-Makefile-dylib.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/bzip2/files/patch-Makefile-dylib.diff",
+      "bytes": 2207,
+      "sha256": "a37bf8ebcd220efd2efc69aa3b289af05f2b92518357c382257b3659f742e638"
+    },
+    {
+      "filename": "bzip2--patch-Makefile-links.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/bzip2/files/patch-Makefile-links.diff",
+      "bytes": 872,
+      "sha256": "92813b6a743409a105b84d2d3964c7ab4a9d26660edb9074c76ff299cd1c2432"
+    },
+    {
+      "filename": "bzip2--patch-Makefile-man.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/bzip2/files/patch-Makefile-man.diff",
+      "bytes": 2124,
+      "sha256": "ad801f0a53da68933d9d69ce2d889deb0c60701c78219bfc58f989b5f2c4c581"
+    },
+    {
+      "filename": "bzip2--patch-Makefile-so.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/archivers/bzip2/files/patch-Makefile-so.diff",
+      "bytes": 2255,
+      "sha256": "45cc2107aa32e48811dc2772d0894e408dd6c9794c8c2a366373cc2179486752"
+    },
+    {
+      "filename": "cairo--patch-darwin-dylib-versions.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/graphics/cairo/files/patch-darwin-dylib-versions.diff",
+      "bytes": 1393,
+      "sha256": "942a9f96d82c0609073065e5eeb43fa2e5bb825ecfdfe5ffd2b32e3cac88581e"
+    },
+    {
+      "filename": "expat--O_CLOEXEC.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/textproc/expat/files/O_CLOEXEC.patch",
+      "bytes": 380,
+      "sha256": "1cae7faab520f3e50936e81bd83092f41ba04eb9b1fb025fe6e2f7ce34ccb302"
+    },
+    {
+      "filename": "expat--XML_ATTR_DEPRECATED.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/textproc/expat/files/XML_ATTR_DEPRECATED.patch",
+      "bytes": 753,
+      "sha256": "48a48bbf08c4560a4dc047945b35ae968f24a1f9b09e7b2ff95cc6fa648e9729"
+    },
+    {
+      "filename": "fontconfig--no-json-c.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/graphics/fontconfig/files/no-json-c.patch",
+      "bytes": 907,
+      "sha256": "9a1c90dd7f9c8d25690697f245621bc41bb40844bda1c2d6118e50dc12f890bd"
+    },
+    {
+      "filename": "fontconfig--patch-docbook-4.2.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/graphics/fontconfig/files/patch-docbook-4.2.diff",
+      "bytes": 856,
+      "sha256": "68868bd836f4cf2a3d0aec35a933d4e1fba9714020f54ec63649e4821d3bf787"
+    },
+    {
+      "filename": "freetype--freetype-config-no-pkg-config.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/print/freetype/files/freetype-config-no-pkg-config.patch",
+      "bytes": 707,
+      "sha256": "30e994e21607ac3bf9f0cc50bf0cbb8887bf026326d820727397274a7ae7eb01"
+    },
+    {
+      "filename": "freetype--patch-modules.cfg.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/print/freetype/files/patch-modules.cfg.diff",
+      "bytes": 308,
+      "sha256": "e6e3164d4174bd4771f204ff98be5d3581469ce4d73bf8399e80cff8b6d2304d"
+    },
+    {
+      "filename": "freetype--patch-src_base_ftrfork.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/print/freetype/files/patch-src_base_ftrfork.c.diff",
+      "bytes": 925,
+      "sha256": "7027e95951b0aea3c38917fd1cd088be9ed8b3b0c96055f2f56ca4eaa685659a"
+    },
+    {
+      "filename": "fribidi--gen.tab_Makefile.am.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/textproc/fribidi/files/gen.tab_Makefile.am.patch",
+      "bytes": 451,
+      "sha256": "55d38149b64c2cccf4240bb4f9227995170fcd18fce649309425e7b5fdce7e5b"
+    },
+    {
+      "filename": "gettext-runtime--_Generic.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/24c1a4825e4de9e86296ac87cdc73f936dc56eec/devel/gettext/files/_Generic.patch",
+      "bytes": 2910,
+      "sha256": "e30d947692b4c43725977f23df2fdd7bd01e0b1e4011002c839b4e82925000ce"
+    },
+    {
+      "filename": "glib2--libintl.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/libintl.patch",
+      "bytes": 621,
+      "sha256": "290b279a91e50f8093a7d9fd5fb43784199257d4aca54a70c0e1e3895406c53b"
+    },
+    {
+      "filename": "glib2--patch-declarations.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-declarations.diff",
+      "bytes": 434,
+      "sha256": "2536955a141878229de4f6abcb64526d414f11eae0400d000f34bfd7c91f60fa"
+    },
+    {
+      "filename": "glib2--patch-do-not-break-build-deliberately.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-do-not-break-build-deliberately.diff",
+      "bytes": 900,
+      "sha256": "d1b5c4c9913e8da3af5f7d4f22343425474175f237327060df21818e4d999412"
+    },
+    {
+      "filename": "glib2--patch-get-launchd-dbus-session-address.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-get-launchd-dbus-session-address.diff",
+      "bytes": 4391,
+      "sha256": "39bdd2f08f8c58918cfb6c8f606a7a344a1f384569006295bf3e7867e3b5b400"
+    },
+    {
+      "filename": "glib2--patch-gio-tests-meson.build.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gio-tests-meson.build.diff",
+      "bytes": 612,
+      "sha256": "fdb4d6997baa548e4581a456b65c8d093b7f6b5bcd856b5ad1b55b9d47172b3c"
+    },
+    {
+      "filename": "glib2--patch-gio_gcredentials.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gio_gcredentials.c.diff",
+      "bytes": 502,
+      "sha256": "062bf1f7d5deaa5b850fea4085804478fbd929b55b16c48a4db03105d199e840"
+    },
+    {
+      "filename": "glib2--patch-gio_gcredentialsprivate.h.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gio_gcredentialsprivate.h.diff",
+      "bytes": 1013,
+      "sha256": "b0d3af46a5afb0e9436ef992ba2195f4bd404b25d9b9fea8e8c41414195a330a"
+    },
+    {
+      "filename": "glib2--patch-gio_gipv6tclassmessage.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gio_gipv6tclassmessage.diff",
+      "bytes": 725,
+      "sha256": "8643ccbe41af8ae51d8beea78c977afa2bf269b2b9831b2c8660d8e185144e48"
+    },
+    {
+      "filename": "glib2--patch-gio_gsocket.h.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gio_gsocket.h.diff",
+      "bytes": 751,
+      "sha256": "f49ce474637539174b12976cd5a9f5c577080410755209b497898f7c553b7208"
+    },
+    {
+      "filename": "glib2--patch-glib2-findfolders-before-SL.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-glib2-findfolders-before-SL.diff",
+      "bytes": 2751,
+      "sha256": "6d0bd741f38f24fb7ea23e083a8b42e1f0fa27047d8549e9be0e908e8809a160"
+    },
+    {
+      "filename": "glib2--patch-glib_gmem.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-glib_gmem.c.diff",
+      "bytes": 493,
+      "sha256": "c0915b1f92fd955b1f875fd2ce7046db52868290256f0a635a3b2cba1de56ee9"
+    },
+    {
+      "filename": "glib2--patch-glib_gunicollate.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-glib_gunicollate.c.diff",
+      "bytes": 302,
+      "sha256": "6fa2c34ada9a47a4837313d6f469e62b652154bf34b40aa2a57bd5cde19a0dd8"
+    },
+    {
+      "filename": "glib2--patch-gmodule-gmodule-dl.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-gmodule-gmodule-dl.c.diff",
+      "bytes": 1184,
+      "sha256": "eab050cf79a2197371f68bf6e4d5a722c6f1367cdf7c21d06927386cd61bb447"
+    },
+    {
+      "filename": "glib2--patch-hardcoded-paths.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-hardcoded-paths.diff",
+      "bytes": 1526,
+      "sha256": "cf21f84a699bcf172672fdf6efcf16e1f5e693eefbdd9e2e5bb45be8eb01b313"
+    },
+    {
+      "filename": "glib2--patch-meson-build-python-path.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-meson-build-python-path.diff",
+      "bytes": 993,
+      "sha256": "620ec4efb4a5798e6df673cacfe5ffb8a5f9978a127a5f11aef7e8082f13ee09"
+    },
+    {
+      "filename": "glib2--patch-meson_build-atomic-test-older-clang-versions.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-meson_build-atomic-test-older-clang-versions.diff",
+      "bytes": 788,
+      "sha256": "08ce6783e0eefe76ac919ed37910cce1347f6050792c471a7cafbca11653472a"
+    },
+    {
+      "filename": "glib2--patch-meson_build-meson_options-appinfo.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-meson_build-meson_options-appinfo.diff",
+      "bytes": 4440,
+      "sha256": "8355a7d67b12e985dfb70ede0fcd1f95e2f9e3da168a07ca981577f92800ed90"
+    },
+    {
+      "filename": "glib2--patch-restore-macos-macros.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/patch-restore-macos-macros.diff",
+      "bytes": 2466,
+      "sha256": "25c0a7b9993e80d0759b2234a7c12e5f8e1e1849443292eb9746e24f7b183e1e"
+    },
+    {
+      "filename": "glib2--universal.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/a702f9b726d2a48092eed32bec5191d4499c74ff/devel/glib2/files/universal.patch",
+      "bytes": 8640,
+      "sha256": "65cae088dc4314d3738f40a1219e169b48a1857adb5d8753b7c0445a1a973a9b"
+    },
+    {
+      "filename": "harfbuzz--patch-meson-assert-macros.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/graphics/harfbuzz/files/patch-meson-assert-macros.diff",
+      "bytes": 861,
+      "sha256": "356a9a947c2e49d45de56abc84814bb6aaf49c195f435e180d2beb83448ba584"
+    },
+    {
+      "filename": "lame--allow-deprecated.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/lame/files/allow-deprecated.patch",
+      "bytes": 301,
+      "sha256": "eeee64b10a39dd37a1473392e88a3dd83504137ad37fb49b4bde54a713a710c5"
+    },
+    {
+      "filename": "lame--lame-4.0-altivec-20260802.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/lame/files/lame-4.0-altivec-20260802.diff",
+      "bytes": 148887,
+      "sha256": "b2326e99687bfb98e3a0f6e028475ad11ed0620e0e4c721565a90e1dbf18dd1d"
+    },
+    {
+      "filename": "lame--patch-parse.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/lame/files/patch-parse.c.diff",
+      "bytes": 976,
+      "sha256": "c038afe85e8d72f772e71472fbd293e4dfe62f04572b44718616c5da8be705bd"
+    },
+    {
+      "filename": "lame--strnlen.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/lame/files/strnlen.diff",
+      "bytes": 920,
+      "sha256": "7e9f7ff1792e615f813980ac9569c5aed748029d86734de46adf066fee67f99c"
+    },
+    {
+      "filename": "lame--lame-4.0-sse-20260715.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/lame/files/lame-4.0-sse-20260715.diff",
+      "bytes": 65037,
+      "sha256": "dc4d853217b25d08360a46bd883109310ee1f6a7c08af26395fe682c471f6f56"
+    },
+    {
+      "filename": "libiconv--patch-src-Makefile.in-darwin.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/textproc/libiconv/files/patch-src-Makefile.in-darwin.diff",
+      "bytes": 940,
+      "sha256": "f81478c2bc923bb7ec309d790feade2359c1680b534f7dbbdf5d2a64fee0740a"
+    },
+    {
+      "filename": "libiconv--patch-utf8mac.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/textproc/libiconv/files/patch-utf8mac.diff",
+      "bytes": 78732,
+      "sha256": "6aaa130c8ba72a758b1cf8b37566d4e9e0836576a3dacf86270b60e92a737e2a"
+    },
+    {
+      "filename": "libpixman--patch-meson-dylib-versions.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/graphics/libpixman/files/patch-meson-dylib-versions.diff",
+      "bytes": 1777,
+      "sha256": "0299fe848588e8a263c74c1bfec2b9e162ba3e05e2fe89bc19b540dca7b59f8a"
+    },
+    {
+      "filename": "libvpx--patch-Makefile.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/libvpx/files/patch-Makefile.diff",
+      "bytes": 403,
+      "sha256": "3abab827cd3e924b9147c53decf71e6a0f831c9d20c2f649c606a3b86990dc3b"
+    },
+    {
+      "filename": "libvpx--patch-configure.sh.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/libvpx/files/patch-configure.sh.diff",
+      "bytes": 2660,
+      "sha256": "951fbf5350fedeef3747256d1b4a9c91a9210ca23ca1589a8f688b27ceaae3ba"
+    },
+    {
+      "filename": "libvpx--patch-vpx_ports.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/libvpx/files/patch-vpx_ports.diff",
+      "bytes": 947,
+      "sha256": "a4831ea499105bea3119a2b92ee90ba672ae08e368286ac543eb9efc22439be1"
+    },
+    {
+      "filename": "pcre2--single_module.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/devel/pcre/files/single_module.patch",
+      "bytes": 1471,
+      "sha256": "a25e1fa7ef4a7824d6fb44687a1c976f2140ef5720f59081ffb6a80466472fc7"
+    },
+    {
+      "filename": "pkgconfig--patch-glib-configure.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/devel/pkgconfig/files/patch-glib-configure.diff",
+      "bytes": 7244,
+      "sha256": "716e457eb3bc53736180d1fc9b6d46851dd5fdca46b9033957816b13bfec6a44"
+    },
+    {
+      "filename": "pkgconfig--patch-glib-glib-gmessages.c.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/devel/pkgconfig/files/patch-glib-glib-gmessages.c.diff",
+      "bytes": 967,
+      "sha256": "e77343b18c5022fd32c38b8a780fc7e4733e8b81c3e98ab003d3d8cbe8ad9738"
+    },
+    {
+      "filename": "rubberband--arch.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/audio/rubberband/files/arch.patch",
+      "bytes": 683,
+      "sha256": "fa0480728019df271153c783be35ec3f9f8690918402acc8163d2f65e4071b4c"
+    },
+    {
+      "filename": "svt-av1--patch-fix-native.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/svt-av1/files/patch-fix-native.diff",
+      "bytes": 741,
+      "sha256": "4aea7f1a00abca8f11b418eea2898f347115a87535602a0fd7f8850659d322d5"
+    },
+    {
+      "filename": "svt-av1--patch-no-dispatch-on-old-OS.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/svt-av1/files/patch-no-dispatch-on-old-OS.diff",
+      "bytes": 2205,
+      "sha256": "acc6255b33ec296450668bd94cf06e9fc795df332b1521a38c50cab07722dc32"
+    },
+    {
+      "filename": "x264--altivec-x264.patch",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/44604c833d8d3ef6900c2cd3798d0f7c46fd0818/multimedia/x264/files/altivec-x264.patch",
+      "bytes": 3985,
+      "sha256": "2ebb3e7f9e98c525d628f88241a6b9b7f95967c3642ae1493db9904e07598db0"
+    },
+    {
+      "filename": "x265--patch-cmakelists-override-processor.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/x265/files/patch-cmakelists-override-processor.diff",
+      "bytes": 454,
+      "sha256": "5f1fd14a7d83d4daf581dcc5c631afff1a34e853f21feed9ec6ef45f7b26f6a9"
+    },
+    {
+      "filename": "x265--patch-ppc.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/multimedia/x265/files/patch-ppc.diff",
+      "bytes": 693,
+      "sha256": "7f086fcddedb80c4e14e3f04afb6e1dd2732e2abf65d6be17ab4f2198797884e"
+    },
+    {
+      "filename": "xorg-libX11--patch-xorg-libX11-pragmas-inside-functions.diff",
+      "url": "https://raw.githubusercontent.com/macports/macports-ports/d178b41b2ecdaaf275c6b196412af61fffe82be1/x11/xorg-libX11/files/patch-xorg-libX11-pragmas-inside-functions.diff",
+      "bytes": 508,
+      "sha256": "92655d7fbc95be327b87416afd550ad2cebb02c3a619bf275947cae37a67a47c"
+    },
+    {
+      "filename": "ffmpeg-9.0.2.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "bytes": 12040788,
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+    },
+    {
+      "filename": "dejavu-sans-ttf-2.37.zip",
+      "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-sans-ttf-2.37.zip",
+      "bytes": 417746,
+      "sha256": "5c6e497a2f36552cb5ffb112c413a6af39c0f3c47653662b90b4fa6499822fd7"
+    }
+  ]
+}

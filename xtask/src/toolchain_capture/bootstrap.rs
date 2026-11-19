@@ -49,33 +49,6 @@ fn number(value: &Value, field: &str) -> Result<u64> {
         .with_context(|| format!("Invalid package lock integer {field}"))
 }
 
-fn retain_failure(path: &Path, failure: &anyhow::Error) {
-    let cause = format!("{failure:#}");
-    // Vendor tools run with a cleared environment and public, locked inputs.
-    // Exclude any credential-shaped lines before storing a bounded excerpt.
-    let excerpt: String = cause
-        .lines()
-        .filter(|line| {
-            let line = line.to_ascii_lowercase();
-            ![
-                "authorization",
-                "bearer",
-                "secret",
-                "credential",
-                "token=",
-                "signature=",
-            ]
-            .iter()
-            .any(|term| line.contains(*term))
-        })
-        .flat_map(|line| line.chars().chain(['\n']))
-        .take(2048)
-        .collect();
-    if let Ok(content) = serde_json::to_vec_pretty(&json!({"failure":excerpt})) {
-        let _ = fs::write(path, content);
-    }
-}
-
 fn load<'a>(lock: &'a Value, capture: &Value) -> Result<Vec<Package<'a>>> {
     ensure!(
         lock["schema_version"] == 1
@@ -989,7 +962,7 @@ pub(super) fn run(root: &Path) -> Result<()> {
         if std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true") {
             let directory = root.join("target/toolchain-bootstrap");
             if fs::create_dir_all(&directory).is_ok() {
-                retain_failure(&directory.join("host-failure.json"), error);
+                crate::package::retain_failure(&directory.join("host-failure.json"), error);
             }
         }
     })

@@ -5,13 +5,20 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    os::unix::fs::symlink,
     path::{Component, Path, PathBuf},
     process::{Command, Output, Stdio},
 };
 
+#[cfg(target_arch = "aarch64")]
+use std::os::unix::fs::symlink;
+#[cfg(target_arch = "x86_64")]
+mod macports;
+#[cfg(target_arch = "aarch64")]
 const LOCK: &str = include_str!("../../components/macos-arm64-standard-input-lock.json");
-const TARGET: &str = "aarch64-apple-darwin";
+#[cfg(target_arch = "x86_64")]
+const LOCK: &str = include_str!("../../components/macos-x64-standard-input-lock.json");
+const TARGET: &str = if cfg!(target_arch = "aarch64") { "aarch64-apple-darwin" } else { "x86_64-apple-darwin" };
+const LABEL: &str = if cfg!(target_arch = "aarch64") { "macos-arm64" } else { "macos-x64" };
 const APPS: [&str; 2] = ["ffmpeg", "ffprobe"];
 const FFMPEG: &str = "ffmpeg-9.0.2.tar.xz";
 const FONT: &str = "dejavu-sans-ttf-2.37.zip";
@@ -188,6 +195,7 @@ fn unpack(archive: &Path, root: &Path, prefix: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_arch = "aarch64")]
 fn package_kegs(lock: &Value, work: &Path) -> Result<BTreeMap<String, PathBuf>> {
     let downloads = work.join("bottles");
     let cellar = work.join("Cellar");
@@ -222,8 +230,9 @@ fn package_kegs(lock: &Value, work: &Path) -> Result<BTreeMap<String, PathBuf>> 
     Ok(kegs)
 }
 
-fn pkg_config_files(work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Result<std::ffi::OsString> {
+fn pkg_config_files(work: &Path, dependencies: &BuildInputs) -> Result<std::ffi::OsString> {
     let mut search = Vec::new();
+    let mut rewritten = BTreeSet::new();
     let prefix = work.to_str().context("UTF-8 media prefix")?;
     let cellar = work.join("Cellar");
     let cellar = cellar.to_str().context("UTF-8 Homebrew Cellar")?;
@@ -231,7 +240,7 @@ fn pkg_config_files(work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Result<std
         !prefix.contains(char::is_whitespace),
         "The component compiler requires a whitespace-free workspace"
     );
-    for keg in kegs.values() {
+    for keg in dependencies.libraries.values() {
         for subdir in ["lib/pkgconfig", "share/pkgconfig"] {
             let config = keg.join(subdir);
             if !config.is_dir() {
@@ -248,12 +257,18 @@ fn pkg_config_files(work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Result<std
                     path.starts_with(keg) && fs::metadata(&path)?.len() <= 128 * 1024,
                     "Invalid pkg-config input from the downloaded keg"
                 );
+                if !rewritten.insert(path.clone()) {
+                    continue;
+                }
                 let contents = fs::read_to_string(&path)?;
-                let relocated = contents
+                let mut relocated = contents
                     .replace("@@HOMEBREW_CELLAR@@", cellar)
                     .replace("@@HOMEBREW_PREFIX@@", prefix)
                     .replace("/opt/homebrew/Cellar/", &format!("{cellar}/"))
                     .replace("/opt/homebrew/opt/", &format!("{prefix}/opt/"));
+                if let Some(prefix) = &dependencies.macports_prefix {
+                    relocated = relocated.replace("/opt/local", prefix.to_str().context("UTF-8 MacPorts prefix")?);
+                }
                 if relocated != contents {
                     fs::write(path, relocated)?;
                 }
@@ -344,6 +359,7 @@ fn sign(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_arch = "aarch64")]
 fn pkgconf(keg: &Path) -> Result<PathBuf> {
     let tool = keg.join("bin/pkgconf");
     let imports = links(&tool, false)?;
@@ -514,12 +530,37 @@ fn sdk_metadata(work: &Path) -> Result<(PathBuf, PathBuf)> {
     Ok((sdk, directory))
 }
 
-fn compile(source_dir: &Path, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Result<()> {
-    let pkgconf = pkgconf(kegs.get("pkgconf").context("Missing pinned pkgconf keg")?)?;
-    let config = pkg_config_files(work, kegs)?;
+struct BuildInputs {
+    libraries: BTreeMap<String, PathBuf>,
+    pkg_config: PathBuf,
+    lame: PathBuf,
+    macports_prefix: Option<PathBuf>,
+    assembler: Option<PathBuf>,
+}
+
+#[cfg(target_arch = "aarch64")]
+fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
+    let libraries = package_kegs(lock, work)?;
+    let pkg_config = pkgconf(libraries.get("pkgconf").context("Missing pinned pkgconf keg")?)?;
+    let lame = libraries.get("lame").context("Missing pinned LAME keg")?.clone();
+    Ok(BuildInputs { libraries, pkg_config, lame, macports_prefix: None, assembler: None })
+}
+
+#[cfg(target_arch = "x86_64")]
+fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
+    let prefix = macports::stage(lock, work)?;
+    let pkg_config = macports::pkg_config(&prefix)?;
+    let assembler = prefix.join("bin/nasm");
+    ensure!(assembler.is_file(), "Missing Intel NASM executable");
+    let libraries = BTreeMap::from([("macports".into(), prefix.clone())]);
+    Ok(BuildInputs { libraries, pkg_config, lame: prefix.clone(), macports_prefix: Some(prefix), assembler: Some(assembler) })
+}
+
+fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result<()> {
+    let config = pkg_config_files(work, dependencies)?;
     let (sdk, standard_config) = sdk_metadata(work)?;
     let search = std::env::join_paths(std::env::split_paths(&config).chain([standard_config]))?;
-    let lame = kegs.get("lame").context("Missing pinned LAME keg")?;
+    let lame = &dependencies.lame;
     let mut configure = Command::new("/bin/bash");
     configure
         .current_dir(source_dir)
@@ -536,7 +577,10 @@ fn compile(source_dir: &Path, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> 
             "--extra-ldflags=-Wl,-headerpad_max_install_names -L{}/lib",
             lame.display()
         ))
-        .arg(format!("--pkg-config={}", pkgconf.display()));
+        .arg(format!("--pkg-config={}", dependencies.pkg_config.display()));
+    if let Some(assembler) = &dependencies.assembler {
+        configure.arg(format!("--x86asmexe={}", assembler.display()));
+    }
     let configured = execute(
         &mut configure,
         "Configure FFmpeg with the locked macOS dependencies",
@@ -659,14 +703,12 @@ fn verify_media(bin: &Path, work: &Path) -> Result<Value> {
 
 fn sources(lock: &Value, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Result<PathBuf> {
     let root = work.join("corresponding-source");
-    let formulae = root.join("homebrew-formulae");
     fs::create_dir(&root)?;
-    fs::create_dir(&formulae)?;
     let entries = lock["sources"]
         .as_array()
         .context("Missing exact macOS corresponding sources")?;
     ensure!(
-        entries.len() == kegs.len() + 5,
+        entries.len() == if cfg!(target_arch = "aarch64") { kegs.len() + 5 } else { 95 },
         "Incomplete macOS corresponding source lock"
     );
     for row in entries {
@@ -674,15 +716,27 @@ fn sources(lock: &Value, work: &Path, kegs: &BTreeMap<String, PathBuf>) -> Resul
         ensure!(basename(name), "Unexpected source archive name");
         download(row, &root.join(name), None)?;
     }
-    for (name, keg) in kegs {
-        let path = keg.join(".brew").join(format!("{name}.rb"));
-        ensure!(
-            path.canonicalize()?.starts_with(keg),
-            "Homebrew formula escaped its reviewed keg"
-        );
-        fs::copy(&path, formulae.join(format!("{name}.rb")))?;
+    if cfg!(target_arch = "aarch64") {
+        let formulae = root.join("homebrew-formulae");
+        fs::create_dir(&formulae)?;
+        for (name, keg) in kegs {
+            let path = keg.join(".brew").join(format!("{name}.rb"));
+            ensure!(
+                path.canonicalize()?.starts_with(keg),
+                "Homebrew formula escaped its reviewed keg"
+            );
+            fs::copy(&path, formulae.join(format!("{name}.rb")))?;
+        }
+    } else {
+        let recipes = root.join("macports-recipes");
+        fs::rename(work.join("port-recipes"), &recipes)?;
+        let commit = field(lock, "macports_key_commit")?;
+        ensure!(commit.len() == 40 && commit.bytes().all(|byte| byte.is_ascii_hexdigit()), "Unexpected MacPorts key commit");
+        let key = json!({"url":format!("https://raw.githubusercontent.com/macports/macports-base/{commit}/keys/archives/macports-archives-2025.pub"),
+            "bytes":95,"sha256":lock["macports_key_sha256"]});
+        download(&key, &recipes.join("macports-archives-2025.pub"), None)?;
     }
-    fs::write(root.join("macos-arm64-standard-input-lock.json"), LOCK)?;
+    fs::write(root.join(format!("{LABEL}-standard-input-lock.json")), LOCK)?;
     Ok(root)
 }
 
@@ -696,25 +750,33 @@ pub fn build(root: &Path) -> Result<()> {
     let parent = nw_platform::security::private_directory(&root.join("target/macos-component"))?;
     let work = parent.join(format!("build-{}", std::process::id()));
     fs::create_dir(&work)?;
-    let kegs = package_kegs(&lock, &work)?;
-    let sources = sources(&lock, &work, &kegs)?;
-    unpack(&sources.join(FFMPEG), &work, "ffmpeg-9.0.2")?;
-    unpack(&sources.join(FONT), &work, "dejavu-sans-ttf-2.37")?;
+    let result = assemble(root, &work, &lock, &app_source);
+    if let Err(error) = &result {
+        crate::package::retain_failure(&work.join("failure.json"), error);
+    }
+    result
+}
+
+fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<()> {
+    let dependencies = prepare_inputs(lock, work).context("Stage and identify the macOS compiler dependencies")?;
+    let sources = sources(lock, work, &dependencies.libraries).context("Stage the macOS corresponding sources")?;
+    unpack(&sources.join(FFMPEG), work, "ffmpeg-9.0.2").context("Unpack the verified FFmpeg release")?;
+    unpack(&sources.join(FONT), work, "dejavu-sans-ttf-2.37").context("Unpack the verified DejaVu font")?;
     let source_dir = work.join("ffmpeg-9.0.2");
-    compile(&source_dir, &work, &kegs)?;
+    compile(&source_dir, work, &dependencies).context("Compile FFmpeg against the staged macOS dependencies")?;
     let profile = work.join("profile");
     let bin = profile.join("bin");
     let fonts = profile.join("fonts");
     fs::create_dir_all(&bin)?;
     fs::create_dir(&fonts)?;
-    let imports = relocate(&source_dir, &bin, &kegs)?;
+    let imports = relocate(&source_dir, &bin, &dependencies.libraries).context("Relocate macOS private media libraries")?;
     let font = work.join("dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf");
     ensure!(
         digest(&font)?["sha256"] == lock["font_sha256"],
         "Unexpected macOS fallback font"
     );
     fs::copy(font, fonts.join("DejaVuSans.ttf"))?;
-    let media = verify_media(&bin, &work)?;
+    let media = verify_media(&bin, work).context("Exercise the relocated macOS codecs")?;
     let mut files = Vec::new();
     for dir in [&bin, &fonts] {
         for entry in fs::read_dir(dir)? {
@@ -736,7 +798,7 @@ pub fn build(root: &Path) -> Result<()> {
         profile.join("embed-profile.json"),
         serde_json::to_vec_pretty(&manifest)?,
     )?;
-    deliver(root, &work, &profile, &source_dir, &manifest)
+    deliver(root, work, &profile, &source_dir, &manifest).context("Build and verify the macOS desktop application")
 }
 
 fn deliver(
@@ -797,7 +859,7 @@ fn deliver(
             "First launch used a different media helper"
         );
     }
-    let archive = delivery.join("macos-arm64-corresponding-source.tar.gz");
+    let archive = delivery.join(format!("{LABEL}-corresponding-source.tar.gz"));
     execute(
         Command::new("/usr/bin/tar")
             .current_dir(work)
@@ -806,7 +868,7 @@ fn deliver(
             .arg("corresponding-source"),
         "Archive the pinned macOS corresponding sources",
     )?;
-    let packaged_app = delivery.join("numera-wiz-macos-arm64.tar.gz");
+    let packaged_app = delivery.join(format!("numera-wiz-{LABEL}.tar.gz"));
     execute(
         Command::new("/usr/bin/tar")
             .current_dir(&delivery)

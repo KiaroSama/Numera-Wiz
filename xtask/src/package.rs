@@ -59,7 +59,7 @@ pub(crate) fn digest(path: &Path) -> Result<Value> {
 
 #[cfg(any(
     windows,
-    all(target_os = "macos", target_arch = "aarch64"),
+    target_os = "macos",
     all(target_os = "linux", target_arch = "x86_64")
 ))]
 pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<std::path::PathBuf> {
@@ -88,6 +88,34 @@ pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<s
     );
     let suffix = std::env::consts::EXE_SUFFIX;
     Ok(target.join("debug").join(format!("numera-wiz{suffix}")))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+pub(crate) fn retain_failure(path: &Path, failure: &anyhow::Error) {
+    let cause = format!("{failure:#}");
+    // Vendor tools run with a cleared environment and public, locked inputs.
+    // Exclude any credential-shaped lines before storing a bounded excerpt.
+    let excerpt: String = cause
+        .lines()
+        .filter(|line| {
+            let line = line.to_ascii_lowercase();
+            ![
+                "authorization",
+                "bearer",
+                "secret",
+                "credential",
+                "token=",
+                "signature=",
+            ]
+            .iter()
+            .any(|term| line.contains(*term))
+        })
+        .flat_map(|line| line.chars().chain(['\n']))
+        .take(2048)
+        .collect();
+    if let Ok(content) = serde_json::to_vec_pretty(&json!({"failure":excerpt})) {
+        let _ = fs::write(path, content);
+    }
 }
 
 fn write_json(path: &Path, value: &Value) -> Result<()> {

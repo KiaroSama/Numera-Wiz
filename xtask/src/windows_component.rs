@@ -508,13 +508,21 @@ pub fn build(root: &Path) -> Result<()> {
         lock["schema_version"] == 1 && lock["target"] == TARGET,
         "Windows component lock target differs"
     );
+    let work = asset_folder(root)?;
+    let result = assemble(root, &work, &lock, &app_source);
+    if let Err(error) = &result {
+        crate::package::retain_failure(&work.join("failure.json"), error);
+    }
+    result
+}
+
+fn assemble(root: &Path, work: &Path, lock: &Value, app_source: &str) -> Result<()> {
     let rows = lock["archives"]
         .as_array()
         .context("Windows input archive records")?;
     let total = lock["total_bytes"].as_u64().context("Windows input size")?;
     let system32 = PathBuf::from(env::var_os("SystemRoot").context("Windows system directory")?)
         .join("System32");
-    let work = asset_folder(root)?;
     let inputs = work.join("inputs");
     let extraction = work.join("toolchain");
     fs::create_dir(&inputs)?;
@@ -525,7 +533,7 @@ pub fn build(root: &Path) -> Result<()> {
         64 * 1024 * 1024,
         &inputs,
         &system32.join("curl.exe"),
-    )?;
+    ).context("Stage the authenticated Windows compiler packages")?;
     let tar = system32.join("tar.exe");
     unpack(
         &tar,
@@ -544,13 +552,13 @@ pub fn build(root: &Path) -> Result<()> {
         unpack(&tar, &inputs.join(field(row, "filename")?), &kit, prefix)?;
     }
     let ffmpeg_source = inputs.join(input(rows, "ffmpeg-source")?);
-    unpack(&tar, &ffmpeg_source, &work, "ffmpeg-9.0.2")?;
+    unpack(&tar, &ffmpeg_source, work, "ffmpeg-9.0.2")?;
     let source_dir = work.join("ffmpeg-9.0.2");
     let configured = execute(
         compiler(&kit, &source_dir, &system32)?
             .arg("./configure")
             .args(OPTIONS),
-    )?;
+    ).context("Configure FFmpeg with the pinned Windows libraries")?;
     ensure!(
         std::str::from_utf8(&configured.stdout)?.contains("License: GPL version 3 or later"),
         "Unexpected FFmpeg license"
@@ -569,7 +577,7 @@ pub fn build(root: &Path) -> Result<()> {
     }
     let imports = collect_deps(&kit, &bin, &system32)?;
     let font_source = inputs.join(input(rows, "font")?);
-    unpack(&tar, &font_source, &work, "dejavu-sans-ttf-2.37")?;
+    unpack(&tar, &font_source, work, "dejavu-sans-ttf-2.37")?;
     let font = work.join("dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf");
     ensure!(
         digest(&font)?["sha256"] == lock["source_attestations"]["font_sha256"],
@@ -610,7 +618,7 @@ pub fn build(root: &Path) -> Result<()> {
         );
     }
     let source_archive =
-        corresponding_sources(&files, &work, &ffmpeg_source, &font_source, &system32)?;
+        corresponding_sources(&files, work, &ffmpeg_source, &font_source, &system32)?;
     fs::write(
         output.join("embed-profile.json"),
         serde_json::to_vec_pretty(&json!({
@@ -619,7 +627,7 @@ pub fn build(root: &Path) -> Result<()> {
             "status":"native_build_candidate",
         }))?,
     )?;
-    bundle_app(root, &work, &output, &system32)?;
+    bundle_app(root, work, &output, &system32).context("Embed and verify the Windows desktop application")?;
     tracing::info!(profile=%output.display(), "Staged the identified Windows component profile");
     Ok(())
 }

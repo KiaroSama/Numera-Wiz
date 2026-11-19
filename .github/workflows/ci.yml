@@ -238,7 +238,7 @@ jobs:
     # Preserve the Apple Silicon lane and previous-package artifact key.
     runs-on: ${{ matrix.os == 'macos-15' && 'macos-26' || matrix.os }}
     # Allow for the native regressions and the separate macOS and Windows media builds.
-    timeout-minutes: ${{ matrix.os == 'macos-15' && 60 || (matrix.os == 'macos-15-intel' || matrix.os == 'windows-2025') && 45 || 30 }}
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos-') && 60 || matrix.os == 'windows-2025' && 45 || 30 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -441,6 +441,13 @@ jobs:
         env:
           NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
         run: cargo run --locked -p xtask -- build-standard-windows-profile
+      - name: Retain bounded Windows component failure evidence
+        if: ${{ !cancelled() && steps.windows-portable.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-component-failure-x64
+          path: target/windows-component/build-*/failure.json
+          if-no-files-found: warn
       - name: Retain the portable Windows executable with corresponding sources
         if: ${{ !cancelled() && steps.windows-portable.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -449,17 +456,24 @@ jobs:
           path: target/windows-component/build-*/delivery/
           if-no-files-found: error
           compression-level: 0
-      - name: Build and exercise the Apple Silicon app with embedded CPU media
-        id: macos-arm64-portable
-        if: ${{ !cancelled() && matrix.os == 'macos-15' && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
+      - name: Build and exercise the macOS app with embedded CPU media
+        id: macos-portable
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
         env:
           NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
-        run: cargo run --locked -p xtask -- build-standard-macos-arm64-profile
-      - name: Retain the Apple Silicon app with corresponding sources
-        if: ${{ !cancelled() && steps.macos-arm64-portable.outcome == 'success' }}
+        run: cargo run --locked -p xtask -- build-standard-macos-profile
+      - name: Retain bounded macOS component failure evidence
+        if: ${{ !cancelled() && steps.macos-portable.outcome == 'failure' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: numera-wiz-portable-macos-arm64
+          name: macos-component-failure-${{ matrix.os }}
+          path: target/macos-component/build-*/failure.json
+          if-no-files-found: warn
+      - name: Retain the macOS app with corresponding sources
+        if: ${{ !cancelled() && steps.macos-portable.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: numera-wiz-portable-${{ matrix.os == 'macos-15' && 'macos-arm64' || 'macos-x64' }}
           path: |
             target/macos-component/build-*/delivery/*.tar.gz
             target/macos-component/build-*/delivery/macos-portable-package.json
