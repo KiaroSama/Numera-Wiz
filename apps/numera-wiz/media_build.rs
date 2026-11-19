@@ -6,13 +6,20 @@ fn admitted(group: &str, name: &str) -> bool {
     let Some((stem, extension)) = name.rsplit_once('.') else {
         return false;
     };
-    let base = stem.split('.').next().unwrap_or_default().to_ascii_uppercase();
+    let base = stem
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
     if stem.is_empty()
         || !stem.as_bytes()[0].is_ascii_alphanumeric()
         || name.len() > 128
-        || !name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
         || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || (base.len() == 4 && (base.starts_with("COM") || base.starts_with("LPT"))
+        || (base.len() == 4
+            && (base.starts_with("COM") || base.starts_with("LPT"))
             && base.as_bytes()[3].is_ascii_digit())
     {
         return false;
@@ -32,13 +39,21 @@ pub fn generate() {
     }
     assert_eq!(env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
     assert_eq!(env::var("TARGET").as_deref(), Ok("x86_64-pc-windows-msvc"));
-    let directory = PathBuf::from(env::var_os("NW_EMBED_MEDIA_DIR").expect("Hosted media profile directory"))
-        .canonicalize().expect("canonical hosted media profile");
+    let directory =
+        PathBuf::from(env::var_os("NW_EMBED_MEDIA_DIR").expect("Hosted media profile directory"))
+            .canonicalize()
+            .expect("canonical hosted media profile");
     let manifest_path = directory.join("embed-profile.json");
     println!("cargo:rerun-if-changed={}", manifest_path.display());
-    assert!(fs::metadata(&manifest_path).expect("media manifest metadata").len() <= 64 * 1024);
-    let manifest: serde_json::Value = serde_json::from_slice(&fs::read(&manifest_path).expect("media manifest"))
-        .expect("valid media manifest");
+    assert!(
+        fs::metadata(&manifest_path)
+            .expect("media manifest metadata")
+            .len()
+            <= 64 * 1024
+    );
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("media manifest"))
+            .expect("valid media manifest");
     assert_eq!(manifest["schema_version"], 1);
     assert_eq!(manifest["target"], "x86_64-pc-windows-msvc");
     let source = env::var("NW_SOURCE_SHA").expect("exact app source for embedded media");
@@ -52,7 +67,9 @@ pub fn generate() {
     let mut total_bytes = 0;
     for asset in assets {
         let path = asset["path"].as_str().expect("media asset path");
-        let (group, name) = path.split_once('/').expect("media asset directory and name");
+        let (group, name) = path
+            .split_once('/')
+            .expect("media asset directory and name");
         assert!(admitted(group, name) && paths.insert(path.to_ascii_lowercase()));
         let sha = asset["sha256"].as_str().expect("media SHA-256");
         let bytes = asset["bytes"].as_u64().expect("media file size");

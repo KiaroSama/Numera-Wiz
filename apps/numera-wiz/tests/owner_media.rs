@@ -105,17 +105,32 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let config_file = config_directory.join("ffmwiz.env");
     let config_output = config_directory.join("imported-config.json");
     std::fs::write(&config_file, FFM_WIZ_CONFIG).unwrap();
-    let (imported, exit) = cli.human(&[
-        "config", "import-ffmwiz", "--input", config_file.to_str().unwrap(),
-        "--out", config_output.to_str().unwrap(),
-    ]).await;
+    let (imported, exit) = cli
+        .human(&[
+            "config",
+            "import-ffmwiz",
+            "--input",
+            config_file.to_str().unwrap(),
+            "--out",
+            config_output.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(exit, 0, "{imported}");
     let imported = imported["result"].clone();
     assert_eq!(imported["input_valid"], true);
     assert_eq!(imported["job"]["settings"].as_object().unwrap().len(), 40);
-    assert_eq!(imported["job"]["settings"]["video_look"]["value"]["value"][1]["amount"], json!({"num":"-1","den":"4"}));
-    assert_eq!(imported["job"]["settings"]["audio_tracks"]["value"]["selection"], json!({"kind":"analyze","duplicates":true,"silence":true}));
-    assert_eq!(serde_json::from_slice::<Value>(&std::fs::read(&config_output).unwrap()).unwrap(), imported);
+    assert_eq!(
+        imported["job"]["settings"]["video_look"]["value"]["value"][1]["amount"],
+        json!({"num":"-1","den":"4"})
+    );
+    assert_eq!(
+        imported["job"]["settings"]["audio_tracks"]["value"]["selection"],
+        json!({"kind":"analyze","duplicates":true,"silence":true})
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(&config_output).unwrap()).unwrap(),
+        imported
+    );
     let config_import = json!({"source":FFM_WIZ_CONFIG,"base_directory":config_directory,"compatibility_profile":"ffmwiz_v1"});
     let (scope, exit) = cli
         .human(&["access", "replay-scope", "create", "--json"])
@@ -867,12 +882,25 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let mut command = cli.command();
     command.args(["bridge", "--access-profile", "operator"]);
     let stdio = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
-    assert_eq!(call!(stdio, "config.import.ffmwiz", config_import.clone(), json!({})), imported);
+    assert_eq!(
+        call!(
+            stdio,
+            "config.import.ffmwiz",
+            config_import.clone(),
+            json!({})
+        ),
+        imported
+    );
     let mut blocked = config_import.clone();
-    blocked["source"] = json!(format!("{FFM_WIZ_CONFIG}raw_ffmpeg_args=-i unexpected.mkv\n"));
+    blocked["source"] = json!(format!(
+        "{FFM_WIZ_CONFIG}raw_ffmpeg_args=-i unexpected.mkv\n"
+    ));
     let blocked = call!(stdio, "config.import.ffmwiz", blocked, json!({}));
     assert_eq!(blocked["input_valid"], false);
-    assert_eq!(blocked["diagnostics"].as_array().unwrap().last().unwrap()["code"], "expert_options_require_typed_review");
+    assert_eq!(
+        blocked["diagnostics"].as_array().unwrap().last().unwrap()["code"],
+        "expert_options_require_typed_review"
+    );
 
     assert_eq!(
         &call!(stdio, "capabilities.refresh", json!({}), json!({})),
@@ -1480,7 +1508,15 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
                 .auth_header(&token),
         );
         let http = ().serve_with_lifecycle(transport, lifecycle).await.unwrap();
-        assert_eq!(call!(http, "config.import.ffmwiz", config_import.clone(), json!({})), imported);
+        assert_eq!(
+            call!(
+                http,
+                "config.import.ffmwiz",
+                config_import.clone(),
+                json!({})
+            ),
+            imported
+        );
 
         assert_eq!(
             &call!(http, "capabilities.refresh", json!({}), json!({})),

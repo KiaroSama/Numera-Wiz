@@ -5,9 +5,9 @@ mod client;
 mod config_cli;
 mod human;
 mod install_root;
+mod mcp;
 #[cfg(feature = "embedded-media")]
 mod portable_media;
-mod mcp;
 mod server;
 mod web_assets;
 use anyhow::Result;

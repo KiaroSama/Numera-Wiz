@@ -621,7 +621,10 @@ pub async fn run_owner(
         Some(path) => Some(path),
         None => {
             let root = root.clone();
-            Some(tokio::task::spawn_blocking(move || crate::portable_media::installed(&root)).await??)
+            Some(
+                tokio::task::spawn_blocking(move || crate::portable_media::installed(&root))
+                    .await??,
+            )
         }
     };
     let binaries = components.map(|path| {
