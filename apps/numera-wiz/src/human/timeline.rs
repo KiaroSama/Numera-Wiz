@@ -145,7 +145,14 @@ impl Timeline {
                 });
                 Ok(request)
             }
-            Self::ImportEdl { context, sequence, track, fps, file, reels } => {
+            Self::ImportEdl {
+                context,
+                sequence,
+                track,
+                fps,
+                file,
+                reels,
+            } => {
                 let reels = if let Some(path) = reels {
                     commands::parse(commands::decode_json(&read_cmx_file(path)?)?)?
                 } else {

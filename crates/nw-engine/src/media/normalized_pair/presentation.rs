@@ -99,9 +99,15 @@ impl AsyncChunkSink for ChunkSink {
     fn write<'a>(&'a mut self, bytes: &'a [u8]) -> SinkFuture<'a> {
         Box::pin(async move {
             if bytes.len() > 8192 {
-                return Err(reject("Native preview ingress exceeded the stdout chunk bound"));
+                return Err(reject(
+                    "Native preview ingress exceeded the stdout chunk bound",
+                ));
             }
-            self.sender.as_ref().ok_or_else(cancelled)?.send(bytes.to_vec()).await
+            self.sender
+                .as_ref()
+                .ok_or_else(cancelled)?
+                .send(bytes.to_vec())
+                .await
                 .map_err(|_| {
                     if self.cancel.is_cancelled() {
                         cancelled()
@@ -169,8 +175,8 @@ impl NativePreviewPipe {
         parent: &CancellationToken,
     ) -> Result<(Self, Box<dyn AsyncChunkSink>)> {
         let picture_bytes = profile.validate()?;
-        let runtime = Handle::try_current()
-            .map_err(|_| reject("Native preview needs the media runtime"))?;
+        let runtime =
+            Handle::try_current().map_err(|_| reject("Native preview needs the media runtime"))?;
         let cancel = parent.child_token();
         let (sender, receiver) = mpsc::channel(STDOUT_CHUNKS);
         let (video_tx, video) = mpsc::channel(VIDEO_SLOTS);
@@ -185,16 +191,28 @@ impl NativePreviewPipe {
         let worker_cancel = cancel.clone();
         let worker = runtime.spawn_blocking(move || {
             let outcome = demux(reader, profile, picture_bytes, clock, [video_tx, audio_tx]);
-            if worker_cancel.is_cancelled() { Err(cancelled()) } else { outcome }
+            if worker_cancel.is_cancelled() {
+                Err(cancelled())
+            } else {
+                outcome
+            }
         });
         Ok((
             Self {
-                video, audio,
-                control: NativePreviewControl { position, profile, cancel: cancel.clone() },
+                video,
+                audio,
+                control: NativePreviewControl {
+                    position,
+                    profile,
+                    cancel: cancel.clone(),
+                },
                 worker,
                 complete: false,
             },
-            Box::new(ChunkSink { sender: Some(sender), cancel }),
+            Box::new(ChunkSink {
+                sender: Some(sender),
+                cancel,
+            }),
         ))
     }
 
@@ -233,7 +251,9 @@ impl NativePreviewControl {
 
     pub fn advance(&self, generation: u64, time: Rational) -> Result<()> {
         if generation != self.profile.generation || time > self.profile.range.end {
-            return Err(reject("Preview clock does not belong to the active generation or range"));
+            return Err(reject(
+                "Preview clock does not belong to the active generation or range",
+            ));
         }
         if !self.position.send_if_modified(|position| {
             if time <= *position {
@@ -241,12 +261,12 @@ impl NativePreviewControl {
             }
             *position = time;
             true
-        }) && time != *self.position.borrow() {
+        }) && time != *self.position.borrow()
+        {
             return Err(reject("Preview clock moved backwards"));
         }
         Ok(())
     }
-
 }
 impl Drop for NativePreviewPipe {
     fn drop(&mut self) {
@@ -273,20 +293,34 @@ fn demux(
 ) -> Result<NativePreviewStats> {
     let runtime = reader.runtime.clone();
     let cancel = reader.cancel.clone();
-    let mut nut = NutReader::new(reader, picture_bytes.max(AUDIO_FRAME_BYTES * AUDIO_PACKET_SAMPLES))?;
+    let mut nut = NutReader::new(
+        reader,
+        picture_bytes.max(AUDIO_FRAME_BYTES * AUDIO_PACKET_SAMPLES),
+    )?;
     let expected = [
-        Format::Rgba { width: profile.width, height: profile.height },
+        Format::Rgba {
+            width: profile.width,
+            height: profile.height,
+        },
         Format::StereoPcmF32,
     ];
-    if !nut.streams().iter().map(|stream| stream.format)
+    if !nut
+        .streams()
+        .iter()
+        .map(|stream| stream.format)
         .eq(expected.into_iter().take(1 + usize::from(profile.audio)))
     {
-        return Err(reject("NUT declarations differ from the selected native preview profile"));
+        return Err(reject(
+            "NUT declarations differ from the selected native preview profile",
+        ));
     }
 
     let horizon = Rational::new(1, 4)?;
     let lateness = Rational::new(3, 25)?;
-    let frame = Rational::new(profile.frame_rate.denominator(), profile.frame_rate.numerator())?;
+    let frame = Rational::new(
+        profile.frame_rate.denominator(),
+        profile.frame_rate.numerator(),
+    )?;
     let mut ends = [profile.range.start; 2];
     let mut counts = [0u64; 2];
     let mut late_video_frames = 0;
@@ -294,26 +328,37 @@ fn demux(
     while let Some(packet) = nut.next_packet()? {
         let stream = packet.stream;
         let clock_unit = nut.streams()[stream].clock;
-        let pts = profile.range.start.checked_add(clock_unit.checked_mul(Rational::new(packet.pts, 1)?)?)?;
+        let pts = profile
+            .range
+            .start
+            .checked_add(clock_unit.checked_mul(Rational::new(packet.pts, 1)?)?)?;
         let duration = if stream == 0 {
             frame
         } else {
             let samples = packet.bytes.len() / AUDIO_FRAME_BYTES;
             if samples == 0 || samples > AUDIO_PACKET_SAMPLES {
-                return Err(reject("Native audio packet exceeds 480 stereo sample frames"));
+                return Err(reject(
+                    "Native audio packet exceeds 480 stereo sample frames",
+                ));
             }
             audio_sample_frames += samples as u64;
             Rational::new(samples as i64, AUDIO_RATE)?
         };
         let end = pts.checked_add(duration)?;
         if pts != ends[stream] || end > profile.range.end {
-            return Err(reject("Native packet timing differs from the exact program interval"));
+            return Err(reject(
+                "Native packet timing differs from the exact program interval",
+            ));
         }
         ends[stream] = end;
         let sequence = counts[stream];
         counts[stream] += 1;
         let packet = NativePreviewPacket {
-            generation: profile.generation, sequence, pts, duration, bytes: packet.bytes,
+            generation: profile.generation,
+            sequence,
+            pts,
+            duration,
+            bytes: packet.bytes,
         };
         let late = runtime.block_on(async {
             let deliver = async {
@@ -342,7 +387,9 @@ fn demux(
         return Err(cancelled());
     }
     if ends[0] != profile.range.end || (profile.audio && ends[1] != profile.range.end) {
-        return Err(reject("Native preview ended before all selected streams completed"));
+        return Err(reject(
+            "Native preview ended before all selected streams completed",
+        ));
     }
     Ok(NativePreviewStats {
         video_frames: counts[0],

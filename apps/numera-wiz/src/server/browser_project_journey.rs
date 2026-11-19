@@ -184,7 +184,10 @@ impl shared::Driver for BrowserProjects<'_> {
                 shared::Key::Tab => "\u{E004}",
                 shared::Key::Space => " ",
                 shared::Key::Escape => "\u{E00C}",
-                shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter | shared::Key::CtrlZ | shared::Key::CtrlShiftZ => unreachable!(),
+                shared::Key::CtrlEnter
+                | shared::Key::CtrlShiftEnter
+                | shared::Key::CtrlZ
+                | shared::Key::CtrlShiftZ => unreachable!(),
             };
             browser_key(self.client, self.base, self.route, value).await;
         }

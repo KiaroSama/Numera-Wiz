@@ -41,10 +41,12 @@ fn page_label<T>(page: &Page<T>) -> String {
 
 fn shortcut(ctx: &egui::Context, modifiers: egui::Modifiers, key: egui::Key) -> bool {
     ctx.input_mut(|input| {
-        let admitted = input.events.iter().any(|event| matches!(event,
+        let admitted = input.events.iter().any(|event| {
+            matches!(event,
             egui::Event::Key { key: current, pressed: true, repeat: false, modifiers: active, .. }
             if *current == key && active.shift == modifiers.shift && active.alt == modifiers.alt
-                && active.matches_logically(modifiers)));
+                && active.matches_logically(modifiers))
+        });
         admitted && input.consume_key(modifiers, key)
     })
 }
@@ -88,17 +90,20 @@ impl WizApp {
     }
 
     fn project_history_keys(&mut self, ctx: &egui::Context) {
-        if !self.project_ready() || ctx.text_edit_focused()
-            || self.projects.sequence_form || self.projects.source_form
+        if !self.project_ready()
+            || ctx.text_edit_focused()
+            || self.projects.sequence_form
+            || self.projects.source_form
         {
             return;
         }
         let group = self.projects.group.as_ref().expect("Ready project");
         let command = egui::Modifiers::COMMAND;
-        let shifted_command = egui::Modifiers { shift: true, ..command };
-        if group.summary["history"]["can_undo"] == true
-            && shortcut(ctx, command, egui::Key::Z)
-        {
+        let shifted_command = egui::Modifiers {
+            shift: true,
+            ..command
+        };
+        if group.summary["history"]["can_undo"] == true && shortcut(ctx, command, egui::Key::Z) {
             self.mutate_project("history.undo", json!({}), ctx);
         } else if group.summary["history"]["can_redo"] == true
             && shortcut(ctx, shifted_command, egui::Key::Z)
@@ -110,28 +115,44 @@ impl WizApp {
     fn timeline_keys(&mut self, ui: &egui::Ui, group: &Group) {
         let ctx = ui.ctx();
         if let Some(position) = ui.input(|input| {
-            input.pointer.any_pressed().then(|| input.pointer.interact_pos()).flatten()
+            input
+                .pointer
+                .any_pressed()
+                .then(|| input.pointer.interact_pos())
+                .flatten()
         }) {
             self.projects.timeline_key_scope = ui.max_rect().contains(position);
         }
-        if !self.projects.timeline_key_scope || !self.project_ready()
-            || ctx.text_edit_focused() || self.projects.sequence_form || self.projects.source_form
+        if !self.projects.timeline_key_scope
+            || !self.project_ready()
+            || ctx.text_edit_focused()
+            || self.projects.sequence_form
+            || self.projects.source_form
         {
             return;
         }
         if let (Some(id), Some(clip)) = (&group.view.clip, &group.clip)
-            && !clip.locked && group.track.as_ref().is_some_and(|track| !track.locked)
+            && !clip.locked
+            && group.track.as_ref().is_some_and(|track| !track.locked)
             && (shortcut(ctx, egui::Modifiers::NONE, egui::Key::Backspace)
                 || shortcut(ctx, egui::Modifiers::NONE, egui::Key::Delete))
         {
-            self.mutate_project("clips.remove", json!({"clip_ids":[id],"mode":"lift","link_policy":"expand"}), ctx);
+            self.mutate_project(
+                "clips.remove",
+                json!({"clip_ids":[id],"mode":"lift","link_policy":"expand"}),
+                ctx,
+            );
             return;
         }
         let Ok(at) = self.projects.forms.preview_at.value() else {
             return;
         };
         let Some(clip) = group.viewport.items.iter().find(|clip| {
-            clip.sequence_start <= at && clip.sequence_start.checked_add(clip.duration).is_ok_and(|end| at < end)
+            clip.sequence_start <= at
+                && clip
+                    .sequence_start
+                    .checked_add(clip.duration)
+                    .is_ok_and(|end| at < end)
         }) else {
             return;
         };
@@ -139,10 +160,17 @@ impl WizApp {
             let mut view = group.view.clone();
             view.clip = Some(clip.id.to_string());
             self.project_reselect(view, ctx);
-        } else if clip.sequence_start < at && group.track.as_ref().is_some_and(|track| {
-            !track.locked && nw_domain::projects::grid_tick(at, track.grid).is_ok()
-        }) && shortcut(ctx, egui::Modifiers::COMMAND, egui::Key::K) {
-            self.mutate_project("clips.split", json!({"clip_id":clip.id,"at_sequence":at,"link_policy":"expand"}), ctx);
+        } else if clip.sequence_start < at
+            && group.track.as_ref().is_some_and(|track| {
+                !track.locked && nw_domain::projects::grid_tick(at, track.grid).is_ok()
+            })
+            && shortcut(ctx, egui::Modifiers::COMMAND, egui::Key::K)
+        {
+            self.mutate_project(
+                "clips.split",
+                json!({"clip_id":clip.id,"at_sequence":at,"link_policy":"expand"}),
+                ctx,
+            );
         }
     }
     fn project_status(&mut self, ui: &mut egui::Ui) {
@@ -361,15 +389,25 @@ impl WizApp {
             } else {
                 "Enable track"
             };
-            if ui.add_enabled(ready && !track.locked, egui::Button::new(label)).clicked() {
+            if ui
+                .add_enabled(ready && !track.locked, egui::Button::new(label))
+                .clicked()
+            {
                 self.mutate_project(
                     "tracks.set_enabled",
                     json!({"track_id":track.id,"enabled":!track.enabled}),
                     ui.ctx(),
                 );
             }
-            let lock_label = if track.locked { "Unlock track" } else { "Lock track" };
-            if ui.add_enabled(ready, egui::Button::new(lock_label)).clicked() {
+            let lock_label = if track.locked {
+                "Unlock track"
+            } else {
+                "Lock track"
+            };
+            if ui
+                .add_enabled(ready, egui::Button::new(lock_label))
+                .clicked()
+            {
                 self.mutate_project(
                     "tracks.set_locked",
                     json!({"track_id":track.id,"locked":!track.locked}),
@@ -843,19 +881,36 @@ impl WizApp {
             return;
         }
         let current_time = self.projects.forms.preview_at.value().ok();
-        if self.projects.native_picture.as_ref().is_some_and(|view| Some(view.requested_time) != current_time) {
+        if self
+            .projects
+            .native_picture
+            .as_ref()
+            .is_some_and(|view| Some(view.requested_time) != current_time)
+        {
             self.projects.native_picture = None;
         }
-        let playing = self.projects.native_picture.as_ref().is_some_and(|view| view.active);
-        ui.add_enabled(idle && !playing, egui::Checkbox::new(
-            &mut self.projects.forms.native_preview_sound, "Sound",
-        ));
-        let short = ui.add_enabled(idle && !playing, egui::Button::new("Play timeline window")).clicked();
-        let visible = ui.add_enabled(idle && !playing, egui::Button::new("Play visible range")).clicked();
+        let playing = self
+            .projects
+            .native_picture
+            .as_ref()
+            .is_some_and(|view| view.active);
+        ui.add_enabled(
+            idle && !playing,
+            egui::Checkbox::new(&mut self.projects.forms.native_preview_sound, "Sound"),
+        );
+        let short = ui
+            .add_enabled(idle && !playing, egui::Button::new("Play timeline window"))
+            .clicked();
+        let visible = ui
+            .add_enabled(idle && !playing, egui::Button::new("Play visible range"))
+            .clicked();
         if playing && ui.button("Stop playback").clicked() {
             self.projects.native_picture = None;
         } else if short || visible {
-            use nw_domain::{preview::{native_wire::OpenRequest, program_window}, projects::{EntityId, ProjectId, Revision}};
+            use nw_domain::{
+                preview::{native_wire::OpenRequest, program_window},
+                projects::{EntityId, ProjectId, Revision},
+            };
             let prepare = || -> Result<(OpenRequest, Rational), String> {
                 let settings = &group.sequence.as_ref().ok_or("Select a sequence")?.settings;
                 let start = self.projects.forms.preview_at.value()?;
@@ -865,7 +920,8 @@ impl WizApp {
                     return Err("The selected sequence has no sample clock".into());
                 }
                 let common_sample_grid = if audio {
-                    let ratio = Rational::new(i64::from(sample_rate), 48_000).map_err(|error| error.message)?;
+                    let ratio = Rational::new(i64::from(sample_rate), 48_000)
+                        .map_err(|error| error.message)?;
                     sample_rate / ratio.numerator() as u32
                 } else {
                     sample_rate
@@ -876,21 +932,32 @@ impl WizApp {
                     program_window(start, settings.frame_rate, common_sample_grid)
                         .map_err(|error| error.message)?
                 };
-                Ok((OpenRequest {
-                    project_id: ProjectId::parse(group.key.project.clone()).map_err(|error| error.message)?,
-                    sequence_id: EntityId::parse(sequence).map_err(|error| error.message)?,
-                    revision: Revision::parse(&group.key.revision).map_err(|error| error.message)?,
-                    range,
-                    width: 320, height: 180, audio,
-                }, start))
+                Ok((
+                    OpenRequest {
+                        project_id: ProjectId::parse(group.key.project.clone())
+                            .map_err(|error| error.message)?,
+                        sequence_id: EntityId::parse(sequence).map_err(|error| error.message)?,
+                        revision: Revision::parse(&group.key.revision)
+                            .map_err(|error| error.message)?,
+                        range,
+                        width: 320,
+                        height: 180,
+                        audio,
+                    },
+                    start,
+                ))
             };
             match prepare() {
                 Ok((request, requested_time)) => {
                     let mailbox = crate::NativePictureMailbox::default();
-                    self.client.play_native_picture(request, mailbox.clone(), ui.ctx().clone());
+                    self.client
+                        .play_native_picture(request, mailbox.clone(), ui.ctx().clone());
                     self.projects.preview_frame = None;
                     self.projects.native_picture = Some(NativePictureView {
-                        mailbox, requested_time, picture: None, active: true,
+                        mailbox,
+                        requested_time,
+                        picture: None,
+                        active: true,
                     });
                 }
                 Err(problem) => self.error = Some(problem),
@@ -899,12 +966,17 @@ impl WizApp {
         if let Some(view) = self.projects.native_picture.as_mut() {
             let (frame, outcome) = view.mailbox.take();
             if let Some(frame) = frame {
-                let rgba = egui::ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &frame.rgba);
+                let rgba = egui::ColorImage::from_rgba_unmultiplied(
+                    [frame.width, frame.height],
+                    &frame.rgba,
+                );
                 if let Some((at, image)) = view.picture.as_mut() {
                     *at = frame.at;
                     image.set(rgba, egui::TextureOptions::LINEAR);
                 } else {
-                    let texture = ui.ctx().load_texture("native-program", rgba, egui::TextureOptions::LINEAR);
+                    let texture =
+                        ui.ctx()
+                            .load_texture("native-program", rgba, egui::TextureOptions::LINEAR);
                     view.picture = Some((frame.at, texture));
                 }
             }
@@ -1054,7 +1126,9 @@ impl WizApp {
                     });
                 }
             });
-            if let Some(sequence_settings) = group.sequence.as_ref().map(|sequence| &sequence.settings) {
+            if let Some(sequence_settings) =
+                group.sequence.as_ref().map(|sequence| &sequence.settings)
+            {
                 let rate = sequence_settings.frame_rate;
                 let fps = rate.numerator();
                 if rate.denominator() == 1 && matches!(fps, 24 | 25 | 30) {

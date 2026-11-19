@@ -581,16 +581,27 @@ pub fn resolve_edit<R: ProjectRead>(
             let (source_id, clip_id) = edit.place(*input, source, &root, &mut ids)?;
             json!({"source_id":source_id,"clip_ids":[clip_id]})
         }
-        ProjectEditIntent::ImportEdl { frame_rate, document_sha256, placements } => {
-            let (first, _) = placements.first().ok_or_else(|| invalid("EDL has no cuts"))?;
+        ProjectEditIntent::ImportEdl {
+            frame_rate,
+            document_sha256,
+            placements,
+        } => {
+            let (first, _) = placements
+                .first()
+                .ok_or_else(|| invalid("EDL has no cuts"))?;
             let sequence_id = first.sequence_id.clone();
             let track_id = first.track_id.clone();
             let sequence = edit.get(&sequence_id)?.payload::<Sequence>("sequence")?;
             let track = edit.get(&track_id)?.payload::<Track>("track")?;
-            if track.sequence_id != sequence_id || track.kind != TrackKind::Video
-                || sequence.settings.frame_rate != frame_rate || track.grid != frame_rate
+            if track.sequence_id != sequence_id
+                || track.kind != TrackKind::Video
+                || sequence.settings.frame_rate != frame_rate
+                || track.grid != frame_rate
             {
-                return Err(DomainError::new("EDL_GRID_MISMATCH", "EDL requires a picture track on the matching frame grid"));
+                return Err(DomainError::new(
+                    "EDL_GRID_MISMATCH",
+                    "EDL requires a picture track on the matching frame grid",
+                ));
             }
             let mut source_ids = Vec::with_capacity(placements.len());
             let mut clip_ids = Vec::with_capacity(placements.len());
@@ -1023,8 +1034,10 @@ fn track_lock_transition(patch: &ProjectPatch) -> Result<Option<&EntityId>> {
     let (Some(before), Some(after)) = (&change.before, &change.after) else {
         return Ok(None);
     };
-    let mut before: EntityEnvelope = serde_json::from_str(before).map_err(|error| invalid(error.to_string()))?;
-    let mut after: EntityEnvelope = serde_json::from_str(after).map_err(|error| invalid(error.to_string()))?;
+    let mut before: EntityEnvelope =
+        serde_json::from_str(before).map_err(|error| invalid(error.to_string()))?;
+    let mut after: EntityEnvelope =
+        serde_json::from_str(after).map_err(|error| invalid(error.to_string()))?;
     if before.kind != "track" || after.kind != "track" || !before.known() || !after.known() {
         return Ok(None);
     }

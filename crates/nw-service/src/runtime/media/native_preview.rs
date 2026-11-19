@@ -5,7 +5,10 @@ use nw_domain::{
     preview::native_wire::{ClockUpdate, Descriptor, Format, OpenRequest, Opened},
     projects::EntityId,
 };
-use nw_engine::{MixedProcessLimits, NativePreviewControl, NativePreviewOutput, NativePreviewPacket, NativePreviewPipe, NativePreviewProfile};
+use nw_engine::{
+    MixedProcessLimits, NativePreviewControl, NativePreviewOutput, NativePreviewPacket,
+    NativePreviewPipe, NativePreviewProfile,
+};
 use std::collections::BTreeSet;
 use tokio::sync::{Notify, mpsc, watch};
 
@@ -42,7 +45,10 @@ pub(in crate::runtime) struct Session {
 impl Session {
     fn check(&self) -> Result<()> {
         if Instant::now() >= self.deadline || self.control.cancellation().is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Native preview generation ended"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Native preview generation ended",
+            ));
         }
         Ok(())
     }
@@ -76,7 +82,9 @@ impl NativePreviewTransfer {
         let session = self.session.clone();
         tokio::task::spawn_blocking(move || service.check_native_preview(&context, &session))
             .await
-            .map_err(|_| DomainError::new("WORKER_FAILED", "Native preview authority check failed"))??;
+            .map_err(|_| {
+                DomainError::new("WORKER_FAILED", "Native preview authority check failed")
+            })??;
         if packet.is_none() {
             let mut report = self.session.result.subscribe();
             loop {
@@ -85,9 +93,9 @@ impl NativePreviewTransfer {
                     self.finished = true;
                     break;
                 }
-                report.changed().await.map_err(|_| DomainError::new(
-                    "WORKER_FAILED", "Native preview settlement was lost",
-                ))?;
+                report.changed().await.map_err(|_| {
+                    DomainError::new("WORKER_FAILED", "Native preview settlement was lost")
+                })?;
             }
         }
         Ok(packet)
@@ -105,7 +113,10 @@ impl Drop for NativePreviewTransfer {
 impl Service {
     fn native_preview_owner(&self, context: &Context) -> Result<()> {
         if context.profile.is_some() || context.principal != self.owner().principal {
-            return Err(DomainError::new("PERMISSION_DENIED", "Native playback requires the local owner"));
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Native playback requires the local owner",
+            ));
         }
         Ok(())
     }
@@ -115,9 +126,13 @@ impl Service {
         self.native_preview_owner(context)?;
         let _gate = self.mutation.lock().map_err(|_| lock_error())?;
         let picture = &session.opened.picture;
-        let project = self.read_project(context, picture.project_id.as_str(), ObjectAction::Read)?;
+        let project =
+            self.read_project(context, picture.project_id.as_str(), ObjectAction::Read)?;
         if project.header().revision != picture.revision {
-            return Err(DomainError::new("STALE_REVISION", "Project changed during native preview"));
+            return Err(DomainError::new(
+                "STALE_REVISION",
+                "Project changed during native preview",
+            ));
         }
         drop(project);
         session.inputs.revalidate(self, context)
@@ -130,23 +145,39 @@ impl Service {
         listener: CancellationToken,
     ) -> Result<Opened> {
         self.native_preview_owner(&context)?;
-        let slot = self.native_preview_slot.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("OWNER_BUSY", "Finish the active native preview before opening another")
-        })?;
+        let slot = self
+            .native_preview_slot
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new(
+                    "OWNER_BUSY",
+                    "Finish the active native preview before opening another",
+                )
+            })?;
         let engine = self.engine()?.clone();
         let width = input.width;
         let height = input.height;
         let audio = input.audio;
-        let generation = self.native_preview_generation.fetch_update(
-            Ordering::AcqRel, Ordering::Acquire, |current| current.checked_add(1),
-        ).map_err(|_| DomainError::new("RESOURCE_LIMIT", "Native preview generation exhausted"))? + 1;
+        let generation = self
+            .native_preview_generation
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| {
+                DomainError::new("RESOURCE_LIMIT", "Native preview generation exhausted")
+            })?
+            + 1;
         let service = self.clone();
         let source_context = context.clone();
         let source_cancel = listener.clone();
         let (capture, inputs, workspace) = tokio::task::spawn_blocking(move || {
             service.capture_native_program(&source_context, &input, &source_cancel)
-        }).await.map_err(|_| DomainError::new("WORKER_FAILED", "Native preview preparation failed"))??;
-        let NativeSetup { profile, opened } = native_setup(&capture, generation, width, height, audio)?;
+        })
+        .await
+        .map_err(|_| DomainError::new("WORKER_FAILED", "Native preview preparation failed"))??;
+        let NativeSetup { profile, opened } =
+            native_setup(&capture, generation, width, height, audio)?;
         let (mut pipe, sink) = NativePreviewPipe::start(profile, &listener)?;
         let [video, audio] = pipe.take_receivers();
         let session = Arc::new(Session {
@@ -207,18 +238,28 @@ impl Service {
         let capture = capture_mixed(&project, &input.sequence_id, input.revision, input.range)?;
         drop(project);
         let clips = || capture.tracks.iter().flat_map(|track| &track.clips);
-        let assets = clips().filter_map(|clip| match &clip.source {
-            OccurrenceSource::Registered { asset_id, .. } => Some(asset_id.as_str()),
-            OccurrenceSource::SolidColor { .. } => None,
-        }).collect::<BTreeSet<_>>();
+        let assets = clips()
+            .filter_map(|clip| match &clip.source {
+                OccurrenceSource::Registered { asset_id, .. } => Some(asset_id.as_str()),
+                OccurrenceSource::SolidColor { .. } => None,
+            })
+            .collect::<BTreeSet<_>>();
         if assets.len() > MAX_ORIGINALS
-            || capture.range.end.checked_sub(capture.range.start)? > nw_domain::time::Rational::new(120, 1)?
-            || capture.settings.width > 3840 || capture.settings.height > 2160
+            || capture.range.end.checked_sub(capture.range.start)?
+                > nw_domain::time::Rational::new(120, 1)?
+            || capture.settings.width > 3840
+            || capture.settings.height > 2160
         {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Native preview exceeds its source, raster or duration bounds"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Native preview exceeds its source, raster or duration bounds",
+            ));
         }
-        let path = nw_platform::security::private_directory(&self.root.join("runtime").join("native-program"))?;
-        self.store.require_media_space(&path, STAGE_LIMIT * assets.len() as u64)?;
+        let path = nw_platform::security::private_directory(
+            &self.root.join("runtime").join("native-program"),
+        )?;
+        self.store
+            .require_media_space(&path, STAGE_LIMIT * assets.len() as u64)?;
         let workspace = files::DirectoryStamp::capture_resolved(&path)?;
         let originals = self.bind_mixed_inputs(context, clips(), cancel)?;
         Ok((capture, originals, workspace))
@@ -226,7 +267,10 @@ impl Service {
 
     fn native_preview_session(&self, context: &Context, id: &str) -> Result<Arc<Session>> {
         self.native_preview_owner(context)?;
-        self.native_preview.lock().map_err(|_| lock_error())?.as_ref()
+        self.native_preview
+            .lock()
+            .map_err(|_| lock_error())?
+            .as_ref()
             .filter(|session| session.opened.picture.session_id.as_str() == id)
             .cloned()
             .ok_or_else(DomainError::object_not_found)
@@ -242,22 +286,41 @@ impl Service {
         self.check_native_preview(&context, &session)?;
         let descriptor = match track {
             NativePreviewTrack::Picture => session.opened.picture.clone(),
-            NativePreviewTrack::Sound => session.opened.sound.clone().ok_or_else(DomainError::object_not_found)?,
+            NativePreviewTrack::Sound => session
+                .opened
+                .sound
+                .clone()
+                .ok_or_else(DomainError::object_not_found)?,
         };
         let receiver = {
             let mut slots = session.receivers.lock().map_err(|_| lock_error())?;
             let receiver = slots[track.index()].take().ok_or_else(|| {
-                DomainError::new("OBJECT_CONFLICT", "Native preview stream has already been claimed")
+                DomainError::new(
+                    "OBJECT_CONFLICT",
+                    "Native preview stream has already been claimed",
+                )
             })?;
             if slots.iter().all(Option::is_none) {
                 session.demand.notify_one();
             }
             receiver
         };
-        Ok(NativePreviewTransfer { service: self.clone(), context, session, descriptor, receiver, finished: false })
+        Ok(NativePreviewTransfer {
+            service: self.clone(),
+            context,
+            session,
+            descriptor,
+            receiver,
+            finished: false,
+        })
     }
 
-    pub fn update_native_preview_clock(&self, context: &Context, id: &str, update: ClockUpdate) -> Result<()> {
+    pub fn update_native_preview_clock(
+        &self,
+        context: &Context,
+        id: &str,
+        update: ClockUpdate,
+    ) -> Result<()> {
         let session = self.native_preview_session(context, id)?;
         self.check_native_preview(context, &session)?;
         session.control.advance(update.generation, update.at)
@@ -267,7 +330,10 @@ impl Service {
         self.native_preview_owner(context)?;
         let session = {
             let mut active = self.native_preview.lock().map_err(|_| lock_error())?;
-            if active.as_ref().is_none_or(|session| session.opened.picture.session_id.as_str() != id) {
+            if active
+                .as_ref()
+                .is_none_or(|session| session.opened.picture.session_id.as_str() != id)
+            {
                 return Err(DomainError::object_not_found());
             }
             active.take().expect("The exact active session was checked")
@@ -282,10 +348,20 @@ struct NativeSetup {
     opened: Opened,
 }
 
-fn native_setup(capture: &MixedCapture, generation: u64, width: u32, height: u32, audio: bool) -> Result<NativeSetup> {
+fn native_setup(
+    capture: &MixedCapture,
+    generation: u64,
+    width: u32,
+    height: u32,
+    audio: bool,
+) -> Result<NativeSetup> {
     let profile = NativePreviewProfile {
-        generation, range: capture.range, frame_rate: capture.settings.frame_rate,
-        width, height, audio,
+        generation,
+        range: capture.range,
+        frame_rate: capture.settings.frame_rate,
+        width,
+        height,
+        audio,
     };
     let picture = Descriptor {
         version: 1,
@@ -295,14 +371,24 @@ fn native_setup(capture: &MixedCapture, generation: u64, width: u32, height: u32
         sequence_id: capture.sequence_id.clone(),
         revision: capture.project_revision,
         range: profile.range,
-        format: Format::Rgba8 { width, height, frame_rate: profile.frame_rate },
+        format: Format::Rgba8 {
+            width,
+            height,
+            frame_rate: profile.frame_rate,
+        },
     };
     picture.validate()?;
-    let sound = audio.then(|| Descriptor { format: Format::StereoF32Le {}, ..picture.clone() });
+    let sound = audio.then(|| Descriptor {
+        format: Format::StereoF32Le {},
+        ..picture.clone()
+    });
     if let Some(sound) = &sound {
         sound.validate()?;
     }
-    Ok(NativeSetup { profile, opened: Opened { picture, sound } })
+    Ok(NativeSetup {
+        profile,
+        opened: Opened { picture, sound },
+    })
 }
 
 async fn stage_native_program(
@@ -314,17 +400,40 @@ async fn stage_native_program(
     let start = Instant::now();
     let mut staged = Vec::with_capacity(inputs.originals.len());
     for held in inputs.originals.values() {
-        let deadline = START_LIMIT.checked_sub(start.elapsed()).filter(|left| !left.is_zero()).ok_or_else(|| {
-            DomainError::new("PROCESS_TIMEOUT", "Native preview staging exceeded its bound")
-        })?;
+        let deadline = START_LIMIT
+            .checked_sub(start.elapsed())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(|| {
+                DomainError::new(
+                    "PROCESS_TIMEOUT",
+                    "Native preview staging exceeded its bound",
+                )
+            })?;
         let stamp = files::SourceStamp::capture_open_resolved(
-            Path::new(&held.asset.identity.path), held.stamp.try_clone_file()?,
+            Path::new(&held.asset.identity.path),
+            held.stamp.try_clone_file()?,
         )?;
-        let streams = inputs.bindings.iter().filter(|binding| binding.asset_id == held.asset.id).cloned().collect::<Vec<_>>();
-        staged.push(engine.stage_mixed_original(
-            &held.asset, stamp, &streams,
-            MixedProcessLimits { workspace, max_bytes: STAGE_LIMIT, deadline, cancel: cancel.clone() },
-        ).await?);
+        let streams = inputs
+            .bindings
+            .iter()
+            .filter(|binding| binding.asset_id == held.asset.id)
+            .cloned()
+            .collect::<Vec<_>>();
+        staged.push(
+            engine
+                .stage_mixed_original(
+                    &held.asset,
+                    stamp,
+                    &streams,
+                    MixedProcessLimits {
+                        workspace,
+                        max_bytes: STAGE_LIMIT,
+                        deadline,
+                        cancel: cancel.clone(),
+                    },
+                )
+                .await?,
+        );
     }
     Ok(staged)
 }

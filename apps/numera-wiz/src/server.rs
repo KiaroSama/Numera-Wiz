@@ -288,7 +288,11 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
             .insert(ReleaseBearer(download_token));
     } else if request.uri().path().starts_with("/api/v1/artifacts/")
         || request.uri().path().starts_with("/api/v1/previews/")
-        || (auth.private && request.uri().path().starts_with("/internal/native-previews"))
+        || (auth.private
+            && request
+                .uri()
+                .path()
+                .starts_with("/internal/native-previews"))
     {
         request
             .extensions_mut()
@@ -306,7 +310,12 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         && request.uri().path().starts_with("/api/v1/uploads/")
     {
         900
-    } else if auth.private && request.uri().path().starts_with("/internal/native-previews/") {
+    } else if auth.private
+        && request
+            .uri()
+            .path()
+            .starts_with("/internal/native-previews/")
+    {
         155
     } else if request.uri().path() == "/api/v1/previews/program" {
         nw_domain::preview::PROGRAM_PLAYBACK_MAX_SECONDS as u64 + 65
@@ -536,9 +545,18 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
             .route("/internal/public", post(public))
             .route("/internal/pair", post(browser::create_pairing))
             .route("/internal/native-previews", post(native_preview::open))
-            .route("/internal/native-previews/{id}", axum::routing::delete(native_preview::close))
-            .route("/internal/native-previews/{id}/clock", axum::routing::put(native_preview::clock))
-            .route("/internal/native-previews/{id}/{track}", get(native_preview::receive));
+            .route(
+                "/internal/native-previews/{id}",
+                axum::routing::delete(native_preview::close),
+            )
+            .route(
+                "/internal/native-previews/{id}/clock",
+                axum::routing::put(native_preview::clock),
+            )
+            .route(
+                "/internal/native-previews/{id}/{track}",
+                get(native_preview::receive),
+            );
     }
     let routes = router
         .layer(DefaultBodyLimit::max(commands::MAX_COMMAND_BYTES))

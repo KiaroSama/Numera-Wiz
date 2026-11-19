@@ -1279,9 +1279,23 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     for (codec, encoder, tag, container, extension, mode) in [
         ("hevc", "libx265", Some("hvc1"), "mp4", "mp4", "quality_vbr"),
         ("hevc", "libx265", None, "matroska", "mkv", "quality_vbr"),
-        ("av1", "libsvtav1", Some("av01"), "mp4", "mp4", "quality_vbr"),
+        (
+            "av1",
+            "libsvtav1",
+            Some("av01"),
+            "mp4",
+            "mp4",
+            "quality_vbr",
+        ),
         ("av1", "libsvtav1", None, "matroska", "mkv", "quality_vbr"),
-        ("av1", "libsvtav1", Some("av01"), "mp4", "mp4", "strict_size"),
+        (
+            "av1",
+            "libsvtav1",
+            Some("av01"),
+            "mp4",
+            "mp4",
+            "strict_size",
+        ),
     ] {
         let output = directory.join(format!("{codec}-export-{mode}.{extension}"));
         let settings = json!({

@@ -1,12 +1,12 @@
 //! Bounded CMX 3600 cut lists for one committed picture track.
 mod import;
-pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600};
 use crate::{
     DomainError, Result,
     media::{MixedCapture, OccurrenceSource},
     projects::{EntityId, ProjectId, Revision, TrackKind, grid_tick},
     time::{Rational, TimeRange},
 };
+pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Write};

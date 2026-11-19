@@ -449,12 +449,22 @@ impl Tracks {
                 "tracks.set_enabled",
                 json!({"track_id":track,"enabled":enabled}),
             ),
-            Self::SetLocked { context, track, locked } => {
-                context.request("tracks.set_locked", json!({"track_id":track,"locked":locked}))
-            }
-            Self::SetEnabled { context, track, enabled } => {
-                context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
-            }
+            Self::SetLocked {
+                context,
+                track,
+                locked,
+            } => context.request(
+                "tracks.set_locked",
+                json!({"track_id":track,"locked":locked}),
+            ),
+            Self::SetEnabled {
+                context,
+                track,
+                enabled,
+            } => context.request(
+                "tracks.set_enabled",
+                json!({"track_id":track,"enabled":enabled}),
+            ),
             Self::SetGain {
                 context,
                 track,

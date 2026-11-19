@@ -8,7 +8,9 @@ use nw_domain::{
     records::Asset,
     time::{Rational, TimeRange},
 };
-use nw_engine::{Engine, MixedProcessLimits, NativePreviewOutput, NativePreviewPipe, NativePreviewProfile};
+use nw_engine::{
+    Engine, MixedProcessLimits, NativePreviewOutput, NativePreviewPipe, NativePreviewProfile,
+};
 use nw_platform::{
     files::{DirectoryStamp, SourceStamp, source_path},
     process,
@@ -424,9 +426,17 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
     };
     let (mut pipe, sink) = NativePreviewPipe::start(profile, token).unwrap();
     let preview = engine.stream_native_program(
-        &plan.payload.capture, &plan.payload.sources, &originals, staged,
+        &plan.payload.capture,
+        &plan.payload.sources,
+        &originals,
+        staged,
         NativePreviewOutput {
-            profile, sink, limits: MixedProcessLimits { cancel: pipe.cancellation(), ..limits() },
+            profile,
+            sink,
+            limits: MixedProcessLimits {
+                cancel: pipe.cancellation(),
+                ..limits()
+            },
         },
     );
     let present = async {
@@ -446,21 +456,31 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
             if stream == 0 {
                 assert_eq!(packet.pts, point(frames));
                 let expected = &expected_pixels[frames as usize * 64 * 48 * 4..][..64 * 48 * 4];
-                for (rgba, bgra) in packet.bytes.as_chunks::<4>().0.iter()
+                for (rgba, bgra) in packet
+                    .bytes
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .zip(expected.as_chunks::<4>().0)
                 {
                     assert_eq!(*rgba, [bgra[2], bgra[1], bgra[0], bgra[3]]);
                 }
                 frames += 1;
             } else {
-                assert_eq!(packet.pts, Rational::new(sample_frames as i64, 48_000).unwrap());
+                assert_eq!(
+                    packet.pts,
+                    Rational::new(sample_frames as i64, 48_000).unwrap()
+                );
                 for stereo in packet.bytes.as_chunks::<8>().0 {
                     let mono = &expected_pcm[sample_frames * 2..][..2];
                     let mono = f32::from(i16::from_le_bytes(mono.try_into().unwrap())) / 32_768.0;
                     let expected = mono * std::f32::consts::FRAC_1_SQRT_2;
                     for channel in stereo.as_chunks::<4>().0 {
                         let actual = f32::from_le_bytes(*channel);
-                        assert!((actual - expected).abs() < 0.000_001, "{actual} != {expected}");
+                        assert!(
+                            (actual - expected).abs() < 0.000_001,
+                            "{actual} != {expected}"
+                        );
                     }
                     sample_frames += 1;
                 }
@@ -469,12 +489,20 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
         }
         assert_eq!((frames, sample_frames), (8, 96_000));
     };
-    let (rendered, ()) = tokio::time::timeout(TEST_DEADLINE, async {
-        tokio::join!(preview, present)
-    }).await.unwrap();
+    let (rendered, ()) =
+        tokio::time::timeout(TEST_DEADLINE, async { tokio::join!(preview, present) })
+            .await
+            .unwrap();
     rendered.unwrap();
     let native = pipe.settled().await.unwrap();
-    assert_eq!((native.video_frames, native.audio_sample_frames, native.late_video_frames), (8, 96_000, 0));
+    assert_eq!(
+        (
+            native.video_frames,
+            native.audio_sample_frames,
+            native.late_video_frames
+        ),
+        (8, 96_000, 0)
+    );
 
     let mut capture = plan.payload.capture.clone();
     capture.tracks.clear();

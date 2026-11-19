@@ -608,9 +608,18 @@ pub fn edit(kind: EditResult) -> Value {
             ),
         ]),
         EditResult::ImportEdl => object([
-            ("document_sha256", json!({"type":"string","pattern":"^[0-9a-f]{64}$"})),
-            ("source_ids", json!({"type":"array","items":reference("Id"),"minItems":1,"maxItems":(super::MAX_CHANGES - 2) / 2,"uniqueItems":true})),
-            ("clip_ids", json!({"type":"array","items":reference("Id"),"minItems":1,"maxItems":(super::MAX_CHANGES - 2) / 2,"uniqueItems":true})),
+            (
+                "document_sha256",
+                json!({"type":"string","pattern":"^[0-9a-f]{64}$"}),
+            ),
+            (
+                "source_ids",
+                json!({"type":"array","items":reference("Id"),"minItems":1,"maxItems":(super::MAX_CHANGES - 2) / 2,"uniqueItems":true}),
+            ),
+            (
+                "clip_ids",
+                json!({"type":"array","items":reference("Id"),"minItems":1,"maxItems":(super::MAX_CHANGES - 2) / 2,"uniqueItems":true}),
+            ),
         ]),
         EditResult::Link => {
             defs.insert("OpaqueGroup".into(), json!({"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$","description":"Opaque link-group token; not an entity identifier."}));

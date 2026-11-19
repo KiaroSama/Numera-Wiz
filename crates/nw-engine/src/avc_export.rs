@@ -4,8 +4,8 @@ use crate::{Engine, Result, lower_remux, plan_digest};
 use nw_domain::{
     DomainError,
     avc_export::{
-        Audio, Container, Detail, Encode, PictureLook, Preset, RateMode, ResizeAspect, Rotation, Strength,
-        VideoCodec,
+        Audio, Container, Detail, Encode, PictureLook, Preset, RateMode, ResizeAspect, Rotation,
+        Strength, VideoCodec,
     },
     mux::{CleanAction, CleanResolution, Stream, StreamKind, StreamOutcome},
     records::{Asset, MediaProbe, Plan},
@@ -403,8 +403,10 @@ impl Engine {
         }
         let source_picture = stream(&plan.source.probe, encode.video_stream)?;
         let output_picture = stream(observed, primary.index)?;
-        let original_is_compressed =
-            matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc" | "av1");
+        let original_is_compressed = matches!(
+            plan.resolution.streams[0].codec.as_str(),
+            "h264" | "hevc" | "av1"
+        );
         if let Some(tag) = mp4_codec_tag(encode)
             && output_picture["codec_tag_string"] != tag
         {
@@ -430,7 +432,9 @@ impl Engine {
             // AVC defaults an absent video_full_range_flag to limited.
             // MP4 and Matroska can expose the same range differently.
             let implicit_limited_range = field == "color_range"
-                && (expected == "tv" || (original_is_compressed || encode.codec == VideoCodec::Av1) && missing(expected))
+                && (expected == "tv"
+                    || (original_is_compressed || encode.codec == VideoCodec::Av1)
+                        && missing(expected))
                 && (actual == "tv" || missing(actual));
             if !(expected == actual
                 || missing(expected) && missing(actual)
@@ -468,14 +472,21 @@ fn mp4_codec_tag(settings: &Encode) -> Option<&'static str> {
 fn svt_parameters(original: &serde_json::Value, strict_size: bool) -> String {
     // SVT needs a nominal rate for its encoder model. Keep the exact PTS grid
     // independent, including irregular sources with a 1 kHz guessed rate.
-    let (num, den) = ["avg_frame_rate", "r_frame_rate"].into_iter().find_map(|key| {
-        let (num, den) = original[key].as_str()?.split_once('/')?;
-        let (num, den) = (num.parse::<u32>().ok()?, den.parse::<u32>().ok()?);
-        (num > 0 && (1..=1001).contains(&den) && num <= 240 * den).then_some((num, den))
-    }).unwrap_or((25, 1));
+    let (num, den) = ["avg_frame_rate", "r_frame_rate"]
+        .into_iter()
+        .find_map(|key| {
+            let (num, den) = original[key].as_str()?.split_once('/')?;
+            let (num, den) = (num.parse::<u32>().ok()?, den.parse::<u32>().ok()?);
+            (num > 0 && (1..=1001).contains(&den) && num <= 240 * den).then_some((num, den))
+        })
+        .unwrap_or((25, 1));
     // FFmpeg selects SVT CBR when the reviewed peak equals the target. CBR
     // requires low delay and uses its buffer without the separate VBR maximum.
-    let rate_control = if strict_size { ":pred-struct=1:mbr=0" } else { "" };
+    let rate_control = if strict_size {
+        ":pred-struct=1:mbr=0"
+    } else {
+        ""
+    };
     format!("lp=1:fps-num={num}:fps-denom={den}{rate_control}")
 }
 
@@ -526,18 +537,22 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         preset,
         "-pix_fmt",
         "yuv420p",
-    ].map(str::to_owned).to_vec();
+    ]
+    .map(str::to_owned)
+    .to_vec();
     if settings.codec != VideoCodec::Av1 {
         export.extend(["-bf".into(), "0".into()]);
     }
-    export.extend([
-        "-threads:v",
-        "2",
-        "-fps_mode:v",
-        "passthrough",
-        "-enc_time_base:v",
-    ]
-    .map(str::to_owned));
+    export.extend(
+        [
+            "-threads:v",
+            "2",
+            "-fps_mode:v",
+            "passthrough",
+            "-enc_time_base:v",
+        ]
+        .map(str::to_owned),
+    );
     export.push(format!("1/{}", clock.denominator()));
     if settings.codec == VideoCodec::Hevc {
         export.extend([
@@ -547,10 +562,17 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     }
     if settings.codec == VideoCodec::Av1 {
         if raster.width < 64 || raster.height < 64 {
-            return Err(unavailable("SVT-AV1 needs an encoded raster of at least 64×64"));
+            return Err(unavailable(
+                "SVT-AV1 needs an encoded raster of at least 64×64",
+            ));
         }
-        let strict_size = settings.bitrate.is_some_and(|bitrate| bitrate.mode == RateMode::StrictSize);
-        export.extend(["-svtav1-params".into(), svt_parameters(original, strict_size)]);
+        let strict_size = settings
+            .bitrate
+            .is_some_and(|bitrate| bitrate.mode == RateMode::StrictSize);
+        export.extend([
+            "-svtav1-params".into(),
+            svt_parameters(original, strict_size),
+        ]);
     }
     if let Some(crf) = settings.crf {
         export.extend(["-crf".into(), crf.to_string()]);

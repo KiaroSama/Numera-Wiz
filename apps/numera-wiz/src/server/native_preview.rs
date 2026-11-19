@@ -8,7 +8,11 @@ use nw_domain::{
     preview::native_wire::{self, ClockUpdate, OpenRequest},
 };
 use nw_service::{NativePreviewTrack, NativePreviewTransfer};
-use std::{future::Future, pin::Pin, task::{Context as TaskContext, Poll}};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context as TaskContext, Poll},
+};
 
 fn rejected(error: DomainError) -> Response {
     let status = match error.code.as_str() {
@@ -31,11 +35,11 @@ pub(super) async fn open(
     if let Err(error) = authority.check() {
         return rejected(error);
     }
-    match owner.service.open_native_preview(
-        authority.context,
-        input,
-        authority.listener_stop,
-    ).await {
+    match owner
+        .service
+        .open_native_preview(authority.context, input, authority.listener_stop)
+        .await
+    {
         Ok(opened) => ([(header::CACHE_CONTROL, "no-store")], Json(opened)).into_response(),
         Err(error) => rejected(error),
     }
@@ -49,12 +53,18 @@ pub(super) async fn clock(
 ) -> Response {
     let advanced = tokio::task::spawn_blocking(move || {
         authority.check()?;
-        owner.service.update_native_preview_clock(&authority.context, &id, update)
-    }).await;
+        owner
+            .service
+            .update_native_preview_clock(&authority.context, &id, update)
+    })
+    .await;
     match advanced {
         Ok(Ok(())) => StatusCode::NO_CONTENT.into_response(),
         Ok(Err(error)) => rejected(error),
-        Err(_) => rejected(DomainError::new("WORKER_FAILED", "Native playback clock worker failed")),
+        Err(_) => rejected(DomainError::new(
+            "WORKER_FAILED",
+            "Native playback clock worker failed",
+        )),
     }
 }
 
@@ -63,7 +73,10 @@ pub(super) async fn close(
     Extension(authority): Extension<DownloadAuthority>,
     Path(id): Path<String>,
 ) -> Response {
-    match authority.check().and_then(|()| owner.service.close_native_preview(&authority.context, &id)) {
+    match authority
+        .check()
+        .and_then(|()| owner.service.close_native_preview(&authority.context, &id))
+    {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(error) => rejected(error),
     }
@@ -89,7 +102,10 @@ impl http_body::Body for PreviewBody {
     type Data = Bytes;
     type Error = axum::Error;
 
-    fn poll_frame(mut self: Pin<&mut Self>, context: &mut TaskContext<'_>) -> Poll<Option<Result<Frame<Bytes>, axum::Error>>> {
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+    ) -> Poll<Option<Result<Frame<Bytes>, axum::Error>>> {
         if self.ended {
             return Poll::Ready(None);
         }
@@ -109,11 +125,15 @@ impl http_body::Body for PreviewBody {
                     header.validate(transfer.descriptor())?;
                     let encoded = native_wire::encode_header(&header)?;
                     Ok(Some((Bytes::from(encoded), Bytes::from(packet.bytes))))
-                }.await;
+                }
+                .await;
                 NextPacket { transfer, result }
             }));
         }
-        let next = self.packet.as_mut().expect("Native body has an owned packet future");
+        let next = self
+            .packet
+            .as_mut()
+            .expect("Native body has an owned packet future");
         let result = std::task::ready!(next.as_mut().poll(context));
         self.packet = None;
         self.transfer = Some(result.transfer);
@@ -142,7 +162,9 @@ impl PreviewBody {
         self.transfer = None;
         self.packet = None;
         self.payload = None;
-        Poll::Ready(Some(Err(axum::Error::new(std::io::Error::other(error.code)))))
+        Poll::Ready(Some(Err(axum::Error::new(std::io::Error::other(
+            error.code,
+        )))))
     }
 }
 
@@ -158,25 +180,40 @@ pub(super) async fn receive(
         _ => return rejected(DomainError::object_not_found()),
     };
     if request.uri().query().is_some() || request.method() != axum::http::Method::GET {
-        return rejected(DomainError::new("VALIDATION_ERROR", "Native preview requires a bare GET"));
+        return rejected(DomainError::new(
+            "VALIDATION_ERROR",
+            "Native preview requires a bare GET",
+        ));
     }
     let auth = authority.clone();
     let transfer = tokio::task::spawn_blocking(move || {
         auth.check()?;
         owner.service.claim_native_preview(auth.context, &id, track)
-    }).await;
+    })
+    .await;
     match transfer {
         Ok(Ok(transfer)) => match native_wire::encode_header(transfer.descriptor()) {
             Ok(wire) => (
-                [(header::CONTENT_TYPE, "application/octet-stream"), (header::CACHE_CONTROL, "no-store")],
+                [
+                    (header::CONTENT_TYPE, "application/octet-stream"),
+                    (header::CACHE_CONTROL, "no-store"),
+                ],
                 Body::new(PreviewBody {
-                    descriptor: Some(Bytes::from(wire)), transfer: Some(transfer), packet: None,
-                    payload: None, authority, ended: false,
+                    descriptor: Some(Bytes::from(wire)),
+                    transfer: Some(transfer),
+                    packet: None,
+                    payload: None,
+                    authority,
+                    ended: false,
                 }),
-            ).into_response(),
+            )
+                .into_response(),
             Err(error) => rejected(error),
         },
         Ok(Err(error)) => rejected(error),
-        Err(_) => rejected(DomainError::new("WORKER_FAILED", "Native preview stream worker failed")),
+        Err(_) => rejected(DomainError::new(
+            "WORKER_FAILED",
+            "Native preview stream worker failed",
+        )),
     }
 }

@@ -1,9 +1,14 @@
 //! Native picture scheduling against the monotonic display clock.
-use super::{native_audio::{AudioClock, AudioFeed, AudioPlayout}, *};
+use super::{
+    native_audio::{AudioClock, AudioFeed, AudioPlayout},
+    *,
+};
 use anyhow::ensure;
 use bytes::Bytes;
 use nw_domain::{
-    preview::native_wire::{self, ClockUpdate, Descriptor, Format, Header, OpenRequest, Opened, PacketOrder},
+    preview::native_wire::{
+        self, ClockUpdate, Descriptor, Format, Header, OpenRequest, Opened, PacketOrder,
+    },
     time::Rational,
 };
 use nw_ui::{NativePictureFrame, NativePictureMailbox};
@@ -27,10 +32,16 @@ impl NativeBody {
         while bytes.len() < length {
             if self.pending.is_empty() {
                 let Some(chunk) = self.response.chunk().await? else {
-                    ensure!(can_end && bytes.is_empty(), "Truncated native preview stream");
+                    ensure!(
+                        can_end && bytes.is_empty(),
+                        "Truncated native preview stream"
+                    );
                     return Ok(None);
                 };
-                ensure!(chunk.len() <= 2 * 1280 * 720 * 4 + 8192, "Excessive native preview chunk");
+                ensure!(
+                    chunk.len() <= 2 * 1280 * 720 * 4 + 8192,
+                    "Excessive native preview chunk"
+                );
                 self.pending = chunk;
             }
             let copy = (length - bytes.len()).min(self.pending.len());
@@ -45,7 +56,10 @@ impl NativeBody {
         };
         let prefix: [u8; 4] = prefix.try_into().expect("Exact native prefix");
         let length = native_wire::header_length(prefix)?;
-        let bytes = self.take(length, false).await?.expect("Required header payload");
+        let bytes = self
+            .take(length, false)
+            .await?
+            .expect("Required header payload");
         Ok(Some(native_wire::decode_header(prefix, &bytes)?))
     }
 
@@ -54,7 +68,10 @@ impl NativeBody {
             return Ok(None);
         };
         let size = order.admit(&header)?;
-        let payload = self.take(size, false).await?.expect("Required picture payload");
+        let payload = self
+            .take(size, false)
+            .await?
+            .expect("Required picture payload");
         Ok(Some((header, payload)))
     }
 }
@@ -66,14 +83,24 @@ impl NativeClient {
         mailbox: &NativePictureMailbox,
         ctx: &eframe::egui::Context,
     ) -> Result<()> {
-        ensure!(self.profile.is_none(), "Native program playback uses the local owner");
+        ensure!(
+            self.profile.is_none(),
+            "Native program playback uses the local owner"
+        );
         let record = self.attach().await?;
         let bearer = self.scoped_token(&record).await?;
         let base = format!("http://127.0.0.1:{}/internal/native-previews", record.port);
         let opening = async {
             Ok::<Opened, anyhow::Error>(
-                self.http.post(&base).bearer_auth(&bearer).json(&input).send().await?
-                    .error_for_status()?.json().await?,
+                self.http
+                    .post(&base)
+                    .bearer_auth(&bearer)
+                    .json(&input)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?,
             )
         };
         let opened = tokio::select! {
@@ -86,8 +113,13 @@ impl NativeClient {
             _ = cancelled(mailbox) => Ok(()),
             result = pictured => result,
         };
-        let closed = self.http.delete(&session).bearer_auth(&bearer)
-            .timeout(Duration::from_secs(2)).send().await;
+        let closed = self
+            .http
+            .delete(&session)
+            .bearer_auth(&bearer)
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await;
         if let Err(error) = closed.and_then(reqwest::Response::error_for_status) {
             tracing::debug!(status=?error.status(), "Native preview close was not acknowledged");
         }
@@ -119,8 +151,14 @@ impl NativeClient {
         );
         let mut audio = if let Some(sound) = &opened.sound {
             sound.validate()?;
-            let expected_sound = Descriptor { format: Format::StereoF32Le {}, ..expected.clone() };
-            ensure!(*sound == expected_sound, "Native audio belongs to a different preview");
+            let expected_sound = Descriptor {
+                format: Format::StereoF32Le {},
+                ..expected.clone()
+            };
+            ensure!(
+                *sound == expected_sound,
+                "Native audio belongs to a different preview"
+            );
             let duration = sound.range.end.checked_sub(sound.range.start)?;
             let samples = nw_domain::projects::grid_tick(duration, Rational::new(48_000, 1)?)?;
             Some(AudioPlayout::open(samples).await?)
@@ -141,7 +179,10 @@ impl NativeClient {
             sound_stream,
         )?;
         let mut order = PacketOrder::new(expected.clone())?;
-        let first = body.packet(&mut order).await?.ok_or_else(|| anyhow::anyhow!("Native picture stream contains no frames"))?;
+        let first = body
+            .packet(&mut order)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Native picture stream contains no frames"))?;
         let origin = tokio::time::Instant::now();
         let done = CancellationToken::new();
         let (position, mut picture_clock) = watch::channel(expected.range.start);
@@ -168,7 +209,10 @@ impl NativeClient {
                         return Ok(());
                     }
                     mailbox.publish(NativePictureFrame {
-                        width: width as usize, height: height as usize, at: header.pts, rgba,
+                        width: width as usize,
+                        height: height as usize,
+                        at: header.pts,
+                        rgba,
                     });
                     ctx.request_repaint();
                     next = tokio::select! {
@@ -176,9 +220,13 @@ impl NativeClient {
                         packet = body.packet(&mut order) => packet?,
                     };
                 }
-                ensure!(order.next_time() == expected.range.end, "Native picture stream ended before its last frame");
+                ensure!(
+                    order.next_time() == expected.range.end,
+                    "Native picture stream ended before its last frame"
+                );
                 Ok::<_, anyhow::Error>(())
-            }.await;
+            }
+            .await;
             if result.is_err() {
                 done.cancel();
             }
@@ -186,9 +234,13 @@ impl NativeClient {
         };
         let playback = async {
             let result = match (sound, feed) {
-                (Some((descriptor, body)), Some(feed)) => deliver_native_sound(descriptor, body, feed, &mut audio_progress, &done).await,
+                (Some((descriptor, body)), Some(feed)) => {
+                    deliver_native_sound(descriptor, body, feed, &mut audio_progress, &done).await
+                }
                 (None, None) => Ok(()),
-                _ => Err(anyhow::anyhow!("Native audio capture and device were not paired")),
+                _ => Err(anyhow::anyhow!(
+                    "Native audio capture and device were not paired"
+                )),
             };
             if result.is_err() {
                 done.cancel();
@@ -205,7 +257,9 @@ impl NativeClient {
             None => PlaybackClock::Monotonic(origin),
         };
         let advance = async {
-            let result = self.advance_native_picture(session, bearer, &expected, clock, &position, &done).await;
+            let result = self
+                .advance_native_picture(session, bearer, &expected, clock, &position, &done)
+                .await;
             if result.is_err() {
                 done.cancel();
             }
@@ -226,13 +280,32 @@ impl NativeClient {
         track: &'static str,
         expected: &Descriptor,
     ) -> Result<NativeBody> {
-        let response = self.http.get(format!("{session}/{track}")).bearer_auth(bearer).send().await?
+        let response = self
+            .http
+            .get(format!("{session}/{track}"))
+            .bearer_auth(bearer)
+            .send()
+            .await?
             .error_for_status()?;
-        ensure!(response.headers().get(reqwest::header::CONTENT_TYPE).is_some_and(|value| value == "application/octet-stream"),
-            "Invalid native preview content type");
-        let mut body = NativeBody { response, pending: Bytes::new() };
-        let descriptor = body.header::<Descriptor>().await?.ok_or_else(|| anyhow::anyhow!("Missing native preview descriptor"))?;
-        ensure!(descriptor == *expected, "Native stream belongs to a different capture");
+        ensure!(
+            response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .is_some_and(|value| value == "application/octet-stream"),
+            "Invalid native preview content type"
+        );
+        let mut body = NativeBody {
+            response,
+            pending: Bytes::new(),
+        };
+        let descriptor = body
+            .header::<Descriptor>()
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing native preview descriptor"))?;
+        ensure!(
+            descriptor == *expected,
+            "Native stream belongs to a different capture"
+        );
         Ok(body)
     }
 
@@ -256,19 +329,38 @@ impl NativeClient {
                 _ = tick.tick() => {},
             }
             let elapsed = match &mut clock {
-                PlaybackClock::Device(clock) => Rational::new(i64::try_from(clock.position()?)?, 48_000)?,
-                PlaybackClock::Monotonic(origin) => Rational::new(origin.elapsed().as_nanos().min(i64::MAX as u128) as i64, 1_000_000_000)?,
+                PlaybackClock::Device(clock) => {
+                    Rational::new(i64::try_from(clock.position()?)?, 48_000)?
+                }
+                PlaybackClock::Monotonic(origin) => Rational::new(
+                    origin.elapsed().as_nanos().min(i64::MAX as u128) as i64,
+                    1_000_000_000,
+                )?,
             };
-            let at = descriptor.range.start.checked_add(elapsed)?.min(descriptor.range.end);
+            let at = descriptor
+                .range
+                .start
+                .checked_add(elapsed)?
+                .min(descriptor.range.end);
             if last == Some(at) {
-                ensure!(progressed.elapsed() < Duration::from_secs(2), "Native playback clock stopped advancing");
+                ensure!(
+                    progressed.elapsed() < Duration::from_secs(2),
+                    "Native playback clock stopped advancing"
+                );
                 continue;
             }
             progressed = tokio::time::Instant::now();
             position.send_replace(at);
-            let request = self.http.put(&path).bearer_auth(bearer)
-                .json(&ClockUpdate { generation: descriptor.generation, at })
-                .timeout(Duration::from_secs(2)).send();
+            let request = self
+                .http
+                .put(&path)
+                .bearer_auth(bearer)
+                .json(&ClockUpdate {
+                    generation: descriptor.generation,
+                    at,
+                })
+                .timeout(Duration::from_secs(2))
+                .send();
             tokio::select! {
                 biased;
                 _ = done.cancelled() => return Ok(()),
@@ -281,7 +373,6 @@ impl NativeClient {
             }
         }
     }
-
 }
 
 async fn deliver_native_sound(
@@ -310,7 +401,11 @@ async fn deliver_native_sound(
     wait_for_time(position, end, done).await
 }
 
-async fn wait_for_time(position: &mut watch::Receiver<Rational>, at: Rational, done: &CancellationToken) -> Result<()> {
+async fn wait_for_time(
+    position: &mut watch::Receiver<Rational>,
+    at: Rational,
+    done: &CancellationToken,
+) -> Result<()> {
     while *position.borrow_and_update() < at {
         tokio::select! {
             _ = done.cancelled() => return Ok(()),

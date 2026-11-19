@@ -98,8 +98,8 @@ pub struct Service {
     #[cfg(test)]
     catalog_hook: Mutex<Option<read_model::CatalogHook>>,
 }
-pub use media::native_preview::{NativePreviewTrack, NativePreviewTransfer};
 pub use media::browser_segment::BrowserProgramTransfer;
+pub use media::native_preview::{NativePreviewTrack, NativePreviewTransfer};
 
 fn lock_error() -> DomainError {
     DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned")
@@ -1308,9 +1308,16 @@ impl Service {
             }
             nw_domain::preview::PROGRAM_PLAYBACK_COMMAND => {
                 let project = request.project.as_ref().ok_or_else(|| {
-                    DomainError::new("VALIDATION_ERROR", "Program playback requires a project context")
+                    DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Program playback requires a project context",
+                    )
                 })?;
-                value(&self.browser_playback_manifest(&context, &project.id, commands::parse(params)?)?)?
+                value(&self.browser_playback_manifest(
+                    &context,
+                    &project.id,
+                    commands::parse(params)?,
+                )?)?
             }
             "markers.wave_projection" => {
                 drop(guard);

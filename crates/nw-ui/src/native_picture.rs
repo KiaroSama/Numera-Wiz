@@ -27,16 +27,25 @@ pub struct NativePictureMailbox {
 impl NativePictureMailbox {
     pub fn publish(&self, frame: NativePictureFrame) {
         if !self.cancelled() {
-            self.slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner).frame = Some(frame);
+            self.slot
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .frame = Some(frame);
         }
     }
 
     pub fn finish(&self, result: Result<(), String>) {
-        self.slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner).outcome = Some(result);
+        self.slot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .outcome = Some(result);
     }
 
     pub(super) fn take(&self) -> (Option<NativePictureFrame>, Option<Result<(), String>>) {
-        let mut slot = self.slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut slot = self
+            .slot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         (slot.frame.take(), slot.outcome.take())
     }
 

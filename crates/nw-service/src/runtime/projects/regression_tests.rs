@@ -1142,28 +1142,53 @@ pub(in crate::runtime) async fn linked_edits() {
     let mut forged_track: Track = forged.payload("track").unwrap();
     assert!(forged_track.locked);
     {
-        let read = track_fixture.service.store.project_read(track_fixture.project.as_str()).unwrap();
-        let rows = read.track_page(&clip.sequence_id, None, 16, 65_536).unwrap();
-        let projected = rows.items.iter().find(|row| row["id"] == clip.track_id.as_str()).unwrap();
+        let read = track_fixture
+            .service
+            .store
+            .project_read(track_fixture.project.as_str())
+            .unwrap();
+        let rows = read
+            .track_page(&clip.sequence_id, None, 16, 65_536)
+            .unwrap();
+        let projected = rows
+            .items
+            .iter()
+            .find(|row| row["id"] == clip.track_id.as_str())
+            .unwrap();
         assert_eq!(projected["locked"], true);
         forged_track.locked = false;
         forged.label = "Changed alongside the lock".into();
         forged.update(&forged_track).unwrap();
-        let patch = ProjectPatch { changes: vec![EntityChange {
-            id: clip.track_id.clone(),
-            before: Some(raw_locked.clone()),
-            after: Some(forged.bytes().unwrap()),
-        }] };
-        assert_eq!(nw_domain::projects::edit::check_compatibility(&read, &patch).unwrap_err().code, "ENTITY_LOCKED");
+        let patch = ProjectPatch {
+            changes: vec![EntityChange {
+                id: clip.track_id.clone(),
+                before: Some(raw_locked.clone()),
+                after: Some(forged.bytes().unwrap()),
+            }],
+        };
+        assert_eq!(
+            nw_domain::projects::edit::check_compatibility(&read, &patch)
+                .unwrap_err()
+                .code,
+            "ENTITY_LOCKED"
+        );
     }
     track_fixture
         .reject_unchanged(
-            track_fixture.request("tracks.set_enabled", "reject-disable-locked-track", json!({"track_id":clip.track_id,"enabled":false})),
+            track_fixture.request(
+                "tracks.set_enabled",
+                "reject-disable-locked-track",
+                json!({"track_id":clip.track_id,"enabled":false}),
+            ),
             "ENTITY_LOCKED",
         )
         .await;
     let unchanged = track_fixture
-        .accept(track_fixture.request("tracks.set_locked", "already-locked-picture-track", set_lock(true)))
+        .accept(track_fixture.request(
+            "tracks.set_locked",
+            "already-locked-picture-track",
+            set_lock(true),
+        ))
         .await;
     assert_eq!(unchanged["no_change"], true);
     track_fixture

@@ -294,7 +294,10 @@ pub async fn stream_with_sink(
         program,
         args,
         Some(deadline),
-        CaptureLimits { stdout: 0, stderr: limits.stderr_bytes },
+        CaptureLimits {
+            stdout: 0,
+            stderr: limits.stderr_bytes,
+        },
         Stdio::null(),
         Some(StreamedOutput {
             max_bytes: limits.stdout_bytes,

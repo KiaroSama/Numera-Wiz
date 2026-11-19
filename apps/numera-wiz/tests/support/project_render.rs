@@ -684,12 +684,30 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
     let mut wrong_reels = edl["reels"].clone();
     wrong_reels[0]["content_sha256"] = json!("0".repeat(64));
     std::fs::write(&reel_file, serde_json::to_vec(&wrong_reels).unwrap()).unwrap();
-    let import = |revision: &'static str, key: &'static str| [
-        "timeline", "import-edl", "--project", project, "--expected-revision", revision,
-        "--sequence", target_id, "--track", target_track, "--fps", "24",
-        "--file", destination.to_str().unwrap(), "--reels", reel_file.to_str().unwrap(),
-        "--replay-scope", scope, "--idempotency-key", key,
-    ];
+    let import = |revision: &'static str, key: &'static str| {
+        [
+            "timeline",
+            "import-edl",
+            "--project",
+            project,
+            "--expected-revision",
+            revision,
+            "--sequence",
+            target_id,
+            "--track",
+            target_track,
+            "--fps",
+            "24",
+            "--file",
+            destination.to_str().unwrap(),
+            "--reels",
+            reel_file.to_str().unwrap(),
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            key,
+        ]
+    };
     let (rejected, status) = cli.human(&import("7", "edl-reject-mismatched-reel")).await;
     assert_ne!(status, 0, "{rejected}");
     assert_eq!(rejected["error"]["code"], "SOURCE_CHANGED");
@@ -702,21 +720,60 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
     let (accepted, status) = cli.human(&import("7", "edl-apply")).await;
     assert_eq!(status, 0, "{accepted}");
     assert_eq!(accepted["result"]["revision"], "8");
-    assert_eq!(accepted["result"]["created"]["document_sha256"], edl["document_sha256"]);
-    assert_eq!(accepted["result"]["created"]["clip_ids"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        accepted["result"]["created"]["document_sha256"],
+        edl["document_sha256"]
+    );
+    assert_eq!(
+        accepted["result"]["created"]["clip_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     let (rejected, status) = cli.human(&import("8", "edl-reject-overlay")).await;
     assert_ne!(status, 0, "{rejected}");
     assert_eq!(rejected["error"]["code"], "CLIP_COLLISION");
     for revision in ["8", "9", "10"] {
         if revision == "9" {
-            edit(cli, scope, project, "8", "edl-undo", "history.undo", json!({})).await;
+            edit(
+                cli,
+                scope,
+                project,
+                "8",
+                "edl-undo",
+                "history.undo",
+                json!({}),
+            )
+            .await;
         } else if revision == "10" {
-            edit(cli, scope, project, "9", "edl-redo", "history.redo", json!({})).await;
+            edit(
+                cli,
+                scope,
+                project,
+                "9",
+                "edl-redo",
+                "history.redo",
+                json!({}),
+            )
+            .await;
         }
-        let (exported, status) = cli.human(&[
-            "timeline", "export-edl", "--project", project, "--revision", revision,
-            "--sequence", target_id, "--track", target_track, "--end", "1",
-        ]).await;
+        let (exported, status) = cli
+            .human(&[
+                "timeline",
+                "export-edl",
+                "--project",
+                project,
+                "--revision",
+                revision,
+                "--sequence",
+                target_id,
+                "--track",
+                target_track,
+                "--end",
+                "1",
+            ])
+            .await;
         assert_eq!(status, 0, "{exported}");
         let result = &exported["result"];
         if revision == "9" {

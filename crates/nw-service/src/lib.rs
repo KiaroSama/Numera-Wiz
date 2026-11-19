@@ -4,7 +4,10 @@ use nw_domain::{
     commands::{self, Empty, IdInput, Request, ResolveInput, Response},
 };
 mod runtime;
-pub use runtime::{ArtifactTransfer, BrowserProgramTransfer, Context, NativePreviewTrack, NativePreviewTransfer, Service};
+pub use runtime::{
+    ArtifactTransfer, BrowserProgramTransfer, Context, NativePreviewTrack, NativePreviewTransfer,
+    Service,
+};
 
 pub use nw_domain::commands::ACTIVE_COMMANDS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1341,7 +1344,11 @@ mod tests {
             ("tracks.set_locked", vec![], true),
             ("timeline.remove_gap", vec![], true),
             ("mixer.set_track_gain", vec![], true),
-            ("interchange.edl.import", vec!["document_sha256", "source_ids", "clip_ids"], false),
+            (
+                "interchange.edl.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
             ("clips.remove", vec![], false),
             ("clips.join_through_edit", vec![], false),
             ("markers.place", vec!["marker_id"], false),

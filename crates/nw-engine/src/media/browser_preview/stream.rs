@@ -1,4 +1,6 @@
-use super::{MAX_FRAGMENT_HEADERS, MAX_INIT_BYTES, invalid, take_box, verify_fragment, verify_initialization};
+use super::{
+    MAX_FRAGMENT_HEADERS, MAX_INIT_BYTES, invalid, take_box, verify_fragment, verify_initialization,
+};
 use nw_domain::{DomainError, Result, preview::MAX_SOURCE_SEGMENT_BYTES};
 use nw_platform::process::{AsyncChunkSink, SinkFuture};
 use tokio::sync::mpsc;
@@ -18,19 +20,36 @@ struct BrowserMp4Sink {
 
 pub fn browser_mp4_stream() -> (Box<dyn AsyncChunkSink>, mpsc::Receiver<BrowserMp4Part>) {
     let (sender, receiver) = mpsc::channel(2);
-    let producer = BrowserMp4Sink { buffered: Vec::new(), leading: None, ordinal: 0, initialized: false, sender };
+    let producer = BrowserMp4Sink {
+        buffered: Vec::new(),
+        leading: None,
+        ordinal: 0,
+        initialized: false,
+        sender,
+    };
     (Box::new(producer), receiver)
 }
 
 /// Bound a box as soon as its complete header is present, before collecting its payload.
 fn complete_box(buffer: &[u8]) -> Result<Option<usize>> {
-    let Some(header) = buffer.first_chunk::<8>() else { return Ok(None); };
+    let Some(header) = buffer.first_chunk::<8>() else {
+        return Ok(None);
+    };
     let size = u32::from_be_bytes(header[..4].try_into().expect("MP4 length field"));
     let (length, header_bytes) = match size {
-        0 => return Err(invalid("Open-ended boxes are forbidden in program playback")),
+        0 => {
+            return Err(invalid(
+                "Open-ended boxes are forbidden in program playback",
+            ));
+        }
         1 => {
-            let Some(header) = buffer.first_chunk::<16>() else { return Ok(None); };
-            (u64::from_be_bytes(header[8..16].try_into().expect("Extended length field")), 16)
+            let Some(header) = buffer.first_chunk::<16>() else {
+                return Ok(None);
+            };
+            (
+                u64::from_be_bytes(header[8..16].try_into().expect("Extended length field")),
+                16,
+            )
         }
         size => (u64::from(size), 8),
     };
@@ -59,9 +78,13 @@ impl BrowserMp4Sink {
             return Ok(());
         };
         let mut previous = prefix.as_slice();
-        let left = take_box(&mut previous)?.ok_or_else(|| invalid("Missing program MP4 box prefix"))?;
+        let left =
+            take_box(&mut previous)?.ok_or_else(|| invalid("Missing program MP4 box prefix"))?;
         let packet = if self.initialized {
-            self.ordinal = self.ordinal.checked_add(1).ok_or_else(|| invalid("Fragment index overflow"))?;
+            self.ordinal = self
+                .ordinal
+                .checked_add(1)
+                .ok_or_else(|| invalid("Fragment index overflow"))?;
             verify_fragment(&left, &right, self.ordinal)?;
             prefix.extend_from_slice(&bytes);
             BrowserMp4Part::Fragment(prefix)
@@ -72,9 +95,15 @@ impl BrowserMp4Sink {
             let mime_type = verify_initialization(&left, &right, true)?;
             self.initialized = true;
             prefix.extend_from_slice(&bytes);
-            BrowserMp4Part::Initialization { mime_type, bytes: prefix }
+            BrowserMp4Part::Initialization {
+                mime_type,
+                bytes: prefix,
+            }
         };
-        self.sender.send(packet).await.map_err(|_| DomainError::new("CANCELLED", "Program playback receiver closed"))
+        self.sender
+            .send(packet)
+            .await
+            .map_err(|_| DomainError::new("CANCELLED", "Program playback receiver closed"))
     }
 }
 
@@ -96,7 +125,11 @@ impl AsyncChunkSink for BrowserMp4Sink {
 
     fn finish(&mut self) -> SinkFuture<'_> {
         Box::pin(async {
-            if !self.initialized || self.ordinal == 0 || !self.buffered.is_empty() || self.leading.is_some() {
+            if !self.initialized
+                || self.ordinal == 0
+                || !self.buffered.is_empty()
+                || self.leading.is_some()
+            {
                 return Err(invalid("Program MP4 ended before its complete fragments"));
             }
             Ok(())

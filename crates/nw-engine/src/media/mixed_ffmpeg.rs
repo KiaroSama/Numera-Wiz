@@ -2,7 +2,8 @@
 use super::{
     BrowserSegment, Listing,
     browser_preview::{append_browser_audio, append_browser_output},
-    identities, listing, normalized_pair::presentation::NativePreviewProfile,
+    identities, listing,
+    normalized_pair::presentation::NativePreviewProfile,
 };
 use crate::{
     Engine, Observer, OutputDestination, PublicationStaging, VerifiedOutput, admission, blocking,
@@ -500,9 +501,12 @@ impl Engine {
         }
         let graph = compile_mixed_graph(capture)?;
         validate_staged_inputs(sources, assets, &staged, &cancel).await?;
-        let MixedFiltergraph { script, audio_extents } =
-            compose_filtergraph(capture, &graph, sources, assets)?;
-        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let MixedFiltergraph {
+            script,
+            audio_extents,
+        } = compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel)
+            .await?;
         let (sidecar, args) = browser_program_invocation(workspace, &staged, script, false)?;
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
@@ -544,20 +548,42 @@ impl Engine {
         sink: Box<dyn AsyncChunkSink>,
         limits: MixedProcessLimits<'_>,
     ) -> Result<()> {
-        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let MixedProcessLimits {
+            workspace,
+            max_bytes,
+            deadline,
+            cancel,
+        } = limits;
         let started = Instant::now();
-        let remaining = || deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
-            .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Program playback exceeded its complete deadline"));
+        let remaining = || {
+            deadline
+                .checked_sub(started.elapsed())
+                .filter(|left| !left.is_zero())
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "PROCESS_TIMEOUT",
+                        "Program playback exceeded its complete deadline",
+                    )
+                })
+        };
         let duration = capture.range.end.checked_sub(capture.range.start)?;
         if duration > Rational::new(nw_domain::preview::PROGRAM_PLAYBACK_MAX_SECONDS, 1)?
-            || capture.settings.width > 1920 || capture.settings.height > 1080
+            || capture.settings.width > 1920
+            || capture.settings.height > 1080
         {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Program playback exceeds its range or raster budget"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Program playback exceeds its range or raster budget",
+            ));
         }
         let graph = compile_mixed_graph(capture)?;
         validate_staged_inputs(sources, assets, &staged, &cancel).await?;
-        let MixedFiltergraph { script, audio_extents } = compose_filtergraph(capture, &graph, sources, assets)?;
-        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let MixedFiltergraph {
+            script,
+            audio_extents,
+        } = compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel)
+            .await?;
         let (sidecar, args) = browser_program_invocation(workspace, &staged, script, true)?;
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
@@ -567,9 +593,17 @@ impl Engine {
             Err(error) => return ticket.finish(Err(error)),
         };
         let result = process::stream_with_sink(
-            Path::new(&self.ffmpeg.path), &args, left,
-            StreamLimits { stdout_bytes: max_bytes, stderr_bytes: 4096 }, sink, cancel.clone(),
-        ).await;
+            Path::new(&self.ffmpeg.path),
+            &args,
+            left,
+            StreamLimits {
+                stdout_bytes: max_bytes,
+                stderr_bytes: 4096,
+            },
+            sink,
+            cancel.clone(),
+        )
+        .await;
         if let Err(error) = ticket.finish(result) {
             if uncertain(&error) {
                 retain_preview_inputs(sidecar, staged);
@@ -590,17 +624,39 @@ impl Engine {
         staged: Vec<StagedMixedInput>,
         output: NativePreviewOutput<'_>,
     ) -> Result<()> {
-        let NativePreviewOutput { profile, sink, limits } = output;
-        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let NativePreviewOutput {
+            profile,
+            sink,
+            limits,
+        } = output;
+        let MixedProcessLimits {
+            workspace,
+            max_bytes,
+            deadline,
+            cancel,
+        } = limits;
         let picture_bytes = profile.validate()?;
-        if profile.range != capture.range || profile.frame_rate != capture.settings.frame_rate
-            || capture.settings.width > 3840 || capture.settings.height > 2160
+        if profile.range != capture.range
+            || profile.frame_rate != capture.settings.frame_rate
+            || capture.settings.width > 3840
+            || capture.settings.height > 2160
         {
-            return Err(invalid("Native preview clock or raster differs from its captured limits"));
+            return Err(invalid(
+                "Native preview clock or raster differs from its captured limits",
+            ));
         }
         let started = Instant::now();
-        let remaining = || deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
-            .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Native program preview exceeded its complete deadline"));
+        let remaining = || {
+            deadline
+                .checked_sub(started.elapsed())
+                .filter(|left| !left.is_zero())
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "PROCESS_TIMEOUT",
+                        "Native program preview exceeded its complete deadline",
+                    )
+                })
+        };
         let graph = compile_mixed_graph(capture)?;
         let frames = nw_domain::media_execution::exact(&graph.output_frames)?;
         let duration = capture.range.end.checked_sub(capture.range.start)?;
@@ -611,13 +667,19 @@ impl Engine {
         };
         let decoded_bytes = frames * picture_bytes as u64 + sample_frames * 8;
         if max_bytes <= decoded_bytes {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Native preview exceeds its stdout budget"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Native preview exceeds its stdout budget",
+            ));
         }
         let stdout_bytes = (decoded_bytes + 1024 * 1024).min(max_bytes);
         validate_staged_inputs(sources, assets, &staged, &cancel).await?;
-        let MixedFiltergraph { mut script, audio_extents } =
-            compose_filtergraph(capture, &graph, sources, assets)?;
-        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let MixedFiltergraph {
+            mut script,
+            audio_extents,
+        } = compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel)
+            .await?;
         let NativePreviewProfile { width, height, .. } = profile;
         script.push_str(&format!(
             ";\n[outv]scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=rgba[viewv]"
@@ -626,20 +688,58 @@ impl Engine {
             script.push_str(";\n[outa]anullsink");
         }
         let (sidecar, mut args) = composition_invocation(workspace, &staged, &script)?;
-        args.extend([
-            "-map", "[viewv]", "-c:v", "rawvideo", "-threads:v", "1", "-pix_fmt", "rgba",
-            "-fps_mode:v", "passthrough", "-enc_time_base:v", "filter",
-        ].map(str::to_owned));
+        args.extend(
+            [
+                "-map",
+                "[viewv]",
+                "-c:v",
+                "rawvideo",
+                "-threads:v",
+                "1",
+                "-pix_fmt",
+                "rgba",
+                "-fps_mode:v",
+                "passthrough",
+                "-enc_time_base:v",
+                "filter",
+            ]
+            .map(str::to_owned),
+        );
         if profile.audio {
-            args.extend([
-                "-map", "[outa]", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", "2",
-                "-bsf:a", "pcm_rechunk=n=480:p=0",
-            ].map(str::to_owned));
+            args.extend(
+                [
+                    "-map",
+                    "[outa]",
+                    "-c:a",
+                    "pcm_f32le",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-bsf:a",
+                    "pcm_rechunk=n=480:p=0",
+                ]
+                .map(str::to_owned),
+            );
         }
-        args.extend([
-            "-map_metadata", "-1", "-map_chapters", "-1", "-avoid_negative_ts", "disabled",
-            "-f", "nut", "-write_index", "0", "-syncpoints", "default", "pipe:1",
-        ].map(str::to_owned));
+        args.extend(
+            [
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
+                "-avoid_negative_ts",
+                "disabled",
+                "-f",
+                "nut",
+                "-write_index",
+                "0",
+                "-syncpoints",
+                "default",
+                "pipe:1",
+            ]
+            .map(str::to_owned),
+        );
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
@@ -648,9 +748,17 @@ impl Engine {
             Err(error) => return ticket.finish(Err(error)),
         };
         let result = process::stream_with_sink(
-            Path::new(&self.ffmpeg.path), &args, left,
-            StreamLimits { stdout_bytes, stderr_bytes: 4096 }, sink, cancel.clone(),
-        ).await;
+            Path::new(&self.ffmpeg.path),
+            &args,
+            left,
+            StreamLimits {
+                stdout_bytes,
+                stderr_bytes: 4096,
+            },
+            sink,
+            cancel.clone(),
+        )
+        .await;
         if let Err(error) = ticket.finish(result) {
             if uncertain(&error) {
                 retain_preview_inputs(sidecar, staged);

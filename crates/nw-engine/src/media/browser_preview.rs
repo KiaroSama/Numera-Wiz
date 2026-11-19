@@ -1,6 +1,5 @@
 //! Bound a generated fragmented MP4 and expose its appendable browser units.
 mod stream;
-pub use stream::{BrowserMp4Part, browser_mp4_stream};
 use super::identities;
 use crate::{Engine, admission, blocking, preservation};
 use nw_domain::{
@@ -11,6 +10,7 @@ use nw_domain::{
 };
 use nw_platform::{files::SourceStamp, process};
 use std::{ops::Range, path::Path, time::Duration};
+pub use stream::{BrowserMp4Part, browser_mp4_stream};
 use tokio_util::sync::CancellationToken;
 
 const MAX_INIT_BYTES: usize = 64 * 1024;
@@ -203,7 +203,11 @@ fn codec_list(mut movie: &[u8], sound_expected: bool) -> Result<String> {
     Ok(format!("video/mp4; codecs=\"{video}{suffix}\""))
 }
 
-fn verify_initialization(file: &BoxRef<'_>, movie: &BoxRef<'_>, sound_expected: bool) -> Result<String> {
+fn verify_initialization(
+    file: &BoxRef<'_>,
+    movie: &BoxRef<'_>,
+    sound_expected: bool,
+) -> Result<String> {
     if file.kind != *b"ftyp" || file.payload.len() < 8 || movie.kind != *b"moov" {
         return Err(invalid("Preview MP4 initialization requires ftyp and moov"));
     }
@@ -212,13 +216,16 @@ fn verify_initialization(file: &BoxRef<'_>, movie: &BoxRef<'_>, sound_expected: 
 }
 
 fn verify_fragment(fragment: &BoxRef<'_>, media: &BoxRef<'_>, ordinal: u32) -> Result<()> {
-    if fragment.kind != *b"moof" || fragment.payload.len() > MAX_FRAGMENT_HEADERS
-        || media.kind != *b"mdat" || media.payload.is_empty()
+    if fragment.kind != *b"moof"
+        || fragment.payload.len() > MAX_FRAGMENT_HEADERS
+        || media.kind != *b"mdat"
+        || media.payload.is_empty()
     {
         return Err(invalid("Unexpected preview MP4 fragment layout"));
     }
     let sequence = child(fragment.payload, *b"mfhd")?;
-    if sequence.len() != 8 || sequence[..4] != [0, 0, 0, 0]
+    if sequence.len() != 8
+        || sequence[..4] != [0, 0, 0, 0]
         || u32::from_be_bytes(sequence[4..].try_into().expect("MP4 fragment sequence")) != ordinal
     {
         return Err(invalid("Preview MP4 fragment sequence differs"));

@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 pub(super) mod browser_segment;
 pub(super) mod mixed;
 pub(super) use browser_segment::BrowserSegmentLease;
-mod timeline_preview;
 pub(super) mod native_preview;
+mod timeline_preview;
 
 struct StillFile {
     bytes: Vec<u8>,

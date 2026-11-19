@@ -48,7 +48,9 @@ impl Body {
 }
 
 pub async fn exercise(cli: &Cli, project: &str, sequence: &str) {
-    let owner: Value = serde_json::from_slice(&std::fs::read(cli.data.join("runtime/owner.json")).unwrap()).unwrap();
+    let owner: Value =
+        serde_json::from_slice(&std::fs::read(cli.data.join("runtime/owner.json")).unwrap())
+            .unwrap();
     let bearer = owner["bearer"].as_str().unwrap();
     let port = owner["port"].as_u64().unwrap();
     let route = format!("http://127.0.0.1:{port}/internal/native-previews");
@@ -65,8 +67,18 @@ pub async fn exercise(cli: &Cli, project: &str, sequence: &str) {
     });
     let denied = client.post(&route).json(&input).send().await.unwrap();
     assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
-    let opened: Opened = client.post(&route).bearer_auth(bearer).json(&input).send()
-        .await.unwrap().error_for_status().unwrap().json().await.unwrap();
+    let opened: Opened = client
+        .post(&route)
+        .bearer_auth(bearer)
+        .json(&input)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(opened.picture.project_id.as_str(), project);
     assert_eq!(opened.picture.sequence_id.as_str(), sequence);
     assert_eq!(opened.picture.revision.to_string(), "4");
@@ -75,23 +87,39 @@ pub async fn exercise(cli: &Cli, project: &str, sequence: &str) {
     assert_eq!(opened.picture.generation, sound.generation);
     let session = format!("{route}/{}", opened.picture.session_id);
     let clock = format!("{session}/clock");
-    let stale = client.put(&clock).bearer_auth(bearer)
+    let stale = client
+        .put(&clock)
+        .bearer_auth(bearer)
         .json(&json!({"generation":opened.picture.generation + 1,"at":Rational::ZERO}))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
     assert_eq!(stale.status(), StatusCode::BAD_REQUEST);
     let fetch = |suffix| {
-        client.get(format!("{session}/{suffix}")).bearer_auth(bearer).send()
+        client
+            .get(format!("{session}/{suffix}"))
+            .bearer_auth(bearer)
+            .send()
     };
     let (picture, audio) = tokio::join!(fetch("picture"), fetch("sound"));
     let body = |response: reqwest::Result<Response>| {
         let response = response.unwrap().error_for_status().unwrap();
-        assert_eq!(response.headers()["Content-Type"], "application/octet-stream");
+        assert_eq!(
+            response.headers()["Content-Type"],
+            "application/octet-stream"
+        );
         assert_eq!(response.headers()["Cache-Control"], "no-store");
-        Body { response, remaining: Bytes::new() }
+        Body {
+            response,
+            remaining: Bytes::new(),
+        }
     };
     let mut picture = body(picture);
     let mut audio = body(audio);
-    assert_eq!(picture.header::<Descriptor>().await.unwrap(), opened.picture);
+    assert_eq!(
+        picture.header::<Descriptor>().await.unwrap(),
+        opened.picture
+    );
     assert_eq!(&audio.header::<Descriptor>().await.unwrap(), sound);
     let mut picture_order = PacketOrder::new(opened.picture.clone()).unwrap();
     let mut audio_order = PacketOrder::new(sound.clone()).unwrap();
@@ -117,9 +145,13 @@ pub async fn exercise(cli: &Cli, project: &str, sequence: &str) {
                 peak = peak.max(f32::from_le_bytes(*value).abs());
             }
             samples += (bytes.len() / 8) as i64;
-            let response = client.put(&clock).bearer_auth(bearer)
+            let response = client
+                .put(&clock)
+                .bearer_auth(bearer)
                 .json(&json!({"generation":header.generation,"at":header.pts}))
-                .send().await.unwrap();
+                .send()
+                .await
+                .unwrap();
             assert_eq!(response.status(), StatusCode::NO_CONTENT);
         }
         (samples, peak)
@@ -127,6 +159,11 @@ pub async fn exercise(cli: &Cli, project: &str, sequence: &str) {
     let (frames, (samples, peak)) = tokio::join!(read_picture, read_audio);
     assert_eq!((frames, samples), (4, 48_000));
     assert!(peak > 0.06);
-    let closed = client.delete(&session).bearer_auth(bearer).send().await.unwrap();
+    let closed = client
+        .delete(&session)
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .unwrap();
     assert_eq!(closed.status(), StatusCode::NO_CONTENT);
 }

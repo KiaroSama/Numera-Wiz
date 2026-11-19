@@ -19,14 +19,20 @@ pub enum Format {
 impl Format {
     pub fn units(self, payload_bytes: usize) -> Result<Rational> {
         match self {
-            Self::Rgba8 { width, height, frame_rate } => {
+            Self::Rgba8 {
+                width,
+                height,
+                frame_rate,
+            } => {
                 if !(1..=1280).contains(&width)
                     || !(1..=720).contains(&height)
                     || frame_rate <= Rational::ZERO
                     || frame_rate > Rational::new(60, 1)?
                     || payload_bytes != (width * height * 4) as usize
                 {
-                    return Err(wire_error("Invalid native RGBA geometry, cadence or payload length"));
+                    return Err(wire_error(
+                        "Invalid native RGBA geometry, cadence or payload length",
+                    ));
                 }
                 Rational::new(frame_rate.denominator(), frame_rate.numerator())
             }
@@ -56,13 +62,20 @@ pub struct Descriptor {
 impl Descriptor {
     pub fn validate(&self) -> Result<()> {
         self.range.validate()?;
-        if self.version != 1 || self.generation == 0
+        if self.version != 1
+            || self.generation == 0
             || self.range.end.checked_sub(self.range.start)? > Rational::new(120, 1)?
         {
-            return Err(wire_error("Invalid native preview descriptor version, generation or range"));
+            return Err(wire_error(
+                "Invalid native preview descriptor version, generation or range",
+            ));
         }
         let clock = match self.format {
-            Format::Rgba8 { width, height, frame_rate } => {
+            Format::Rgba8 {
+                width,
+                height,
+                frame_rate,
+            } => {
                 let payload = usize::try_from(u64::from(width) * u64::from(height))
                     .ok()
                     .and_then(|pixels| pixels.checked_mul(4))
@@ -92,14 +105,20 @@ pub struct Header {
 impl Header {
     pub fn validate(&self, expected: &Descriptor) -> Result<Rational> {
         if self.generation != expected.generation || self.format != expected.format {
-            return Err(wire_error("Packet belongs to a different preview generation or format"));
+            return Err(wire_error(
+                "Packet belongs to a different preview generation or format",
+            ));
         }
         if self.duration != self.format.units(self.payload_bytes as usize)? {
-            return Err(wire_error("Native preview packet duration differs from the payload"));
+            return Err(wire_error(
+                "Native preview packet duration differs from the payload",
+            ));
         }
         let end = self.pts.checked_add(self.duration)?;
         if !expected.range.contains(self.pts) || end > expected.range.end {
-            return Err(wire_error("Native preview packet is outside the captured interval"));
+            return Err(wire_error(
+                "Native preview packet is outside the captured interval",
+            ));
         }
         let clock = match self.format {
             Format::Rgba8 { frame_rate, .. } => frame_rate,
@@ -121,7 +140,11 @@ impl PacketOrder {
     pub fn new(descriptor: Descriptor) -> Result<Self> {
         descriptor.validate()?;
         let next_time = descriptor.range.start;
-        Ok(Self { descriptor, next_packet: 0, next_time })
+        Ok(Self {
+            descriptor,
+            next_packet: 0,
+            next_time,
+        })
     }
 
     pub fn next_time(&self) -> Rational {
@@ -133,7 +156,9 @@ impl PacketOrder {
         match packet.format {
             Format::StereoF32Le {} => {
                 if packet.sequence != self.next_packet || packet.pts != self.next_time {
-                    return Err(wire_error("Native audio packets have missing or repeated time"));
+                    return Err(wire_error(
+                        "Native audio packets have missing or repeated time",
+                    ));
                 }
             }
             Format::Rgba8 { frame_rate, .. } => {
@@ -142,11 +167,15 @@ impl PacketOrder {
                     || packet.pts < self.next_time
                     || packet.sequence != grid_tick(offset, frame_rate)?
                 {
-                    return Err(wire_error("Native picture packet order differs from its frame index"));
+                    return Err(wire_error(
+                        "Native picture packet order differs from its frame index",
+                    ));
                 }
             }
         }
-        self.next_packet = packet.sequence.checked_add(1)
+        self.next_packet = packet
+            .sequence
+            .checked_add(1)
             .ok_or_else(|| wire_error("Native packet sequence exceeds its bound"))?;
         self.next_time = end;
         Ok(packet.payload_bytes as usize)
@@ -162,7 +191,8 @@ pub fn header_length(prefix: [u8; 4]) -> Result<usize> {
 }
 
 pub fn encode_header(header: &impl Serialize) -> Result<Vec<u8>> {
-    let json = serde_json::to_vec(header).map_err(|_| wire_error("Native header cannot be encoded"))?;
+    let json =
+        serde_json::to_vec(header).map_err(|_| wire_error("Native header cannot be encoded"))?;
     if json.len() > MAX_HEADER_BYTES {
         return Err(wire_error("Native preview header exceeds its length limit"));
     }
@@ -173,7 +203,9 @@ pub fn encode_header(header: &impl Serialize) -> Result<Vec<u8>> {
 
 pub fn decode_header<T: DeserializeOwned>(prefix: [u8; 4], bytes: &[u8]) -> Result<T> {
     if header_length(prefix)? != bytes.len() {
-        return Err(wire_error("Native preview header is truncated or has trailing bytes"));
+        return Err(wire_error(
+            "Native preview header is truncated or has trailing bytes",
+        ));
     }
     serde_json::from_slice(bytes).map_err(|_| wire_error("Native preview header is invalid JSON"))
 }
