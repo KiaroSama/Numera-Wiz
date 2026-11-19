@@ -119,6 +119,11 @@ pub enum Media {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review burning registered SubRip captions with the offline font.
+    BurnSubtitles {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Measure and review independent loudness normalization of selected PCM tracks.
     Normalize {
         #[arg(long)]
@@ -619,6 +624,13 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             query("media.probe", params)
+        }
+        Command::Media(Media::BurnSubtitles { file }) => {
+            let mut input: nw_domain::subtitle_burn::BurnInput = commands::parse(document(&file)?)?;
+            input.audio.validate()?;
+            input.color.validate()?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("subtitles.burn", serde_json::to_value(input)?)
         }
         Command::Media(Media::Split { file }) => {
             let mut input: nw_domain::packet_cut::SplitInput = commands::parse(document(&file)?)?;

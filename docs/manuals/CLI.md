@@ -859,3 +859,32 @@ A split requires two to sixteen nonoverlapping intervals. The end of each
 interval is exclusive. Each start must already be a keyframe. Inspect the
 result, then use `batches submit` with its plan ID and hash. A rejected
 part blocks submission and each accepted job independently verifies its output.
+
+
+### Burn SubRip captions into a Matroska video
+
+Run `numera-wiz media burn-subtitles --file caption.json`. This route uses
+the installed DejaVu Sans font and an ordinary registered Matroska FFV1
+picture. Register a UTF-8 SRT file as a separate input, or select an embedded
+SubRip stream by its original stream index. The output encodes the picture
+in lossless FFV1 and copies each selected compatible audio track.
+
+```json
+{
+  "asset_id": "<video asset id>",
+  "output": "/exports/burned.mkv",
+  "video_stream": 0,
+  "subtitle": {"kind": "external", "asset_id": "<registered SRT id>"},
+  "audio": {"kind": "copy_selected", "indices": [1, 2]},
+  "color": {"kind": "preserve_sdr"},
+  "quality": "lossless_ffv1"
+}
+```
+
+Use `{"kind":"embedded","stream_index":3}` for embedded SubRip.
+Audio can also be `{"kind":"copy_all"}` or `{"kind":"none"}`. For tagged
+limited-range BT.2020 PQ or HLG, choose
+`{"kind":"tone_map_bt709","peak_nits":1000}` and set the reviewed source
+peak. The graph uses a 100-nit reference and linear-light Mobius tone
+mapping before encoding limited-range BT.709. Inspect the plan and submit
+its ID and hash through the usual job commands.

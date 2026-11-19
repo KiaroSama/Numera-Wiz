@@ -574,6 +574,26 @@ impl Service {
             }
             first_output_index += input.tracks.len();
         }
+        if let Some(burn) = &plan.subtitle_burn && source_visible {
+            use nw_domain::subtitle_burn::{BurnReview, SubtitleSource};
+            let (embedded_subtitle_stream, external_subtitle_asset) = match &burn.subtitle {
+                SubtitleSource::Embedded { stream_index } => (Some(*stream_index), None),
+                SubtitleSource::External { source } => {
+                    let available = self.object(context, &source.id, &source.creator).is_ok()
+                        && self.path(context, Path::new(&source.identity.path), false).is_ok();
+                    (None, available.then(|| source.id.clone()))
+                }
+            };
+            review.subtitle_burn = Some(BurnReview {
+                video_stream: burn.video_stream,
+                embedded_subtitle_stream,
+                external_subtitle_asset,
+                audio: burn.audio.clone(),
+                color: burn.color,
+                quality: burn.quality,
+                font_sha256: burn.font.sha256.clone(),
+            });
+        }
         Ok(review)
     }
     fn job_view(&self, context: &Context, job: &Job) -> Result<nw_domain::views::JobView> {
@@ -717,8 +737,7 @@ impl Service {
         if let Some(object) = &plan.source.source_object {
             files::revalidate_source_object(&path, object)?;
         }
-        for input in &plan.added_tracks {
-            let source = &input.source;
+        for source in plan.external_sources() {
             let recorded: Asset = self
                 .store
                 .get(&named("asset", &source.id)?)?
@@ -1125,6 +1144,7 @@ impl Service {
                 "timeline.preview_frame",
                 "media.probe",
                 "media.cut",
+                "subtitles.burn",
                 "media.split_plan",
                 "media.analyze.volume",
                 "media.analyze.loudness",
@@ -1940,7 +1960,7 @@ impl Service {
                 drop(permit);
                 return Ok(response);
             }
-            "streams.clean" | "streams.add" | "streams.replace" | "streams.extract" | "jobs.plan"
+            "streams.clean" | "streams.add" | "streams.replace" | "streams.extract" | "subtitles.burn" | "jobs.plan"
             | "chapters.remove" | "chapters.import" | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
@@ -2243,10 +2263,10 @@ impl Service {
                                 )
                             })?;
                     files::revalidate(&plan.source.identity, &cancellation)?;
-                    let mut additions = Vec::with_capacity(plan.added_tracks.len());
-                    for input in &plan.added_tracks {
-                        let identity = &input.source.identity;
-                        let object = input.source.source_object.as_ref().ok_or_else(|| {
+                    let mut additions = Vec::new();
+                    for dependency in plan.external_sources() {
+                        let identity = &dependency.identity;
+                        let object = dependency.source_object.as_ref().ok_or_else(|| {
                             DomainError::new(
                                 "INVALID_PLAN",
                                 "External source native identity is absent",
@@ -2259,7 +2279,14 @@ impl Service {
                         stamp.revalidate()?;
                         additions.push(stamp);
                     }
-                    for component in [&plan.ffmpeg, &plan.ffprobe] {
+                    if let Some(burn) = &plan.subtitle_burn {
+                        let font = files::SourceStamp::capture_resolved(Path::new(&burn.font.path))?;
+                        font.require_object(&burn.font_object)?;
+                        additions.push(font);
+                    }
+                    for component in [&plan.ffmpeg, &plan.ffprobe].into_iter()
+                        .chain(plan.subtitle_burn.iter().map(|burn| &burn.font))
+                    {
                         files::revalidate(component, &cancellation).map_err(|error| {
                             if error.code == "SOURCE_CHANGED" {
                                 DomainError::new(
@@ -2619,6 +2646,26 @@ impl Service {
         now: u64,
     ) -> Result<Plan> {
         let input = match command {
+            "subtitles.burn" => {
+                use nw_domain::subtitle_burn::{BurnInput, SubtitleInput, SubtitleSource};
+                let input: BurnInput = commands::parse(params)?;
+                let subtitle = match &input.subtitle {
+                    SubtitleInput::Embedded { stream_index } => SubtitleSource::Embedded { stream_index: *stream_index },
+                    SubtitleInput::External { asset_id } => {
+                        let source: Asset = self.store.get(&named("asset", asset_id)?)?
+                            .ok_or_else(DomainError::object_not_found)?;
+                        self.object(context, &source.id, &source.creator)?;
+                        self.path(context, Path::new(&source.identity.path), false)?;
+                        SubtitleSource::External { source: Box::new(source) }
+                    }
+                };
+                let asset = input.asset_id.clone();
+                let output_path = input.output.clone();
+                return self.prepare_native_copy(context, &asset, &output_path,
+                    Default::default(), |engine, source, output| {
+                        engine.subtitle_burn_plan_at(source, output, input, subtitle, &context.principal, now)
+                    });
+            }
             "streams.add" => {
                 let input: nw_domain::track_append::AppendInput = commands::parse(params)?;
                 if !(1..=nw_domain::track_append::MAX_ADDED_INPUTS).contains(&input.additions.len())
@@ -3665,6 +3712,7 @@ mod tests {
         let plan = Plan {
             audio_normalization: Vec::new(),
             packet_cut: None,
+            subtitle_burn: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

@@ -58,6 +58,8 @@ pub struct Asset {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtitle_burn: Option<crate::subtitle_burn::Burn>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audio_normalization: Vec<crate::audio_normalization::Track>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -90,6 +92,14 @@ pub struct Plan {
     pub expires_at: String,
     pub verification_scope: String,
 }
+impl Plan {
+    pub fn external_sources(&self) -> impl Iterator<Item = &Asset> {
+        self.added_tracks.iter().map(|input| &input.source).chain(
+            self.subtitle_burn.as_ref().and_then(|burn| burn.subtitle.external()),
+        )
+    }
+}
+
 fn legacy_plan_version() -> u32 {
     1
 }

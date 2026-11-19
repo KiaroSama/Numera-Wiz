@@ -8,6 +8,7 @@ mod output_profile;
 mod packet_cut;
 mod preservation;
 mod progress;
+mod subtitle_burn;
 mod track_append;
 mod wave_cues;
 pub use media::BrowserSegment;
@@ -426,6 +427,7 @@ impl Engine {
         let mut plan = Plan {
             audio_normalization: Vec::new(),
             packet_cut: None,
+            subtitle_burn: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -472,7 +474,13 @@ impl Engine {
         } else {
             OutputProfile::Matroska
         };
-        let expected_scope = if plan.audio_normalization.is_empty() { profile.scope() } else { audio_normalization::SCOPE };
+        let expected_scope = if plan.subtitle_burn.is_some() {
+            subtitle_burn::SCOPE
+        } else if plan.audio_normalization.is_empty() {
+            profile.scope()
+        } else {
+            audio_normalization::SCOPE
+        };
         if plan.verification_scope != expected_scope {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -493,7 +501,9 @@ impl Engine {
         }
         track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux {
-            let expected = if plan.packet_cut.is_some() {
+            let expected = if plan.subtitle_burn.is_some() {
+                subtitle_burn::invocation(plan, profile)?
+            } else if plan.packet_cut.is_some() {
                 packet_cut::invocation(plan, profile)?
             } else if !plan.audio_normalization.is_empty() {
                 audio_normalization::invocation(plan, profile)?
@@ -678,6 +688,11 @@ impl Engine {
             cancel.clone(),
         )
         .await?;
+        let caption = if plan.subtitle_burn.is_some() {
+            Some(self.stage_caption(plan, staging.path().parent().expect("Owned staging directory"), cancel.clone()).await?)
+        } else {
+            None
+        };
         let added_paths = additions
             .iter()
             .enumerate()
@@ -698,6 +713,7 @@ impl Engine {
             .iter()
             .map(|v| match v.as_str() {
                 "@owned_staging@" => staging_name.clone(),
+                subtitle_burn::FILTER => caption.as_ref().expect("Validated caption invocation").filter().to_owned(),
                 "@chapter_sidecar@" => sidecar
                     .as_ref()
                     .expect("Validated chapter invocation")
@@ -711,6 +727,9 @@ impl Engine {
         if let Err(error) = source_stamp.revalidate().and_then(|_| {
             for input in &additions {
                 input.revalidate()?;
+            }
+            if let Some(caption) = &caption {
+                caption.revalidate()?;
             }
             sidecar
                 .as_ref()
@@ -769,6 +788,9 @@ impl Engine {
         for input in &additions {
             input.revalidate()?;
         }
+        if let Some(caption) = &caption {
+            caption.revalidate()?;
+        }
         let stage_path = staging.path().to_owned();
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
@@ -810,6 +832,7 @@ impl Engine {
                             .into_iter()
                             .map(track_append::StagedInput::into_source),
                     )
+                    .chain(caption.into_iter().flat_map(subtitle_burn::StagedCaption::into_sources))
                     .collect(),
             },
             plan,

@@ -553,3 +553,11 @@ ordered `outputs` list of destination/range pairs. Specify
 `chapters: "drop"` and grant `media.cut` alongside the split command.
 Inspect each range and its outcome, then submit the plan ID and hash through
 `batches.submit`. Track the individual results with `batches.inspect`.
+
+
+`subtitles.burn` reviews a registered FFV1 picture, an embedded SubRip
+track or registered UTF-8 SRT, the offline font, explicit audio selection,
+and a source color policy. The current request profile is
+`quality: "lossless_ffv1"` with a new Matroska destination. Use
+`commands.schema` for the complete typed request and submit the returned
+ID and hash with `jobs.submit`.

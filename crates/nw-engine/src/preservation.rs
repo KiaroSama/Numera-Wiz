@@ -23,6 +23,7 @@ fn invalid(message: &str) -> DomainError {
 #[derive(Default)]
 struct StreamDigest {
     hash: Sha256,
+    presentation: Sha256,
     packets: u64,
     bytes: u64,
     first: Option<(Rational, bool)>,
@@ -148,6 +149,10 @@ impl Ledger {
             .bytes
             .checked_add(size)
             .ok_or_else(|| invalid("Packet byte count overflow"))?;
+        if let Some(pts) = pts {
+            stream.presentation.update(pts.numerator().to_be_bytes());
+            stream.presentation.update(pts.denominator().to_be_bytes());
+        }
         stream.hash.update((bytes.len() as u64).to_be_bytes());
         stream.hash.update(bytes);
         Ok(())
@@ -532,6 +537,17 @@ pub async fn verify(
             let name = format!("Input {slot} stream {}", stream.index);
             let left = source.streams.get(&stream.index);
             let right = output.streams.get(&output_index);
+            if slot == 0 && plan.subtitle_burn.as_ref().is_some_and(|burn| burn.video_stream == stream.index) {
+                let same_clock = left.zip(right).is_some_and(|(left, right)| {
+                    left.first.is_some() && left.packets == right.packets
+                        && left.presentation.clone().finalize() == right.presentation.clone().finalize()
+                });
+                if !same_clock {
+                    return Err(invalid("Rendered caption video does not preserve the original frame presentation sequence"));
+                }
+                crate::subtitle_burn::verify_picture(plan, observed, output_index)?;
+                continue;
+            }
             if slot == 0 && plan.audio_normalization.iter().any(|track| track.request.stream_index == stream.index) {
                 let samples_match = left.zip(right).is_some_and(|(left, right)| {
                     left.bytes > 0 && left.bytes == right.bytes && left.first.map(|v| v.0) == right.first.map(|v| v.0)

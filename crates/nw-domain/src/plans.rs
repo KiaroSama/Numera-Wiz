@@ -75,6 +75,7 @@ pub fn digest(plan: &Plan) -> Result<String> {
         1 if plan.required_rights.is_none()
             && plan.audio_normalization.is_empty()
             && plan.packet_cut.is_none()
+            && plan.subtitle_burn.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
@@ -108,6 +109,16 @@ pub fn digest(plan: &Plan) -> Result<String> {
 pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     if plan.schema_version != 2 {
         return Err(invalid("Review a fresh version 2 execution plan"));
+    }
+    if let Some(burn) = &plan.subtitle_burn {
+        burn.color.validate()?;
+        burn.audio.validate()?;
+        if plan.resolution.action != crate::mux::CleanAction::Remux
+            || !plan.added_tracks.is_empty() || !plan.audio_normalization.is_empty() || plan.packet_cut.is_some()
+            || plan.resolution.chapter_import.is_some() || plan.resolution.metadata_patch.is_some()
+        {
+            return Err(invalid("Burning subtitles is a separate reviewed picture transformation"));
+        }
     }
     if !plan.added_tracks.is_empty() {
         crate::track_append::validate_sources(&plan.source, &plan.added_tracks, &plan.output)?;
@@ -187,6 +198,11 @@ fn digest_value(mut value: Value) -> Result<String> {
             semantic_source(source);
         }
     }
+    if let Some(external) = object.get_mut("subtitle_burn")
+        .and_then(|burn| burn.get_mut("subtitle")).and_then(|source| source.get_mut("source"))
+    {
+        semantic_source(external.as_object_mut().ok_or_else(|| invalid("External subtitle source must be an object"))?);
+    }
     let bytes =
         serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;
     Ok(hex::encode(Sha256::digest(bytes)))
@@ -260,6 +276,7 @@ mod tests {
         let mut plan = Plan {
             audio_normalization: Vec::new(),
             packet_cut: None,
+            subtitle_burn: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

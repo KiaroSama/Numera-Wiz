@@ -593,6 +593,7 @@ async fn unrelated_inventories() {
         let plan = Plan {
             audio_normalization: Vec::new(),
             packet_cut: None,
+            subtitle_burn: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

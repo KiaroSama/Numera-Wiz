@@ -13,6 +13,7 @@ mod preview;
 mod projects;
 mod reference;
 mod track_append;
+mod subtitle_burn;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
@@ -162,6 +163,7 @@ pub struct WizApp {
     track_append: track_append::TrackAppendUi,
     packet_cut: packet_cut::CutForm,
     normalize: normalize::NormalizeUi,
+    caption_burn: subtitle_burn::CaptionBurnUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -355,6 +357,7 @@ impl WizApp {
             track_append: Default::default(),
             packet_cut: Default::default(),
             normalize: Default::default(),
+            caption_burn: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -396,6 +399,7 @@ impl WizApp {
             self.track_append = Default::default();
             self.packet_cut = Default::default();
             self.normalize = Default::default();
+            self.caption_burn = Default::default();
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -1586,6 +1590,7 @@ impl eframe::App for WizApp {
                 self.track_append_panel(ui, &asset);
                 self.packet_cut_panel(ui, &asset);
                 self.normalize_panel(ui, &asset);
+                self.subtitle_burn_panel(ui, &asset);
             }
         });
         if !self.folder.open {

@@ -99,10 +99,115 @@ async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
     }
     grouped
 }
+async fn caption_frame(components: &Path, path: &Path, time: &str) -> Vec<u8> {
+    let arguments = [
+        "-v", "error", "-i", path.to_str().unwrap(), "-ss", time, "-map", "0:v:0",
+        "-frames:v", "1", "-pix_fmt", "rgb24", "-c:v", "rawvideo", "-threads", "1",
+        "-f", "rawvideo", "pipe:1",
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &arguments, Duration::from_secs(30),
+        96 * 64 * 3, CancellationToken::new()).await.unwrap().stdout
+}
+
+async fn caption_burn(parent: &Path) -> Value {
+    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
+        .expect("Hosted caption proof needs the same-source authenticated CPU media profile"));
+    let directory = parent.join("caption 'unicode [راست]:0");
+    std::fs::create_dir(&directory).unwrap();
+    let subtitles = directory.join("ترجمه فارسی.srt");
+    std::fs::write(&subtitles, "1\n00:00:00,375 --> 00:00:01,125\nسلام دنیا و العربية!\n\n").unwrap();
+    let cli = Cli {
+        data: directory.join("state"),
+        components: components.clone(),
+        request_timeout: Duration::from_secs(60),
+    };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let external = cli.mutation(&scope, "register-external-caption", "assets.register", json!({"path":subtitles})).await;
+    let mut cases = Vec::new();
+    for transfer in ["bt709", "smpte2084", "arib-std-b67"] {
+        let hdr = transfer != "bt709";
+        let input = directory.join(format!("original-{transfer}.mkv"));
+        let output = directory.join(format!("burned-{transfer}.mkv"));
+        let (matrix, primaries, pixel_format) = if hdr {
+            ("bt2020nc", "bt2020", "yuv420p10le")
+        } else {
+            ("bt709", "bt709", "yuv420p")
+        };
+        let args = [
+            "-v", "error", "-filter_threads", "1",
+            "-f", "lavfi", "-i", "testsrc2=size=96x64:rate=8:duration=2",
+            "-f", "lavfi", "-i", "sine=frequency=330:sample_rate=48000:duration=2",
+            "-f", "lavfi", "-i", "sine=frequency=550:sample_rate=48000:duration=2",
+            "-i", subtitles.to_str().unwrap(), "-map", "0:v", "-map", "1:a", "-map", "2:a", "-map", "3:s",
+            "-vf", "setsar=4/3", "-c:v", "ffv1", "-pix_fmt", pixel_format, "-color_range", "tv",
+            "-colorspace", matrix, "-color_primaries", primaries, "-color_trc", transfer,
+            "-c:a:0", "pcm_s16le", "-c:a:1", "flac", "-c:s", "copy", input.to_str().unwrap(),
+        ].map(str::to_owned);
+        nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
+            4096, CancellationToken::new()).await.unwrap();
+        let registered = cli.mutation(&scope, &format!("register-caption-{transfer}"), "assets.register", json!({"path":input})).await;
+        let subtitle = if hdr { json!({"kind":"embedded","stream_index":3}) }
+            else { json!({"kind":"external","asset_id":external["id"]}) };
+        let color = if hdr { json!({"kind":"tone_map_bt709","peak_nits":1000}) }
+            else { json!({"kind":"preserve_sdr"}) };
+        let params = json!({"asset_id":registered["id"],"output":output,"video_stream":0,"subtitle":subtitle,
+            "color":color,"audio":{"kind":"copy_selected","indices":[2,1]},"quality":"lossless_ffv1"});
+        let review = cli.query("subtitles.burn", params.clone()).await;
+        let document = directory.join(format!("burn-{transfer}.json"));
+        std::fs::write(&document, serde_json::to_vec(&params).unwrap()).unwrap();
+        let (typed, code) = cli.human(&["media", "burn-subtitles", "--file", document.to_str().unwrap()]).await;
+        assert_eq!(code, 0, "{typed}");
+        assert_eq!(typed["result"]["hash"], review["hash"]);
+        assert_eq!(review["subtitle_burn"]["font_sha256"].as_str().unwrap().len(), 64);
+        let job = cli.mutation(&scope, &format!("burn-caption-{transfer}"), "jobs.submit",
+            json!({"plan_id":review["id"],"plan_hash":review["hash"]})).await;
+        cli.completed(job["job_id"].as_str().unwrap()).await;
+        let probe = fixture::probe(&components, &output).await;
+        assert_eq!(probe["streams"].as_array().unwrap().len(), 3);
+        let video = &probe["streams"][0];
+        assert_eq!(video["sample_aspect_ratio"], "4:3");
+        assert_eq!(video["pix_fmt"], "yuv420p");
+        assert_eq!(video["color_range"], "tv");
+        let original_probe = fixture::probe(&components, &input).await;
+        for key in ["color_primaries", "color_space", "color_transfer"] {
+            if hdr {
+                assert_eq!(video[key], "bt709");
+            } else {
+                assert_eq!(video[key], original_probe["streams"][0][key]);
+            }
+        }
+        assert!(video.get("side_data_list").is_none());
+        assert_eq!(probe["streams"][1]["codec_name"], "flac");
+        assert_eq!(probe["streams"][2]["codec_name"], "pcm_s16le");
+        let original_packets = packets(&components, &input).await;
+        let burned_packets = packets(&components, &output).await;
+        for (input_index, output_index) in [(2,1), (1,2)] {
+            let expected: Vec<_> = original_packets[&input_index].iter().cloned().map(|mut packet| {
+                packet["stream_index"] = json!(output_index);
+                packet
+            }).collect();
+            assert_eq!(burned_packets[&output_index], expected);
+        }
+        let frame = caption_frame(&components, &output, "0.500").await;
+        assert_eq!(frame.len(),96 * 64 * 3);
+        let original = caption_frame(&components, &input, "0.500").await;
+        assert_ne!(frame, original);
+        if !hdr {
+            assert_eq!(caption_frame(&components, &output, "0").await, caption_frame(&components, &input, "0").await);
+            assert_eq!(caption_frame(&components, &output, "1.500").await, caption_frame(&components, &input, "1.500").await);
+        }
+        cases.push(json!({"job":job["job_id"],"source_transfer":transfer,"correct_sdr_tags":true,
+            "non_square_sar_preserved":true,"independent_audio_packet_equality":true,
+            "caption_picture_sha256":hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&frame))}));
+    }
+    json!(cases)
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
     let media = fixture::generate().await;
+    let caption_facts = caption_burn(media.directory.path()).await;
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -1462,6 +1567,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
         "packet_split":{"batch":split_batch["batch_id"],"verified_parts":2,"original_clock_packets":16,"rejected_member_blocks_batch":true},
+        "caption_burn":caption_facts,
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},
