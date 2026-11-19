@@ -242,6 +242,15 @@ impl ProjectRead for ObservedRead<'_> {
     ) -> Result<Vec<EntityEnvelope>> {
         panic!("Compiler used legacy full-vector interval prefetch")
     }
+    fn following(
+        &self,
+        _: &EntityId,
+        _: &EntityId,
+        _: Rational,
+        _: usize,
+    ) -> Result<Vec<EntityEnvelope>> {
+        panic!("Compiler expanded an edit-only clip tail")
+    }
 }
 impl RenderRead for ObservedRead<'_> {
     fn render_header_raw(&self) -> &str {

@@ -601,6 +601,7 @@ mod tests {
                     | "clips.trim"
                     | "clips.slip"
                     | "tracks.set_enabled"
+                    | "timeline.remove_gap"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
@@ -1303,6 +1304,7 @@ mod tests {
             ("clips.trim", vec![], true),
             ("clips.slip", vec![], true),
             ("tracks.set_enabled", vec![], true),
+            ("timeline.remove_gap", vec![], true),
             ("clips.remove", vec![], false),
             ("markers.place", vec!["marker_id"], false),
             ("markers.remove", vec![], false),

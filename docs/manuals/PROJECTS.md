@@ -191,6 +191,24 @@ in one edit. Each registered stream needs a probe-declared interval. The
 engine checks the resulting range, current access and the registered source
 identity before committing the edit. A zero offset returns a no-change receipt.
 
+## Close an empty timeline range
+
+Open **Visible sequence range (exact seconds)** and enter the start and
+exclusive end of an empty region. Use **Close gap on selected track** or
+**Close gap across all tracks**. The edit shifts later clips left by the gap
+length. Source ranges, clip IDs, link groups and sequence markers retain their
+values. Undo restores the complete original timeline positions.
+
+```text
+numera-wiz timeline remove-gap --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track VIDEO --track AUDIO --start 1 --end 4 --replay-scope SCOPE --idempotency-key close-gap
+```
+
+MCP uses `timeline.remove_gap` with `sequence_id`, `track_ids` and the
+half-open `range`. Both endpoints must be on each selected track's grid.
+Include every linked companion in the later clips through the selected tracks.
+An occupied range returns `GAP_NOT_EMPTY`. One operation covers up to 16
+tracks and 128 clips. An empty tail returns a no-change receipt.
+
 ## Track participation
 
 In Projects, select an audio or video track and choose **Disable track**.

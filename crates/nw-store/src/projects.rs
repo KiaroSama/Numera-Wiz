@@ -766,7 +766,7 @@ impl ProjectReadSnapshot {
         sequence: &EntityId,
         track_id: &EntityId,
         start: nw_domain::time::Rational,
-        end: nw_domain::time::Rational,
+        end: Option<nw_domain::time::Rational>,
         after: Option<&str>,
         limit: usize,
     ) -> Result<(Vec<(String, ClipSummary)>, bool)> {
@@ -775,7 +775,7 @@ impl ProjectReadSnapshot {
             sequence,
             track_id,
             &track,
-            nw_domain::time::TimeRange { start, end },
+            (start, end),
             (after, limit),
             None,
         )
@@ -787,11 +787,11 @@ impl ProjectReadSnapshot {
         sequence: &EntityId,
         track_id: &EntityId,
         track: &Track,
-        range: nw_domain::time::TimeRange,
+        range: (nw_domain::time::Rational, Option<nw_domain::time::Rational>),
         page: (Option<&str>, usize),
         summary_budget: Option<usize>,
     ) -> Result<(Vec<(String, ClipSummary)>, bool)> {
-        let nw_domain::time::TimeRange { start, end } = range;
+        let (start, end) = range;
         let (after, limit) = page;
         let mut summary_bytes = 0;
         let mut admit_summary = |bytes: usize| -> Result<()> {
@@ -812,14 +812,16 @@ impl ProjectReadSnapshot {
         let scaled = start.checked_mul(track.grid)?;
         let tick = scaled.numerator() / scaled.denominator();
         let lower = format!("{prefix}{tick:016x}/");
-        let upper_time = end.checked_mul(track.grid)?;
-        let upper_tick = upper_time.numerator() / upper_time.denominator();
-        let upper = format!(
-            "{prefix}{:016x}/",
-            upper_tick
-                .checked_add(1)
-                .ok_or_else(|| domain::limit("Viewport grid overflow"))?
-        );
+        let upper = if let Some(end) = end {
+            let upper_time = end.checked_mul(track.grid)?;
+            let upper_tick = upper_time.numerator() / upper_time.denominator();
+            format!(
+                "{prefix}{:016x}/",
+                upper_tick.checked_add(1).ok_or_else(|| domain::limit("Viewport grid overflow"))?
+            )
+        } else {
+            format!("{prefix}\u{10ffff}")
+        };
         let table = self.read.open_table(RECORDS).map_err(storage)?;
         let mut rows = Vec::new();
         if after.is_none()
@@ -832,6 +834,9 @@ impl ProjectReadSnapshot {
             admit_summary(data.value().len())?;
             let clip: ClipSummary = decode(data.value())?;
             if clip.sequence_start.checked_add(clip.duration)? > start {
+                if limit == 0 {
+                    return Ok((rows, true));
+                }
                 rows.push((key.value().to_owned(), clip));
             }
         }
@@ -850,7 +855,7 @@ impl ProjectReadSnapshot {
             }
             admit_summary(data.value().len())?;
             let clip: ClipSummary = decode(data.value())?;
-            if clip.sequence_start >= end {
+            if end.is_some_and(|end| clip.sequence_start >= end) {
                 break;
             }
             if clip.sequence_start.checked_add(clip.duration)? <= start {
@@ -916,7 +921,7 @@ impl ProjectReadSnapshot {
                 sequence,
                 track,
                 range.start,
-                range.end,
+                Some(range.end),
                 track_after,
                 limit + 1,
             )?;
@@ -1008,11 +1013,24 @@ impl ProjectRead for ProjectReadSnapshot {
         if self.raw_entity(track)?.is_none() {
             return Ok(Vec::new());
         }
-        let (rows, more) = self.clip_rows(sequence, track, start, end, None, limit)?;
+        let (rows, more) = self.clip_rows(sequence, track, start, Some(end), None, limit)?;
         if more {
             return Err(domain::limit(
                 "Collision candidates exceed the bounded edit closure",
             ));
+        }
+        rows.iter().map(|(_, clip)| self.entity(&clip.id)).collect()
+    }
+    fn following(
+        &self,
+        sequence: &EntityId,
+        track: &EntityId,
+        from: nw_domain::time::Rational,
+        limit: usize,
+    ) -> Result<Vec<EntityEnvelope>> {
+        let (rows, more) = self.clip_rows(sequence, track, from, None, None, limit)?;
+        if more || rows.len() > limit {
+            return Err(domain::limit("Gap closure exceeds the permitted clip count"));
         }
         rows.iter().map(|(_, clip)| self.entity(&clip.id)).collect()
     }

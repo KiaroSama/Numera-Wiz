@@ -4,6 +4,19 @@ use nw_domain::{projects as model, time::TimeRange};
 
 #[derive(Subcommand)]
 pub enum Timeline {
+    /// Close an empty range on the selected tracks and move the later clips left.
+    RemoveGap {
+        #[command(flatten)]
+        context: super::projects::WriteContext,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long = "track", required = true)]
+        tracks: Vec<String>,
+        #[arg(long)]
+        start: String,
+        #[arg(long)]
+        end: String,
+    },
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
         #[arg(long)]
@@ -38,6 +51,17 @@ pub enum Timeline {
 impl Timeline {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
+            Self::RemoveGap { context, sequence, tracks, start, end } => {
+                let range = TimeRange {
+                    start: super::projects::rational(&start)?,
+                    end: super::projects::rational(&end)?,
+                };
+                range.validate()?;
+                let input: model::RemoveGapInput = commands::parse(json!({
+                    "sequence_id":sequence,"track_ids":tracks,"range":range
+                }))?;
+                context.request("timeline.remove_gap", serde_json::to_value(input)?)
+            }
             Self::PreviewFrame {
                 project,
                 revision,

@@ -94,7 +94,7 @@ impl RenderRead for ProjectReadSnapshot {
             sequence,
             track_id,
             track,
-            range,
+            (range.start, Some(range.end)),
             (None, limit),
             Some(MAX_CLIPS * 1024),
         )?;

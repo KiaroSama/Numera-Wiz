@@ -95,6 +95,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `logs status` | Inspect owner log health under current owner authority. |
 | `projects list/create/inspect`, `sequences create/inspect` | Discover readable projects; create and inspect durable project/sequence state. |
 | `tracks set-enabled TRACK --enabled false` | Disable a track at the expected project revision while preserving clip identities. |
+| `timeline remove-gap --sequence ID --track ID --start A --end B` | Close an empty range and move later clips on the selected tracks. Repeat `--track` for linked tracks. |
 | `clips place/move/link/unlink/split/trim/slip/remove`, `history undo/redo` | Apply revision-checked project edits and retained history. |
 | `markers wave-projection --project ID --clip ID --revision N` | Read original WAVE cues at their exact positions in a committed audio clip. |
 

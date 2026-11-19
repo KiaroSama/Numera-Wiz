@@ -434,6 +434,9 @@ impl Service {
                     "clips.slip" => {
                         ProjectEditIntent::Slip(commands::parse(request.params.clone())?)
                     }
+                    "timeline.remove_gap" => {
+                        ProjectEditIntent::RemoveGap(commands::parse(request.params.clone())?)
+                    }
                     "tracks.set_enabled" => {
                         ProjectEditIntent::SetTrackEnabled(commands::parse(request.params.clone())?)
                     }
@@ -460,6 +463,7 @@ impl Service {
                     ProjectEditIntent::Unlink(_)
                     | ProjectEditIntent::Trim(_)
                     | ProjectEditIntent::Slip(_)
+                    | ProjectEditIntent::RemoveGap(_)
                     | ProjectEditIntent::SetTrackEnabled(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
                     _ => MAX_CHANGES * 2,

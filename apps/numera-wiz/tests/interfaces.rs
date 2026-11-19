@@ -524,6 +524,7 @@ fn project_mcp_output_contract(pages: &[rmcp::model::ListToolsResult]) {
         "clips.trim",
         "clips.slip",
         "tracks.set_enabled",
+        "timeline.remove_gap",
         "clips.remove",
         "history.undo",
         "history.redo",

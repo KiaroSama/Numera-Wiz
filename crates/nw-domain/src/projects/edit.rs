@@ -16,6 +16,13 @@ pub trait ProjectRead {
         end: Rational,
         limit: usize,
     ) -> Result<Vec<EntityEnvelope>>;
+    fn following(
+        &self,
+        sequence: &EntityId,
+        track: &EntityId,
+        from: Rational,
+        limit: usize,
+    ) -> Result<Vec<EntityEnvelope>>;
     fn entity(&self, id: &EntityId) -> Result<EntityEnvelope> {
         let raw = self
             .raw_entity(id)?
@@ -43,6 +50,7 @@ pub enum ProjectEditIntent {
     Split(SplitInput),
     Trim(TrimInput),
     Slip(SlipInput),
+    RemoveGap(RemoveGapInput),
     SetTrackEnabled(SetTrackEnabledInput),
     Remove(RemoveInput),
 }
@@ -698,6 +706,63 @@ pub fn resolve_edit<R: ProjectRead>(
                 grid_tick(magnitude, track.grid)?;
                 clip.source_range.start = clip.source_range.start.checked_add(input.delta)?;
                 clip.source_range.end = clip.source_range.end.checked_add(input.delta)?;
+                entity.update(&clip)?;
+                edit.set(entity)?;
+            }
+            json!({})
+        }
+        ProjectEditIntent::RemoveGap(input) => {
+            input.range.validate()?;
+            let tracks: BTreeSet<_> = input.track_ids.iter().collect();
+            if !(1..=16).contains(&tracks.len()) || tracks.len() != input.track_ids.len() {
+                return Err(invalid("Select one to sixteen distinct tracks"));
+            }
+            let sequence = edit.get(&input.sequence_id)?;
+            sequence.semantics()?;
+            if sequence.payload::<Sequence>("sequence")?.locked {
+                return Err(DomainError::new("ENTITY_LOCKED", "The sequence is locked"));
+            }
+            let mut selected = BTreeSet::new();
+            for track_id in tracks {
+                let track_entity = edit.get(track_id)?;
+                track_entity.semantics()?;
+                let track: Track = track_entity.payload("track")?;
+                if track.sequence_id != input.sequence_id || track_entity.owner_id.as_ref() != Some(&input.sequence_id) {
+                    return Err(invalid("Every selected track must belong to the sequence"));
+                }
+                if track.locked {
+                    return Err(DomainError::new("ENTITY_LOCKED", "A selected track is locked"));
+                }
+                grid_tick(input.range.start, track.grid)?;
+                grid_tick(input.range.end, track.grid)?;
+                for entity in read.following(&input.sequence_id, track_id, input.range.start, MAX_CHANGES - selected.len())? {
+                    let clip: Clip = entity.payload("clip")?;
+                    if clip.sequence_id != input.sequence_id || clip.track_id != *track_id {
+                        return Err(DomainError::new("PROJECT_CORRUPT", "The clip index differs from its timeline owner"));
+                    }
+                    if clip.sequence_start < input.range.end {
+                        return Err(DomainError::new("GAP_NOT_EMPTY", "A selected track contains material in the requested gap"));
+                    }
+                    if !selected.insert(entity.id) {
+                        return Err(DomainError::new("PROJECT_CORRUPT", "The clip index contains a repeated occurrence"));
+                    }
+                }
+            }
+            if selected.is_empty() {
+                return edit.finish(json!({}));
+            }
+            let closure = expand_links(read, &selected.iter().cloned().collect::<Vec<_>>())?;
+            if closure.iter().any(|entity| !selected.contains(&entity.id)) {
+                return Err(DomainError::new(
+                    "LINKED_TRACKS_REQUIRED",
+                    "Every linked clip must be on a selected track at or after the end of the gap",
+                ));
+            }
+            let duration = input.range.end.checked_sub(input.range.start)?;
+            for mut entity in closure {
+                let mut clip: Clip = entity.payload("clip")?;
+                edit.clip_context(&clip)?;
+                clip.sequence_start = clip.sequence_start.checked_sub(duration)?;
                 entity.update(&clip)?;
                 edit.set(entity)?;
             }

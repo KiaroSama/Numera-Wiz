@@ -21,7 +21,7 @@ pub struct WriteContext {
     pub identity: MutationIdentity,
 }
 impl WriteContext {
-    fn request(self, id: &str, params: Value) -> Result<Request> {
+    pub(super) fn request(self, id: &str, params: Value) -> Result<Request> {
         let mut request = query(id, params);
         model::validate_id(&self.project)?;
         model::Revision::parse(&self.expected_revision)?;

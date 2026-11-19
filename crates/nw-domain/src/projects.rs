@@ -796,6 +796,15 @@ pub struct SlipInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct RemoveGapInput {
+    pub sequence_id: EntityId,
+    #[schemars(length(min = 1, max = 16), extend("uniqueItems" = true))]
+    pub track_ids: Vec<EntityId>,
+    pub range: crate::time::TimeRange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetTrackEnabledInput {
     pub track_id: EntityId,
     pub enabled: bool,

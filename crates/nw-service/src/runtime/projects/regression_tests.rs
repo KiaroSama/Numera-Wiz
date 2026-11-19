@@ -850,6 +850,39 @@ pub(in crate::runtime) async fn linked_edits() {
     for (id, raw) in right_ids.iter().zip(before_slip) {
         assert_eq!(fixture.raw(id), raw);
     }
+    let gap_fixture = Fixture::new().await;
+    let left: Clip = gap_fixture.entity(&gap_fixture.clips[1]).payload("clip").unwrap();
+    let right: Clip = gap_fixture.entity(&gap_fixture.clips[2]).payload("clip").unwrap();
+    gap_fixture.accept(gap_fixture.move_request(2, 16, "move-gap-linked-tail")).await;
+    gap_fixture.accept(gap_fixture.request("clips.link", "link-gap-tail", json!({
+        "clip_ids":[gap_fixture.clips[1],gap_fixture.clips[2]],"link_policy":"expand"
+    }))).await;
+    let close_gap = |tracks, start| json!({
+        "sequence_id":left.sequence_id,"track_ids":tracks,
+        "range":{"start":{"num":start,"den":"1"},"end":{"num":"4","den":"1"}}
+    });
+    let both = [&left.track_id, &right.track_id];
+    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-not-empty", close_gap(both, "0")), "GAP_NOT_EMPTY").await;
+    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-link-outside", close_gap([&left.track_id, &left.track_id], "1")), "VALIDATION_ERROR").await;
+    let mut one_track = close_gap(both, "1");
+    one_track["track_ids"] = json!([left.track_id]);
+    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-link-other-track", one_track), "LINKED_TRACKS_REQUIRED").await;
+    let before: Vec<_> = gap_fixture.clips[1..3].iter().map(|id| gap_fixture.raw(id)).collect();
+    let actual = gap_fixture.accept(gap_fixture.request("timeline.remove_gap", "close-gap", close_gap(both, "1"))).await;
+    assert_eq!(actual["changed_ids"].as_array().unwrap().len(), 2);
+    for (id, raw) in gap_fixture.clips[1..3].iter().zip(&before) {
+        let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
+        let original: Clip = original.payload("clip").unwrap();
+        let after: Clip = gap_fixture.entity(id).payload("clip").unwrap();
+        assert_eq!(after.sequence_start, nw_domain::time::Rational::new(1, 1).unwrap());
+        assert_eq!(after.source_range, original.source_range);
+        assert_eq!(after.duration, original.duration);
+        assert_eq!(after.link_group_id, original.link_group_id);
+    }
+    gap_fixture.accept(gap_fixture.request("history.undo", "undo-close-gap", json!({}))).await;
+    for (id, raw) in gap_fixture.clips[1..3].iter().zip(before) {
+        assert_eq!(gap_fixture.raw(id), raw);
+    }
     let track_fixture = Fixture::new().await;
     let clip: Clip = track_fixture
         .entity(&track_fixture.clips[0])

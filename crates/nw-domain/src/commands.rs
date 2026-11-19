@@ -208,7 +208,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-        | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
+        | "markers.place" | "markers.remove" | "timeline.remove_gap" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
         }
         _ => ProjectContextRule::Forbidden,
@@ -317,7 +317,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "clips.move" | "clips.trim" | "clips.slip" | "tracks.set_enabled" => {
+        "clips.move" | "clips.trim" | "clips.slip" | "tracks.set_enabled" | "timeline.remove_gap" => {
             Some(contracts::edit(EditResult::Move))
         }
         "clips.link" => Some(contracts::edit(EditResult::Link)),
@@ -560,6 +560,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Shift the source windows of linked clips while retaining their timeline positions",
             DurableMutation,
             crate::projects::SlipInput
+        ),
+        row!(
+            "timeline.remove_gap",
+            "Close a verified empty region and shift the later clips on explicitly selected tracks",
+            DurableMutation,
+            crate::projects::RemoveGapInput
         ),
         row!(
             "tracks.set_enabled",
@@ -1790,6 +1796,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "timeline.render",
     "timeline.preview_frame",
     "timeline.render_mixed",
+    "timeline.remove_gap",
     "clips.place",
     "clips.move",
     "clips.link",
