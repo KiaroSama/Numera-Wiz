@@ -287,7 +287,8 @@ mod tests {
             })
             .unwrap_or_else(|| panic!("projects.create descriptor missing: {list_response:?}"));
         assert_eq!(
-            descriptor, listed_descriptor,
+            &catalog_fields(descriptor),
+            listed_descriptor,
             "list={list_response:?}; schema={schema_response:?}"
         );
 
