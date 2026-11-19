@@ -276,37 +276,50 @@ impl WizApp {
         let ready = self.project_ready();
         ui.heading(group.summary["name"].as_str().unwrap_or("Project"));
         ui.small(format!("Revision {}", group.key.revision));
-        let query = ui.horizontal(|ui| {
-            if ui
-                .add_enabled(idle, egui::Button::new("Projects catalog"))
-                .clicked()
-            {
-                self.project_navigate(Navigation::Catalog, ui.ctx());
-            }
-            if ui.add_enabled(idle, egui::Button::new("Refresh")).clicked() {
-                self.project_refresh(ui.ctx());
-            }
-            ui.add_enabled_ui(ready, |ui| {
-                ui.menu_button("Search", |ui| {
-                    let input = ui.add(
-                        egui::TextEdit::singleline(&mut self.projects.bin_query_input)
-                            .hint_text("Search names in this bin")
-                            .desired_width(160.0)
-                            .char_limit(128),
-                    );
-                    let enter = input.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-                    if ui.button("Apply").clicked() || enter {
-                        ui.close();
-                        return Some(self.projects.bin_query_input.clone());
-                    }
-                    if ui.add_enabled(group.view.bin_query.is_some() || !self.projects.bin_query_input.is_empty(), egui::Button::new("Clear search")).clicked() {
-                        ui.close();
-                        return Some(String::new());
-                    }
-                    None
-                }).inner.flatten()
-            }).inner
-        }).inner;
+        let query = ui
+            .horizontal(|ui| {
+                if ui
+                    .add_enabled(idle, egui::Button::new("Projects catalog"))
+                    .clicked()
+                {
+                    self.project_navigate(Navigation::Catalog, ui.ctx());
+                }
+                if ui.add_enabled(idle, egui::Button::new("Refresh")).clicked() {
+                    self.project_refresh(ui.ctx());
+                }
+                ui.add_enabled_ui(ready, |ui| {
+                    ui.menu_button("Search", |ui| {
+                        let input = ui.add(
+                            egui::TextEdit::singleline(&mut self.projects.bin_query_input)
+                                .hint_text("Search names in this bin")
+                                .desired_width(160.0)
+                                .char_limit(128),
+                        );
+                        let enter = input.lost_focus()
+                            && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                        if ui.button("Apply").clicked() || enter {
+                            ui.close();
+                            return Some(self.projects.bin_query_input.clone());
+                        }
+                        if ui
+                            .add_enabled(
+                                group.view.bin_query.is_some()
+                                    || !self.projects.bin_query_input.is_empty(),
+                                egui::Button::new("Clear search"),
+                            )
+                            .clicked()
+                        {
+                            ui.close();
+                            return Some(String::new());
+                        }
+                        None
+                    })
+                    .inner
+                    .flatten()
+                })
+                .inner
+            })
+            .inner;
         if let Some(query) = query {
             self.project_search_bin((!query.is_empty()).then_some(query), ui.ctx());
             return;
@@ -777,7 +790,10 @@ impl WizApp {
         ui.separator();
         let ready_on_track = ready
             && group.track.as_ref().is_some_and(|track| !track.locked)
-            && group.sequence.as_ref().is_some_and(|sequence| !sequence.locked);
+            && group
+                .sequence
+                .as_ref()
+                .is_some_and(|sequence| !sequence.locked);
         let edit_ready = ready_on_track && !clip.locked;
         ui.add_enabled_ui(edit_ready,|ui| {
             rational(ui,"Move by (seconds)",&mut self.projects.forms.delta);

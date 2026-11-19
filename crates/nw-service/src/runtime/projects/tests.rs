@@ -148,7 +148,13 @@ pub(in crate::runtime) async fn indexed_snapshot_and_edit_cases() {
             .unwrap();
         assert!(page.scanned <= 129);
         let sparse = indexed
-            .bin_search_page(&EntityId::parse(bin).unwrap(), None, 128, 256, "never matches")
+            .bin_search_page(
+                &EntityId::parse(bin).unwrap(),
+                None,
+                128,
+                256,
+                "never matches",
+            )
             .unwrap();
         assert!(sparse.items.is_empty() && sparse.next_key.is_some());
         assert_eq!(sparse.count_accuracy, "lower_bound");

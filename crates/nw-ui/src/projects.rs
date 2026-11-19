@@ -522,7 +522,13 @@ impl WizApp {
             self.error = Some(error.message);
             return;
         }
-        let mut view = self.projects.group.as_ref().expect("Ready group").view.clone();
+        let mut view = self
+            .projects
+            .group
+            .as_ref()
+            .expect("Ready group")
+            .view
+            .clone();
         if view.bin_query != query {
             view.bin_query = query;
             self.project_reselect(view, ctx);

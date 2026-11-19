@@ -1446,8 +1446,16 @@ mod tests {
                 .is_none()
         );
         let filtered = ProjectCli::try_parse_from([
-            "test", "inspect", "--project", id, "--projection", "bin_page", "--bin", id,
-            "--query", "ÉDiT",
+            "test",
+            "inspect",
+            "--project",
+            id,
+            "--projection",
+            "bin_page",
+            "--bin",
+            id,
+            "--query",
+            "ÉDiT",
         ])
         .unwrap();
         let filtered = prepare(Command::Projects(filtered.command)).unwrap();

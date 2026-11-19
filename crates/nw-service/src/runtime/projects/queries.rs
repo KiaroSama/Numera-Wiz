@@ -164,7 +164,8 @@ impl Query {
         if let Some(name) = &query.bin_query {
             binding["query"] = json!(name);
         }
-        query.binding = serde_json::to_string(&binding).map_err(|e| domain::invalid(e.to_string()))?;
+        query.binding =
+            serde_json::to_string(&binding).map_err(|e| domain::invalid(e.to_string()))?;
         if query.binding.len() > 8192 {
             return Err(domain::limit("Project query binding exceeds 8 KiB"));
         }
@@ -212,7 +213,8 @@ impl Query {
             _ => {
                 let page = match self.projection.as_str() {
                     "bin_page" => {
-                        let bin = self.bin
+                        let bin = self
+                            .bin
                             .as_ref()
                             .ok_or_else(|| domain::invalid("Bin identity required"))?;
                         let budget = MAX_PAGE_BYTES - 8192;
@@ -260,10 +262,9 @@ impl Query {
                         .as_ref()
                         .map(|key| ticket.cursor(id, binding, key, count))
                 );
-                result["total_count"] = json!(if self.bin_query.is_some() || matches!(
-                    self.projection.as_str(),
-                    "viewport" | "marker_page"
-                ) {
+                result["total_count"] = json!(if self.bin_query.is_some()
+                    || matches!(self.projection.as_str(), "viewport" | "marker_page")
+                {
                     count
                 } else {
                     page.total_count
@@ -840,13 +841,15 @@ pub(super) async fn exercise_real_snapshot_lifetime() {
         .reopen_current_generation(&service.root_lease)
         .unwrap();
     let stale = service
-        .dispatch(context.clone(), page_request(Some(fresh["next_cursor"].clone())))
+        .dispatch(
+            context.clone(),
+            page_request(Some(fresh["next_cursor"].clone())),
+        )
         .await;
     assert_eq!(stale.error.unwrap().code, "SNAPSHOT_EXPIRED");
 
     let create_bin = |revision: &str, parent: &str, name: &str, key: &str| {
-        let mut request =
-            Request::query("bins.add", json!({"parent_id":parent,"name":name}));
+        let mut request = Request::query("bins.add", json!({"parent_id":parent,"name":name}));
         request.project = Some(nw_domain::commands::ProjectRef {
             id: project.into(),
             expected_revision: Some(revision.into()),

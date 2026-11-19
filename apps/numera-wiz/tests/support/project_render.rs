@@ -25,8 +25,7 @@ async fn edit(
     assert_eq!(
         response["ok"], true,
         "Public compiler fixture edit {id} ({key}) failed: {} {}",
-        response["error"]["code"],
-        response["error"]["message"]
+        response["error"]["code"], response["error"]["message"]
     );
     assert!(response["receipt_id"].is_string());
     response["result"].clone()

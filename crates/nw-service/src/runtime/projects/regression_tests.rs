@@ -1319,10 +1319,19 @@ async fn clip_locks_change_only_the_linked_lock_flags() {
         .await;
     assert!(accepted.ok, "{:?}", accepted.error);
     assert!(accepted.receipt_id.is_some());
-    let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+    let replay = fixture
+        .service
+        .dispatch(fixture.context.clone(), request)
+        .await;
     assert_eq!(accepted.receipt_id, replay.receipt_id);
     assert_eq!(accepted.result, replay.result);
-    assert_eq!(accepted.result.unwrap()["changed_ids"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        accepted.result.unwrap()["changed_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     for id in ids {
         assert!(fixture.entity(id).payload::<Clip>("clip").unwrap().locked);
     }

@@ -564,7 +564,11 @@ pub fn inspect(sequence_only: bool) -> Value {
         vec![
             summary,
             entity,
-            collection("bin_page", "ProjectItemSummary", enumeration(&["exact", "lower_bound"])),
+            collection(
+                "bin_page",
+                "ProjectItemSummary",
+                enumeration(&["exact", "lower_bound"]),
+            ),
         ]
     };
     document(json!({"oneOf":branches}), defs)

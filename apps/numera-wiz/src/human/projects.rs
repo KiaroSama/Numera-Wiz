@@ -105,7 +105,9 @@ impl Projects {
                 let mut params = json!({"projection":projection,"entity_id":entity,"bin_id":bin,"limit":limit,"cursor":cursor});
                 if let Some(query) = query {
                     if projection != "bin_page" {
-                        return Err(model::invalid("A name query requires the bin_page projection"));
+                        return Err(model::invalid(
+                            "A name query requires the bin_page projection",
+                        ));
                     }
                     model::label(&query)?;
                     params["query"] = json!(query);
@@ -130,7 +132,11 @@ pub enum Bins {
 impl Bins {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::Add { context, parent, name } => {
+            Self::Add {
+                context,
+                parent,
+                name,
+            } => {
                 model::label(&name)?;
                 let input = model::CreateBinInput {
                     parent_id: model::EntityId::parse(parent)?,
