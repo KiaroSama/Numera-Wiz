@@ -2597,3 +2597,17 @@ CLI, MCP and artifact HTTP jobs passed. The first Windows attempt reported a
 filesystem error when the retained prior executable reopened the preserved
 project after the new executable closed. The other three package lifecycle
 journeys in that job passed. [Chrome](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/job/135555727831) · [Desktop](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/job/135572009458) · [CI attempts](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602)
+
+## Package and media verification on `bf775d6`
+
+Each of the four portable archives passed the embedded CPU FFV1 exercise and
+produced the documented first H.264 export. Independent downloads matched the
+archive digest, target executable architecture, FFmpeg and ffprobe digests,
+matching sources, sample and six agent configuration manifests. The Windows
+regression restored the existing project through the prior and current owner
+processes on the first attempt. [CI and packages](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206) · [Windows evidence](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14538798362)
+
+The HEVC tests preserved all six original presentation times in MP4 and
+Matroska. The registered sample edit matched all 6,588 original 5.1 PCM sample
+frames in WAVE and decoded FLAC. The actual Chrome and desktop workspaces and
+both official MCP transports passed. [Media report](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14537983513) · [Chrome](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135621836372) · [Desktop](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135647881278) · [MCP transports](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/job/135621836272)
