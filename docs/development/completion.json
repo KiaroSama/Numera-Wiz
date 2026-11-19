@@ -82,6 +82,24 @@
           "asserted_domain": "Linux x64 standalone first export through its documented typed CLI",
           "platforms": ["ubuntu-24.04"],
           "observed_outcome": "The packaged application registered the bundled sample, reviewed and submitted the exact H.264 plan, then saved a byte-identical verified copy. Archive inspection matched the sample, guide and six agent manifests."
+        },
+        {
+          "boundary": "standalone_cli_first_export",
+          "commit": "241ca51f7fcb8e6cf56fb54a6d8a62a267704b26",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135532000611",
+          "artifact_sha256": "ee29baa6661a1bb78aee341478906624f8d376d895eca554de8c95021f515038",
+          "asserted_domain": "Apple Silicon standalone first export through its documented typed CLI",
+          "platforms": ["macos-26"],
+          "observed_outcome": "The packaged application finished the H.264 export and compared the saved copy with the published digest. Archive inspection matched the fixture, manual and all six agent manifests."
+        },
+        {
+          "boundary": "hosted_windows_cli_first_export",
+          "commit": "241ca51f7fcb8e6cf56fb54a6d8a62a267704b26",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135532000722",
+          "artifact_sha256": "ac679051d16eece076b8b6c2f5a6fae0a4a66531520c607f8ab79f1ac8e30853",
+          "asserted_domain": "Windows x64 standalone application's hosted first export",
+          "platforms": ["windows-2025"],
+          "observed_outcome": "The hosted packaged application completed its reviewed export and verified the saved copy before uploading. The published ZIP was 537766446 bytes and exceeded the independent download connector's 512 MiB limit."
         }
       ]
     },

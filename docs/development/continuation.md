@@ -19,6 +19,13 @@ the first export and verified the saved bytes. Archive inspection matched the
 sample, manual, six agent manifests and the packaged executable.
 [Linux first-export artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/artifacts/14526695217)
 
+The Apple Silicon archive matched the same fixture, guide and six manifests.
+Its packaged CLI completed the first export and matched the saved output
+digest. The Windows runner completed the same application check before upload.
+Its ZIP exceeded the independent connector's 512 MiB limit. Windows artifact
+upload now uses level-one ZIP compression and retains the generated plugin
+dotfiles. [Apple Silicon artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/artifacts/14527572249) · [Windows hosted result](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135532000722)
+
 On the same commit, a folder cleanup batch kept the relative paths of two
 Unicode-named videos and published the exact companion bytes. The CLI and both
 MCP transports produced the same review hash. A changed companion was refused

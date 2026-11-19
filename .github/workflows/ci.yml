@@ -483,7 +483,7 @@ jobs:
           if-no-files-found: error
           # The staging directory contains the packaged Claude, Codex and Cursor manifests.
           include-hidden-files: true
-          compression-level: 0
+          compression-level: 1
       - name: Build and exercise the macOS app with embedded CPU media
         id: macos-portable
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
