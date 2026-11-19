@@ -865,6 +865,41 @@ impl WizApp {
                     });
                 }
             });
+            if let Some(sequence_settings) = group.sequence.as_ref().map(|sequence| &sequence.settings) {
+                let rate = sequence_settings.frame_rate;
+                let fps = rate.numerator();
+                if rate.denominator() == 1 && matches!(fps, 24 | 25 | 30) {
+                    ui.collapsing("Import picture cut list", |ui| {
+                        let ready = self.project_ready();
+                        let forms = &mut self.projects.forms;
+                        let limit = nw_domain::interchange::MAX_DOCUMENT_BYTES;
+                        ui.add(egui::TextEdit::multiline(&mut forms.edl_document)
+                            .hint_text("CMX 3600 cut list").desired_rows(5).char_limit(limit));
+                        ui.add(egui::TextEdit::multiline(&mut forms.edl_reels)
+                            .hint_text("JSON reel map, if the list contains media reels").desired_rows(3).char_limit(limit));
+                        let can_apply = ready && !forms.edl_document.trim().is_empty();
+                        if ui.add_enabled(can_apply, egui::Button::new("Apply cut list")).clicked() {
+                            if forms.edl_document.len().max(forms.edl_reels.len()) > limit {
+                                self.error = Some("EDL input exceeds 16 KiB".into());
+                                return;
+                            }
+                            let reels = if forms.edl_reels.trim().is_empty() {
+                                Ok(json!([]))
+                            } else {
+                                nw_domain::commands::decode_json(forms.edl_reels.as_bytes())
+                            };
+                            match reels {
+                                Ok(reels) => {
+                                    let parameters = json!({"sequence_id":sequence,"track_id":track,
+                                        "frames_per_second":fps,"document":forms.edl_document,"reels":reels});
+                                    self.mutate_project("interchange.edl.import", parameters, ui.ctx());
+                                }
+                                Err(error) => self.error = Some(error.message),
+                            }
+                        }
+                    });
+                }
+            }
         }
         ui.collapsing("Export timeline range", |ui| {
             let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;

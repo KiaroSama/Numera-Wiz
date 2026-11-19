@@ -99,6 +99,7 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
                 | "timeline.remove_gap"
                 | "mixer.set_track_gain"
                 | "interchange.edl.export"
+                | "interchange.edl.import"
                 | "clips.join_through_edit"
         )
     {
@@ -167,6 +168,9 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
             bounded_array(&mut schema, "clip_ids", 1, 128);
             enumeration(&mut schema, "collision", &["reject"]);
             enumeration(&mut schema, "link_policy", &["expand"]);
+        }
+        "interchange.edl.import" => {
+            schema["properties"]["frames_per_second"]["enum"] = json!([24, 25, 30]);
         }
         "clips.link"
         | "clips.unlink"

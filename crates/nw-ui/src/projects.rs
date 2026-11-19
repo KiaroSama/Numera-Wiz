@@ -216,6 +216,8 @@ impl ProjectsUi {
     fn advance(&mut self) -> Result<u64, String> {
         self.preview_frame = None;
         self.edl = None;
+        self.forms.edl_document.clear();
+        self.forms.edl_reels.clear();
         self.mixed_review = None;
         self.marker_page = None;
         self.wave_projection = None;

@@ -109,6 +109,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "markers.remove"
         | "timeline.remove_gap"
         | "mixer.set_track_gain"
+        | "interchange.edl.import"
         | "history.undo"
         | "history.redo" => Some(ProjectAction::Edit),
         _ => return None,
@@ -146,6 +147,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     if matches!(
         command,
         "clips.place"
+            | "interchange.edl.import"
             | "clips.slip"
             | "timeline.preview_frame"
             | crate::preview::PROGRAM_SEGMENT_COMMAND

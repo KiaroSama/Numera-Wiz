@@ -35,6 +35,22 @@ pub enum Timeline {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Import a UTF-8 CMX 3600 cut list as one reversible edit.
+    ImportEdl {
+        #[command(flatten)]
+        context: super::projects::WriteContext,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        track: String,
+        #[arg(long)]
+        fps: u32,
+        #[arg(long)]
+        file: PathBuf,
+        /// JSON array binding every non-black reel to a registered asset, stream and digest.
+        #[arg(long)]
+        reels: Option<PathBuf>,
+    },
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
         #[arg(long)]
@@ -126,6 +142,23 @@ impl Timeline {
                 });
                 Ok(request)
             }
+            Self::ImportEdl { context, sequence, track, fps, file, reels } => {
+                let reels = if let Some(path) = reels {
+                    commands::parse(commands::decode_json(&read_cmx_file(path)?)?)?
+                } else {
+                    Vec::new()
+                };
+                let document = String::from_utf8(read_cmx_file(file)?)
+                    .map_err(|_| DomainError::new("EDL_INVALID", "EDL document must be UTF-8"))?;
+                let input = nw_domain::interchange::EdlImportInput {
+                    sequence_id: model::EntityId::parse(sequence)?,
+                    track_id: model::EntityId::parse(track)?,
+                    frames_per_second: fps,
+                    document,
+                    reels,
+                };
+                context.request("interchange.edl.import", serde_json::to_value(input)?)
+            }
             Self::PreviewSegment {
                 project,
                 revision,
@@ -209,6 +242,18 @@ impl Timeline {
             }
         }
     }
+}
+
+fn read_cmx_file(path: PathBuf) -> Result<Vec<u8>> {
+    let limit = nw_domain::interchange::MAX_DOCUMENT_BYTES;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take((limit + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > limit {
+        return Err(DomainError::new("RESOURCE_LIMIT", "EDL input file exceeds 16 KiB").into());
+    }
+    Ok(bytes)
 }
 
 pub(super) async fn save_edl(client: &NativeClient, request: Request, path: &Path) -> Result<()> {

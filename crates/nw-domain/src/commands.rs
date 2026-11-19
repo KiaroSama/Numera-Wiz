@@ -223,6 +223,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "markers.remove"
         | "timeline.remove_gap"
         | "mixer.set_track_gain"
+        | "interchange.edl.import"
         | "history.undo"
         | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
@@ -337,6 +338,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
+        "interchange.edl.import" => Some(contracts::edit(EditResult::ImportEdl)),
         "clips.move"
         | "clips.trim"
         | "clips.slip"
@@ -595,6 +597,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Export one committed picture track as a non-drop CMX 3600 cut list",
             Query,
             crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.edl.import",
+            "Apply a non-drop CMX 3600 picture cut list as one reversible project edit",
+            DurableMutation,
+            crate::interchange::EdlImportInput
         ),
         row!(
             "timeline.remove_gap",
@@ -1845,6 +1853,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "timeline.render_mixed",
     "timeline.remove_gap",
     "interchange.edl.export",
+    "interchange.edl.import",
     "clips.place",
     "clips.move",
     "clips.link",

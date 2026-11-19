@@ -666,9 +666,64 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
     let (refusal, status) = cli.human(&args).await;
     assert_ne!(status, 0, "{refusal}");
     assert_eq!(
-        std::fs::read(destination).unwrap(),
+        std::fs::read(&destination).unwrap(),
         b"keep the existing cut list"
     );
+
+    let target = edit(cli, scope, project, "6", "edl-create-target", "sequences.create", json!({
+        "name":"Imported CMX cuts", "settings":{"width":64,"height":48,"frame_rate":{"num":"24","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
+        "tracks":[{"kind":"video","name":"V1"}]
+    })).await;
+    let target_id = target["created"]["sequence_id"].as_str().unwrap();
+    let target_track = target["created"]["tracks"][0]["id"].as_str().unwrap();
+    let reel_file = media.directory.path().join("reels.json");
+    std::fs::write(&destination, text.as_bytes()).unwrap();
+    let mut wrong_reels = edl["reels"].clone();
+    wrong_reels[0]["content_sha256"] = json!("0".repeat(64));
+    std::fs::write(&reel_file, serde_json::to_vec(&wrong_reels).unwrap()).unwrap();
+    let import = |revision: &'static str, key: &'static str| [
+        "timeline", "import-edl", "--project", project, "--expected-revision", revision,
+        "--sequence", target_id, "--track", target_track, "--fps", "24",
+        "--file", destination.to_str().unwrap(), "--reels", reel_file.to_str().unwrap(),
+        "--replay-scope", scope, "--idempotency-key", key,
+    ];
+    let (rejected, status) = cli.human(&import("7", "edl-reject-mismatched-reel")).await;
+    assert_ne!(status, 0, "{rejected}");
+    assert_eq!(rejected["error"]["code"], "SOURCE_CHANGED");
+    std::fs::write(&reel_file, serde_json::to_vec(&edl["reels"]).unwrap()).unwrap();
+    std::fs::write(&destination, text.replacen("00:00:00:00", "::00:00:00:", 1)).unwrap();
+    let (rejected, status) = cli.human(&import("7", "edl-reject-invalid-timecode")).await;
+    assert_ne!(status, 0, "{rejected}");
+    assert_eq!(rejected["error"]["code"], "EDL_INVALID");
+    std::fs::write(&destination, text.as_bytes()).unwrap();
+    let (accepted, status) = cli.human(&import("7", "edl-apply")).await;
+    assert_eq!(status, 0, "{accepted}");
+    assert_eq!(accepted["result"]["revision"], "8");
+    assert_eq!(accepted["result"]["created"]["document_sha256"], edl["document_sha256"]);
+    assert_eq!(accepted["result"]["created"]["clip_ids"].as_array().unwrap().len(), 2);
+    let (rejected, status) = cli.human(&import("8", "edl-reject-overlay")).await;
+    assert_ne!(status, 0, "{rejected}");
+    assert_eq!(rejected["error"]["code"], "CLIP_COLLISION");
+    for revision in ["8", "9", "10"] {
+        if revision == "9" {
+            edit(cli, scope, project, "8", "edl-undo", "history.undo", json!({})).await;
+        } else if revision == "10" {
+            edit(cli, scope, project, "9", "edl-redo", "history.redo", json!({})).await;
+        }
+        let (exported, status) = cli.human(&[
+            "timeline", "export-edl", "--project", project, "--revision", revision,
+            "--sequence", target_id, "--track", target_track, "--end", "1",
+        ]).await;
+        assert_eq!(status, 0, "{exported}");
+        let result = &exported["result"];
+        if revision == "9" {
+            assert!(result["reels"].as_array().unwrap().is_empty());
+            assert!(result["document"].as_str().unwrap().contains("00:00:01:00"));
+        } else {
+            assert_eq!(result["document"], edl["document"]);
+            assert_eq!(result["reels"], edl["reels"]);
+        }
+    }
 }
 
 async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {

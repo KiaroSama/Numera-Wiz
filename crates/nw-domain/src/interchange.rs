@@ -1,4 +1,6 @@
-//! A bounded CMX 3600 cut-list projection of one committed picture track.
+//! Bounded CMX 3600 cut lists for one committed picture track.
+mod import;
+pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600};
 use crate::{
     DomainError, Result,
     media::{MixedCapture, OccurrenceSource},
@@ -18,7 +20,7 @@ pub struct EdlInput {
     pub range: TimeRange,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EdlReel {
     pub name: String,

@@ -693,7 +693,8 @@ impl Service {
             | "markers.place"
             | "markers.remove"
             | "timeline.remove_gap"
-            | "mixer.set_track_gain" => self.project_receipt_readable(context, &response)?,
+            | "mixer.set_track_gain"
+            | "interchange.edl.import" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1328,6 +1329,7 @@ impl Service {
             | "markers.remove"
             | "timeline.remove_gap"
             | "mixer.set_track_gain"
+            | "interchange.edl.import"
             | "history.undo"
             | "history.redo" => {
                 drop(guard);

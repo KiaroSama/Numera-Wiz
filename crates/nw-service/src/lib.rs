@@ -613,6 +613,7 @@ mod tests {
                     | "timeline.remove_gap"
                     | "mixer.set_track_gain"
                     | "clips.join_through_edit"
+                    | "interchange.edl.import"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
@@ -626,7 +627,7 @@ mod tests {
                     "writer_lease",
                     "affected_scope",
                 ];
-                if id == "clips.slip" {
+                if matches!(id, "clips.slip" | "interchange.edl.import") {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }
                 assert_eq!(requirement["request_gates"], serde_json::json!(gates));

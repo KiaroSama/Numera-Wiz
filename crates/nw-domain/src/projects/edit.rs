@@ -44,6 +44,11 @@ pub enum ProjectEditIntent {
     Marker(SequenceMarkerInput),
     RemoveMarker(SequenceMarkerTarget),
     Place(Box<PlaceInput>, SourceBinding),
+    ImportEdl {
+        frame_rate: Rational,
+        document_sha256: String,
+        placements: Vec<(PlaceInput, SourceBinding)>,
+    },
     Move(MoveInput),
     Link(LinkInput),
     Unlink(UnlinkInput),
@@ -162,6 +167,62 @@ impl<R: ProjectRead> Edit<'_, R> {
         let source: SourceBinding = source_entity.payload("source_binding")?;
         source_valid(&source, &clip.source_range, track.kind)?;
         Ok(track)
+    }
+    fn place(
+        &mut self,
+        input: PlaceInput,
+        source: SourceBinding,
+        root: &EntityId,
+        ids: &mut AllocatedIds,
+    ) -> Result<(EntityId, EntityId)> {
+        if input.collision != "reject" {
+            return Err(invalid("Only collision:reject is supported"));
+        }
+        let duration = input.source_range.duration()?;
+        let source_id = ids.next()?;
+        let clip_id = ids.next()?;
+        let clip = Clip {
+            sequence_id: input.sequence_id,
+            track_id: input.track_id,
+            source_id: source_id.clone(),
+            occurrence_id: ids.next()?,
+            source_range: input.source_range,
+            sequence_start: input.sequence_start,
+            duration,
+            rate: Rational::new(1, 1)?,
+            link_group_id: None,
+            locked: false,
+        };
+        let source_label = match &source {
+            SourceBinding::SolidColor { .. } => "Solid color".to_owned(),
+            SourceBinding::Registered { .. } => "Registered source".to_owned(),
+        };
+        self.insert(EntityEnvelope::new(
+            &self.read.header().id,
+            source_id.clone(),
+            "source_binding",
+            Some(root.clone()),
+            source_label,
+            &source,
+        )?)?;
+        self.clip_context(&clip)?;
+        let mut entity = EntityEnvelope::new(
+            &self.read.header().id,
+            clip_id.clone(),
+            "clip",
+            Some(clip.track_id.clone()),
+            "Clip".into(),
+            &clip,
+        )?;
+        entity.references.push(EntityReference {
+            role: "source".into(),
+            target: source_id.clone(),
+        });
+        self.count(&clip.track_id, 1)?;
+        self.count(root, 1)?;
+        self.insert(entity)?;
+        self.sources.push(source);
+        Ok((source_id, clip_id))
     }
     fn finish(self, created: serde_json::Value) -> Result<ResolvedEdit> {
         let forward = ProjectPatch {
@@ -516,55 +577,31 @@ pub fn resolve_edit<R: ProjectRead>(
             json!({})
         }
         ProjectEditIntent::Place(input, source) => {
-            let input = *input;
-            if input.collision != "reject" {
-                return Err(invalid("Only collision:reject is supported"));
-            }
-            let duration = input.source_range.duration()?;
-            let source_id = ids.next()?;
-            let clip_id = ids.next()?;
-            let clip = Clip {
-                sequence_id: input.sequence_id,
-                track_id: input.track_id,
-                source_id: source_id.clone(),
-                occurrence_id: ids.next()?,
-                source_range: input.source_range,
-                sequence_start: input.sequence_start,
-                duration,
-                rate: Rational::new(1, 1)?,
-                link_group_id: None,
-                locked: false,
-            };
-            let source_label = match &source {
-                SourceBinding::SolidColor { .. } => "Solid color".to_owned(),
-                SourceBinding::Registered { .. } => "Registered source".to_owned(),
-            };
-            edit.insert(EntityEnvelope::new(
-                &read.header().id,
-                source_id.clone(),
-                "source_binding",
-                Some(root.clone()),
-                source_label,
-                &source,
-            )?)?;
-            edit.clip_context(&clip)?;
-            let mut entity = EntityEnvelope::new(
-                &read.header().id,
-                clip_id.clone(),
-                "clip",
-                Some(clip.track_id.clone()),
-                "Clip".into(),
-                &clip,
-            )?;
-            entity.references.push(EntityReference {
-                role: "source".into(),
-                target: source_id.clone(),
-            });
-            edit.count(&clip.track_id, 1)?;
-            edit.count(&root, 1)?;
-            edit.insert(entity)?;
-            edit.sources.push(source);
+            let (source_id, clip_id) = edit.place(*input, source, &root, &mut ids)?;
             json!({"source_id":source_id,"clip_ids":[clip_id]})
+        }
+        ProjectEditIntent::ImportEdl { frame_rate, document_sha256, placements } => {
+            let (first, _) = placements.first().ok_or_else(|| invalid("EDL has no cuts"))?;
+            let sequence_id = first.sequence_id.clone();
+            let track_id = first.track_id.clone();
+            let sequence = edit.get(&sequence_id)?.payload::<Sequence>("sequence")?;
+            let track = edit.get(&track_id)?.payload::<Track>("track")?;
+            if track.sequence_id != sequence_id || track.kind != TrackKind::Video
+                || sequence.settings.frame_rate != frame_rate || track.grid != frame_rate
+            {
+                return Err(DomainError::new("EDL_GRID_MISMATCH", "EDL requires a picture track on the matching frame grid"));
+            }
+            let mut source_ids = Vec::with_capacity(placements.len());
+            let mut clip_ids = Vec::with_capacity(placements.len());
+            for (input, source) in placements {
+                if input.sequence_id != sequence_id || input.track_id != track_id {
+                    return Err(invalid("EDL cuts must share one picture track"));
+                }
+                let (source_id, clip_id) = edit.place(input, source, &root, &mut ids)?;
+                source_ids.push(source_id);
+                clip_ids.push(clip_id);
+            }
+            json!({"document_sha256":document_sha256,"source_ids":source_ids,"clip_ids":clip_ids})
         }
         ProjectEditIntent::Link(input) => {
             let selected = link_selection(read, &input.clip_ids, 2)?;

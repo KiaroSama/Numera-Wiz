@@ -218,6 +218,11 @@ digest, MIME codec string and fragment offsets for an admitted SDR source. The
 manifest expires after 45 seconds. Use the paired browser or the authenticated
 same-origin delivery route described in the [MCP manual](MCP.md#source-frame-preview).
 
+`timeline export-edl` writes a non-drop picture cut list and returns its reel
+map. `timeline import-edl` takes a UTF-8 file and optional JSON reel map, then
+applies the cuts as one edit on the selected picture track. The import requires
+the track's frame rate and expected project revision. [CMX 3600 commands](PROJECTS.md#export-a-cmx-3600-cut-list)
+
 `assets register` accepts a single static PNG or JPEG of up to 32 MiB and
 12,000,000 pixels. File contents determine the input format. For a registered
 still, use `media preview-frame --asset ID --stream 0 --frame 0`. Animated

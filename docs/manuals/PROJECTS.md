@@ -259,6 +259,26 @@ timecodes use the registered asset origin. The export uses non-drop timecode,
 unit-rate cuts and black events for gaps. Color generators and timing outside
 the admitted grid return an error. The selected-track export covers picture cuts.
 
+### Import a cut list
+
+Select the destination picture track at the same frame rate. Open **Import
+picture cut list**, paste the EDL and its JSON reel map, and choose **Apply cut
+list**. Black events become opaque black clips. Every media reel must identify
+an authorized registered asset, stream and matching SHA-256 digest. The selected
+track must have free space at the original record times. The import accepts up
+to 63 contiguous non-drop picture cuts. One Undo or Redo applies to the entire
+list.
+
+```text
+numera-wiz timeline import-edl --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --fps 24 --file cuts.edl --reels reels.json --replay-scope SCOPE --idempotency-key import-cuts
+```
+
+Save the export's `reels` array as `reels.json`. Omit `--reels` for a black-only
+list. The MCP command `interchange.edl.import` accepts the UTF-8 `document` and
+the `reels` array directly, along with the destination sequence, track and frame
+rate. The receipt includes the document digest and the created clip IDs in cut
+order.
+
 ## Audio track gain
 
 Select an audio track and open **Track gain**. Set the gain in hundredths of a

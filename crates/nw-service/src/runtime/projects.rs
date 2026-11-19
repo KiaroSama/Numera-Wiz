@@ -354,7 +354,7 @@ impl Service {
         let preparation = (|| -> Result<_> {
             let mut held = Vec::new();
             let source_permit =
-                if matches!(request.command.id.as_str(), "clips.place" | "clips.slip") {
+                if matches!(request.command.id.as_str(), "clips.place" | "clips.slip" | "interchange.edl.import") {
                     Some(
                         self.batch_preflights
                             .clone()
@@ -409,6 +409,43 @@ impl Service {
                             )?;
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
+                    }
+                    "interchange.edl.import" => {
+                        let import = nw_domain::interchange::parse_cmx3600(commands::parse(request.params.clone())?)?;
+                        let mut bindings = BTreeMap::new();
+                        let mut placements = Vec::with_capacity(import.cuts.len());
+                        for (input, expected_sha256) in import.cuts {
+                            let source = match &input.source {
+                                PlaceSource::SolidColor { rgba, duration } => SourceBinding::SolidColor {
+                                    rgba: *rgba,
+                                    duration: *duration,
+                                },
+                                PlaceSource::Registered { asset_id, stream_index } => {
+                                    let key = (asset_id.as_str(), *stream_index);
+                                    let (binding, held_index) = match bindings.entry((key.0.to_owned(), key.1)) {
+                                        std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                                        std::collections::btree_map::Entry::Vacant(entry) => {
+                                            let (binding, source) = self.registered_project_source(context, key.0, key.1, cancel)?;
+                                            let index = held.len();
+                                            held.push(source);
+                                            entry.insert((binding, index))
+                                        }
+                                    };
+                                    let asset = &held[*held_index].asset;
+                                    if expected_sha256.as_deref() != Some(asset.identity.sha256.as_str()) {
+                                        return Err(DomainError::new("SOURCE_CHANGED", "EDL reel digest differs from the registered media"));
+                                    }
+                                    validate_declared_source_extent(asset, &input.source_range, &input.source)?;
+                                    binding.clone()
+                                }
+                            };
+                            placements.push((input, source));
+                        }
+                        ProjectEditIntent::ImportEdl {
+                            frame_rate: import.frames_per_second,
+                            document_sha256: import.document_sha256,
+                            placements,
+                        }
                     }
                     "clips.move" => {
                         ProjectEditIntent::Move(commands::parse(request.params.clone())?)
@@ -474,6 +511,7 @@ impl Service {
                     | ProjectEditIntent::SetTrackGain(_)
                     | ProjectEditIntent::SetTrackEnabled(_) => 0,
                     ProjectEditIntent::Link(_) => 1,
+                    ProjectEditIntent::ImportEdl { placements, .. } => placements.len() * 3,
                     _ => MAX_CHANGES * 2,
                 };
                 let ids = (0..id_budget)
