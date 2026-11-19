@@ -836,6 +836,13 @@ fn full_projection_and_exact_forms() {
     const SOURCE: &str = "20000000-0000-4000-8000-000000000004";
     let (mut app, port, ctx) = ready();
     app.scope = Some(scope());
+    let rate = Rational::new(30000, 1001).unwrap();
+    let step = |num, den, frames| forms::ExactForm::new(num, den).stepped_frame(rate, frames);
+    assert_eq!(step("0", "1", 1).unwrap(), Rational::new(1001, 30000).unwrap());
+    assert_eq!(step("1001", "30000", 1).unwrap(), Rational::new(1001, 15000).unwrap());
+    assert_eq!(step("1001", "30000", -1).unwrap(), Rational::ZERO);
+    assert!(step("0", "1", -1).is_err());
+    assert!(step("1", "30000", 1).is_err());
     let defaults = app.projects.forms.sequence().unwrap();
     assert_eq!(
         defaults["settings"]["frame_rate"],

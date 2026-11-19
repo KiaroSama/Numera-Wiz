@@ -105,8 +105,9 @@ the excerpt. Closing the preview, choosing a different source or hiding the tab
 ends playback.
 
 In **Projects**, open **Timeline frame** in the detail pane. Enter an exact
-sequence time and choose **Decode timeline frame**. The preview shows the
-highest visible opaque layer at that frame and shows black in uncovered gaps.
+sequence time and choose **Decode timeline frame**. Use **Previous frame**
+and **Next frame** to move on the sequence's exact frame grid. The preview
+shows the highest visible opaque layer at that time and black in uncovered gaps.
 
 ## Append audio and subtitles
 

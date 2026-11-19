@@ -684,21 +684,36 @@ impl WizApp {
         ui.collapsing("Timeline frame", |ui| {
             let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
             ui.add_enabled_ui(idle, |ui| {
-                rational(ui, "Sequence time (seconds)", &mut self.projects.forms.preview_at);
-                if ui.button("Decode timeline frame").clicked() {
-                    match self.projects.forms.preview_at.value() {
-                        Ok(at) => {
-                            self.projects.preview_frame = None;
-                            self.query_with_project(
-                                "timeline.preview_frame",
-                                json!({"sequence_id":sequence,"revision":group.key.revision,"at":at}),
-                                Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
-                                self.project_action(Phase::PreviewFrame),
-                                ui.ctx(),
-                            );
-                        }
-                        Err(error) => self.error = Some(error),
+                let at = &mut self.projects.forms.preview_at;
+                rational(ui, "Sequence time (seconds)", at);
+                let mut request = None;
+                ui.horizontal_wrapped(|ui| {
+                    if ui.button("Decode timeline frame").clicked() {
+                        request = Some(at.value());
                     }
+                    if let Some(sequence) = &group.sequence {
+                        for (frames, label) in [(-1, "Previous frame"), (1, "Next frame")] {
+                            let adjacent = at.stepped_frame(sequence.settings.frame_rate, frames);
+                            if ui.add_enabled(adjacent.is_ok(), egui::Button::new(label)).clicked() {
+                                request = Some(adjacent);
+                            }
+                        }
+                    }
+                });
+                match request {
+                    Some(Ok(time)) => {
+                        *at = ExactForm::new(&time.numerator().to_string(), &time.denominator().to_string());
+                        self.projects.preview_frame = None;
+                        self.query_with_project(
+                            "timeline.preview_frame",
+                            json!({"sequence_id":sequence,"revision":group.key.revision,"at":time}),
+                            Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                            self.project_action(Phase::PreviewFrame),
+                            ui.ctx(),
+                        );
+                    }
+                    Some(Err(error)) => self.error = Some(error),
+                    None => {}
                 }
             });
             if let Some((at, texture)) = &self.projects.preview_frame
