@@ -17,7 +17,7 @@ pub(super) struct DownloadAuthority {
     pub listener_stop: CancellationToken,
 }
 impl DownloadAuthority {
-    fn check(&self) -> nw_domain::Result<()> {
+    pub(super) fn check(&self) -> nw_domain::Result<()> {
         if self.owner.stop.is_cancelled() || self.listener_stop.is_cancelled() {
             return Err(DomainError::new(
                 "OWNER_STOPPING",

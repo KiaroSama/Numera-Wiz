@@ -35,7 +35,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 use tokio::sync::{Semaphore, broadcast};
@@ -83,6 +83,9 @@ pub struct Service {
     transfers: Arc<Semaphore>,
     browser_segments: Mutex<HashMap<String, media::BrowserSegmentLease>>,
     browser_captures: Arc<Semaphore>,
+    native_preview_slot: Arc<Semaphore>,
+    native_preview_generation: AtomicU64,
+    native_preview: Mutex<Option<Arc<media::native_preview::Session>>>,
     pending: Arc<AtomicUsize>,
     dispatcher: tokio::sync::mpsc::Sender<String>,
     dispatcher_receiver: Mutex<Option<tokio::sync::mpsc::Receiver<String>>>,
@@ -95,6 +98,8 @@ pub struct Service {
     #[cfg(test)]
     catalog_hook: Mutex<Option<read_model::CatalogHook>>,
 }
+pub use media::native_preview::{NativePreviewTrack, NativePreviewTransfer};
+
 fn lock_error() -> DomainError {
     DomainError::new("INTERNAL_ERROR", "Owner state lock was poisoned")
 }
@@ -340,6 +345,9 @@ impl Service {
             transfers: Arc::new(Semaphore::new(2)),
             browser_segments: Mutex::new(HashMap::new()),
             browser_captures: Arc::new(Semaphore::new(2)),
+            native_preview_slot: Arc::new(Semaphore::new(1)),
+            native_preview_generation: AtomicU64::new(0),
+            native_preview: Mutex::new(None),
             pending: Arc::new(AtomicUsize::new(0)),
             dispatcher,
             dispatcher_receiver: Mutex::new(Some(receiver)),

@@ -151,10 +151,16 @@ impl Read for ChunkReader {
 pub struct NativePreviewPipe {
     pub video: mpsc::Receiver<NativePreviewPacket>,
     pub audio: mpsc::Receiver<NativePreviewPacket>,
+    control: NativePreviewControl,
+    worker: JoinHandle<Result<NativePreviewStats>>,
+    complete: bool,
+}
+
+#[derive(Clone)]
+pub struct NativePreviewControl {
     position: watch::Sender<Rational>,
     profile: NativePreviewProfile,
     cancel: CancellationToken,
-    worker: JoinHandle<Result<NativePreviewStats>>,
 }
 
 impl NativePreviewPipe {
@@ -182,11 +188,45 @@ impl NativePreviewPipe {
             if worker_cancel.is_cancelled() { Err(cancelled()) } else { outcome }
         });
         Ok((
-            Self { video, audio, position, profile, cancel: cancel.clone(), worker },
+            Self {
+                video, audio,
+                control: NativePreviewControl { position, profile, cancel: cancel.clone() },
+                worker,
+                complete: false,
+            },
             Box::new(ChunkSink { sender: Some(sender), cancel }),
         ))
     }
 
+    pub fn control(&self) -> NativePreviewControl {
+        self.control.clone()
+    }
+
+    pub fn take_receivers(&mut self) -> [mpsc::Receiver<NativePreviewPacket>; 2] {
+        [
+            std::mem::replace(&mut self.video, mpsc::channel(1).1),
+            std::mem::replace(&mut self.audio, mpsc::channel(1).1),
+        ]
+    }
+
+    pub fn cancellation(&self) -> CancellationToken {
+        self.control.cancellation()
+    }
+
+    pub fn advance(&self, generation: u64, time: Rational) -> Result<()> {
+        self.control.advance(generation, time)
+    }
+
+    pub async fn settled(mut self) -> Result<NativePreviewStats> {
+        let result = (&mut self.worker)
+            .await
+            .map_err(|_| reject("Native preview demultiplexer could not settle"))?;
+        self.complete = result.is_ok();
+        result
+    }
+}
+
+impl NativePreviewControl {
     pub fn cancellation(&self) -> CancellationToken {
         self.cancel.clone()
     }
@@ -207,16 +247,12 @@ impl NativePreviewPipe {
         Ok(())
     }
 
-    pub async fn settled(mut self) -> Result<NativePreviewStats> {
-        (&mut self.worker)
-            .await
-            .map_err(|_| reject("Native preview demultiplexer could not settle"))?
-    }
 }
-
 impl Drop for NativePreviewPipe {
     fn drop(&mut self) {
-        self.cancel.cancel();
+        if !self.complete {
+            self.control.cancel.cancel();
+        }
     }
 }
 

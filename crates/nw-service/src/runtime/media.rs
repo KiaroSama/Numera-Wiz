@@ -11,6 +11,7 @@ mod browser_segment;
 pub(super) mod mixed;
 pub(super) use browser_segment::BrowserSegmentLease;
 mod timeline_preview;
+pub(super) mod native_preview;
 
 struct StillFile {
     bytes: Vec<u8>,

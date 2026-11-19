@@ -23,7 +23,7 @@ pub use media::mixed_ffmpeg::{
 };
 pub use media::normalized_pair::{
     NormalizedWindow,
-    presentation::{NativePreviewPacket, NativePreviewPipe, NativePreviewProfile, NativePreviewStats},
+    presentation::{NativePreviewControl, NativePreviewPacket, NativePreviewPipe, NativePreviewProfile, NativePreviewStats},
 };
 pub use media::preview::ObservedPng;
 use nw_domain::{

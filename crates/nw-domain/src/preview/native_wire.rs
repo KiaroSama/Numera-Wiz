@@ -177,3 +177,29 @@ pub fn decode_header<T: DeserializeOwned>(prefix: [u8; 4], bytes: &[u8]) -> Resu
 fn wire_error(message: &'static str) -> DomainError {
     DomainError::new("INVALID_NATIVE_PREVIEW", message)
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRequest {
+    pub project_id: ProjectId,
+    pub sequence_id: EntityId,
+    pub revision: Revision,
+    pub range: TimeRange,
+    pub width: u32,
+    pub height: u32,
+    pub audio: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Opened {
+    pub picture: Descriptor,
+    pub sound: Option<Descriptor>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClockUpdate {
+    pub generation: u64,
+    pub at: Rational,
+}

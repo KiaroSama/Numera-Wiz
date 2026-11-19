@@ -2,6 +2,8 @@
 use super::owner::Cli;
 use nw_domain::commands::{ProjectRef, Request};
 use serde_json::{Value, json};
+#[path = "native_preview.rs"]
+mod native_preview;
 
 async fn edit(
     cli: &Cli,
@@ -142,6 +144,7 @@ pub async fn registered_timeline_frame(
             "source_range":{"start":start,"end":end},"sequence_start":place,"collision":"reject"
         })).await;
     }
+    native_preview::exercise(cli, project_id, sequence_id).await;
     let native = cli
         .human(&[
             "timeline",
