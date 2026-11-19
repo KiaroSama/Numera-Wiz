@@ -239,7 +239,10 @@ fn download(
         process::run(&mut command, deadline, seconds + 5, Some(&partial))?
             .success()
             .with_context(|| {
-                format!("Retry fetch {}; initial transfer: {initial}", output.display())
+                format!(
+                    "Retry fetch {}; initial transfer: {initial}",
+                    output.display()
+                )
             })?;
     } else {
         response
