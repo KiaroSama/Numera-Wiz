@@ -715,6 +715,7 @@ mod tests {
                 }),
                 action: Some(plan.resolution.action.clone()),
                 error: None,
+                extraction: None,
             });
             children.push(plan);
         }

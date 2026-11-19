@@ -1,10 +1,10 @@
-//! Shared native/browser cleanup batch controls; the owner owns all plans and jobs.
+//! Shared native/browser batch controls; the owner owns all plans and jobs.
 use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
     batches::{
-        BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, FailurePolicy, ItemInput,
-        UnresolvedPolicy,
+        BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, ExtractBatchInput,
+        ExtractBatchItem, ExtractKind, ExtractSelector, FailurePolicy, ItemInput, UnresolvedPolicy,
     },
     views::{AssetSummary, SnapshotPage},
 };
@@ -47,11 +47,13 @@ pub(super) struct Candidate {
     name: String,
     output: String,
     needs_output: bool,
+    extract: ExtractSelector,
 }
 pub(super) struct BatchUi {
     pub open: bool,
     pub candidates: Vec<Candidate>,
     generation: u64,
+    extract: bool,
     failure: FailurePolicy,
     unresolved: UnresolvedPolicy,
     plan: Option<Arc<BatchPlanReview>>,
@@ -68,6 +70,7 @@ impl Default for BatchUi {
             open: false,
             candidates: Vec::new(),
             generation: 0,
+            extract: false,
             failure: FailurePolicy::RejectAll,
             unresolved: UnresolvedPolicy::Reject,
             plan: None,
@@ -107,6 +110,7 @@ impl WizApp {
                 name: asset.display_name.clone(),
                 output: String::new(),
                 needs_output: true,
+                extract: ExtractSelector { kind: ExtractKind::Audio, ordinal: 1 },
             });
         } else {
             self.batch
@@ -177,6 +181,28 @@ impl WizApp {
     }
     fn review_batch(&mut self, ctx: &egui::Context) {
         if !self.cleanup_actions_allowed(ctx) || self.folder.open {
+            return;
+        }
+        if self.batch.extract {
+            let input = ExtractBatchInput {
+                items: self.batch.candidates.iter().map(|item| ExtractBatchItem {
+                    target: ItemInput {
+                        asset_id: item.asset_id.clone(),
+                        output: item.output.clone(),
+                    },
+                    selector: item.extract,
+                }).collect(),
+                failure_policy: self.batch.failure,
+            };
+            match input.validate() {
+                Ok(()) => self.query(
+                    "streams.extract.batch_plan",
+                    json!(input),
+                    Action::BatchPlan(self.batch.generation),
+                    ctx,
+                ),
+                Err(error) => self.error = Some(format!("{}: {}",error.code,error.message)),
+            }
             return;
         }
         let input = self.normalized_intent().and_then(|intent| {
@@ -278,7 +304,8 @@ impl WizApp {
             return;
         }
         let mut open = true;
-        egui::Window::new("Cleanup batch")
+        let title = if self.batch.extract { "Stream extraction batch" } else { "Cleanup batch" };
+        egui::Window::new(title).id(egui::Id::new("Cleanup batch"))
             .default_pos(egui::pos2(24.0,160.0)).default_width(1040.0)
             .default_height(540.0).open(&mut open).show(ctx, |ui| {
                 let idle = !self.waiting && self.pending.is_none();
@@ -296,28 +323,68 @@ impl WizApp {
                     }
                     ui.label(format!("{} explicit candidates",self.batch.candidates.len()));
                 });
-                ui.label("Select files with the media checkboxes. The current stream selection, file-time policy and execution limits apply to every candidate.");
-                let times = match self.file_times {
-                    nw_domain::file_times::FileTimeRequest::New => "New timestamps",
-                    nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
-                    nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
-                };
-                ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
                 let mut changed = false;
+                ui.horizontal(|ui| {
+                    if self.batch.extract {
+                        ui.label("Select each track by its one-based ordinal and give it a distinct .mkv path.");
+                    } else {
+                        ui.label("Select files with the media checkboxes. The current stream selection, file-time policy and execution limits apply to every candidate.");
+                    }
+                    changed |= ui.add_enabled(idle, egui::Checkbox::new(&mut self.batch.extract, "Extract streams")).changed();
+                });
+                if !self.batch.extract {
+                    let times = match self.file_times {
+                        nw_domain::file_times::FileTimeRequest::New => "New timestamps",
+                        nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
+                        nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
+                    };
+                    ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
+                }
+                let mut add = None;
+                let mut remove = None;
+                let more_outputs = self.batch.candidates.len() < nw_domain::batches::MAX_BATCH_ITEMS;
                 ui.add_enabled_ui(idle,|ui| {
                     ui.horizontal(|ui| {
                         ui.label("Rejected candidates");
                         changed |= ui.selectable_value(&mut self.batch.failure,FailurePolicy::RejectAll,"Refuse the batch").changed();
                         changed |= ui.selectable_value(&mut self.batch.failure,FailurePolicy::ContinueWithRejected,"Keep rejected rows and run accepted files").changed();
                     });
-                    ui.horizontal(|ui| {
-                        ui.label("Indices absent from every eligible stream");
-                        changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::Reject,"Refuse submission").changed();
-                        changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::PerFileNoMatch,"Apply each file's explicit no-match policy").changed();
-                    });
+                    if !self.batch.extract {
+                        ui.horizontal(|ui| {
+                            ui.label("Indices absent from every eligible stream");
+                            changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::Reject,"Refuse submission").changed();
+                            changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::PerFileNoMatch,"Apply each file's explicit no-match policy").changed();
+                        });
+                    }
                     egui::ScrollArea::vertical().id_salt("batch-candidates").max_height(150.0).show(ui,|ui| {
                         for (index,item) in self.batch.candidates.iter_mut().enumerate() {
                             ui.push_id(index,|ui| {
+                                if self.batch.extract {
+                                    ui.horizontal(|ui| {
+                                        let selected = item.extract.kind;
+                                        egui::ComboBox::from_id_salt("extract-kind")
+                                            .selected_text(format!("{selected:?}"))
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Video, "Video");
+                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Audio, "Audio");
+                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Subtitle, "Subtitle");
+                                            });
+                                        changed |= selected != item.extract.kind;
+                                        changed |= ui.add(egui::DragValue::new(&mut item.extract.ordinal).range(1..=256).prefix("Track ")).changed();
+                                        if ui.add_enabled(more_outputs, egui::Button::new("Add output for this file")).clicked() {
+                                            add = Some(Candidate {
+                                                asset_id: item.asset_id.clone(),
+                                                name: item.name.clone(),
+                                                output: String::new(),
+                                                needs_output: false,
+                                                extract: item.extract,
+                                            });
+                                        }
+                                        if ui.button("Remove output").clicked() {
+                                            remove = Some(index);
+                                        }
+                                    });
+                                }
                                 ui.horizontal(|ui| {
                                     ui.label(format!("{}. {}",index+1,item.name));
                                     changed |= ui.add(egui::TextEdit::singleline(&mut item.output)
@@ -327,6 +394,14 @@ impl WizApp {
                         }
                     });
                 });
+                if let Some(item) = add {
+                    self.batch.candidates.push(item);
+                    changed = true;
+                }
+                if let Some(index) = remove {
+                    self.batch.candidates.remove(index);
+                    changed = true;
+                }
                 if changed { self.batch.invalidate(); }
                 if let Some(plan) = self.batch.plan.clone() {
                     ui.separator();
@@ -344,6 +419,14 @@ impl WizApp {
                                     self.query("plans.inspect",json!({"id":reference.id}),Action::Inspect,ui.ctx());
                                 }
                             });
+                            if let Some(extraction) = item.extraction {
+                                ui.label(format!(
+                                    "{:?} track {}{}",
+                                    extraction.selector.kind,
+                                    extraction.selector.ordinal,
+                                    extraction.source_index.map_or_else(String::new, |index| format!(" · original stream {index}")),
+                                ));
+                            }
                             if let Some(error) = &item.error { ui.colored_label(egui::Color32::YELLOW,format!("{}: {}",error.code,error.message.as_deref().unwrap_or("Details require current owner access"))); }
                         }
                     });

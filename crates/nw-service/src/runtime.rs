@@ -1092,6 +1092,7 @@ impl Service {
                 "assets.register_folder",
                 "streams.clean",
                 "streams.extract",
+                "streams.extract.batch_plan",
                 "streams.clean.batch_plan",
             ]
             .contains(&request.command.id.as_str())
@@ -1750,6 +1751,11 @@ impl Service {
             "streams.clean.batch_plan" => {
                 let input: nw_domain::batches::CleanBatchInput = commands::parse(params)?;
                 let plan = self.prepare_batch(&context, input, now, &cancellation)?;
+                value(&self.batch_review(&context, &plan)?)?
+            }
+            "streams.extract.batch_plan" => {
+                let input: nw_domain::batches::ExtractBatchInput = commands::parse(params)?;
+                let plan = self.prepare_extract_batch(&context, input, now, &cancellation)?;
                 value(&self.batch_review(&context, &plan)?)?
             }
             "batches.plan_inspect" => {

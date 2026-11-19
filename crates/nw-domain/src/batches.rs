@@ -1,10 +1,10 @@
-//! Explicit bounded cleanup batches. Every candidate retains its own outcome and job.
+//! Explicit bounded media batches. Every candidate retains its own outcome and job.
 use crate::{
     DomainError, Result,
     commands::CleanInput,
     execution::CleanupLimits,
     file_times::FileTimeRequest,
-    mux::{CleanAction, CleanIntent},
+    mux::{CleanAction, CleanIntent, Stream, StreamKind},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,32 @@ pub struct ItemInput {
     pub asset_id: String,
     pub output: String,
 }
+
+fn valid_batch_items<'a>(items: impl ExactSizeIterator<Item = &'a ItemInput>) -> Result<()> {
+    if !(1..=MAX_BATCH_ITEMS).contains(&items.len()) {
+        return Err(DomainError::new(
+            "VALIDATION_ERROR",
+            "A media batch requires 1-64 explicit candidates",
+        ));
+    }
+    let mut outputs = BTreeSet::new();
+    for item in items {
+        let name = item.output.rsplit(['/', '\\']).next().unwrap_or("");
+        if !identifier(&item.asset_id)
+            || name.is_empty()
+            || name.len() > 1024
+            || item.output.len() > 16384
+            || !outputs.insert(&item.output)
+        {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Batch candidates need valid asset IDs and distinct bounded output paths",
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CleanBatchInput {
@@ -49,29 +75,9 @@ pub struct CleanBatchInput {
 }
 impl CleanBatchInput {
     pub fn validate(&self) -> Result<()> {
-        if self.items.is_empty() || self.items.len() > MAX_BATCH_ITEMS {
-            return Err(DomainError::new(
-                "VALIDATION_ERROR",
-                "A cleanup batch requires 1-64 explicit candidates",
-            ));
-        }
+        valid_batch_items(self.items.iter())?;
         self.execution_limits.validate()?;
         crate::mux::validate_intent(&self.intent)?;
-        let mut outputs = BTreeSet::new();
-        for item in &self.items {
-            let name = item.output.rsplit(['/', '\\']).next().unwrap_or("");
-            if !identifier(&item.asset_id)
-                || name.is_empty()
-                || name.len() > 1024
-                || item.output.len() > 16384
-                || !outputs.insert(&item.output)
-            {
-                return Err(DomainError::new(
-                    "VALIDATION_ERROR",
-                    "Batch candidates need valid asset IDs and distinct bounded output paths",
-                ));
-            }
-        }
         Ok(())
     }
     pub fn clean_input(&self, item: &ItemInput) -> CleanInput {
@@ -84,6 +90,82 @@ impl CleanBatchInput {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtractKind {
+    Video,
+    Audio,
+    Subtitle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractSelector {
+    pub kind: ExtractKind,
+    /// One-based ordinal within the selected media type in original index order.
+    pub ordinal: u32,
+}
+impl ExtractSelector {
+    pub fn resolve(self, streams: &[Stream]) -> Result<u32> {
+        self.validate()?;
+        let kind = match self.kind {
+            ExtractKind::Video => StreamKind::Video,
+            ExtractKind::Audio => StreamKind::Audio,
+            ExtractKind::Subtitle => StreamKind::Subtitle,
+        };
+        let mut eligible: Vec<_> = streams
+            .iter()
+            .filter(|stream| stream.kind == kind && !stream.attached_picture())
+            .map(|stream| stream.index)
+            .collect();
+        eligible.sort_unstable();
+        eligible.get(self.ordinal as usize - 1).copied().ok_or_else(|| {
+            DomainError::new("STREAM_NOT_FOUND", "This asset does not have the selected track")
+        })
+    }
+
+    fn validate(self) -> Result<()> {
+        if !(1..=256).contains(&self.ordinal) {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "The track ordinal must be between 1 and 256",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractBatchItem {
+    pub target: ItemInput,
+    pub selector: ExtractSelector,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractBatchInput {
+    pub items: Vec<ExtractBatchItem>,
+    pub failure_policy: FailurePolicy,
+}
+impl ExtractBatchInput {
+    pub fn validate(&self) -> Result<()> {
+        valid_batch_items(self.items.iter().map(|item| &item.target))?;
+        for item in &self.items {
+            item.selector.validate()?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewedExtraction {
+    pub selector: ExtractSelector,
+    pub source_index: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlanReference {
@@ -102,6 +184,8 @@ pub struct PlannedItem {
     pub plan: Option<PlanReference>,
     pub action: Option<CleanAction>,
     pub error: Option<DomainError>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extraction: Option<ReviewedExtraction>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -226,13 +310,30 @@ impl BatchPlan {
                     ));
                 }
             }
+            if let Some(extraction) = item.extraction {
+                extraction.selector.validate()?;
+                if extraction.source_index.is_some() != item.plan.is_some()
+                    || (item.plan.is_some() && item.action != Some(CleanAction::Remux))
+                {
+                    return Err(DomainError::new(
+                        "INVALID_PLAN",
+                        "Batch extraction disagrees with the reviewed stream-copy outcome",
+                    ));
+                }
+            }
         }
-        let semantic_items = self.items.iter().map(|item| serde_json::json!({
-            "index":item.index,"source_sha256":item.source_sha256,"source_bytes":item.source_bytes,
-            "output":item.requested_output,"action":item.action,
-            "plan_hash":item.plan.as_ref().map(|plan| &plan.hash),
-            "error_code":item.error.as_ref().map(|error| &error.code),
-        })).collect::<Vec<_>>();
+        let semantic_items = self.items.iter().map(|item| {
+            let mut semantic = serde_json::json!({
+                "index":item.index,"source_sha256":item.source_sha256,"source_bytes":item.source_bytes,
+                "output":item.requested_output,"action":item.action,
+                "plan_hash":item.plan.as_ref().map(|plan| &plan.hash),
+                "error_code":item.error.as_ref().map(|error| &error.code),
+            });
+            if let Some(extraction) = item.extraction {
+                semantic["extraction"] = serde_json::json!(extraction);
+            }
+            semantic
+        }).collect::<Vec<_>>();
         let bytes = serde_json::to_vec(&(
             self.schema_version,
             &self.data_root,
@@ -289,6 +390,8 @@ pub struct PlannedItemView {
     pub plan: Option<PlanReference>,
     pub action: Option<CleanAction>,
     pub error: Option<crate::views::ErrorView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extraction: Option<ReviewedExtraction>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BatchPlanReview {
@@ -586,6 +689,7 @@ mod tests {
                     "INCOMPATIBLE_PRESERVATION",
                     "Explicit rejected candidate",
                 )),
+                extraction: None,
             }],
         };
         plan.hash = plan.digest().unwrap();
@@ -606,8 +710,21 @@ mod tests {
             "Creation and display audit does not change batch execution identity"
         );
         let mut raw = serde_json::to_value(&plan).unwrap();
+        assert!(raw["items"][0].get("extraction").is_none());
+        assert_eq!(
+            serde_json::from_value::<BatchPlan>(raw.clone()).unwrap().digest().unwrap(),
+            semantic,
+        );
         raw["items"][0]["future_selection"] = true.into();
         assert!(serde_json::from_value::<BatchPlan>(raw).is_err());
+        plan.items[0].extraction = Some(ReviewedExtraction {
+            selector: ExtractSelector { kind: ExtractKind::Audio, ordinal: 2 },
+            source_index: None,
+        });
+        assert_ne!(plan.digest().unwrap(), semantic);
+        plan.items[0].extraction.as_mut().unwrap().source_index = Some(0);
+        assert_eq!(plan.digest().unwrap_err().code, "INVALID_PLAN");
+        plan.items[0].extraction = None;
         plan.unresolved.push(UnresolvedIndex {
             kind: crate::mux::StreamKind::Audio,
             source_index: 0,

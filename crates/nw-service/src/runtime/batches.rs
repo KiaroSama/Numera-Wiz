@@ -1,8 +1,9 @@
-//! Cleanup batch composition. Child media plans and jobs remain the authoritative engine work.
+//! Media batch composition. Child media plans and jobs remain the authoritative engine work.
 use super::*;
 use nw_domain::batches::{
-    Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, ItemResult, PlanReference,
-    PlannedItem, PlannedItemView,
+    Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, ExtractBatchInput,
+    ExtractSelector, FailurePolicy, ItemInput, ItemResult, PlanReference, PlannedItem,
+    PlannedItemView, ReviewedExtraction, UnresolvedIndex, UnresolvedPolicy,
 };
 
 pub(super) struct MemberLease {
@@ -23,6 +24,12 @@ fn rejected(mut error: DomainError) -> DomainError {
     error.message.truncate(end);
     error
 }
+
+struct ReviewedBatchItems {
+    items: Vec<PlannedItem>,
+    children: Vec<Plan>,
+}
+
 impl Service {
     pub(super) fn batch_child_command(&self, context: &Context, command: &str) -> Result<()> {
         if self
@@ -83,9 +90,88 @@ impl Service {
                 }
             }
         }
-        let mut items = Vec::with_capacity(input.items.len());
+        let items = self.review_batch_items(
+            context,
+            input.items.iter().map(|item| (item, None)),
+            cancel,
+            |item, _| self.prepare_cleanup(context, input.clean_input(item), now),
+        )?;
+        self.confirm_batch_policy(context, revision, "streams.clean.batch_plan")?;
+        self.retain_batch_plan(
+            context,
+            now,
+            input.failure_policy,
+            input.unresolved_policy,
+            unresolved
+                .into_iter()
+                .map(|(kind, source_index)| UnresolvedIndex {
+                    kind: if kind == 0 {
+                        nw_domain::mux::StreamKind::Audio
+                    } else {
+                        nw_domain::mux::StreamKind::Subtitle
+                    },
+                    source_index,
+                })
+                .collect(),
+            items,
+        )
+    }
+
+    pub(super) fn prepare_extract_batch(
+        &self,
+        context: &Context,
+        input: ExtractBatchInput,
+        now: u64,
+        cancel: &CancellationToken,
+    ) -> Result<BatchPlan> {
+        input.validate()?;
+        let revision = self
+            .policy(context)?
+            .as_ref()
+            .map_or(0, |policy| policy.revision);
+        self.batch_child_command(context, "streams.extract")?;
+        let items = self.review_batch_items(
+            context,
+            input.items.iter().map(|item| (&item.target, Some(item.selector))),
+            cancel,
+            |item, selector| {
+                let selector = selector.ok_or_else(|| {
+                    DomainError::new("INVALID_PLAN", "Batch extraction has no track selector")
+                })?;
+                self.prepare_native_copy(
+                    context,
+                    &item.asset_id,
+                    &item.output,
+                    Default::default(),
+                    |engine, asset, output| {
+                        let index = selector.resolve(&asset.probe.streams)?;
+                        engine.extract_plan_at(asset, output, index, &context.principal, now)
+                    },
+                )
+            },
+        )?;
+        self.confirm_batch_policy(context, revision, "streams.extract.batch_plan")?;
+        self.retain_batch_plan(
+            context,
+            now,
+            input.failure_policy,
+            UnresolvedPolicy::PerFileNoMatch,
+            Vec::new(),
+            items,
+        )
+    }
+
+    fn review_batch_items<'a>(
+        &self,
+        context: &Context,
+        targets: impl ExactSizeIterator<Item = (&'a ItemInput, Option<ExtractSelector>)>,
+        cancel: &CancellationToken,
+        mut compile: impl FnMut(&ItemInput, Option<ExtractSelector>) -> Result<Plan>,
+    ) -> Result<ReviewedBatchItems> {
+        let mut items = Vec::with_capacity(targets.len());
+        let mut children = Vec::with_capacity(targets.len());
         let mut resolved_outputs = BTreeSet::new();
-        for (index, item) in input.items.iter().enumerate() {
+        for (index, (item, selector)) in targets.enumerate() {
             if cancel.is_cancelled() {
                 return Err(DomainError::new("CANCELLED", "Batch preview cancelled"));
             }
@@ -109,8 +195,12 @@ impl Service {
                 plan: None,
                 action: None,
                 error: None,
+                extraction: selector.map(|selector| ReviewedExtraction {
+                    selector,
+                    source_index: None,
+                }),
             };
-            match self.prepare_cleanup(context, input.clean_input(item), now) {
+            match compile(item, selector) {
                 Ok(plan) => {
                     if !resolved_outputs.insert(plan.output.clone()) {
                         candidate.error = Some(DomainError::new(
@@ -126,28 +216,52 @@ impl Service {
                             .to_owned();
                         candidate.requested_output = plan.output.clone();
                         candidate.action = Some(plan.resolution.action.clone());
+                        if let Some(extraction) = &mut candidate.extraction {
+                            extraction.source_index = plan
+                                .resolution
+                                .outcomes
+                                .iter()
+                                .find(|outcome| outcome.output_index == Some(0))
+                                .map(|outcome| outcome.source_index);
+                        }
                         candidate.plan = Some(PlanReference {
                             id: plan.id.clone(),
                             hash: plan.hash.clone(),
                         });
-                        self.store.put(&named("plan", &plan.id)?, &plan)?;
+                        children.push(plan);
                     }
                 }
                 Err(error) => candidate.error = Some(rejected(error)),
             }
             items.push(candidate);
         }
+        Ok(ReviewedBatchItems { items, children })
+    }
+
+    fn confirm_batch_policy(&self, context: &Context, revision: u64, command: &str) -> Result<()> {
         let current = self.policy(context)?;
         if current.as_ref().map_or(0, |policy| policy.revision) != revision
             || current
                 .as_ref()
-                .is_some_and(|policy| !policy.allows_command("streams.clean.batch_plan"))
+                .is_some_and(|policy| !policy.allows_command(command))
         {
             return Err(DomainError::new(
                 "STALE_REVISION",
-                "Access policy changed while preparing the cleanup batch",
+                "Access policy changed while preparing the media batch",
             ));
         }
+        Ok(())
+    }
+
+    fn retain_batch_plan(
+        &self,
+        context: &Context,
+        now: u64,
+        failure_policy: FailurePolicy,
+        unresolved_policy: UnresolvedPolicy,
+        unresolved: Vec<UnresolvedIndex>,
+        reviewed: ReviewedBatchItems,
+    ) -> Result<BatchPlan> {
         let mut plan = BatchPlan {
             schema_version: 1,
             id: Uuid::new_v4().to_string(),
@@ -159,24 +273,13 @@ impl Service {
                 .checked_add(1800)
                 .ok_or_else(|| DomainError::new("RESOURCE_LIMIT", "Batch plan clock exhausted"))?
                 .to_string(),
-            failure_policy: input.failure_policy,
-            unresolved_policy: input.unresolved_policy,
-            unresolved: unresolved
-                .into_iter()
-                .map(|(kind, source_index)| nw_domain::batches::UnresolvedIndex {
-                    kind: if kind == 0 {
-                        nw_domain::mux::StreamKind::Audio
-                    } else {
-                        nw_domain::mux::StreamKind::Subtitle
-                    },
-                    source_index,
-                })
-                .collect(),
-            items,
+            failure_policy,
+            unresolved_policy,
+            unresolved,
+            items: reviewed.items,
         };
         plan.hash = plan.digest()?;
-        plan.validate_hash()?;
-        self.store.put(&named("batch-plan", &plan.id)?, &plan)?;
+        self.store.retain_media_batch_review(&plan, &reviewed.children)?;
         Ok(plan)
     }
     pub(super) fn read_batch_plan(
@@ -235,6 +338,7 @@ impl Service {
                 output_path,
                 plan: item.plan.clone(),
                 action: item.action.clone(),
+                extraction: item.extraction,
                 error: item
                     .error
                     .as_ref()

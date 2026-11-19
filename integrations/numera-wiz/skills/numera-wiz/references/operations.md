@@ -22,6 +22,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
 | `streams.extract` | Review packet-copy extraction of one registered stream to a fresh Matroska path. |
+| `streams.extract.batch_plan` | Review separate Matroska outputs with a per-file track type and ordinal. Submit the approved ID and hash via `batches.submit`. |
 | `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
 | `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
 | `chapters.wave_cues` | Read original RIFF or RF64 cue offsets, lengths and labels from an authorized asset. |

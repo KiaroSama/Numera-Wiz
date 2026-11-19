@@ -106,6 +106,14 @@ and the granted `output` path. Inspect the plan and submit its exact ID and
 hash with `jobs.submit`. The output preserves metadata and dispositions for
 the chosen stream and omits the other streams and chapters.
 
+`streams.extract.batch_plan` takes `items` with a `target` containing
+`asset_id` and `output`, plus a `selector` with `kind` and one-based
+`ordinal`. Resolve each target against its own registered probe, including
+assets from a folder scan. The review preserves the requested selector and
+resolved original index or rejection. Set `failure_policy` to `reject_all`
+or `continue_with_rejected`. With both extraction commands granted, review
+the batch and submit its ID and hash through `batches.submit`.
+
 ## Engine capability reports
 
 Grant `capabilities.inspect`, `capabilities.refresh` or `capabilities.clear`

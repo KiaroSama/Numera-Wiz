@@ -266,7 +266,31 @@ impl Store {
         self.internal_batch(&[(key.into(), serde_json::to_value(value).map_err(storage)?)])
     }
     pub fn internal_batch(&self, records: &[(String, Value)]) -> Result<()> {
-        if records.len() > 64 {
+        self.write_internal_batch(records, 64)
+    }
+    pub fn retain_media_batch_review(
+        &self,
+        batch: &nw_domain::batches::BatchPlan,
+        children: &[Plan],
+    ) -> Result<()> {
+        use nw_domain::batches::MAX_BATCH_ITEMS;
+        batch.validate_hash()?;
+        if children.len() > MAX_BATCH_ITEMS
+            || !batch.items.iter().filter_map(|item| item.plan.as_ref()).map(|reference| {
+                (reference.id.as_str(), reference.hash.as_str())
+            }).eq(children.iter().map(|plan| (plan.id.as_str(), plan.hash.as_str())))
+        {
+            return Err(DomainError::new("INVALID_PLAN", "Batch review does not match its child plans"));
+        }
+        let mut records = Vec::with_capacity(children.len() + 1);
+        for child in children {
+            records.push((format!("plan/{}", child.id), serde_json::to_value(child).map_err(storage)?));
+        }
+        records.push((format!("batch-plan/{}", batch.id), serde_json::to_value(batch).map_err(storage)?));
+        self.write_internal_batch(&records, MAX_BATCH_ITEMS + 1)
+    }
+    fn write_internal_batch(&self, records: &[(String, Value)], limit: usize) -> Result<()> {
+        if records.len() > limit {
             return Err(DomainError::new(
                 "RESOURCE_LIMIT",
                 "Transaction record budget exceeded",

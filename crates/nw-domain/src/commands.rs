@@ -232,6 +232,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "streams.extract" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
+        "streams.extract.batch_plan" => Some(
+            serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -915,6 +918,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Review copy of one original stream into its own Matroska output",
             Query,
             ExtractInput
+        ),
+        row!(
+            "streams.extract.batch_plan",
+            "Review distinct video, audio and subtitle outputs by per-file track ordinal",
+            Query,
+            crate::batches::ExtractBatchInput
         ),
         row!(
             "plans.inspect",
@@ -1652,6 +1661,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "assets.output_suggest",
     "streams.clean",
     "streams.extract",
+    "streams.extract.batch_plan",
     "plans.inspect",
     "jobs.submit",
     "jobs.inspect",

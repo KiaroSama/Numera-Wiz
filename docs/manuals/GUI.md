@@ -257,3 +257,10 @@ Choose a registered source, enter a new `.mkv` output path and expand
 **Extract one stream**. Select the stream by its original index and review the
 retained stream and destination. **Run reviewed plan** copies its packets and
 publishes the new file after verification.
+
+To extract from several files or create multiple outputs from one file, select
+media in the library and open **Batch**. Enable **Extract streams**, select the
+track type and one-based ordinal for each row, and enter a distinct new
+`.mkv` path. **Add output for this file** adds another track from the same
+source. Review the resolved original indices and the rejected rows before
+running the batch. The batch shows each completed output on its own row.

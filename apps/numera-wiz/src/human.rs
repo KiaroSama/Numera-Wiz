@@ -286,6 +286,11 @@ pub enum Streams {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Review a document of distinct Matroska outputs with per-source track selectors.
+    ExtractBatch {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Preview candidate and retained stream counts for 1-64 assets.
     Report {
         #[arg(long = "asset", required = true)]
@@ -599,6 +604,14 @@ pub fn prepare(command: Command) -> Result<Request> {
             "streams.extract",
             json!({"asset_id":asset,"stream_index":stream,"output":native_path(&out)?}),
         ),
+        Command::Streams(Streams::ExtractBatch { file }) => {
+            let mut input: nw_domain::batches::ExtractBatchInput = commands::parse(document(&file)?)?;
+            input.validate()?;
+            for item in &mut input.items {
+                item.target.output = native_path(Path::new(&item.target.output))?;
+            }
+            query("streams.extract.batch_plan", serde_json::to_value(input)?)
+        }
         Command::Streams(Streams::Report {
             assets,
             intent_file,

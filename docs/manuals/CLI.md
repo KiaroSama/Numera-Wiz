@@ -75,6 +75,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams report --asset ID --intent-file INTENT.json` | Inspect selection counts; repeat --asset for up to 64 assets. |
 | `streams clean --asset ID --out PATH --intent-file INTENT.json` | Prepare a cleanup plan for separate review and submission. |
 | `streams extract --asset ID --stream INDEX --out PATH.mkv` | Review packet-copy extraction of a single original video, audio or subtitle stream. Submit the reviewed plan separately. |
+| `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
@@ -321,6 +322,34 @@ Transfer buffers are bounded and cancellation/revocation stops subsequent frames
 Native/browser Save As streams verified client copies through the shared controls.
 The complete retained-artifact lifecycle remains open; see the save instructions
 below and the GUI guide for the exercised development scope.
+
+## Extract tracks from registered files
+
+Import a folder with `assets register-folder` and use the registered asset IDs
+from its report. Give each desired output a separate row and a new `.mkv`
+path in an existing destination directory.
+
+```json
+{
+  "items": [
+    {
+      "target": {"asset_id": "registered-asset-id", "output": "/exports/audio-2.mkv"},
+      "selector": {"kind": "audio", "ordinal": 2}
+    },
+    {
+      "target": {"asset_id": "registered-asset-id", "output": "/exports/video-1.mkv"},
+      "selector": {"kind": "video", "ordinal": 1}
+    }
+  ],
+  "failure_policy": "continue_with_rejected"
+}
+```
+
+Track ordinals start at one within each media type. The review records the
+resolved original index for each file. A missing selector produces a rejected
+row. Use `reject_all` to refuse the whole batch if a row is rejected. Submit
+the reviewed ID and hash with `batches submit` and observe results with
+`batches wait`. Each completed file has its own verified result.
 
 ## Authority and errors
 
