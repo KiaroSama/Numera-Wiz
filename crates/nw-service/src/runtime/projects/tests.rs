@@ -747,14 +747,14 @@ pub(in crate::runtime) async fn held_source_current_grants() {
         "VALIDATION_ERROR",
     );
     let slipped = good(
-        write(&service, &actor, &scope, Some((project, "2")), "clips.slip", "held-slip-later", slip("1", "4")).await,
+        write(&service, &actor, &scope, Some((project, "2")), "clips.slip", "held-slip-later", slip("1", "1")).await,
     );
     assert_eq!(slipped["changed_ids"], json!([clip]));
     {
         let read = service.store.project_read(project).unwrap();
         let clip: Clip = read.entity(&EntityId::parse(clip.to_owned()).unwrap()).unwrap().payload("clip").unwrap();
-        assert_eq!(clip.source_range.start, nw_domain::time::Rational::new(-3, 4).unwrap());
-        assert_eq!(clip.source_range.end, nw_domain::time::Rational::new(1, 4).unwrap());
+        assert_eq!(clip.source_range.start, nw_domain::time::Rational::ZERO);
+        assert_eq!(clip.source_range.end, nw_domain::time::Rational::new(1, 1).unwrap());
         assert_eq!(clip.sequence_start, nw_domain::time::Rational::ZERO);
     }
     good(

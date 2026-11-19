@@ -83,6 +83,45 @@ fn clock(row: &serde_json::Value) -> Result<(Rational, Rational)> {
     Ok((time_base, time_base.checked_mul(Rational::new(start, 1)?)?))
 }
 
+fn asset_clock(asset: &Asset, selected_index: u32) -> Result<(Rational, Rational, Rational)> {
+    let timing = |index| {
+        let row =
+            asset.probe.stream_details.get(&index).ok_or_else(|| {
+                incompatible("A registered stream has no exact clock observation")
+            })?;
+        clock(row)
+    };
+    let (time_base, stream_start) = timing(selected_index)?;
+    let mut asset_origin = stream_start;
+    for stream in &asset.probe.streams {
+        if stream.index != selected_index
+            && matches!(stream.kind, StreamKind::Audio | StreamKind::Video)
+            && !stream.attached_picture()
+        {
+            asset_origin = asset_origin.min(timing(stream.index)?.1);
+        }
+    }
+    Ok((time_base, stream_start, asset_origin))
+}
+
+/// Return the probe-declared interval on the same asset clock used by timeline renders.
+pub fn declared_relative_stream_window(asset: &Asset, stream_index: u32) -> Result<Option<TimeRange>> {
+    let Some(row) = asset.probe.stream_details.get(&stream_index) else {
+        return Ok(None);
+    };
+    let Some(ticks) = row["duration_ts"]
+        .as_i64()
+        .or_else(|| row["duration_ts"].as_str()?.parse().ok())
+        .filter(|duration| *duration > 0)
+    else {
+        return Ok(None);
+    };
+    let (time_base, stream_start, asset_origin) = asset_clock(asset, stream_index)?;
+    let start = stream_start.checked_sub(asset_origin)?;
+    let end = start.checked_add(time_base.checked_mul(Rational::new(ticks, 1)?)?)?;
+    Ok(Some(TimeRange { start, end }))
+}
+
 pub fn bind_mixed_source(
     occurrence: &CapturedOccurrence,
     asset: &Asset,
@@ -127,23 +166,7 @@ pub fn bind_mixed_source(
                 "Captured physical stream differs from the registered probe",
             )
         })?;
-    let timing = |index| {
-        let row =
-            asset.probe.stream_details.get(&index).ok_or_else(|| {
-                incompatible("A registered stream has no exact clock observation")
-            })?;
-        clock(row)
-    };
-    let (time_base, stream_start) = timing(selected.index)?;
-    let mut asset_origin = stream_start;
-    for stream in &asset.probe.streams {
-        if stream.index != selected.index
-            && matches!(stream.kind, StreamKind::Audio | StreamKind::Video)
-            && !stream.attached_picture()
-        {
-            asset_origin = asset_origin.min(timing(stream.index)?.1);
-        }
-    }
+    let (time_base, stream_start, asset_origin) = asset_clock(asset, selected.index)?;
     Ok(BoundSource {
         asset_id: asset_id.clone(),
         asset_row_sha256,

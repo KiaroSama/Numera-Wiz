@@ -398,13 +398,11 @@ impl Service {
                                 source
                             }
                         };
-                        if let (Some(held_source), PlaceSource::Registered { stream_index, .. }) =
-                            (held.last(), &input.source)
-                        {
+                        if let Some(held_source) = held.last() {
                             validate_declared_source_extent(
                                 &held_source.asset,
                                 &input.source_range,
-                                *stream_index,
+                                &input.source,
                             )?;
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
@@ -618,11 +616,13 @@ impl Service {
                     "Registered source differs from the committed clip binding",
                 ));
             }
-            if !validate_declared_source_extent(&source.asset, &range, stream_index)? {
-                return Err(DomainError::new(
+            let bounds = nw_domain::media::declared_relative_stream_window(&source.asset, stream_index)?
+                .ok_or_else(|| DomainError::new(
                     "SOURCE_EXTENT_UNAVAILABLE",
                     "Slip requires a declared interval for the registered stream",
-                ));
+                ))?;
+            if range.start < bounds.start || range.end > bounds.end {
+                return Err(domain::invalid("Slipped source span exceeds the declared stream interval"));
             }
         }
         Ok(held.into_values().map(|(_, source)| source).collect())
@@ -659,10 +659,13 @@ pub(super) mod tests;
 fn validate_declared_source_extent(
     asset: &Asset,
     range: &SourceSpan,
-    stream_index: u32,
-) -> Result<bool> {
-    let Some(details) = asset.probe.stream_details.get(&stream_index) else {
-        return Ok(false);
+    source: &PlaceSource,
+) -> Result<()> {
+    let PlaceSource::Registered { stream_index, .. } = source else {
+        return Ok(());
+    };
+    let Some(details) = asset.probe.stream_details.get(stream_index) else {
+        return Ok(());
     };
     let integer = |name: &str| {
         details[name]
@@ -673,17 +676,17 @@ fn validate_declared_source_extent(
         .as_str()
         .and_then(|s| s.split_once('/'))
     else {
-        return Ok(false);
+        return Ok(());
     };
     let (Ok(numerator), Ok(denominator)) = (numerator.parse::<i64>(), denominator.parse::<i64>())
     else {
-        return Ok(false);
+        return Ok(());
     };
     let (Some(start), Some(duration)) = (integer("start_pts"), integer("duration_ts")) else {
-        return Ok(false);
+        return Ok(());
     };
     if duration <= 0 {
-        return Ok(false);
+        return Ok(());
     }
     let grid = nw_domain::time::Rational::new(numerator, denominator)?;
     if grid <= nw_domain::time::Rational::ZERO {
@@ -696,7 +699,7 @@ fn validate_declared_source_extent(
             "Requested source span exceeds established probe-declared bounds",
         ));
     }
-    Ok(true)
+    Ok(())
 }
 
 #[cfg(test)]

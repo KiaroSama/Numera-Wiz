@@ -16,7 +16,7 @@ pub use capture::mixed::{
 };
 pub use mixed_graph::{AudioSpan, MixedGraph, OriginalWindow, VideoSpan, compile_mixed_graph};
 pub use mixed_plan::{MediaPlanV2, MixedReview, MixedTools, RenderContractV2};
-pub use mixed_source::{BoundSource, bind_mixed_source};
+pub use mixed_source::{BoundSource, bind_mixed_source, declared_relative_stream_window};
 pub use plan::{MediaPlanV1, compile};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
