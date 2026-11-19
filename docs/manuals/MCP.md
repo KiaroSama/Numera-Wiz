@@ -249,6 +249,15 @@ The supported parameters are `kind: "still"`, a `target` with `kind:
 {"format":"png"}` and `delivery: "inline"`. This response-scoped mode
 uses the 160 × 90 source monitor and caps PNG bytes at 96 KiB before base64.
 
+`previews.source_segment` takes `asset_id`, `video_stream` and optional
+`audio_stream`. It produces a manifest for the first two seconds of a zero-origin
+limited BT.709 video stream with optional zero-origin stereo 48 kHz audio. The
+same principal and profile may fetch the bytes through
+`GET /api/v1/previews/{segment_id}/mp4` with its bearer header within 45 seconds.
+The manifest supplies the initialization and ordered fragment byte ranges and a
+SHA-256 digest for the complete segment. The owner's current source and command
+permissions apply when serving the bytes.
+
 `timeline.preview_frame` uses the exact project context and takes
 `sequence_id`, `revision` and rational `at` in seconds. The returned RGBA frame
 includes the active registered or solid-color clip identity, or a gap marker.

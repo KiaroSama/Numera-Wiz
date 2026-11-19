@@ -8,6 +8,8 @@ use nw_domain::{
 use std::time::{Duration, Instant};
 
 pub(super) mod mixed;
+mod browser_segment;
+pub(super) use browser_segment::BrowserSegmentLease;
 mod timeline_preview;
 
 impl Service {

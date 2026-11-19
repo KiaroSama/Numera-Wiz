@@ -56,6 +56,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `media probe PATH` | Probe an authorized source. |
 | `media preview-frame --asset ID --stream INDEX --frame N` | Decode the selected video frame into a bounded 160 × 90 RGBA preview. |
 | `previews observe --asset ID --stream INDEX --frame N` | Return an inline PNG from the registered source monitor with exact observation metadata. |
+| `media preview-segment --asset ID --video-stream INDEX [--audio-stream INDEX]` | Prepare a temporary two-second browser preview and return its delivery manifest. |
 | `timeline preview-frame --project PROJECT --sequence SEQUENCE --revision REV --at TIME` | Decode the visible picture at one exact sequence-frame boundary, with `TIME` as an integer or fraction. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
@@ -194,6 +195,11 @@ both sources and reports per-frame PSNR and SSIM in decoded 8-bit RGB.
 decoded frame index. The JSON result includes the selected asset and content
 digest, dimensions and `rgba_base64`. The CPU decoder fits the picture to the
 preview area and fills any remaining space with black.
+
+`media preview-segment` takes original stream indices and returns the byte
+digest, MIME codec string and fragment offsets for an admitted SDR source. The
+manifest expires after 45 seconds. Use the paired browser or the authenticated
+same-origin delivery route described in the [MCP manual](MCP.md#source-frame-preview).
 
 `assets register` accepts a single static PNG or JPEG of up to 32 MiB and
 12,000,000 pixels. File contents determine the input format. For a registered

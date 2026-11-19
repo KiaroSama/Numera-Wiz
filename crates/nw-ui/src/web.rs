@@ -1,5 +1,6 @@
 //! Single-threaded browser presentation. Credentials are sent only to the paired origin.
 mod download;
+pub(super) mod source_segment;
 use crate::{CommandClient, Reply, SaveReply};
 use nw_domain::commands::{self, Request};
 use std::{cell::RefCell, sync::Arc};
@@ -11,6 +12,14 @@ struct BrowserClient {
     bearer: String,
 }
 impl CommandClient for BrowserClient {
+    fn open_source_segment(&self, segment: nw_domain::preview::SourceSegment) {
+        source_segment::open(&self.origin, &self.bearer, segment);
+    }
+
+    fn close_source_segment(&self) {
+        source_segment::close();
+    }
+
     fn choose_media(&self, reply: Reply) {
         let origin = self.origin.clone();
         let bearer = self.bearer.clone();

@@ -46,6 +46,8 @@ enum Action {
     Capabilities,
     ImportConfig(u64),
     SourcePreview,
+    #[cfg(target_arch = "wasm32")]
+    SourceSegment,
     VolumeMeasurement,
     LoudnessMeasurement,
     CompareAudio,
@@ -370,6 +372,8 @@ impl WizApp {
     }
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
         if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
+            #[cfg(target_arch = "wasm32")]
+            self.client.close_source_segment();
             self.intent.disposition_patches.clear();
             self.metadata = Default::default();
             self.chapter_document.clear();
@@ -846,6 +850,14 @@ impl WizApp {
                     }
                 }
                 Action::SourcePreview => self.accept_source_preview(result, ctx)?,
+                #[cfg(target_arch = "wasm32")]
+                Action::SourceSegment => {
+                    let request = &completed
+                        .as_ref()
+                        .ok_or("Browser preview has no captured request")?
+                        .request;
+                    self.accept_source_segment(result, request)?;
+                }
                 Action::VolumeMeasurement => {
                     let measurement: VolumeMeasurement =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;

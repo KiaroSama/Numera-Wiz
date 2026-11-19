@@ -130,6 +130,7 @@ jobs:
       NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
       NW_CHROMEDRIVER: /usr/local/share/chromedriver-linux64/chromedriver
       NW_BROWSER_SAVE: '1'
+      NW_BROWSER_PREVIEW_COMPONENTS: ${{ github.workspace }}/target/browser-preview-components/bin
       XDG_CURRENT_DESKTOP: GNOME
       XDG_SESSION_TYPE: x11
       NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
@@ -150,6 +151,12 @@ jobs:
         run: chmod +x target/fixture-components/bin/ffmpeg target/fixture-components/bin/ffprobe
       - name: Install selected Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-x64-ffmpeg-component
+          path: target/qualified-linux-component
+      - name: Authenticate the same-source browser playback component
+        run: cargo run --locked -p xtask -- prepare-browser-preview-components
       - name: Install actual browser display and OS picker input tools
         run: cargo run --locked -p xtask -- ci-linux-dependencies browser
       - name: Record actual browser and driver candidates

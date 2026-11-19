@@ -81,6 +81,8 @@ pub struct Service {
     heavy: Arc<Semaphore>,
     batch_preflights: Arc<Semaphore>,
     transfers: Arc<Semaphore>,
+    browser_segments: Mutex<HashMap<String, media::BrowserSegmentLease>>,
+    browser_captures: Arc<Semaphore>,
     pending: Arc<AtomicUsize>,
     dispatcher: tokio::sync::mpsc::Sender<String>,
     dispatcher_receiver: Mutex<Option<tokio::sync::mpsc::Receiver<String>>>,
@@ -336,6 +338,8 @@ impl Service {
             heavy: Arc::new(Semaphore::new(1)),
             batch_preflights: Arc::new(Semaphore::new(2)),
             transfers: Arc::new(Semaphore::new(2)),
+            browser_segments: Mutex::new(HashMap::new()),
+            browser_captures: Arc::new(Semaphore::new(2)),
             pending: Arc::new(AtomicUsize::new(0)),
             dispatcher,
             dispatcher_receiver: Mutex::new(Some(receiver)),
@@ -1077,6 +1081,7 @@ impl Service {
                 "media.analyze.audio_tracks",
                 "media.preview_frame",
                 nw_domain::preview::OBSERVE_COMMAND,
+                "previews.source_segment",
                 "capabilities.refresh",
                 "chapters.remove",
                 "chapters.import",
@@ -1436,6 +1441,15 @@ impl Service {
                 drop(guard);
                 let still = self.observe_still(&context, commands::parse(params)?, cancellation)?;
                 return Ok(Response::success(&request.request_id, value(&still)?).bounded());
+            }
+            "previews.source_segment" => {
+                drop(guard);
+                let segment = self.prepare_browser_source_segment(
+                    &context,
+                    commands::parse(params)?,
+                    cancellation.clone(),
+                )?;
+                return Ok(Response::success(&request.request_id, value(&segment)?).bounded());
             }
             "media.analyze.volume" => {
                 drop(guard);

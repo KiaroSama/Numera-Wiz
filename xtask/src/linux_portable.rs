@@ -2,7 +2,11 @@
 use crate::package::{digest, output, source};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 const TARGET: &str = "x86_64-unknown-linux-gnu";
 const COMPONENT: &str = "linux-x64-ffmpeg-component.tar.gz";
@@ -87,7 +91,7 @@ pub fn build(root: &Path) -> Result<()> {
     result
 }
 
-fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
+fn verified_profile(root: &Path, profile: &Path, app_source: &str) -> Result<(PathBuf, Value)> {
     let supplied = root.join("target/qualified-linux-component");
     let candidates = fs::read_dir(supplied)?.collect::<std::io::Result<Vec<_>>>()?;
     ensure!(
@@ -114,14 +118,25 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
             "Linux component archive identity differs"
         );
     }
-    let profile = work.join("profile");
-    fs::create_dir_all(&profile)?;
-    extract_component(&input.join(COMPONENT), &profile)?;
-    let identity = json!({"target":TARGET,"schema_version":1,"app_source":app_source,"files":files(&proof, &profile)?});
+    fs::create_dir(profile)?;
+    extract_component(&input.join(COMPONENT), profile)?;
+    let identity = json!({"target":TARGET,"schema_version":1,"app_source":app_source,"files":files(&proof, profile)?});
     fs::write(
         profile.join("embed-profile.json"),
         serde_json::to_vec_pretty(&identity)?,
     )?;
+    Ok((input, proof))
+}
+
+pub fn prepare_browser_preview(root: &Path) -> Result<()> {
+    let profile = root.join("target/browser-preview-components");
+    verified_profile(root, &profile, &source(root)?)?;
+    Ok(())
+}
+
+fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
+    let profile = work.join("profile");
+    let (input, proof) = verified_profile(root, &profile, app_source)?;
     let binary = crate::package::build_portable_executable(root, &profile)?;
     let bundle = work.join("bundle");
     let delivery = work.join("delivery");

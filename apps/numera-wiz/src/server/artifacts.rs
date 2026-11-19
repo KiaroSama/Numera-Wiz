@@ -198,6 +198,36 @@ fn rejected(error: DomainError) -> Response {
     )
         .into_response()
 }
+
+pub(super) async fn preview_segment(
+    State(owner): State<Arc<Owner>>,
+    Path(id): Path<String>,
+    axum::Extension(authority): axum::Extension<DownloadAuthority>,
+    request: Request,
+) -> Response {
+    if request.uri().query().is_some() || request.method() != axum::http::Method::GET {
+        return failure(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Preview delivery uses GET with a bearer header and no query parameters",
+        );
+    }
+    let result = tokio::task::spawn_blocking(move || {
+        authority.check()?;
+        let segment = owner.service.browser_source_bytes(&authority.context, &id)?;
+        authority.check()?;
+        Ok::<_, DomainError>(segment)
+    }).await;
+    match result {
+        Ok(Ok(segment)) => (
+            [(header::CONTENT_TYPE, "video/mp4"), (header::CACHE_CONTROL, "no-store")],
+            segment.bytes.clone(),
+        ).into_response(),
+        Ok(Err(error)) => rejected(error),
+        Err(_) => failure(StatusCode::INTERNAL_SERVER_ERROR, "WORKER_FAILED", "Preview delivery failed"),
+    }
+}
+
 pub(super) async fn receive(
     State(owner): State<Arc<Owner>>,
     Path(id): Path<String>,

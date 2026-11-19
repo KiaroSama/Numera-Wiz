@@ -192,3 +192,39 @@ pub struct InlineObservation {
     #[schemars(length(min = 1, max = 131072))]
     pub png_base64: String,
 }
+
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SourceSegmentInput {
+    pub asset_id: String,
+    pub video_stream: u32,
+    pub audio_stream: Option<u32>,
+}
+
+pub const SOURCE_SEGMENT_SECONDS: i64 = 2;
+pub const MAX_SOURCE_SEGMENT_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_SOURCE_SEGMENT_FRAGMENTS: usize = 8;
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SegmentBytes {
+    pub offset: u32,
+    pub length: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SourceSegment {
+    pub segment_id: String,
+    pub source_sha256: String,
+    pub selection: SourceSegmentInput,
+    pub sha256: String,
+    #[schemars(range(min = 1, max = 2097152))]
+    pub bytes: u32,
+    pub mime_type: String,
+    pub initialization: SegmentBytes,
+    #[schemars(length(min = 1, max = 8))]
+    pub fragments: Vec<SegmentBytes>,
+    pub expires_in_seconds: u32,
+    pub requested_range: crate::time::TimeRange,
+}

@@ -296,6 +296,10 @@ mod media_fixture;
 mod project_journey;
 
 #[cfg(all(test, feature = "embedded-web"))]
+#[path = "browser_preview_journey.rs"]
+mod preview_journey;
+
+#[cfg(all(test, feature = "embedded-web"))]
 mod tests {
     use super::*;
     pub(super) struct ObservedReport {
@@ -436,7 +440,7 @@ mod tests {
         pub(super) observed_reports: ObservedReports,
         pub(super) owner: Arc<Owner>,
         pub(super) endpoint: String,
-        _root: tempfile::TempDir,
+        pub(super) root: tempfile::TempDir,
         task: tokio::task::JoinHandle<()>,
     }
     impl Drop for Fixture {
@@ -445,8 +449,11 @@ mod tests {
         }
     }
     async fn fixture() -> Fixture {
+        fixture_with_components("NW_FIXTURE_COMPONENTS").await
+    }
+    pub(super) async fn fixture_with_components(variable: &str) -> Fixture {
         let root = tempfile::tempdir().unwrap();
-        let components = std::env::var_os("NW_FIXTURE_COMPONENTS").map(|path| {
+        let components = std::env::var_os(variable).map(|path| {
             let path = std::path::PathBuf::from(path);
             (path.join("ffmpeg"), path.join("ffprobe"))
         });
@@ -491,11 +498,11 @@ mod tests {
             observed_reports,
             owner,
             endpoint: format!("http://127.0.0.1:{port}"),
-            _root: root,
+            root,
             task,
         }
     }
-    async fn pairing(fixture: &Fixture) -> String {
+    pub(super) async fn pairing(fixture: &Fixture) -> String {
         let response = create_pairing(
             State(fixture.owner.clone()),
             Json(PairingInput {
@@ -2102,6 +2109,7 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+        preview_journey::run(&client, &base, &route, &directory).await;
         driver(&client, &base, reqwest::Method::DELETE, &route, Value::Null).await;
         process.kill().await.unwrap();
         let _ = process.wait().await;

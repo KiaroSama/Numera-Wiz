@@ -10,6 +10,8 @@ pub(super) struct SourcePreview {
     stream: Option<u32>,
     frame: u32,
     texture: Option<egui::TextureHandle>,
+    #[cfg(target_arch = "wasm32")]
+    audio_stream: Option<u32>,
 }
 
 impl WizApp {
@@ -25,6 +27,8 @@ impl WizApp {
         let idle = self.request_idle();
         let still_image = asset.probe.is_still_image();
         let mut request = None;
+        #[cfg(target_arch = "wasm32")]
+        let mut playback = None;
         ui.collapsing("Source frame preview", |ui| {
             let state = &mut self.source_preview;
             let stream = state.stream.get_or_insert(first.index);
@@ -61,6 +65,35 @@ impl WizApp {
                         request = Some((*stream, state.frame));
                     }
                 });
+                #[cfg(target_arch = "wasm32")]
+                if !still_image && crate::web::source_segment::supported() {
+                    ui.horizontal_wrapped(|ui| {
+                        egui::ComboBox::from_id_salt("source-playback-audio")
+                            .selected_text(state.audio_stream.map_or_else(
+                                || "No sound".to_owned(),
+                                |index| format!("Audio stream {index}"),
+                            ))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut state.audio_stream, None, "No sound");
+                                for audio in asset.probe.streams.iter().filter(|stream| {
+                                    stream.kind == StreamKind::Audio
+                                        && asset.probe.stream_details.get(&stream.index).is_some_and(
+                                            |detail| detail["channel_layout"] == "stereo"
+                                                && detail["sample_rate"] == "48000",
+                                        )
+                                }) {
+                                    ui.selectable_value(
+                                        &mut state.audio_stream,
+                                        Some(audio.index),
+                                        format!("Audio stream {}", audio.index),
+                                    );
+                                }
+                            });
+                        if ui.button("Open two-second video preview").clicked() {
+                            playback = Some((*stream, state.audio_stream));
+                        }
+                    });
+                }
             });
             if changed || request.is_some() {
                 state.texture = None;
@@ -79,6 +112,39 @@ impl WizApp {
                 ui.ctx(),
             );
         }
+        #[cfg(target_arch = "wasm32")]
+        if let Some((video_stream, audio_stream)) = playback {
+            self.client.close_source_segment();
+            self.query(
+                "previews.source_segment",
+                json!({"asset_id":asset.id,"video_stream":video_stream,"audio_stream":audio_stream}),
+                Action::SourceSegment,
+                ui.ctx(),
+            );
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn accept_source_segment(
+        &mut self,
+        result: Value,
+        request: &nw_domain::commands::Request,
+    ) -> Result<(), String> {
+        let reply: preview::SourceSegment =
+            serde_json::from_value(result).map_err(|error| error.to_string())?;
+        let selected = self.selected_asset().ok_or("Select a source to play")?;
+        let expected: preview::SourceSegmentInput = serde_json::from_value(request.params.clone())
+            .map_err(|error| format!("Invalid source preview request: {error}"))?;
+        if reply.selection != expected
+            || reply.selection.asset_id != selected.id
+            || reply.source_sha256 != selected.identity.sha256
+            || Some(reply.selection.video_stream) != self.source_preview.stream
+            || reply.selection.audio_stream != self.source_preview.audio_stream
+        {
+            return Err("The preview does not match the selected video and audio streams".into());
+        }
+        self.client.open_source_segment(reply);
+        Ok(())
     }
 
     pub(super) fn accept_source_preview(

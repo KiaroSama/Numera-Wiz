@@ -14,6 +14,7 @@ pub use media::mixed_ffmpeg::{
 };
 pub use media::normalized_pair::NormalizedWindow;
 pub use media::preview::ObservedPng;
+pub use media::BrowserSegment;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},

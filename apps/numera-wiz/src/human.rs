@@ -113,6 +113,15 @@ pub enum Media {
         #[arg(long, default_value_t = 0)]
         frame: u32,
     },
+    /// Prepare a temporary browser-playable excerpt from a registered source.
+    PreviewSegment {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        video_stream: u32,
+        #[arg(long)]
+        audio_stream: Option<u32>,
+    },
     /// Measure peak and RMS for one registered audio stream.
     AnalyzeVolume {
         #[arg(long)]
@@ -589,6 +598,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Previews(Previews::Observe { asset, stream, frame }) => query(
             nw_domain::preview::OBSERVE_COMMAND,
             serde_json::to_value(nw_domain::preview::ObserveInput::source(asset, stream, frame))?,
+        ),
+        Command::Media(Media::PreviewSegment { asset, video_stream, audio_stream }) => query(
+            "previews.source_segment",
+            json!(nw_domain::preview::SourceSegmentInput { asset_id: asset, video_stream, audio_stream }),
         ),
         Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
             "media.analyze.volume",

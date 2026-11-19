@@ -1,5 +1,6 @@
 //! Observe actual identified components through the shared supervised process budget.
 mod audio_tracks;
+mod browser_preview;
 pub(super) mod execution;
 pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;
@@ -7,6 +8,7 @@ pub(super) mod preview;
 mod stream_observations;
 pub(super) mod verification;
 mod volume;
+pub use browser_preview::BrowserSegment;
 use super::{Engine, blocking};
 use nw_domain::{
     DomainError, Result,

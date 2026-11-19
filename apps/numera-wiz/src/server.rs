@@ -284,7 +284,9 @@ async fn authenticate(State(auth): State<Auth>, mut request: Request, next: Next
         request
             .extensions_mut()
             .insert(ReleaseBearer(download_token));
-    } else if request.uri().path().starts_with("/api/v1/artifacts/") {
+    } else if request.uri().path().starts_with("/api/v1/artifacts/")
+        || request.uri().path().starts_with("/api/v1/previews/")
+    {
         request
             .extensions_mut()
             .insert(artifacts::DownloadAuthority {
@@ -511,6 +513,7 @@ fn router(owner: Arc<Owner>, port: u16, private: bool, listener_stop: Cancellati
             ),
         )
         .route("/api/v1/artifacts/{id}/bytes", get(artifacts::receive))
+        .route("/api/v1/previews/{id}/mp4", get(artifacts::preview_segment))
         .route("/api/v1/uploads", post(uploads::create))
         .route("/api/v1/uploads/{id}", axum::routing::put(uploads::receive))
         .route("/api/v1/lease", post(lease))

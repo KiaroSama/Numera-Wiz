@@ -98,6 +98,12 @@ preview loads from the registered source and fits the picture in the display.
 For a single static PNG or JPEG, add the image with the usual file controls,
 then choose **Decode frame** to display its only picture.
 
+In the paired browser, select an admitted BT.709 video stream and choose
+**Open two-second video preview**. Select **No sound** or an original stereo
+48 kHz audio stream. Use the browser's playback controls to play or seek within
+the excerpt. Closing the preview, choosing a different source or hiding the tab
+ends playback.
+
 In **Projects**, open **Timeline frame** in the detail pane. Enter an exact
 sequence time and choose **Decode timeline frame**. The preview shows the
 highest visible opaque layer at that frame and shows black in uncovered gaps.

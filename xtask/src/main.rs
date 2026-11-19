@@ -51,6 +51,8 @@ fn run() -> Result<()> {
         "build-standard-linux-profile" => toolchain_capture::bootstrap(root),
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         "package-standard-linux-application" => linux_portable::build(root),
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        "prepare-browser-preview-components" => linux_portable::prepare_browser_preview(root),
         #[cfg(target_os = "macos")]
         "build-standard-macos-profile" => macos_component::build(root),
         #[cfg(windows)]
@@ -64,7 +66,7 @@ fn run() -> Result<()> {
             #[cfg(target_os = "macos")]
             println!("xtask build-standard-macos-profile");
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-            println!("xtask package-standard-linux-application");
+            println!("xtask package-standard-linux-application | prepare-browser-preview-components");
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),
