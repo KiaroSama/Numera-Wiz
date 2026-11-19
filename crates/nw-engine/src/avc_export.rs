@@ -5,6 +5,7 @@ use nw_domain::{
     DomainError,
     avc_export::{
         Audio, Container, Detail, Encode, PictureLook, Preset, ResizeAspect, Rotation, Strength,
+        VideoCodec,
     },
     mux::{CleanAction, CleanResolution, Stream, StreamKind, StreamOutcome},
     records::{Asset, MediaProbe, Plan},
@@ -14,6 +15,14 @@ use std::path::Path;
 use tokio_util::sync::CancellationToken;
 
 pub(super) const SCOPE: &str = "Verify source and AVC output picture counts and presentation clocks, raster, aspect and observed SDR signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
+const HEVC_SCOPE: &str = "Verify source and HEVC output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies hvc1 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
+
+pub(super) fn scope(codec: VideoCodec) -> &'static str {
+    match codec {
+        VideoCodec::H264 => SCOPE,
+        VideoCodec::Hevc => HEVC_SCOPE,
+    }
+}
 
 fn unavailable(message: &str) -> DomainError {
     DomainError::new("AVC_EXPORT_UNQUALIFIED", message)
@@ -239,9 +248,9 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
     let picture = &resolved.streams[0];
     if picture.kind != StreamKind::Video
         || picture.attached_picture()
-        || !matches!(picture.codec.as_str(), "ffv1" | "h264")
+        || !matches!(picture.codec.as_str(), "ffv1" | "h264" | "hevc")
     {
-        return Err(unavailable("Choose an original SDR FFV1 or H.264 picture"));
+        return Err(unavailable("Choose an original SDR FFV1, H.264 or HEVC picture"));
     }
     if let Audio::Aac { stream_index, .. } = settings.audio {
         let audio = streams
@@ -281,8 +290,10 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
         stream.tags.clear();
         stream.dispositions.clear();
     }
-    resolved.reasons =
-        vec!["Encode an original SDR picture using libx264 and the reviewed CPU preset".into()];
+    resolved.reasons = vec![format!(
+        "Encode an original SDR picture using {} and the reviewed CPU preset",
+        settings.codec.encoder()
+    )];
     Ok(resolved)
 }
 
@@ -355,8 +366,8 @@ impl Engine {
             now,
             |streams| resolution(streams, &settings).map(|outcome| (outcome, Some(output_profile))),
         )?;
+        plan.verification_scope = scope(settings.codec).into();
         plan.avc_export = Some(settings);
-        plan.verification_scope = SCOPE.into();
         plan.argv_template = invocation(&plan, output_profile)?;
         plan.hash = plan_digest(&plan)?;
         self.validate_plan(&plan)?;
@@ -375,12 +386,12 @@ impl Engine {
         let invalid = || {
             DomainError::new(
                 "VERIFICATION_FAILED",
-                "Encoded output differs from the reviewed AVC/AAC stream format",
+                "Encoded output differs from the reviewed picture and audio format",
             )
         };
         let primary = observed.streams.first().ok_or_else(invalid)?;
         if primary.index != 0
-            || primary.codec != "h264"
+            || primary.codec != encode.codec.probe_name()
             || primary.kind != StreamKind::Video
             || observed.streams.len() != plan.resolution.streams.len()
         {
@@ -388,7 +399,12 @@ impl Engine {
         }
         let source_picture = stream(&plan.source.probe, encode.video_stream)?;
         let output_picture = stream(observed, primary.index)?;
-        let original_is_avc = plan.resolution.streams[0].codec == "h264";
+        let original_is_compressed = matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc");
+        if encode.codec == VideoCodec::Hevc && encode.container == Container::Mp4
+            && output_picture["codec_tag_string"] != "hvc1"
+        {
+            return Err(invalid());
+        }
         let (expected, _) = picture_filter(source_picture, encode)?;
         let actual = raster(output_picture)?;
         if (expected.width, expected.height, expected.sar)
@@ -409,7 +425,7 @@ impl Engine {
             // AVC defaults an absent video_full_range_flag to limited.
             // MP4 and Matroska can expose the same range differently.
             let implicit_limited_range = field == "color_range"
-                && (expected == "tv" || original_is_avc && missing(expected))
+                && (expected == "tv" || original_is_compressed && missing(expected))
                 && (actual == "tv" || missing(actual));
             if !(expected == actual
                 || missing(expected) && missing(actual)
@@ -417,7 +433,7 @@ impl Engine {
             {
                 return Err(DomainError::new(
                     "VERIFICATION_FAILED",
-                    format!("Encoded AVC picture differs from the reviewed {field}"),
+                    format!("Encoded picture differs from the reviewed {field}"),
                 ));
             }
         }
@@ -473,7 +489,7 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     let end = args.len() - 3;
     let mut export = [
         "-c:v",
-        "libx264",
+        settings.codec.encoder(),
         "-preset",
         preset,
         "-pix_fmt",
@@ -489,6 +505,12 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     .map(str::to_owned)
     .to_vec();
     export.push(format!("1/{}", clock.denominator()));
+    if settings.codec == VideoCodec::Hevc {
+        export.extend([
+            "-x265-params".into(),
+            "bframes=0:pools=none:frame-threads=2:log-level=error".into(),
+        ]);
+    }
     if let Some(crf) = settings.crf {
         export.extend(["-crf".into(), crf.to_string()]);
     }
@@ -517,6 +539,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         ]);
     }
     if settings.container == Container::Mp4 {
+        if settings.codec == VideoCodec::Hevc {
+            export.extend(["-tag:v".into(), "hvc1".into()]);
+        }
         export.extend(["-movflags".into(), "+faststart".into()]);
         if clock.denominator() != 1000 {
             export.extend([

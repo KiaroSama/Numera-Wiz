@@ -140,7 +140,17 @@ impl ImportedJob {
     }
 
     pub fn selects_avc_encode(&self) -> bool {
-        matches!(self.get("video_codec"), Some(Setting::Encoder { name }) if matches!(name.as_str(), "h264" | "libx264"))
+        self.cpu_encode_codec().is_some()
+    }
+
+    fn cpu_encode_codec(&self) -> Option<crate::avc_export::VideoCodec> {
+        use crate::avc_export::VideoCodec;
+        let Some(Setting::Encoder { name }) = self.get("video_codec") else { return None; };
+        match name.as_str() {
+            "h264" | "libx264" => Some(VideoCodec::H264),
+            "hevc" | "libx265" => Some(VideoCodec::Hevc),
+            _ => None,
+        }
     }
 
     fn avc_crop(&self, details: &serde_json::Value) -> Result<Option<Crop>> {
@@ -336,12 +346,12 @@ impl ImportedJob {
         asset: &crate::records::Asset,
     ) -> Result<crate::avc_export::EncodeInput> {
         use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode};
-        if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_avc_encode() {
+        let Some(codec) = self.cpu_encode_codec().filter(|_| self.version == 1 && self.settings.len() <= FIELDS.len()) else {
             return Err(DomainError::new(
                 "INVALID_JOB_DOCUMENT",
-                "Use a version 1 FFmWiz profile with CPU H.264",
+                "Use a version 1 FFmWiz profile with CPU H.264 or HEVC",
             ));
-        }
+        };
         let source = self.imported_source()?;
         let output = self.path("output_path")?;
         let extension = output
@@ -511,6 +521,7 @@ impl ImportedJob {
             || transform.flip_vertical
             || transform.look.is_some();
         let settings = Encode {
+            codec,
             video_stream: picture.index,
             container,
             crf: None,

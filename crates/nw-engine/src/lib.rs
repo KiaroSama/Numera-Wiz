@@ -544,8 +544,8 @@ impl Engine {
             nw_domain::plans::SourcePurpose::RetainedFolderCompanion { .. }
         ) {
             "retained_folder_companion_verified_bytes"
-        } else if plan.avc_export.is_some() {
-            avc_export::SCOPE
+        } else if let Some(settings) = &plan.avc_export {
+            avc_export::scope(settings.codec)
         } else if plan.video_retime.is_some() {
             video_retime::SCOPE
         } else if plan.media_join.is_some() {

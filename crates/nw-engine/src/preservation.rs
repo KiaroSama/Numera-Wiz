@@ -644,6 +644,10 @@ pub(super) async fn verify_avc_timing(
     observer: &Observer,
 ) -> Result<String> {
     let encode = plan.avc_export.as_ref().expect("Reviewed AVC export");
+    let codec = match encode.codec {
+        nw_domain::avc_export::VideoCodec::H264 => "AVC",
+        nw_domain::avc_export::VideoCodec::Hevc => "HEVC",
+    };
     let deadline = plan.execution_limits.clone().unwrap_or_default().operation;
     let source = scan(
         engine,
@@ -724,7 +728,7 @@ pub(super) async fn verify_avc_timing(
         }
     }
     Ok(format!(
-        "Verified {picture_count} original picture presentation times across the AVC output."
+        "Verified {picture_count} original picture presentation times across the {codec} output."
     ))
 }
 

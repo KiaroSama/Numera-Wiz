@@ -4,7 +4,7 @@ use eframe::egui;
 use nw_domain::{
     avc_export::{
         Audio, Bitrate, Container, Crop, Detail, Encode, EncodeInput, PictureLook,
-        PictureTransform, Preset, RateMode, Resize, ResizeAspect, Rotation, Strength,
+        PictureTransform, Preset, RateMode, Resize, ResizeAspect, Rotation, Strength, VideoCodec,
     },
     mux::StreamKind,
     records::Asset,
@@ -16,6 +16,7 @@ pub(super) struct AvcUi {
     audio: Option<u32>,
     bitrate: u16,
     crf: u8,
+    codec: VideoCodec,
     average_kbps: u32,
     rate_mode: Option<RateMode>,
     preset: Preset,
@@ -29,6 +30,7 @@ impl Default for AvcUi {
             audio: None,
             bitrate: 128,
             crf: 18,
+            codec: VideoCodec::H264,
             average_kbps: 2000,
             rate_mode: None,
             preset: Preset::Balanced,
@@ -45,7 +47,7 @@ impl WizApp {
             .iter()
             .filter(|item| {
                 item.kind == StreamKind::Video
-                    && matches!(item.codec.as_str(), "ffv1" | "h264")
+                    && matches!(item.codec.as_str(), "ffv1" | "h264" | "hevc")
                     && !item.attached_picture()
             })
             .collect();
@@ -69,8 +71,12 @@ impl WizApp {
         let idle = self.request_idle();
         let mut changed = false;
         let mut review = false;
-        ui.collapsing("Encode H.264 video", |ui| {
+        ui.collapsing("Encode video", |ui| {
             ui.add_enabled_ui(idle, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    changed |= ui.radio_value(&mut self.avc_export.codec, VideoCodec::H264, "H.264").changed();
+                    changed |= ui.radio_value(&mut self.avc_export.codec, VideoCodec::Hevc, "HEVC").changed();
+                });
                 let chosen = self.avc_export.picture.get_or_insert(pictures[0].index);
                 egui::ComboBox::from_id_salt("avc-picture")
                     .selected_text(format!("Picture {chosen}"))
@@ -198,7 +204,7 @@ impl WizApp {
                 review = ui
                     .add_enabled(
                         container.is_some(),
-                        egui::Button::new("Review H.264 export"),
+                        egui::Button::new("Review video export"),
                     )
                     .clicked();
             });
@@ -210,6 +216,7 @@ impl WizApp {
             let settings = Encode {
                 video_stream: self.avc_export.picture.expect("Registered picture stream"),
                 container: container.expect("Reviewed destination extension"),
+                codec: self.avc_export.codec,
                 crf: self
                     .avc_export
                     .rate_mode

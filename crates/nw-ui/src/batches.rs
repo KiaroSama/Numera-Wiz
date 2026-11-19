@@ -678,7 +678,7 @@ impl WizApp {
                                 let action = if item.companion.is_some() && item.plan.is_some() {
                                     "Copy companion"
                                 } else if folder_encode && item.plan.is_some() {
-                                    "Encode H.264"
+                                    "Encode video"
                                 } else {
                                     action_label(&item.action)
                                 };

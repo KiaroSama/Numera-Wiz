@@ -16,6 +16,8 @@ pub struct EncodeInput {
 pub struct Encode {
     pub video_stream: u32,
     pub container: Container,
+    #[serde(default, skip_serializing_if = "VideoCodec::is_h264")]
+    pub codec: VideoCodec,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(range(min = 1, max = 51))]
     pub crf: Option<u8>,
@@ -25,6 +27,34 @@ pub struct Encode {
     pub audio: Audio,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picture: Option<PictureTransform>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VideoCodec {
+    #[default]
+    H264,
+    Hevc,
+}
+
+impl VideoCodec {
+    fn is_h264(&self) -> bool {
+        *self == Self::H264
+    }
+
+    pub fn encoder(self) -> &'static str {
+        match self {
+            Self::H264 => "libx264",
+            Self::Hevc => "libx265",
+        }
+    }
+
+    pub fn probe_name(self) -> &'static str {
+        match self {
+            Self::H264 => "h264",
+            Self::Hevc => "hevc",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
@@ -258,6 +288,8 @@ pub struct FolderEncodeInput {
     pub snapshot_hash: String,
     pub output_root: String,
     pub container: Container,
+    #[serde(default, skip_serializing_if = "VideoCodec::is_h264")]
+    pub codec: VideoCodec,
     #[schemars(range(min = 1, max = 51))]
     pub crf: u8,
     pub preset: Preset,
@@ -324,6 +356,7 @@ impl FolderEncodeInput {
         let settings = Encode {
             video_stream: picture.index,
             container: self.container,
+            codec: self.codec,
             crf: Some(self.crf),
             bitrate: None,
             preset: self.preset,

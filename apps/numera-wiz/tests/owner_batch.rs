@@ -1232,6 +1232,49 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     );
     results.push(json!({"job":job["job_id"],"container":"matroska","range":"limited"}));
 
+    for (container, extension) in [("mp4", "mp4"), ("matroska", "mkv")] {
+        let output = directory.join(format!("hevc-export.{extension}"));
+        let settings = json!({
+            "video_stream":0,"container":container,"codec":"hevc","preset":"balanced",
+            "bitrate":{"average_kbps":700,"mode":"quality_vbr"},"audio":{"kind":"drop"}
+        });
+        let plan = cli.query("media.encode", json!({
+            "asset_id":original["id"],"output":output,"settings":settings
+        })).await;
+        let legacy = format!(
+            "input_path={}\noutput_path={}\noutput_format={extension}\nvideo_codec=HEVC\nuse_gpu=n\nvideo_bitrate_kbps=700\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            path.display(), output.display(),
+        );
+        let imported = cli.query("config.import.ffmwiz", json!({
+            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
+        })).await;
+        assert_eq!(imported["input_valid"], true, "{imported}");
+        let imported_plan = cli.query("jobs.plan", json!({
+            "asset_id":original["id"],"job_document":imported["job"]
+        })).await;
+        assert_eq!(imported_plan["hash"], plan["hash"]);
+        let accepted = accepted(
+            &cli,
+            &scope,
+            &format!("run-hevc-{extension}"),
+            "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        ).await;
+        succeeded(&cli, &accepted).await;
+        let observed = fixture::probe(&components, &output).await;
+        let picture = &observed["streams"][0];
+        assert_eq!(picture["codec_name"], "hevc");
+        assert_eq!(picture["sample_aspect_ratio"], "4:3");
+        assert_eq!(picture["color_range"], "tv");
+        if extension == "mp4" {
+            assert_eq!(picture["codec_tag_string"], "hvc1");
+        }
+        let clock = pts(&packets(&components, &output).await[&0]);
+        assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
+        results.push(json!({"job":accepted["job_id"],"container":container,"codec":"hevc",
+          "presentation_ms":clock,"matching_import_plan":true}));
+    }
+
     for (mode, peak, buffer, crop, resize) in [
         ("quality_vbr", "1400k", "2800k", "crop=31,41,39,29", false),
         (

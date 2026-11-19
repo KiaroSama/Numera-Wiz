@@ -28,11 +28,11 @@ to each operation/media/transport/package boundary separately.
 | `streams.extract.batch_plan`, `streams.extract.folder_batch_plan` | Review separate Matroska outputs using track types and ordinals. For a folder snapshot inspect the excluded rows and derived destinations. Submit the approved ID and hash via `batches.submit`. |
 | `streams.add`, `streams.replace`, `audio.normalize` | Add or replace registered tracks with a verified stream plan, or normalize selected PCM tracks from independently measured loudness. |
 | `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
-| `jobs.plan` | Review admitted FFmWiz packet-copy, short FFV1 retiming or CPU H.264 settings against the matching registered source. |
+| `jobs.plan` | Review admitted FFmWiz packet-copy, short FFV1 retiming, CPU H.264 or CPU HEVC settings against the matching registered source. |
 | `media.cut`, `media.split_plan`, `media.join` | Review original-keyframe cuts, split batches or ordered joins of compatible Matroska segments. |
 | `audio.edit`, `media.retime` | Review ordered PCM sample ranges or change a registered short FFV1 picture's speed and direction. |
 | `subtitles.burn` | Review embedded or registered SubRip, explicit SDR preservation or HDR tone mapping, and the retained audio tracks. |
-| `media.encode`, `media.encode_folder_plan` | Review CPU H.264 export with optional AAC, individually or from a retained folder snapshot. |
+| `media.encode`, `media.encode_folder_plan` | Review CPU H.264 or HEVC export with optional AAC, individually or from a retained folder snapshot. |
 | `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
 | `chapters.wave_cues` | Read original RIFF or RF64 cue offsets, lengths and labels from an authorized asset. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |

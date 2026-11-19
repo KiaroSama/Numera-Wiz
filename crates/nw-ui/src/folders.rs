@@ -2,7 +2,7 @@
 use crate::{Action, WizApp, batches::FolderBatchKind};
 use eframe::egui;
 use nw_domain::{
-    avc_export::{Container, FolderAudio, FolderEncodeInput, Preset},
+    avc_export::{Container, FolderAudio, FolderEncodeInput, Preset, VideoCodec},
     batches::{
         CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector,
         FolderBatchReview, FolderOutputLayout,
@@ -29,6 +29,7 @@ pub(super) struct FolderUi {
     cleanup_output_layout: FolderOutputLayout,
     cleanup_copy_companions: bool,
     encode_container: Container,
+    encode_codec: VideoCodec,
     encode_crf: u8,
     encode_preset: Preset,
     encode_audio: bool,
@@ -64,6 +65,7 @@ impl Default for FolderUi {
             cleanup_output_layout: FolderOutputLayout::Indexed,
             cleanup_copy_companions: false,
             encode_container: Container::Mp4,
+            encode_codec: VideoCodec::H264,
             encode_crf: 18,
             encode_preset: Preset::Balanced,
             encode_audio: true,
@@ -705,9 +707,11 @@ impl WizApp {
     }
 
     fn folder_encode_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
-        ui.collapsing("Encode the folder as H.264", |ui| {
+        ui.collapsing("Encode folder video", |ui| {
             ui.add_enabled_ui(idle, |ui| {
                 ui.horizontal_wrapped(|ui| {
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::H264, "H.264");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Hevc, "HEVC");
                     ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
                     ui.radio_value(
                         &mut self.folder.encode_container,
@@ -744,6 +748,7 @@ impl WizApp {
                         snapshot_hash: snapshot.hash.clone(),
                         output_root: self.folder.batch_output_root.clone(),
                         container: self.folder.encode_container,
+                        codec: self.folder.encode_codec,
                         crf: self.folder.encode_crf,
                         preset: self.folder.encode_preset,
                         audio: if self.folder.encode_audio {

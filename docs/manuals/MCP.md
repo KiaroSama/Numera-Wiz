@@ -622,9 +622,10 @@ lossless picture retime as `media.retime`. Grant both commands to that
 profile.
 
 
-`media.encode` reviews an SDR FFV1 or H.264 source for verified H.264 export
-with optional AAC in MP4 or Matroska. Set the preset and choose `crf` or
-`bitrate` in `settings`. Use `commands.schema` for the complete contract and
+`media.encode` reviews an SDR FFV1, H.264 or HEVC source for H.264 or HEVC export
+with optional AAC in MP4 or Matroska. The `settings.codec` field selects
+`h264` or `hevc`. Set the preset and choose `crf` or `bitrate` in `settings`.
+Use `commands.schema` for the complete contract and
 `jobs.submit` to run the reviewed plan.
 
 Set `settings.picture` to request an ordered crop, rotation, flip and resize.

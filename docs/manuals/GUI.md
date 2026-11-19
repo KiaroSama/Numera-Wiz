@@ -363,9 +363,9 @@ tempo and playback direction. Review the output frame count and
 presentation clock before running the job.
 
 
-Use **Encode H.264 video** on a registered SDR FFV1 or H.264 asset in
+Use **Encode video** on a registered SDR FFV1, H.264 or HEVC asset in
 Matroska or self-contained MP4/MOV.
-Choose the picture, optional AAC audio, quality and CPU preset. Enter a
+Choose H.264 or HEVC, the picture, optional AAC audio, quality and CPU preset. Enter a
 new MP4 or Matroska destination, then review and run the job.
 
 Enable **Transform the picture** for crop, rotation, horizontal or vertical
@@ -373,7 +373,7 @@ flip and resize. For resize, choose preserve display aspect, square-pixel
 stretch or square-pixel fit with padding. **Adjust color and detail**
 opens grayscale, color, denoise, and sharpen or blur controls.
 
-For a registered folder, open **Encode the folder as H.264** in the folder
-review. Set an existing destination outside the intake folder, choose the
+For a registered folder, open **Encode folder video** in the folder review.
+Set an existing destination outside the intake folder, choose the codec,
 container, quality and audio handling, and use **Review folder encode**.
 The batch preview lists each proposed output and its verification job.
