@@ -87,6 +87,12 @@ pub enum Setting {
     Integer {
         value: u32,
     },
+    CropMargins {
+        top: u32,
+        left: u32,
+        right: u32,
+        bottom: u32,
+    },
     Scalar {
         value: Rational,
     },
@@ -480,6 +486,17 @@ fn setting(field: &str, original: &str, base: &Path) -> Option<Setting> {
         }
         "video_codec" | "audio_codec" => encoder(value),
         "use_gpu" if value == "y" => Some(Setting::PreferNvidia),
+        "crop" if value.contains(',') => {
+            let mut fields = value.split(',');
+            let mut margin = || integer(fields.next()?.trim(), 0, 16384);
+            let [top, left, right, bottom] = [margin()?, margin()?, margin()?, margin()?];
+            fields.next().is_none().then_some(Setting::CropMargins {
+                top,
+                left,
+                right,
+                bottom,
+            })
+        }
         "use_gpu"
         | "crop"
         | "keep_source_metadata"

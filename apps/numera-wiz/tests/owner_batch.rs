@@ -1114,19 +1114,33 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     assert_eq!(actual_pts, [0, 512, 1920, 3584, 6016, 8192]);
     results.push(json!({"job":common_job["job_id"],"container":"mp4","reordered_original_packet_pts":original_pts,"verified_decoded_pts":actual_pts}));
 
-    for (mode, peak, buffer) in [("quality_vbr", "1400k", "2800k"), ("strict_size", "700k", "1400k")] {
+    for (mode, peak, buffer, crop, resize) in [
+        ("quality_vbr", "1400k", "2800k", "crop=31,41,39,29", false),
+        (
+            "strict_size",
+            "700k",
+            "1400k",
+            "crop=y\ncrop_top=31\ncrop_left=41\ncrop_right=39\ncrop_bottom=29",
+            true,
+        ),
+    ] {
         let output = directory.join(format!("imported-{mode}.mp4"));
+        let resolution = if resize { "stretch:160x120" } else { "n" };
         let legacy = format!(
-            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\nresolution=n\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
+            "input_path={}\noutput_path={}\noutput_format=mp4\nvideo_codec=H264\nuse_gpu=n\nvideo_bitrate_kbps=700\nvideo_bitrate_mode={mode}\n{crop}\nresolution={resolution}\naudio_tracks=0\naudio_codec=aac\naudio_bitrate_kbps=128\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
             path.display(), output.display(),
         );
         let import = cli.query("config.import.ffmwiz", json!({"source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"})).await;
         assert_eq!(import["input_valid"], true, "{import}");
         let plan = cli.query("jobs.plan", json!({"asset_id": original["id"], "job_document":import["job"]})).await;
+        let mut picture = json!({"crop":{"width":240,"height":120,"x":40,"y":30}});
+        if resize {
+            picture["resize"] = json!({"width":160,"height":120,"aspect":"square_pixels"});
+        }
         let direct = cli.query("media.encode", json!({"asset_id":original["id"],"output":output,"settings":{
             "video_stream":0,"container":"mp4","bitrate":{"average_kbps":700,"mode":mode},"preset":"balanced",
             "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128},
-            "picture":{"resize":{"width":320,"height":180,"aspect":"square_pixels"}}
+            "picture":picture,
         }})).await;
         assert_eq!(plan["hash"], direct["hash"]);
         let options = plan["argv_template"].as_array().unwrap();
@@ -1138,9 +1152,13 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         })).await;
         succeeded(&cli, &accepted).await;
         let probe = fixture::probe(&components, &output).await;
-        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], "1:1");
+        let (width, aspect) = if resize { (160, "1:1") } else { (240, "4:3") };
+        assert_eq!(probe["streams"][0]["width"], width);
+        assert_eq!(probe["streams"][0]["height"], 120);
+        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], aspect);
         assert_eq!(probe["streams"][0]["codec_name"], "h264");
-        results.push(json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,"peak":peak,"buffer":buffer}));
+        results.push(json!({"job":accepted["job_id"],"import_rate_mode":mode,"average_kbps":700,
+            "peak":peak,"buffer":buffer,"width":width,"sample_aspect_ratio":aspect}));
     }
 
     let intake = directory.join("encode-intake");

@@ -1010,7 +1010,11 @@ average and uses twice the average as the buffer.
 `jobs.plan` also accepts a reviewed FFmWiz CPU H.264 profile with an explicit
 video bitrate, `use_gpu=n`, `keep_source_metadata=n` and `subtitle_tracks=none`.
 Choose `audio_tracks=none` or one original audio ordinal with AAC and an explicit
-audio bitrate. The imported profile preserves FFmWiz's square-pixel output rule.
+audio bitrate. Specify crop margins as `crop=top,left,right,bottom` or with
+`crop=y` and separate `crop_top`, `crop_left`, `crop_right` and `crop_bottom`
+settings. The importer aligns the crop to the 4:2:0 grid. The output retains
+the original sample aspect with `resolution=n`. An explicit
+`stretch:WIDTHxHEIGHT` emits square pixels.
 
 The optional `settings.picture` object accepts an even-coordinate crop,
 quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final

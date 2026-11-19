@@ -150,7 +150,11 @@ a verified prior-package open and handoff across the supported systems.
 FFmWiz uses average bitrate for `quality_vbr` and `strict_size`. Its peak and
 buffer are two and four times the average for `quality_vbr`, and one and two
 times the average for `strict_size`. The Numera CPU AVC planner applies those
-controls for admitted H.264 configurations and retains their square-pixel
-output rule. An independent FFmpeg exercise verified both outputs at the six
+controls for admitted H.264 configurations. Its crop importer follows the
+donor's 4:2:0 margin alignment and preserves the original sample aspect
+for no-resize exports. Explicit stretch produces square pixels.
+An independent FFmpeg exercise verified both bitrate routes at the six
 original variable presentation times.
 [FFmWiz bitrate lowering](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/L01_encode_opts.py#L105-L131)
+[FFmWiz crop alignment](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/support/L00_filters.py#L147-L201)
+[FFmWiz CPU resize and aspect policy](https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/ffmwiz/wizard_build_filters.py#L190-L289)

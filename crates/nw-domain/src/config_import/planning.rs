@@ -2,6 +2,7 @@
 use super::{FIELDS, ImportedJob, Setting, TrackChoice};
 use crate::{
     DomainError, Result,
+    avc_export::Crop,
     mux::{CleanIntent, NoMatch, Selection, Selector, Stream, StreamKind},
 };
 use schemars::JsonSchema;
@@ -37,6 +38,30 @@ fn unsupported(field: &str) -> DomainError {
     )
 }
 
+fn even_crop_axis(extent: u32, near: u32, far: u32) -> Option<(u32, u32)> {
+    let total = near.checked_add(far).filter(|total| *total < extent)?;
+    let lower = |value| value & !1;
+    let near_options = [lower(near), lower(near) + 2];
+    let far_options = [lower(far), lower(far) + 2];
+    // The source and output use the same two-pixel grid. Searching the adjacent
+    // even margins suffices. FFmWiz breaks ties by size, center, and retained area.
+    near_options
+        .into_iter()
+        .flat_map(|left| far_options.into_iter().map(move |right| (left, right)))
+        .filter(|(left, right)| left + right <= extent - 2)
+        .min_by_key(|&(left, right)| {
+            let trimmed = left + right;
+            (
+                left.abs_diff(near) + right.abs_diff(far),
+                trimmed.abs_diff(total),
+                (i64::from(left) - i64::from(right)).abs_diff(i64::from(near) - i64::from(far)),
+                trimmed,
+                left,
+            )
+        })
+        .map(|(left, right)| (left, extent - left - right))
+}
+
 impl ImportedJob {
     fn get(&self, name: &str) -> Option<&Setting> {
         self.settings.get(name).map(|field| &field.value)
@@ -64,6 +89,52 @@ impl ImportedJob {
         matches!(self.get("video_codec"), Some(Setting::Encoder { name }) if matches!(name.as_str(), "h264" | "libx264"))
     }
 
+    fn avc_crop(&self, details: &serde_json::Value) -> Result<Option<Crop>> {
+        let margin = |key| match self.get(key) {
+            Some(Setting::Integer { value }) => *value,
+            _ => 0,
+        };
+        let (top, left, right, bottom) = match self.get("crop") {
+            None | Some(Setting::Enabled { value: false }) => return Ok(None),
+            Some(Setting::Enabled { value: true }) => (
+                margin("crop_top"),
+                margin("crop_left"),
+                margin("crop_right"),
+                margin("crop_bottom"),
+            ),
+            Some(Setting::CropMargins {
+                top,
+                left,
+                right,
+                bottom,
+            }) => (*top, *left, *right, *bottom),
+            _ => return Err(unsupported("crop")),
+        };
+        let axis = |field: &str, max: u32, near, far| {
+            let extent = details[field]
+                .as_u64()
+                .and_then(|value| u32::try_from(value).ok())
+                .filter(|value| (2..=max).contains(value) && value.is_multiple_of(2));
+            extent
+                .and_then(|extent| even_crop_axis(extent, near, far))
+                .ok_or_else(|| {
+                    field_error(
+                        "JOB_PROFILE_UNSUPPORTED",
+                        "crop",
+                        "Crop margins must leave a nonempty picture on the admitted 4:2:0 grid",
+                    )
+                })
+        };
+        let (x, width) = axis("width", 4096, left, right)?;
+        let (y, height) = axis("height", 2160, top, bottom)?;
+        Ok(Some(Crop {
+            width,
+            height,
+            x,
+            y,
+        }))
+    }
+
     pub fn avc_encode(&self, asset: &crate::records::Asset) -> Result<crate::avc_export::EncodeInput> {
         use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, PictureTransform, Preset, RateMode, Resize, ResizeAspect};
         if self.version != 1 || self.settings.len() > FIELDS.len() || !self.selects_avc_encode() {
@@ -87,9 +158,10 @@ impl ImportedJob {
                     | "audio_tracks" | "audio_codec" | "audio_bitrate_kbps", _) => true,
                 ("output_format", Setting::Source) => same_extension(source, output),
                 ("output_format", Setting::Choice { value }) => value.eq_ignore_ascii_case(extension),
-                ("use_gpu" | "crop" | "cpu_two_pass" | "reverse_video" | "reverse_audio"
+                ("use_gpu" | "cpu_two_pass" | "reverse_video" | "reverse_audio"
                     | "keep_source_metadata" | "keep_embedded_attachments" | "detect_duplicate_audio", Setting::Enabled { value: false }) => true,
-                ("crop_top" | "crop_left" | "crop_bottom" | "crop_right", Setting::Integer { value: 0 }) => true,
+                ("crop", Setting::Enabled { .. } | Setting::CropMargins { .. })
+                | ("crop_top" | "crop_left" | "crop_bottom" | "crop_right", Setting::Integer { .. }) => true,
                 ("subtitle_tracks", Setting::Tracks { selection: TrackChoice::None }) => true,
                 ("resolution" | "fps" | "color_range" | "audio_sample_rate" | "video_speed" | "audio_speed", Setting::Source) => true,
                 ("resolution", Setting::Geometry { mode: super::ScaleMode::Stretch, width: Some(_), height: Some(_) }) => true,
@@ -131,12 +203,14 @@ impl ImportedJob {
             return Err(unsupported("video_codec"));
         }
         let details = asset.probe.stream_details.get(&picture.index).ok_or_else(|| missing("input_path"))?;
-        let (width, height) = match self.get("resolution") {
-            Some(Setting::Geometry { width: Some(width), height: Some(height), .. }) => (*width, *height),
-            _ => {
-                let dimension = |key: &str| details[key].as_u64().and_then(|number| u32::try_from(number).ok()).ok_or_else(|| missing("resolution"));
-                (dimension("width")?, dimension("height")?)
-            }
+        let crop = self.avc_crop(details)?;
+        let resize = match self.get("resolution") {
+            Some(Setting::Geometry { width: Some(width), height: Some(height), .. }) => Some(Resize {
+                width: *width,
+                height: *height,
+                aspect: ResizeAspect::SquarePixels,
+            }),
+            _ => None,
         };
         let audio = match self.get("audio_tracks") {
             Some(Setting::Tracks { selection: TrackChoice::None }) => Audio::Drop {},
@@ -161,7 +235,8 @@ impl ImportedJob {
         };
         let settings = Encode { video_stream: picture.index, container, crf: None,
             bitrate: Some(Bitrate { average_kbps, mode }), preset: Preset::Balanced, audio,
-            picture: Some(PictureTransform { resize: Some(Resize { width, height, aspect: ResizeAspect::SquarePixels }), ..Default::default() }),
+            picture: (crop.is_some() || resize.is_some())
+                .then_some(PictureTransform { crop, resize, ..Default::default() }),
         };
         settings.validate()?;
         Ok(EncodeInput { asset_id: asset.id.clone(), output: output.to_str().ok_or_else(|| missing("output_path"))?.to_owned(), settings })
