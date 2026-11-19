@@ -101,6 +101,8 @@ to the operating profile when needed. Inspect accepts `{"scope":"components"}`.
 Refresh accepts `{"components":true,"devices":false,"force":true}`. Clear
 accepts `{"namespace":"components","fingerprint":"<reported SHA-256>"}`.
 All three commands use the current owner process and omit durable replay fields.
+The refreshed `advertised.license` field records the exact FFmpeg executable's
+recognized build notice when available.
 
 Refresh returns the declared codecs, formats and filters separately from the
 verified CPU FFV1 round trip. In an explicit `bridge --native-owner` session,

@@ -87,3 +87,19 @@ for layer effects, solid fill and brightness/contrast. The five changed
 files were reviewed, including checks that short records preserve earlier
 state and oversized descriptors fail admission. Layered PSD import still
 requires a matching Numera workflow. [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/ad952917628648dc630f3f00fab86227a70a8dba...851642f6ec395c47a1843b6f6cf435c08de4f4eb)
+
+## November 19 upstream changes
+
+FFmWiz remains at `b4968caf` and MuxCls at `1269bd71`. FFmpeg Skill 3.13.2
+adds build-license observation, signature-based WAV selection, typed retime
+reports, and selection of which tools its MCP server advertises. Numera now
+reads the identified FFmpeg executable's `-L` declaration in the existing
+capability report. Numera's registered input admission already binds RIFF and
+RF64 WAVE to the WAV demuxer. The HDR matrix, image-sequence, and caption
+changes relate to workflows still in development. [FFmpeg Skill changes](https://github.com/kajisho5/ffmpeg-skill/compare/ab4c2484d1dd0cc399613e7fe76938ffcf95ca97...2cb864c2af4c3d67623132a0ed2974e83619c023)
+
+FilmCraft advances the shared DNG decoder and TIFF traversal together to
+Craft Libraries `3b8e426a`. EffectCraft delegates PSD brightness and exposure
+block writes to `027416ac` and exposes one-, two-, and four-view selection in
+the composition viewer. The application and dependency changes inform the
+remaining image-format and viewer work. [FilmCraft change](https://github.com/storytold/filmcraft/commit/3d37c0f1f1bfd937f76d8fc929f1b2ef828ebf2c) · [EffectCraft changes](https://github.com/storytold/effectcraft/compare/851642f6ec395c47a1843b6f6cf435c08de4f4eb...686fb3fa0485ab4af74c60e343203572fc37138f) · [PSD writers](https://github.com/storytold/craft-libs/commit/027416ac9f36b60229c595f942d36bf74f0ed4d2)

@@ -3,7 +3,7 @@ use crate::{Engine, blocking, media};
 use nw_domain::{
     DomainError, Result,
     capabilities::{
-        AdvertisedComponents, CapabilityReport, ClearResult, NvencObservations, Observation,
+        AdvertisedComponents, BuildLicense, CapabilityReport, ClearResult, NvencObservations, Observation,
         RefreshInput,
     },
     media::ComponentIdentity,
@@ -31,6 +31,24 @@ impl VideoProbe {
             Self::H264Nvenc => ("h264_nvenc", "h264"),
             Self::HevcNvenc => ("hevc_nvenc", "hevc"),
         }
+    }
+}
+
+fn declared_license(notice: &str) -> Option<BuildLicense> {
+    let notice = notice.split_ascii_whitespace().collect::<Vec<_>>().join(" ");
+    if notice.contains("has nonfree parts compiled in.") {
+        return Some(BuildLicense::Nonfree);
+    }
+    let (_, terms) = notice.split_once("under the terms of the GNU ")?;
+    let (lesser, terms) = terms.strip_prefix("Lesser ").map_or((false, terms), |terms| (true, terms));
+    let terms = terms.strip_prefix("General Public License as published by the Free Software Foundation; either version ")?;
+    let (version, _) = terms.split_once(" of the License, or (at your option) any later version.")?;
+    match (lesser, version) {
+        (false, "2") => Some(BuildLicense::Gpl2),
+        (false, "3") => Some(BuildLicense::Gpl3),
+        (true, "2.1") => Some(BuildLicense::Lgpl21),
+        (true, "3") => Some(BuildLicense::Lgpl3),
+        _ => None,
     }
 }
 
@@ -123,6 +141,7 @@ impl Engine {
             Observation::Unavailable
         };
         report.advertised = Some(AdvertisedComponents {
+            license: self.observe_build_license(cancel.clone()).await?,
             encoders: encoders.into_iter().collect(),
             decoders: decoders.into_iter().collect(),
             filters: filters.into_iter().collect(),
@@ -136,6 +155,19 @@ impl Engine {
         // A transient failure gives the caller evidence without poisoning later refreshes.
         *cache = (report.cpu_round_trip != Observation::Failed).then(|| report.clone());
         Ok(report)
+    }
+
+    async fn observe_build_license(&self, cancel: CancellationToken) -> Result<Option<BuildLicense>> {
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let args = ["-hide_banner", "-L"].map(str::to_owned);
+        let output = process::run_with_output_limits(Path::new(&self.ffmpeg.path), &args,
+            Duration::from_secs(3), 8192, 8192, cancel).await;
+        match ticket.finish(output) {
+            Ok(output) => Ok(declared_license(&String::from_utf8_lossy(&output.stdout))
+                .or_else(|| declared_license(&output.stderr_tail))),
+            Err(error) if matches!(error.code.as_str(), "PROCESS_FAILED" | "PROCESS_TIMEOUT") => Ok(None),
+            Err(error) => Err(error),
+        }
     }
 
     async fn refresh_nvenc(

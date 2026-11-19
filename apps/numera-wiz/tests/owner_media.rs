@@ -162,6 +162,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{observed}");
     let capabilities = &observed["result"];
     assert_eq!(capabilities["cpu_round_trip"], "exercised");
+    assert_eq!(capabilities["advertised"]["license"], "LGPL-2.1-or-later");
     assert_eq!(capabilities["hardware"], "unknown");
     assert!(capabilities["nvenc"].is_null());
     assert!(

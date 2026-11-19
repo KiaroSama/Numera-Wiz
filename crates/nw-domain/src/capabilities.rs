@@ -49,8 +49,25 @@ pub enum Observation {
     Exercised,
 }
 
+/// License declared by the exact FFmpeg executable in its `-L` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum BuildLicense {
+    #[serde(rename = "GPL-2.0-or-later")]
+    Gpl2,
+    #[serde(rename = "GPL-3.0-or-later")]
+    Gpl3,
+    #[serde(rename = "LGPL-2.1-or-later")]
+    Lgpl21,
+    #[serde(rename = "LGPL-3.0-or-later")]
+    Lgpl3,
+    Nonfree,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AdvertisedComponents {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<BuildLicense>,
     pub encoders: Vec<String>,
     pub decoders: Vec<String>,
     pub filters: Vec<String>,
