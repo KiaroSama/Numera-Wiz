@@ -173,6 +173,21 @@ impl ClipSelection {
             && self.revision == group.key.revision
     }
 }
+#[cfg(not(target_arch = "wasm32"))]
+struct NativePictureView {
+    mailbox: crate::NativePictureMailbox,
+    requested_time: Rational,
+    picture: Option<(Rational, egui::TextureHandle)>,
+    active: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for NativePictureView {
+    fn drop(&mut self) {
+        self.mailbox.cancel();
+    }
+}
+
 #[derive(Default)]
 pub(super) struct ProjectsUi {
     pub(super) active: bool,
@@ -198,6 +213,8 @@ pub(super) struct ProjectsUi {
     focus_catalog: bool,
     clip_selection: Option<ClipSelection>,
     preview_frame: Option<(Rational, egui::TextureHandle)>,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_picture: Option<NativePictureView>,
     edl: Option<nw_domain::interchange::EdlExport>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
@@ -215,6 +232,10 @@ impl ProjectsUi {
     }
     fn advance(&mut self) -> Result<u64, String> {
         self.preview_frame = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.native_picture = None;
+        }
         self.edl = None;
         self.forms.edl_document.clear();
         self.forms.edl_reels.clear();
@@ -543,6 +564,10 @@ impl WizApp {
         };
         let action = self.project_action(Phase::Mutation);
         if self.mutate_with_project(command, params, Some(reference), action, ctx) {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.projects.native_picture = None;
+            }
             #[cfg(target_arch = "wasm32")]
             self.client.close_browser_playback();
             self.projects.stale = true;

@@ -310,6 +310,17 @@ to +2,400. The track page includes the gain for tracks with an adjustment.
 Current mixed exports use the FFmpeg `volume` filter for an adjusted track.
 The track record carries a codec version that requires gain support from the reader.
 
+## Native timeline picture preview
+
+Open **Timeline frame**, set the exact sequence time, then choose **Play picture
+window**. The desktop shows up to two seconds of picture on the sequence
+frame grid. **Stop picture preview**, a new frame inspection or a project
+edit closes the active view. This control runs under a native owner session.
+
+The native owner streams decoded RGBA over the protected local connection.
+It can also supply a separate stereo PCM response for the same generation.
+OS audio output is still under development.
+
 ## Browser timeline playback
 
 Open **Timeline frame** in the browser workspace, set **Sequence time (seconds)**

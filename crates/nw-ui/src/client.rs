@@ -14,6 +14,19 @@ pub trait CommandClient: Send + Sync {
     );
     #[cfg(target_arch = "wasm32")]
     fn close_browser_playback(&self);
+    #[cfg(not(target_arch = "wasm32"))]
+    fn supports_native_picture(&self) -> bool {
+        false
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn play_native_picture(
+        &self,
+        _request: nw_domain::preview::native_wire::OpenRequest,
+        _mailbox: crate::NativePictureMailbox,
+        _ctx: eframe::egui::Context,
+    ) {
+    }
     fn save_artifact(
         &self,
         manifest: nw_domain::artifacts::ArtifactManifest,

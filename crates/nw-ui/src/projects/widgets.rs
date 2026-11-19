@@ -763,6 +763,83 @@ impl WizApp {
         });
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn native_picture(&mut self, ui: &mut egui::Ui, group: &Group, sequence: &str, idle: bool) {
+        if !self.client.supports_native_picture() {
+            return;
+        }
+        let current_time = self.projects.forms.preview_at.value().ok();
+        if self.projects.native_picture.as_ref().is_some_and(|view| Some(view.requested_time) != current_time) {
+            self.projects.native_picture = None;
+        }
+        let playing = self.projects.native_picture.as_ref().is_some_and(|view| view.active);
+        if playing && ui.button("Stop picture preview").clicked() {
+            self.projects.native_picture = None;
+        } else if !playing
+            && ui.add_enabled(idle, egui::Button::new("Play picture window")).clicked()
+        {
+            use nw_domain::{preview::native_wire::OpenRequest, projects::{EntityId, ProjectId, Revision, grid_tick}};
+            let prepare = || -> Result<OpenRequest, String> {
+                let settings = &group.sequence.as_ref().ok_or("Select a sequence")?.settings;
+                let start = self.projects.forms.preview_at.value()?;
+                grid_tick(start, settings.frame_rate).map_err(|error| error.message)?;
+                let rate = settings.frame_rate;
+                let counts = rate.checked_mul(Rational::new(2, 1).expect("Preview window length"))
+                    .map_err(|error| error.message)?;
+                let frames = counts.numerator() / counts.denominator();
+                let delta = Rational::new(rate.denominator(), rate.numerator())
+                    .and_then(|period| period.checked_mul(Rational::new(frames, 1)?))
+                    .map_err(|error| error.message)?;
+                let end = start.checked_add(delta).map_err(|error| error.message)?;
+                Ok(OpenRequest {
+                    project_id: ProjectId::parse(group.key.project.clone()).map_err(|error| error.message)?,
+                    sequence_id: EntityId::parse(sequence).map_err(|error| error.message)?,
+                    revision: Revision::parse(&group.key.revision).map_err(|error| error.message)?,
+                    range: TimeRange { start, end },
+                    width: 320, height: 180, audio: false,
+                })
+            };
+            match prepare() {
+                Ok(request) => {
+                    let mailbox = crate::NativePictureMailbox::default();
+                    let requested_time = request.range.start;
+                    self.client.play_native_picture(request, mailbox.clone(), ui.ctx().clone());
+                    self.projects.preview_frame = None;
+                    self.projects.native_picture = Some(NativePictureView {
+                        mailbox, requested_time, picture: None, active: true,
+                    });
+                }
+                Err(problem) => self.error = Some(problem),
+            }
+        }
+        if let Some(view) = self.projects.native_picture.as_mut() {
+            let (frame, outcome) = view.mailbox.take();
+            if let Some(frame) = frame {
+                let rgba = egui::ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &frame.rgba);
+                if let Some((at, image)) = view.picture.as_mut() {
+                    *at = frame.at;
+                    image.set(rgba, egui::TextureOptions::LINEAR);
+                } else {
+                    let texture = ui.ctx().load_texture("native-program", rgba, egui::TextureOptions::LINEAR);
+                    view.picture = Some((frame.at, texture));
+                }
+            }
+            if let Some(result) = outcome {
+                view.active = false;
+                if let Err(error) = result {
+                    self.error = Some(error);
+                }
+            }
+            if let Some((at, texture)) = &view.picture {
+                ui.small(format!("Sequence time {} s", exact(*at)));
+                let width = ui.available_width().clamp(1.0, 640.0);
+                ui.image((texture.id(), egui::vec2(width, width * 180.0 / 320.0)));
+            } else if view.active {
+                ui.small("Preparing picture...");
+            }
+        }
+    }
+
     fn timeline_preview(&mut self, ui: &mut egui::Ui, group: &Group) {
         let Some(sequence) = &group.view.sequence else {
             return;
@@ -791,6 +868,10 @@ impl WizApp {
                 });
                 match request {
                     Some(Ok(time)) => {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            self.projects.native_picture = None;
+                        }
                         *at = ExactForm::new(
                             &time.numerator().to_string(),
                             &time.denominator().to_string(),
@@ -811,6 +892,8 @@ impl WizApp {
                     None => {}
                 }
             });
+            #[cfg(not(target_arch = "wasm32"))]
+            self.native_picture(ui, group, sequence, idle);
             #[cfg(target_arch = "wasm32")]
             if let Some(settings) = group.sequence.as_ref().map(|sequence| &sequence.settings)
                 && crate::web::source_segment::supported()

@@ -9,6 +9,10 @@ mod config_import;
 mod folders;
 mod jobs;
 mod media_join;
+#[cfg(not(target_arch = "wasm32"))]
+mod native_picture;
+#[cfg(not(target_arch = "wasm32"))]
+pub use native_picture::{NativePictureFrame, NativePictureMailbox};
 mod normalize;
 mod observations;
 mod packet_cut;

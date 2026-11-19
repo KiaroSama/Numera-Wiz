@@ -124,6 +124,10 @@ impl PacketOrder {
         Ok(Self { descriptor, next_packet: 0, next_time })
     }
 
+    pub fn next_time(&self) -> Rational {
+        self.next_time
+    }
+
     pub fn admit(&mut self, packet: &Header) -> Result<usize> {
         let end = packet.validate(&self.descriptor)?;
         match packet.format {

@@ -574,6 +574,24 @@ struct NativeUiClient {
 }
 #[cfg(feature = "desktop")]
 impl nw_ui::CommandClient for NativeUiClient {
+    fn supports_native_picture(&self) -> bool {
+        self.client.profile.is_none()
+    }
+
+    fn play_native_picture(
+        &self,
+        request: nw_domain::preview::native_wire::OpenRequest,
+        mailbox: nw_ui::NativePictureMailbox,
+        ctx: eframe::egui::Context,
+    ) {
+        let client = self.client.clone();
+        self.runtime.spawn(async move {
+            let result = client.play_native_picture(request, &mailbox, &ctx).await;
+            mailbox.finish(result.map_err(|error| error.to_string()));
+            ctx.request_repaint();
+        });
+    }
+
     fn choose_media(&self, reply: nw_ui::Reply) {
         match rfd::FileDialog::new()
             .set_title("Add media to Numera Wiz")
