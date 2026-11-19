@@ -194,20 +194,14 @@ pub(super) fn verify(path: &Path, size: u64, expected_sha256: &str) -> Result<()
     Ok(())
 }
 
-fn download(
+fn fetch_archive(
     url: &str,
     output: &Path,
     size: u64,
-    expected_sha256: &str,
     deadline: Instant,
     allow_https_redirect: bool,
-) -> Result<()> {
-    let mut partial_name = output
-        .file_name()
-        .context("Missing download filename")?
-        .to_owned();
-    partial_name.push(".partial");
-    let partial = output.with_file_name(partial_name);
+    resume_at: Option<u64>,
+) -> Result<process::Output> {
     let length = size.to_string();
     let seconds = if size > 64 * 1024 * 1024 { 120 } else { 55 };
     let transfer_seconds = seconds.to_string();
@@ -227,20 +221,80 @@ fn download(
     if allow_https_redirect {
         command.args(["--location", "--max-redirs", "5", "--proto-redir", "=https"]);
     }
+    if let Some(offset) = resume_at {
+        command.args(["--range", &format!("{offset}-")]);
+    }
     command.args(["--", url]);
-    let response = process::run(&mut command, deadline, seconds + 5, Some(&partial))?;
+    process::run(&mut command, deadline, seconds + 5, Some(output))
+}
+
+fn recover_archive(
+    url: &str,
+    partial: &Path,
+    size: u64,
+    offset: u64,
+    deadline: Instant,
+    allow_https_redirect: bool,
+) -> Result<()> {
+    if offset == 0 || offset >= size {
+        fs::remove_file(partial)?;
+        return fetch_archive(url, partial, size, deadline, allow_https_redirect, None)?
+            .success();
+    }
+    let tail = partial.with_extension("remaining");
+    let remaining = size - offset;
+    fetch_archive(
+        url,
+        &tail,
+        remaining,
+        deadline,
+        allow_https_redirect,
+        Some(offset),
+    )?
+    .success()?;
+    {
+        let mut source = File::open(&tail)?;
+        ensure!(
+            source.metadata()?.len() == remaining,
+            "Unexpected archive range length"
+        );
+        let mut destination = OpenOptions::new().append(true).open(partial)?;
+        ensure!(
+            std::io::copy(&mut source, &mut destination)? == remaining,
+            "Incomplete archive suffix"
+        );
+    }
+    fs::remove_file(tail)?;
+    Ok(())
+}
+
+fn download(
+    url: &str,
+    output: &Path,
+    size: u64,
+    expected_sha256: &str,
+    deadline: Instant,
+    allow_https_redirect: bool,
+) -> Result<()> {
+    let mut partial_name = output
+        .file_name()
+        .context("Missing download filename")?
+        .to_owned();
+    partial_name.push(".partial");
+    let partial = output.with_file_name(partial_name);
+    let response = fetch_archive(url, &partial, size, deadline, allow_https_redirect, None)?;
     if response.failure.is_none() && response.status.code() == Some(28) {
         let initial = response.success().expect_err("curl transfer timed out");
-        fs::remove_file(&partial).context("Discard the incomplete locked archive before retry")?;
+        let offset = fs::metadata(&partial)?.len();
         tracing::warn!(
             archive = ?output.file_name(),
-            "Locked archive transfer timed out, retrying once"
+            staged_bytes = offset,
+            "Locked archive transfer timed out, recovering once"
         );
-        process::run(&mut command, deadline, seconds + 5, Some(&partial))?
-            .success()
+        recover_archive(url, &partial, size, offset, deadline, allow_https_redirect)
             .with_context(|| {
                 format!(
-                    "Retry fetch {}; initial transfer: {initial}",
+                    "Recover {}; initial transfer: {initial}",
                     output.display()
                 )
             })?;
