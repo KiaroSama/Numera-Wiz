@@ -90,6 +90,26 @@ pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<s
     Ok(target.join("debug").join(format!("numera-wiz{suffix}")))
 }
 
+#[cfg(any(windows, target_os = "macos", all(target_os = "linux", target_arch = "x86_64")))]
+pub(crate) fn qualify_portable_application(command: &mut Command) -> Result<Value> {
+    let process = command.stdin(std::process::Stdio::null()).output()
+        .context("Start the packaged application with its embedded media")?;
+    let response = serde_json::from_slice::<Value>(&process.stdout);
+    if process.status.success() && let Ok(report) = &response
+        && report["ok"] == true && report["result"]["cpu_round_trip"] == "exercised"
+    {
+        return Ok(report.clone());
+    }
+    let safe_code = |path: &str| {
+        response.as_ref().ok().and_then(|report| report.pointer(path)).and_then(Value::as_str)
+            .filter(|code| code.len() <= 64 && code.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'_'))
+            .unwrap_or("unavailable")
+    };
+    let diagnostics = &process.stderr[process.stderr.len().saturating_sub(2048)..];
+    bail!("Portable application first launch failed ({}), response code {}, CPU FFV1 result {}\n{}",
+        process.status, safe_code("/error/code"), safe_code("/result/cpu_round_trip"), String::from_utf8_lossy(diagnostics));
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) fn retain_failure(path: &Path, failure: &anyhow::Error) {
     let cause = format!("{failure:#}");

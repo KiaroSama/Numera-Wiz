@@ -437,7 +437,7 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
     let executable = delivery.join("numera-wiz.exe");
     fs::copy(binary, &executable)?;
     let isolated_state = work.join("first-launch-state");
-    let smoke = execute(
+    let smoke = crate::package::qualify_portable_application(
         Command::new(&executable)
             .current_dir(&delivery)
             .env("PATH", system32)
@@ -445,11 +445,6 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
             .arg(&isolated_state)
             .args(["media", "capabilities", "refresh", "--force"]),
     )?;
-    let smoke: Value = serde_json::from_slice(&smoke.stdout)?;
-    ensure!(
-        smoke["ok"] == true && smoke["result"]["cpu_round_trip"] == "exercised",
-        "Installed portable media did not pass the real application FFV1 round trip"
-    );
     let profile_manifest: Value =
         serde_json::from_slice(&fs::read(profile.join("embed-profile.json"))?)?;
     let items = profile_manifest["files"]

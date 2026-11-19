@@ -77,6 +77,17 @@ fn files(proof: &Value, profile: &Path) -> Result<Vec<Value>> {
 
 pub fn build(root: &Path) -> Result<()> {
     let app_source = source(root)?;
+    let parent = nw_platform::security::private_directory(&root.join("target/linux-portable"))?;
+    let work = parent.join(format!("build-{}", std::process::id()));
+    fs::create_dir(&work)?;
+    let result = assemble(root, &work, &app_source);
+    if let Err(error) = &result {
+        crate::package::retain_failure(&work.join("failure.json"), error);
+    }
+    result
+}
+
+fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
     let supplied = root.join("target/qualified-linux-component");
     let candidates = fs::read_dir(supplied)?.collect::<std::io::Result<Vec<_>>>()?;
     ensure!(
@@ -103,8 +114,6 @@ pub fn build(root: &Path) -> Result<()> {
             "Linux component archive identity differs"
         );
     }
-    let parent = nw_platform::security::private_directory(&root.join("target/linux-portable"))?;
-    let work = parent.join(format!("build-{}", std::process::id()));
     let profile = work.join("profile");
     fs::create_dir_all(&profile)?;
     extract_component(&input.join(COMPONENT), &profile)?;
@@ -128,20 +137,16 @@ pub fn build(root: &Path) -> Result<()> {
     )?;
     let state = work.join("first-launch-state");
     fs::create_dir(&state)?;
-    let first_launch: Value = serde_json::from_slice(&output(
+    let first_launch = crate::package::qualify_portable_application(
         Command::new(&executable)
             .current_dir(&bundle)
             .env_clear()
             .env("PATH", "/usr/bin:/bin")
-            .env("HOME", &work)
+            .env("HOME", work)
             .arg("--data-dir")
             .arg(&state)
             .args(["media", "capabilities", "refresh", "--force"]),
-    )?)?;
-    ensure!(
-        first_launch["ok"] == true && first_launch["result"]["cpu_round_trip"] == "exercised",
-        "Embedded Linux media did not perform the application FFV1 round trip"
-    );
+    )?;
     for name in TOOLS {
         ensure!(
             first_launch["result"][name]["sha256"]

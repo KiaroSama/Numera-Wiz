@@ -833,18 +833,12 @@ fn deliver(
     sign(&app)?;
     let home = work.join("first-launch-home");
     fs::create_dir(&home)?;
-    let receipt = execute(
+    let receipt = crate::package::qualify_portable_application(
         clean_process(&executable, &home)
             .arg("--data-dir")
             .arg(home.join("state"))
             .args(["media", "capabilities", "refresh", "--force"]),
-        "Qualify the application first launch",
     )?;
-    let receipt: Value = serde_json::from_slice(&receipt.stdout)?;
-    ensure!(
-        receipt["ok"] == true && receipt["result"]["cpu_round_trip"] == "exercised",
-        "Embedded macOS media did not perform the application FFV1 round trip"
-    );
     let files = manifest["files"]
         .as_array()
         .context("Embedded macOS component list")?;
