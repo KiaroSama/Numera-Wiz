@@ -440,12 +440,18 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(ale["document"], expected);
     assert_eq!(std::fs::read_to_string(&ale_path).unwrap(), expected);
     if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
-        std::fs::copy(&ale_path, std::path::PathBuf::from(evidence_dir).join("selected-assets.ale")).unwrap();
+        std::fs::copy(
+            &ale_path,
+            std::path::PathBuf::from(evidence_dir).join("selected-assets.ale"),
+        )
+        .unwrap();
     }
-    let duplicates = cli.raw(&Request::query(
-        "interchange.ale.export",
-        json!({"asset_ids":[wave_asset,wave_asset]}),
-    )).await;
+    let duplicates = cli
+        .raw(&Request::query(
+            "interchange.ale.export",
+            json!({"asset_ids":[wave_asset,wave_asset]}),
+        ))
+        .await;
     assert_eq!(duplicates["error"]["code"], "ALE_UNREPRESENTABLE");
     assert_eq!(
         call!(

@@ -1062,45 +1062,105 @@ async fn otio_round_trip(
     );
     let mut sources = exported["sources"].clone();
     sources[0]["target_url"] = json!("file://localhost/example.mov");
-    let mut external = Request::query("interchange.fcp7.import", json!({
-        "sequence_id":sequence,"track_id":video,"start":{"num":"4","den":"1"},
-        "document":fcp7.replace("<!DOCTYPE xmeml>", "<!DOCTYPE xmeml SYSTEM \"https://invalid.example/xmeml.dtd\">"),
-        "sources":sources
-    }));
-    external.project = Some(ProjectRef {id:project.into(), expected_revision:Some("16".into())});
+    let mut external = Request::query(
+        "interchange.fcp7.import",
+        json!({
+            "sequence_id":sequence,"track_id":video,"start":{"num":"4","den":"1"},
+            "document":fcp7.replace("<!DOCTYPE xmeml>", "<!DOCTYPE xmeml SYSTEM \"https://invalid.example/xmeml.dtd\">"),
+            "sources":sources
+        }),
+    );
+    external.project = Some(ProjectRef {
+        id: project.into(),
+        expected_revision: Some("16".into()),
+    });
     external.replay_scope = Some(scope.into());
     external.idempotency_key = Some("fcp7-external-doctype".into());
     let rejected = cli.raw(&external).await;
     assert_eq!(rejected["error"]["code"], "FCP7_INVALID");
     let imported = edit(
-        cli, scope, project, "16", "fcp7-picture-import", "interchange.fcp7.import",
+        cli,
+        scope,
+        project,
+        "16",
+        "fcp7-picture-import",
+        "interchange.fcp7.import",
         json!({"sequence_id":sequence,"track_id":video,"start":{"num":"4","den":"1"},
             "document":fcp7,"sources":sources}),
-    ).await;
-    assert_eq!(imported["created"]["document_sha256"], nw_domain::projects::hash(fcp7.as_bytes()));
-    let (read_back, status) = cli.human(&[
-        "timeline", "export-otio", "--project", project, "--revision", "17", "--sequence",
-        sequence, "--track", video, "--start", "4", "--end", "11/2",
-    ]).await;
+    )
+    .await;
+    assert_eq!(
+        imported["created"]["document_sha256"],
+        nw_domain::projects::hash(fcp7.as_bytes())
+    );
+    let (read_back, status) = cli
+        .human(&[
+            "timeline",
+            "export-otio",
+            "--project",
+            project,
+            "--revision",
+            "17",
+            "--sequence",
+            sequence,
+            "--track",
+            video,
+            "--start",
+            "4",
+            "--end",
+            "11/2",
+        ])
+        .await;
     assert_eq!(status, 0, "{read_back}");
-    let read_back: Value = serde_json::from_str(read_back["result"]["document"].as_str().unwrap()).unwrap();
+    let read_back: Value =
+        serde_json::from_str(read_back["result"]["document"].as_str().unwrap()).unwrap();
     assert_eq!(&read_back["tracks"]["children"][0]["children"], items);
-    let (xml, status) = cli.human(&[
-        "timeline", "export-fcp7", "--project", project, "--revision", "17", "--sequence",
-        sequence, "--track", video, "--start", "4", "--end", "11/2",
-    ]).await;
+    let (xml, status) = cli
+        .human(&[
+            "timeline",
+            "export-fcp7",
+            "--project",
+            project,
+            "--revision",
+            "17",
+            "--sequence",
+            sequence,
+            "--track",
+            video,
+            "--start",
+            "4",
+            "--end",
+            "11/2",
+        ])
+        .await;
     assert_eq!(status, 0, "{xml}");
     let xml = &xml["result"];
     let body = xml["document"].as_str().unwrap();
     assert!(body.contains("<start>12</start><end>24</end><in>24</in><out>36</out>"));
-    assert_eq!(xml["document_sha256"], nw_domain::projects::hash(body.as_bytes()));
-    let replay = edit(cli, scope, project, "17", "fcp7-reimport", "interchange.fcp7.import", json!({
-        "sequence_id":sequence,"track_id":video,"start":{"num":"6","den":"1"},
-        "document":body,"sources":xml["sources"]
-    })).await;
+    assert_eq!(
+        xml["document_sha256"],
+        nw_domain::projects::hash(body.as_bytes())
+    );
+    let replay = edit(
+        cli,
+        scope,
+        project,
+        "17",
+        "fcp7-reimport",
+        "interchange.fcp7.import",
+        json!({
+            "sequence_id":sequence,"track_id":video,"start":{"num":"6","den":"1"},
+            "document":body,"sources":xml["sources"]
+        }),
+    )
+    .await;
     assert_eq!(replay["created"]["document_sha256"], xml["document_sha256"]);
     if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
-        std::fs::write(std::path::PathBuf::from(evidence_dir).join("fcp7-round-trip.xml"), body).unwrap();
+        std::fs::write(
+            std::path::PathBuf::from(evidence_dir).join("fcp7-round-trip.xml"),
+            body,
+        )
+        .unwrap();
     }
 }
 

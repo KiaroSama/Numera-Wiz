@@ -415,7 +415,9 @@ impl Service {
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
                     }
-                    "interchange.edl.import" | "interchange.otio.import" | "interchange.fcp7.import" => {
+                    "interchange.edl.import"
+                    | "interchange.otio.import"
+                    | "interchange.fcp7.import" => {
                         use nw_domain::interchange::{CutTrack, parse_cmx3600, parse_otio};
                         let params = request.params.clone();
                         let (target, document_sha256, cuts) =
@@ -427,9 +429,13 @@ impl Service {
                                     import.cuts,
                                 )
                             } else if request.command.id == "interchange.fcp7.import" {
-                                let import = nw_domain::interchange::fcp7::import(commands::parse(params)?)?;
+                                let import =
+                                    nw_domain::interchange::fcp7::import(commands::parse(params)?)?;
                                 (
-                                    CutTrack::Fcp7 { kind: import.kind, range: import.range },
+                                    CutTrack::Fcp7 {
+                                        kind: import.kind,
+                                        range: import.range,
+                                    },
                                     import.document_sha256,
                                     import.cuts,
                                 )

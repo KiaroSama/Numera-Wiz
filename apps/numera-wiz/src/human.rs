@@ -621,9 +621,12 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Tracks(command) => command.prepare()?,
         Command::Markers(command) => command.prepare()?,
         Command::History(command) => command.prepare()?,
-        Command::Interchange(Interchange::ExportAle { asset, frame_rate, .. }) => {
-            query("interchange.ale.export", json!({"asset_ids":asset,"frame_rate":frame_rate}))
-        }
+        Command::Interchange(Interchange::ExportAle {
+            asset, frame_rate, ..
+        }) => query(
+            "interchange.ale.export",
+            json!({"asset_ids":asset,"frame_rate":frame_rate}),
+        ),
         Command::Chapters(Chapters::Inspect { asset }) => {
             query("chapters.inspect", json!({"id":asset}))
         }
@@ -1175,10 +1178,9 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
         return wait_batch(client, id).await;
     }
     let interchange_destination = match &command {
-        Command::Timeline(Timeline::ExportEdl(args) | Timeline::ExportOtio(args) |
-            Timeline::ExportFcp7(args)) => {
-            args.out.clone()
-        }
+        Command::Timeline(
+            Timeline::ExportEdl(args) | Timeline::ExportOtio(args) | Timeline::ExportFcp7(args),
+        ) => args.out.clone(),
         Command::Interchange(Interchange::ExportAle { out, .. }) => out.clone(),
         _ => None,
     };

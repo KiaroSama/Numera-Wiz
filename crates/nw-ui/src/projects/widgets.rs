@@ -1186,10 +1186,20 @@ impl WizApp {
         if let Some(track) = &group.view.track {
             for format in [TrackExchange::Otio, TrackExchange::Fcp7] {
                 let (heading, copy, hint, export_command, import_command) = match format {
-                    TrackExchange::Otio => ("OpenTimelineIO", "Copy OTIO", "OpenTimelineIO JSON",
-                        "interchange.otio.export", "interchange.otio.import"),
-                    TrackExchange::Fcp7 => ("Final Cut Pro 7 XML", "Copy XML", "Final Cut Pro 7 XML",
-                        "interchange.fcp7.export", "interchange.fcp7.import"),
+                    TrackExchange::Otio => (
+                        "OpenTimelineIO",
+                        "Copy OTIO",
+                        "OpenTimelineIO JSON",
+                        "interchange.otio.export",
+                        "interchange.otio.import",
+                    ),
+                    TrackExchange::Fcp7 => (
+                        "Final Cut Pro 7 XML",
+                        "Copy XML",
+                        "Final Cut Pro 7 XML",
+                        "interchange.fcp7.export",
+                        "interchange.fcp7.import",
+                    ),
                 };
                 ui.collapsing(heading, |ui| {
                     let ready = self.project_ready();

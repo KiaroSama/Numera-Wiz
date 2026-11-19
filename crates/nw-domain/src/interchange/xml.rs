@@ -1,4 +1,7 @@
-use quick_xml::{Reader, events::{BytesStart, Event}};
+use quick_xml::{
+    Reader, XmlVersion,
+    events::{BytesStart, Event},
+};
 use std::collections::BTreeMap;
 
 const MAX_DEPTH: usize = 24;
@@ -25,13 +28,17 @@ impl Element {
 
 fn node(start: &BytesStart<'_>, reader: &Reader<&[u8]>) -> std::result::Result<Element, ()> {
     let mut node = Element {
-        name: std::str::from_utf8(start.name().as_ref()).map_err(|_| ())?.into(),
+        name: std::str::from_utf8(start.name().as_ref())
+            .map_err(|_| ())?
+            .into(),
         ..Element::default()
     };
     for attr in start.attributes() {
         let attr = attr.map_err(|_| ())?;
         let key = std::str::from_utf8(attr.key.as_ref()).map_err(|_| ())?;
-        let value = attr.decode_and_unescape_value(reader.decoder()).map_err(|_| ())?;
+        let value = attr
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|_| ())?;
         node.attrs.insert(key.into(), value.into_owned());
     }
     Ok(node)
@@ -39,7 +46,10 @@ fn node(start: &BytesStart<'_>, reader: &Reader<&[u8]>) -> std::result::Result<E
 
 /// Parse UTF-8 XML with a bounded tree and at most one inert, exact doctype name.
 pub(super) fn parse(text: &str, doctype: &str) -> std::result::Result<Element, ()> {
-    if text.chars().any(|character| character < ' ' && !matches!(character, '\t' | '\n' | '\r')) {
+    if text
+        .chars()
+        .any(|character| character < ' ' && !matches!(character, '\t' | '\n' | '\r'))
+    {
         return Err(());
     }
     let mut reader = Reader::from_str(text);
@@ -61,15 +71,25 @@ pub(super) fn parse(text: &str, doctype: &str) -> std::result::Result<Element, (
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
                     return Err(());
                 }
-                stack.last_mut().ok_or(())?.elements.push(node(&start, &reader)?);
+                stack
+                    .last_mut()
+                    .ok_or(())?
+                    .elements
+                    .push(node(&start, &reader)?);
             }
             Event::End(_) => {
                 let finished = stack.pop().ok_or(())?;
                 stack.last_mut().ok_or(())?.elements.push(finished);
             }
-            Event::Text(text) => stack.last_mut().ok_or(())?.text
+            Event::Text(text) => stack
+                .last_mut()
+                .ok_or(())?
+                .text
                 .push_str(&text.xml10_content().map_err(|_| ())?),
-            Event::CData(text) => stack.last_mut().ok_or(())?.text
+            Event::CData(text) => stack
+                .last_mut()
+                .ok_or(())?
+                .text
                 .push_str(&text.xml10_content().map_err(|_| ())?),
             Event::GeneralRef(value) => {
                 let text = &mut stack.last_mut().ok_or(())?.text;
@@ -81,7 +101,9 @@ pub(super) fn parse(text: &str, doctype: &str) -> std::result::Result<Element, (
                 }
             }
             Event::DocType(name) => {
-                if seen_doctype || stack.len() != 1 || count != 0
+                if seen_doctype
+                    || stack.len() != 1
+                    || count != 0
                     || std::str::from_utf8(name.as_ref()).map_err(|_| ())?.trim() != doctype
                 {
                     return Err(());
@@ -89,9 +111,14 @@ pub(super) fn parse(text: &str, doctype: &str) -> std::result::Result<Element, (
                 seen_doctype = true;
             }
             Event::Decl(decl) => {
-                if seen_declaration || seen_doctype || count != 0
-                    || decl.encoding().transpose().map_err(|_| ())?
-                    .is_some_and(|encoding| !encoding.as_ref().eq_ignore_ascii_case(b"utf-8"))
+                if seen_declaration
+                    || seen_doctype
+                    || count != 0
+                    || decl
+                        .encoding()
+                        .transpose()
+                        .map_err(|_| ())?
+                        .is_some_and(|encoding| !encoding.as_ref().eq_ignore_ascii_case(b"utf-8"))
                 {
                     return Err(());
                 }

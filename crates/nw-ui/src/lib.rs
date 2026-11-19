@@ -941,9 +941,8 @@ impl WizApp {
                     }
                 }
                 Action::AleDocument => {
-                    self.ale_document = Some(
-                        serde_json::from_value(result).map_err(|error| error.to_string())?,
-                    );
+                    self.ale_document =
+                        Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                     self.status = "Avid Log Exchange document is ready.".into();
                 }
                 Action::ClearCapabilities => {

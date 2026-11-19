@@ -1287,7 +1287,10 @@ impl Service {
                         &input.track_id,
                     )?)?
                 } else if request.command.id == "interchange.fcp7.export" {
-                    value(&nw_domain::interchange::fcp7::export(&capture, &input.track_id)?)?
+                    value(&nw_domain::interchange::fcp7::export(
+                        &capture,
+                        &input.track_id,
+                    )?)?
                 } else {
                     value(&nw_domain::interchange::export_otio(
                         &capture,
@@ -1839,7 +1842,9 @@ impl Service {
                     if cancellation.is_cancelled() {
                         return Err(DomainError::new("CANCELLED", "ALE export was cancelled"));
                     }
-                    let asset: Asset = self.store.get(&named("asset", id)?)?
+                    let asset: Asset = self
+                        .store
+                        .get(&named("asset", id)?)?
                         .ok_or_else(DomainError::object_not_found)?;
                     self.object(&context, &asset.id, &asset.creator)?;
                     self.path(&context, Path::new(&asset.identity.path), false)?;
