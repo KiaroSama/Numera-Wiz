@@ -1320,7 +1320,10 @@ impl Service {
                             &cancellation,
                         )?)?
                     }
-                    _ => value(&nw_domain::interchange::export_otio(&capture, &input.track_id)?)?,
+                    _ => value(&nw_domain::interchange::export_otio(
+                        &capture,
+                        &input.track_id,
+                    )?)?,
                 }
             }
             "timeline.preview_frame" => {

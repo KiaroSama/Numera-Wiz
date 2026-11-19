@@ -291,7 +291,8 @@ fn result_schema(id: &str) -> Option<Value> {
             Some(serde_json::to_value(schema_for!(crate::interchange::OtioExport)).expect("schema"))
         }
         "interchange.aaf.export" | "interchange.omf.export" => Some(
-            serde_json::to_value(schema_for!(crate::interchange::BinaryTrackExport)).expect("schema"),
+            serde_json::to_value(schema_for!(crate::interchange::BinaryTrackExport))
+                .expect("schema"),
         ),
         "interchange.ale.export" => Some(
             serde_json::to_value(schema_for!(crate::interchange::ale::Export)).expect("schema"),
@@ -370,9 +371,7 @@ fn result_schema(id: &str) -> Option<Value> {
         | "interchange.fcp7.import"
         | "interchange.fcpxml.import"
         | "interchange.aaf.import"
-        | "interchange.omf.import" => {
-            Some(contracts::edit(EditResult::ImportCuts))
-        }
+        | "interchange.omf.import" => Some(contracts::edit(EditResult::ImportCuts)),
         "clips.move"
         | "clips.trim"
         | "clips.slip"

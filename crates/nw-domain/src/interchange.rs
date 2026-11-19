@@ -11,11 +11,11 @@ use crate::{
     projects::{EntityId, ProjectId, Revision, TrackKind, grid_tick},
     time::{Rational, TimeRange},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600};
 pub use otio::{
     ImportedOtio, MAX_OTIO_BYTES, OtioExport, OtioImportInput, OtioSource, export_otio, parse_otio,
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Write};
@@ -40,13 +40,19 @@ pub fn decode_binary_document(encoded: &str, limit: usize) -> Result<Vec<u8>> {
         return Err(too_large());
     }
     let bytes = STANDARD.decode(encoded).map_err(|_| {
-        DomainError::new("INTERCHANGE_INVALID", "Expected standard Base64 for binary interchange")
+        DomainError::new(
+            "INTERCHANGE_INVALID",
+            "Expected standard Base64 for binary interchange",
+        )
     })?;
     if bytes.len() > limit {
         return Err(too_large());
     }
     if bytes.is_empty() {
-        return Err(DomainError::new("INTERCHANGE_INVALID", "Binary interchange document is empty"));
+        return Err(DomainError::new(
+            "INTERCHANGE_INVALID",
+            "Binary interchange document is empty",
+        ));
     }
     Ok(bytes)
 }

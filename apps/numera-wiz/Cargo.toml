@@ -36,11 +36,11 @@ tempfile.workspace = true
 subtle = "2.6"
 http-body = "1"
 bytes = "1"
+base64 = "=0.22.1"
 rfd = { version = "=0.17.2", optional = true }
 cpal = { version = "=0.18.2", default-features = false, optional = true }
 [dev-dependencies]
 redb.workspace = true
-base64 = "=0.22.1"
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 reqwest.workspace = true
 

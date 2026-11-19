@@ -1284,8 +1284,13 @@ async fn slide_moves_linked_clips_between_fixed_outer_edges() {
                 ))
                 .await;
             clips.push(
-                EntityId::parse(placed["created"]["clip_ids"][0].as_str().unwrap().to_owned())
-                    .unwrap(),
+                EntityId::parse(
+                    placed["created"]["clip_ids"][0]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
+                )
+                .unwrap(),
             );
         }
     }
@@ -1353,7 +1358,11 @@ async fn slide_moves_linked_clips_between_fixed_outer_edges() {
     assert_eq!(unchanged["no_change"], true);
     assert_eq!(
         before,
-        sides.iter().flatten().map(|id| fixture.raw(id)).collect::<Vec<_>>()
+        sides
+            .iter()
+            .flatten()
+            .map(|id| fixture.raw(id))
+            .collect::<Vec<_>>()
     );
 
     let request = fixture.request("clips.slide", "slide-linked-right", slide("1", "4"));
@@ -1363,11 +1372,17 @@ async fn slide_moves_linked_clips_between_fixed_outer_edges() {
         .await;
     assert!(accepted.ok, "{:?}", accepted.error);
     assert!(accepted.receipt_id.is_some());
-    let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+    let replay = fixture
+        .service
+        .dispatch(fixture.context.clone(), request)
+        .await;
     assert_eq!(accepted.receipt_id, replay.receipt_id);
     assert_eq!(accepted.result, replay.result);
     assert_eq!(
-        accepted.result.unwrap()["changed_ids"].as_array().unwrap().len(),
+        accepted.result.unwrap()["changed_ids"]
+            .as_array()
+            .unwrap()
+            .len(),
         6
     );
 
@@ -1396,7 +1411,9 @@ async fn slide_moves_linked_clips_between_fixed_outer_edges() {
         ("history.undo", "slide-undo", &before),
         ("history.redo", "slide-redo", &after),
     ] {
-        fixture.accept(fixture.request(command, key, json!({}))).await;
+        fixture
+            .accept(fixture.request(command, key, json!({})))
+            .await;
         for (id, raw) in sides.iter().flatten().zip(expected) {
             assert_eq!(fixture.raw(id), *raw);
         }

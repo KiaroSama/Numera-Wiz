@@ -436,7 +436,10 @@ fn slide<R: ProjectRead>(edit: &mut Edit<'_, R>, input: SlideInput) -> Result<()
         };
         for entity in selected {
             let clip: Clip = entity.payload("clip")?;
-            if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+            if tracks
+                .insert(clip.track_id.clone(), (entity, clip))
+                .is_some()
+            {
                 return Err(slide_boundaries_required());
             }
         }
@@ -459,9 +462,11 @@ fn slide<R: ProjectRead>(edit: &mut Edit<'_, R>, input: SlideInput) -> Result<()
     }
     let mut unchanged = Vec::new();
     for (track, (mut left_entity, mut left)) in left {
-        let (mut middle_entity, middle) =
-            middle.remove(&track).ok_or_else(slide_boundaries_required)?;
-        let (mut right_entity, mut right) = right.remove(&track).ok_or_else(slide_boundaries_required)?;
+        let (mut middle_entity, middle) = middle
+            .remove(&track)
+            .ok_or_else(slide_boundaries_required)?;
+        let (mut right_entity, mut right) =
+            right.remove(&track).ok_or_else(slide_boundaries_required)?;
         if left.sequence_id != middle.sequence_id
             || right.sequence_id != middle.sequence_id
             || left.end()? != middle.sequence_start

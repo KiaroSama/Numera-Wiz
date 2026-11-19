@@ -2656,3 +2656,9 @@ The latest FFmWiz and MuxCls revisions update their Gitleaks handling. Numera's
 main branch already contains the corresponding Gitlink handling via PR 4.
 Their documentation supplies the owner's public donations link.
 [FFmWiz revision](https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6) · [MuxCls revision](https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2) · [Numera PR 4](https://github.com/KiaroSama/Numera-Wiz/pull/4)
+
+The linked OMF 2 fixture follows the published Bento container and Avid
+property definitions. It carries two cuts, three gaps and nonidentity
+object reference keys. Its SHA-256 is
+`cdcde89a6577d55830754b0d1b26b30c758786f99600ae49cf4106fe388da55c`.
+[OMF interchange specification](https://www.cubase.it/wp/wp-content/uploads/2014/12/omfspec21.pdf)

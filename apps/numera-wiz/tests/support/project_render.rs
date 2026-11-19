@@ -845,7 +845,12 @@ async fn verify_slid_registered_picture(
         )
         .await;
         revision = placed["revision"].as_str().unwrap().into();
-        clips.push(placed["created"]["clip_ids"][0].as_str().unwrap().to_owned());
+        clips.push(
+            placed["created"]["clip_ids"][0]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        );
     }
     let args = |delta: &'static str, key: &'static str| {
         [
@@ -892,7 +897,10 @@ async fn verify_slid_registered_picture(
         .await;
     assert_eq!(status, 0, "{observed}");
     assert_eq!(observed["result"]["origin"]["clip_id"], clips[1]);
-    assert_eq!(observed["result"]["rgba_base64"], source_frame["rgba_base64"]);
+    assert_eq!(
+        observed["result"]["rgba_base64"],
+        source_frame["rgba_base64"]
+    );
 }
 
 async fn otio_round_trip(
@@ -1313,13 +1321,31 @@ async fn fcpxml_round_trip(
             "document":document,"sources":sources}),
     )
     .await;
-    assert_eq!(imported["created"]["document_sha256"], nw_domain::projects::hash(document.as_bytes()));
+    assert_eq!(
+        imported["created"]["document_sha256"],
+        nw_domain::projects::hash(document.as_bytes())
+    );
     let path = directory.join("numera-round-trip.fcpxml");
-    let (result, status) = cli.human(&[
-        "timeline", "export-fcpxml", "--project", project, "--revision", "19",
-        "--sequence", sequence, "--track", video, "--start", "8", "--end", "19/2",
-        "--out", path.to_str().unwrap(),
-    ]).await;
+    let (result, status) = cli
+        .human(&[
+            "timeline",
+            "export-fcpxml",
+            "--project",
+            project,
+            "--revision",
+            "19",
+            "--sequence",
+            sequence,
+            "--track",
+            video,
+            "--start",
+            "8",
+            "--end",
+            "19/2",
+            "--out",
+            path.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(status, 0, "{result}");
     let result = &result["result"];
     let exported = result["document"].as_str().unwrap();
@@ -1327,7 +1353,10 @@ async fn fcpxml_round_trip(
     assert!(exported.contains(r#"offset="1/2s" start="1s" duration="1/2s" srcEnable="video""#));
     assert!(exported.contains(r#"offset="1s" start="0s" duration="1/2s""#));
     assert_eq!(std::fs::read(&path).unwrap(), exported.as_bytes());
-    assert_eq!(result["document_sha256"], nw_domain::projects::hash(exported.as_bytes()));
+    assert_eq!(
+        result["document_sha256"],
+        nw_domain::projects::hash(exported.as_bytes())
+    );
     let rebound = edit(
         cli,
         scope,
@@ -1339,10 +1368,16 @@ async fn fcpxml_round_trip(
             "document":exported,"sources":result["sources"]}),
     )
     .await;
-    assert_eq!(rebound["created"]["document_sha256"], result["document_sha256"]);
+    assert_eq!(
+        rebound["created"]["document_sha256"],
+        result["document_sha256"]
+    );
     if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
-        std::fs::write(std::path::PathBuf::from(evidence_dir).join("fcpxml-round-trip.fcpxml"), exported)
-            .unwrap();
+        std::fs::write(
+            std::path::PathBuf::from(evidence_dir).join("fcpxml-round-trip.fcpxml"),
+            exported,
+        )
+        .unwrap();
     }
 }
 
@@ -1361,17 +1396,34 @@ async fn linked_audio_round_trip(
     ] {
         let path = directory.join(format!("numera-round-trip.{format}"));
         let bindings = directory.join(format!("numera-round-trip-{format}.json"));
-        let (out, status) = cli.human(&[
-            "timeline", &format!("export-{format}"), "--project", project, "--revision", base,
-            "--sequence", sequence, "--track", audio, "--end", "1/24",
-            "--out", path.to_str().unwrap(),
-        ]).await;
+        let (out, status) = cli
+            .human(&[
+                "timeline",
+                &format!("export-{format}"),
+                "--project",
+                project,
+                "--revision",
+                base,
+                "--sequence",
+                sequence,
+                "--track",
+                audio,
+                "--end",
+                "1/24",
+                "--out",
+                path.to_str().unwrap(),
+            ])
+            .await;
         assert_eq!(status, 0, "{out}");
         let out = &out["result"];
         let raw = std::fs::read(&path).unwrap();
         assert_eq!(out["document_sha256"], nw_domain::projects::hash(&raw));
         assert_eq!(
-            nw_domain::interchange::decode_binary_document(out["document_base64"].as_str().unwrap(), nw_domain::interchange::MAX_BINARY_BYTES).unwrap(),
+            nw_domain::interchange::decode_binary_document(
+                out["document_base64"].as_str().unwrap(),
+                nw_domain::interchange::MAX_BINARY_BYTES
+            )
+            .unwrap(),
             raw,
         );
         assert!(if format == "aaf" {
@@ -1382,29 +1434,153 @@ async fn linked_audio_round_trip(
                 && label[12..16] == [0, 2, 0, 0]
         });
         std::fs::write(&bindings, serde_json::to_vec(&out["sources"]).unwrap()).unwrap();
-        let (imported, status) = cli.human(&[
-            "timeline", &format!("import-{format}"), "--project", project,
-            "--expected-revision", base, "--sequence", sequence, "--track", audio,
-            "--start", destination, "--file", path.to_str().unwrap(), "--sources", bindings.to_str().unwrap(),
-            "--replay-scope", scope, "--idempotency-key", &format!("linked-{format}-import"),
-        ]).await;
+        let (imported, status) = cli
+            .human(&[
+                "timeline",
+                &format!("import-{format}"),
+                "--project",
+                project,
+                "--expected-revision",
+                base,
+                "--sequence",
+                sequence,
+                "--track",
+                audio,
+                "--start",
+                destination,
+                "--file",
+                path.to_str().unwrap(),
+                "--sources",
+                bindings.to_str().unwrap(),
+                "--replay-scope",
+                scope,
+                "--idempotency-key",
+                &format!("linked-{format}-import"),
+            ])
+            .await;
         assert_eq!(status, 0, "{imported}");
-        assert_eq!(imported["result"]["created"]["document_sha256"], out["document_sha256"]);
-        let (read_back, status) = cli.human(&[
-            "timeline", "export-otio", "--project", project, "--revision", revision,
-            "--sequence", sequence, "--track", audio, "--start", destination, "--end", end,
-        ]).await;
+        assert_eq!(
+            imported["result"]["created"]["document_sha256"],
+            out["document_sha256"]
+        );
+        let (read_back, status) = cli
+            .human(&[
+                "timeline",
+                "export-otio",
+                "--project",
+                project,
+                "--revision",
+                revision,
+                "--sequence",
+                sequence,
+                "--track",
+                audio,
+                "--start",
+                destination,
+                "--end",
+                end,
+            ])
+            .await;
         assert_eq!(status, 0, "{read_back}");
         let document: Value =
             serde_json::from_str(read_back["result"]["document"].as_str().unwrap()).unwrap();
         assert_eq!(&document["tracks"]["children"][0], original);
         if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
             std::fs::write(
-                std::path::PathBuf::from(evidence_dir).join(format!("{format}-round-trip.{format}")),
+                std::path::PathBuf::from(evidence_dir)
+                    .join(format!("{format}-round-trip.{format}")),
                 &raw,
             )
             .unwrap();
         }
+    }
+    independent_omf_import(cli, scope, project, sequence, audio, directory).await;
+}
+
+async fn independent_omf_import(
+    cli: &Cli,
+    scope: &str,
+    project: &str,
+    sequence: &str,
+    audio: &str,
+    directory: &std::path::Path,
+) {
+    // This fixture uses Bento 2.0 property contexts and nonidentity reference keys.
+    let fixture = include_bytes!("../fixtures/linked-audio.omf");
+    let fixture_path = directory.join("independent-linked-audio.omf");
+    let bindings_path = directory.join("independent-omf-sources.json");
+    let bindings = std::fs::read(directory.join("numera-round-trip-omf.json")).unwrap();
+    let mut bindings: Value = serde_json::from_slice(&bindings).unwrap();
+    bindings[0]["target_url"] = json!("linked-audio.wav");
+    std::fs::write(&fixture_path, fixture).unwrap();
+    std::fs::write(&bindings_path, serde_json::to_vec(&bindings).unwrap()).unwrap();
+    let (imported, status) = cli
+        .human(&[
+            "timeline",
+            "import-omf",
+            "--project",
+            project,
+            "--expected-revision",
+            "22",
+            "--sequence",
+            sequence,
+            "--track",
+            audio,
+            "--start",
+            "3",
+            "--file",
+            fixture_path.to_str().unwrap(),
+            "--sources",
+            bindings_path.to_str().unwrap(),
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "external-linked-omf",
+        ])
+        .await;
+    assert_eq!(status, 0, "{imported}");
+    assert_eq!(
+        imported["result"]["created"]["document_sha256"],
+        nw_domain::projects::hash(fixture)
+    );
+    let (reviewed, status) = cli
+        .human(&[
+            "timeline",
+            "export-otio",
+            "--project",
+            project,
+            "--revision",
+            "23",
+            "--sequence",
+            sequence,
+            "--track",
+            audio,
+            "--start",
+            "3",
+            "--end",
+            "4",
+        ])
+        .await;
+    assert_eq!(status, 0, "{reviewed}");
+    let document: Value =
+        serde_json::from_str(reviewed["result"]["document"].as_str().unwrap()).unwrap();
+    let children = document["tracks"]["children"][0]["children"]
+        .as_array()
+        .unwrap();
+    let expected = [
+        ("Gap.1", 0, 3),
+        ("Clip.2", 6, 1),
+        ("Gap.1", 0, 2),
+        ("Clip.2", 12, 4),
+        ("Gap.1", 0, 47_990),
+    ];
+    assert_eq!(children.len(), expected.len());
+    for (child, (schema, start, duration)) in children.iter().zip(expected) {
+        assert_eq!(child["OTIO_SCHEMA"], schema);
+        let range = &child["source_range"];
+        assert_eq!(range["start_time"]["value"], start);
+        assert_eq!(range["duration"]["value"], duration);
+        assert_eq!(range["duration"]["rate"], 48000.0);
     }
 }
 

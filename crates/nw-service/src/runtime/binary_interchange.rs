@@ -4,7 +4,10 @@ use craft_timeline::time::{FrameRate, TICKS_PER_SECOND, Tick};
 use nw_domain::{
     DomainError, Result,
     interchange::{ImportedOtio, MAX_BINARY_BYTES, MAX_BINARY_IMPORT_BYTES, OtioSource},
-    media::{CapturedOccurrence, MixedCapture, OccurrenceSource, bind_mixed_source, declared_relative_stream_window},
+    media::{
+        CapturedOccurrence, MixedCapture, OccurrenceSource, bind_mixed_source,
+        declared_relative_stream_window,
+    },
     mux::StreamKind,
     projects::{self, EntityId, PlaceInput, PlaceSource, SourceSpan, TrackKind, grid_tick, hash},
     records::Asset,
@@ -23,7 +26,10 @@ const IDENTITY: Identity<'static> = Identity {
     product: "Numera Wiz",
     version: env!("CARGO_PKG_VERSION"),
     platform: "Numera Wiz",
-    product_id: [0x17, 0xb1, 0xc7, 0xac, 0x16, 0x16, 0x48, 0xa2, 0xae, 0xf0, 0x59, 0x20, 0xb1, 0xc4, 0x3e, 0x15],
+    product_id: [
+        0x17, 0xb1, 0xc7, 0xac, 0x16, 0x16, 0x48, 0xa2, 0xae, 0xf0, 0x59, 0x20, 0xb1, 0xc4, 0x3e,
+        0x15,
+    ],
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -75,12 +81,18 @@ fn exact_time(format: Format, ticks: Tick) -> Result<Rational> {
 
 fn check_notes(format: Format, report: &Report) -> Result<()> {
     if let Some(note) = report.entries.first() {
-        return Err(format.unsupported(format!("Document requires a lossy conversion: {}", note.message)));
+        return Err(format.unsupported(format!(
+            "Document requires a lossy conversion: {}",
+            note.message
+        )));
     }
     Ok(())
 }
 
-fn validate_bindings(format: Format, sources: &[OtioSource]) -> Result<BTreeMap<&str, &OtioSource>> {
+fn validate_bindings(
+    format: Format,
+    sources: &[OtioSource],
+) -> Result<BTreeMap<&str, &OtioSource>> {
     if sources.len() > MAX_CUTS {
         return Err(projects::limit("Too many registered media bindings"));
     }
@@ -90,12 +102,18 @@ fn validate_bindings(format: Format, sources: &[OtioSource]) -> Result<BTreeMap<
             || source.target_url.len() > 4096
             || source.target_url.chars().any(char::is_control)
             || source.content_sha256.len() != 64
-            || !source.content_sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || !source
+                .content_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         {
             return Err(format.invalid("Invalid media locator or SHA-256 binding"));
         }
         projects::validate_id(&source.asset_id)?;
-        if bindings.insert(source.target_url.as_str(), source).is_some() {
+        if bindings
+            .insert(source.target_url.as_str(), source)
+            .is_some()
+        {
             return Err(format.invalid("Duplicate media locator binding"));
         }
     }
@@ -111,7 +129,9 @@ pub(crate) fn import(
     sources: &[OtioSource],
 ) -> Result<ImportedOtio> {
     if bytes.len() > MAX_BINARY_IMPORT_BYTES {
-        return Err(projects::limit("Binary interchange exceeds the bounded input size"));
+        return Err(projects::limit(
+            "Binary interchange exceeds the bounded input size",
+        ));
     }
     let bindings = validate_bindings(format, sources)?;
     let start = start.unwrap_or(Rational::ZERO);
@@ -138,7 +158,9 @@ pub(crate) fn import(
         return Err(format.unsupported("Markers and nested compositions are outside this cut list"));
     }
     if track.items.len() > MAX_ITEMS {
-        return Err(projects::limit("Binary interchange exceeds the bounded cut and gap count"));
+        return Err(projects::limit(
+            "Binary interchange exceeds the bounded cut and gap count",
+        ));
     }
     let kind = match track.kind {
         model::CKind::Picture => TrackKind::Video,
@@ -154,33 +176,51 @@ pub(crate) fn import(
             model::CItem::Filler(_) => {}
             model::CItem::Clip(clip) if duration > Rational::ZERO && clip.gain.is_none() => {
                 if cuts.len() == MAX_CUTS {
-                    return Err(projects::limit("Binary interchange exceeds the atomic edit limit"));
+                    return Err(projects::limit(
+                        "Binary interchange exceeds the atomic edit limit",
+                    ));
                 }
-                let source = document.sources.get(clip.source)
+                let source = document
+                    .sources
+                    .get(clip.source)
                     .ok_or_else(|| format.invalid("Cut references a missing source"))?;
                 if format == Format::Omf && source.sample_rate != composition.sample_rate {
-                    return Err(format.unsupported("OMF requires matching source and track sample rates"));
+                    return Err(
+                        format.unsupported("OMF requires matching source and track sample rates")
+                    );
                 }
                 let source_range = linked_source_range(format, track.kind, source, clip, duration)?;
                 let (locator, binding) = source.path.as_deref()
                     .and_then(|path| bindings.get_key_value(path))
                     .ok_or_else(|| format.invalid("Every linked media locator needs an explicit registered source binding"))?;
                 used.insert(*locator);
-                cuts.push((PlaceInput {
-                    sequence_id: sequence_id.clone(),
-                    track_id: track_id.clone(),
-                    source: PlaceSource::Registered { asset_id: binding.asset_id.clone(), stream_index: binding.stream_index },
-                    source_range,
-                    sequence_start: cursor,
-                    collision: "reject".into(),
-                }, Some(binding.content_sha256.clone())));
+                cuts.push((
+                    PlaceInput {
+                        sequence_id: sequence_id.clone(),
+                        track_id: track_id.clone(),
+                        source: PlaceSource::Registered {
+                            asset_id: binding.asset_id.clone(),
+                            stream_index: binding.stream_index,
+                        },
+                        source_range,
+                        sequence_start: cursor,
+                        collision: "reject".into(),
+                    },
+                    Some(binding.content_sha256.clone()),
+                ));
             }
-            _ => return Err(format.unsupported("Import requires plain positive-duration cuts and gaps")),
+            _ => {
+                return Err(
+                    format.unsupported("Import requires plain positive-duration cuts and gaps")
+                );
+            }
         }
         cursor = cursor.checked_add(duration)?;
     }
     if cuts.is_empty() || used.len() != bindings.len() {
-        return Err(format.invalid("Import requires at least one cut and exactly the used media bindings"));
+        return Err(
+            format.invalid("Import requires at least one cut and exactly the used media bindings")
+        );
     }
     Ok(ImportedOtio {
         kind,
@@ -215,7 +255,9 @@ fn linked_source_range(
 }
 
 fn number(metadata: &Value, field: &str) -> Option<u32> {
-    metadata[field].as_u64().and_then(|value| u32::try_from(value).ok())
+    metadata[field]
+        .as_u64()
+        .and_then(|value| u32::try_from(value).ok())
         .or_else(|| metadata[field].as_str()?.parse().ok())
 }
 
@@ -238,7 +280,10 @@ fn picture_rate(format: Format, metadata: &Value) -> Result<FrameRate> {
     };
     let confirmed = rate("avg_frame_rate")
         .filter(|value| Some(*value) == rate("r_frame_rate"))
-        .ok_or_else(|| format.unsupported("Picture export requires matching registered frame rate observations"))?;
+        .ok_or_else(|| {
+            format
+                .unsupported("Picture export requires matching registered frame rate observations")
+        })?;
     frame_rate(format, confirmed)
 }
 
@@ -253,8 +298,16 @@ fn pcm_bits(codec: &str, container: &str) -> Option<u16> {
 }
 
 fn clip_locator(format: Format, asset: &Asset) -> Result<String> {
-    let name = asset.identity.path.rsplit(['/', '\\']).next().unwrap_or_default();
-    if name.is_empty() || name.len() > 255 || name == "." || name == ".."
+    let name = asset
+        .identity
+        .path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default();
+    if name.is_empty()
+        || name.len() > 255
+        || name == "."
+        || name == ".."
         || name.chars().any(char::is_control)
         || name.contains([':', '?', '*', '"', '<', '>', '|'])
     {
@@ -270,25 +323,46 @@ fn linked_asset(
     binding: &OtioSource,
     sequence_rate: FrameRate,
 ) -> Result<model::Source> {
-    let OccurrenceSource::Registered { media_kind, probe_sha256, .. } = &occurrence.source else {
+    let OccurrenceSource::Registered {
+        media_kind,
+        probe_sha256,
+        ..
+    } = &occurrence.source
+    else {
         return Err(format.unsupported("Binary interchange exports registered media cuts"));
     };
     let probe = serde_json::to_vec(&asset.probe)
         .map_err(|_| format.invalid("Could not verify the registered source identity"))?;
-    if asset.id != binding.asset_id || asset.identity.sha256 != binding.content_sha256 || hash(&probe) != *probe_sha256 {
-        return Err(DomainError::new("SOURCE_CHANGED", "Registered asset or probe differs from the captured binding"));
+    if asset.id != binding.asset_id
+        || asset.identity.sha256 != binding.content_sha256
+        || hash(&probe) != *probe_sha256
+    {
+        return Err(DomainError::new(
+            "SOURCE_CHANGED",
+            "Registered asset or probe differs from the captured binding",
+        ));
     }
     let stream_kind = match media_kind {
         TrackKind::Video => StreamKind::Video,
         TrackKind::Audio => StreamKind::Audio,
     };
-    let mut streams = asset.probe.streams.iter().filter(|stream| stream.kind == stream_kind && !stream.attached_picture());
-    let stream = streams.next().filter(|stream| stream.index == binding.stream_index)
+    let mut streams = asset
+        .probe
+        .streams
+        .iter()
+        .filter(|stream| stream.kind == stream_kind && !stream.attached_picture());
+    let stream = streams
+        .next()
+        .filter(|stream| stream.index == binding.stream_index)
         .ok_or_else(|| format.invalid("Linked source stream differs from the registered probe"))?;
     if streams.next().is_some() {
-        return Err(format.unsupported("Linked export requires one stream of the selected media kind per file"));
+        return Err(format
+            .unsupported("Linked export requires one stream of the selected media kind per file"));
     }
-    let metadata = asset.probe.stream_details.get(&binding.stream_index)
+    let metadata = asset
+        .probe
+        .stream_details
+        .get(&binding.stream_index)
         .ok_or_else(|| format.unsupported("Registered stream has no descriptor metadata"))?;
     let mut source = model::Source {
         key: format!("{}:{}", binding.asset_id, binding.stream_index),
@@ -312,15 +386,25 @@ fn linked_asset(
         nested: None,
     };
     let declared_end = if *media_kind == TrackKind::Video {
-        let bound = bind_mixed_source(occurrence, asset, hash(&serde_json::to_vec(asset)
-            .map_err(|_| format.invalid("Could not verify the registered source identity"))?))?;
+        let bound =
+            bind_mixed_source(
+                occurrence,
+                asset,
+                hash(&serde_json::to_vec(asset).map_err(|_| {
+                    format.invalid("Could not verify the registered source identity")
+                })?),
+            )?;
         if bound.stream_start != bound.asset_origin {
-            return Err(format.unsupported("Linked export requires a source starting at the asset origin"));
+            return Err(
+                format.unsupported("Linked export requires a source starting at the asset origin")
+            );
         }
         source.frame_rate = picture_rate(format, metadata)?;
-        source.width = number(metadata, "width").filter(|value| *value > 0)
+        source.width = number(metadata, "width")
+            .filter(|value| *value > 0)
             .ok_or_else(|| format.unsupported("Registered picture width is unavailable"))?;
-        source.height = number(metadata, "height").filter(|value| *value > 0)
+        source.height = number(metadata, "height")
+            .filter(|value| *value > 0)
             .ok_or_else(|| format.unsupported("Registered picture height is unavailable"))?;
         if asset.probe.is_still_image() {
             return Err(format.unsupported("Linked picture export requires moving media"));
@@ -328,18 +412,28 @@ fn linked_asset(
         declared_relative_stream_window(asset, binding.stream_index)?.map(|range| range.end)
     } else {
         source.kind = model::CKind::Sound;
-        source.bits = pcm_bits(&stream.codec, &asset.probe.format)
-            .ok_or_else(|| format.unsupported("Linked sound export requires registered integer PCM WAVE or AIFF"))?;
-        let aiff_name = binding.target_url.rsplit_once('.').is_some_and(|(_, extension)| {
-            ["aif", "aiff", "aifc"].iter().any(|candidate| extension.eq_ignore_ascii_case(candidate))
-        });
+        source.bits = pcm_bits(&stream.codec, &asset.probe.format).ok_or_else(|| {
+            format.unsupported("Linked sound export requires registered integer PCM WAVE or AIFF")
+        })?;
+        let aiff_name = binding
+            .target_url
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| {
+                ["aif", "aiff", "aifc"]
+                    .iter()
+                    .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+            });
         if (asset.probe.format == "aiff") != aiff_name {
-            return Err(format.unsupported("The linked sound file name must match its PCM container"));
+            return Err(
+                format.unsupported("The linked sound file name must match its PCM container")
+            );
         }
-        source.channels = number(metadata, "channels").filter(|value| (1..=2).contains(value))
+        source.channels = number(metadata, "channels")
+            .filter(|value| (1..=2).contains(value))
             .ok_or_else(|| format.unsupported("Linked sound export requires mono or stereo PCM"))?;
         source.file_channels = source.channels;
-        source.sample_rate = number(metadata, "sample_rate").filter(|value| (8_000..=384_000).contains(value))
+        source.sample_rate = number(metadata, "sample_rate")
+            .filter(|value| (8_000..=384_000).contains(value))
             .ok_or_else(|| format.unsupported("Registered sound sample rate is unavailable"))?;
         pcm_extent(format, asset, metadata, source.sample_rate)?
     };
@@ -360,22 +454,37 @@ fn linked_asset(
     Ok(source)
 }
 
-fn pcm_extent(format: Format, asset: &Asset, metadata: &Value, rate: u32) -> Result<Option<Rational>> {
-    let integer = |name: &str| metadata[name].as_i64().or_else(|| metadata[name].as_str()?.parse().ok());
+fn pcm_extent(
+    format: Format,
+    asset: &Asset,
+    metadata: &Value,
+    rate: u32,
+) -> Result<Option<Rational>> {
+    let integer = |name: &str| {
+        metadata[name]
+            .as_i64()
+            .or_else(|| metadata[name].as_str()?.parse().ok())
+    };
     // WAVE and AIFF are single-stream sample files. FFprobe can omit the start
     // PTS because the first sample is implicitly zero.
     if asset.probe.streams.len() != 1 || integer("start_pts").is_some_and(|start| start != 0) {
-        return Err(format.unsupported("Linked PCM requires a single stream starting at sample zero"));
+        return Err(
+            format.unsupported("Linked PCM requires a single stream starting at sample zero")
+        );
     }
-    let base = metadata["time_base"].as_str().and_then(|base| base.split_once('/'));
+    let base = metadata["time_base"]
+        .as_str()
+        .and_then(|base| base.split_once('/'));
     let Some(("1", denominator)) = base else {
         return Err(format.unsupported("Registered PCM requires an exact sample clock"));
     };
     if denominator.parse::<u32>().ok() != Some(rate) {
         return Err(format.unsupported("Registered PCM time base differs from its sample rate"));
     }
-    integer("duration_ts").filter(|duration| *duration > 0)
-        .map(|duration| Rational::new(duration, i64::from(rate))).transpose()
+    integer("duration_ts")
+        .filter(|duration| *duration > 0)
+        .map(|duration| Rational::new(duration, i64::from(rate)))
+        .transpose()
 }
 
 pub(crate) fn export(
@@ -385,14 +494,18 @@ pub(crate) fn export(
     assets: &BTreeMap<String, Asset>,
 ) -> Result<BinaryExport> {
     capture.range.validate()?;
-    let track = capture.tracks.iter()
+    let track = capture
+        .tracks
+        .iter()
         .find(|track| track.id == *track_id && track.gain_centidb == 0)
         .ok_or_else(|| format.unsupported("Select an enabled unity-gain track"))?;
     if track.clips.is_empty() || track.clips.len() > MAX_CUTS {
         return Err(format.unsupported("Export requires one to 63 registered media cuts"));
     }
     let kind = match (format, track.kind) {
-        (Format::Omf, TrackKind::Video) => return Err(format.unsupported("OMF exports an audio track")),
+        (Format::Omf, TrackKind::Video) => {
+            return Err(format.unsupported("OMF exports an audio track"));
+        }
         (_, TrackKind::Video) => model::CKind::Picture,
         (_, TrackKind::Audio) => model::CKind::Sound,
     };
@@ -408,30 +521,57 @@ pub(crate) fn export(
     let unity = Rational::new(1, 1)?;
     for cut in &track.clips {
         let range = cut.sequence_range;
-        if range.start < cursor || range.end > capture.range.end || range.end <= range.start
-            || cut.rate != unity || cut.source_range.end.checked_sub(cut.source_range.start)? != range.end.checked_sub(range.start)?
+        if range.start < cursor
+            || range.end > capture.range.end
+            || range.end <= range.start
+            || cut.rate != unity
+            || cut.source_range.end.checked_sub(cut.source_range.start)?
+                != range.end.checked_sub(range.start)?
         {
-            return Err(format.unsupported("Export requires ordered unit-rate cuts inside the selected range"));
+            return Err(format
+                .unsupported("Export requires ordered unit-rate cuts inside the selected range"));
         }
         if range.start > cursor {
-            items.push(model::CItem::Filler(exact_tick(format, range.start.checked_sub(cursor)?)?));
+            items.push(model::CItem::Filler(exact_tick(
+                format,
+                range.start.checked_sub(cursor)?,
+            )?));
         }
-        let OccurrenceSource::Registered { asset_id, stream_index, content_sha256, media_kind, .. } = &cut.source else {
+        let OccurrenceSource::Registered {
+            asset_id,
+            stream_index,
+            content_sha256,
+            media_kind,
+            ..
+        } = &cut.source
+        else {
             return Err(format.unsupported("Binary interchange exports registered media cuts"));
         };
         if *media_kind != track.kind {
             return Err(format.invalid("Cut media kind differs from the selected track"));
         }
-        let asset = assets.get(asset_id).ok_or_else(DomainError::object_not_found)?;
+        let asset = assets
+            .get(asset_id)
+            .ok_or_else(DomainError::object_not_found)?;
         let target_url = clip_locator(format, asset)?;
         let key = target_url.to_lowercase();
-        let binding = OtioSource { target_url, asset_id: asset_id.clone(), stream_index: *stream_index, content_sha256: content_sha256.clone() };
+        let binding = OtioSource {
+            target_url,
+            asset_id: asset_id.clone(),
+            stream_index: *stream_index,
+            content_sha256: content_sha256.clone(),
+        };
         let index = match bindings.get(&key) {
             Some((prior, index)) if *prior == binding => *index,
-            Some(_) => return Err(format.unsupported("Different sources need distinct portable linked file names")),
+            Some(_) => {
+                return Err(format
+                    .unsupported("Different sources need distinct portable linked file names"));
+            }
             None => {
                 let index = document.sources.len();
-                document.sources.push(linked_asset(format, cut, asset, &binding, rate)?);
+                document
+                    .sources
+                    .push(linked_asset(format, cut, asset, &binding, rate)?);
                 bindings.insert(key, (binding, index));
                 index
             }
@@ -461,9 +601,17 @@ pub(crate) fn export(
         cursor = range.end;
     }
     if cursor < capture.range.end {
-        items.push(model::CItem::Filler(exact_tick(format, capture.range.end.checked_sub(cursor)?)?));
+        items.push(model::CItem::Filler(exact_tick(
+            format,
+            capture.range.end.checked_sub(cursor)?,
+        )?));
     }
-    let channels = document.sources.iter().map(|source| source.channels).max().unwrap_or(0);
+    let channels = document
+        .sources
+        .iter()
+        .map(|source| source.channels)
+        .max()
+        .unwrap_or(0);
     document.compositions.push(model::Composition {
         name: "Numera Wiz".into(),
         aaf_mob_id: None,
@@ -475,7 +623,11 @@ pub(crate) fn export(
         drop: false,
         tracks: vec![model::CTrack {
             kind,
-            name: match kind { model::CKind::Picture => "V1", model::CKind::Sound => "A1" }.into(),
+            name: match kind {
+                model::CKind::Picture => "V1",
+                model::CKind::Sound => "A1",
+            }
+            .into(),
             number: 1,
             channels,
             items,
@@ -484,15 +636,29 @@ pub(crate) fn export(
     });
     let mut report = Report::default();
     let mut bytes = match format {
-        Format::Aaf => aaf::write(&document, &aaf::WriteOptions { identity: IDENTITY, small_sectors: true }, &mut report),
+        Format::Aaf => aaf::write(
+            &document,
+            &aaf::WriteOptions {
+                identity: IDENTITY,
+                small_sectors: true,
+            },
+            &mut report,
+        ),
         Format::Omf => omf::write(&document, &IDENTITY, &mut report),
-    }.map_err(|_| format.unsupported("Could not serialize the linked cut list"))?;
+    }
+    .map_err(|_| format.unsupported("Could not serialize the linked cut list"))?;
     check_notes(format, &report)?;
     if format == Format::Omf {
         bytes = bento::standard_output(&bytes)?;
     }
     if bytes.len() > MAX_BINARY_BYTES {
-        return Err(projects::limit("Binary interchange exceeds the bounded output size"));
+        return Err(projects::limit(
+            "Binary interchange exceeds the bounded output size",
+        ));
     }
-    Ok(BinaryExport { document_sha256: hash(&bytes), document: bytes, sources: bindings.into_values().map(|(binding, _)| binding).collect() })
+    Ok(BinaryExport {
+        document_sha256: hash(&bytes),
+        document: bytes,
+        sources: bindings.into_values().map(|(binding, _)| binding).collect(),
+    })
 }

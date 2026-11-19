@@ -13,7 +13,9 @@ pub(super) fn linked_aaf(bytes: &[u8]) -> Result<()> {
         let Some(stream) = container.child(storage, "properties") else {
             continue;
         };
-        let table = container.read_capped(stream, bytes.len() as u64).map_err(|_| invalid())?;
+        let table = container
+            .read_capped(stream, bytes.len() as u64)
+            .map_err(|_| invalid())?;
         property_bytes += table.len();
         if property_bytes > bytes.len() * 4 {
             return Err(invalid());
@@ -25,12 +27,16 @@ pub(super) fn linked_aaf(bytes: &[u8]) -> Result<()> {
         let values_start = 4 + 6 * count;
         let entries = table.get(4..values_start).ok_or_else(invalid)?;
         let mut values = &table[values_start..];
-        for entry in entries.chunks_exact(6) {
+        for entry in entries.as_chunks::<6>().0 {
             let size = usize::from(u16::from_le_bytes([entry[4], entry[5]]));
             let (value, remainder) = values.split_at_checked(size).ok_or_else(invalid)?;
             values = remainder;
             match &entry[..4] {
-                [0x02, 0x27, 0x42, 0x00] => return Err(format.unsupported("Embedded AAF essence requires a separate media extraction workflow")),
+                [0x02, 0x27, 0x42, 0x00] => {
+                    return Err(format.unsupported(
+                        "Embedded AAF essence requires a separate media extraction workflow",
+                    ));
+                }
                 [0x01, 0x4b, 0x82, 0x00] if !exact_rate(value, i32::from_le_bytes) => {
                     return Err(format.unsupported("AAF edit rate cannot be represented exactly"));
                 }
@@ -50,5 +56,7 @@ pub(super) fn exact_rate(bytes: &[u8], decode: fn([u8; 4]) -> i32) -> bool {
     };
     let num = i64::from(decode(*numerator));
     let denominator = i64::from(decode([*a, *b, *c, *d]));
-    num > 0 && denominator > 0 && i128::from(TICKS_PER_SECOND) * i128::from(denominator) % i128::from(num) == 0
+    num > 0
+        && denominator > 0
+        && i128::from(TICKS_PER_SECOND) * i128::from(denominator) % i128::from(num) == 0
 }

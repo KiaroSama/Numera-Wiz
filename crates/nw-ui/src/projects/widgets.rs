@@ -795,14 +795,19 @@ impl WizApp {
                 && neighbor.sequence_start.checked_add(neighbor.duration).ok()
                     == Some(clip.sequence_start)
         });
-        let right = group.viewport.items.iter().find(|neighbor| {
-            neighbor.track_id == clip.track_id && neighbor.sequence_start == end
-        });
+        let right =
+            group.viewport.items.iter().find(|neighbor| {
+                neighbor.track_id == clip.track_id && neighbor.sequence_start == end
+            });
         let (Some(left), Some(right)) = (left, right) else {
             return;
         };
         ui.collapsing("Slide clip between neighbors", |ui| {
-            rational(ui, "Shift clip by (seconds)", &mut self.projects.forms.slide_delta);
+            rational(
+                ui,
+                "Shift clip by (seconds)",
+                &mut self.projects.forms.slide_delta,
+            );
             if ui.button("Apply slide").clicked() {
                 match self.projects.forms.slide_delta.value() {
                     Ok(delta) => self.mutate_project(

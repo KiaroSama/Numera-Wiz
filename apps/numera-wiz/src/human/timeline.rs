@@ -387,11 +387,15 @@ pub(super) async fn save_interchange(
             let digest = value["document_sha256"].as_str().ok_or_else(|| {
                 DomainError::new("INVALID_RESPONSE", "Interchange digest is missing")
             })?;
-            if matches!(request.command.id.as_str(), "interchange.aaf.export" | "interchange.omf.export") {
+            if matches!(
+                request.command.id.as_str(),
+                "interchange.aaf.export" | "interchange.omf.export"
+            ) {
                 let encoded = value["document_base64"].as_str().ok_or_else(|| {
                     DomainError::new("INVALID_RESPONSE", "Binary interchange document is missing")
                 })?;
-                let bytes = interchange::decode_binary_document(encoded, interchange::MAX_BINARY_BYTES)?;
+                let bytes =
+                    interchange::decode_binary_document(encoded, interchange::MAX_BINARY_BYTES)?;
                 nw_platform::download::save_verified_document(path, &bytes, digest)
             } else {
                 let text = value["document"].as_str().ok_or_else(|| {

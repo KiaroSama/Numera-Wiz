@@ -15,7 +15,11 @@ use nw_domain::{
     time::{Rational, TimeRange},
 };
 use serde_json::{Value, json};
-use std::{collections::{BTreeMap, BTreeSet}, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    time::Duration,
+};
 use web_time::Instant;
 
 const PAGE: usize = 128;
@@ -1114,12 +1118,15 @@ impl WizApp {
                 return Ok(());
             }
             Phase::TrackExport(format) => {
-                use nw_domain::interchange::{BinaryTrackExport, MAX_BINARY_BYTES, OtioExport, decode_binary_document};
+                use nw_domain::interchange::{
+                    BinaryTrackExport, MAX_BINARY_BYTES, OtioExport, decode_binary_document,
+                };
                 let (project, sequence, track, revision, range, digest, expected, document) =
                     if format.is_binary() {
                         let result: BinaryTrackExport =
                             serde_json::from_value(result).map_err(|error| error.to_string())?;
-                        let raw = decode_binary_document(&result.document_base64, MAX_BINARY_BYTES).map_err(|error| error.message)?;
+                        let raw = decode_binary_document(&result.document_base64, MAX_BINARY_BYTES)
+                            .map_err(|error| error.message)?;
                         (
                             result.project_id,
                             result.sequence_id,
@@ -1128,7 +1135,10 @@ impl WizApp {
                             result.range,
                             nw_domain::projects::hash(&raw),
                             result.document_sha256,
-                            TrackDocument { document: result.document_base64, sources: result.sources },
+                            TrackDocument {
+                                document: result.document_base64,
+                                sources: result.sources,
+                            },
                         )
                     } else {
                         let result: OtioExport =
@@ -1141,7 +1151,10 @@ impl WizApp {
                             result.range,
                             nw_domain::projects::hash(result.document.as_bytes()),
                             result.document_sha256,
-                            TrackDocument { document: result.document, sources: result.sources },
+                            TrackDocument {
+                                document: result.document,
+                                sources: result.sources,
+                            },
                         )
                     };
                 let group = self

@@ -62,9 +62,15 @@ impl<'a> Reader<'a> {
         let block_size = usize::from(u16::from_be_bytes([label[10], label[11]]).max(1)) * 1024;
         let start = word(&label[16..20])? as usize;
         let size = word(&label[20..24])? as usize;
-        let toc = input[..index].get(start..start.checked_add(size).ok_or_else(invalid)?)
+        let toc = input[..index]
+            .get(start..start.checked_add(size).ok_or_else(invalid)?)
             .ok_or_else(invalid)?;
-        Ok(Self { input, toc, block_size, dialect })
+        Ok(Self {
+            input,
+            toc,
+            block_size,
+            dialect,
+        })
     }
 
     fn extent(&self, operand: &[u8]) -> Result<&'a [u8]> {
@@ -75,7 +81,8 @@ impl<'a> Reader<'a> {
         };
         let start = usize::try_from(wide).map_err(|_| invalid())?;
         let length = word(length)? as usize;
-        self.input.get(start..start.checked_add(length).ok_or_else(invalid)?)
+        self.input
+            .get(start..start.checked_add(length).ok_or_else(invalid)?)
             .ok_or_else(invalid)
     }
 
@@ -100,18 +107,35 @@ impl<'a> Reader<'a> {
                 (Dialect::Standard, 2) | (_, 5) => 8,
                 (_, 7) => 12,
                 (_, 1..=4 | 9..=13 | 15) => 4,
-                (_, 6 | 8 | 14) => return Err(Format::Omf.unsupported("Fragmented Bento values are outside the OMF cut subset")),
+                (_, 6 | 8 | 14) => {
+                    return Err(Format::Omf
+                        .unsupported("Fragmented Bento values are outside the OMF cut subset"));
+                }
                 _ => return Err(invalid()),
             };
-            let operand = self.toc.get(position..position + size).ok_or_else(invalid)?;
+            let operand = self
+                .toc
+                .get(position..position + size)
+                .ok_or_else(invalid)?;
             position += size;
             match (self.dialect, op) {
-                (Dialect::Standard, 1) => key = Key { object: word(&operand[..4])?, property: word(&operand[4..8])?, kind: word(&operand[8..])? },
+                (Dialect::Standard, 1) => {
+                    key = Key {
+                        object: word(&operand[..4])?,
+                        property: word(&operand[4..8])?,
+                        kind: word(&operand[8..])?,
+                    }
+                }
                 (Dialect::Standard, 2) => {
                     key.property = word(&operand[..4])?;
                     key.kind = word(&operand[4..])?;
                 }
-                (Dialect::Codec, 1) => key = Key { object: word(operand)?, ..Key::default() },
+                (Dialect::Codec, 1) => {
+                    key = Key {
+                        object: word(operand)?,
+                        ..Key::default()
+                    }
+                }
                 (Dialect::Codec, 2) => {
                     key.property = word(operand)?;
                     key.kind = 0;
@@ -120,14 +144,23 @@ impl<'a> Reader<'a> {
                 (_, 15) if !has_value => reference_list = word(operand)?,
                 (_, 15) => return Err(invalid()),
                 (_, 5 | 7 | 9..=13) => {
-                    if has_value || key.object == 0 || key.property == 0 || key.kind == 0 || entries.len() == MAX_VALUES {
+                    if has_value
+                        || key.object == 0
+                        || key.property == 0
+                        || key.kind == 0
+                        || entries.len() == MAX_VALUES
+                    {
                         return Err(invalid());
                     }
                     let data = match op {
                         5 | 7 => self.extent(operand)?,
                         _ => &operand[..usize::from(op - 9)],
                     };
-                    entries.push(Value { key, reference_list, data });
+                    entries.push(Value {
+                        key,
+                        reference_list,
+                        data,
+                    });
                     has_value = true;
                 }
                 _ => {}
@@ -144,9 +177,17 @@ impl<'a> Reader<'a> {
 fn names<'a>(entries: &[Value<'a>]) -> Result<BTreeMap<u32, &'a str>> {
     let mut namespaces = BTreeSet::new();
     let mut names = BTreeMap::new();
-    for entry in entries.iter().filter(|entry| matches!(entry.key.property, TYPE_NAME | PROPERTY_NAME)) {
-        let name = std::str::from_utf8(entry.data).map_err(|_| invalid())?.trim_end_matches('\0');
-        if name.len() > 255 || !namespaces.insert(name) || names.insert(entry.key.object, name).is_some() {
+    for entry in entries
+        .iter()
+        .filter(|entry| matches!(entry.key.property, TYPE_NAME | PROPERTY_NAME))
+    {
+        let name = std::str::from_utf8(entry.data)
+            .map_err(|_| invalid())?
+            .trim_end_matches('\0');
+        if name.len() > 255
+            || !namespaces.insert(name)
+            || names.insert(entry.key.object, name).is_some()
+        {
             return Err(invalid());
         }
     }
@@ -154,8 +195,9 @@ fn names<'a>(entries: &[Value<'a>]) -> Result<BTreeMap<u32, &'a str>> {
 }
 
 fn data_order(entries: &[Value<'_>], names: &BTreeMap<u32, &str>, head: u32) -> Result<bool> {
-    let mut values = entries.iter().filter(|entry| entry.key.object == head
-        && names.get(&entry.key.property) == Some(&"OMFI:HEAD:ByteOrder"));
+    let mut values = entries.iter().filter(|entry| {
+        entry.key.object == head && names.get(&entry.key.property) == Some(&"OMFI:HEAD:ByteOrder")
+    });
     let order = match values.next().map(|entry| entry.data) {
         Some(b"MM") => true,
         Some(b"II") => false,
@@ -169,25 +211,44 @@ fn data_order(entries: &[Value<'_>], names: &BTreeMap<u32, &str>, head: u32) -> 
 
 fn media_guard(entries: &[Value<'_>], names: &BTreeMap<u32, &str>, big_endian: bool) -> Result<()> {
     let format = Format::Omf;
-    let decode: fn([u8; 4]) -> i32 = if big_endian { i32::from_be_bytes } else { i32::from_le_bytes };
+    let decode: fn([u8; 4]) -> i32 = if big_endian {
+        i32::from_be_bytes
+    } else {
+        i32::from_le_bytes
+    };
     for entry in entries {
         match names.get(&entry.key.property).copied() {
-            Some("OMFI:HEAD:Version") if entry.data != [2, 0] => return Err(format.unsupported("Linked OMF requires Interchange version 2.0")),
-            Some("OMFI:HEAD:MediaData") if !entry.data.is_empty() && entry.data != [0; 2] => return Err(format.unsupported("Embedded OMF essence requires a separate media extraction workflow")),
-            Some("OMFI:WAVE:Data" | "OMFI:AIFC:Data" | "OMFI:WAVE:AudioData" | "OMFI:AIFC:AudioData") => {
-                return Err(format.unsupported("Embedded OMF essence requires a separate media extraction workflow"));
+            Some("OMFI:HEAD:Version") if entry.data != [2, 0] => {
+                return Err(format.unsupported("Linked OMF requires Interchange version 2.0"));
+            }
+            Some("OMFI:HEAD:MediaData") if !entry.data.is_empty() && entry.data != [0; 2] => {
+                return Err(format.unsupported(
+                    "Embedded OMF essence requires a separate media extraction workflow",
+                ));
+            }
+            Some(
+                "OMFI:WAVE:Data" | "OMFI:AIFC:Data" | "OMFI:WAVE:AudioData" | "OMFI:AIFC:AudioData",
+            ) => {
+                return Err(format.unsupported(
+                    "Embedded OMF essence requires a separate media extraction workflow",
+                ));
             }
             Some("OMFI:WAVD:Summary" | "OMFI:AIFD:Summary") if !pcm_header(entry.data) => {
-                return Err(format.unsupported("OMF sound descriptors must hold PCM header metadata only"));
+                return Err(
+                    format.unsupported("OMF sound descriptors must hold PCM header metadata only")
+                );
             }
-            Some("OMFI:MSLT:EditRate" | "OMFI:MDFL:SampleRate") if !exact_rate(entry.data, decode) => {
+            Some("OMFI:MSLT:EditRate" | "OMFI:MDFL:SampleRate")
+                if !exact_rate(entry.data, decode) =>
+            {
                 return Err(format.unsupported("OMF edit rate cannot be represented exactly"));
             }
             Some("OMFI:TRKD:Origin") if entry.data != [0; 4] => {
                 return Err(format.unsupported("OMF timeline slot origins must be zero"));
             }
-            Some("OMFI:SCLP:FadeInLength" | "OMFI:SCLP:FadeOutLength" | "OMFI:CMOB:DefFadeLength")
-                if entry.data.iter().any(|value| *value != 0) => {
+            Some(
+                "OMFI:SCLP:FadeInLength" | "OMFI:SCLP:FadeOutLength" | "OMFI:CMOB:DefFadeLength",
+            ) if entry.data.iter().any(|value| *value != 0) => {
                 return Err(format.unsupported("OMF clip fades are outside the cut subset"));
             }
             _ => {}
@@ -217,9 +278,17 @@ fn pcm_header(bytes: &[u8]) -> bool {
             return format_chunk && rest.len() == if wave { 0 } else { 8 };
         }
         let size = [header[4], header[5], header[6], header[7]];
-        let size = if wave { u32::from_le_bytes(size) } else { u32::from_be_bytes(size) };
-        let Ok(padded) = usize::try_from(u64::from(size) + u64::from(size % 2)) else { return false; };
-        let Some(next) = rest.get(padded..) else { return false; };
+        let size = if wave {
+            u32::from_le_bytes(size)
+        } else {
+            u32::from_be_bytes(size)
+        };
+        let Ok(padded) = usize::try_from(u64::from(size) + u64::from(size % 2)) else {
+            return false;
+        };
+        let Some(next) = rest.get(padded..) else {
+            return false;
+        };
         format_chunk |= (wave && id == b"fmt ") || (!wave && id == b"COMM");
         chunks = next;
     }
@@ -235,7 +304,12 @@ fn reference_keys<'a>(kind: Option<&&str>, value: &'a [u8]) -> Result<Option<&'a
             }
             let ([a, b], keys) = value.split_first_chunk::<2>().ok_or_else(invalid)?;
             let counts = [u16::from_be_bytes([*a, *b]), u16::from_le_bytes([*a, *b])];
-            if !counts.into_iter().any(|count| keys.len() == usize::from(count) * 4) { return Err(invalid()); }
+            if !counts
+                .into_iter()
+                .any(|count| keys.len() == usize::from(count) * 4)
+            {
+                return Err(invalid());
+            }
             Ok(Some(keys))
         }
         Some("omfi:ObjRef") => Err(invalid()),
@@ -245,14 +319,25 @@ fn reference_keys<'a>(kind: Option<&&str>, value: &'a [u8]) -> Result<Option<&'a
 
 fn mapped_targets(entries: &[Value<'_>]) -> Result<BTreeMap<u32, BTreeMap<u32, u32>>> {
     let mut lists = BTreeMap::new();
-    for entry in entries.iter().filter(|entry| entry.key.property == REFERENCE_LIST) {
+    for entry in entries
+        .iter()
+        .filter(|entry| entry.key.property == REFERENCE_LIST)
+    {
         let (pairs, rest) = entry.data.as_chunks::<8>();
-        if entry.key.kind != REFERENCE_DATA || !rest.is_empty() || lists.contains_key(&entry.key.object) {
+        if entry.key.kind != REFERENCE_DATA
+            || !rest.is_empty()
+            || lists.contains_key(&entry.key.object)
+        {
             return Err(invalid());
         }
         let mut targets = BTreeMap::new();
         for pair in pairs {
-            if targets.insert(word(&pair[..4])?, word(&pair[4..])?).is_some() { return Err(invalid()); }
+            if targets
+                .insert(word(&pair[..4])?, word(&pair[4..])?)
+                .is_some()
+            {
+                return Err(invalid());
+            }
         }
         lists.insert(entry.key.object, targets);
     }
@@ -268,7 +353,9 @@ pub(super) fn linked_codec_input(input: &[u8]) -> Result<Vec<u8>> {
     let objects: BTreeSet<_> = values.iter().map(|entry| entry.key.object).collect();
     let mut writer = Writer::new(Dialect::Codec);
     for entry in values {
-        if entry.key.property < STANDARD_FIRST_ID && !matches!(entry.key.property, TYPE_NAME | PROPERTY_NAME) {
+        if entry.key.property < STANDARD_FIRST_ID
+            && !matches!(entry.key.property, TYPE_NAME | PROPERTY_NAME)
+        {
             continue;
         }
         let kind = names.get(&entry.key.kind);
@@ -288,7 +375,8 @@ pub(super) fn linked_codec_input(input: &[u8]) -> Result<Vec<u8>> {
                     variants.into_iter().find(|key| objects.contains(key))
                 } else {
                     None
-                }.ok_or_else(invalid)?;
+                }
+                .ok_or_else(invalid)?;
                 data.extend_from_slice(&target.to_be_bytes());
             }
             writer.value(entry.key, 0, &data)?;
@@ -302,23 +390,41 @@ pub(super) fn linked_codec_input(input: &[u8]) -> Result<Vec<u8>> {
 pub(super) fn standard_output(input: &[u8]) -> Result<Vec<u8>> {
     let values = Reader::open(input, Dialect::Codec)?.read()?;
     let names = names(&values)?;
-    let head = values.iter().find(|entry| names.get(&entry.key.property) == Some(&"OMFI:OOBJ:ObjClass") && entry.data == b"HEAD")
-        .map(|entry| entry.key.object).ok_or_else(invalid)?;
+    let head = values
+        .iter()
+        .find(|entry| {
+            names.get(&entry.key.property) == Some(&"OMFI:OOBJ:ObjClass") && entry.data == b"HEAD"
+        })
+        .map(|entry| entry.key.object)
+        .ok_or_else(invalid)?;
     let map_id = |id: u32| -> Result<u32> {
         match id {
             id if id == head => Ok(TOC_OBJECT),
             id if id < CODEC_FIRST_ID => Ok(id),
-            id => id.checked_add(STANDARD_FIRST_ID - CODEC_FIRST_ID).ok_or_else(invalid),
+            id => id
+                .checked_add(STANDARD_FIRST_ID - CODEC_FIRST_ID)
+                .ok_or_else(invalid),
         }
     };
-    let max_id = values.iter().map(|entry| entry.key.object).max().ok_or_else(invalid)?;
-    let mut next_id = map_id(max_id)?.max(STANDARD_FIRST_ID).checked_add(1).ok_or_else(invalid)?;
+    let max_id = values
+        .iter()
+        .map(|entry| entry.key.object)
+        .max()
+        .ok_or_else(invalid)?;
+    let mut next_id = map_id(max_id)?
+        .max(STANDARD_FIRST_ID)
+        .checked_add(1)
+        .ok_or_else(invalid)?;
     let mut writer = Writer::new(Dialect::Standard);
     for entry in values {
         if entry.key.object == TOC_OBJECT || entry.key.property == 22 {
             continue;
         }
-        let key = Key { object: map_id(entry.key.object)?, property: map_id(entry.key.property)?, kind: map_id(entry.key.kind)? };
+        let key = Key {
+            object: map_id(entry.key.object)?,
+            property: map_id(entry.key.property)?,
+            kind: map_id(entry.key.kind)?,
+        };
         let mut list = 0;
         if let Some(keys) = reference_keys(names.get(&entry.key.kind), entry.data)?
             && !keys.is_empty()
@@ -326,17 +432,55 @@ pub(super) fn standard_output(input: &[u8]) -> Result<Vec<u8>> {
             list = next_id;
             next_id = next_id.checked_add(1).ok_or_else(invalid)?;
             let mut pairs = Vec::new();
-            for bytes in keys.as_chunks::<4>().0.iter().copied().collect::<BTreeSet<_>>() {
+            for bytes in keys
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+            {
                 pairs.extend_from_slice(&bytes);
                 pairs.extend_from_slice(&map_id(u32::from_be_bytes(bytes))?.to_be_bytes());
             }
-            writer.value(Key { object: list, property: REFERENCE_LIST, kind: REFERENCE_DATA }, 0, &pairs)?;
+            writer.value(
+                Key {
+                    object: list,
+                    property: REFERENCE_LIST,
+                    kind: REFERENCE_DATA,
+                },
+                0,
+                &pairs,
+            )?;
         }
         writer.value(key, list, entry.data)?;
     }
-    writer.value(Key { object: TOC_OBJECT, property: 2, kind: TOC_TYPE }, 0, &next_id.to_be_bytes())?;
-    writer.value(Key { object: TOC_OBJECT, property: 3, kind: TOC_TYPE }, 0, &STANDARD_FIRST_ID.to_be_bytes())?;
-    writer.value(Key { object: TOC_OBJECT, property: 6, kind: TOC_TYPE }, 0, &[0; 4])?;
+    writer.value(
+        Key {
+            object: TOC_OBJECT,
+            property: 2,
+            kind: TOC_TYPE,
+        },
+        0,
+        &next_id.to_be_bytes(),
+    )?;
+    writer.value(
+        Key {
+            object: TOC_OBJECT,
+            property: 3,
+            kind: TOC_TYPE,
+        },
+        0,
+        &STANDARD_FIRST_ID.to_be_bytes(),
+    )?;
+    writer.value(
+        Key {
+            object: TOC_OBJECT,
+            property: 6,
+            kind: TOC_TYPE,
+        },
+        0,
+        &[0; 4],
+    )?;
     writer.finish()
 }
 
@@ -348,7 +492,11 @@ struct Writer {
 
 impl Writer {
     fn new(dialect: Dialect) -> Self {
-        Self { dialect, heap: Vec::new(), toc: BTreeMap::new() }
+        Self {
+            dialect,
+            heap: Vec::new(),
+            toc: BTreeMap::new(),
+        }
     }
 
     fn value(&mut self, key: Key, reference_list: u32, data: &[u8]) -> Result<()> {
@@ -362,7 +510,9 @@ impl Writer {
         } else {
             field = location(self.heap.len(), data.len())?;
             if self.heap.len() + data.len() > super::MAX_BINARY_IMPORT_BYTES * 4 {
-                return Err(nw_domain::projects::limit("OMF metadata exceeds the bounded Bento extent"));
+                return Err(nw_domain::projects::limit(
+                    "OMF metadata exceeds the bounded Bento extent",
+                ));
             }
             self.heap.extend_from_slice(data);
         }
@@ -377,35 +527,52 @@ impl Writer {
         for (key, (reference_list, field)) in &self.toc {
             let mut entry = vec![1];
             entry.extend_from_slice(&key.object.to_be_bytes());
-            if self.dialect == Dialect::Codec { entry.push(2); }
+            if self.dialect == Dialect::Codec {
+                entry.push(2);
+            }
             entry.extend_from_slice(&key.property.to_be_bytes());
-            if self.dialect == Dialect::Codec { entry.push(3); }
+            if self.dialect == Dialect::Codec {
+                entry.push(3);
+            }
             entry.extend_from_slice(&key.kind.to_be_bytes());
             if *reference_list != 0 {
                 entry.push(15);
                 entry.extend_from_slice(&reference_list.to_be_bytes());
             }
             entry.extend_from_slice(field);
-            if self.dialect == Dialect::Standard && toc.len() % BLOCK_SIZE + entry.len() >= BLOCK_SIZE {
+            if self.dialect == Dialect::Standard
+                && toc.len() % BLOCK_SIZE + entry.len() >= BLOCK_SIZE
+            {
                 toc.resize(toc.len().next_multiple_of(BLOCK_SIZE), 24);
             }
             toc.extend(entry);
         }
-        if self.dialect == Dialect::Standard { toc.push(24); }
+        if self.dialect == Dialect::Standard {
+            toc.push(24);
+        }
         toc
     }
 
     fn finish(mut self) -> Result<Vec<u8>> {
         let start = self.heap.len();
-        let toc_key = Key { object: TOC_OBJECT, property: 4, kind: TOC_TYPE };
-        let container_key = Key { object: TOC_OBJECT, property: 5, kind: TOC_TYPE };
+        let toc_key = Key {
+            object: TOC_OBJECT,
+            property: 4,
+            kind: TOC_TYPE,
+        };
+        let container_key = Key {
+            object: TOC_OBJECT,
+            property: 5,
+            kind: TOC_TYPE,
+        };
         let (toc, padding, major) = if self.dialect == Dialect::Standard {
             self.toc.insert(toc_key, (0, location(start, 0)?));
             self.toc.insert(container_key, (0, location(0, 0)?));
             let bytes = self.make_toc().len();
             let aligned = (start + bytes).next_multiple_of(4);
             self.toc.insert(toc_key, (0, location(start, bytes)?));
-            self.toc.insert(container_key, (0, location(0, aligned + LABEL_SIZE)?));
+            self.toc
+                .insert(container_key, (0, location(0, aligned + LABEL_SIZE)?));
             (self.make_toc(), aligned - start - bytes, 2)
         } else {
             (self.make_toc(), 0, 1)

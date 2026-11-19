@@ -153,7 +153,8 @@ impl Service {
             .batch_preflights
             .try_acquire()
             .map_err(|_| domain::limit("Source preflight capacity is busy; retry this request"))?;
-        let stale_source = || DomainError::new("SOURCE_CHANGED", "Binary interchange source changed");
+        let stale_source =
+            || DomainError::new("SOURCE_CHANGED", "Binary interchange source changed");
         let mut assets = BTreeMap::new();
         let mut sources = BTreeMap::new();
         for clip in &track.clips {
@@ -166,12 +167,15 @@ impl Service {
                 ..
             } = &clip.source
             else {
-                return Err(domain::invalid("Binary interchange requires registered media"));
+                return Err(domain::invalid(
+                    "Binary interchange requires registered media",
+                ));
             };
             let (binding, held) = match sources.entry((asset_id, *stream_index)) {
                 std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::btree_map::Entry::Vacant(entry) => {
-                    let source = self.registered_project_source(context, asset_id, *stream_index, cancel)?;
+                    let source =
+                        self.registered_project_source(context, asset_id, *stream_index, cancel)?;
                     entry.insert(source)
                 }
             };
@@ -184,7 +188,9 @@ impl Service {
             {
                 return Err(stale_source());
             }
-            assets.entry(asset_id.clone()).or_insert_with(|| held.asset.clone());
+            assets
+                .entry(asset_id.clone())
+                .or_insert_with(|| held.asset.clone());
         }
         let output = binary_interchange::export(format, capture, track_id, &assets)?;
         if output.document.len() > MAX_BINARY_BYTES {
@@ -193,14 +199,28 @@ impl Service {
 
         let _guard = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Binary interchange export cancelled"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Binary interchange export cancelled",
+            ));
         }
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(command)) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Binary interchange grant changed"));
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command(command))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Binary interchange grant changed",
+            ));
         }
-        let current = self.read_project(context, capture.project_id.as_str(), ObjectAction::Read)?;
+        let current =
+            self.read_project(context, capture.project_id.as_str(), ObjectAction::Read)?;
         if current.header().revision != capture.project_revision {
-            return Err(DomainError::new("STALE_REVISION", "Binary interchange project revision changed"));
+            return Err(DomainError::new(
+                "STALE_REVISION",
+                "Binary interchange project revision changed",
+            ));
         }
         for (_, held) in sources.into_values() {
             self.object(context, &held.asset.id, &held.asset.creator)?;
@@ -521,50 +541,61 @@ impl Service {
                         use nw_domain::interchange::{self, BinaryTrackImport, CutTrack};
                         let params = request.params.clone();
                         let command = request.command.id.as_str();
-                        let (target, document_sha256, cuts) =
-                            if command == "interchange.edl.import" {
-                                let import = interchange::parse_cmx3600(commands::parse(params)?)?;
-                                (
-                                    CutTrack::Edl(import.frames_per_second),
-                                    import.document_sha256,
-                                    import.cuts,
-                                )
-                            } else {
-                                let (import, mismatch) = match command {
-                                    "interchange.fcp7.import" => (
-                                        interchange::fcp7::import(commands::parse(params)?)?,
-                                        "FCP7_TRACK_MISMATCH",
-                                    ),
-                                    "interchange.fcpxml.import" => (
-                                        interchange::fcpxml::import(commands::parse(params)?)?,
-                                        "FCPXML_TRACK_MISMATCH",
-                                    ),
-                                    "interchange.aaf.import" | "interchange.omf.import" => {
-                                        let (format, mismatch) = if command == "interchange.aaf.import" {
-                                            (binary_interchange::Format::Aaf, "AAF_TRACK_MISMATCH")
-                                        } else {
-                                            (binary_interchange::Format::Omf, "OMF_TRACK_MISMATCH")
-                                        };
-                                        let input: BinaryTrackImport = commands::parse(params)?;
-                                        let bytes = interchange::decode_binary_document(&input.document_base64, interchange::MAX_BINARY_IMPORT_BYTES)?;
-                                        let import = binary_interchange::import(
-                                            format, &bytes, &input.sequence_id, &input.track_id,
-                                            input.start, &input.sources,
-                                        )?;
-                                        (import, mismatch)
-                                    }
-                                    _ => (interchange::parse_otio(commands::parse(params)?)?, "OTIO_TRACK_MISMATCH"),
-                                };
-                                (
-                                    CutTrack::Exact {
-                                        kind: import.kind,
-                                        range: import.range,
-                                        mismatch,
-                                    },
-                                    import.document_sha256,
-                                    import.cuts,
-                                )
+                        let (target, document_sha256, cuts) = if command == "interchange.edl.import"
+                        {
+                            let import = interchange::parse_cmx3600(commands::parse(params)?)?;
+                            (
+                                CutTrack::Edl(import.frames_per_second),
+                                import.document_sha256,
+                                import.cuts,
+                            )
+                        } else {
+                            let (import, mismatch) = match command {
+                                "interchange.fcp7.import" => (
+                                    interchange::fcp7::import(commands::parse(params)?)?,
+                                    "FCP7_TRACK_MISMATCH",
+                                ),
+                                "interchange.fcpxml.import" => (
+                                    interchange::fcpxml::import(commands::parse(params)?)?,
+                                    "FCPXML_TRACK_MISMATCH",
+                                ),
+                                "interchange.aaf.import" | "interchange.omf.import" => {
+                                    let (format, mismatch) = if command == "interchange.aaf.import"
+                                    {
+                                        (binary_interchange::Format::Aaf, "AAF_TRACK_MISMATCH")
+                                    } else {
+                                        (binary_interchange::Format::Omf, "OMF_TRACK_MISMATCH")
+                                    };
+                                    let input: BinaryTrackImport = commands::parse(params)?;
+                                    let bytes = interchange::decode_binary_document(
+                                        &input.document_base64,
+                                        interchange::MAX_BINARY_IMPORT_BYTES,
+                                    )?;
+                                    let import = binary_interchange::import(
+                                        format,
+                                        &bytes,
+                                        &input.sequence_id,
+                                        &input.track_id,
+                                        input.start,
+                                        &input.sources,
+                                    )?;
+                                    (import, mismatch)
+                                }
+                                _ => (
+                                    interchange::parse_otio(commands::parse(params)?)?,
+                                    "OTIO_TRACK_MISMATCH",
+                                ),
                             };
+                            (
+                                CutTrack::Exact {
+                                    kind: import.kind,
+                                    range: import.range,
+                                    mismatch,
+                                },
+                                import.document_sha256,
+                                import.cuts,
+                            )
+                        };
                         let mut bindings = BTreeMap::new();
                         let mut placements = Vec::with_capacity(cuts.len());
                         for (input, expected_sha256) in cuts {

@@ -132,7 +132,9 @@ pub fn export(capture: &MixedCapture, track_id: &EntityId) -> Result<OtioExport>
             || clip.rate != Rational::new(1, 1)?
             || length != source.end.checked_sub(source.start)?
         {
-            return Err(unsupported("FCPXML requires ordered unit-rate media cuts inside the range"));
+            return Err(unsupported(
+                "FCPXML requires ordered unit-rate media cuts inside the range",
+            ));
         }
         append_gap(&mut story, cursor, start)?;
         let url = format!("file://localhost/__numera_wiz_assets__/{asset_id}/{stream_index}");
@@ -147,7 +149,9 @@ pub fn export(capture: &MixedCapture, track_id: &EntityId) -> Result<OtioExport>
             .entry(url)
             .or_insert_with(|| (next, source.end, binding.clone()));
         if *identity != binding {
-            return Err(unsupported("Cuts disagree on the registered media identity"));
+            return Err(unsupported(
+                "Cuts disagree on the registered media identity",
+            ));
         }
         *asset_end = (*asset_end).max(source.end);
         write!(
@@ -226,7 +230,9 @@ fn clip_kind(asset: &Element, clip: &Element) -> Result<TrackKind> {
     match (attr(clip, "srcEnable").unwrap_or("all"), video, audio) {
         ("video", true, _) | ("all", true, false) => Ok(TrackKind::Video),
         ("audio", _, true) | ("all", false, true) => Ok(TrackKind::Audio),
-        _ => Err(unsupported("Select a single video or audio component in FCPXML")),
+        _ => Err(unsupported(
+            "Select a single video or audio component in FCPXML",
+        )),
     }
 }
 
@@ -238,13 +244,17 @@ fn original_url(asset: &Element) -> Result<&str> {
     match (locations.next(), locations.next(), attr(asset, "src")) {
         (Some(location), None, None) => required_attr(location, "src"),
         (None, None, Some(source)) => Ok(source),
-        _ => Err(invalid("A referenced FCPXML asset needs one original-media source")),
+        _ => Err(invalid(
+            "A referenced FCPXML asset needs one original-media source",
+        )),
     }
 }
 
 pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
     if input.document.len() > MAX_OTIO_BYTES || input.sources.len() > MAX_CUTS {
-        return Err(crate::projects::limit("FCPXML exceeds the bounded document or mapping size"));
+        return Err(crate::projects::limit(
+            "FCPXML exceeds the bounded document or mapping size",
+        ));
     }
     let root = xml::parse(&input.document, "fcpxml")
         .map_err(|()| invalid("Expected bounded UTF-8 FCPXML without external declarations"))?;
@@ -265,7 +275,9 @@ pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
     )?;
     let spine = required(sequence, "spine")?;
     if attr(spine, "offset").is_some() || attr(spine, "lane").is_some() {
-        return Err(unsupported("FCPXML import requires a primary story with no connected lanes"));
+        return Err(unsupported(
+            "FCPXML import requires a primary story with no connected lanes",
+        ));
     }
     let resources = required(&root, "resources")?;
     let mut resource_ids = BTreeMap::new();
@@ -296,7 +308,9 @@ pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
                 .content_sha256
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            || bindings.insert(binding.target_url.as_str(), binding).is_some()
+            || bindings
+                .insert(binding.target_url.as_str(), binding)
+                .is_some()
         {
             return Err(invalid("Invalid or duplicate FCPXML media binding"));
         }
@@ -322,7 +336,9 @@ pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
             || attr(clip, "audioStart").is_some()
             || attr(clip, "audioDuration").is_some()
         {
-            return Err(unsupported("FCPXML supports one enabled primary story with cuts and gaps"));
+            return Err(unsupported(
+                "FCPXML supports one enabled primary story with cuts and gaps",
+            ));
         }
         let start = match time_attr(clip, "offset")? {
             Some(offset) => offset.checked_sub(origin)?,
@@ -331,22 +347,31 @@ pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
         let length = time(required_attr(clip, "duration")?)?;
         let end = start.checked_add(length)?;
         if start < cursor || length <= Rational::ZERO || duration.is_some_and(|limit| end > limit) {
-            return Err(unsupported("FCPXML requires ordered positive cuts and gaps within duration"));
+            return Err(unsupported(
+                "FCPXML requires ordered positive cuts and gaps within duration",
+            ));
         }
         cursor = end;
         if clip.name == "gap" {
             continue;
         }
         if cuts.len() == MAX_CUTS {
-            return Err(crate::projects::limit("FCPXML exceeds the atomic edit limit"));
+            return Err(crate::projects::limit(
+                "FCPXML exceeds the atomic edit limit",
+            ));
         }
         let asset = resource_ids
             .get(required_attr(clip, "ref")?)
             .filter(|asset| asset.name == "asset")
             .ok_or_else(|| invalid("FCPXML clip refers to an undeclared asset"))?;
         let this_kind = clip_kind(asset, clip)?;
-        if kind.replace(this_kind).is_some_and(|previous| previous != this_kind) {
-            return Err(unsupported("Place one video or audio track per FCPXML import"));
+        if kind
+            .replace(this_kind)
+            .is_some_and(|previous| previous != this_kind)
+        {
+            return Err(unsupported(
+                "Place one video or audio track per FCPXML import",
+            ));
         }
         let asset_origin = time_attr(asset, "start")?.unwrap_or(Rational::ZERO);
         let source_start = time_attr(clip, "start")?
@@ -359,9 +384,9 @@ pub fn import(input: OtioImportInput) -> Result<ImportedOtio> {
             return Err(invalid("FCPXML cut lies outside the declared asset range"));
         }
         let url = original_url(asset)?;
-        let binding = bindings
-            .get(url)
-            .ok_or_else(|| invalid("Every FCPXML original-media URL requires a registered binding"))?;
+        let binding = bindings.get(url).ok_or_else(|| {
+            invalid("Every FCPXML original-media URL requires a registered binding")
+        })?;
         used.insert(url);
         cuts.push((
             PlaceInput {
