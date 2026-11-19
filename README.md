@@ -43,8 +43,18 @@ export and continuous preview remain in development.
   replacement or removal in a stream-copy plan.
 - Inspect original RIFF and RF64 cue offsets, region lengths and labels.
 - Set or remove selected container and stream tags in a verified Matroska copy.
+- Add or replace authorized Matroska audio and SubRip tracks with verified
+  original packet timing. Normalize supported PCM tracks from independently
+  measured loudness.
+- Cut or split compatible Matroska files at original keyframes and review
+  ordered copy joins of compatible sources.
+- Burn embedded or external SubRip with the offline DejaVu Sans font. Review
+  lossless FFV1 output with original SDR signaling or a PQ/HLG-to-BT.709 tone map.
+- Edit ordered PCM sample ranges with independent reversal and tempo controls.
+  Retime or reverse short FFV1 clips on a variable-rate presentation clock.
 - Decode a single frame from a registered video stream in the shared GUI, CLI
-  and MCP interface.
+  and MCP interface. The browser can also play and seek a bounded authorized
+  two-second source excerpt with optional audio.
 - Preview one exact frame of an opaque layered sequence, including its
   registered picture or an uncovered background.
 - Authorized folder intake with deterministic relative paths, retained probe
@@ -59,8 +69,8 @@ export and continuous preview remain in development.
   link/unlink, atomic history/receipts and bounded revision snapshots. Shared
   native/browser controls implement catalog discovery, project/sequence creation,
   solid-color/registered-source placement, move/split/lift, bounded clip selection,
-  Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen. New
-  [Actual native/Chrome input checks](docs/development/evidence/gui-topology-ci277.json)
+  Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen.
+  [Native and Chrome input checks](docs/development/evidence/gui-topology-ci277.json)
   passed finite solid-color Link/Unlink, Undo/Redo and frontend reopen. Mixed
   audio/video, cross-track input, decoded preview and the complete editor remain
   unfinished.
