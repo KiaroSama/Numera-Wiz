@@ -1,6 +1,6 @@
 //! Burn a held text subtitle into video using FFmpeg's libass filter.
 use super::{Engine, Result, blocking, io_error, lower_remux, plan_digest, registered_object};
-use crate::output_profile::OutputProfile;
+use crate::{output_profile::OutputProfile, track_append::stage_dependency};
 use nw_domain::{
     DomainError,
     execution::DeadlinePolicy,
@@ -465,16 +465,17 @@ impl Engine {
                 nw_platform::security::write_private(&output, &bytes, false)?;
                 None
             }
-            SubtitleSource::External { source } => Some(stage_file(
+            SubtitleSource::External { source } => Some(stage_dependency(
                 &source.identity,
                 registered_object(source)?,
                 &output,
                 &cancel,
+                DeadlinePolicy::Finite { seconds: 30 },
             )?),
         };
         originals.extend(original);
         let font = font_dir.join(FONT);
-        originals.push(stage_file(&burn.font, &burn.font_object, &font, &cancel)?);
+        originals.push(stage_dependency(&burn.font, &burn.font_object, &font, &cancel, DeadlinePolicy::Finite { seconds: 30 })?);
         let filter = format!(
             "{prefix}subtitles=filename={}:fontsdir={}:force_style={}:wrap_unicode=1",
             escape_option(&files::path_text(&output)?),
@@ -489,28 +490,6 @@ impl Engine {
             filter,
         })
     }
-}
-
-fn stage_file(
-    identity: &FileIdentity,
-    object: &nw_domain::records::NativeObjectIdentity,
-    output: &Path,
-    cancel: &CancellationToken,
-) -> Result<files::SourceStamp> {
-    let parent = output.parent().expect("Owned staging directory");
-    let temp = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
-    let (temp, _, stamp) = files::copy_into_staging_observed(
-        identity,
-        object,
-        temp,
-        cancel,
-        DeadlinePolicy::Finite { seconds: 30 },
-        &mut |_| Ok(()),
-    )?;
-    temp.persist_noclobber(output)
-        .map_err(|error| io_error(error.error))?;
-    stamp.revalidate()?;
-    Ok(stamp)
 }
 
 pub(super) fn verify_picture(plan: &Plan, probe: &MediaProbe, output: u32) -> Result<()> {

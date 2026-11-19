@@ -440,12 +440,79 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     json!({"job":job["job_id"],"samples":6588,"channel_layout":"5.1","bit_exact_expected_pcm":true,"tempo":tempo_facts})
 }
 
+async fn packet_join(parent: &Path) -> Value {
+    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
+        .expect("Hosted joins need authenticated media tools"));
+    let directory = parent.join("join نگارش");
+    std::fs::create_dir(&directory).unwrap();
+    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let mut paths = Vec::new();
+    let mut assets = Vec::new();
+    for (index, (color, tone, sar)) in [("red",440,1),("blue",660,1),("green",550,2)].into_iter().enumerate() {
+        let input = directory.join(format!("segment-{index}.mkv"));
+        let picture = format!("color=c={color}:s=96x64:r=8:d=1");
+        let audio = format!("sine=frequency={tone}:sample_rate=48000:duration=1");
+        let aspect = format!("setsar={sar}");
+        let args = [
+            "-v", "error", "-f", "lavfi", "-i", &picture, "-f", "lavfi", "-i", &audio,
+            "-map", "0:v", "-map", "1:a", "-vf", &aspect, "-c:v", "ffv1", "-g", "4",
+            "-c:a", "pcm_s16le", input.to_str().unwrap(),
+        ].map(str::to_owned);
+        nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
+            4096, CancellationToken::new()).await.unwrap();
+        let asset = cli.mutation(&scope, &format!("register-join-part-{index}"), "assets.register",
+            json!({"path":input})).await;
+        paths.push(input);
+        assets.push(asset);
+    }
+    let destination = directory.join("joined.mkv");
+    let rejected = json!({"inputs_in_order":[assets[0]["id"],assets[2]["id"]],"output":destination,
+        "audio":"copy_all","metadata":"first_input","strategy":"copy"});
+    let reply = cli.raw(&nw_domain::commands::Request::query("media.join", rejected)).await;
+    assert_eq!(reply["error"]["code"], "JOIN_INCOMPATIBLE", "{reply}");
+    assert!(!destination.exists());
+    let first = packets(&components, &paths[0]).await;
+    let following = packets(&components, &paths[1]).await;
+    let mut runs = Vec::new();
+    for audio in ["copy_all","drop"] {
+        let output = directory.join(format!("joined-{audio}.mkv"));
+        let request = json!({"inputs_in_order":[assets[0]["id"],assets[1]["id"]],"output":output,
+            "audio":audio,"metadata":"first_input","strategy":"copy"});
+        let plan = cli.query("media.join", request.clone()).await;
+        assert_eq!(plan["media_join"][1]["offset"],json!({"num":"1","den":"1"}));
+        let document = directory.join(format!("join-{audio}.json"));
+        std::fs::write(&document, serde_json::to_vec(&request).unwrap()).unwrap();
+        let (checked, code) = cli.human(&["media","join","--file",document.to_str().unwrap()]).await;
+        assert_eq!(code,0,"{checked}");
+        assert_eq!(checked["result"]["hash"],plan["hash"]);
+        let job = cli.mutation(&scope,&format!("publish-join-{audio}"),"jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        cli.completed(job["job_id"].as_str().unwrap()).await;
+        let joined = packets(&components,&output).await;
+        assert_eq!(joined.len(), if audio=="copy_all" {2} else {1});
+        for (stream, packets) in joined {
+            let mut expected = first[&stream].clone();
+            expected.extend(following[&stream].iter().cloned().map(|mut packet| {
+                for field in ["pts","dts"] {
+                    packet[field]=json!(packet[field].as_i64().unwrap()+1000);
+                }
+                packet
+            }));
+            assert_eq!(packets,expected);
+        }
+        runs.push(json!({"job":job["job_id"],"audio_policy":audio,"verified_original_packets":true}));
+    }
+    json!({"outputs":runs,"sar_mismatch_refused":true})
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
     let media = fixture::generate().await;
     let caption_facts = caption_burn(media.directory.path()).await;
     let sample_edit_facts = multirange_audio_edits(media.directory.path()).await;
+    let join_facts = packet_join(media.directory.path()).await;
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -1947,6 +2014,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "packet_split":{"batch":split_batch["batch_id"],"verified_parts":2,"original_clock_packets":16,"rejected_member_blocks_batch":true},
         "caption_burn":caption_facts,
         "sample_edit":sample_edit_facts,
+        "packet_join":join_facts,
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},

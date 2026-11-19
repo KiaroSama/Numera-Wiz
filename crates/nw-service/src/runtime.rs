@@ -574,6 +574,19 @@ impl Service {
             }
             first_output_index += input.tracks.len();
         }
+        if let Some(join) = &plan.media_join {
+            let mut offset = nw_domain::time::Rational::ZERO;
+            for (position, (source, duration)) in join.all(&plan.source).enumerate() {
+                if self.object(context, &source.id, &source.creator).is_ok()
+                    && self.path(context, Path::new(&source.identity.path), false).is_ok()
+                {
+                    review.media_join.push(nw_domain::media_join::SegmentReview {
+                        position, asset_id: source.id.clone(), duration, offset,
+                    });
+                }
+                offset = offset.checked_add(duration)?;
+            }
+        }
         if let Some(burn) = &plan.subtitle_burn
             && source_visible
         {
@@ -1148,6 +1161,7 @@ impl Service {
                 "timeline.preview_frame",
                 "media.probe",
                 "media.cut",
+                "media.join",
                 "subtitles.burn",
                 "media.split_plan",
                 "media.analyze.volume",
@@ -1959,6 +1973,42 @@ impl Service {
                     value(&self.plan_review(&context, &plan)?)?,
                 )
                 .bounded();
+                if response.ok {
+                    self.store.put(&named("plan", &plan.id)?, &plan)?;
+                }
+                return Ok(response);
+            }
+            "media.join" => {
+                let input: nw_domain::media_join::JoinInput = commands::parse(params)?;
+                input.validate()?;
+                let output = files::path_text(&self.path(&context, Path::new(&input.output), true)?)?;
+                let inputs = self.registered_join_inputs(&context, &input.inputs_in_order)?;
+                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+                    DomainError::new("RESOURCE_LIMIT", "Join review capacity is full")
+                })?;
+                drop(guard);
+                let (primary, join, stamps) = runtime.block_on(self.engine()?.inspect_media_join(
+                    inputs, &output, input.audio, input.metadata, cancellation.clone(),
+                ))?;
+                let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+                if cancellation.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Join review was cancelled"));
+                }
+                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("media.join")) {
+                    return Err(DomainError::new("PERMISSION_DENIED", "Join command access changed during inspection"));
+                }
+                let current = self.registered_join_inputs(&context, &input.inputs_in_order)?;
+                for ((reviewed, _), fresh) in join.all(&primary).zip(&current) {
+                    if reviewed.identity != fresh.identity || reviewed.source_object != fresh.source_object {
+                        return Err(DomainError::new("SOURCE_CHANGED", "A registered join input changed during inspection"));
+                    }
+                }
+                for stamp in &stamps {
+                    stamp.revalidate()?;
+                }
+                let plan = self.prepare_native_copy(&context, &primary.id, &output, Default::default(),
+                    |engine, first, path| engine.media_join_plan_at(first, path, join, &context.principal, self.clock.now()?))?;
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
@@ -2907,6 +2957,16 @@ impl Service {
             .collect()
     }
 
+    fn registered_join_inputs(&self, context: &Context, ids: &[String]) -> Result<Vec<Asset>> {
+        ids.iter().map(|id| {
+            let source: Asset = self.store.get(&named("asset", id)?)?
+                .ok_or_else(DomainError::object_not_found)?;
+            self.object(context, &source.id, &source.creator)?;
+            self.path(context, Path::new(&source.identity.path), false)?;
+            Ok(source)
+        }).collect()
+    }
+
     fn prepare_native_copy(
         &self,
         context: &Context,
@@ -3837,6 +3897,7 @@ mod tests {
             packet_cut: None,
             subtitle_burn: None,
             audio_edit: None,
+            media_join: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

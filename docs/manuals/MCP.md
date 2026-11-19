@@ -568,3 +568,9 @@ tempo for one registered PCM s16le stream. It returns exact unity-tempo
 sample counts and a reviewed duration tolerance for tempo changes. It
 produces one signed 16-bit WAVE stream. Use `commands.schema` to inspect
 the typed input and `jobs.submit` to execute a reviewed plan.
+
+
+`media.join` reviews two to eight registered compatible Matroska
+inputs in `inputs_in_order` using `strategy: "copy"`. Review the
+individual source durations and offsets before `jobs.submit`. Use
+`audio: "drop"` for a picture-only verified copy join.

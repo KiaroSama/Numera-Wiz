@@ -5,6 +5,7 @@ mod audio_normalization;
 mod budget;
 mod capabilities;
 mod media;
+mod media_join;
 mod output_profile;
 mod packet_cut;
 mod preservation;
@@ -430,6 +431,7 @@ impl Engine {
             packet_cut: None,
             subtitle_burn: None,
             audio_edit: None,
+            media_join: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -479,7 +481,9 @@ impl Engine {
         if profile == OutputProfile::WavePcm && plan.audio_edit.is_none() {
             return Err(DomainError::new("INVALID_PLAN", "WAVE output requires a reviewed PCM sample edit"));
         }
-        let expected_scope = if plan.subtitle_burn.is_some() {
+        let expected_scope = if plan.media_join.is_some() {
+            media_join::SCOPE
+        } else if plan.subtitle_burn.is_some() {
             subtitle_burn::SCOPE
         } else if plan.audio_normalization.is_empty() {
             profile.scope()
@@ -506,7 +510,9 @@ impl Engine {
         }
         track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux {
-            let expected = if plan.audio_edit.is_some() {
+            let expected = if plan.media_join.is_some() {
+                media_join::invocation(plan, profile)?
+            } else if plan.audio_edit.is_some() {
                 audio_edit::invocation(plan, profile)?
             } else if plan.subtitle_burn.is_some() {
                 subtitle_burn::invocation(plan, profile)?
@@ -695,6 +701,11 @@ impl Engine {
             cancel.clone(),
         )
         .await?;
+        let join = if plan.media_join.is_some() {
+            Some(media_join::stage(plan, staging.path().parent().expect("Owned staging directory"), cancel.clone()).await?)
+        } else {
+            None
+        };
         let caption = if plan.subtitle_burn.is_some() {
             Some(
                 self.stage_caption(
@@ -727,6 +738,7 @@ impl Engine {
             .iter()
             .map(|v| match v.as_str() {
                 "@owned_staging@" => staging_name.clone(),
+                media_join::SIDECAR => join.as_ref().expect("Validated packet join").manifest().to_owned(),
                 subtitle_burn::FILTER => caption
                     .as_ref()
                     .expect("Validated caption invocation")
@@ -745,6 +757,9 @@ impl Engine {
         if let Err(error) = source_stamp.revalidate().and_then(|_| {
             for input in &additions {
                 input.revalidate()?;
+            }
+	        if let Some(join) = &join {
+                join.revalidate()?;
             }
             if let Some(caption) = &caption {
                 caption.revalidate()?;
@@ -790,7 +805,9 @@ impl Engine {
             )
             .await?;
         verify_structure(plan, &observed)?;
-        let mut verification = if plan.audio_edit.is_some() {
+        let mut verification = if plan.media_join.is_some() {
+            preservation::verify_join(self, plan, staging.path(), &observed, cancel.clone(), &observer).await?
+        } else if plan.audio_edit.is_some() {
             self.verify_audio_edit(plan, staging.path(), &observed, cancel.clone()).await?
         } else {
             preservation::verify(
@@ -809,6 +826,9 @@ impl Engine {
         };
         for input in &additions {
             input.revalidate()?;
+        }
+        if let Some(join) = &join {
+            join.revalidate()?;
         }
         if let Some(caption) = &caption {
             caption.revalidate()?;
@@ -861,6 +881,7 @@ impl Engine {
                             .into_iter()
                             .flat_map(subtitle_burn::StagedCaption::into_sources),
                     )
+                    .chain(join.into_iter().flat_map(media_join::StagedJoin::into_originals))
                     .collect(),
             },
             plan,

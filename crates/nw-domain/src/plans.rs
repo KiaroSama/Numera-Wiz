@@ -77,6 +77,7 @@ pub fn digest(plan: &Plan) -> Result<String> {
             && plan.packet_cut.is_none()
             && plan.subtitle_burn.is_none()
             && plan.audio_edit.is_none()
+            && plan.media_join.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
@@ -110,6 +111,17 @@ pub fn digest(plan: &Plan) -> Result<String> {
 pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     if plan.schema_version != 2 {
         return Err(invalid("Review a fresh version 2 execution plan"));
+    }
+    if let Some(join) = &plan.media_join {
+        join.validate(&plan.source, &plan.output)?;
+        if plan.resolution.action != crate::mux::CleanAction::Remux
+            || plan.subtitle_burn.is_some() || plan.audio_edit.is_some() || plan.packet_cut.is_some()
+            || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
+            || plan.resolution.preservation.chapters || plan.resolution.chapter_import.is_some()
+            || plan.resolution.metadata_patch.is_some()
+        {
+            return Err(invalid("A packet join has its own ordered sources, track and chapter policy"));
+        }
     }
     if let Some(edit) = &plan.audio_edit {
         edit.output_samples()?;
@@ -230,6 +242,13 @@ fn digest_value(mut value: Value) -> Result<String> {
                 .ok_or_else(|| invalid("External subtitle source must be an object"))?,
         );
     }
+    if let Some(segments) = object.get_mut("media_join").and_then(|join| join.get_mut("following")).and_then(Value::as_array_mut) {
+        for segment in segments {
+            let source = segment.get_mut("input").and_then(Value::as_object_mut)
+                .ok_or_else(|| invalid("Joined source must be an object"))?;
+            semantic_source(source);
+        }
+    }
     let bytes =
         serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;
     Ok(hex::encode(Sha256::digest(bytes)))
@@ -305,6 +324,7 @@ mod tests {
             packet_cut: None,
             subtitle_burn: None,
             audio_edit: None,
+            media_join: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

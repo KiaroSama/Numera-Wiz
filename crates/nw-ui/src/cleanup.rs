@@ -630,6 +630,12 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
+                for segment in &plan.media_join {
+                    let label = self.assets.iter().find(|source| source.id == segment.asset_id)
+                        .map_or(segment.asset_id.as_str(), |source| source.display_name.as_str());
+                    ui.label(format!("{} · {} · offset {}/{} seconds", segment.position + 1, label,
+                        segment.offset.numerator(), segment.offset.denominator()));
+                }
                 if let Some(edit) = &plan.audio_edit {
                     ui.label(format!("Original PCM audio {} at {} Hz, {}", edit.stream_index, edit.sample_rate, edit.channel_layout));
                     for piece in &edit.pieces {

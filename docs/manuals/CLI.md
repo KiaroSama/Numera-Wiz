@@ -914,3 +914,25 @@ A tempo change requires a source interval of at least one second. Review
 the expected output frame count and the declared tolerance for
 pitch-preserving tempo processing. Use the returned plan ID and hash
 with the ordinary job commands.
+
+
+### Join compatible Matroska files
+
+Run `numera-wiz media join --file join.json`. Provide two to eight
+registered sources in the desired order and choose a new Matroska
+destination. The copy profile requires compatible FFV1 and, when audio
+is retained, PCM s16le with matching stream indices and clock parameters.
+
+```json
+{
+  "inputs_in_order": ["<first asset id>", "<second asset id>"],
+  "output": "/exports/joined.mkv",
+  "audio": "copy_all",
+  "metadata": "first_input",
+  "strategy": "copy"
+}
+```
+
+Choose `audio: "drop"` for a picture-only output or `metadata: "strip"`
+to remove authored tags. The route drops chapter, subtitle and attachment
+streams. Review each segment's offset and submit the returned plan and hash.

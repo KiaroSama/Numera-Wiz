@@ -114,6 +114,11 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
+    /// Review a copy-only ordered join of compatible registered Matroska files.
+    Join {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review multiple exact source ranges and their separate Matroska destinations.
     Split {
         #[arg(long)]
@@ -641,6 +646,12 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut input: nw_domain::audio_edit::EditInput = commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("audio.edit", serde_json::to_value(input)?)
+        }
+        Command::Media(Media::Join { file }) => {
+            let mut input: nw_domain::media_join::JoinInput = commands::parse(document(&file)?)?;
+            input.validate()?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("media.join", serde_json::to_value(input)?)
         }
         Command::Media(Media::Split { file }) => {
             let mut input: nw_domain::packet_cut::SplitInput = commands::parse(document(&file)?)?;

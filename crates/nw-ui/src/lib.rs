@@ -7,6 +7,7 @@ mod config_import;
 mod folders;
 mod jobs;
 mod audio_edit;
+mod media_join;
 mod normalize;
 mod observations;
 mod packet_cut;
@@ -165,6 +166,7 @@ pub struct WizApp {
     packet_cut: packet_cut::CutForm,
     normalize: normalize::NormalizeUi,
     caption_burn: subtitle_burn::CaptionBurnUi,
+    media_join: media_join::JoinUi,
     audio_edit: audio_edit::AudioEditUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
@@ -360,6 +362,7 @@ impl WizApp {
             packet_cut: Default::default(),
             normalize: Default::default(),
             caption_burn: Default::default(),
+            media_join: Default::default(),
             audio_edit: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
@@ -403,6 +406,7 @@ impl WizApp {
             self.packet_cut = Default::default();
             self.normalize = Default::default();
             self.caption_burn = Default::default();
+            self.media_join = Default::default();
             self.audio_edit = Default::default();
             self.compare_audio_indices = asset
                 .probe
@@ -1596,6 +1600,7 @@ impl eframe::App for WizApp {
                 self.normalize_panel(ui, &asset);
                 self.audio_edit_panel(ui, &asset);
                 self.subtitle_burn_panel(ui, &asset);
+                self.media_join_panel(ui, &asset);
             }
         });
         if !self.folder.open {

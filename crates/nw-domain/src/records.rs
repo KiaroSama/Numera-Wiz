@@ -59,6 +59,8 @@ pub struct Asset {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_join: Option<crate::media_join::Join>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio_edit: Option<crate::audio_edit::Edit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subtitle_burn: Option<crate::subtitle_burn::Burn>,
@@ -100,7 +102,7 @@ impl Plan {
             self.subtitle_burn
                 .as_ref()
                 .and_then(|burn| burn.subtitle.external()),
-        )
+        ).chain(self.media_join.iter().flat_map(|join| join.following.iter().map(|segment| &segment.input)))
     }
 }
 
