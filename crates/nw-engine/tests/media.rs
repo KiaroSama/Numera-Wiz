@@ -273,6 +273,115 @@ async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &
     assert!(matches!(result, Err(err) if err.code == "VERIFICATION_FAILED"));
     assert_eq!(engine.media_process_capacity(), (2, 2, 0));
 
+    // FFprobe can resynchronize or ignore an incomplete trailer. Reject corrupt
+    // transport bytes before launching it or the remuxer.
+    let video_path = root.join("normalized-0.nut");
+    let original_video = std::fs::read(&video_path).unwrap();
+    let malformed_path = root.join("malformed-video.nut");
+    let mut bad_identifier = original_video.clone();
+    bad_identifier[0] ^= 1;
+    let mut bad_checksum = original_video.clone();
+    let stream_start = bad_checksum
+        .windows(8)
+        .position(|window| window == b"NS\x11\x40\x5b\xf2\xf9\xdb")
+        .unwrap();
+    bad_checksum[stream_start - 1] ^= 1;
+    for bytes in [
+        bad_identifier.as_slice(),
+        bad_checksum.as_slice(),
+        &original_video[..original_video.len() - 1],
+    ] {
+        std::fs::write(&malformed_path, bytes).unwrap();
+        let result = engine
+            .mux_normalized_pair_candidate(
+                [
+                    reinput(0, &malformed_path, bytes),
+                    reinput(1, &audio_path, &original_audio),
+                ],
+                DirectoryStamp::capture_resolved(&root).unwrap(),
+                token.clone(),
+            )
+            .await;
+        assert!(matches!(result, Err(err) if err.code == "VERIFICATION_FAILED"));
+    }
+    assert_eq!(engine.media_process_capacity(), (2, 2, 0));
+
+    let mut large_video_options = video.to_vec();
+    large_video_options.extend(["-vf", "scale=160:120", "-frames:v", "1", "-f", "nut"]);
+    let large_video = collect(ffmpeg, &media.source, &large_video_options, token).await;
+    let large_video_path = root.join("checksummed-video.nut");
+    std::fs::write(&large_video_path, &large_video).unwrap();
+    let mut bad_frame_checksum = large_video.clone();
+    let index_start = large_video
+        .windows(8)
+        .rposition(|window| window == b"NX\xdd\x67\x2f\x23\xe6\x4e")
+        .unwrap();
+    // One RGBA frame precedes the index and its last header byte is a CRC byte.
+    bad_frame_checksum[index_start - 160 * 120 * 4 - 1] ^= 1;
+    std::fs::write(&malformed_path, &bad_frame_checksum).unwrap();
+    let result = engine
+        .mux_normalized_pair_candidate(
+            [
+                reinput(0, &malformed_path, &bad_frame_checksum),
+                reinput(1, &audio_path, &original_audio),
+            ],
+            DirectoryStamp::capture_resolved(&root).unwrap(),
+            token.clone(),
+        )
+        .await;
+    assert!(matches!(result, Err(err) if err.code == "VERIFICATION_FAILED"));
+
+    let audition = collect(
+        ffmpeg,
+        &media.source,
+        &[
+            "-map",
+            "0:a:0",
+            "-t",
+            "0.105",
+            "-c:a",
+            "pcm_f32le",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-bsf:a",
+            "pcm_rechunk=n=480:p=0",
+            "-output_ts_offset",
+            "0.125",
+            "-f",
+            "nut",
+            "-write_index",
+            "0",
+            "-syncpoints",
+            "default",
+        ],
+        token,
+    )
+    .await;
+    let audition_path = root.join("audition-float.nut");
+    std::fs::write(&audition_path, &audition).unwrap();
+    let audition_pair = engine
+        .mux_normalized_pair_candidate(
+            [
+                reinput(0, &large_video_path, &large_video),
+                reinput(1, &audition_path, &audition),
+            ],
+            DirectoryStamp::capture_resolved(&root).unwrap(),
+            token.clone(),
+        )
+        .await
+        .unwrap();
+    let audition_pair_path = root.join("audition-pair.nut");
+    std::fs::write(&audition_pair_path, audition_pair.output.stdout).unwrap();
+    let audition_probe = fixture::probe(&media.bin, &audition_pair_path).await;
+    let audition_stream = &audition_probe["streams"][1];
+    assert_eq!(audition_stream["codec_name"], "pcm_f32le");
+    assert_eq!(audition_stream["sample_fmt"], "flt");
+    assert_eq!(audition_stream["sample_rate"], "48000");
+    assert_eq!(audition_stream["channels"], 2);
+    assert_eq!(audition_stream["start_pts"], 6_000);
+
     for (options, format, bytes) in [
         (video.as_slice(), "rawvideo", 64 * 48 * 4 * 4),
         (audio.as_slice(), "s16le", 48_000 * 2),

@@ -1,4 +1,5 @@
 //! Bounded NUT candidates for registered windows and verified input pairs.
+mod nut;
 mod reference;
 use super::{identities, verification::ratio};
 use crate::{Engine, admission, blocking, preservation};
@@ -11,9 +12,10 @@ use nw_platform::{
     },
 };
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     fs::File,
-    io::{Seek, Write},
+    io::{BufReader, Read, Seek, Write},
     ops::Range,
     path::Path,
     time::Duration,
@@ -21,6 +23,8 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 const CANDIDATE_LIMIT: usize = 256 * 1024;
+const NUT_VERIFICATION_BYTES: u64 = 8 * 1024 * 1024;
+const NUT_VERIFICATION_PACKETS: usize = 8 * 1024;
 const STREAM_FORMAT_FIELDS: &str = "codec_type,codec_name,width,height,pix_fmt,sample_rate,channels,channel_layout,sample_fmt,color_range,color_space,color_transfer,color_primaries";
 
 /// Source positions on the selected stream's decoded frame or sample grid.
@@ -342,7 +346,45 @@ impl Engine {
         Ok(output)
     }
 
-    async fn inspect_nut(&self, input: File, cancel: CancellationToken) -> Result<Value> {
+    async fn inspect_nut(&self, mut input: File, cancel: CancellationToken) -> Result<Value> {
+        let (input, declarations, ledger) = blocking({
+            let cancel = cancel.clone();
+            move || {
+                let length = input.metadata().map_err(files::io_error)?.len();
+                if length > NUT_VERIFICATION_BYTES {
+                    return Err(invalid_pair("NUT candidate exceeded the verification byte limit"));
+                }
+                let (declarations, ledger) = {
+                    let bounded = BufReader::new((&mut input).take(length + 1));
+                    let mut reader = nut::NutReader::new(bounded, length as usize)?;
+                    let mut ledger = Vec::new();
+                    loop {
+                        if cancel.is_cancelled() {
+                            return Err(DomainError::new("CANCELLED", "NUT verification cancelled"));
+                        }
+                        let Some(packet) = reader.next_packet()? else {
+                            break;
+                        };
+                        if ledger.len() == NUT_VERIFICATION_PACKETS {
+                            return Err(invalid_pair("NUT candidate exceeded the packet inventory limit"));
+                        }
+                        ledger.push(WirePacket {
+                            stream: packet.stream,
+                            pts: packet.pts,
+                            size: packet.bytes.len() as i64,
+                            sha256: Sha256::digest(&packet.bytes).into(),
+                        });
+                    }
+                    if reader.position() != length {
+                        return Err(invalid_pair("NUT candidate changed length during verification"));
+                    }
+                    (reader.streams().to_vec(), ledger)
+                };
+                input.rewind().map_err(files::io_error)?;
+                Ok((input, declarations, ledger))
+            }
+        })
+        .await?;
         let fields = format!(
             "stream=index,time_base,{STREAM_FORMAT_FIELDS}:packet=stream_index,pts,size,data_hash"
         );
@@ -375,13 +417,92 @@ impl Engine {
         )
         .await;
         let report = ticket.finish(report)?;
-        serde_json::from_slice(&report.stdout)
-            .map_err(|_| invalid_pair("Invalid NUT packet inventory"))
+        let report = serde_json::from_slice(&report.stdout)
+            .map_err(|_| invalid_pair("Invalid NUT packet inventory"))?;
+        verify_wire_report(&declarations, &ledger, &report)?;
+        Ok(report)
     }
 }
 
 fn invalid_pair(message: &str) -> DomainError {
     DomainError::new("VERIFICATION_FAILED", message)
+}
+
+struct WirePacket {
+    stream: usize,
+    pts: i64,
+    size: i64,
+    sha256: [u8; 32],
+}
+
+fn verify_wire_report(
+    declarations: &[nut::Stream],
+    ledger: &[WirePacket],
+    report: &Value,
+) -> Result<()> {
+    let probe_streams = streams(report)?;
+    let probe_packets = report["packets"]
+        .as_array()
+        .ok_or_else(|| invalid_pair("Missing NUT packet inventory"))?;
+    if declarations.len() != probe_streams.len() || ledger.len() != probe_packets.len() {
+        return Err(invalid_pair("NUT wire and ffprobe inventories differ"));
+    }
+    for (index, (declared, probe)) in declarations.iter().zip(probe_streams).enumerate() {
+        let format_matches = match declared.format {
+            nut::Format::Rgba { width, height } => {
+                probe["codec_type"] == "video"
+                    && probe["codec_name"] == "rawvideo"
+                    && probe["pix_fmt"] == "rgba"
+                    && probe["width"].as_u64() == Some(u64::from(width))
+                    && probe["height"].as_u64() == Some(u64::from(height))
+            }
+            nut::Format::PcmS16 { sample_rate, channels } => {
+                probe_audio_matches(probe, "pcm_s16le", "s16", sample_rate, channels)
+            }
+            nut::Format::StereoPcmF32 => probe_audio_matches(probe, "pcm_f32le", "flt", 48_000, 2),
+        };
+        if !format_matches
+            || probe["index"].as_u64() != Some(index as u64)
+            || ratio(probe["time_base"].as_str().unwrap_or_default())? != declared.clock
+        {
+            return Err(invalid_pair("NUT wire and ffprobe stream declarations differ"));
+        }
+    }
+    for (packet, probe) in ledger.iter().zip(probe_packets) {
+        if probe["stream_index"].as_u64() != Some(packet.stream as u64)
+            || preservation::integer(&probe["pts"])? != Some(packet.pts)
+            || preservation::integer(&probe["size"])? != Some(packet.size)
+            || packet_digest(&probe["data_hash"])? != packet.sha256
+        {
+            return Err(invalid_pair("NUT wire and ffprobe packet data differ"));
+        }
+    }
+    Ok(())
+}
+
+fn probe_audio_matches(
+    stream: &Value,
+    codec: &str,
+    format: &str,
+    sample_rate: u32,
+    channels: u32,
+) -> bool {
+    stream["codec_type"] == "audio"
+        && stream["codec_name"] == codec
+        && stream["sample_fmt"] == format
+        && stream["sample_rate"]
+            .as_str()
+            .and_then(|value| value.parse::<u32>().ok())
+            == Some(sample_rate)
+        && stream["channels"].as_u64() == Some(u64::from(channels))
+}
+
+fn packet_digest(value: &Value) -> Result<[u8; 32]> {
+    let digest = preservation::packet_sha256(value)?;
+    let mut hash = [0; 32];
+    hex::decode_to_slice(&digest[7..], &mut hash)
+        .map_err(|_| invalid_pair("Invalid packet digest"))?;
+    Ok(hash)
 }
 
 #[derive(PartialEq, Eq)]
@@ -435,6 +556,7 @@ fn stream_signature(report: &Value, index: u32, role: StreamKind) -> Result<Stre
                 .as_u64()
                 .and_then(|channels| channels.checked_mul(2))
         }
+        StreamKind::Audio if probe_audio_matches(stream, "pcm_f32le", "flt", 48_000, 2) => Some(8),
         _ => None,
     }
     .filter(|size| *size > 0)
@@ -479,11 +601,7 @@ fn stream_signature(report: &Value, index: u32, role: StreamKind) -> Result<Stre
                 "Normalized packet length differs from its stream shape",
             ));
         }
-        let digest = preservation::packet_sha256(&packet["data_hash"])?;
-        let mut hash = [0; 32];
-        hex::decode_to_slice(&digest[7..], &mut hash)
-            .map_err(|_| invalid_pair("Invalid packet digest"))?;
-        packets.push((timestamp, size, hash));
+        packets.push((timestamp, size, packet_digest(&packet["data_hash"])?));
     }
     if packets.is_empty() {
         return Err(invalid_pair(
