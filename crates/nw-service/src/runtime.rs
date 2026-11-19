@@ -749,6 +749,20 @@ impl Service {
                     self.managed_read(context, Path::new(&plan.source.identity.path))?;
                 }
             }
+            nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source } => {
+                let snapshot = self.read_folder(context, &source.snapshot_id)?;
+                let entry = snapshot.entries.get(source.index as usize);
+                if managed || snapshot.creator != plan.source.creator || !entry.is_some_and(|entry| {
+                    entry.outcome == nw_domain::ingest::FolderEntryOutcome::CompanionInventoried
+                        && entry.identity.as_ref() == Some(&plan.source.identity)
+                        && entry.source_object == plan.source.source_object
+                }) {
+                    return Err(DomainError::new(
+                        "INVALID_PLAN",
+                        "Plan source differs from the retained folder companion",
+                    ));
+                }
+            }
             _ => {}
         }
         self.root_authority(context, Path::new(&plan.source.identity.path), false)?;
@@ -3229,11 +3243,22 @@ impl Service {
         limits: nw_domain::execution::CleanupLimits,
         compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
     ) -> Result<Plan> {
-        self.admit_execution_limits(context, &limits)?;
         let asset: Asset = self
             .store
             .get(&named("asset", asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
+        self.prepare_captured_copy(context, asset, output, limits, compile)
+    }
+
+    fn prepare_captured_copy(
+        &self,
+        context: &Context,
+        asset: Asset,
+        output: &str,
+        limits: nw_domain::execution::CleanupLimits,
+        compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
+    ) -> Result<Plan> {
+        self.admit_execution_limits(context, &limits)?;
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;
         let output = self.path(context, Path::new(output), true)?;

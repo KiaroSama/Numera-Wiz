@@ -422,14 +422,15 @@ folder intake used by the CLI and shared workspace. An immutable review records
 completeness, bounds, failures, companion inventories and successful media IDs.
 The default discovery-only agent remains unable to register or inspect host
 folders until the owner explicitly grants registration, owned-object and root
-rights. Companions are inventory only, not copied artifacts. A lost mutation
-response is resolved with its original replay scope/key.
+rights. Companion inventory records each file's original byte identity. A lost
+mutation response is resolved with its original replay scope and key.
 
 `streams.clean.folder_batch_plan` takes the exact retained snapshot ID and hash,
 an existing output directory outside the source tree, and the ordinary cleanup
 intent and policies. `output_layout: "preserve_tree"` keeps each retained
-source's relative path in existing output subdirectories. Review `excluded`
-against the snapshot and use
+source's relative path in existing output subdirectories. Set
+`copy_companions: true` to add verified copies of the inventoried files. Review
+`excluded` against the snapshot and use
 `batches.submit` with the returned `plan.id` and `plan.hash`. The profile needs
 the folder review, folder inspection and cleanup commands plus independent read
 and write grants. [Folder batch contract](../development/cleanup-batches.md#cleanup-from-a-retained-folder-snapshot)

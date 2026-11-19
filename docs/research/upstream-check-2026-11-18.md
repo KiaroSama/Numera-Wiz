@@ -136,6 +136,12 @@ including the original Unicode names and bounded collision handling. Hosted
 qualification for the new layout is pending.
 [MuxCls folder naming](https://github.com/KiaroSama/MuxCls/blob/1269bd71712466469d539fbf279432659ccaa6a2/muxcls/output.py#L83-L168)
 
+The same MuxCls revision treats companion files as independent copies. Numera
+uses the existing Rust byte-copy job and requires the retained inventory's
+original bytes. Video size calculations exclude companion jobs. Hosted
+qualification for the combined batch is pending.
+[MuxCls copy logic](https://github.com/KiaroSama/MuxCls/blob/1269bd71712466469d539fbf279432659ccaa6a2/muxcls/copying.py)
+
 FFmpeg Skill's latest changes cover Chinese phrase wrapping, observed
 picture geometry and right-to-left caption punctuation. Numera's
 SubRip route lets libass determine reading order across each whole

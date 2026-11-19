@@ -371,6 +371,38 @@ impl Engine {
         })
     }
 
+    pub fn companion_copy_plan_at(
+        &self,
+        asset: Asset,
+        output: &Path,
+        file_times: nw_domain::file_times::FileTimeRequest,
+        creator: &str,
+        now: u64,
+        source: nw_domain::ingest::FolderCompanionSource,
+    ) -> Result<Plan> {
+        let mut plan = self.review_stream_copy(asset, output, file_times, creator, now, |_| {
+            Ok(mux::CleanResolution {
+                action: CleanAction::CopyUnchanged,
+                streams: Vec::new(),
+                outcomes: Vec::new(),
+                reasons: vec!["Copy the retained companion's exact bytes".into()],
+                warnings: Vec::new(),
+                preservation: mux::Preservation::default(),
+                metadata_patch: None,
+                chapter_import: None,
+            })
+        })?;
+        plan.required_rights
+            .as_mut()
+            .expect("Native copy review has captured rights")
+            .source_read
+            .purpose = nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source };
+        plan.verification_scope = "retained_folder_companion_verified_bytes".into();
+        plan.hash = plan_digest(&plan)?;
+        self.validate_plan(&plan)?;
+        Ok(plan)
+    }
+
     fn review_resolved_output(
         &self,
         mut asset: Asset,
@@ -482,7 +514,7 @@ impl Engine {
         Ok(plan)
     }
     pub fn validate_plan(&self, plan: &Plan) -> Result<()> {
-        nw_domain::plans::validate_requirements(plan)?;
+        let rights = nw_domain::plans::validate_requirements(plan)?;
         if let Some(policy) = &plan.file_times {
             policy.validate()?;
         }
@@ -507,7 +539,12 @@ impl Engine {
                 "WAVE output requires a reviewed PCM sample edit",
             ));
         }
-        let expected_scope = if plan.avc_export.is_some() {
+        let expected_scope = if matches!(
+            &rights.source_read.purpose,
+            nw_domain::plans::SourcePurpose::RetainedFolderCompanion { .. }
+        ) {
+            "retained_folder_companion_verified_bytes"
+        } else if plan.avc_export.is_some() {
             avc_export::SCOPE
         } else if plan.video_retime.is_some() {
             video_retime::SCOPE

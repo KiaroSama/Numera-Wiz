@@ -711,6 +711,7 @@ mod tests {
                 store.put(&format!("plan/{}", plan.id), &plan).unwrap();
             }
             items.push(PlannedItem {
+                companion: None,
                 index: index as u32,
                 asset_id: plan.source.id.clone(),
                 source_sha256: plan.source.identity.sha256.clone(),

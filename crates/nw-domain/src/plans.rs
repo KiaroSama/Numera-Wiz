@@ -28,6 +28,7 @@ pub struct SourceRead {
 pub enum SourcePurpose {
     NativeFile,
     CreatorBoundManaged { principal: String },
+    RetainedFolderCompanion { source: crate::ingest::FolderCompanionSource },
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -248,6 +249,19 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
         return Err(invalid(
             "Managed input purpose must remain bound to its planning principal",
         ));
+    }
+    if let SourcePurpose::RetainedFolderCompanion { source } = &rights.source_read.purpose
+        && (source.snapshot_id.is_empty()
+            || source.snapshot_id.len() > 128
+            || source.index as usize >= crate::ingest::MAX_FOLDER_ENTRIES
+            || plan.source.probe.format != crate::ingest::FOLDER_COMPANION_FORMAT
+            || !plan.source.probe.streams.is_empty()
+            || plan.resolution.action != crate::mux::CleanAction::CopyUnchanged
+            || !plan.resolution.streams.is_empty()
+            || !plan.argv_template.is_empty()
+            || !plan.added_tracks.is_empty())
+    {
+        return Err(invalid("Retained folder companions require an exact byte copy"));
     }
     Ok(rights)
 }

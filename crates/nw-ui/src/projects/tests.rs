@@ -685,6 +685,7 @@ fn folder_batch_review_and_submit() {
         &snapshot,
         output,
         nw_domain::batches::FolderOutputLayout::PreserveTree,
+        false,
         &ctx,
     );
     let (review, reply) = port.pop();
@@ -693,6 +694,7 @@ fn folder_batch_review_and_submit() {
     assert_eq!(review.params["snapshot_hash"], folder_hash);
     assert_eq!(review.params["output_root"], output);
     assert_eq!(review.params["output_layout"], "preserve_tree");
+    assert_eq!(review.params["copy_companions"], false);
     assert!(review.replay_scope.is_none() && review.idempotency_key.is_none());
     assert!(port.empty(), "Folder review must not submit a batch");
     let plan_hash = "cd".repeat(32);

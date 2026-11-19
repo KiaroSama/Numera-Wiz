@@ -576,7 +576,13 @@ impl Store {
                         })?;
                     nw_domain::plans::decode(decode(value.value())?)?
                 };
+                let rights = nw_domain::plans::validate_requirements(&child)?;
+                let child_companion = match &rights.source_read.purpose {
+                    nw_domain::plans::SourcePurpose::RetainedFolderCompanion { source } => Some(source),
+                    _ => None,
+                };
                 if child.hash != reference.hash
+                    || child_companion != item.companion.as_ref()
                     || child.source.id != item.asset_id
                     || child.source.identity.bytes != item.source_bytes
                     || child.source.identity.sha256 != item.source_sha256
@@ -584,7 +590,7 @@ impl Store {
                     || child.output != item.requested_output
                     || child.output.rsplit(['/', '\\']).next() != Some(item.output_name.as_str())
                     || child.expires_at.parse::<u64>().unwrap_or(0) <= now
-                    || nw_domain::plans::validate_requirements(&child)?.data_root != self.root_id()
+                    || rights.data_root != self.root_id()
                 {
                     return Err(DomainError::new(
                         "INVALID_ACCEPTANCE",

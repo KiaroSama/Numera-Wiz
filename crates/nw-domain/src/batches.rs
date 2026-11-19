@@ -100,6 +100,8 @@ pub struct CleanFolderBatchInput {
     /// Preserve the snapshot's relative paths within the existing output tree.
     #[serde(default)]
     pub output_layout: FolderOutputLayout,
+    #[serde(default)]
+    pub copy_companions: bool,
     pub intent: CleanIntent,
     pub file_times: FileTimeRequest,
     pub execution_limits: CleanupLimits,
@@ -116,6 +118,13 @@ pub enum FolderOutputLayout {
 }
 impl CleanFolderBatchInput {
     pub fn validate(&self) -> Result<()> {
+        if self.copy_companions && self.output_layout != FolderOutputLayout::PreserveTree {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Companion copy uses the preserved source folder layout",
+            )
+            .field("output_layout"));
+        }
         validate_folder_reference(&self.snapshot_id, &self.snapshot_hash, &self.output_root)
     }
 }
@@ -258,6 +267,8 @@ pub struct PlannedItem {
     pub action: Option<CleanAction>,
     pub error: Option<DomainError>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion: Option<crate::ingest::FolderCompanionSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extraction: Option<ReviewedExtraction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packet_cut: Option<crate::time::TimeRange>,
@@ -396,6 +407,18 @@ impl BatchPlan {
                     ));
                 }
             }
+            if let Some(companion) = &item.companion
+                && (!identifier(&companion.snapshot_id)
+                    || companion.index as usize >= crate::ingest::MAX_FOLDER_ENTRIES
+                    || item.extraction.is_some()
+                    || item.packet_cut.is_some()
+                    || item.plan.is_some() && item.action != Some(CleanAction::CopyUnchanged))
+            {
+                return Err(DomainError::new(
+                    "INVALID_PLAN",
+                    "Companion batch members use a retained folder byte-copy plan",
+                ));
+            }
         }
         if self.items.iter().any(|item| item.packet_cut.is_some()) {
             let mut ranges = Vec::with_capacity(self.items.len());
@@ -443,6 +466,9 @@ impl BatchPlan {
             }
             if let Some(range) = item.packet_cut {
                 semantic["packet_cut"] = serde_json::json!(range);
+            }
+            if let Some(companion) = &item.companion {
+                semantic["companion"] = serde_json::json!(companion);
             }
             semantic
         }).collect::<Vec<_>>();
@@ -502,6 +528,8 @@ pub struct PlannedItemView {
     pub plan: Option<PlanReference>,
     pub action: Option<CleanAction>,
     pub error: Option<crate::views::ErrorView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion: Option<crate::ingest::FolderCompanionSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extraction: Option<ReviewedExtraction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -579,6 +607,8 @@ pub struct ItemResult {
     pub source_bytes: String,
     pub output_bytes: Option<String>,
     pub error: Option<crate::views::ErrorView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion: Option<crate::ingest::FolderCompanionSource>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BatchResult {
@@ -630,10 +660,10 @@ impl BatchResult {
             match state {
                 Some(crate::records::JobState::Succeeded) => {
                     self.succeeded += 1;
-                    input += item.source_bytes.parse::<u64>().map_err(|_| {
+                    let source_bytes = item.source_bytes.parse::<u64>().map_err(|_| {
                         DomainError::new("INVALID_BATCH", "Invalid successful input size")
-                    })? as u128;
-                    output += item
+                    })?;
+                    let output_bytes = item
                         .output_bytes
                         .as_ref()
                         .and_then(|bytes| bytes.parse::<u64>().ok())
@@ -642,7 +672,11 @@ impl BatchResult {
                                 "INVALID_BATCH",
                                 "Successful batch member has no verified output size",
                             )
-                        })? as u128;
+                        })?;
+                    if item.companion.is_none() {
+                        input += u128::from(source_bytes);
+                        output += u128::from(output_bytes);
+                    }
                 }
                 Some(crate::records::JobState::Skipped) => self.skipped += 1,
                 Some(crate::records::JobState::Failed) | None => self.failed += 1,
@@ -729,6 +763,7 @@ mod tests {
             artifact_id: output.map(|_| format!("job-{index}")),
             source_bytes: source.into(),
             output_bytes: output.map(String::from),
+            companion: None,
             error: if index == 0 {
                 Some(crate::views::ErrorView {
                     code: "INCOMPATIBLE_PRESERVATION".into(),
@@ -804,6 +839,7 @@ mod tests {
             unresolved_policy: UnresolvedPolicy::Reject,
             unresolved: Vec::new(),
             items: vec![PlannedItem {
+                companion: None,
                 index: 0,
                 asset_id: "asset".into(),
                 source_sha256: "ab".repeat(32),

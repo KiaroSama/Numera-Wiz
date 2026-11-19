@@ -60,8 +60,9 @@ export and continuous preview remain in development.
 - Preview one exact frame of an opaque layered sequence, including its
   registered picture or an uncovered background.
 - Authorized folder intake with deterministic relative paths, retained probe
-  failures, explicit bounds/exclusions and companion inventories. Inventory does
-  not copy companions or qualify the whole MuxCls utility.
+  failures, explicit bounds/exclusions and companion inventories. A reviewed
+  cleanup batch can preserve relative paths and copy the inventoried companion
+  bytes into a separate tree.
 - Immutable command review, exactly-once durable acceptance, bounded FFmpeg/copy
   execution, cancellation, recovery and verified no-replace output publication.
 - CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped

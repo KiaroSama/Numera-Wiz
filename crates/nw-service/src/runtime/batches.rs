@@ -7,7 +7,10 @@ use nw_domain::batches::{
     PlanReference, PlannedItem, PlannedItemView, ReviewedExtraction, UnresolvedIndex,
     UnresolvedPolicy,
 };
-use nw_domain::ingest::{FolderEntryOutcome, FolderSnapshot};
+use nw_domain::ingest::{
+    CompanionIntakePolicy, FOLDER_COMPANION_FORMAT, FolderCompanionSource, FolderEntry,
+    FolderEntryOutcome, FolderSnapshot,
+};
 
 const FOLDER_BATCH_COMMAND: &str = "streams.clean.folder_batch_plan";
 
@@ -35,6 +38,26 @@ struct FolderTargets {
     output: files::DirectoryStamp,
     items: Vec<ItemInput>,
     excluded: Vec<FolderBatchExclusion>,
+    companions: BTreeMap<String, CompanionAsset>,
+}
+
+struct CompanionAsset {
+    asset: Asset,
+    source: FolderCompanionSource,
+}
+
+#[derive(Default)]
+struct FolderTargetPolicy<'a> {
+    extension: Option<&'a str>,
+    layout: FolderOutputLayout,
+    copy_companions: bool,
+}
+
+struct CleanupFolderContext<'a> {
+    source: &'a files::DirectoryStamp,
+    output: &'a files::DirectoryStamp,
+    policy_revision: u64,
+    companions: &'a BTreeMap<String, CompanionAsset>,
 }
 
 struct ReviewedBatchItems {
@@ -136,18 +159,21 @@ fn available_folder_name(
     selected: &mut BTreeSet<PathBuf>,
 ) -> Result<PathBuf> {
     let stem = target.file_stem().and_then(|name| name.to_str());
-    let extension = target.extension().and_then(|name| name.to_str());
-    let (Some(stem), Some(extension)) = (stem, extension) else {
+    let Some(stem) = stem else {
         return Err(DomainError::new(
             "INVALID_RECORD",
-            "Folder output needs a representable filename and extension",
+            "Folder output needs a representable filename",
         ));
     };
+    let extension = target
+        .extension()
+        .and_then(|name| name.to_str())
+        .map_or_else(String::new, |name| format!(".{name}"));
     for number in 1..=128 {
         let candidate = if number == 1 {
             target.clone()
         } else {
-            target.with_file_name(format!("{stem} ({number}).{extension}"))
+            target.with_file_name(format!("{stem} ({number}){extension}"))
         };
         if selected.contains(&candidate) || number > 1 && original.contains(&candidate) {
             continue;
@@ -165,6 +191,41 @@ fn available_folder_name(
         "OUTPUT_EXISTS",
         "No available name among the original and 127 numbered folder outputs",
     ))
+}
+
+fn captured_companion(
+    snapshot: &FolderSnapshot,
+    entry: &FolderEntry,
+    path: &Path,
+) -> Result<CompanionAsset> {
+    let invalid = || DomainError::new("INVALID_RECORD", "Incomplete retained companion identity");
+    let identity = entry.identity.as_ref().ok_or_else(invalid)?;
+    if Path::new(&identity.path) != path {
+        return Err(invalid());
+    }
+    Ok(CompanionAsset {
+        source: FolderCompanionSource {
+            snapshot_id: snapshot.id.clone(),
+            index: entry.index,
+        },
+        asset: Asset {
+            source_object: Some(entry.source_object.clone().ok_or_else(invalid)?),
+            display_name: path.file_name().and_then(|name| name.to_str()).ok_or_else(invalid)?.into(),
+            id: format!("companion-{}-{}", snapshot.id, entry.index),
+            creator: snapshot.creator.clone(),
+            identity: identity.clone(),
+            probe: nw_domain::records::MediaProbe {
+                probe_timeout: None,
+                streams: Vec::new(),
+                stream_details: BTreeMap::new(),
+                format: FOLDER_COMPANION_FORMAT.into(),
+                container_duration: None,
+                global_tags: BTreeMap::new(),
+                chapters: Value::Null,
+                verification_scope: "retained_folder_bytes".into(),
+            },
+        },
+    })
 }
 
 impl Service {
@@ -218,6 +279,12 @@ impl Service {
                 "Folder enumeration was incomplete; inspect and rescan before review",
             ));
         }
+        if input.copy_companions && snapshot.input.companion_policy != CompanionIntakePolicy::Inventory {
+            return Err(DomainError::new(
+                "COMPANION_INVENTORY_REQUIRED",
+                "Register the input folder with companion inventory before reviewing a companion copy",
+            ));
+        }
         let failed = snapshot
             .entries
             .iter()
@@ -261,12 +328,16 @@ impl Service {
             output,
             items,
             excluded,
+            companions,
         } = self.folder_targets(
             context,
             &snapshot,
             &input.output_root,
-            None,
-            input.output_layout,
+            FolderTargetPolicy {
+                layout: input.output_layout,
+                copy_companions: input.copy_companions,
+                ..Default::default()
+            },
             cancel,
         )?;
         let plan = self.prepare_cleanup_batch(
@@ -281,7 +352,12 @@ impl Service {
             },
             now,
             cancel,
-            Some((&source, &output, revision)),
+            Some(CleanupFolderContext {
+                source: &source,
+                output: &output,
+                policy_revision: revision,
+                companions: &companions,
+            }),
         )?;
         let plan = self.batch_review(context, &plan)?;
         self.confirm_batch_policy(context, revision, FOLDER_BATCH_COMMAND)?;
@@ -298,8 +374,7 @@ impl Service {
         context: &Context,
         snapshot: &FolderSnapshot,
         output_root: &str,
-        extension: Option<&str>,
-        layout: FolderOutputLayout,
+        policy: FolderTargetPolicy<'_>,
         cancel: &CancellationToken,
     ) -> Result<FolderTargets> {
         let output = Path::new(output_root);
@@ -340,11 +415,15 @@ impl Service {
         }
         let mut items = Vec::new();
         let mut excluded = Vec::new();
-        let original = if layout == FolderOutputLayout::PreserveTree {
+        let mut companions = BTreeMap::new();
+        let is_companion = |entry: &FolderEntry| {
+            policy.copy_companions && entry.outcome == FolderEntryOutcome::CompanionInventoried
+        };
+        let original = if policy.layout == FolderOutputLayout::PreserveTree {
             snapshot
                 .entries
                 .iter()
-                .filter(|entry| entry.outcome == FolderEntryOutcome::Registered)
+                .filter(|entry| entry.outcome == FolderEntryOutcome::Registered || is_companion(entry))
                 .map(|entry| {
                     output
                         .path()
@@ -362,36 +441,45 @@ impl Service {
                     "Folder batch review cancelled",
                 ));
             }
-            if entry.outcome != FolderEntryOutcome::Registered {
+            let companion = is_companion(entry);
+            if entry.outcome != FolderEntryOutcome::Registered && !companion {
                 excluded.push(FolderBatchExclusion {
                     index: entry.index,
                     outcome: entry.outcome,
                 });
                 continue;
             }
-            let id = entry.asset_id.as_deref().ok_or_else(|| {
-                DomainError::new("INVALID_RECORD", "Registered folder entry has no asset")
-            })?;
-            let asset: Asset = self
-                .store
-                .get(&named("asset", id)?)?
-                .ok_or_else(DomainError::object_not_found)?;
-            self.object(context, id, &asset.creator)?;
             let relative = entry.relative_path.split('/').collect::<PathBuf>();
             let expected_path = source_root.join(&relative);
-            if asset.id != id
-                || asset.creator != snapshot.creator
-                || Some(&asset.identity) != entry.identity.as_ref()
-                || asset.source_object != entry.source_object
-                || Path::new(&asset.identity.path) != expected_path
-            {
-                return Err(DomainError::new(
-                    "INVALID_RECORD",
-                    "Registered asset differs from its retained folder entry",
-                ));
-            }
             self.root_authority(context, &expected_path, false)?;
-            let mut target = match layout {
+            let id = if companion {
+                let captured = captured_companion(snapshot, entry, &expected_path)?;
+                let id = captured.asset.id.clone();
+                companions.insert(id.clone(), captured);
+                id
+            } else {
+                let id = entry.asset_id.as_deref().ok_or_else(|| {
+                    DomainError::new("INVALID_RECORD", "Registered folder entry has no asset")
+                })?;
+                let asset: Asset = self
+                    .store
+                    .get(&named("asset", id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(context, id, &asset.creator)?;
+                if asset.id != id
+                    || asset.creator != snapshot.creator
+                    || Some(&asset.identity) != entry.identity.as_ref()
+                    || asset.source_object != entry.source_object
+                    || Path::new(&asset.identity.path) != expected_path
+                {
+                    return Err(DomainError::new(
+                        "INVALID_RECORD",
+                        "Registered asset differs from its retained folder entry",
+                    ));
+                }
+                id.to_owned()
+            };
+            let mut target = match policy.layout {
                 FolderOutputLayout::Indexed => output
                     .path()
                     .join(folder_output_name(entry.index, &expected_path)?),
@@ -419,11 +507,11 @@ impl Service {
                     available_folder_name(path, &original, &mut selected)?
                 }
             };
-            if let Some(extension) = extension {
+            if let Some(extension) = policy.extension {
                 target.set_extension(extension);
             }
             items.push(ItemInput {
-                asset_id: id.into(),
+                asset_id: id,
                 output: files::path_text(&target)?,
             });
         }
@@ -432,6 +520,7 @@ impl Service {
             output,
             items,
             excluded,
+            companions,
         })
     }
 
@@ -480,12 +569,15 @@ impl Service {
             output,
             items,
             excluded,
+            ..
         } = self.folder_targets(
             context,
             &snapshot,
             &input.output_root,
-            Some(extension),
-            FolderOutputLayout::Indexed,
+            FolderTargetPolicy {
+                extension: Some(extension),
+                ..Default::default()
+            },
             cancel,
         )?;
         if items.is_empty() {
@@ -517,6 +609,7 @@ impl Service {
             context,
             items.iter().map(|item| (item, None)),
             cancel,
+            None,
             |item, _, _| {
                 let plan = self.prepare_native_copy(
                     context,
@@ -559,11 +652,11 @@ impl Service {
         input: CleanBatchInput,
         now: u64,
         cancel: &CancellationToken,
-        folder: Option<(&files::DirectoryStamp, &files::DirectoryStamp, u64)>,
+        folder: Option<CleanupFolderContext<'_>>,
     ) -> Result<BatchPlan> {
         input.validate()?;
-        let (command, revision) = match folder {
-            Some((_, _, revision)) => (FOLDER_BATCH_COMMAND, revision),
+        let (command, revision) = match &folder {
+            Some(folder) => (FOLDER_BATCH_COMMAND, folder.policy_revision),
             None => (
                 "streams.clean.batch_plan",
                 self.policy(context)?
@@ -571,6 +664,7 @@ impl Service {
                     .map_or(0, |policy| policy.revision),
             ),
         };
+        let companions = folder.as_ref().map(|folder| folder.companions);
         self.batch_child_command(context, "streams.clean")?;
         self.admit_execution_limits(context, &input.execution_limits)?;
         let mut unresolved = BTreeSet::new();
@@ -588,6 +682,9 @@ impl Service {
         for item in &input.items {
             if cancel.is_cancelled() {
                 return Err(DomainError::new("CANCELLED", "Batch preview cancelled"));
+            }
+            if companions.is_some_and(|files| files.contains_key(&item.asset_id)) {
+                continue;
             }
             let asset: Asset = self
                 .store
@@ -609,19 +706,39 @@ impl Service {
             context,
             input.items.iter().map(|item| (item, None)),
             cancel,
+            companions,
             |item, _, _| {
-                let plan = self.prepare_cleanup(context, input.clean_input(item), now)?;
-                if let Some((_, output, _)) = folder {
-                    validate_folder_destination(output, item, &plan)?;
+                let plan = if let Some(companion) = companions.and_then(|files| files.get(&item.asset_id)) {
+                    self.prepare_captured_copy(
+                        context,
+                        companion.asset.clone(),
+                        &item.output,
+                        input.execution_limits.clone(),
+                        |engine, asset, output| {
+                            engine.companion_copy_plan_at(
+                                asset,
+                                output,
+                                input.file_times,
+                                &context.principal,
+                                now,
+                                companion.source.clone(),
+                            )
+                        },
+                    )?
+                } else {
+                    self.prepare_cleanup(context, input.clean_input(item), now)?
+                };
+                if let Some(folder) = &folder {
+                    validate_folder_destination(folder.output, item, &plan)?;
                 }
                 Ok(plan)
             },
         )?;
-        if let Some((source, output, _)) = folder {
-            source.revalidate()?;
-            output.revalidate()?;
-            self.root_authority(context, source.path(), false)?;
-            self.root_authority(context, output.path(), true)?;
+        if let Some(folder) = &folder {
+            folder.source.revalidate()?;
+            folder.output.revalidate()?;
+            self.root_authority(context, folder.source.path(), false)?;
+            self.root_authority(context, folder.output.path(), true)?;
         }
         self.confirm_batch_policy(context, revision, command)?;
         self.retain_batch_plan(
@@ -664,6 +781,7 @@ impl Service {
                 .iter()
                 .map(|item| (&item.target, Some(item.selector))),
             cancel,
+            None,
             |item, selector, _| self.prepare_extraction(context, item, selector, now),
         )?;
         self.confirm_batch_policy(context, revision, "streams.extract.batch_plan")?;
@@ -742,12 +860,15 @@ impl Service {
             output,
             items,
             excluded,
+            ..
         } = self.folder_targets(
             context,
             &snapshot,
             &input.output_root,
-            Some("mkv"),
-            FolderOutputLayout::Indexed,
+            FolderTargetPolicy {
+                extension: Some("mkv"),
+                ..Default::default()
+            },
             cancel,
         )?;
         if items.is_empty() || items.len() > nw_domain::batches::MAX_BATCH_ITEMS {
@@ -773,6 +894,7 @@ impl Service {
             context,
             items.iter().map(|item| (item, Some(input.selector))),
             cancel,
+            None,
             |item, selector, _| {
                 let plan = self.prepare_extraction(context, item, selector, now)?;
                 validate_folder_destination(&output, item, &plan)?;
@@ -849,6 +971,7 @@ impl Service {
             context,
             targets.iter().map(|item| (item, None)),
             cancel,
+            None,
             |item, _, index| {
                 results[index].clone()?;
                 self.prepare_native_copy(
@@ -896,6 +1019,7 @@ impl Service {
         context: &Context,
         targets: impl ExactSizeIterator<Item = (&'a ItemInput, Option<ExtractSelector>)>,
         cancel: &CancellationToken,
+        companions: Option<&BTreeMap<String, CompanionAsset>>,
         mut compile: impl FnMut(&ItemInput, Option<ExtractSelector>, usize) -> Result<Plan>,
     ) -> Result<ReviewedBatchItems> {
         let mut items = Vec::with_capacity(targets.len());
@@ -905,10 +1029,14 @@ impl Service {
             if cancel.is_cancelled() {
                 return Err(DomainError::new("CANCELLED", "Batch preview cancelled"));
             }
-            let asset: Asset = self
-                .store
-                .get(&named("asset", &item.asset_id)?)?
-                .ok_or_else(DomainError::object_not_found)?;
+            let companion = companions.and_then(|files| files.get(&item.asset_id));
+            let asset: Asset = if let Some(companion) = companion {
+                companion.asset.clone()
+            } else {
+                self.store
+                    .get(&named("asset", &item.asset_id)?)?
+                    .ok_or_else(DomainError::object_not_found)?
+            };
             self.object(context, &asset.id, &asset.creator)?;
             let mut candidate = PlannedItem {
                 index: index as u32,
@@ -925,6 +1053,7 @@ impl Service {
                 plan: None,
                 action: None,
                 error: None,
+                companion: companion.map(|companion| companion.source.clone()),
                 packet_cut: None,
                 extraction: selector.map(|selector| ReviewedExtraction {
                     selector,
@@ -1062,6 +1191,7 @@ impl Service {
                 owner.then(|| item.requested_output.clone())
             };
             items.push(PlannedItemView {
+                companion: item.companion.clone(),
                 index: item.index,
                 asset_id: item.asset_id.clone(),
                 source_sha256: item.source_sha256.clone(),
@@ -1142,6 +1272,7 @@ impl Service {
         let mut items = Vec::with_capacity(plan.items.len());
         for (member, item) in batch.members.iter().zip(&plan.items) {
             let mut result = ItemResult {
+                companion: item.companion.clone(),
                 index: item.index,
                 asset_id: item.asset_id.clone(),
                 output_name: item.output_name.clone(),

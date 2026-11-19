@@ -111,6 +111,13 @@ names, reserving the registered files' original names. The existing no-replace
 execution checks protect the reviewed names when another process creates a file
 after review.
 
+Set `copy_companions` to `true` with `preserve_tree` to add inventoried
+companions to the same batch. A companion row identifies its snapshot and row
+index. The copy uses the frozen source SHA-256 and native identity. A changed
+source rejects batch acceptance before any jobs are queued. Each companion has
+its own job and artifact result. Video size statistics use the successful
+video rows only.
+
 The folder review requires complete enumeration and at least one registered
 source. `reject_all` refuses a snapshot with failed intake rows.
 `continue_with_rejected` reviews the registered sources and retains failed
@@ -123,7 +130,7 @@ the full intake inventory. Review creates no directories or media files.
 The shared native/browser Folder intake window can also review a complete
 snapshot into the batch window. That mode shows frozen member decisions and
 excluded snapshot rows, and uses the ordinary Run and retry controls.
-Automatic directory creation, in-source output exclusion, companion copying,
+Automatic directory creation, in-source output exclusion, reviewed replacement,
 and mixed audio and encode workflows remain open. This slice awaits hosted
 transport and GUI qualification on its source.
 
@@ -136,6 +143,6 @@ that exact proposal. Ctrl/Cmd+Enter runs the reviewed batch while its window is 
 Escape closes the batch or output-details window without cancelling accepted jobs.
 The same transport retry keeps the original request identity. History and individual
 job/output inspection use the canonical authorized queries. Full directory expansion,
-companion policy, reviewed replacement and GUI cancellation qualification remain
+reviewed replacement and GUI cancellation qualification remain
 required follow-up work.
 No archive support row or full-task checkbox is qualified by this document.

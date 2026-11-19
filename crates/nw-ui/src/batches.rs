@@ -284,6 +284,7 @@ impl WizApp {
         snapshot: &FolderReview,
         output_root: &str,
         output_layout: nw_domain::batches::FolderOutputLayout,
+        copy_companions: bool,
         ctx: &egui::Context,
     ) {
         if !self.cleanup_actions_allowed(ctx) {
@@ -295,6 +296,7 @@ impl WizApp {
                 snapshot_hash: snapshot.hash.clone(),
                 output_root: output_root.into(),
                 output_layout,
+                copy_companions,
                 intent,
                 file_times: self.file_times,
                 execution_limits: self.execution_limits.clone(),
@@ -673,7 +675,9 @@ impl WizApp {
                     egui::ScrollArea::vertical().id_salt("batch-preview").max_height(170.0).show(ui,|ui| {
                         for item in &plan.items {
                             ui.horizontal(|ui| {
-                                let action = if folder_encode && item.plan.is_some() {
+                                let action = if item.companion.is_some() && item.plan.is_some() {
+                                    "Copy companion"
+                                } else if folder_encode && item.plan.is_some() {
                                     "Encode H.264"
                                 } else {
                                     action_label(&item.action)
@@ -716,7 +720,8 @@ impl WizApp {
                     egui::ScrollArea::vertical().id_salt("batch-result").max_height(180.0).show(ui,|ui| {
                         for item in &result.items {
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}. {} | {}",item.index+1,item.output_name,state_label(&item.state)));
+                                let kind = if item.companion.is_some() { " | Companion" } else { "" };
+                                ui.label(format!("{}. {} | {}{kind}",item.index+1,item.output_name,state_label(&item.state)));
                                 if let Some(id) = &item.job_id
                                     && ui.add_enabled(idle,egui::Button::new("Job details")).clicked() {
                                     self.query("jobs.inspect",json!({"id":id}),Action::Inspect,ui.ctx());

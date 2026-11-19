@@ -2480,6 +2480,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     std::fs::create_dir(&tree_root).unwrap();
     let mut tree_input = folder_batch_input(&clean_folder, &tree_root);
     tree_input["output_layout"] = json!("preserve_tree");
+    tree_input["copy_companions"] = json!(true);
     let missing_child = sdk!(
         stdio,
         "streams.clean.folder_batch_plan",
@@ -2503,6 +2504,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     std::fs::create_dir(&tree_child).unwrap();
     let collision = tree_root.join("-first-فارسی.mkv");
     std::fs::write(&collision, b"existing destination").unwrap();
+    let companion_collision = tree_root.join("notes.txt");
+    std::fs::write(&companion_collision, b"existing companion destination").unwrap();
     let document = media.directory.path().join("preserved-folder-output.json");
     std::fs::write(&document, serde_json::to_vec(&tree_input).unwrap()).unwrap();
     let (tree_cli, status) = cli
@@ -2532,10 +2535,29 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(tree_cli["result"]["plan"]["hash"], tree_plan["hash"]);
     assert_eq!(tree_stdio["plan"]["hash"], tree_plan["hash"]);
     let tree_paths = [tree_root.join("-first-فارسی (2).mkv"), tree_root.join(second_relative)];
-    for (item, path) in tree_plan["items"].as_array().unwrap().iter().zip(&tree_paths) {
+    let tree_items = tree_plan["items"].as_array().unwrap();
+    assert_eq!(tree_items.len(), 3);
+    for (item, path) in tree_items.iter().zip(&tree_paths) {
         assert_eq!(item["output_path"], json!(path));
+        assert!(item["companion"].is_null());
         assert!(!path.exists());
     }
+    let notes = tree_root.join("notes (2).txt");
+    assert_eq!(tree_items[2]["output_path"], json!(notes));
+    assert_eq!(tree_items[2]["companion"]["snapshot_id"], clean_folder["id"]);
+    let source_notes = intake.join("notes.txt");
+    let original_notes = std::fs::read(&source_notes).unwrap();
+    std::fs::write(&source_notes, b"changed since retained intake").unwrap();
+    let changed = sdk!(
+        http,
+        "batches.submit",
+        json!({"plan_id":tree_plan["id"],"plan_hash":tree_plan["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"changed-companion"})
+    );
+    assert_eq!(changed["error"]["code"], "SOURCE_CHANGED");
+    assert!(!notes.exists());
+    assert!(tree_paths.iter().all(|path| !path.exists()));
+    std::fs::write(source_notes, &original_notes).unwrap();
     let tree_group = call!(
         http,
         "batches.submit",
@@ -2543,11 +2565,18 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         json!({"replay_scope":http_scope,"idempotency_key":"preserved-folder-batch"})
     );
     let tree_result = finished!(http, tree_group["batch_id"]);
-    assert_eq!(tree_result["succeeded"], 2);
-    for (path, source) in tree_paths.iter().zip([&media.source, &second]) {
+    assert_eq!(tree_result["succeeded"], 3);
+    assert_eq!(tree_result["items"][2]["companion"], tree_items[2]["companion"]);
+    let videos = [&media.source, &second];
+    let video_bytes: u64 = videos.iter().map(|path| std::fs::metadata(path).unwrap().len()).sum();
+    assert_eq!(tree_result["successful_video_input_bytes"], video_bytes.to_string());
+    assert_eq!(tree_result["successful_video_output_bytes"], video_bytes.to_string());
+    for (path, source) in tree_paths.iter().zip(videos) {
         assert_eq!(std::fs::read(path).unwrap(), std::fs::read(source).unwrap());
     }
     assert_eq!(std::fs::read(collision).unwrap(), b"existing destination");
+    assert_eq!(std::fs::read(notes).unwrap(), original_notes);
+    assert_eq!(std::fs::read(companion_collision).unwrap(), b"existing companion destination");
     let extraction_root = media.directory.path().join("retained-folder-extraction");
     std::fs::create_dir(&extraction_root).unwrap();
     let folder_extraction = json!({
@@ -3190,8 +3219,9 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             "companion_inventory_only":true,"jobs_wait_cli":true,"verified_copy_job":folder_accepted["job_id"]},
         "folder_batch":{"batch":folder_group["batch_id"],"published":2,"match_cli_stdio_http":true,
             "intentional_exclusions":3,"no_replace":true,"copy_full_byte_equality":true,
-            "preserved_tree":{"batch":tree_group["batch_id"],"published":2,"numbered_collision":true,
-                "retained_unicode_paths":true,"match_cli_stdio_http":true,"missing_parent_refused":true}},
+            "preserved_tree":{"batch":tree_group["batch_id"],"published_media":2,"published_companions":1,
+                "numbered_collision":true,"retained_unicode_paths":true,"match_cli_stdio_http":true,
+                "missing_parent_refused":true,"changed_companion_refused":true,"companion_sha256_verified":true}},
         "track_append":{"job":append_job["job_id"],"kept_original_streams":3,"added_audio":2,"added_subtitles":2,
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},

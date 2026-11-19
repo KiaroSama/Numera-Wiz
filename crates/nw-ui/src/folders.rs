@@ -27,6 +27,7 @@ pub(super) struct FolderUi {
     snapshot_id: String,
     batch_output_root: String,
     cleanup_output_layout: FolderOutputLayout,
+    cleanup_copy_companions: bool,
     encode_container: Container,
     encode_crf: u8,
     encode_preset: Preset,
@@ -61,6 +62,7 @@ impl Default for FolderUi {
             snapshot_id: String::new(),
             batch_output_root: String::new(),
             cleanup_output_layout: FolderOutputLayout::Indexed,
+            cleanup_copy_companions: false,
             encode_container: Container::Mp4,
             encode_crf: 18,
             encode_preset: Preset::Balanced,
@@ -630,6 +632,9 @@ impl WizApp {
             ui.label("This snapshot has no registered video to review.");
             return;
         }
+        let has_companions = snapshot.entries.iter().any(|entry| {
+            entry.outcome == FolderEntryOutcome::CompanionInventoried
+        });
         ui.label("Existing authorized engine directory in a separate tree");
         ui.add_enabled_ui(idle, |ui| {
             reveal_focus(
@@ -653,6 +658,9 @@ impl WizApp {
                     "Preserve source tree",
                 );
             });
+            if has_companions && self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree {
+                ui.checkbox(&mut self.folder.cleanup_copy_companions, "Copy inventoried companion files");
+            }
             self.batch_policy_controls(ui, true);
         });
         let intake_failed = snapshot.entries.iter().any(|entry| {
@@ -677,7 +685,10 @@ impl WizApp {
             self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
             if review.clicked() {
                 let root = self.folder.batch_output_root.clone();
-                self.review_folder_batch(snapshot, &root, self.folder.cleanup_output_layout, ui.ctx());
+                let layout = self.folder.cleanup_output_layout;
+                let companions = has_companions && self.folder.cleanup_copy_companions
+                    && layout == FolderOutputLayout::PreserveTree;
+                self.review_folder_batch(snapshot, &root, layout, companions, ui.ctx());
             }
         }
         if !intake_failed {

@@ -124,6 +124,16 @@ pub enum FolderEntryOutcome {
     Excluded,
     Rejected,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FolderCompanionSource {
+    pub snapshot_id: String,
+    pub index: u32,
+}
+
+pub const FOLDER_COMPANION_FORMAT: &str = "folder_companion";
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FolderEntry {

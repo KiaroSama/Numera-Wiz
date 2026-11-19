@@ -170,6 +170,7 @@ impl MixedOriginalBindings {
                 || original.original.path.contains('\0')
                 || exact(&original.original.bytes)? == 0
                 || matches!(&original.source_purpose, SourcePurpose::CreatorBoundManaged { principal } if principal != &self.principal)
+                || matches!(&original.source_purpose, SourcePurpose::RetainedFolderCompanion { .. })
             {
                 return Err(invalid(
                     "An accepted original differs from the reviewed source metadata",

@@ -245,10 +245,11 @@ explicit cleanup batch. To review all registered video in a complete,
 failure-free snapshot, enter an existing authorized output directory in a
 separate tree and select **Review folder cleanup batch**. Choose **Preserve
 source tree** to keep relative paths inside matching output subdirectories.
-Create those subdirectories before review. The batch window shows
+Create those subdirectories before review. Select **Copy inventoried companion
+files** to include their verified byte copies. The batch window shows
 the frozen snapshot, exclusions and member destinations. Select **Run reviewed
 batch** after checking them. **Return to explicit candidates** leaves the
-folder review. Companion inventory is visible among excluded rows. The
+folder review. The
 folder-derived review awaits hosted interaction evidence.
 
 
