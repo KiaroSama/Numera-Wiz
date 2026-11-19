@@ -270,6 +270,15 @@ pub enum Streams {
         #[arg(long)]
         limits_file: Option<PathBuf>,
     },
+    /// Review a single original stream's packet-copy extraction into Matroska.
+    Extract {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Preview candidate and retained stream counts for 1-64 assets.
     Report {
         #[arg(long = "asset", required = true)]
@@ -575,6 +584,10 @@ pub fn prepare(command: Command) -> Result<Request> {
             }
             query("streams.clean", params)
         }
+        Command::Streams(Streams::Extract { asset, stream, out }) => query(
+            "streams.extract",
+            json!({"asset_id":asset,"stream_index":stream,"output":native_path(&out)?}),
+        ),
         Command::Streams(Streams::Report {
             assets,
             intent_file,

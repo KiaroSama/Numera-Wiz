@@ -225,6 +225,9 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::VolumeMeasurement))
                 .expect("schema"),
         ),
+        "streams.extract" => Some(
+            serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -345,6 +348,13 @@ pub struct CleanInput {
     pub asset_id: String,
     pub output: String,
     pub intent: CleanIntent,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractInput {
+    pub asset_id: String,
+    pub stream_index: u32,
+    pub output: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -889,6 +899,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Plan cleanup of a registered asset",
             Query,
             CleanInput
+        ),
+        row!(
+            "streams.extract",
+            "Review copy of one original stream into its own Matroska output",
+            Query,
+            ExtractInput
         ),
         row!(
             "plans.inspect",
@@ -1624,6 +1640,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "assets.inspect",
     "assets.output_suggest",
     "streams.clean",
+    "streams.extract",
     "plans.inspect",
     "jobs.submit",
     "jobs.inspect",

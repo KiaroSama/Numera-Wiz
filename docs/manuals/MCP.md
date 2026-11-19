@@ -94,6 +94,12 @@ and reports peak and RMS to six decimal places as integer millionths of a dBFS.
 A silent signal is represented as `{"kind":"silence"}`. The response includes
 the registered source digest and a decimal-string sample count per channel.
 
+`streams.extract` reviews one registered video, audio or subtitle stream for
+packet copy to a new Matroska path. Pass `asset_id`, the original `stream_index`,
+and the granted `output` path. Inspect the plan and submit its exact ID and
+hash with `jobs.submit`. The output preserves metadata and dispositions for
+the chosen stream and omits the other streams and chapters.
+
 ## Engine capability reports
 
 Grant `capabilities.inspect`, `capabilities.refresh` or `capabilities.clear`

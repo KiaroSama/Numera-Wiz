@@ -860,6 +860,26 @@ impl WizApp {
             self.refresh_jobs(ctx);
         }
     }
+    fn extraction_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
+        use nw_domain::mux::StreamKind;
+        egui::CollapsingHeader::new("Extract one stream").show(ui, |ui| {
+            ui.label("Set the Matroska output path above and choose an original stream to review.");
+            egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                for stream in asset.probe.streams.iter().filter(|stream| {
+                    matches!(stream.kind, StreamKind::Video | StreamKind::Audio | StreamKind::Subtitle)
+                        && !stream.attached_picture()
+                }) {
+                    let label = format!("Review {:?} stream {}", stream.kind, stream.index);
+                    if ui.add_enabled(self.request_idle() && !self.output.trim().is_empty(), egui::Button::new(label)).clicked() {
+                        self.changed();
+                        self.query("streams.extract", json!({"asset_id":asset.id,"stream_index":stream.index,"output":self.output}),
+                            Action::Plan(self.generation), ui.ctx());
+                    }
+                }
+            });
+        });
+    }
+
     fn volume_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
         use nw_domain::mux::StreamKind;
         let mut audio = asset
@@ -1376,7 +1396,10 @@ impl eframe::App for WizApp {
             });
             self.capability_panel(ui);
             self.config_import_panel(ui);
-            if let Some(asset) = self.selected_asset() { self.volume_panel(ui, &asset); }
+            if let Some(asset) = self.selected_asset() {
+                self.volume_panel(ui, &asset);
+                self.extraction_panel(ui, &asset);
+            }
         });
         if !self.folder.open {
             self.batch_window(ui.ctx());

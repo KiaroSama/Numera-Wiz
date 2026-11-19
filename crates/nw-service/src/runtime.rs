@@ -1090,6 +1090,7 @@ impl Service {
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
+                "streams.extract",
                 "streams.clean.batch_plan",
             ]
             .contains(&request.command.id.as_str())
@@ -1722,26 +1723,9 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "chapters.remove" | "chapters.import" | "disposition.patch"
-            | "metadata.patch" => {
-                let input = match request.command.id.as_str() {
-                    "chapters.remove" => {
-                        commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup()
-                    }
-                    "chapters.import" => {
-                        commands::parse::<nw_domain::chapters::ImportInput>(params)?
-                            .into_cleanup()?
-                    }
-                    "disposition.patch" => {
-                        commands::parse::<nw_domain::dispositions::PatchInput>(params)?
-                            .into_cleanup()
-                    }
-                    "metadata.patch" => {
-                        commands::parse::<nw_domain::metadata::PatchInput>(params)?.into_cleanup()
-                    }
-                    _ => commands::parse::<CleanInput>(params)?,
-                };
-                let plan = self.prepare_cleanup(&context, input, now)?;
+            "streams.clean" | "streams.extract" | "chapters.remove" | "chapters.import"
+            | "disposition.patch" | "metadata.patch" => {
+                let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
                     value(&self.plan_review(&context, &plan)?)?,
@@ -2362,23 +2346,42 @@ impl Service {
         input: CleanInput,
         now: u64,
     ) -> Result<Plan> {
-        self.admit_execution_limits(context, &input.execution_limits)?;
+        self.prepare_native_copy(context, &input.asset_id, &input.output, input.execution_limits,
+            |engine, asset, output| engine.clean_plan_with_file_times_at(
+                asset, output, &input.intent, input.file_times, &context.principal, now,
+            ))
+    }
+
+    fn prepare_copy_review(&self, context: &Context, command: &str, params: Value, now: u64) -> Result<Plan> {
+        let input = match command {
+            "streams.extract" => {
+                let input: commands::ExtractInput = commands::parse(params)?;
+                return self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
+                    |engine, asset, output| engine.extract_plan_at(asset, output, input.stream_index, &context.principal, now));
+            }
+            "chapters.remove" => commands::parse::<nw_domain::chapters::RemoveInput>(params)?.into_cleanup(),
+            "chapters.import" => commands::parse::<nw_domain::chapters::ImportInput>(params)?.into_cleanup()?,
+            "disposition.patch" => commands::parse::<nw_domain::dispositions::PatchInput>(params)?.into_cleanup(),
+            "metadata.patch" => commands::parse::<nw_domain::metadata::PatchInput>(params)?.into_cleanup(),
+            _ => commands::parse::<CleanInput>(params)?,
+        };
+        self.prepare_cleanup(context, input, now)
+    }
+
+    fn prepare_native_copy(&self, context: &Context, asset_id: &str, output: &str,
+        limits: nw_domain::execution::CleanupLimits,
+        compile: impl FnOnce(&Engine, Asset, &Path) -> Result<Plan>,
+    ) -> Result<Plan> {
+        self.admit_execution_limits(context, &limits)?;
         let asset: Asset = self
             .store
-            .get(&named("asset", &input.asset_id)?)?
+            .get(&named("asset", asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;
-        let output = self.path(context, Path::new(&input.output), true)?;
-        let mut plan = self.engine()?.clean_plan_with_file_times_at(
-            asset,
-            &output,
-            &input.intent,
-            input.file_times,
-            &context.principal,
-            now,
-        )?;
-        plan.execution_limits = Some(input.execution_limits);
+        let output = self.path(context, Path::new(output), true)?;
+        let mut plan = compile(self.engine()?, asset, &output)?;
+        plan.execution_limits = Some(limits);
         let rights = plan
             .required_rights
             .as_mut()

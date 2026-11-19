@@ -51,6 +51,20 @@ fn assert_volume(result: &Value, asset: &Value) {
     assert_eq!(result["rms"], json!({"kind":"finite","micro_db":-21073778}));
 }
 
+fn assert_audio_extraction(review: &Value) {
+    let resolution = &review["resolution"];
+    assert_eq!(resolution["action"], "remux");
+    let streams = resolution["streams"].as_array().unwrap();
+    assert_eq!(streams.len(), 1);
+    assert_eq!(streams[0]["kind"], "audio");
+    assert_eq!(streams[0]["index"], 1);
+    let outcomes = resolution["outcomes"].as_array().unwrap();
+    assert_eq!(outcomes.len(), 3);
+    assert!(outcomes[0]["output_index"].is_null());
+    assert_eq!(outcomes[1]["output_index"], 0);
+    assert!(outcomes[2]["output_index"].is_null());
+}
+
 macro_rules! call {
     ($client:expr, $id:expr, $params:expr, $context:expr) => {{
         let args = json!({"params":$params,"context":$context});
@@ -893,7 +907,27 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
     chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    {
+    let extraction = media.directory.path().join("extracted-primary-audio.mkv");
+    let (reviewed, exit) = cli.human(&["streams", "extract", "--asset", asset["id"].as_str().unwrap(),
+        "--stream", "1", "--out", extraction.to_str().unwrap()]).await;
+    assert_eq!(exit, 0, "{reviewed}");
+    let reviewed = &reviewed["result"];
+    assert_audio_extraction(reviewed);
+    assert!(!extraction.exists());
+    let accepted = cli.mutation(&scope, "extract-primary-audio", "jobs.submit",
+        json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    let job = cli.completed(accepted["result"]["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "succeeded", "{job}");
+    let output_probe = fixture::probe(&media.bin, &extraction).await;
+    let output_streams = output_probe["streams"].as_array().unwrap();
+    assert_eq!(output_streams.len(), 1);
+    assert_eq!(output_streams[0]["codec_name"], "pcm_s16le");
+    assert_eq!(output_streams[0]["tags"]["language"], "eng");
+    }
+
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -997,6 +1031,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
     );
+    assert_audio_extraction(&call!(stdio, "streams.extract", json!({"asset_id":operator_asset["id"],"stream_index":1,
+        "output":media.directory.path().join("stdio-extraction.mkv")}), json!({})));
     let volume = call!(
         stdio,
         "media.analyze.volume",
@@ -1579,6 +1615,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
+        assert_audio_extraction(&call!(http, "streams.extract", json!({"asset_id":asset["id"],"stream_index":1,
+            "output":media.directory.path().join(format!("http-extraction-{ordinal}.mkv"))}), json!({})));
         let volume = call!(
             http,
             "media.analyze.volume",

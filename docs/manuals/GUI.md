@@ -248,3 +248,10 @@ playback, resources/fault coverage and full version 1 remain required.
 Select a registered file in Stream Cleanup and expand **Audio levels**. Choose
 the original audio stream to measure. Numera Wiz displays its decoded peak,
 RMS, and sample count per channel from FFmpeg.
+
+## Extract a stream
+
+Choose a registered source, enter a new `.mkv` output path and expand
+**Extract one stream**. Select the stream by its original index and review the
+retained stream and destination. **Run reviewed plan** copies its packets and
+publishes the new file after verification.

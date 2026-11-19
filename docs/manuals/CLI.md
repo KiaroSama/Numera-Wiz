@@ -73,6 +73,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams resolve --streams-file STREAMS.json --intent-file INTENT.json` | Resolve a bounded explicit original-stream inventory. |
 | `streams report --asset ID --intent-file INTENT.json` | Inspect selection counts; repeat --asset for up to 64 assets. |
 | `streams clean --asset ID --out PATH --intent-file INTENT.json` | Prepare a cleanup plan for separate review and submission. |
+| `streams extract --asset ID --stream INDEX --out PATH.mkv` | Review packet-copy extraction of a single original video, audio or subtitle stream. Submit the reviewed plan separately. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |

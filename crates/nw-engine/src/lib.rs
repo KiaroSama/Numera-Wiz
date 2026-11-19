@@ -266,12 +266,39 @@ impl Engine {
     }
     pub fn clean_plan_with_file_times_at(
         &self,
-        mut asset: Asset,
+        asset: Asset,
         output: &Path,
         intent: &CleanIntent,
         file_times: nw_domain::file_times::FileTimeRequest,
         creator: &str,
         now: u64,
+    ) -> Result<Plan> {
+        self.review_stream_copy(asset, output, file_times, creator, now, |streams| mux::resolve(streams, intent))
+    }
+
+    pub fn extract_plan_at(
+        &self,
+        asset: Asset,
+        output: &Path,
+        stream_index: u32,
+        creator: &str,
+        now: u64,
+    ) -> Result<Plan> {
+        if !output.extension().and_then(|value| value.to_str()).is_some_and(|value| value.eq_ignore_ascii_case("mkv")) {
+            return Err(DomainError::new("CONTAINER_UNQUALIFIED", "Select a Matroska .mkv output for stream extraction"));
+        }
+        self.review_stream_copy(asset, output, nw_domain::file_times::FileTimeRequest::default(), creator, now,
+            |streams| mux::extract_one(streams, stream_index))
+    }
+
+    fn review_stream_copy(
+        &self,
+        mut asset: Asset,
+        output: &Path,
+        file_times: nw_domain::file_times::FileTimeRequest,
+        creator: &str,
+        now: u64,
+        resolve: impl FnOnce(&[Stream]) -> Result<mux::CleanResolution>,
     ) -> Result<Plan> {
         let object = registered_object(&asset)?.clone();
         let source_stamp = files::SourceStamp::capture_resolved(Path::new(&asset.identity.path))?;
@@ -283,7 +310,7 @@ impl Engine {
                 "Output must be distinct from the source",
             ));
         }
-        let resolution = mux::resolve(&asset.probe.streams, intent)?;
+        let resolution = resolve(&asset.probe.streams)?;
         let profile = if resolution.action == CleanAction::Remux {
             let profile = OutputProfile::from_output(&output)?;
             profile.admit(&asset, &resolution)?;
