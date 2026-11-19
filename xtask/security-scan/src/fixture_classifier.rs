@@ -21,7 +21,7 @@ fn reviewed(result: &VerifiedScan, total: usize) -> Result<()> {
 }
 fn row(commit: &str, path: usize) -> serde_json::Value {
     json!({"RuleID": if path == 3 { "sourcegraph-access-token" } else { "generic-api-key" },
-        "File": DOCUMENTS[path].path, "StartLine": ([111,254,301,2][path]), "Commit": commit})
+        "File": DOCUMENTS[path].path, "StartLine": ([111,254,301,2,6][path]), "Commit": commit})
 }
 fn mock_plan(bytes: &[u8], deadline: Deadline) -> Result<Plan> {
     let parsed = report::parse(bytes, deadline)?;
@@ -57,6 +57,17 @@ fn pure(deadline: Deadline) -> Result<()> {
             "SECURITY_MOCK_LOCATION_FAILED",
         )?;
     }
+    let lock_rows = [
+        row(&commit, 4),
+        json!({"RuleID":"generic-api-key","File":DOCUMENTS[4].path,"StartLine":7,"Commit":commit}),
+        json!({"RuleID":"generic-api-key","File":DOCUMENTS[4].path,"StartLine":8,"Commit":commit}),
+    ];
+    let bytes = serde_json::to_vec(&lock_rows).private("SECURITY_FIXTURE_IO")?;
+    let lock_plan = mock_plan(&bytes, deadline)?;
+    require(
+        lock_plan.total() == 3 && lock_plan.unknown() == 1 && lock_plan.resolutions() == 1,
+        "SECURITY_PUBLIC_COMPONENT_LOCATION_FAILED",
+    )?;
     let many: Vec<_> = (0..257).map(|n| row(&format!("{n:040x}"), 0)).collect();
     require(
         failed_at(
@@ -70,9 +81,9 @@ fn pure(deadline: Deadline) -> Result<()> {
     )?;
     require(
         failed_at(
-            &classifier::positive_cache_room(4),
+            &classifier::positive_cache_room(DOCUMENTS.len()),
             "SECURITY_CLASSIFIER_CACHE_LIMIT",
-        ) && classifier::positive_cache_room(3).is_ok(),
+        ) && classifier::positive_cache_room(DOCUMENTS.len() - 1).is_ok(),
         "SECURITY_MOCK_CACHE_BOUND_FAILED",
     )?;
     require(
@@ -479,9 +490,9 @@ fn variants(fixture: &Fixture) -> Result<()> {
     )?;
     reviewed(&result, result.finding_count)?;
     require(
-        result.finding_count >= 10
-            && result.classifier_resolutions >= 8
-            && result.classifier_blob_reads == 4
+        result.finding_count >= 12
+            && result.classifier_resolutions >= 9
+            && result.classifier_blob_reads == DOCUMENTS.len()
             && result.classifier_cache_hits >= 4,
         "SECURITY_ACTUAL_REPEATED_MERGE_CACHE_FAILED",
     )?;

@@ -8,7 +8,7 @@ pub struct Document {
     pub length: u64,
     pub sha256: &'static str,
 }
-pub const DOCUMENTS: [Document; 4] = [
+pub const DOCUMENTS: [Document; 5] = [
     Document {
         path: "docs/research-pack/handoff/02-2-functional-scope-and-migration.md",
         length: 27483,
@@ -28,6 +28,13 @@ pub const DOCUMENTS: [Document; 4] = [
         path: "docs/research-pack/research_v7/filmcraft-source-commands.json",
         length: 344827,
         sha256: "dc79337d44c786b037dabe5c18ecfac9cfeb3ea6912f761d3dc0d189590f1ed5",
+    },
+    // Lines 6 and 7 identify the upstream commit and digest of the public
+    // MacPorts archive verification key. Bind the whole reviewed lock payload.
+    Document {
+        path: "components/macos-x64-standard-input-lock.json",
+        length: 64087,
+        sha256: "81190602c798d0c0157bd5de4722a7b5308b948a2fa171916879d567a8470267",
     },
 ];
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -98,6 +105,7 @@ impl Plan {
                 (Some(1), "generic-api-key", "254") => Some(1),
                 (Some(2), "generic-api-key", "301" | "1070") => Some(2),
                 (Some(3), "sourcegraph-access-token", "2") => Some(3),
+                (Some(4), "generic-api-key", "6" | "7") => Some(4),
                 _ => None,
             };
             if let Some(path) = entry.filter(|_| crate::protocol::revision(&row.commit)) {
