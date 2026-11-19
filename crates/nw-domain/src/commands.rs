@@ -208,7 +208,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.render_mixed"
         | "interchange.edl.export" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
+        | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
             ProjectContextRule::RequiredWrite
         }
@@ -328,7 +328,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "clips.link" => Some(contracts::edit(EditResult::Link)),
         "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
         "clips.split" => Some(contracts::edit(EditResult::Split)),
-        "clips.remove" => Some(contracts::edit(EditResult::Remove)),
+        "clips.remove" | "clips.join_through_edit" => Some(contracts::edit(EditResult::Remove)),
         "markers.place" => Some(contracts::edit(EditResult::Marker)),
         "markers.remove" => Some(contracts::edit(EditResult::Remove)),
         "markers.wave_projection" => Some(
@@ -553,6 +553,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Split exact source and sequence intervals",
             DurableMutation,
             crate::projects::SplitInput
+        ),
+        row!(
+            "clips.join_through_edit",
+            "Rejoin adjacent source-contiguous halves and preserve the left clip identities",
+            DurableMutation,
+            crate::projects::JoinThroughEditInput
         ),
         row!(
             "clips.trim",
@@ -1820,6 +1826,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.link",
     "clips.unlink",
     "clips.split",
+    "clips.join_through_edit",
     "clips.trim",
     "clips.slip",
     "tracks.set_enabled",

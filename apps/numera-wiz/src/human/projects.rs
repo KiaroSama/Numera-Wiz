@@ -348,6 +348,15 @@ pub enum Clips {
         #[arg(long)]
         at: String,
     },
+    /// Rejoin adjacent halves of the same source on every linked track.
+    JoinThroughEdit {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long)]
+        left: String,
+        #[arg(long)]
+        right: String,
+    },
     Trim {
         #[command(flatten)]
         context: WriteContext,
@@ -394,6 +403,7 @@ impl Clips {
             Self::Unlink { context, clips } => context.request("clips.unlink", json!({"clip_ids":clips,"link_policy":"expand"})),
             Self::Move { context, clips, delta } => context.request("clips.move", json!({"clip_ids":clips,"delta":rational(&delta)?,"collision":"reject","link_policy":"expand"})),
             Self::Split { context, clip, at } => context.request("clips.split", json!({"clip_id":clip,"at_sequence":rational(&at)?,"link_policy":"expand"})),
+            Self::JoinThroughEdit { context, left, right } => context.request("clips.join_through_edit", json!({"left_id":left,"right_id":right})),
             Self::Trim { context, clips, head, tail } => context.request("clips.trim", json!({"clip_ids":clips,"head":rational(&head)?,"tail":rational(&tail)?,"link_policy":"expand"})),
             Self::Slip { context, clips, delta } => context.request("clips.slip", json!({"clip_ids":clips,"delta":rational(&delta)?,"link_policy":"expand"})),
             Self::Remove { context, clips } => context.request("clips.remove", json!({"clip_ids":clips,"mode":"lift","link_policy":"expand"})),

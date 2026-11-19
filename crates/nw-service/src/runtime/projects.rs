@@ -428,6 +428,9 @@ impl Service {
                     "clips.split" => {
                         ProjectEditIntent::Split(commands::parse(request.params.clone())?)
                     }
+                    "clips.join_through_edit" => {
+                        ProjectEditIntent::JoinThroughEdit(commands::parse(request.params.clone())?)
+                    }
                     "clips.trim" => {
                         ProjectEditIntent::Trim(commands::parse(request.params.clone())?)
                     }
@@ -465,6 +468,7 @@ impl Service {
                 let id_budget = match &intent {
                     ProjectEditIntent::Unlink(_)
                     | ProjectEditIntent::Trim(_)
+                    | ProjectEditIntent::JoinThroughEdit(_)
                     | ProjectEditIntent::Slip(_)
                     | ProjectEditIntent::RemoveGap(_)
                     | ProjectEditIntent::SetTrackGain(_)

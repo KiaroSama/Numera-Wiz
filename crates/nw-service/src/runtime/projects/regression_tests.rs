@@ -850,6 +850,46 @@ pub(in crate::runtime) async fn linked_edits() {
     for (id, raw) in right_ids.iter().zip(before_slip) {
         assert_eq!(fixture.raw(id), raw);
     }
+    let through = Fixture::new().await;
+    through.accept(through.request("clips.link", "link-through-edit", json!({
+        "clip_ids":[through.clips[0],through.clips[2]],"link_policy":"expand"
+    }))).await;
+    let first_ids = [&through.clips[0], &through.clips[2]];
+    let before_split: Vec<_> = first_ids.iter().map(|id| through.entity(id)).collect();
+    let split = through.accept(through.request("clips.split", "split-through-edit", json!({
+        "clip_id":through.clips[0],"at_sequence":{"num":"1","den":"2"},"link_policy":"expand"
+    }))).await;
+    let right_ids: Vec<_> = split["created"]["clip_ids"].as_array().unwrap().iter()
+        .map(|id| EntityId::parse(id.as_str().unwrap().to_owned()).unwrap()).collect();
+    let left_clip: Clip = before_split[0].payload("clip").unwrap();
+    let right = right_ids.iter().find(|id| {
+        through.entity(id).payload::<Clip>("clip").unwrap().track_id == left_clip.track_id
+    }).unwrap();
+    through.reject_unchanged(through.request("clips.join_through_edit", "refuse-different-source", json!({
+        "left_id":through.clips[0],"right_id":through.clips[1]
+    })), "THROUGH_EDIT_REQUIRED").await;
+    let split_images: Vec<_> = first_ids.into_iter().chain(right_ids.iter()).map(|id| (id.clone(), through.raw(id))).collect();
+    let joined = through.accept(through.request("clips.join_through_edit", "join-original-halves", json!({
+        "left_id":through.clips[0],"right_id":right
+    }))).await;
+    assert_eq!(joined["changed_ids"].as_array().unwrap().len(), 6);
+    for original in before_split {
+        let before: Clip = original.payload("clip").unwrap();
+        let after: Clip = through.entity(&original.id).payload("clip").unwrap();
+        assert_eq!(after.source_range, before.source_range);
+        assert_eq!(after.sequence_start, before.sequence_start);
+        assert_eq!(after.duration, before.duration);
+        assert_eq!(after.occurrence_id, before.occurrence_id);
+        assert_eq!(after.link_group_id, before.link_group_id);
+    }
+    {
+        let read = through.service.store.project_read(through.project.as_str()).unwrap();
+        assert!(right_ids.iter().all(|id| read.raw_entity(id).unwrap().is_none()));
+    }
+    through.accept(through.request("history.undo", "restore-through-split", json!({}))).await;
+    for (id, raw) in split_images {
+        assert_eq!(through.raw(&id), raw);
+    }
     let gap_fixture = Fixture::new().await;
     let left: Clip = gap_fixture.entity(&gap_fixture.clips[1]).payload("clip").unwrap();
     let right: Clip = gap_fixture.entity(&gap_fixture.clips[2]).payload("clip").unwrap();

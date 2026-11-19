@@ -94,7 +94,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.render_mixed"
         | "interchange.edl.export" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
+        | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
             Some(ProjectAction::Edit)
         }

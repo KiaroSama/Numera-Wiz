@@ -677,7 +677,7 @@ impl Service {
         };
         let readable = match request.command.id.as_str() {
             "projects.create" | "sequences.create" | "clips.place" | "clips.move"
-            | "clips.link" | "clips.unlink" | "clips.split" | "clips.trim" | "clips.slip"
+            | "clips.link" | "clips.unlink" | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip"
             | "clips.remove" | "tracks.set_enabled" | "history.undo" | "history.redo"
             | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" => {
                 self.project_receipt_readable(context, &response)?
@@ -1274,7 +1274,7 @@ impl Service {
                 &cancellation,
             )?,
             "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
-            | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split"
+            | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split" | "clips.join_through_edit"
             | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
             | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
                 drop(guard);

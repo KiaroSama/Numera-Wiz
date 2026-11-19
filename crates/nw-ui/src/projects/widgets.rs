@@ -596,6 +596,16 @@ impl WizApp {
             ui.collapsing("Trim linked clips", |ui| {
                 rational(ui, "Trim from beginning (seconds)", &mut self.projects.forms.trim_head);
                 rational(ui, "Trim from end (seconds)", &mut self.projects.forms.trim_tail);
+                if let (Some(left_id), Some(left)) = (&group.view.clip, &group.clip)
+                    && let Ok(boundary) = left.end()
+                    && let Some(right) = group.viewport.items.iter().find(|candidate| {
+                        candidate.track_id == left.track_id && candidate.source_id == left.source_id
+                            && candidate.sequence_start == boundary
+                    })
+                    && ui.button("Join with next through edit").clicked()
+                {
+                    self.mutate_project("clips.join_through_edit", json!({"left_id":left_id,"right_id":right.id}), ui.ctx());
+                }
                 if ui.button("Apply trim").clicked() {
                     match (self.projects.forms.trim_head.value(), self.projects.forms.trim_tail.value()) {
                         (Ok(head), Ok(tail)) => self.mutate_project("clips.trim", json!({

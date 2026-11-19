@@ -48,6 +48,7 @@ pub enum ProjectEditIntent {
     Link(LinkInput),
     Unlink(UnlinkInput),
     Split(SplitInput),
+    JoinThroughEdit(JoinThroughEditInput),
     Trim(TrimInput),
     Slip(SlipInput),
     RemoveGap(RemoveGapInput),
@@ -346,6 +347,31 @@ fn validate_link_group_candidate<R: ProjectRead>(read: &R, candidate: &EntityId)
     }
     Ok(())
 }
+fn through_edit_required() -> DomainError {
+    DomainError::new("THROUGH_EDIT_REQUIRED", "Select adjacent halves of the same original source on every linked track")
+}
+
+fn through_edit_tracks<R: ProjectRead>(read: &R, seed: &EntityId) -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
+    let mut tracks = BTreeMap::new();
+    for entity in link_selection(read, std::slice::from_ref(seed), 1)? {
+        let clip: Clip = entity.payload("clip")?;
+        let fields: BTreeMap<String, Box<serde_json::value::RawValue>> = serde_json::from_str(&entity.payload_json)
+            .map_err(|error| invalid(error.to_string()))?;
+        if !entity.extensions.is_empty()
+            || entity.references.iter().any(|reference| !matches!(reference.role.as_str(), "ownership" | "source"))
+            || fields.keys().any(|key| !matches!(key.as_str(),
+                "sequence_id" | "track_id" | "source_id" | "occurrence_id" | "source_range"
+                | "sequence_start" | "duration" | "rate" | "link_group_id" | "locked"))
+        {
+            return Err(DomainError::new("UNSUPPORTED_SEMANTIC_NODE", "Through-edit join requires unmodified clip and link semantics"));
+        }
+        if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+            return Err(through_edit_required());
+        }
+    }
+    Ok(tracks)
+}
+
 pub fn resolve_edit<R: ProjectRead>(
     read: &R,
     intent: ProjectEditIntent,
@@ -657,6 +683,38 @@ pub fn resolve_edit<R: ProjectRead>(
                 edit.insert(entity)?;
             }
             json!({"clip_ids":right_ids,"no_change":right_ids.is_empty()})
+        }
+        ProjectEditIntent::JoinThroughEdit(input) => {
+            let left = through_edit_tracks(read, &input.left_id)?;
+            let mut right = through_edit_tracks(read, &input.right_id)?;
+            if left.keys().ne(right.keys()) {
+                return Err(through_edit_required());
+            }
+            if left.len() > MAX_CHANGES / 3 {
+                return Err(limit("Through-edit join exceeds its track and clip change budget"));
+            }
+            for (track, (mut entity, mut clip)) in left {
+                let (following_entity, following) = right.remove(&track).ok_or_else(through_edit_required)?;
+                edit.clip_context(&clip)?;
+                edit.clip_context(&following)?;
+                if clip.sequence_id != following.sequence_id
+                    || clip.source_id != following.source_id
+                    || clip.end()? != following.sequence_start
+                    || clip.source_range.end != following.source_range.start
+                    || entity.enabled != following_entity.enabled
+                    || entity.label != following_entity.label
+                    || !read.dependents(&following_entity.id, MAX_CLOSURE)?.is_empty()
+                {
+                    return Err(through_edit_required());
+                }
+                clip.source_range.end = following.source_range.end;
+                clip.duration = clip.source_range.duration()?;
+                entity.update(&clip)?;
+                edit.set(entity)?;
+                edit.delete(&following_entity.id)?;
+                edit.count(&track, -1)?;
+            }
+            json!({})
         }
         ProjectEditIntent::Trim(input) => {
             if input.head < Rational::ZERO || input.tail < Rational::ZERO {

@@ -173,6 +173,22 @@ revision, raw project/entity bytes, history and redo remain unchanged. Retrying 
 lost response uses the exact original identity, expected revision and parameters,
 including for no-change; it is different from the fresh second Link above.
 
+## Rejoin a through edit
+
+Inspect the left clip and open **Trim linked clips**. Choose **Join with next
+through edit** when the adjacent right clip is visible and shares the source.
+Both timeline and source boundaries must meet exactly on every linked track.
+The join keeps each left clip and its group identity. Undo restores both halves
+and their original link groups.
+
+```text
+numera-wiz clips join-through-edit --project PROJECT --expected-revision REVISION --left LEFT --right RIGHT --replay-scope SCOPE --idempotency-key join-through-edit
+```
+
+MCP uses `clips.join_through_edit` with `left_id` and `right_id`. The current
+route accepts unchanged clip semantics and opaque link groups. Effects,
+unmatched linked tracks and discontinuous source windows refuse the edit.
+
 ## Slip a source window
 
 In Projects, inspect a clip, open **Slip linked clips**, and enter a signed

@@ -604,6 +604,7 @@ mod tests {
                     | "tracks.set_enabled"
                     | "timeline.remove_gap"
                     | "mixer.set_track_gain"
+                    | "clips.join_through_edit"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);
@@ -1314,6 +1315,7 @@ mod tests {
             ("timeline.remove_gap", vec![], true),
             ("mixer.set_track_gain", vec![], true),
             ("clips.remove", vec![], false),
+            ("clips.join_through_edit", vec![], false),
             ("markers.place", vec!["marker_id"], false),
             ("markers.remove", vec![], false),
             ("history.undo", vec![], false),
