@@ -1747,13 +1747,13 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(stdio_normalize["hash"], http_normalize["hash"]);
     let measurements = http_normalize["audio_normalization"].as_array().unwrap();
     assert_eq!(measurements.len(), 2);
-    let first = measurements[0]["measurement"]["integrated_centi_lufs"]
+    let first_lufs = measurements[0]["measurement"]["integrated_centi_lufs"]
         .as_i64()
         .unwrap();
-    let second = measurements[1]["measurement"]["integrated_centi_lufs"]
+    let second_lufs = measurements[1]["measurement"]["integrated_centi_lufs"]
         .as_i64()
         .unwrap();
-    assert!((first - second).abs() > 1500);
+    assert!((first_lufs - second_lufs).abs() > 1500);
     let normalized_job = call!(
         http,
         "jobs.submit",
