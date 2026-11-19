@@ -1,4 +1,5 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
+mod audio_edit;
 mod batches;
 mod capabilities;
 mod cleanup;
@@ -6,7 +7,6 @@ pub mod client;
 mod config_import;
 mod folders;
 mod jobs;
-mod audio_edit;
 mod media_join;
 mod normalize;
 mod observations;

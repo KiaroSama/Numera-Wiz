@@ -135,7 +135,8 @@ impl Ledger {
         let flags = value["flags"]
             .as_str()
             .ok_or_else(|| invalid("Missing packet flags"))?;
-        let shift_timestamp = |time: Option<Rational>| time.map(|time| time.checked_add(shift)).transpose();
+        let shift_timestamp =
+            |time: Option<Rational>| time.map(|time| time.checked_add(shift)).transpose();
         let pts = shift_timestamp(pts)?;
         let dts = shift_timestamp(dts)?;
         let record = canonical(json!([
@@ -153,12 +154,13 @@ impl Ledger {
         if stream.packets == 0 {
             stream.first = pts.map(|pts| (pts, flags.starts_with('K')));
         }
-        if let Some((pts, end)) = pts.zip(duration)
+        if let Some((pts, end)) = pts
+            .zip(duration)
             .filter(|(_, duration)| *duration > Rational::ZERO)
             .and_then(|(pts, duration)| pts.checked_add(duration).ok().map(|end| (pts, end)))
         {
-            stream.irregular_clock |= dts != Some(pts)
-                || stream.last_pts.is_some_and(|last| pts <= last);
+            stream.irregular_clock |=
+                dts != Some(pts) || stream.last_pts.is_some_and(|last| pts <= last);
             stream.last_pts = Some(pts);
             stream.last_end = Some(stream.last_end.map_or(end, |previous| previous.max(end)));
         } else {
@@ -368,7 +370,15 @@ async fn scan(
     deadline: nw_domain::execution::DeadlinePolicy,
     window: Option<TimeRange>,
 ) -> Result<Ledger> {
-    scan_into(engine, path, Ledger::new(probe, window)?, cancel, observer, deadline).await
+    scan_into(
+        engine,
+        path,
+        Ledger::new(probe, window)?,
+        cancel,
+        observer,
+        deadline,
+    )
+    .await
 }
 
 async fn scan_into(
@@ -551,16 +561,30 @@ pub(super) async fn check_join_clock(
     cancel: CancellationToken,
 ) -> Result<()> {
     let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
-    let observed = scan(engine, Path::new(&source.identity.path), &source.probe, cancel, &observer,
-        nw_domain::execution::CleanupLimits::default().operation, None).await?;
+    let observed = scan(
+        engine,
+        Path::new(&source.identity.path),
+        &source.probe,
+        cancel,
+        &observer,
+        nw_domain::execution::CleanupLimits::default().operation,
+        None,
+    )
+    .await?;
     for stream in streams {
         let accepted = observed.streams.get(&stream.index).is_some_and(|ledger| {
-            !ledger.irregular_clock && ledger.first.is_some_and(|(first, key)| {
-                first == Rational::ZERO && (stream.kind != nw_domain::mux::StreamKind::Video || key)
-            }) && ledger.last_end.is_some_and(|end| end <= duration)
+            !ledger.irregular_clock
+                && ledger.first.is_some_and(|(first, key)| {
+                    first == Rational::ZERO
+                        && (stream.kind != nw_domain::mux::StreamKind::Video || key)
+                })
+                && ledger.last_end.is_some_and(|end| end <= duration)
         });
         if !accepted {
-            return Err(DomainError::new("JOIN_INCOMPATIBLE", "Original copy segments require zero-based packet clocks, ordinary picture keyframes, and no packets beyond the reviewed boundary"));
+            return Err(DomainError::new(
+                "JOIN_INCOMPATIBLE",
+                "Original copy segments require zero-based packet clocks, ordinary picture keyframes, and no packets beyond the reviewed boundary",
+            ));
         }
     }
     Ok(())
@@ -582,24 +606,48 @@ pub(super) async fn verify_join(
         let mut ledger = Ledger::new(&source.probe, None)?;
         ledger.shift = offset;
         ledger.streams = expected;
-        expected = scan_into(engine, Path::new(&source.identity.path), ledger, cancel.clone(),
-            observer, deadline).await?.streams;
+        expected = scan_into(
+            engine,
+            Path::new(&source.identity.path),
+            ledger,
+            cancel.clone(),
+            observer,
+            deadline,
+        )
+        .await?
+        .streams;
         offset = offset.checked_add(duration)?;
     }
     let actual = scan(engine, path, observed, cancel, observer, deadline, None).await?;
     let mut packets = 0u64;
     for (source, output) in plan.resolution.streams.iter().zip(&observed.streams) {
-        let (left, right) = expected.get(&source.index).zip(actual.streams.get(&output.index))
+        let (left, right) = expected
+            .get(&source.index)
+            .zip(actual.streams.get(&output.index))
             .ok_or_else(|| invalid("Missing joined packet ledger"))?;
-        if left.packets != right.packets || left.bytes != right.bytes
+        if left.packets != right.packets
+            || left.bytes != right.bytes
             || left.hash.clone().finalize() != right.hash.clone().finalize()
         {
-            return Err(invalid("A joined stream differs from the reviewed ordered packet payloads or rebased clocks"));
+            return Err(invalid(
+                "A joined stream differs from the reviewed ordered packet payloads or rebased clocks",
+            ));
         }
-        verify_codec(&plan.source.probe, source.index, observed, output.index, "Original joined stream format")?;
-        packets = packets.checked_add(left.packets).ok_or_else(|| invalid("Joined packet count overflow"))?;
+        verify_codec(
+            &plan.source.probe,
+            source.index,
+            observed,
+            output.index,
+            "Original joined stream format",
+        )?;
+        packets = packets
+            .checked_add(left.packets)
+            .ok_or_else(|| invalid("Joined packet count overflow"))?;
     }
-    Ok(format!("Verified {packets} ordered original packets, rebased timestamps, codec parameters and exposed side data across {} joined segments.", join.following.len() + 1))
+    Ok(format!(
+        "Verified {packets} ordered original packets, rebased timestamps, codec parameters and exposed side data across {} joined segments.",
+        join.following.len() + 1
+    ))
 }
 
 pub(super) async fn pcm_frames(
@@ -611,15 +659,30 @@ pub(super) async fn pcm_frames(
     cancel: CancellationToken,
 ) -> Result<u32> {
     let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
-    let ledger = scan(engine, path, probe, cancel, &observer,
-        nw_domain::execution::CleanupLimits::default().operation, None).await?;
+    let ledger = scan(
+        engine,
+        path,
+        probe,
+        cancel,
+        &observer,
+        nw_domain::execution::CleanupLimits::default().operation,
+        None,
+    )
+    .await?;
     let frame_bytes = u64::from(channels) * 2;
-    let bytes = ledger.streams.get(&index).filter(|stream| stream.bytes > 0)
-        .ok_or_else(|| invalid("Source PCM has no observed sample bytes"))?.bytes;
+    let bytes = ledger
+        .streams
+        .get(&index)
+        .filter(|stream| stream.bytes > 0)
+        .ok_or_else(|| invalid("Source PCM has no observed sample bytes"))?
+        .bytes;
     if frame_bytes == 0 || bytes % frame_bytes != 0 {
-        return Err(invalid("Observed PCM bytes do not align with original sample frames"));
+        return Err(invalid(
+            "Observed PCM bytes do not align with original sample frames",
+        ));
     }
-    u32::try_from(bytes / frame_bytes).map_err(|_| invalid("PCM sample count exceeds the admitted range"))
+    u32::try_from(bytes / frame_bytes)
+        .map_err(|_| invalid("PCM sample count exceeds the admitted range"))
 }
 
 pub async fn verify(

@@ -1,7 +1,11 @@
 //! Sample edit controls share the ordinary source, review and Run workflow.
 use super::{Action, WizApp};
 use eframe::egui;
-use nw_domain::{audio_edit::{EditInput, Piece}, mux::StreamKind, records::Asset};
+use nw_domain::{
+    audio_edit::{EditInput, Piece},
+    mux::StreamKind,
+    records::Asset,
+};
 
 pub(super) struct AudioEditUi {
     stream: Option<u32>,
@@ -9,19 +13,31 @@ pub(super) struct AudioEditUi {
 }
 
 fn initial_piece(start_sample: u32) -> Piece {
-    Piece { start_sample, end_sample: start_sample.saturating_add(48000), reverse: false, tempo_hundredths: 100 }
+    Piece {
+        start_sample,
+        end_sample: start_sample.saturating_add(48000),
+        reverse: false,
+        tempo_hundredths: 100,
+    }
 }
 
 impl Default for AudioEditUi {
     fn default() -> Self {
-        Self { stream: None, pieces: vec![initial_piece(0)] }
+        Self {
+            stream: None,
+            pieces: vec![initial_piece(0)],
+        }
     }
 }
 
 impl WizApp {
     pub(super) fn audio_edit_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
-        let streams: Vec<_> = asset.probe.streams.iter()
-            .filter(|stream| stream.kind == StreamKind::Audio && stream.codec == "pcm_s16le").collect();
+        let streams: Vec<_> = asset
+            .probe
+            .streams
+            .iter()
+            .filter(|stream| stream.kind == StreamKind::Audio && stream.codec == "pcm_s16le")
+            .collect();
         if streams.is_empty() {
             return;
         }
@@ -72,9 +88,18 @@ impl WizApp {
             self.changed();
         }
         if review {
-            let request = EditInput { asset_id: asset.id.clone(), output: self.output.clone(),
-                stream_index: self.audio_edit.stream.expect("Selected audio track"), pieces: self.audio_edit.pieces.clone() };
-            self.query("audio.edit", serde_json::json!(request), Action::Plan(self.generation), ui.ctx());
+            let request = EditInput {
+                asset_id: asset.id.clone(),
+                output: self.output.clone(),
+                stream_index: self.audio_edit.stream.expect("Selected audio track"),
+                pieces: self.audio_edit.pieces.clone(),
+            };
+            self.query(
+                "audio.edit",
+                serde_json::json!(request),
+                Action::Plan(self.generation),
+                ui.ctx(),
+            );
         }
     }
 }

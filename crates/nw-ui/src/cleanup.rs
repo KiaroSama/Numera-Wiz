@@ -630,25 +630,58 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
-                if let Some(retime) = &plan.video_retime && let Ok(clock) = retime.output_clock() {
-                    ui.label(format!("{} pictures at {}% tempo{}", clock.len(), retime.tempo_hundredths,
-                        if retime.reverse { " · reverse order" } else { "" }));
-                    ui.label(format!("Presentation clock at 0 through {} ms", clock.last().copied().unwrap_or_default()));
+                if let Some(retime) = &plan.video_retime
+                    && let Ok(clock) = retime.output_clock()
+                {
+                    ui.label(format!(
+                        "{} pictures at {}% tempo{}",
+                        clock.len(),
+                        retime.tempo_hundredths,
+                        if retime.reverse {
+                            " · reverse order"
+                        } else {
+                            ""
+                        }
+                    ));
+                    ui.label(format!(
+                        "Presentation clock at 0 through {} ms",
+                        clock.last().copied().unwrap_or_default()
+                    ));
                 }
                 for segment in &plan.media_join {
-                    let label = self.assets.iter().find(|source| source.id == segment.asset_id)
-                        .map_or(segment.asset_id.as_str(), |source| source.display_name.as_str());
-                    ui.label(format!("{} · {} · offset {}/{} seconds", segment.position + 1, label,
-                        segment.offset.numerator(), segment.offset.denominator()));
+                    let label = self
+                        .assets
+                        .iter()
+                        .find(|source| source.id == segment.asset_id)
+                        .map_or(segment.asset_id.as_str(), |source| {
+                            source.display_name.as_str()
+                        });
+                    ui.label(format!(
+                        "{} · {} · offset {}/{} seconds",
+                        segment.position + 1,
+                        label,
+                        segment.offset.numerator(),
+                        segment.offset.denominator()
+                    ));
                 }
                 if let Some(edit) = &plan.audio_edit {
-                    ui.label(format!("Original PCM audio {} at {} Hz, {}", edit.stream_index, edit.sample_rate, edit.channel_layout));
+                    ui.label(format!(
+                        "Original PCM audio {} at {} Hz, {}",
+                        edit.stream_index, edit.sample_rate, edit.channel_layout
+                    ));
                     for piece in &edit.pieces {
-                        ui.label(format!("Samples {}–{} · {}% tempo{}", piece.start_sample, piece.end_sample,
-                            piece.tempo_hundredths, if piece.reverse { " · reverse" } else { "" }));
+                        ui.label(format!(
+                            "Samples {}–{} · {}% tempo{}",
+                            piece.start_sample,
+                            piece.end_sample,
+                            piece.tempo_hundredths,
+                            if piece.reverse { " · reverse" } else { "" }
+                        ));
                     }
                     if let Ok((nominal, tolerance)) = edit.output_samples() {
-                        ui.label(format!("Output {nominal} sample frames, permitted deviation {tolerance}"));
+                        ui.label(format!(
+                            "Output {nominal} sample frames, permitted deviation {tolerance}"
+                        ));
                     }
                 }
                 if let Some(burn) = &plan.subtitle_burn {

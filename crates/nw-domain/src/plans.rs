@@ -115,33 +115,50 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     }
     if let Some(retime) = &plan.video_retime {
         retime.output_clock()?;
-        if plan.resolution.action != crate::mux::CleanAction::Remux || plan.media_join.is_some()
-            || plan.subtitle_burn.is_some() || plan.audio_edit.is_some() || plan.packet_cut.is_some()
-            || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
-            || plan.resolution.preservation.chapters || plan.resolution.chapter_import.is_some()
+        if plan.resolution.action != crate::mux::CleanAction::Remux
+            || plan.media_join.is_some()
+            || plan.subtitle_burn.is_some()
+            || plan.audio_edit.is_some()
+            || plan.packet_cut.is_some()
+            || !plan.audio_normalization.is_empty()
+            || !plan.added_tracks.is_empty()
+            || plan.resolution.preservation.chapters
+            || plan.resolution.chapter_import.is_some()
             || plan.resolution.metadata_patch.is_some()
         {
-            return Err(invalid("Picture retiming requires its own original source and reviewed frame clock"));
+            return Err(invalid(
+                "Picture retiming requires its own original source and reviewed frame clock",
+            ));
         }
     }
     if let Some(join) = &plan.media_join {
         join.validate(&plan.source, &plan.output)?;
         if plan.resolution.action != crate::mux::CleanAction::Remux
-            || plan.subtitle_burn.is_some() || plan.audio_edit.is_some() || plan.packet_cut.is_some()
-            || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
-            || plan.resolution.preservation.chapters || plan.resolution.chapter_import.is_some()
+            || plan.subtitle_burn.is_some()
+            || plan.audio_edit.is_some()
+            || plan.packet_cut.is_some()
+            || !plan.audio_normalization.is_empty()
+            || !plan.added_tracks.is_empty()
+            || plan.resolution.preservation.chapters
+            || plan.resolution.chapter_import.is_some()
             || plan.resolution.metadata_patch.is_some()
         {
-            return Err(invalid("A packet join has its own ordered sources, track and chapter policy"));
+            return Err(invalid(
+                "A packet join has its own ordered sources, track and chapter policy",
+            ));
         }
     }
     if let Some(edit) = &plan.audio_edit {
         edit.output_samples()?;
         if plan.resolution.action != crate::mux::CleanAction::Remux
-            || plan.packet_cut.is_some() || plan.subtitle_burn.is_some()
-            || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
+            || plan.packet_cut.is_some()
+            || plan.subtitle_burn.is_some()
+            || !plan.audio_normalization.is_empty()
+            || !plan.added_tracks.is_empty()
         {
-            return Err(invalid("Sample-domain edits require one original source and one audio output"));
+            return Err(invalid(
+                "Sample-domain edits require one original source and one audio output",
+            ));
         }
     }
     if let Some(burn) = &plan.subtitle_burn {
@@ -254,9 +271,15 @@ fn digest_value(mut value: Value) -> Result<String> {
                 .ok_or_else(|| invalid("External subtitle source must be an object"))?,
         );
     }
-    if let Some(segments) = object.get_mut("media_join").and_then(|join| join.get_mut("following")).and_then(Value::as_array_mut) {
+    if let Some(segments) = object
+        .get_mut("media_join")
+        .and_then(|join| join.get_mut("following"))
+        .and_then(Value::as_array_mut)
+    {
         for segment in segments {
-            let source = segment.get_mut("input").and_then(Value::as_object_mut)
+            let source = segment
+                .get_mut("input")
+                .and_then(Value::as_object_mut)
                 .ok_or_else(|| invalid("Joined source must be an object"))?;
             semantic_source(source);
         }

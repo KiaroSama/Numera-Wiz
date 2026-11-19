@@ -475,7 +475,13 @@ impl Engine {
         };
         originals.extend(original);
         let font = font_dir.join(FONT);
-        originals.push(stage_dependency(&burn.font, &burn.font_object, &font, &cancel, DeadlinePolicy::Finite { seconds: 30 })?);
+        originals.push(stage_dependency(
+            &burn.font,
+            &burn.font_object,
+            &font,
+            &cancel,
+            DeadlinePolicy::Finite { seconds: 30 },
+        )?);
         let filter = format!(
             "{prefix}subtitles=filename={}:fontsdir={}:force_style={}:wrap_unicode=1",
             escape_option(&files::path_text(&output)?),

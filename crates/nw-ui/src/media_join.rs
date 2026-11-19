@@ -15,7 +15,12 @@ pub(super) struct JoinUi {
 
 impl WizApp {
     pub(super) fn media_join_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
-        if !asset.probe.format.split(',').any(|format| format == "matroska") {
+        if !asset
+            .probe
+            .format
+            .split(',')
+            .any(|format| format == "matroska")
+        {
             return;
         }
         let idle = self.request_idle();
@@ -55,13 +60,28 @@ impl WizApp {
         }
         if review {
             let request = JoinInput {
-                inputs_in_order: std::iter::once(asset.id.clone()).chain(self.media_join.following.iter().cloned()).collect(),
+                inputs_in_order: std::iter::once(asset.id.clone())
+                    .chain(self.media_join.following.iter().cloned())
+                    .collect(),
                 output: self.output.clone(),
-                audio: if self.media_join.drop_audio { Audio::Drop } else { Audio::CopyAll },
-                metadata: if self.media_join.strip_metadata { Metadata::Strip } else { Metadata::FirstInput },
+                audio: if self.media_join.drop_audio {
+                    Audio::Drop
+                } else {
+                    Audio::CopyAll
+                },
+                metadata: if self.media_join.strip_metadata {
+                    Metadata::Strip
+                } else {
+                    Metadata::FirstInput
+                },
                 strategy: Strategy::Copy,
             };
-            self.query("media.join", serde_json::json!(request), Action::Plan(self.generation), ui.ctx());
+            self.query(
+                "media.join",
+                serde_json::json!(request),
+                Action::Plan(self.generation),
+                ui.ctx(),
+            );
         }
     }
 }

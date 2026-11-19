@@ -142,7 +142,11 @@ impl PlanReview {
             packet_cut: plan.packet_cut,
             subtitle_burn: None,
             media_join: Vec::new(),
-            video_retime: plan.video_retime.as_ref().filter(|_| source_visible).cloned(),
+            video_retime: plan
+                .video_retime
+                .as_ref()
+                .filter(|_| source_visible)
+                .cloned(),
             audio_edit: plan.audio_edit.as_ref().filter(|_| source_visible).cloned(),
             audio_normalization: plan.audio_normalization.clone(),
             added_tracks: Vec::new(),

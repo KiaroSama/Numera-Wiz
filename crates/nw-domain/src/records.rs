@@ -100,11 +100,19 @@ pub struct Plan {
 }
 impl Plan {
     pub fn external_sources(&self) -> impl Iterator<Item = &Asset> {
-        self.added_tracks.iter().map(|input| &input.source).chain(
-            self.subtitle_burn
-                .as_ref()
-                .and_then(|burn| burn.subtitle.external()),
-        ).chain(self.media_join.iter().flat_map(|join| join.following.iter().map(|segment| &segment.input)))
+        self.added_tracks
+            .iter()
+            .map(|input| &input.source)
+            .chain(
+                self.subtitle_burn
+                    .as_ref()
+                    .and_then(|burn| burn.subtitle.external()),
+            )
+            .chain(
+                self.media_join
+                    .iter()
+                    .flat_map(|join| join.following.iter().map(|segment| &segment.input)),
+            )
     }
 }
 

@@ -1,9 +1,5 @@
 //! Ordered, explicit media concatenation with reviewed packet-clock boundaries.
-use crate::{
-    DomainError, Result, packet_cut,
-    records::Asset,
-    time::Rational,
-};
+use crate::{DomainError, Result, packet_cut, records::Asset, time::Rational};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -76,7 +72,9 @@ impl JoinInput {
         if !(2..=MAX_INPUTS).contains(&count)
             || self.inputs_in_order.iter().collect::<BTreeSet<_>>().len() != count
         {
-            return Err(invalid("Choose two to eight different registered assets in playback order"));
+            return Err(invalid(
+                "Choose two to eight different registered assets in playback order",
+            ));
         }
         Ok(())
     }
@@ -84,8 +82,11 @@ impl JoinInput {
 
 impl Join {
     pub fn all<'a>(&'a self, primary: &'a Asset) -> impl Iterator<Item = (&'a Asset, Rational)> {
-        std::iter::once((primary, self.primary_duration))
-            .chain(self.following.iter().map(|segment| (&segment.input, segment.duration)))
+        std::iter::once((primary, self.primary_duration)).chain(
+            self.following
+                .iter()
+                .map(|segment| (&segment.input, segment.duration)),
+        )
     }
 
     pub fn validate(&self, primary: &Asset, output: &str) -> Result<()> {
@@ -98,21 +99,38 @@ impl Join {
         let mut bytes = 0u64;
         let mut duration_sum = Rational::ZERO;
         for (asset, duration) in self.all(primary) {
-            let object = asset.source_object.as_ref().ok_or_else(|| invalid("Join input has no registered file identity"))?;
-            if !ids.insert(&asset.id) || !paths.insert(&asset.identity.path)
-                || native_ids.contains(&object) || asset.identity.path == output || duration <= Rational::ZERO
+            let object = asset
+                .source_object
+                .as_ref()
+                .ok_or_else(|| invalid("Join input has no registered file identity"))?;
+            if !ids.insert(&asset.id)
+                || !paths.insert(&asset.identity.path)
+                || native_ids.contains(&object)
+                || asset.identity.path == output
+                || duration <= Rational::ZERO
             {
-                return Err(invalid("Join inputs need distinct file identities, positive durations and a new destination"));
+                return Err(invalid(
+                    "Join inputs need distinct file identities, positive durations and a new destination",
+                ));
             }
             native_ids.push(object);
-            let size = asset.identity.bytes.parse::<u64>().map_err(|_| invalid("Invalid joined source size"))?;
-            bytes = bytes.checked_add(size).ok_or_else(|| invalid("Joined size overflow"))?;
+            let size = asset
+                .identity
+                .bytes
+                .parse::<u64>()
+                .map_err(|_| invalid("Invalid joined source size"))?;
+            bytes = bytes
+                .checked_add(size)
+                .ok_or_else(|| invalid("Joined size overflow"))?;
             packet_cut::ffmpeg_time(duration)?;
             duration_sum = duration_sum.checked_add(duration)?;
         }
         packet_cut::ffmpeg_time(duration_sum)?;
         if bytes > MAX_INPUT_BYTES {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Join staging is limited to 8 GiB across all inputs"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Join staging is limited to 8 GiB across all inputs",
+            ));
         }
         Ok(())
     }

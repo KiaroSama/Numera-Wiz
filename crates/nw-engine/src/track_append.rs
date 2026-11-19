@@ -192,8 +192,12 @@ pub(super) fn stage_dependency(
 ) -> Result<files::SourceStamp> {
     let parent = output.parent().expect("Owned staging directory");
     let temp = tempfile::NamedTempFile::new_in(parent).map_err(io_error)?;
-    let (temp, _, stamp) = files::copy_into_staging_observed(identity, object, temp, cancel, deadline, &mut |_| Ok(()))?;
-    temp.persist_noclobber(output).map_err(|error| io_error(error.error))?;
+    let (temp, _, stamp) =
+        files::copy_into_staging_observed(identity, object, temp, cancel, deadline, &mut |_| {
+            Ok(())
+        })?;
+    temp.persist_noclobber(output)
+        .map_err(|error| io_error(error.error))?;
     stamp.revalidate()?;
     Ok(stamp)
 }

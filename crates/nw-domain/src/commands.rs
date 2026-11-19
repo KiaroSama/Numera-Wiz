@@ -240,8 +240,8 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
         ),
-        "media.retime" | "media.join" | "audio.edit" | "audio.normalize" | "subtitles.burn" | "media.cut" | "streams.add" | "streams.replace"
-        | "streams.extract" | "jobs.plan" => {
+        "media.retime" | "media.join" | "audio.edit" | "audio.normalize" | "subtitles.burn"
+        | "media.cut" | "streams.add" | "streams.replace" | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
         "streams.extract.batch_plan" | "media.split_plan" => Some(

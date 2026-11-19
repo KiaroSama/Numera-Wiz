@@ -2,7 +2,9 @@
 use super::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
-    mux::StreamKind, records::Asset, time::{Rational, TimeRange},
+    mux::StreamKind,
+    records::Asset,
+    time::{Rational, TimeRange},
     video_retime::{AudioPolicy, RetimeInput},
 };
 
@@ -16,16 +18,35 @@ pub(super) struct RetimeUi {
 
 impl Default for RetimeUi {
     fn default() -> Self {
-        Self { video: None, from_ms: 0, to_ms: 1000, tempo: 100, reverse: false }
+        Self {
+            video: None,
+            from_ms: 0,
+            to_ms: 1000,
+            tempo: 100,
+            reverse: false,
+        }
     }
 }
 
 impl WizApp {
     pub(super) fn video_retime_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
-        let videos: Vec<_> = asset.probe.streams.iter().filter(|stream| {
-            stream.kind == StreamKind::Video && stream.codec == "ffv1" && !stream.attached_picture()
-        }).collect();
-        if videos.is_empty() || !asset.probe.format.split(',').any(|format| format == "matroska") {
+        let videos: Vec<_> = asset
+            .probe
+            .streams
+            .iter()
+            .filter(|stream| {
+                stream.kind == StreamKind::Video
+                    && stream.codec == "ffv1"
+                    && !stream.attached_picture()
+            })
+            .collect();
+        if videos.is_empty()
+            || !asset
+                .probe
+                .format
+                .split(',')
+                .any(|format| format == "matroska")
+        {
             return;
         }
         let idle = self.request_idle();
@@ -58,13 +79,29 @@ impl WizApp {
         }
         if review {
             let range = TimeRange {
-                start: Rational::new(i64::from(self.video_retime.from_ms),1000).expect("Bounded millisecond field"),
-                end: Rational::new(i64::from(self.video_retime.to_ms),1000).expect("Bounded millisecond field"),
+                start: Rational::new(i64::from(self.video_retime.from_ms), 1000)
+                    .expect("Bounded millisecond field"),
+                end: Rational::new(i64::from(self.video_retime.to_ms), 1000)
+                    .expect("Bounded millisecond field"),
             };
-            let request = RetimeInput { asset_id: asset.id.clone(), output: self.output.clone(),
-                video_stream: self.video_retime.video.expect("Registered picture selected"),
-                range, tempo_hundredths: self.video_retime.tempo, reverse: self.video_retime.reverse, audio: AudioPolicy::Drop };
-            self.query("media.retime", serde_json::json!(request), Action::Plan(self.generation), ui.ctx());
+            let request = RetimeInput {
+                asset_id: asset.id.clone(),
+                output: self.output.clone(),
+                video_stream: self
+                    .video_retime
+                    .video
+                    .expect("Registered picture selected"),
+                range,
+                tempo_hundredths: self.video_retime.tempo,
+                reverse: self.video_retime.reverse,
+                audio: AudioPolicy::Drop,
+            };
+            self.query(
+                "media.retime",
+                serde_json::json!(request),
+                Action::Plan(self.generation),
+                ui.ctx(),
+            );
         }
     }
 }

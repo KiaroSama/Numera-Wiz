@@ -578,11 +578,18 @@ impl Service {
             let mut offset = nw_domain::time::Rational::ZERO;
             for (position, (source, duration)) in join.all(&plan.source).enumerate() {
                 if self.object(context, &source.id, &source.creator).is_ok()
-                    && self.path(context, Path::new(&source.identity.path), false).is_ok()
+                    && self
+                        .path(context, Path::new(&source.identity.path), false)
+                        .is_ok()
                 {
-                    review.media_join.push(nw_domain::media_join::SegmentReview {
-                        position, asset_id: source.id.clone(), duration, offset,
-                    });
+                    review
+                        .media_join
+                        .push(nw_domain::media_join::SegmentReview {
+                            position,
+                            asset_id: source.id.clone(),
+                            duration,
+                            offset,
+                        });
                 }
                 offset = offset.checked_add(duration)?;
             }
@@ -1869,35 +1876,73 @@ impl Service {
             }
             "audio.edit" => {
                 let input: nw_domain::audio_edit::EditInput = commands::parse(params)?;
-                let bound: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                let bound: Asset = self
+                    .store
+                    .get(&named("asset", &input.asset_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &bound.id, &bound.creator)?;
                 self.path(&context, Path::new(&bound.identity.path), false)?;
                 self.path(&context, Path::new(&input.output), true)?;
-                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-                    DomainError::new("RESOURCE_LIMIT", "Sample edit review capacity is full")
-                })?;
+                let _permit = self
+                    .batch_preflights
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| {
+                        DomainError::new("RESOURCE_LIMIT", "Sample edit review capacity is full")
+                    })?;
                 drop(guard);
                 let (stamp, edit) = runtime.block_on(self.engine()?.inspect_audio_edit(
-                    &bound, input.stream_index, input.pieces, cancellation.clone(),
+                    &bound,
+                    input.stream_index,
+                    input.pieces,
+                    cancellation.clone(),
                 ))?;
                 let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
                 if cancellation.is_cancelled() {
-                    return Err(DomainError::new("CANCELLED", "Sample edit review was cancelled"));
+                    return Err(DomainError::new(
+                        "CANCELLED",
+                        "Sample edit review was cancelled",
+                    ));
                 }
-                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("audio.edit")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Sample edit review access changed during inspection"));
+                if self
+                    .policy(&context)?
+                    .is_some_and(|profile| !profile.allows_command("audio.edit"))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Sample edit review access changed during inspection",
+                    ));
                 }
                 stamp.revalidate()?;
-                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output, Default::default(),
+                let plan = self.prepare_native_copy(
+                    &context,
+                    &input.asset_id,
+                    &input.output,
+                    Default::default(),
                     |engine, current, output| {
-                        if current.identity != bound.identity || current.source_object != bound.source_object {
-                            return Err(DomainError::new("SOURCE_CHANGED", "Original audio asset changed during sample inspection"));
+                        if current.identity != bound.identity
+                            || current.source_object != bound.source_object
+                        {
+                            return Err(DomainError::new(
+                                "SOURCE_CHANGED",
+                                "Original audio asset changed during sample inspection",
+                            ));
                         }
-                        engine.audio_edit_plan_at(current, output, edit, &context.principal, self.clock.now()?)
-                    })?;
+                        engine.audio_edit_plan_at(
+                            current,
+                            output,
+                            edit,
+                            &context.principal,
+                            self.clock.now()?,
+                        )
+                    },
+                )?;
                 stamp.revalidate()?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
@@ -1981,8 +2026,18 @@ impl Service {
             }
             "media.retime" => {
                 let input: nw_domain::video_retime::RetimeInput = commands::parse(params)?;
-                let plan = self.prepare_picture_retime(&context, input, "media.retime", &cancellation, &runtime)?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let plan = self.prepare_picture_retime(
+                    &context,
+                    input,
+                    "media.retime",
+                    &cancellation,
+                    &runtime,
+                )?;
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
@@ -1991,34 +2046,72 @@ impl Service {
             "media.join" => {
                 let input: nw_domain::media_join::JoinInput = commands::parse(params)?;
                 input.validate()?;
-                let output = files::path_text(&self.path(&context, Path::new(&input.output), true)?)?;
+                let output =
+                    files::path_text(&self.path(&context, Path::new(&input.output), true)?)?;
                 let inputs = self.registered_join_inputs(&context, &input.inputs_in_order)?;
-                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-                    DomainError::new("RESOURCE_LIMIT", "Join review capacity is full")
-                })?;
+                let _permit = self
+                    .batch_preflights
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| {
+                        DomainError::new("RESOURCE_LIMIT", "Join review capacity is full")
+                    })?;
                 drop(guard);
-                let (primary, join, stamps) = runtime.block_on(self.engine()?.inspect_media_join(
-                    inputs, &output, input.audio, input.metadata, cancellation.clone(),
-                ))?;
+                let (primary, join, stamps) =
+                    runtime.block_on(self.engine()?.inspect_media_join(
+                        inputs,
+                        &output,
+                        input.audio,
+                        input.metadata,
+                        cancellation.clone(),
+                    ))?;
                 let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
                 if cancellation.is_cancelled() {
                     return Err(DomainError::new("CANCELLED", "Join review was cancelled"));
                 }
-                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("media.join")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Join command access changed during inspection"));
+                if self
+                    .policy(&context)?
+                    .is_some_and(|profile| !profile.allows_command("media.join"))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Join command access changed during inspection",
+                    ));
                 }
                 let current = self.registered_join_inputs(&context, &input.inputs_in_order)?;
                 for ((reviewed, _), fresh) in join.all(&primary).zip(&current) {
-                    if reviewed.identity != fresh.identity || reviewed.source_object != fresh.source_object {
-                        return Err(DomainError::new("SOURCE_CHANGED", "A registered join input changed during inspection"));
+                    if reviewed.identity != fresh.identity
+                        || reviewed.source_object != fresh.source_object
+                    {
+                        return Err(DomainError::new(
+                            "SOURCE_CHANGED",
+                            "A registered join input changed during inspection",
+                        ));
                     }
                 }
                 for stamp in &stamps {
                     stamp.revalidate()?;
                 }
-                let plan = self.prepare_native_copy(&context, &primary.id, &output, Default::default(),
-                    |engine, first, path| engine.media_join_plan_at(first, path, join, &context.principal, self.clock.now()?))?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let plan = self.prepare_native_copy(
+                    &context,
+                    &primary.id,
+                    &output,
+                    Default::default(),
+                    |engine, first, path| {
+                        engine.media_join_plan_at(
+                            first,
+                            path,
+                            join,
+                            &context.principal,
+                            self.clock.now()?,
+                        )
+                    },
+                )?;
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
@@ -2107,29 +2200,43 @@ impl Service {
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params.clone())?;
                 let plan = if input.job_document.selects_picture_retime() {
-                    let asset: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                    let asset: Asset = self
+                        .store
+                        .get(&named("asset", &input.asset_id)?)?
                         .ok_or_else(DomainError::object_not_found)?;
                     self.object(&context, &asset.id, &asset.creator)?;
-                    let declared = self.path(&context, input.job_document.imported_source()?, false)?;
+                    let declared =
+                        self.path(&context, input.job_document.imported_source()?, false)?;
                     if declared != Path::new(&asset.identity.path) {
-                        return Err(DomainError::new("JOB_SOURCE_MISMATCH", "The job must use its registered original input path")
-                            .field("job_document.settings.input_path"));
+                        return Err(DomainError::new(
+                            "JOB_SOURCE_MISMATCH",
+                            "The job must use its registered original input path",
+                        )
+                        .field("job_document.settings.input_path"));
                     }
                     self.prepare_picture_retime(
-                        &context, input.job_document.picture_retime(&asset)?, "jobs.plan", &cancellation, &runtime,
+                        &context,
+                        input.job_document.picture_retime(&asset)?,
+                        "jobs.plan",
+                        &cancellation,
+                        &runtime,
                     )?
                 } else {
                     self.prepare_copy_review(&context, "jobs.plan", params, now)?
                 };
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
                 return Ok(response);
             }
             "streams.clean" | "streams.add" | "streams.replace" | "streams.extract"
-            | "subtitles.burn" | "chapters.remove" | "chapters.import"
-            | "disposition.patch" | "metadata.patch" => {
+            | "subtitles.burn" | "chapters.remove" | "chapters.import" | "disposition.patch"
+            | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
@@ -2991,52 +3098,92 @@ impl Service {
     }
 
     fn prepare_picture_retime(
-        &self, context: &Context, input: nw_domain::video_retime::RetimeInput, command: &str,
-        cancel: &CancellationToken, runtime: &tokio::runtime::Handle,
+        &self,
+        context: &Context,
+        input: nw_domain::video_retime::RetimeInput,
+        command: &str,
+        cancel: &CancellationToken,
+        runtime: &tokio::runtime::Handle,
     ) -> Result<Plan> {
         let access = || -> Result<()> {
             if self.policy(context)?.is_some_and(|profile| {
                 !profile.allows_command(command) || !profile.allows_command("media.retime")
             }) {
-                return Err(DomainError::new("PERMISSION_DENIED", "Picture-retime review requires current media.retime access"));
+                return Err(DomainError::new(
+                    "PERMISSION_DENIED",
+                    "Picture-retime review requires current media.retime access",
+                ));
             }
             Ok(())
         };
         access()?;
-        let frozen: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+        let frozen: Asset = self
+            .store
+            .get(&named("asset", &input.asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
         self.object(context, &frozen.id, &frozen.creator)?;
         self.path(context, Path::new(&frozen.identity.path), false)?;
         self.path(context, Path::new(&input.output), true)?;
-        let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-            DomainError::new("RESOURCE_LIMIT", "Picture retime review capacity is full")
-        })?;
-        let (stamp, retime) = runtime.block_on(self.engine()?.inspect_video_retime(&frozen, &input, cancel.clone()))?;
+        let _permit = self
+            .batch_preflights
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                DomainError::new("RESOURCE_LIMIT", "Picture retime review capacity is full")
+            })?;
+        let (stamp, retime) = runtime.block_on(self.engine()?.inspect_video_retime(
+            &frozen,
+            &input,
+            cancel.clone(),
+        ))?;
         let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Picture retime review cancelled"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Picture retime review cancelled",
+            ));
         }
         access()?;
         stamp.revalidate()?;
-        let plan = self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
+        let plan = self.prepare_native_copy(
+            context,
+            &input.asset_id,
+            &input.output,
+            Default::default(),
             |engine, current, output| {
-                if current.identity != frozen.identity || current.source_object != frozen.source_object {
-                    return Err(DomainError::new("SOURCE_CHANGED", "Original retime input changed during observation"));
+                if current.identity != frozen.identity
+                    || current.source_object != frozen.source_object
+                {
+                    return Err(DomainError::new(
+                        "SOURCE_CHANGED",
+                        "Original retime input changed during observation",
+                    ));
                 }
-                engine.video_retime_plan_at(current, output, retime, &context.principal, self.clock.now()?)
-            })?;
+                engine.video_retime_plan_at(
+                    current,
+                    output,
+                    retime,
+                    &context.principal,
+                    self.clock.now()?,
+                )
+            },
+        )?;
         stamp.revalidate()?;
         Ok(plan)
     }
 
     fn registered_join_inputs(&self, context: &Context, ids: &[String]) -> Result<Vec<Asset>> {
-        ids.iter().map(|id| {
-            let source: Asset = self.store.get(&named("asset", id)?)?
-                .ok_or_else(DomainError::object_not_found)?;
-            self.object(context, &source.id, &source.creator)?;
-            self.path(context, Path::new(&source.identity.path), false)?;
-            Ok(source)
-        }).collect()
+        ids.iter()
+            .map(|id| {
+                let source: Asset = self
+                    .store
+                    .get(&named("asset", id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(context, &source.id, &source.creator)?;
+                self.path(context, Path::new(&source.identity.path), false)?;
+                Ok(source)
+            })
+            .collect()
     }
 
     fn prepare_native_copy(

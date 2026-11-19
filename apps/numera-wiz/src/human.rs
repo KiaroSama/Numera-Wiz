@@ -653,7 +653,8 @@ pub fn prepare(command: Command) -> Result<Request> {
             query("audio.edit", serde_json::to_value(input)?)
         }
         Command::Media(Media::Retime { file }) => {
-            let mut input: nw_domain::video_retime::RetimeInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::video_retime::RetimeInput =
+                commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("media.retime", serde_json::to_value(input)?)
         }

@@ -41,20 +41,27 @@ impl Edit {
     pub fn output_samples(&self) -> Result<(u64, u64)> {
         if !(1..=16).contains(&self.pieces.len())
             || !(8000..=192000).contains(&self.sample_rate)
-            || !matches!((self.channels, self.channel_layout.as_str()),
-                (1, "mono") | (2, "stereo") | (6, "5.1" | "5.1(side)"))
+            || !matches!(
+                (self.channels, self.channel_layout.as_str()),
+                (1, "mono") | (2, "stereo") | (6, "5.1" | "5.1(side)")
+            )
         {
-            return Err(invalid("Select one to sixteen pieces and an admitted PCM channel layout and sample rate"));
+            return Err(invalid(
+                "Select one to sixteen pieces and an admitted PCM channel layout and sample rate",
+            ));
         }
         let mut nominal = 0u64;
         let mut tolerance = 0u64;
         let mut reverse_bytes = 0u64;
         let frame_bytes = u64::from(self.channels) * 2;
         for piece in &self.pieces {
-            if piece.start_sample >= piece.end_sample || piece.end_sample > self.source_samples
+            if piece.start_sample >= piece.end_sample
+                || piece.end_sample > self.source_samples
                 || !(10..=800).contains(&piece.tempo_hundredths)
             {
-                return Err(invalid("Each positive sample interval must fit the verified source and use a tempo from 0.10× to 8×"));
+                return Err(invalid(
+                    "Each positive sample interval must fit the verified source and use a tempo from 0.10× to 8×",
+                ));
             }
             let length = u64::from(piece.end_sample - piece.start_sample);
             let tempo = u64::from(piece.tempo_hundredths);
@@ -64,16 +71,22 @@ impl Edit {
             }
             if tempo != 100 {
                 if length < u64::from(self.sample_rate) {
-                    return Err(invalid("Tempo changes require at least one second of original audio per piece"));
+                    return Err(invalid(
+                        "Tempo changes require at least one second of original audio per piece",
+                    ));
                 }
                 // FFmpeg's overlap-add filter window can change the exact sample
                 // count. Review and verify a bounded deviation rather than pad silently.
-                tolerance += u64::from(self.sample_rate) / 20
-                    + length * 2 / tempo;
+                tolerance += u64::from(self.sample_rate) / 20 + length * 2 / tempo;
             }
         }
-        if reverse_bytes > MAX_REVERSE_BYTES || nominal.saturating_add(tolerance) * frame_bytes > MAX_OUTPUT_BYTES {
-            return Err(DomainError::new("RESOURCE_LIMIT", "The selected audio exceeds the reverse memory or output size budget"));
+        if reverse_bytes > MAX_REVERSE_BYTES
+            || nominal.saturating_add(tolerance) * frame_bytes > MAX_OUTPUT_BYTES
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "The selected audio exceeds the reverse memory or output size budget",
+            ));
         }
         Ok((nominal, tolerance))
     }

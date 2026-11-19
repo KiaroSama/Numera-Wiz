@@ -481,7 +481,10 @@ impl Engine {
             OutputProfile::Matroska
         };
         if profile == OutputProfile::WavePcm && plan.audio_edit.is_none() {
-            return Err(DomainError::new("INVALID_PLAN", "WAVE output requires a reviewed PCM sample edit"));
+            return Err(DomainError::new(
+                "INVALID_PLAN",
+                "WAVE output requires a reviewed PCM sample edit",
+            ));
         }
         let expected_scope = if plan.video_retime.is_some() {
             video_retime::SCOPE
@@ -708,7 +711,14 @@ impl Engine {
         )
         .await?;
         let join = if plan.media_join.is_some() {
-            Some(media_join::stage(plan, staging.path().parent().expect("Owned staging directory"), cancel.clone()).await?)
+            Some(
+                media_join::stage(
+                    plan,
+                    staging.path().parent().expect("Owned staging directory"),
+                    cancel.clone(),
+                )
+                .await?,
+            )
         } else {
             None
         };
@@ -744,7 +754,11 @@ impl Engine {
             .iter()
             .map(|v| match v.as_str() {
                 "@owned_staging@" => staging_name.clone(),
-                media_join::SIDECAR => join.as_ref().expect("Validated packet join").manifest().to_owned(),
+                media_join::SIDECAR => join
+                    .as_ref()
+                    .expect("Validated packet join")
+                    .manifest()
+                    .to_owned(),
                 subtitle_burn::FILTER => caption
                     .as_ref()
                     .expect("Validated caption invocation")
@@ -764,7 +778,7 @@ impl Engine {
             for input in &additions {
                 input.revalidate()?;
             }
-	        if let Some(join) = &join {
+            if let Some(join) = &join {
                 join.revalidate()?;
             }
             if let Some(caption) = &caption {
@@ -812,25 +826,35 @@ impl Engine {
             .await?;
         verify_structure(plan, &observed)?;
         let mut verification = if plan.video_retime.is_some() {
-            self.verify_video_retime(plan, staging.path(), &observed, cancel.clone()).await?
+            self.verify_video_retime(plan, staging.path(), &observed, cancel.clone())
+                .await?
         } else if plan.media_join.is_some() {
-            preservation::verify_join(self, plan, staging.path(), &observed, cancel.clone(), &observer).await?
+            preservation::verify_join(
+                self,
+                plan,
+                staging.path(),
+                &observed,
+                cancel.clone(),
+                &observer,
+            )
+            .await?
         } else if plan.audio_edit.is_some() {
-            self.verify_audio_edit(plan, staging.path(), &observed, cancel.clone()).await?
+            self.verify_audio_edit(plan, staging.path(), &observed, cancel.clone())
+                .await?
         } else {
             preservation::verify(
-            self,
-            plan,
-            staging.path(),
-            &observed,
-            &additions
-                .iter()
-                .map(track_append::StagedInput::path)
-                .collect::<Vec<_>>(),
-            cancel.clone(),
-            &observer,
-        )
-        .await?
+                self,
+                plan,
+                staging.path(),
+                &observed,
+                &additions
+                    .iter()
+                    .map(track_append::StagedInput::path)
+                    .collect::<Vec<_>>(),
+                cancel.clone(),
+                &observer,
+            )
+            .await?
         };
         for input in &additions {
             input.revalidate()?;
@@ -889,7 +913,10 @@ impl Engine {
                             .into_iter()
                             .flat_map(subtitle_burn::StagedCaption::into_sources),
                     )
-                    .chain(join.into_iter().flat_map(media_join::StagedJoin::into_originals))
+                    .chain(
+                        join.into_iter()
+                            .flat_map(media_join::StagedJoin::into_originals),
+                    )
                     .collect(),
             },
             plan,

@@ -346,63 +346,145 @@ async fn caption_burn(parent: &Path) -> Value {
     }
     let black = directory.join("punctuation-reference.mkv");
     let generate = [
-        "-v", "error", "-f", "lavfi", "-i", "color=black:s=320x160:r=8:d=2",
-        "-c:v", "ffv1", black.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &generate, Duration::from_secs(30),
-        4096, CancellationToken::new()).await.unwrap();
-    let picture = accepted(&cli, &scope, "register-punctuation-reference", "assets.register", json!({"path":black})).await;
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=black:s=320x160:r=8:d=2",
+        "-c:v",
+        "ffv1",
+        black.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &generate,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let picture = accepted(
+        &cli,
+        &scope,
+        "register-punctuation-reference",
+        "assets.register",
+        json!({"path":black}),
+    )
+    .await;
     for (language, caption, mark) in [
         ("fa", "سلام این آزمون است؟", '\u{200f}'),
         ("he", "שלום זה מבחן?", '\u{200f}'),
         ("en", "Hello, this works?", '\u{200e}'),
     ] {
         let sidecar = directory.join(format!("reading-order-{language}.srt"));
-        let content = format!("1\n00:00:00,000 --> 00:00:00,950\n{caption}\n\n2\n00:00:01,000 --> 00:00:01,950\n{mark}{caption}{mark}\n");
+        let content = format!(
+            "1\n00:00:00,000 --> 00:00:00,950\n{caption}\n\n2\n00:00:01,000 --> 00:00:01,950\n{mark}{caption}{mark}\n"
+        );
         std::fs::write(&sidecar, content).unwrap();
-        let captions = accepted(&cli, &scope, &format!("register-punctuation-{language}"),
-            "assets.register", json!({"path":sidecar})).await;
+        let captions = accepted(
+            &cli,
+            &scope,
+            &format!("register-punctuation-{language}"),
+            "assets.register",
+            json!({"path":sidecar}),
+        )
+        .await;
         let output = directory.join(format!("reading-order-{language}.mkv"));
         let params = json!({"asset_id":picture["id"],"video_stream":0,"output":output,
             "subtitle":{"kind":"external","asset_id":captions["id"]},"audio":{"kind":"none"},
             "color":{"kind":"preserve_sdr"},"quality":"lossless_ffv1"});
         let plan = cli.query("subtitles.burn", params).await;
-        let job = accepted(&cli, &scope, &format!("render-punctuation-{language}"), "jobs.submit",
-            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        let job = accepted(
+            &cli,
+            &scope,
+            &format!("render-punctuation-{language}"),
+            "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        )
+        .await;
         succeeded(&cli, &job).await;
         let plain = caption_frame(&components, &output, "0.5").await;
         let explicit = caption_frame(&components, &output, "1.5").await;
         let black_frame = caption_frame(&components, &black, "0.5").await;
-        assert!(plain != black_frame && plain == explicit, "Punctuation placement differs in {language}");
+        assert!(
+            plain != black_frame && plain == explicit,
+            "Punctuation placement differs in {language}"
+        );
         cases.push(json!({"language":language,"reading_order":"whole_event","matched_direction_mark_reference":true}));
     }
     json!(cases)
 }
 
 async fn multirange_audio_edits(parent: &Path) -> Value {
-    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
-        .expect("Hosted sample edits need the authenticated FFmpeg tools"));
+    let components = std::path::PathBuf::from(
+        std::env::var_os("NW_CAPTION_COMPONENTS")
+            .expect("Hosted sample edits need the authenticated FFmpeg tools"),
+    );
     let directory = parent.join("sample-domain-edit");
     std::fs::create_dir(&directory).unwrap();
     let raw_path = directory.join("numbered-samples.raw");
     let original = directory.join("sample-order-5.1.wav");
     let output = directory.join("ترتیب-ویرایش.wav");
-    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
-    let samples: Vec<u8> = (0..15000).flat_map(|frame| {
-        (0..6).flat_map(move |channel| {
-            i16::try_from((frame * 37 + 4096 * channel) % 30000 - 15000).unwrap().to_le_bytes()
+    let cli = Cli {
+        data: directory.join("state"),
+        components: components.clone(),
+        request_timeout: Duration::from_secs(60),
+    };
+    let samples: Vec<u8> = (0..15000)
+        .flat_map(|frame| {
+            (0..6).flat_map(move |channel| {
+                i16::try_from((frame * 37 + 4096 * channel) % 30000 - 15000)
+                    .unwrap()
+                    .to_le_bytes()
+            })
         })
-    }).collect();
+        .collect();
     std::fs::write(&raw_path, &samples).unwrap();
     let args = [
-        "-v", "error", "-f", "s16le", "-ar", "48000", "-ch_layout", "5.1",
-        "-i", raw_path.to_str().unwrap(), "-c:a", "pcm_s16le", original.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
-        4096, CancellationToken::new()).await.unwrap();
-    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
-    let registered = accepted(&cli, &scope, "register-sample-order", "assets.register", json!({"path":original})).await;
-    let pieces = [(120,2560,false),(5700,9801,true),(11000,11047,false)];
+        "-v",
+        "error",
+        "-f",
+        "s16le",
+        "-ar",
+        "48000",
+        "-ch_layout",
+        "5.1",
+        "-i",
+        raw_path.to_str().unwrap(),
+        "-c:a",
+        "pcm_s16le",
+        original.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &args,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let registered = accepted(
+        &cli,
+        &scope,
+        "register-sample-order",
+        "assets.register",
+        json!({"path":original}),
+    )
+    .await;
+    let pieces = [
+        (120, 2560, false),
+        (5700, 9801, true),
+        (11000, 11047, false),
+    ];
     let params = json!({"asset_id":registered["id"],"output":output,"stream_index":0,
         "pieces":pieces.iter().map(|(start,end,reverse)| json!({"start_sample":start,"end_sample":end,
             "reverse":reverse,"tempo_hundredths":100})).collect::<Vec<_>>()});
@@ -411,165 +493,370 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     assert_eq!(review["audio_edit"]["channel_layout"], "5.1");
     let document = directory.join("audio-edit.json");
     std::fs::write(&document, serde_json::to_vec(&params).unwrap()).unwrap();
-    let (checked, code) = cli.human(&["media", "edit-audio", "--file", document.to_str().unwrap()]).await;
+    let (checked, code) = cli
+        .human(&["media", "edit-audio", "--file", document.to_str().unwrap()])
+        .await;
     assert_eq!(code, 0, "{checked}");
     assert_eq!(checked["result"]["hash"], review["hash"]);
-    let job = accepted(&cli, &scope, "execute-numbered-sample-edit", "jobs.submit",
-        json!({"plan_id":review["id"],"plan_hash":review["hash"]})).await;
+    let job = accepted(
+        &cli,
+        &scope,
+        "execute-numbered-sample-edit",
+        "jobs.submit",
+        json!({"plan_id":review["id"],"plan_hash":review["hash"]}),
+    )
+    .await;
     succeeded(&cli, &job).await;
     let decoded = [
-        "-v", "error", "-i", output.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
-    ].map(str::to_owned);
-    let output_bytes = nw_platform::process::run(&components.join("ffmpeg"), &decoded, Duration::from_secs(30),
-        128 * 1024, CancellationToken::new()).await.unwrap().stdout;
+        "-v",
+        "error",
+        "-i",
+        output.to_str().unwrap(),
+        "-c:a",
+        "pcm_s16le",
+        "-f",
+        "s16le",
+        "pipe:1",
+    ]
+    .map(str::to_owned);
+    let output_bytes = nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &decoded,
+        Duration::from_secs(30),
+        128 * 1024,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap()
+    .stdout;
     let mut expected = Vec::new();
-    for (begin,end,reverse) in pieces {
+    for (begin, end, reverse) in pieces {
         if reverse {
-            for frame in (begin..end).rev() { expected.extend_from_slice(&samples[frame * 12..(frame + 1) * 12]); }
+            for frame in (begin..end).rev() {
+                expected.extend_from_slice(&samples[frame * 12..(frame + 1) * 12]);
+            }
         } else {
             expected.extend_from_slice(&samples[begin * 12..end * 12]);
         }
     }
     assert_eq!(output_bytes.len(), 6588 * 12);
-    assert!(output_bytes == expected, "Incorrect sample or channel order");
+    assert!(
+        output_bytes == expected,
+        "Incorrect sample or channel order"
+    );
     let probe = fixture::probe(&components, &output).await;
     assert_eq!(probe["streams"][0]["channel_layout"], "5.1");
     assert_eq!(probe["streams"][0]["sample_rate"], "48000");
     assert_eq!(probe["streams"][0]["bits_per_sample"], 16);
     let tone = directory.join("tone-1000.wav");
     let make_tone = [
-        "-v", "error", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:duration=2",
-        "-c:a", "pcm_s16le", tone.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &make_tone, Duration::from_secs(30),
-        4096, CancellationToken::new()).await.unwrap();
-    let tone_asset = accepted(&cli, &scope, "register-tone-original", "assets.register", json!({"path":tone})).await;
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=1000:sample_rate=48000:duration=2",
+        "-c:a",
+        "pcm_s16le",
+        tone.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &make_tone,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let tone_asset = accepted(
+        &cli,
+        &scope,
+        "register-tone-original",
+        "assets.register",
+        json!({"path":tone}),
+    )
+    .await;
     let mut tempo_facts = Vec::new();
     for percent in [10u16, 800] {
         let target = directory.join(format!("tone-{percent}.wav"));
         let params = json!({"asset_id":tone_asset["id"],"output":target,"stream_index":0,
             "pieces":[{"start_sample":0,"end_sample":96000,"reverse":true,"tempo_hundredths":percent}]});
         let reviewed = cli.query("audio.edit", params).await;
-        let tempo_job = accepted(&cli, &scope, &format!("execute-tempo-{percent}"), "jobs.submit",
-            json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
+        let tempo_job = accepted(
+            &cli,
+            &scope,
+            &format!("execute-tempo-{percent}"),
+            "jobs.submit",
+            json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]}),
+        )
+        .await;
         succeeded(&cli, &tempo_job).await;
         let decoded = [
-            "-v", "error", "-i", target.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
-        ].map(str::to_owned);
-        let actual = nw_platform::process::run(&components.join("ffmpeg"), &decoded, Duration::from_secs(30),
-            2 * 1024 * 1024, CancellationToken::new()).await.unwrap().stdout;
+            "-v",
+            "error",
+            "-i",
+            target.to_str().unwrap(),
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "s16le",
+            "pipe:1",
+        ]
+        .map(str::to_owned);
+        let actual = nw_platform::process::run(
+            &components.join("ffmpeg"),
+            &decoded,
+            Duration::from_secs(30),
+            2 * 1024 * 1024,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap()
+        .stdout;
         let (chunks, remainder) = actual.as_chunks::<2>();
         assert!(remainder.is_empty());
-        let tones: Vec<_> = chunks.iter().map(|sample| i16::from_le_bytes(*sample)).collect();
+        let tones: Vec<_> = chunks
+            .iter()
+            .map(|sample| i16::from_le_bytes(*sample))
+            .collect();
         let middle = &tones[tones.len() / 4..tones.len() * 3 / 4];
-        let cycles = middle.windows(2).filter(|pair| pair[0] <= 0 && pair[1] > 0).count();
+        let cycles = middle
+            .windows(2)
+            .filter(|pair| pair[0] <= 0 && pair[1] > 0)
+            .count();
         let measured = cycles * 48000 / middle.len();
         let nominal = 96000 * 100 / usize::from(percent);
         assert!(tones.len().abs_diff(nominal) * 100 < nominal * 4);
         assert!(measured.abs_diff(1000) <= 15);
-        tempo_facts.push(json!({"tempo_percent":percent,"observed_hz":measured,"output_samples":tones.len()}));
+        tempo_facts.push(
+            json!({"tempo_percent":percent,"observed_hz":measured,"output_samples":tones.len()}),
+        );
     }
     json!({"job":job["job_id"],"samples":6588,"channel_layout":"5.1","bit_exact_expected_pcm":true,"tempo":tempo_facts})
 }
 
 async fn packet_join(parent: &Path) -> Value {
-    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
-        .expect("Hosted joins need authenticated media tools"));
+    let components = std::path::PathBuf::from(
+        std::env::var_os("NW_CAPTION_COMPONENTS")
+            .expect("Hosted joins need authenticated media tools"),
+    );
     let directory = parent.join("join نگارش");
     std::fs::create_dir(&directory).unwrap();
-    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
-    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let cli = Cli {
+        data: directory.join("state"),
+        components: components.clone(),
+        request_timeout: Duration::from_secs(60),
+    };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let mut paths = Vec::new();
     let mut assets = Vec::new();
-    for (index, (color, tone, sar)) in [("red",440,1),("blue",660,1),("green",550,2)].into_iter().enumerate() {
+    for (index, (color, tone, sar)) in [("red", 440, 1), ("blue", 660, 1), ("green", 550, 2)]
+        .into_iter()
+        .enumerate()
+    {
         let input = directory.join(format!("segment-{index}.mkv"));
         let picture = format!("color=c={color}:s=96x64:r=8:d=1");
         let audio = format!("sine=frequency={tone}:sample_rate=48000:duration=1");
         let aspect = format!("setsar={sar}");
         let args = [
-            "-v", "error", "-f", "lavfi", "-i", &picture, "-f", "lavfi", "-i", &audio,
-            "-map", "0:v", "-map", "1:a", "-vf", &aspect, "-c:v", "ffv1", "-g", "4",
-            "-c:a", "pcm_s16le", input.to_str().unwrap(),
-        ].map(str::to_owned);
-        nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
-            4096, CancellationToken::new()).await.unwrap();
-        let asset = accepted(&cli, &scope, &format!("register-join-part-{index}"), "assets.register",
-            json!({"path":input})).await;
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            &picture,
+            "-f",
+            "lavfi",
+            "-i",
+            &audio,
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-vf",
+            &aspect,
+            "-c:v",
+            "ffv1",
+            "-g",
+            "4",
+            "-c:a",
+            "pcm_s16le",
+            input.to_str().unwrap(),
+        ]
+        .map(str::to_owned);
+        nw_platform::process::run(
+            &components.join("ffmpeg"),
+            &args,
+            Duration::from_secs(30),
+            4096,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let asset = accepted(
+            &cli,
+            &scope,
+            &format!("register-join-part-{index}"),
+            "assets.register",
+            json!({"path":input}),
+        )
+        .await;
         paths.push(input);
         assets.push(asset);
     }
     let destination = directory.join("joined.mkv");
     let rejected = json!({"inputs_in_order":[assets[0]["id"],assets[2]["id"]],"output":destination,
         "audio":"copy_all","metadata":"first_input","strategy":"copy"});
-    let reply = cli.raw(&nw_domain::commands::Request::query("media.join", rejected)).await;
+    let reply = cli
+        .raw(&nw_domain::commands::Request::query("media.join", rejected))
+        .await;
     assert_eq!(reply["error"]["code"], "JOIN_INCOMPATIBLE", "{reply}");
     assert!(!destination.exists());
     let first = packets(&components, &paths[0]).await;
     let following = packets(&components, &paths[1]).await;
     let mut runs = Vec::new();
-    for audio in ["copy_all","drop"] {
+    for audio in ["copy_all", "drop"] {
         let output = directory.join(format!("joined-{audio}.mkv"));
         let request = json!({"inputs_in_order":[assets[0]["id"],assets[1]["id"]],"output":output,
             "audio":audio,"metadata":"first_input","strategy":"copy"});
         let plan = cli.query("media.join", request.clone()).await;
-        assert_eq!(plan["media_join"][1]["offset"],json!({"num":"1","den":"1"}));
+        assert_eq!(
+            plan["media_join"][1]["offset"],
+            json!({"num":"1","den":"1"})
+        );
         let document = directory.join(format!("join-{audio}.json"));
         std::fs::write(&document, serde_json::to_vec(&request).unwrap()).unwrap();
-        let (checked, code) = cli.human(&["media","join","--file",document.to_str().unwrap()]).await;
-        assert_eq!(code,0,"{checked}");
-        assert_eq!(checked["result"]["hash"],plan["hash"]);
-        let job = accepted(&cli, &scope,&format!("publish-join-{audio}"),"jobs.submit",
-            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        let (checked, code) = cli
+            .human(&["media", "join", "--file", document.to_str().unwrap()])
+            .await;
+        assert_eq!(code, 0, "{checked}");
+        assert_eq!(checked["result"]["hash"], plan["hash"]);
+        let job = accepted(
+            &cli,
+            &scope,
+            &format!("publish-join-{audio}"),
+            "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        )
+        .await;
         succeeded(&cli, &job).await;
-        let joined = packets(&components,&output).await;
-        assert_eq!(joined.len(), if audio=="copy_all" {2} else {1});
+        let joined = packets(&components, &output).await;
+        assert_eq!(joined.len(), if audio == "copy_all" { 2 } else { 1 });
         for (stream, packets) in joined {
             let mut expected = first[&stream].clone();
             expected.extend(following[&stream].iter().cloned().map(|mut packet| {
-                for field in ["pts","dts"] {
-                    packet[field]=json!(packet[field].as_i64().unwrap()+1000);
+                for field in ["pts", "dts"] {
+                    packet[field] = json!(packet[field].as_i64().unwrap() + 1000);
                 }
                 packet
             }));
-            assert_eq!(packets,expected);
+            assert_eq!(packets, expected);
         }
-        runs.push(json!({"job":job["job_id"],"audio_policy":audio,"verified_original_packets":true}));
+        runs.push(
+            json!({"job":job["job_id"],"audio_policy":audio,"verified_original_packets":true}),
+        );
     }
     json!({"outputs":runs,"sar_mismatch_refused":true})
 }
 
 async fn variable_picture_retime(parent: &Path) -> Value {
-    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
-        .expect("Hosted picture retiming needs authenticated media tools"));
+    let components = std::path::PathBuf::from(
+        std::env::var_os("NW_CAPTION_COMPONENTS")
+            .expect("Hosted picture retiming needs authenticated media tools"),
+    );
     let directory = parent.join("variable-picture-clock");
     std::fs::create_dir(&directory).unwrap();
-    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
-    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let cli = Cli {
+        data: directory.join("state"),
+        components: components.clone(),
+        request_timeout: Duration::from_secs(60),
+    };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let path = directory.join("vfr-original.mkv");
     let args = [
-        "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=96x64:rate=1000:duration=0.520",
-        "-vf", r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512)",
-        "-fps_mode", "passthrough", "-enc_time_base:v", "1/1000", "-c:v", "ffv1",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=1000:duration=0.520",
+        "-vf",
+        r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512)",
+        "-fps_mode",
+        "passthrough",
+        "-enc_time_base:v",
+        "1/1000",
+        "-c:v",
+        "ffv1",
         path.to_str().unwrap(),
-    ].map(str::to_owned);
-    nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
-        4096, CancellationToken::new()).await.unwrap();
-    let original = accepted(&cli, &scope,"register-vfr-original","assets.register",json!({"path":path})).await;
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &args,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let original = accepted(
+        &cli,
+        &scope,
+        "register-vfr-original",
+        "assets.register",
+        json!({"path":path}),
+    )
+    .await;
     let decode = |path: &Path| {
-        ["-v","error","-i",path.to_str().unwrap(),"-map","0:v:0","-fps_mode","passthrough",
-         "-pix_fmt","yuv420p","-c:v","rawvideo","-threads","1","-f","rawvideo","pipe:1"].map(str::to_owned)
+        [
+            "-v",
+            "error",
+            "-i",
+            path.to_str().unwrap(),
+            "-map",
+            "0:v:0",
+            "-fps_mode",
+            "passthrough",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "rawvideo",
+            "-threads",
+            "1",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]
+        .map(str::to_owned)
     };
-    let input = nw_platform::process::run(&components.join("ffmpeg"),&decode(&path),Duration::from_secs(30),
-        64*1024,CancellationToken::new()).await.unwrap().stdout;
-    let size=96*64*3/2;
-    assert_eq!(input.len(),size*6);
-    let mut decisions=Vec::new();
-    for (tempo,reverse) in [(10, false),(100, false),(800,false),(100,true)] {
+    let input = nw_platform::process::run(
+        &components.join("ffmpeg"),
+        &decode(&path),
+        Duration::from_secs(30),
+        64 * 1024,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap()
+    .stdout;
+    let size = 96 * 64 * 3 / 2;
+    assert_eq!(input.len(), size * 6);
+    let mut decisions = Vec::new();
+    for (tempo, reverse) in [(10, false), (100, false), (800, false), (100, true)] {
         let output = directory.join(format!("retime-{tempo}-{reverse}.mkv"));
         let range = json!({"start":{"num":"0","den":"1"},"end":{"num":"513","den":"1000"}});
-        let params=json!({"asset_id":original["id"],"output":output,"range":range,
+        let params = json!({"asset_id":original["id"],"output":output,"range":range,
             "video_stream":0,"tempo_hundredths":tempo,"reverse":reverse,"audio":"drop"});
-        let plan=cli.query("media.retime",params.clone()).await;
+        let plan = cli.query("media.retime", params.clone()).await;
         let legacy_speed = format!("{}.{:02}", tempo / 100, tempo % 100);
         let legacy = format!(
             "input_path={}\noutput_path={}\noutput_format=mkv\nvideo_codec=ffv1\naudio_tracks=none\nsubtitle_tracks=none\nvideo_speed={legacy_speed}\nreverse_video={}\n",
@@ -577,35 +864,69 @@ async fn variable_picture_retime(parent: &Path) -> Value {
             output.display(),
             if reverse { "y" } else { "n" },
         );
-        let imported = cli.query("config.import.ffmwiz", json!({
-            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1",
-        })).await;
+        let imported = cli
+            .query(
+                "config.import.ffmwiz",
+                json!({
+                    "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1",
+                }),
+            )
+            .await;
         assert_eq!(imported["input_valid"], true, "{imported}");
-        let compiled = cli.query("jobs.plan", json!({"asset_id":original["id"],"job_document":imported["job"]})).await;
-        assert_eq!(compiled["hash"],plan["hash"]);
+        let compiled = cli
+            .query(
+                "jobs.plan",
+                json!({"asset_id":original["id"],"job_document":imported["job"]}),
+            )
+            .await;
+        assert_eq!(compiled["hash"], plan["hash"]);
 
-        let doc=directory.join(format!("retime-{tempo}-{reverse}.json"));
-        std::fs::write(&doc,serde_json::to_vec(&params).unwrap()).unwrap();
-        let (typed,status)=cli.human(&["media","retime","--file",doc.to_str().unwrap()]).await;
-        assert_eq!(status,0,"{typed}");
-        assert_eq!(typed["result"]["hash"],plan["hash"]);
-        let job=accepted(&cli, &scope,&format!("run-retime-{tempo}-{reverse}"),"jobs.submit",
-            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        let doc = directory.join(format!("retime-{tempo}-{reverse}.json"));
+        std::fs::write(&doc, serde_json::to_vec(&params).unwrap()).unwrap();
+        let (typed, status) = cli
+            .human(&["media", "retime", "--file", doc.to_str().unwrap()])
+            .await;
+        assert_eq!(status, 0, "{typed}");
+        assert_eq!(typed["result"]["hash"], plan["hash"]);
+        let job = accepted(
+            &cli,
+            &scope,
+            &format!("run-retime-{tempo}-{reverse}"),
+            "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        )
+        .await;
         succeeded(&cli, &job).await;
-        let picture=packets(&components,&output).await;
-        let observed:Vec<_>=picture[&0].iter().map(|packet|packet["pts"].as_i64().unwrap()).collect();
+        let picture = packets(&components, &output).await;
+        let observed: Vec<_> = picture[&0]
+            .iter()
+            .map(|packet| packet["pts"].as_i64().unwrap())
+            .collect();
         let expected = if reverse {
-            vec![0,1,137,289,393,481]
+            vec![0, 1, 137, 289, 393, 481]
         } else {
-            [0,32,120,224,376,512].map(|ticks|ticks*100/tempo).to_vec()
+            [0, 32, 120, 224, 376, 512]
+                .map(|ticks| ticks * 100 / tempo)
+                .to_vec()
         };
-        assert_eq!(observed,expected);
-        let data = nw_platform::process::run(&components.join("ffmpeg"),&decode(&output),Duration::from_secs(30),
-            64*1024,CancellationToken::new()).await.unwrap().stdout;
-        assert_eq!(data.len(),input.len());
-        for (index,picture) in data.chunks_exact(size).enumerate() {
-            let original_index=if reverse {5-index} else {index};
-            assert!(picture==&input[original_index*size..(original_index+1)*size], "Lossless frame changed");
+        assert_eq!(observed, expected);
+        let data = nw_platform::process::run(
+            &components.join("ffmpeg"),
+            &decode(&output),
+            Duration::from_secs(30),
+            64 * 1024,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap()
+        .stdout;
+        assert_eq!(data.len(), input.len());
+        for (index, picture) in data.chunks_exact(size).enumerate() {
+            let original_index = if reverse { 5 - index } else { index };
+            assert!(
+                picture == &input[original_index * size..(original_index + 1) * size],
+                "Lossless frame changed"
+            );
         }
         decisions.push(json!({"job":job["job_id"],"tempo":tempo,"reverse":reverse,
             "exact_variable_clock_ms":observed,"lossless_picture_equality":true}));

@@ -75,14 +75,20 @@ impl OutputProfile {
             return Ok(());
         }
         if self == Self::WavePcm {
-            return if matches!(admission::frozen_demuxer(&source.probe.format)?, "matroska" | "wav")
-                && matches!(outcome.streams.as_slice(), [stream] if stream.kind == StreamKind::Audio && stream.codec == "pcm_s16le")
-                && !outcome.preservation.global_tags && !outcome.preservation.stream_tags
-                && !outcome.preservation.dispositions && !outcome.preservation.chapters
+            return if matches!(
+                admission::frozen_demuxer(&source.probe.format)?,
+                "matroska" | "wav"
+            ) && matches!(outcome.streams.as_slice(), [stream] if stream.kind == StreamKind::Audio && stream.codec == "pcm_s16le")
+                && !outcome.preservation.global_tags
+                && !outcome.preservation.stream_tags
+                && !outcome.preservation.dispositions
+                && !outcome.preservation.chapters
             {
                 Ok(())
             } else {
-                Err(incompatible("WAVE output requires the reviewed sample-domain PCM route"))
+                Err(incompatible(
+                    "WAVE output requires the reviewed sample-domain PCM route",
+                ))
             };
         }
         if admission::frozen_demuxer(&source.probe.format)? != "mov" {
