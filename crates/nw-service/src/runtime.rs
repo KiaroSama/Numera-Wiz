@@ -545,14 +545,30 @@ impl Service {
                 })
             })
             .collect();
-        Ok(nw_domain::views::PlanReview::new(
+        let mut review = nw_domain::views::PlanReview::new(
             plan,
             source_visible,
             output_visible,
             policy.is_none(),
             policy.as_ref().map_or(0, |profile| profile.revision),
             actions,
-        ))
+        );
+        let mut first_output_index = plan.resolution.streams.len();
+        for (slot, input) in plan.added_tracks.iter().enumerate() {
+            if self.object(context, &input.source.id, &input.source.creator).is_ok()
+                && self.path(context, Path::new(&input.source.identity.path), false).is_ok()
+            {
+                review.added_tracks.push(nw_domain::views::AddedTrackReview {
+                    input_slot: slot + 1,
+                    source_id: input.source.id.clone(),
+                    source_sha256: input.source.identity.sha256.clone(),
+                    first_output_index,
+                    streams: input.tracks.clone(),
+                });
+            }
+            first_output_index += input.tracks.len();
+        }
+        Ok(review)
     }
     fn job_view(&self, context: &Context, job: &Job) -> Result<nw_domain::views::JobView> {
         use nw_domain::views::{ArtifactView, ErrorView, JobView};
@@ -694,6 +710,25 @@ impl Service {
         )?;
         if let Some(object) = &plan.source.source_object {
             files::revalidate_source_object(&path, object)?;
+        }
+        for input in &plan.added_tracks {
+            let source = &input.source;
+            let recorded: Asset = self.store.get(&named("asset", &source.id)?)?
+                .ok_or_else(DomainError::object_not_found)?;
+            self.object(context, &recorded.id, &recorded.creator)?;
+            if recorded.id != source.id || recorded.identity != source.identity
+                || recorded.source_object != source.source_object
+            {
+                return Err(DomainError::new("SOURCE_CHANGED", "External source differs from its registered identity"));
+            }
+            let chosen = self.path(context, Path::new(&source.identity.path), false)?;
+            if chosen != Path::new(&source.identity.path) {
+                return Err(DomainError::new("SOURCE_CHANGED", "External source canonical path changed"));
+            }
+            let object = source.source_object.as_ref().ok_or_else(|| {
+                DomainError::new("INVALID_PLAN", "External source native identity is absent")
+            })?;
+            files::revalidate_source_object(&chosen, object)?;
         }
         Ok(path)
     }
@@ -1090,6 +1125,7 @@ impl Service {
                 "assets.register",
                 "assets.register_folder",
                 "streams.clean",
+                "streams.add",
                 "streams.extract",
                 "streams.extract.batch_plan",
                 "streams.clean.batch_plan",
@@ -1772,7 +1808,7 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "streams.extract" | "jobs.plan" | "chapters.remove"
+            "streams.clean" | "streams.add" | "streams.extract" | "jobs.plan" | "chapters.remove"
             | "chapters.import" | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
@@ -2075,6 +2111,18 @@ impl Service {
                                 )
                             })?;
                     files::revalidate(&plan.source.identity, &cancellation)?;
+                    let mut additions = Vec::with_capacity(plan.added_tracks.len());
+                    for input in &plan.added_tracks {
+                        let identity = &input.source.identity;
+                        let object = input.source.source_object.as_ref().ok_or_else(|| {
+                            DomainError::new("INVALID_PLAN", "External source native identity is absent")
+                        })?;
+                        let stamp = files::SourceStamp::capture_resolved(Path::new(&identity.path))?;
+                        stamp.require_object(object)?;
+                        files::revalidate(identity, &cancellation)?;
+                        stamp.revalidate()?;
+                        additions.push(stamp);
+                    }
                     for component in [&plan.ffmpeg, &plan.ffprobe] {
                         files::revalidate(component, &cancellation).map_err(|error| {
                             if error.code == "SOURCE_CHANGED" {
@@ -2091,7 +2139,7 @@ impl Service {
                     ffmpeg.revalidate()?;
                     ffprobe.revalidate()?;
                     output_parent.revalidate()?;
-                    Ok((source, ffmpeg, ffprobe, output_parent))
+                    Ok((source, ffmpeg, ffprobe, output_parent, additions))
                 })();
                 let accept_guard = self.mutation.lock().map_err(|_| lock_error())?;
                 if let Some(replay) =
@@ -2113,9 +2161,12 @@ impl Service {
                 self.path(&context, Path::new(&plan.output), true)?;
                 files::revalidate_output(&plan.output)?;
                 let policy = self.policy(&context)?;
-                let (source, ffmpeg, ffprobe, output_parent) = prepared?;
+                let (source, ffmpeg, ffprobe, output_parent, additions) = prepared?;
                 output_parent.revalidate()?;
                 source.revalidate()?;
+                for source in additions {
+                    source.revalidate()?;
+                }
                 for component in [ffmpeg, ffprobe] {
                     component.revalidate().map_err(|_| {
                         DomainError::new(
@@ -2432,6 +2483,21 @@ impl Service {
         now: u64,
     ) -> Result<Plan> {
         let input = match command {
+            "streams.add" => {
+                let input: nw_domain::track_append::AppendInput = commands::parse(params)?;
+                if !(1..=nw_domain::track_append::MAX_ADDED_INPUTS).contains(&input.additions.len()) {
+                    return Err(DomainError::new("VALIDATION_ERROR", "Add 1–4 external audio or subtitle inputs"));
+                }
+                let inputs = input.additions.into_iter().map(|addition| {
+                    let source: Asset = self.store.get(&named("asset", &addition.asset_id)?)?
+                        .ok_or_else(DomainError::object_not_found)?;
+                    self.object(context, &source.id, &source.creator)?;
+                    self.path(context, Path::new(&source.identity.path), false)?;
+                    addition.resolve(source)
+                }).collect::<Result<Vec<_>>>()?;
+                return self.prepare_native_copy(context, &input.target, &input.output, Default::default(),
+                    |engine, primary, output| engine.append_tracks_plan_at(primary, inputs, output, &context.principal, now));
+            }
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params)?;
                 if self
@@ -3426,6 +3492,7 @@ mod tests {
             },
         };
         let plan = Plan {
+            added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,
             schema_version: 1,

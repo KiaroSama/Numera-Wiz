@@ -65,6 +65,8 @@ pub struct JobSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub added_tracks: Vec<AddedTrackReview>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_probe_timeout: Option<crate::execution::DeadlinePolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,6 +93,15 @@ pub struct PlanReview {
     pub policy_revision: u64,
     pub effective_actions: BTreeSet<ObjectAction>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AddedTrackReview {
+    pub input_slot: usize,
+    pub source_id: String,
+    pub source_sha256: String,
+    pub first_output_index: usize,
+    pub streams: Vec<crate::mux::Stream>,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ComponentSummary {
     pub file_name: String,
@@ -116,6 +127,7 @@ impl PlanReview {
         effective_actions: BTreeSet<ObjectAction>,
     ) -> Self {
         Self {
+            added_tracks: Vec::new(),
             source_probe_timeout: plan.source.probe.probe_timeout,
             execution_limits: plan.execution_limits.clone(),
             file_times: plan.file_times.clone(),

@@ -617,6 +617,7 @@ mod tests {
             chapter_import: None,
         };
         let plan = Plan {
+            added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,
             schema_version: 1,

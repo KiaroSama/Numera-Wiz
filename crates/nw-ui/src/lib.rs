@@ -10,6 +10,7 @@ mod observations;
 mod preview;
 mod projects;
 mod reference;
+mod track_append;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
@@ -156,6 +157,7 @@ pub struct WizApp {
     audio_track_report: Option<AudioTrackReport>,
     reference_metrics: reference::ReferenceUi,
     observations: observations::ObservationUi,
+    track_append: track_append::TrackAppendUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -346,6 +348,7 @@ impl WizApp {
             audio_track_report: None,
             reference_metrics: Default::default(),
             observations: Default::default(),
+            track_append: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -384,6 +387,7 @@ impl WizApp {
             self.audio_track_report = None;
             self.reference_metrics.result = None;
             self.observations = Default::default();
+            self.track_append = Default::default();
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -1571,6 +1575,7 @@ impl eframe::App for WizApp {
                 self.extraction_panel(ui, &asset);
                 self.reference_panel(ui, &asset);
                 self.observations_panel(ui, &asset);
+                self.track_append_panel(ui, &asset);
             }
         });
         if !self.folder.open {

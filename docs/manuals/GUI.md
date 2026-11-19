@@ -108,6 +108,15 @@ In **Projects**, open **Timeline frame** in the detail pane. Enter an exact
 sequence time and choose **Decode timeline frame**. The preview shows the
 highest visible opaque layer at that frame and shows black in uncovered gaps.
 
+## Append audio and subtitles
+
+Register the original MKV and each external source. Select the original MKV,
+set a new `.mkv` destination, then open **Add audio and subtitle tracks**.
+Choose the external sources in order. Use **Explicit track selectors** for
+individual stream indices, language, title and disposition overrides. Choose
+**Review appended tracks**, inspect the input-to-output mapping, then submit
+the reviewed plan through the ordinary job controls.
+
 ## Dispositions
 
 Open **Disposition changes** in the Stream Cleanup form and select an original

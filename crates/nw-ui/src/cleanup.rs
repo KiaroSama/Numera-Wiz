@@ -631,6 +631,18 @@ impl WizApp {
                     });
                     ui.small(&outcome.reason);
                 }
+                for input in &plan.added_tracks {
+                    for (offset, stream) in input.streams.iter().enumerate() {
+                        ui.label(format!("Input {} {:?} stream {} → output {}", input.input_slot,
+                            stream.kind, stream.index, input.first_output_index + offset));
+                        if let Some(title) = stream.tags.get("title") {
+                            ui.small(title);
+                        }
+                        if let Some(language) = stream.tags.get("language") {
+                            ui.small(language);
+                        }
+                    }
+                }
                 if !self.intent.disposition_patches.is_empty() {
                     ui.collapsing("Resolved dispositions", |ui| {
                         for stream in &plan.resolution.streams {

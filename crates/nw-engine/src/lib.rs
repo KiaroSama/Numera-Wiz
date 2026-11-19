@@ -6,6 +6,7 @@ mod media;
 mod output_profile;
 mod preservation;
 mod progress;
+mod track_append;
 mod wave_cues;
 pub use media::BrowserSegment;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
@@ -421,6 +422,7 @@ impl Engine {
         }
         source_stamp.revalidate()?;
         let mut plan = Plan {
+            added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
             schema_version: 2,
@@ -484,8 +486,10 @@ impl Engine {
                 admit_matroska(Path::new(&plan.output), &plan.resolution.streams)?;
             }
         }
+        track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux
-            && plan.argv_template != lower_remux(&plan.source, &plan.resolution, profile)?
+            && plan.argv_template
+                != lower_with_additions(&plan.source, &plan.resolution, profile, &plan.added_tracks)?
         {
             return Err(DomainError::new(
                 "INVALID_PLAN",
@@ -607,7 +611,7 @@ impl Engine {
                     VerifiedStaging {
                         file: staging,
                         identity: actual,
-                        source: source_stamp,
+                        sources: vec![source_stamp],
                     },
                     plan,
                     job_id,
@@ -653,6 +657,14 @@ impl Engine {
         .await?;
         let staging = prepare_staging(plan, job_id, &observer).await?;
         let staging_name = files::path_text(staging.path())?;
+        let additions = track_append::stage(
+            &plan.added_tracks,
+            staging.path().parent().expect("Owned staging directory").to_owned(),
+            cancel.clone(),
+        ).await?;
+        let added_paths = additions.iter().enumerate().map(|(index, input)| {
+            Ok((track_append::placeholder(index), format!("file:{}", files::path_text(input.path())?)))
+        }).collect::<Result<BTreeMap<_, _>>>()?;
         let sidecar = if let Some(import) = &plan.resolution.chapter_import {
             Some(stage_chapter_sidecar(import, staging.path(), &cancel).await?)
         } else {
@@ -668,12 +680,15 @@ impl Engine {
                     .expect("Validated chapter invocation")
                     .argument
                     .clone(),
-                _ => v.clone(),
+                _ => added_paths.get(v).unwrap_or(v).clone(),
             })
             .collect::<Vec<_>>();
         observer(ExecutionEvent::Prepared(args.clone())).await?;
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = source_stamp.revalidate().and_then(|_| {
+            for input in &additions {
+                input.revalidate()?;
+            }
             sidecar
                 .as_ref()
                 .map_or(Ok(()), |sidecar| sidecar.stamp.revalidate())
@@ -720,10 +735,14 @@ impl Engine {
             plan,
             staging.path(),
             &observed,
+            &additions.iter().map(track_append::StagedInput::path).collect::<Vec<_>>(),
             cancel.clone(),
             &observer,
         )
         .await?;
+        for input in &additions {
+            input.revalidate()?;
+        }
         let stage_path = staging.path().to_owned();
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
@@ -753,7 +772,9 @@ impl Engine {
             VerifiedStaging {
                 file: staging,
                 identity: actual,
-                source: source_stamp,
+                sources: std::iter::once(source_stamp)
+                    .chain(additions.into_iter().map(track_append::StagedInput::into_source))
+                    .collect(),
             },
             plan,
             job_id,
@@ -945,7 +966,7 @@ async fn prepare_owned_staging(
 struct VerifiedStaging {
     file: tempfile::NamedTempFile,
     identity: FileIdentity,
-    source: files::SourceStamp,
+    sources: Vec<files::SourceStamp>,
 }
 struct VerifiedOutput {
     file: PublicationStaging,
@@ -976,7 +997,7 @@ async fn publish(
     let VerifiedStaging {
         file,
         identity,
-        source,
+        sources,
     } = verified;
     let parent_stamp = output_parent_stamp(plan)?;
     let parent_object = reviewed_parent(plan)?.clone();
@@ -984,7 +1005,7 @@ async fn publish(
         VerifiedOutput {
             file: PublicationStaging::Unlinked(file),
             identity,
-            sources: vec![source],
+            sources,
         },
         OutputDestination {
             path: plan.output.clone(),
@@ -1283,6 +1304,15 @@ fn lower_remux(
     resolution: &mux::CleanResolution,
     profile: OutputProfile,
 ) -> Result<Vec<String>> {
+    lower_with_additions(asset, resolution, profile, &[])
+}
+
+fn lower_with_additions(
+    asset: &Asset,
+    resolution: &mux::CleanResolution,
+    profile: OutputProfile,
+    additions: &[nw_domain::track_append::AddedInput],
+) -> Result<Vec<String>> {
     let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
     let mut args = [
         "-hide_banner",
@@ -1305,6 +1335,15 @@ fn lower_remux(
     .to_vec();
     args.extend(admission::options(demuxer));
     args.extend(["-i".into(), "fd:".into()]);
+    for (index, added) in additions.iter().enumerate() {
+        let demuxer = admission::frozen_demuxer(&added.source.probe.format)?;
+        args.extend(["-protocol_whitelist", "file", "-format_whitelist", demuxer, "-f", demuxer]
+            .map(str::to_owned));
+        if demuxer == "mov" {
+            args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
+        }
+        args.extend(["-i".into(), track_append::placeholder(index)]);
+    }
     if resolution.chapter_import.is_some() {
         args.extend(
             [
@@ -1318,8 +1357,12 @@ fn lower_remux(
             .map(String::from),
         );
     }
-    for stream in &resolution.streams {
-        args.extend(["-map".into(), format!("0:{}", stream.index)]);
+    let mapped = std::iter::once((asset, resolution.streams.as_slice()))
+        .chain(additions.iter().map(|added| (&added.source, added.tracks.as_slice())))
+        .enumerate()
+        .flat_map(|(slot, (asset, streams))| streams.iter().map(move |stream| (slot, asset, stream)));
+    for (slot, _, stream) in mapped.clone() {
+        args.extend(["-map".into(), format!("{slot}:{}", stream.index)]);
     }
     args.extend([
         "-c".into(),
@@ -1332,7 +1375,7 @@ fn lower_remux(
         },
         "-map_chapters".into(),
         if resolution.chapter_import.is_some() {
-            "1".into()
+            (additions.len() + 1).to_string()
         } else if resolution.preservation.chapters {
             "0".into()
         } else {
@@ -1354,11 +1397,12 @@ fn lower_remux(
             args.extend(["-metadata".into(), format!("{key}=")]);
         }
     }
-    for (index, stream) in resolution.streams.iter().enumerate() {
+    for (index, (slot, asset, stream)) in mapped.enumerate() {
+        let demuxer = admission::frozen_demuxer(&asset.probe.format)?;
         args.extend([
             format!("-map_metadata:s:{index}"),
             if resolution.preservation.stream_tags {
-                format!("0:s:{}", stream.index)
+                format!("{slot}:s:{}", stream.index)
             } else {
                 "-1".into()
             },
@@ -1421,13 +1465,15 @@ fn lower_remux(
 }
 fn verify_structure(plan: &Plan, actual: &MediaProbe) -> Result<()> {
     let profile = OutputProfile::from_output(Path::new(&plan.output))?;
-    if actual.streams.len() != plan.resolution.streams.len() {
+    let additional_tracks = plan.added_tracks.iter().flat_map(|input| &input.tracks);
+    let expected = plan.resolution.streams.iter().chain(additional_tracks);
+    if actual.streams.len() != expected.clone().count() {
         return Err(DomainError::new(
             "VERIFICATION_FAILED",
             "Output stream count differs from the frozen outcome manifest",
         ));
     }
-    for (expected, observed) in plan.resolution.streams.iter().zip(&actual.streams) {
+    for (expected, observed) in expected.zip(&actual.streams) {
         if expected.kind != observed.kind
             || expected.codec != observed.codec
             || expected.dispositions != observed.dispositions

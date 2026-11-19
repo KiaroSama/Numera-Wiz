@@ -342,6 +342,11 @@ pub enum Streams {
         #[arg(long)]
         limits_file: Option<PathBuf>,
     },
+    /// Review explicit external audio and subtitle additions in strict-copy mode.
+    Add {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review a single original stream's packet-copy extraction into Matroska.
     Extract {
         #[arg(long)]
@@ -752,6 +757,11 @@ pub fn prepare(command: Command) -> Result<Request> {
                 params["file_times"] = serde_json::to_value(policy)?;
             }
             query("streams.clean", params)
+        }
+        Command::Streams(Streams::Add { file }) => {
+            let mut input: nw_domain::track_append::AppendInput = commands::parse(document(&file)?)?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("streams.add", serde_json::to_value(input)?)
         }
         Command::Streams(Streams::Extract { asset, stream, out }) => query(
             "streams.extract",

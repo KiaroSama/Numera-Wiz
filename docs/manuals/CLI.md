@@ -219,6 +219,33 @@ and `--remove` for individual FFmpeg flags such as `comment`, `original` or
 `--exclusive-default` changes the default bit on that stream and its peers of
 the same type. Review the resolved stream flags before submitting the plan.
 
+### Append audio and subtitles
+
+Register the original Matroska video and each external input separately. A
+UTF-8 SubRip file up to 4 MiB can be registered directly. Save a request such as
+the following and run `numera-wiz streams add --file append.json`.
+
+```json
+{
+  "target": "<registered Matroska video ID>",
+  "additions": [
+    {"asset_id":"<external audio ID>","selector":{"kind":"all"}},
+    {"asset_id":"<registered SubRip ID>","selector":{"kind":"explicit","tracks":[
+      {"stream_index":0,"language":"fas","title":"Persian","disposition":["default"]}
+    ]}}
+  ],
+  "output": "/absolute/path/new-output.mkv",
+  "conversion": "forbid"
+}
+```
+
+Review `added_tracks` for the source digest, original stream indices, and first
+output index of each group. Submit the returned plan ID and hash through
+`jobs submit`. The executor independently compares packet data, timing and codec
+parameters for each retained and appended stream before publishing.
+
+### Command envelopes
+
 The active registry contains discovery/schema, pure cleanup resolution, replay-scope
 creation, access-profile create/update/inspect/put/list, file-delivered token
 issue/revoke, scoped internal credential issuance, media probe, source

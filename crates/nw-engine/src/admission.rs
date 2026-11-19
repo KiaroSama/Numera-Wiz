@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 const MAX_STILL_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_SUBRIP_BYTES: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_STILL_PIXELS: &str = "12000000";
 
 pub struct Input {
@@ -95,7 +96,7 @@ pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -
         ));
     }
     file.seek(SeekFrom::Start(0)).map_err(io_error)?;
-    let mut prefix = [0u8; 16];
+    let mut prefix = [0u8; 64];
     let mut length = 0;
     while length < prefix.len() {
         let count = file.read(&mut prefix[length..]).map_err(io_error)?;
@@ -116,10 +117,77 @@ pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -
         "mov" => mov_boxes(&mut file, 0, length, 0, &mut 0, cancel)?,
         "png_pipe" => png_chunks(&mut file, length, cancel)?,
         "jpeg_pipe" => jpeg_markers(&mut file, length, cancel)?,
+        "srt" => subrip(&mut file, length, cancel)?,
         _ => {}
     }
     file.seek(SeekFrom::Start(0)).map_err(io_error)?;
     Ok(Input { file, demuxer })
+}
+
+fn cue_number(line: &str) -> bool {
+    let value = line.trim();
+    !value.is_empty() && value.len() <= 9 && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn cue_timestamp(value: &str) -> Option<u32> {
+    let raw = value.as_bytes();
+    if raw.len() != 12 || raw[2] != b':' || raw[5] != b':' || raw[8] != b',' {
+        return None;
+    }
+    let digits = |range: std::ops::Range<usize>| -> Option<u32> {
+        raw.get(range)?.iter().try_fold(0, |total, digit| {
+            digit.is_ascii_digit().then(|| total * 10 + u32::from(digit - b'0'))
+        })
+    };
+    let (hours, minutes, seconds, millis) = (digits(0..2)?, digits(3..5)?, digits(6..8)?, digits(9..12)?);
+    (minutes < 60 && seconds < 60).then(|| ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis)
+}
+
+fn cue_time(line: &str) -> bool {
+    let Some((start, end)) = line.split_once("-->") else { return false; };
+    cue_timestamp(start.trim()).zip(cue_timestamp(end.trim())).is_some_and(|(a, b)| a < b)
+}
+
+fn subrip_prefix(bytes: &[u8]) -> bool {
+    let mut lines = bytes.split(|byte| *byte == b'\n');
+    let number = lines.next().and_then(|line| std::str::from_utf8(line).ok());
+    let time = lines.next().and_then(|line| std::str::from_utf8(line).ok());
+    number.is_some_and(|line| cue_number(line.trim_start_matches('\u{feff}')))
+        && time.is_some_and(cue_time)
+}
+
+fn subrip(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()> {
+    if length > MAX_SUBRIP_BYTES {
+        return Err(DomainError::new("RESOURCE_LIMIT", "A SubRip source may contain at most 4 MiB"));
+    }
+    let invalid = || DomainError::new("INVALID_PROBE", "Expected a finite UTF-8 SubRip cue document");
+    file.seek(SeekFrom::Start(0)).map_err(io_error)?;
+    let mut bytes = Vec::with_capacity(length as usize);
+    file.take(length + 1).read_to_end(&mut bytes).map_err(io_error)?;
+    if bytes.len() as u64 != length {
+        return Err(invalid());
+    }
+    let text = std::str::from_utf8(&bytes).map_err(|_| invalid())?.trim_start_matches('\u{feff}');
+    if text.chars().any(|value| value.is_control() && !matches!(value, '\n' | '\r' | '\t')) {
+        return Err(invalid());
+    }
+    let mut lines = text.lines();
+    let mut any = false;
+    while let Some(number) = lines.next() {
+        if number.trim().is_empty() {
+            continue;
+        }
+        check_cancel(cancel)?;
+        if !cue_number(number) || !lines.next().is_some_and(cue_time) {
+            return Err(invalid());
+        }
+        let mut body = lines.by_ref().take_while(|line| !line.trim().is_empty()).peekable();
+        if body.peek().is_none() || body.any(|line| line.len() > 4096) {
+            return Err(invalid());
+        }
+        any = true;
+    }
+    any.then_some(()).ok_or_else(invalid)
 }
 
 // png_pipe can decode the default picture of an APNG. Require a complete
@@ -418,6 +486,9 @@ fn classify(bytes: &[u8]) -> Result<&'static str> {
     {
         return Ok("mp3");
     }
+    if subrip_prefix(bytes) {
+        return Ok("srt");
+    }
     Err(DomainError::new(
         "INPUT_ROUTE_REQUIRED",
         "No ordinary self-contained file route matches this content; reference manifests and sequences require an explicit resolver",
@@ -433,6 +504,7 @@ pub fn frozen_demuxer(format: &str) -> Result<&'static str> {
         "flac" => Ok("flac"),
         "mp3" => Ok("mp3"),
         "ogg" => Ok("ogg"),
+        "srt" => Ok("srt"),
         "png_pipe" => Ok("png_pipe"),
         "jpeg_pipe" => Ok("jpeg_pipe"),
         _ => Err(DomainError::new(

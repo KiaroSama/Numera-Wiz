@@ -264,6 +264,15 @@ includes the active registered or solid-color clip identity, or a gap marker.
 Choose a sequence-frame boundary. A registered source requires an exact
 original video tick at the mapped time.
 
+## Append audio and subtitles
+
+`streams.add` accepts the typed [append request](CLI.md#append-audio-and-subtitles)
+as `params`. It requires access to the original video, each additional asset
+and its physical path, and a new `.mkv` destination. The review includes
+`added_tracks` per readable input. Call `jobs.submit` with the returned `id`
+and `hash` and the ordinary durable replay identifiers. `jobs.inspect` exposes
+verification and artifact publication.
+
 ## Cleanup selection reports
 
 streams.clean.report uses the same asset_ids and full typed intent as the CLI

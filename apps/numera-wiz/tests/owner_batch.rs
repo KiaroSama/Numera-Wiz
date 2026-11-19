@@ -1095,6 +1095,68 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             .all(|item| item["error"]["code"] == "OUTPUT_COLLISION" && item["plan"].is_null())
     );
     assert_eq!(destination_entries(), published);
+
+    let append_audio = media.directory.path().join("append-external-audio.mkv");
+    std::fs::copy(&media.source, &append_audio).unwrap();
+    let append_captions = media.directory.path().join("زیرنویس-append.srt");
+    std::fs::write(&append_captions, "1\n00:00:00,125 --> 00:00:00,950\nنمونهٔ فارسی\n").unwrap();
+    let mut added_assets = Vec::new();
+    for (ordinal, file) in [&append_audio, &append_captions].into_iter().enumerate() {
+        added_assets.push(call!(
+            stdio, "assets.register", json!({"path":file}),
+            json!({"replay_scope":sdk_scope,"idempotency_key":format!("append-file-{ordinal}")})
+        ));
+    }
+    let appended = media.directory.path().join("append-verified.mkv");
+    let append_request = json!({"target":sdk_assets[0]["id"],"output":appended,"conversion":"forbid",
+        "additions":[
+            {"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
+                {"stream_index":1,"language":"eng","title":"External one","disposition":[]},
+                {"stream_index":2,"language":"fas","title":"صدای دوم","disposition":["comment"]}]}},
+            {"asset_id":added_assets[1]["id"],"selector":{"kind":"explicit","tracks":[
+                {"stream_index":0,"language":"fas","title":"زیرنویس","disposition":[]}]}}
+        ]});
+    let append_document = media.directory.path().join("append-tracks.json");
+    std::fs::write(&append_document, serde_json::to_vec(&append_request).unwrap()).unwrap();
+    let (cli_append, code) = cli.human(&[
+        "--access-profile", "batch-operator", "streams", "add", "--file", append_document.to_str().unwrap(),
+    ]).await;
+    assert_eq!(code, 0, "{cli_append}");
+    let stdio_append = call!(stdio, "streams.add", append_request.clone(), json!({}));
+    let http_append = call!(http, "streams.add", append_request.clone(), json!({}));
+    assert_eq!(cli_append["result"]["hash"], stdio_append["hash"]);
+    assert_eq!(http_append["hash"], stdio_append["hash"]);
+    assert_eq!(http_append["added_tracks"], stdio_append["added_tracks"]);
+    assert_eq!(http_append["added_tracks"][0]["first_output_index"], 3);
+    assert_eq!(http_append["added_tracks"][1]["first_output_index"], 5);
+    let mut forbidden = append_request;
+    forbidden["additions"][0]["selector"]["tracks"][0]["stream_index"] = json!(0);
+    let refused = sdk!(http, "streams.add", forbidden, json!({}));
+    assert_eq!(refused["error"]["code"], "INVALID_TRACK_ADDITION");
+    assert!(!appended.exists());
+    let append_job = call!(http, "jobs.submit",
+        json!({"plan_id":http_append["id"],"plan_hash":http_append["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"append-verified"}));
+    cli.completed(append_job["job_id"].as_str().unwrap()).await;
+    let appended_probe = fixture::probe(&media.bin, &appended).await;
+    assert_eq!(appended_probe["streams"].as_array().unwrap().len(), 6);
+    assert_eq!(appended_probe["streams"][3]["tags"]["title"], "External one");
+    assert_eq!(appended_probe["streams"][4]["tags"]["title"], "صدای دوم");
+    assert_eq!(appended_probe["streams"][4]["disposition"]["comment"], 1);
+    assert_eq!(appended_probe["streams"][5]["tags"]["language"], "fas");
+    assert_eq!(appended_probe["streams"][5]["tags"]["title"], "زیرنویس");
+    let appended_packets = packets(&media.bin, &appended).await;
+    let subrip = packets(&media.bin, &append_captions).await;
+    for (output, (original, index)) in [
+        (&original_packets, 0u64),(&original_packets,1),(&original_packets,2),
+        (&original_packets,1),(&original_packets,2),(&subrip,0),
+    ].into_iter().enumerate() {
+        let mut expected = original[&index].clone();
+        for packet in &mut expected {
+            packet["stream_index"] = json!(output);
+        }
+        assert_eq!(appended_packets[&(output as u64)], expected);
+    }
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
@@ -1118,6 +1180,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             "companion_inventory_only":true,"jobs_wait_cli":true,"verified_copy_job":folder_accepted["job_id"]},
         "folder_batch":{"batch":folder_group["batch_id"],"published":2,"match_cli_stdio_http":true,
             "intentional_exclusions":3,"no_replace":true,"copy_full_byte_equality":true},
+        "track_append":{"job":append_job["job_id"],"kept_original_streams":3,"added_audio":2,"added_subtitles":1,
+            "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "scope":"Retained video-folder cleanup to a disjoint destination; companion copying, output trees, mixed audio/encode workflows, replacement and GUI batching remain separate qualification"});
     std::fs::write(
         evidence.join("batch-media-report.json"),

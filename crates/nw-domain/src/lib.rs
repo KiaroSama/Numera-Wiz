@@ -15,6 +15,7 @@ pub mod preview;
 pub mod reference_metrics;
 pub mod stream_observations;
 pub mod time;
+pub mod track_append;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

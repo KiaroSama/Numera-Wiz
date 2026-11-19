@@ -73,6 +73,7 @@ fn invalid(message: &str) -> DomainError {
 pub fn digest(plan: &Plan) -> Result<String> {
     match plan.schema_version {
         1 if plan.required_rights.is_none()
+            && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
             && plan.execution_limits.is_none()
@@ -105,6 +106,9 @@ pub fn digest(plan: &Plan) -> Result<String> {
 pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     if plan.schema_version != 2 {
         return Err(invalid("Review a fresh version 2 execution plan"));
+    }
+    if !plan.added_tracks.is_empty() {
+        crate::track_append::validate_sources(&plan.source, &plan.added_tracks, &plan.output)?;
     }
     let rights = plan
         .required_rights
@@ -150,6 +154,20 @@ fn digest_value(mut value: Value) -> Result<String> {
         .get_mut("source")
         .and_then(Value::as_object_mut)
         .ok_or_else(|| invalid("Plan source must be an object"))?;
+    semantic_source(source);
+    if let Some(inputs) = object.get_mut("added_tracks").and_then(Value::as_array_mut) {
+        for input in inputs {
+            let source = input.get_mut("source").and_then(Value::as_object_mut)
+                .ok_or_else(|| invalid("Added track source must be an object"))?;
+            semantic_source(source);
+        }
+    }
+    let bytes =
+        serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;
+    Ok(hex::encode(Sha256::digest(bytes)))
+}
+
+fn semantic_source(source: &mut serde_json::Map<String, Value>) {
     for key in ["id", "creator", "display_name"] {
         source.remove(key);
     }
@@ -157,9 +175,6 @@ fn digest_value(mut value: Value) -> Result<String> {
         // The timeout of a completed source observation is audit, not future execution.
         probe.remove("probe_timeout");
     }
-    let bytes =
-        serde_json::to_vec(&ordered(value)).map_err(|_| invalid("Cannot encode semantic plan"))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
 }
 fn ordered(value: Value) -> Value {
     match value {
@@ -218,6 +233,7 @@ mod tests {
         };
         let output = "/exports/output.mkv".to_owned();
         let mut plan = Plan {
+            added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,
             schema_version: 2,

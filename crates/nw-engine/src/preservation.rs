@@ -372,101 +372,86 @@ pub async fn verify(
     plan: &Plan,
     path: &Path,
     observed: &MediaProbe,
+    additional_paths: &[&Path],
     cancel: CancellationToken,
     observer: &Observer,
 ) -> Result<String> {
-    let source = scan(
-        engine,
+    if additional_paths.len() != plan.added_tracks.len() {
+        return Err(invalid("Staged input count differs from the frozen stream map"));
+    }
+    let operation = plan.execution_limits.clone().unwrap_or_default().operation;
+    let primary = (
         Path::new(&plan.source.identity.path),
         &plan.source.probe,
-        cancel.clone(),
-        observer,
-        plan.execution_limits.clone().unwrap_or_default().operation,
-    )
-    .await?;
-    let output = scan(
-        engine,
-        path,
-        observed,
-        cancel,
-        observer,
-        plan.execution_limits.clone().unwrap_or_default().operation,
-    )
-    .await?;
+        plan.resolution.streams.as_slice(),
+    );
+    let additional = additional_paths.iter().zip(&plan.added_tracks).map(|(path, input)| {
+        (*path, &input.source.probe, input.tracks.as_slice())
+    });
+    let mut inputs = Vec::with_capacity(1 + additional_paths.len());
+    for (source_path, probe, streams) in std::iter::once(primary).chain(additional) {
+        inputs.push((scan(engine, source_path, probe, cancel.clone(), observer, operation).await?, probe, streams));
+    }
+    let output = scan(engine, path, observed, cancel.clone(), observer, operation).await?;
     let mut packets = 0u64;
     let mut bytes = 0u64;
-    for (position, stream) in plan.resolution.streams.iter().enumerate() {
-        let output_index = observed
-            .streams
-            .get(position)
-            .ok_or_else(|| invalid("Missing verified output stream"))?
-            .index;
-        let left = source.streams.get(&stream.index);
-        let right = output.streams.get(&output_index);
-        match (left, right) {
-            (Some(left), Some(right))
-                if left.packets == right.packets
+    let mut mapped_output = observed.streams.iter();
+    for (slot, (source, probe, streams)) in inputs.into_iter().enumerate() {
+        for stream in streams {
+            let output_index = mapped_output.next()
+                .ok_or_else(|| invalid("Missing verified output stream"))?.index;
+            let name = format!("Input {slot} stream {}", stream.index);
+            let left = source.streams.get(&stream.index);
+            let right = output.streams.get(&output_index);
+            match (left, right) {
+                (Some(left), Some(right)) if left.packets == right.packets
                     && left.bytes == right.bytes
-                    && left.hash.clone().finalize() == right.hash.clone().finalize() =>
-            {
-                packets = packets
-                    .checked_add(left.packets)
-                    .ok_or_else(|| invalid("Packet count overflow"))?;
-                bytes = bytes
-                    .checked_add(left.bytes)
-                    .ok_or_else(|| invalid("Packet byte count overflow"))?;
+                    && left.hash.clone().finalize() == right.hash.clone().finalize() => {
+                    packets = packets.checked_add(left.packets)
+                        .ok_or_else(|| invalid("Packet count overflow"))?;
+                    bytes = bytes.checked_add(left.bytes)
+                        .ok_or_else(|| invalid("Packet byte count overflow"))?;
+                }
+                (None, None) => {}
+                _ => return Err(invalid(&format!(
+                    "{name} packet payload, timing, flags or exposed side data changed"
+                ))),
             }
-            (None, None) => {}
-            _ => {
-                return Err(invalid(&format!(
-                    "Retained stream {} packet payload, timing, flags or exposed side data changed",
-                    stream.index
-                )));
-            }
+            verify_codec(probe, stream.index, observed, output_index, &name)?;
         }
-        let left = plan
-            .source
-            .probe
-            .stream_details
-            .get(&stream.index)
-            .ok_or_else(|| invalid("Missing frozen source codec parameters"))?;
-        let right = observed
-            .stream_details
-            .get(&output_index)
-            .ok_or_else(|| invalid("Missing output codec parameters"))?;
-        for field in [
-            "codec_name",
-            "codec_type",
-            "profile",
-            "level",
-            "width",
-            "height",
-            "pix_fmt",
-            "sample_aspect_ratio",
-            "sample_fmt",
-            "sample_rate",
-            "channels",
-            "channel_layout",
-            "bits_per_sample",
-            "color_range",
-            "color_space",
-            "color_transfer",
-            "color_primaries",
-            "chroma_location",
-            "extradata_hash",
-            "side_data_list",
-        ] {
-            if canonical(left[field].clone()) != canonical(right[field].clone()) {
-                return Err(invalid(&format!(
-                    "Retained stream {} codec parameter {field} changed; no decoded reframing oracle is admitted",
-                    stream.index
-                )));
-            }
-        }
+    }
+    if mapped_output.next().is_some() {
+        return Err(invalid("Unmapped stream appeared in the verified output"));
     }
     Ok(format!(
         "Full packet read: {packets} retained packets and {bytes} payload bytes; SHA-256 payloads, exact original-clock PTS/DTS/duration, flags, codec parameters/extradata and ffprobe-exposed side data matched. No decoded fallback or unexposed raw side-data identity claim."
     ))
+}
+
+fn verify_codec(
+    source: &MediaProbe,
+    source_index: u32,
+    output: &MediaProbe,
+    output_index: u32,
+    source_name: &str,
+) -> Result<()> {
+    let left = source.stream_details.get(&source_index)
+        .ok_or_else(|| invalid("Missing frozen source codec parameters"))?;
+    let right = output.stream_details.get(&output_index)
+        .ok_or_else(|| invalid("Missing output codec parameters"))?;
+    for field in [
+        "codec_name", "codec_type", "profile", "level", "width", "height", "pix_fmt",
+        "sample_aspect_ratio", "sample_fmt", "sample_rate", "channels", "channel_layout",
+        "bits_per_sample", "color_range", "color_space", "color_transfer", "color_primaries",
+        "chroma_location", "extradata_hash", "side_data_list",
+    ] {
+        if canonical(left[field].clone()) != canonical(right[field].clone()) {
+            return Err(invalid(&format!(
+                "{source_name} codec parameter {field} changed; no decoded reframing oracle is admitted"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

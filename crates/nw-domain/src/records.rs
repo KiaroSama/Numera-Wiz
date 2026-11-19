@@ -58,6 +58,8 @@ pub struct Asset {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub added_tracks: Vec<crate::track_append::AddedInput>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_limits: Option<crate::execution::CleanupLimits>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
