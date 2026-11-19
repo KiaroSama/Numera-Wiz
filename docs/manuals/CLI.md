@@ -973,3 +973,29 @@ For an imported FFmWiz FFV1 picture job, set `audio_tracks=none` and
 `reverse_video` to review the registered whole clip through
 `jobs plan`. The imported input path must match the registered asset.
 Fields outside the picture-only profile receive field-specific errors.
+
+
+### Encode H.264 with optional AAC
+
+Use `numera-wiz media encode --file export.json` with a registered
+SDR Matroska FFV1 picture. Choose a new MP4 or Matroska destination.
+
+```json
+{
+  "asset_id": "<registered asset id>",
+  "output": "/exports/video.mp4",
+  "settings": {
+    "video_stream": 0,
+    "container": "mp4",
+    "crf": 18,
+    "preset": "balanced",
+    "audio": {"kind": "aac", "stream_index": 1, "bitrate_kbps": 128}
+  }
+}
+```
+
+The CPU preset offers fast, balanced and slow settings. Use
+`{"kind":"drop"}` for picture only. The output verifies original picture
+presentation times and dimensions. Selected AAC retains the original
+mono or stereo rate and verifies the coded timing. Review and submit
+the returned plan ID and hash.

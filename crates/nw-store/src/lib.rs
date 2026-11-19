@@ -623,6 +623,7 @@ mod tests {
             audio_edit: None,
             media_join: None,
             video_retime: None,
+            avc_export: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

@@ -1,5 +1,6 @@
 //! Shared human media workspace; all authoritative behavior is requested from the owner.
 mod audio_edit;
+mod avc_export;
 mod batches;
 mod capabilities;
 mod cleanup;
@@ -170,6 +171,7 @@ pub struct WizApp {
     media_join: media_join::JoinUi,
     video_retime: video_retime::RetimeUi,
     audio_edit: audio_edit::AudioEditUi,
+    avc_export: avc_export::AvcUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -367,6 +369,7 @@ impl WizApp {
             media_join: Default::default(),
             video_retime: Default::default(),
             audio_edit: Default::default(),
+            avc_export: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -412,6 +415,7 @@ impl WizApp {
             self.media_join = Default::default();
             self.video_retime = Default::default();
             self.audio_edit = Default::default();
+            self.avc_export = Default::default();
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -1606,6 +1610,7 @@ impl eframe::App for WizApp {
                 self.subtitle_burn_panel(ui, &asset);
                 self.media_join_panel(ui, &asset);
                 self.video_retime_panel(ui, &asset);
+                self.avc_export_panel(ui, &asset);
             }
         });
         if !self.folder.open {

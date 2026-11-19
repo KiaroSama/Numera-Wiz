@@ -934,6 +934,61 @@ async fn variable_picture_retime(parent: &Path) -> Value {
     json!(decisions)
 }
 
+async fn cpu_avc_export(parent: &Path) -> Value {
+    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
+        .expect("Hosted AVC export needs the authenticated FFmpeg CPU tools"));
+    let directory = parent.join("cpu-avc-export");
+    std::fs::create_dir(&directory).unwrap();
+    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let path = directory.join("original-vfr-export.mkv");
+    let generate = [
+        "-v","error","-f","lavfi","-i","testsrc2=size=320x180:rate=1000:d=0.520",
+        "-f","lavfi","-i","sine=frequency=800:sample_rate=48000:d=0.52",
+        "-map","0:v:0","-map","1:a:0","-vf",r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512),setsar=4/3",
+        "-fps_mode","passthrough","-enc_time_base:v","1/1000","-c:v","ffv1","-c:a","pcm_s16le",path.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"),&generate,Duration::from_secs(30),4096,CancellationToken::new())
+        .await.unwrap();
+    let original = accepted(&cli,&scope,"register-avc-source","assets.register",json!({"path":path})).await;
+    let mut results = Vec::new();
+    for (container, extension) in [("mp4","mp4"),("matroska","mkv")] {
+        let output = directory.join(format!("avc-export.{extension}"));
+        let input = json!({"asset_id":original["id"],"output":output,"settings":{
+            "video_stream":0,"container":container,"crf":18,"preset":"balanced",
+            "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
+        }});
+        let plan = cli.query("media.encode",input.clone()).await;
+        let document = directory.join(format!("avc-{container}.json"));
+        std::fs::write(&document,serde_json::to_vec(&input).unwrap()).unwrap();
+        let (typed, code) = cli.human(&["media","encode","--file",document.to_str().unwrap()]).await;
+        assert_eq!(code,0,"{typed}");
+        assert_eq!(typed["result"]["hash"],plan["hash"]);
+        let job = accepted(&cli,&scope,&format!("run-avc-{container}"),"jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        succeeded(&cli,&job).await;
+        let probe = fixture::probe(&components,&output).await;
+        assert_eq!(probe["streams"][0]["codec_name"],"h264");
+        assert_eq!(probe["streams"][0]["sample_aspect_ratio"],"4:3");
+        assert_eq!(probe["streams"][1]["codec_name"],"aac");
+        assert_eq!(probe["streams"][1]["sample_rate"],"48000");
+        let time_base = probe["streams"][0]["time_base"].as_str().unwrap();
+        let (numerator, denominator) = time_base.split_once('/').unwrap();
+        let numerator: i64 = numerator.parse().unwrap();
+        let denominator: i64 = denominator.parse().unwrap();
+        let clock: Vec<_> = packets(&components,&output).await[&0].iter()
+            .map(|packet| {
+                let value = packet["pts"].as_i64().unwrap() * numerator * 1000;
+                assert_eq!(value % denominator, 0);
+                value / denominator
+            }).collect();
+        assert_eq!(clock, [0,32,120,224,376,512]);
+        results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
+            "picture":"h264","audio":"aac","sample_aspect_ratio":"4:3"}));
+    }
+    json!(results)
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
@@ -942,6 +997,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let sample_edit_facts = multirange_audio_edits(media.directory.path()).await;
     let join_facts = packet_join(media.directory.path()).await;
     let retime_facts = variable_picture_retime(media.directory.path()).await;
+    let avc_facts = cpu_avc_export(media.directory.path()).await;
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -2445,6 +2501,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "sample_edit":sample_edit_facts,
         "packet_join":join_facts,
         "picture_retime":retime_facts,
+        "cpu_avc_export":avc_facts,
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},

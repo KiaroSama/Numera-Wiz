@@ -11,6 +11,7 @@ use std::path::Path;
 pub enum OutputProfile {
     Matroska,
     WavePcm,
+    AvcMp4,
     QuickTimeMpeg4,
     IsoMp4Mpeg4,
 }
@@ -37,13 +38,14 @@ impl OutputProfile {
             Self::Matroska => "matroska",
             Self::WavePcm => "wav",
             Self::QuickTimeMpeg4 => "mov",
-            Self::IsoMp4Mpeg4 => "mp4",
+            Self::IsoMp4Mpeg4 | Self::AvcMp4 => "mp4",
         }
     }
     pub fn scope(self) -> &'static str {
         match self {
             Self::Matroska => crate::preservation::SCOPE,
             Self::WavePcm => crate::audio_edit::SCOPE,
+            Self::AvcMp4 => crate::avc_export::SCOPE,
             Self::QuickTimeMpeg4 | Self::IsoMp4Mpeg4 => ISO_SCOPE,
         }
     }
@@ -70,6 +72,9 @@ impl OutputProfile {
                     "This metadata patch route requires a Matroska output",
                 ));
             }
+        }
+        if self == Self::AvcMp4 {
+            return crate::avc_export::admit(source, outcome);
         }
         if self == Self::Matroska {
             return Ok(());
@@ -103,7 +108,7 @@ impl OutputProfile {
         let same_family = match self {
             Self::QuickTimeMpeg4 => extension.as_deref() == Some("mov"),
             Self::IsoMp4Mpeg4 => matches!(extension.as_deref(), Some("mp4" | "m4v")),
-            Self::Matroska | Self::WavePcm => unreachable!(),
+            Self::Matroska | Self::WavePcm | Self::AvcMp4 => unreachable!(),
         };
         if !same_family {
             return Err(incompatible(
@@ -113,7 +118,7 @@ impl OutputProfile {
         let (brand, compatible, vendor) = match self {
             Self::QuickTimeMpeg4 => ("qt  ", "qt  ", Some("FFMP")),
             Self::IsoMp4Mpeg4 => ("isom", "isomiso2mp41", None),
-            Self::Matroska | Self::WavePcm => unreachable!(),
+            Self::Matroska | Self::WavePcm | Self::AvcMp4 => unreachable!(),
         };
         let tags = &source.probe.global_tags;
         for (key, expected) in [

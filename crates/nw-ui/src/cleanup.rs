@@ -630,6 +630,15 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
+                if let Some(encode) = &plan.avc_export {
+                    ui.label(format!(
+                        "Picture {} to H.264 · CRF {} · {:?} preset",
+                        encode.video_stream, encode.crf, encode.preset
+                    ));
+                    if let nw_domain::avc_export::Audio::Aac { stream_index, bitrate_kbps } = encode.audio {
+                        ui.label(format!("Audio {stream_index} to AAC at {bitrate_kbps} kbps"));
+                    }
+                }
                 if let Some(retime) = &plan.video_retime
                     && let Ok(clock) = retime.output_clock()
                 {

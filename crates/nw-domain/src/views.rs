@@ -66,6 +66,8 @@ pub struct JobSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avc_export: Option<crate::avc_export::Encode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video_retime: Option<crate::video_retime::Retime>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub media_join: Vec<crate::media_join::SegmentReview>,
@@ -141,6 +143,7 @@ impl PlanReview {
         Self {
             packet_cut: plan.packet_cut,
             subtitle_burn: None,
+            avc_export: plan.avc_export.as_ref().filter(|_| source_visible).cloned(),
             media_join: Vec::new(),
             video_retime: plan
                 .video_retime

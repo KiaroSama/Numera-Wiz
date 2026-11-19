@@ -592,3 +592,9 @@ profile. The verified result retains the exact variable frame clock.
 tracks, and the supported speed/reverse settings compiles to the same
 lossless picture retime as `media.retime`. Grant both commands to that
 profile.
+
+
+`media.encode` reviews an SDR FFV1 source for verified H.264 export
+with optional AAC in MP4 or Matroska. Set the preset and CRF in
+`settings`. Use `commands.schema` for the complete contract and
+`jobs.submit` to run the reviewed plan.

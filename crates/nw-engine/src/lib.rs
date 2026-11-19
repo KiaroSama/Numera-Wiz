@@ -2,6 +2,7 @@
 mod admission;
 mod audio_edit;
 mod audio_normalization;
+mod avc_export;
 mod budget;
 mod capabilities;
 mod media;
@@ -358,12 +359,26 @@ impl Engine {
 
     fn review_stream_copy(
         &self,
-        mut asset: Asset,
+        asset: Asset,
         output: &Path,
         file_times: nw_domain::file_times::FileTimeRequest,
         creator: &str,
         now: u64,
         resolve: impl FnOnce(&[Stream]) -> Result<mux::CleanResolution>,
+    ) -> Result<Plan> {
+        self.review_resolved_output(asset, output, file_times, creator, now, |streams| {
+            resolve(streams).map(|resolution| (resolution, None))
+        })
+    }
+
+    fn review_resolved_output(
+        &self,
+        mut asset: Asset,
+        output: &Path,
+        file_times: nw_domain::file_times::FileTimeRequest,
+        creator: &str,
+        now: u64,
+        resolve: impl FnOnce(&[Stream]) -> Result<(mux::CleanResolution, Option<OutputProfile>)>,
     ) -> Result<Plan> {
         let object = registered_object(&asset)?.clone();
         let source_stamp = files::SourceStamp::capture_resolved(Path::new(&asset.identity.path))?;
@@ -375,9 +390,12 @@ impl Engine {
                 "Output must be distinct from the source",
             ));
         }
-        let resolution = resolve(&asset.probe.streams)?;
+        let (resolution, requested_profile) = resolve(&asset.probe.streams)?;
         let profile = if resolution.action == CleanAction::Remux {
-            let profile = OutputProfile::from_output(&output)?;
+            let profile = match requested_profile {
+                Some(profile) => profile,
+                None => OutputProfile::from_output(&output)?,
+            };
             profile.admit(&asset, &resolution)?;
             if profile == OutputProfile::Matroska {
                 admit_matroska(&output, &resolution.streams)?;
@@ -434,6 +452,7 @@ impl Engine {
             audio_edit: None,
             media_join: None,
             video_retime: None,
+            avc_export: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -475,7 +494,9 @@ impl Engine {
                 "Stored plan hash mismatch",
             ));
         }
-        let profile = if plan.resolution.action == CleanAction::Remux {
+        let profile = if let Some(encode) = &plan.avc_export {
+            avc_export::profile(encode, Path::new(&plan.output))?
+        } else if plan.resolution.action == CleanAction::Remux {
             OutputProfile::from_output(Path::new(&plan.output))?
         } else {
             OutputProfile::Matroska
@@ -486,7 +507,9 @@ impl Engine {
                 "WAVE output requires a reviewed PCM sample edit",
             ));
         }
-        let expected_scope = if plan.video_retime.is_some() {
+        let expected_scope = if plan.avc_export.is_some() {
+            avc_export::SCOPE
+        } else if plan.video_retime.is_some() {
             video_retime::SCOPE
         } else if plan.media_join.is_some() {
             media_join::SCOPE
@@ -517,7 +540,9 @@ impl Engine {
         }
         track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux {
-            let expected = if plan.video_retime.is_some() {
+            let expected = if plan.avc_export.is_some() {
+                avc_export::invocation(plan, profile)?
+            } else if plan.video_retime.is_some() {
                 video_retime::invocation(plan, profile)?
             } else if plan.media_join.is_some() {
                 media_join::invocation(plan, profile)?
@@ -824,8 +849,13 @@ impl Engine {
                 cancel.clone(),
             )
             .await?;
-        verify_structure(plan, &observed)?;
-        let mut verification = if plan.video_retime.is_some() {
+        if plan.avc_export.is_none() {
+            verify_structure(plan, &observed)?;
+        }
+        let mut verification = if plan.avc_export.is_some() {
+            self.verify_avc(plan, staging.path(), &observed, cancel.clone(), &observer)
+                .await?
+        } else if plan.video_retime.is_some() {
             self.verify_video_retime(plan, staging.path(), &observed, cancel.clone())
                 .await?
         } else if plan.media_join.is_some() {

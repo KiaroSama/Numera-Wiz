@@ -79,6 +79,7 @@ pub fn digest(plan: &Plan) -> Result<String> {
             && plan.audio_edit.is_none()
             && plan.media_join.is_none()
             && plan.video_retime.is_none()
+            && plan.avc_export.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
@@ -112,6 +113,16 @@ pub fn digest(plan: &Plan) -> Result<String> {
 pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     if plan.schema_version != 2 {
         return Err(invalid("Review a fresh version 2 execution plan"));
+    }
+    if let Some(encode) = &plan.avc_export {
+        encode.validate()?;
+        if plan.resolution.action != crate::mux::CleanAction::Remux || plan.video_retime.is_some()
+            || plan.media_join.is_some() || plan.subtitle_burn.is_some() || plan.audio_edit.is_some()
+            || plan.packet_cut.is_some() || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
+            || plan.resolution.chapter_import.is_some() || plan.resolution.metadata_patch.is_some()
+        {
+            return Err(invalid("AVC export requires a separate reviewed render and output verification"));
+        }
     }
     if let Some(retime) = &plan.video_retime {
         retime.output_clock()?;
@@ -361,6 +372,7 @@ mod tests {
             audio_edit: None,
             media_join: None,
             video_retime: None,
+            avc_export: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

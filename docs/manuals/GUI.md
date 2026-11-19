@@ -353,3 +353,8 @@ Use **Change picture speed or reverse** for a registered short
 Matroska FFV1 clip. Choose the original frame time, exclusive end,
 tempo and playback direction. Review the output frame count and
 presentation clock before running the job.
+
+
+Use **Encode H.264 video** on a registered SDR Matroska FFV1 asset.
+Choose the picture, optional AAC audio, quality and CPU preset. Enter a
+new MP4 or Matroska destination, then review and run the job.

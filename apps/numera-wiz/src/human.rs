@@ -114,6 +114,11 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
+    /// Review a CPU AVC export with optional AAC.
+    Encode {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review a lossless FFV1 picture retime or reversal.
     Retime {
         #[arg(long)]
@@ -651,6 +656,12 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut input: nw_domain::audio_edit::EditInput = commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("audio.edit", serde_json::to_value(input)?)
+        }
+        Command::Media(Media::Encode { file }) => {
+            let mut input: nw_domain::avc_export::EncodeInput = commands::parse(document(&file)?)?;
+            input.settings.validate()?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("media.encode", serde_json::to_value(input)?)
         }
         Command::Media(Media::Retime { file }) => {
             let mut input: nw_domain::video_retime::RetimeInput =

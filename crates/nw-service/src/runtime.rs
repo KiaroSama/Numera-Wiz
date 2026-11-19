@@ -1168,6 +1168,7 @@ impl Service {
                 "timeline.preview_frame",
                 "media.probe",
                 "media.cut",
+                "media.encode",
                 "media.join",
                 "media.retime",
                 "subtitles.burn",
@@ -2235,8 +2236,8 @@ impl Service {
                 return Ok(response);
             }
             "streams.clean" | "streams.add" | "streams.replace" | "streams.extract"
-            | "subtitles.burn" | "chapters.remove" | "chapters.import" | "disposition.patch"
-            | "metadata.patch" => {
+            | "media.encode" | "subtitles.burn" | "chapters.remove" | "chapters.import"
+            | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
@@ -2923,6 +2924,11 @@ impl Service {
         now: u64,
     ) -> Result<Plan> {
         let input = match command {
+            "media.encode" => {
+                let input: nw_domain::avc_export::EncodeInput = commands::parse(params)?;
+                return self.prepare_native_copy(context, &input.asset_id, &input.output, Default::default(),
+                    |engine, source, output| engine.avc_plan_at(source, output, input.settings, &context.principal, now));
+            }
             "subtitles.burn" => {
                 use nw_domain::subtitle_burn::{BurnInput, SubtitleInput, SubtitleSource};
                 let input: BurnInput = commands::parse(params)?;
@@ -4118,6 +4124,7 @@ mod tests {
             audio_edit: None,
             media_join: None,
             video_retime: None,
+            avc_export: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,
