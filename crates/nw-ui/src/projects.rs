@@ -15,17 +15,31 @@ use nw_domain::{
     time::{Rational, TimeRange},
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{collections::{BTreeMap, BTreeSet}, sync::Arc, time::Duration};
 use web_time::Instant;
 
 const PAGE: usize = 128;
 const GROUP_BYTES: usize = 2 * 1024 * 1024;
 const TRACKED_HANDLES: usize = 4;
 const BINDINGS: usize = 8;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum TrackExchange {
     Otio,
     Fcp7,
+    Fcpxml,
+    Aaf,
+    Omf,
+}
+
+impl TrackExchange {
+    fn is_binary(self) -> bool {
+        matches!(self, Self::Aaf | Self::Omf)
+    }
+}
+
+struct TrackDocument {
+    document: String,
+    sources: Vec<nw_domain::interchange::OtioSource>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -224,8 +238,7 @@ pub(super) struct ProjectsUi {
     #[cfg(not(target_arch = "wasm32"))]
     native_picture: Option<NativePictureView>,
     edl: Option<nw_domain::interchange::EdlExport>,
-    otio: Option<nw_domain::interchange::OtioExport>,
-    fcp7: Option<nw_domain::interchange::OtioExport>,
+    track_documents: BTreeMap<TrackExchange, TrackDocument>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
     wave_projection: Option<nw_domain::projects::wave_projection::Projection>,
@@ -249,12 +262,8 @@ impl ProjectsUi {
         self.edl = None;
         self.forms.edl_document.clear();
         self.forms.edl_reels.clear();
-        self.otio = None;
-        self.forms.otio_document.clear();
-        self.forms.otio_sources.clear();
-        self.fcp7 = None;
-        self.forms.fcp7_document.clear();
-        self.forms.fcp7_sources.clear();
+        self.track_documents.clear();
+        self.forms.track_imports.clear();
         self.mixed_review = None;
         self.marker_page = None;
         self.wave_projection = None;
@@ -1105,29 +1114,54 @@ impl WizApp {
                 return Ok(());
             }
             Phase::TrackExport(format) => {
-                let doc: nw_domain::interchange::OtioExport =
-                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                use nw_domain::interchange::{BinaryTrackExport, MAX_BINARY_BYTES, OtioExport, decode_binary_document};
+                let (project, sequence, track, revision, range, digest, expected, document) =
+                    if format.is_binary() {
+                        let result: BinaryTrackExport =
+                            serde_json::from_value(result).map_err(|error| error.to_string())?;
+                        let raw = decode_binary_document(&result.document_base64, MAX_BINARY_BYTES).map_err(|error| error.message)?;
+                        (
+                            result.project_id,
+                            result.sequence_id,
+                            result.track_id,
+                            result.revision,
+                            result.range,
+                            nw_domain::projects::hash(&raw),
+                            result.document_sha256,
+                            TrackDocument { document: result.document_base64, sources: result.sources },
+                        )
+                    } else {
+                        let result: OtioExport =
+                            serde_json::from_value(result).map_err(|error| error.to_string())?;
+                        (
+                            result.project_id,
+                            result.sequence_id,
+                            result.track_id,
+                            result.revision,
+                            result.range,
+                            nw_domain::projects::hash(result.document.as_bytes()),
+                            result.document_sha256,
+                            TrackDocument { document: result.document, sources: result.sources },
+                        )
+                    };
                 let group = self
                     .projects
                     .group
                     .as_ref()
                     .ok_or("No displayed sequence for the track export")?;
-                if doc.project_id.as_str() != group.key.project
-                    || group.view.sequence.as_deref() != Some(doc.sequence_id.as_str())
-                    || group.view.track.as_deref() != Some(doc.track_id.as_str())
-                    || doc.revision.to_string() != group.key.revision
-                    || doc.range != group.view.range
-                    || nw_domain::projects::hash(doc.document.as_bytes()) != doc.document_sha256
+                if project.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(sequence.as_str())
+                    || group.view.track.as_deref() != Some(track.as_str())
+                    || revision.to_string() != group.key.revision
+                    || range != group.view.range
+                    || digest != expected
                 {
                     return Err(
                         "Track document differs from the displayed revision, track, range or accepted digest"
                             .into(),
                     );
                 }
-                match format {
-                    TrackExchange::Otio => self.projects.otio = Some(doc),
-                    TrackExchange::Fcp7 => self.projects.fcp7 = Some(doc),
-                }
+                self.projects.track_documents.insert(format, document);
                 return Ok(());
             }
             Phase::MixedReview => {

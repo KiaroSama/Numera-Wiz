@@ -6,10 +6,12 @@
 
 [![Rust CI](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml?query=branch%3Arewrite%2Frust-completion)
 [![Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml?query=branch%3Arewrite%2Frust-completion)
-[![Rust](https://img.shields.io/badge/Rust-1.99.1-DEA584?logo=rust)](rust-toolchain.toml)
-[![Platforms](https://img.shields.io/badge/builds-Windows%20%7C%20Linux%20%7C%20macOS-blue)](.github/workflows/ci.yml)
-[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20HTTP-blue)](docs/agents/README.md)
-[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.99.1-DEA584?logo=rust&style=flat-square)](rust-toolchain.toml)
+[![Platforms](https://img.shields.io/badge/builds-Windows%20%7C%20Linux%20%7C%20macOS-2868a9?style=flat-square)](.github/workflows/ci.yml)
+[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20HTTP-6853a3?style=flat-square)](docs/agents/README.md)
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-31643b?style=flat-square)](LICENSE)
+[![Repository size](https://img.shields.io/github/repo-size/KiaroSama/Numera-Wiz?style=flat-square&color=64748b)](https://github.com/KiaroSama/Numera-Wiz)
+[![Donations](https://img.shields.io/badge/Support-donations-d04a9a?style=flat-square)](https://github.com/KiaroSama/FFmWiz#donate)
 
 A **Pure Rust** media application with a local **FFmpeg/ffprobe** engine, shared
 native/browser workspace, CLI and official MCP transports. FFmWiz and MuxCls
@@ -69,11 +71,12 @@ export and continuous preview remain in development.
 - CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped
   operator profiles, bounded artifact transfer and verified client Save As.
 - [Track and asset exchange](docs/manuals/PROJECTS.md#exchange-a-track-with-opentimelineio)
-  includes selected-track CMX 3600, OpenTimelineIO and Final Cut Pro 7 XML,
-  plus Avid Log Exchange metadata for registered sources.
+  includes selected-track CMX 3600, OpenTimelineIO, Final Cut Pro 7 XML,
+  Final Cut Pro XML, linked AAF picture or audio, linked OMF 2 audio, and
+  Avid Log Exchange metadata for registered sources.
 - [Project state editing](docs/manuals/PROJECTS.md) through shared CLI/MCP commands:
   authorized catalog discovery, exact sequence grids, place/move/split/lift,
-  link/unlink, atomic history/receipts and bounded revision snapshots. Shared
+  linked Slip, Roll and Slide, atomic history and bounded revision snapshots. Shared
   native/browser controls implement catalog discovery, project/sequence creation,
   solid-color/registered-source placement, move/split/lift, bounded clip selection,
   Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen.

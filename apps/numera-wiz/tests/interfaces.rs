@@ -554,6 +554,7 @@ fn project_mcp_output_contract(pages: &[rmcp::model::ListToolsResult]) {
         "clips.join_through_edit",
         "clips.trim",
         "clips.slip",
+        "clips.slide",
         "tracks.set_enabled",
         "tracks.set_locked",
         "mixer.set_track_gain",

@@ -96,7 +96,10 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.render_mixed"
         | "interchange.edl.export"
         | "interchange.otio.export"
-        | "interchange.fcp7.export" => Some(ProjectAction::Read),
+        | "interchange.fcp7.export"
+        | "interchange.fcpxml.export"
+        | "interchange.aaf.export"
+        | "interchange.omf.export" => Some(ProjectAction::Read),
         "sequences.create"
         | "clips.place"
         | "clips.move"
@@ -107,6 +110,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "clips.trim"
         | "clips.slip"
         | "clips.roll"
+        | "clips.slide"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
@@ -116,6 +120,9 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "mixer.set_track_gain"
         | "interchange.edl.import"
         | "interchange.fcp7.import"
+        | "interchange.fcpxml.import"
+        | "interchange.aaf.import"
+        | "interchange.omf.import"
         | "interchange.otio.import"
         | "history.undo"
         | "history.redo" => Some(ProjectAction::Edit),
@@ -140,6 +147,9 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
             | "markers.wave_projection"
             | "interchange.edl.export"
             | "interchange.fcp7.export"
+            | "interchange.fcpxml.export"
+            | "interchange.aaf.export"
+            | "interchange.omf.export"
             | "interchange.otio.export"
     );
     if write || timeline_query {
@@ -157,11 +167,17 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
     if matches!(
         command,
         "clips.place"
+            | "interchange.aaf.export"
+            | "interchange.omf.export"
             | "interchange.edl.import"
             | "interchange.fcp7.import"
+            | "interchange.fcpxml.import"
+            | "interchange.aaf.import"
+            | "interchange.omf.import"
             | "interchange.otio.import"
             | "clips.slip"
             | "clips.roll"
+            | "clips.slide"
             | "timeline.preview_frame"
             | crate::preview::PROGRAM_SEGMENT_COMMAND
             | "timeline.render_mixed"

@@ -368,6 +368,19 @@ pub enum Clips {
         #[arg(long, allow_hyphen_values = true)]
         delta: String,
     },
+    /// Shift a clip between adjacent neighbors without changing its source window.
+    Slide {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long)]
+        left: String,
+        #[arg(long)]
+        clip: String,
+        #[arg(long)]
+        right: String,
+        #[arg(long, allow_hyphen_values = true)]
+        delta: String,
+    },
     Trim {
         #[command(flatten)]
         context: WriteContext,
@@ -417,6 +430,9 @@ impl Clips {
             Self::JoinThroughEdit { context, left, right } => context.request("clips.join_through_edit", json!({"left_id":left,"right_id":right})),
             Self::Roll { context, left, right, delta } => context.request("clips.roll", json!({
                 "left_id":left,"right_id":right,"delta":rational(&delta)?,"link_policy":"expand"
+            })),
+            Self::Slide { context, left, clip, right, delta } => context.request("clips.slide", json!({
+                "left_id":left,"clip_id":clip,"right_id":right,"delta":rational(&delta)?,"link_policy":"expand"
             })),
             Self::Trim { context, clips, head, tail } => context.request("clips.trim", json!({"clip_ids":clips,"head":rational(&head)?,"tail":rational(&tail)?,"link_policy":"expand"})),
             Self::Slip { context, clips, delta } => context.request("clips.slip", json!({"clip_ids":clips,"delta":rational(&delta)?,"link_policy":"expand"})),

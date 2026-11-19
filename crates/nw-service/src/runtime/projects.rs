@@ -129,6 +129,99 @@ impl Service {
         ))
     }
 
+    pub(super) fn export_binary_track(
+        &self,
+        context: &Context,
+        command: &str,
+        format: binary_interchange::Format,
+        capture: &nw_domain::media::MixedCapture,
+        track_id: &EntityId,
+        cancel: &CancellationToken,
+    ) -> Result<nw_domain::interchange::BinaryTrackExport> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+        use nw_domain::{
+            interchange::{BinaryTrackExport, MAX_BINARY_BYTES},
+            media::OccurrenceSource,
+        };
+
+        let track = capture
+            .tracks
+            .iter()
+            .find(|track| track.id == *track_id)
+            .ok_or_else(|| domain::invalid("Select one enabled track for binary interchange"))?;
+        let _permit = self
+            .batch_preflights
+            .try_acquire()
+            .map_err(|_| domain::limit("Source preflight capacity is busy; retry this request"))?;
+        let stale_source = || DomainError::new("SOURCE_CHANGED", "Binary interchange source changed");
+        let mut assets = BTreeMap::new();
+        let mut sources = BTreeMap::new();
+        for clip in &track.clips {
+            let OccurrenceSource::Registered {
+                asset_id,
+                stream_index,
+                content_sha256,
+                probe_sha256,
+                media_kind,
+                ..
+            } = &clip.source
+            else {
+                return Err(domain::invalid("Binary interchange requires registered media"));
+            };
+            let (binding, held) = match sources.entry((asset_id, *stream_index)) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    let source = self.registered_project_source(context, asset_id, *stream_index, cancel)?;
+                    entry.insert(source)
+                }
+            };
+            if !matches!(&*binding, SourceBinding::Registered {
+                content_sha256: actual_content,
+                probe_sha256: actual_probe,
+                media_kind: actual_kind,
+                ..
+            } if actual_content == content_sha256 && actual_probe == probe_sha256 && actual_kind == media_kind)
+            {
+                return Err(stale_source());
+            }
+            assets.entry(asset_id.clone()).or_insert_with(|| held.asset.clone());
+        }
+        let output = binary_interchange::export(format, capture, track_id, &assets)?;
+        if output.document.len() > MAX_BINARY_BYTES {
+            return Err(domain::limit("Binary interchange document exceeds 160 KiB"));
+        }
+
+        let _guard = self.mutation.lock().map_err(|_| lock_error())?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Binary interchange export cancelled"));
+        }
+        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(command)) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Binary interchange grant changed"));
+        }
+        let current = self.read_project(context, capture.project_id.as_str(), ObjectAction::Read)?;
+        if current.header().revision != capture.project_revision {
+            return Err(DomainError::new("STALE_REVISION", "Binary interchange project revision changed"));
+        }
+        for (_, held) in sources.into_values() {
+            self.object(context, &held.asset.id, &held.asset.creator)?;
+            let path = Path::new(&held.asset.identity.path);
+            if self.path(context, path, false)? != path {
+                return Err(stale_source());
+            }
+            held.stamp.revalidate()?;
+        }
+        Ok(BinaryTrackExport {
+            project_id: capture.project_id.clone(),
+            sequence_id: capture.sequence_id.clone(),
+            track_id: track_id.clone(),
+            revision: capture.project_revision,
+            range: capture.range,
+            document_base64: STANDARD.encode(output.document),
+            document_sha256: output.document_sha256,
+            sources: output.sources,
+        })
+    }
+
     pub(super) fn wave_marker_projection(
         &self,
         context: &Context,
@@ -358,9 +451,13 @@ impl Service {
                 "clips.place"
                     | "clips.slip"
                     | "clips.roll"
+                    | "clips.slide"
                     | "interchange.edl.import"
                     | "interchange.otio.import"
                     | "interchange.fcp7.import"
+                    | "interchange.fcpxml.import"
+                    | "interchange.aaf.import"
+                    | "interchange.omf.import"
             ) {
                 Some(
                     self.batch_preflights
@@ -417,34 +514,52 @@ impl Service {
                     }
                     "interchange.edl.import"
                     | "interchange.otio.import"
-                    | "interchange.fcp7.import" => {
-                        use nw_domain::interchange::{CutTrack, parse_cmx3600, parse_otio};
+                    | "interchange.fcp7.import"
+                    | "interchange.fcpxml.import"
+                    | "interchange.aaf.import"
+                    | "interchange.omf.import" => {
+                        use nw_domain::interchange::{self, BinaryTrackImport, CutTrack};
                         let params = request.params.clone();
+                        let command = request.command.id.as_str();
                         let (target, document_sha256, cuts) =
-                            if request.command.id == "interchange.edl.import" {
-                                let import = parse_cmx3600(commands::parse(params)?)?;
+                            if command == "interchange.edl.import" {
+                                let import = interchange::parse_cmx3600(commands::parse(params)?)?;
                                 (
                                     CutTrack::Edl(import.frames_per_second),
                                     import.document_sha256,
                                     import.cuts,
                                 )
-                            } else if request.command.id == "interchange.fcp7.import" {
-                                let import =
-                                    nw_domain::interchange::fcp7::import(commands::parse(params)?)?;
-                                (
-                                    CutTrack::Fcp7 {
-                                        kind: import.kind,
-                                        range: import.range,
-                                    },
-                                    import.document_sha256,
-                                    import.cuts,
-                                )
                             } else {
-                                let import = parse_otio(commands::parse(params)?)?;
+                                let (import, mismatch) = match command {
+                                    "interchange.fcp7.import" => (
+                                        interchange::fcp7::import(commands::parse(params)?)?,
+                                        "FCP7_TRACK_MISMATCH",
+                                    ),
+                                    "interchange.fcpxml.import" => (
+                                        interchange::fcpxml::import(commands::parse(params)?)?,
+                                        "FCPXML_TRACK_MISMATCH",
+                                    ),
+                                    "interchange.aaf.import" | "interchange.omf.import" => {
+                                        let (format, mismatch) = if command == "interchange.aaf.import" {
+                                            (binary_interchange::Format::Aaf, "AAF_TRACK_MISMATCH")
+                                        } else {
+                                            (binary_interchange::Format::Omf, "OMF_TRACK_MISMATCH")
+                                        };
+                                        let input: BinaryTrackImport = commands::parse(params)?;
+                                        let bytes = interchange::decode_binary_document(&input.document_base64, interchange::MAX_BINARY_IMPORT_BYTES)?;
+                                        let import = binary_interchange::import(
+                                            format, &bytes, &input.sequence_id, &input.track_id,
+                                            input.start, &input.sources,
+                                        )?;
+                                        (import, mismatch)
+                                    }
+                                    _ => (interchange::parse_otio(commands::parse(params)?)?, "OTIO_TRACK_MISMATCH"),
+                                };
                                 (
-                                    CutTrack::Otio {
+                                    CutTrack::Exact {
                                         kind: import.kind,
                                         range: import.range,
+                                        mismatch,
                                     },
                                     import.document_sha256,
                                     import.cuts,
@@ -535,6 +650,9 @@ impl Service {
                     "clips.roll" => {
                         ProjectEditIntent::Roll(commands::parse(request.params.clone())?)
                     }
+                    "clips.slide" => {
+                        ProjectEditIntent::Slide(commands::parse(request.params.clone())?)
+                    }
                     "timeline.remove_gap" => {
                         ProjectEditIntent::RemoveGap(commands::parse(request.params.clone())?)
                     }
@@ -572,6 +690,7 @@ impl Service {
                     | ProjectEditIntent::JoinThroughEdit(_)
                     | ProjectEditIntent::Slip(_)
                     | ProjectEditIntent::Roll(_)
+                    | ProjectEditIntent::Slide(_)
                     | ProjectEditIntent::RemoveGap(_)
                     | ProjectEditIntent::SetTrackGain(_)
                     | ProjectEditIntent::SetTrackEnabled(_)
@@ -620,12 +739,14 @@ impl Service {
             };
             let header = read.header().clone();
             let expected_header = Some(read.header_raw().to_owned());
-            let source_checks =
-                if matches!(request.command.id.as_str(), "clips.slip" | "clips.roll") {
-                    source_window_checks(&read, &patch)?
-                } else {
-                    Vec::new()
-                };
+            let source_checks = if matches!(
+                request.command.id.as_str(),
+                "clips.slip" | "clips.roll" | "clips.slide"
+            ) {
+                source_window_checks(&read, &patch)?
+            } else {
+                Vec::new()
+            };
             drop(read);
             if !source_checks.is_empty() {
                 held = self.prepare_window_sources(context, source_checks, cancel)?;

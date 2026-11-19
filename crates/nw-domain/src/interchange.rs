@@ -1,6 +1,7 @@
 //! Bounded interchange documents for registered assets and committed project tracks.
 pub mod ale;
 pub mod fcp7;
+pub mod fcpxml;
 mod import;
 mod otio;
 mod xml;
@@ -14,6 +15,7 @@ pub use import::{EdlImportInput, ImportedEdl, MAX_DOCUMENT_BYTES, parse_cmx3600}
 pub use otio::{
     ImportedOtio, MAX_OTIO_BYTES, OtioExport, OtioImportInput, OtioSource, export_otio, parse_otio,
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Write};
@@ -21,8 +23,55 @@ use std::{collections::BTreeMap, fmt::Write};
 #[derive(Clone, Copy)]
 pub enum CutTrack {
     Edl(Rational),
-    Otio { kind: TrackKind, range: TimeRange },
-    Fcp7 { kind: TrackKind, range: TimeRange },
+    Exact {
+        kind: TrackKind,
+        range: TimeRange,
+        mismatch: &'static str,
+    },
+}
+
+pub const MAX_BINARY_BYTES: usize = 160 * 1024;
+pub const MAX_BINARY_IMPORT_BYTES: usize = 512 * 1024;
+pub const MAX_BINARY_IMPORT_BASE64_BYTES: usize = MAX_BINARY_IMPORT_BYTES.div_ceil(3) * 4;
+
+pub fn decode_binary_document(encoded: &str, limit: usize) -> Result<Vec<u8>> {
+    let too_large = || crate::projects::limit("Binary interchange document exceeds its size limit");
+    if encoded.len() > limit.div_ceil(3) * 4 {
+        return Err(too_large());
+    }
+    let bytes = STANDARD.decode(encoded).map_err(|_| {
+        DomainError::new("INTERCHANGE_INVALID", "Expected standard Base64 for binary interchange")
+    })?;
+    if bytes.len() > limit {
+        return Err(too_large());
+    }
+    if bytes.is_empty() {
+        return Err(DomainError::new("INTERCHANGE_INVALID", "Binary interchange document is empty"));
+    }
+    Ok(bytes)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BinaryTrackImport {
+    pub sequence_id: EntityId,
+    pub track_id: EntityId,
+    pub start: Option<Rational>,
+    pub document_base64: String,
+    pub sources: Vec<OtioSource>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BinaryTrackExport {
+    pub project_id: ProjectId,
+    pub sequence_id: EntityId,
+    pub track_id: EntityId,
+    pub revision: Revision,
+    pub range: TimeRange,
+    pub document_base64: String,
+    pub document_sha256: String,
+    pub sources: Vec<OtioSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

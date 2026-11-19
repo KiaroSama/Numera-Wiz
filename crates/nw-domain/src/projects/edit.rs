@@ -56,6 +56,7 @@ pub enum ProjectEditIntent {
     Split(SplitInput),
     JoinThroughEdit(JoinThroughEditInput),
     Roll(RollInput),
+    Slide(SlideInput),
     Trim(TrimInput),
     Slip(SlipInput),
     RemoveGap(RemoveGapInput),
@@ -418,6 +419,86 @@ fn through_edit_required() -> DomainError {
     )
 }
 
+fn slide_boundaries_required() -> DomainError {
+    DomainError::new(
+        "SLIDE_BOUNDARIES_REQUIRED",
+        "Select a clip and its two adjacent neighbors, with a complete linked triplet on every affected track",
+    )
+}
+
+fn slide<R: ProjectRead>(edit: &mut Edit<'_, R>, input: SlideInput) -> Result<()> {
+    let read = edit.read;
+    let anchor: Clip = read.entity(&input.clip_id)?.payload("clip")?;
+    let side = |seed: &EntityId| -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
+        let mut tracks = BTreeMap::new();
+        let selected = match input.link_policy {
+            LinkPolicy::Expand => link_selection(read, std::slice::from_ref(seed), 1)?,
+        };
+        for entity in selected {
+            let clip: Clip = entity.payload("clip")?;
+            if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+                return Err(slide_boundaries_required());
+            }
+        }
+        if tracks
+            .get(&anchor.track_id)
+            .is_none_or(|(entity, _)| entity.id != *seed)
+        {
+            return Err(slide_boundaries_required());
+        }
+        Ok(tracks)
+    };
+    let left = side(&input.left_id)?;
+    let mut middle = side(&input.clip_id)?;
+    let mut right = side(&input.right_id)?;
+    if left.keys().ne(middle.keys()) || left.keys().ne(right.keys()) {
+        return Err(slide_boundaries_required());
+    }
+    if left.len() > MAX_CHANGES / 3 {
+        return Err(limit("Slide exceeds its clip change budget"));
+    }
+    let mut unchanged = Vec::new();
+    for (track, (mut left_entity, mut left)) in left {
+        let (mut middle_entity, middle) =
+            middle.remove(&track).ok_or_else(slide_boundaries_required)?;
+        let (mut right_entity, mut right) = right.remove(&track).ok_or_else(slide_boundaries_required)?;
+        if left.sequence_id != middle.sequence_id
+            || right.sequence_id != middle.sequence_id
+            || left.end()? != middle.sequence_start
+            || middle.end()? != right.sequence_start
+        {
+            return Err(slide_boundaries_required());
+        }
+        edit.clip_context(&left)?;
+        edit.clip_context(&middle)?;
+        edit.clip_context(&right)?;
+        if input.delta == Rational::ZERO {
+            unchanged.extend([left_entity, middle_entity, right_entity]);
+            continue;
+        }
+        left.source_range.end = left.source_range.end.checked_add(input.delta)?;
+        left.duration = left.source_range.duration()?;
+        let middle_start = middle.sequence_start.checked_add(input.delta)?;
+        right.sequence_start = right.sequence_start.checked_add(input.delta)?;
+        right.source_range.start = right.source_range.start.checked_add(input.delta)?;
+        right.duration = right.source_range.duration()?;
+        left_entity.update(&json!({
+            "source_range":left.source_range,"duration":left.duration
+        }))?;
+        middle_entity.update(&json!({"sequence_start":middle_start}))?;
+        right_entity.update(&json!({
+            "sequence_start":right.sequence_start,"source_range":right.source_range,"duration":right.duration
+        }))?;
+        edit.set(left_entity)?;
+        edit.set(middle_entity)?;
+        edit.set(right_entity)?;
+    }
+    if input.delta == Rational::ZERO {
+        validate_unchanged(read, &unchanged)?;
+    }
+    Ok(())
+}
+
 fn through_edit_tracks<R: ProjectRead>(
     read: &R,
     seed: &EntityId,
@@ -608,13 +689,14 @@ pub fn resolve_edit<R: ProjectRead>(
                         ));
                     }
                 }
-                CutTrack::Otio { kind, range } | CutTrack::Fcp7 { kind, range } => {
+                CutTrack::Exact {
+                    kind,
+                    range,
+                    mismatch,
+                } => {
                     if track.sequence_id != sequence_id || track.kind != kind {
                         return Err(DomainError::new(
-                            match target {
-                                CutTrack::Fcp7 { .. } => "FCP7_TRACK_MISMATCH",
-                                _ => "OTIO_TRACK_MISMATCH",
-                            },
+                            mismatch,
                             "Source and destination track kinds must match",
                         ));
                     }
@@ -885,6 +967,10 @@ pub fn resolve_edit<R: ProjectRead>(
                 edit.set(left_entity)?;
                 edit.set(right_entity)?;
             }
+            json!({})
+        }
+        ProjectEditIntent::Slide(input) => {
+            slide(&mut edit, input)?;
             json!({})
         }
         ProjectEditIntent::Trim(input) => {

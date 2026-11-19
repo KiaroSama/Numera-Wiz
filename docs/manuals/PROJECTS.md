@@ -269,6 +269,27 @@ numera-wiz clips roll --left LEFT --right RIGHT --delta 1/24 --project PROJECT -
 
 MCP `clips.roll` uses `left_id`, `right_id`, `delta` and `link_policy:"expand"`.
 
+## Slide a clip between its neighbors
+
+Select a clip with both adjacent neighbors visible on its timeline track. Open
+**Slide clip between neighbors** and enter a signed offset on the exact frame or
+sample grid. Negative moves earlier. Positive moves later. The selected clip
+keeps its duration and source window. Its neighbors absorb the change at the two
+cut points so the outer endpoints stay fixed.
+
+With linked clips, each affected track needs a matching left, center and right
+clip in the respective linked groups. This edit supports clips at normal,
+forward speed. A gap, a locked clip or track, or insufficient source handles
+blocks the whole edit. Undo restores all three clips on every affected track
+together.
+
+```text
+numera-wiz clips slide --left LEFT --clip CENTER --right RIGHT --delta -1/24 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key slide-left
+```
+
+MCP `clips.slide` takes `left_id`, `clip_id`, `right_id`, `delta` and
+`link_policy:"expand"`.
+
 ## Project keyboard shortcuts
 
 Use Command on macOS and Ctrl on Windows or Linux. Command/Ctrl+Z undoes
@@ -389,6 +410,53 @@ must match an explicit registered media binding. The exporter supplies an
 opaque placeholder for each source. Relink the files in the receiving editor.
 The 96 KiB document and 63-cut limits also apply to this format.
 [Apple Final Cut Pro XML reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/)
+
+## Exchange a track with Final Cut Pro XML
+
+In the Projects workspace, select a track and open **Final Cut Pro XML**.
+Prepare the visible range and copy both the document and media bindings. The
+CLI uses `timeline export-fcpxml` and `timeline import-fcpxml` with the same
+arguments as OTIO. MCP uses `interchange.fcpxml.export` and
+`interchange.fcpxml.import`.
+
+V1.10 export writes a single primary story of registered-media cuts and gaps.
+Import accepts that subset in versions 1.8–1.14, including projects in an event.
+It reads exact rational seconds and honors the sequence timecode origin, media
+start offsets, and leading and trailing gaps. Pick one audio or video component
+per clip. The destination grid and the entire empty placement range are checked
+before any edit. The URL in each original-media reference requires an explicit
+registered binding and is never opened. Relink exported placeholder URLs in
+the receiving editor. Each document admits up to 63 cuts and 96 KiB.
+[Apple FCPXML documentation](https://developer.apple.com/documentation/professional-video-applications/fcpxml-reference)
+
+## Exchange linked AAF and OMF 2 tracks
+
+Choose **AAF** or **OMF 2** on the selected track in Projects and copy the
+Base64 document and its media bindings. Use the CLI to store an actual binary
+file and apply it to an empty range.
+
+```text
+numera-wiz timeline export-aaf --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 1 --out cuts.aaf
+numera-wiz timeline import-aaf --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --start 2 --file cuts.aaf --sources sources.json --replay-scope SCOPE --idempotency-key import-cuts
+```
+
+Use `export-omf` and `import-omf` for OMF 2. Save the returned `sources` array
+as a separate UTF-8 JSON file. MCP uses `interchange.aaf.export`,
+`interchange.aaf.import`, `interchange.omf.export` and
+`interchange.omf.import` with `document_base64` for the binary document.
+The SHA-256 covers the decoded file bytes and `--out` saves only after verifying
+the digest.
+
+The linked subset preserves one track of unit-rate cuts and gaps, with up to
+63 registered cuts. AAF accepts constant-rate picture or integer PCM WAVE/AIFF
+audio. OMF 2 accepts audio with matching source and timeline sample rates.
+Linked audio export uses mono or stereo and preserves sample positions.
+Select a range aligned to the sequence's picture grid for the timecode track.
+Export writes portable basenames for relinking. Import treats locators as
+registered media binding keys and opens only the authorized registered source
+verified by its digest. Embedded essence, effects, transitions and nested
+compositions are outside the supported subset. Import accepts up to 512 KiB and
+export produces up to 160 KiB to fit the command result envelope.
 
 ## Export an Avid clip log
 

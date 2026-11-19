@@ -210,7 +210,10 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.render_mixed"
         | "interchange.edl.export"
         | "interchange.otio.export"
-        | "interchange.fcp7.export" => ProjectContextRule::RequiredRead,
+        | "interchange.fcp7.export"
+        | "interchange.fcpxml.export"
+        | "interchange.aaf.export"
+        | "interchange.omf.export" => ProjectContextRule::RequiredRead,
         "sequences.create"
         | "clips.place"
         | "clips.move"
@@ -221,6 +224,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "clips.trim"
         | "clips.slip"
         | "clips.roll"
+        | "clips.slide"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
@@ -231,6 +235,9 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "interchange.edl.import"
         | "interchange.otio.import"
         | "interchange.fcp7.import"
+        | "interchange.fcpxml.import"
+        | "interchange.aaf.import"
+        | "interchange.omf.import"
         | "history.undo"
         | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
@@ -280,9 +287,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "interchange.edl.export" => {
             Some(serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"))
         }
-        "interchange.otio.export" | "interchange.fcp7.export" => {
+        "interchange.otio.export" | "interchange.fcp7.export" | "interchange.fcpxml.export" => {
             Some(serde_json::to_value(schema_for!(crate::interchange::OtioExport)).expect("schema"))
         }
+        "interchange.aaf.export" | "interchange.omf.export" => Some(
+            serde_json::to_value(schema_for!(crate::interchange::BinaryTrackExport)).expect("schema"),
+        ),
         "interchange.ale.export" => Some(
             serde_json::to_value(schema_for!(crate::interchange::ale::Export)).expect("schema"),
         ),
@@ -355,13 +365,19 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "interchange.edl.import" | "interchange.otio.import" | "interchange.fcp7.import" => {
+        "interchange.edl.import"
+        | "interchange.otio.import"
+        | "interchange.fcp7.import"
+        | "interchange.fcpxml.import"
+        | "interchange.aaf.import"
+        | "interchange.omf.import" => {
             Some(contracts::edit(EditResult::ImportCuts))
         }
         "clips.move"
         | "clips.trim"
         | "clips.slip"
         | "clips.roll"
+        | "clips.slide"
         | "tracks.set_enabled"
         | "tracks.set_locked"
         | "timeline.remove_gap"
@@ -620,6 +636,12 @@ fn build_registry() -> Vec<Descriptor> {
             crate::projects::RollInput
         ),
         row!(
+            "clips.slide",
+            "Move linked clips between adjacent neighbors while retaining the outer timeline extent",
+            DurableMutation,
+            crate::projects::SlideInput
+        ),
+        row!(
             "interchange.edl.export",
             "Export one committed picture track as a non-drop CMX 3600 cut list",
             Query,
@@ -654,6 +676,42 @@ fn build_registry() -> Vec<Descriptor> {
             "Apply one Final Cut Pro 7 XML track as a reversible edit with media bindings",
             DurableMutation,
             crate::interchange::OtioImportInput
+        ),
+        row!(
+            "interchange.fcpxml.export",
+            "Export one committed track as Final Cut Pro XML with media bindings",
+            Query,
+            crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.fcpxml.import",
+            "Apply one Final Cut Pro XML track as a reversible edit with media bindings",
+            DurableMutation,
+            crate::interchange::OtioImportInput
+        ),
+        row!(
+            "interchange.aaf.export",
+            "Export one committed track as linked AAF with media bindings",
+            Query,
+            crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.aaf.import",
+            "Apply one linked AAF track as a reversible edit with media bindings",
+            DurableMutation,
+            crate::interchange::BinaryTrackImport
+        ),
+        row!(
+            "interchange.omf.export",
+            "Export one committed track as linked OMF 2 with media bindings",
+            Query,
+            crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.omf.import",
+            "Apply one linked OMF 2 track as a reversible edit with media bindings",
+            DurableMutation,
+            crate::interchange::BinaryTrackImport
         ),
         row!(
             "timeline.remove_gap",
@@ -1930,6 +1988,12 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "interchange.otio.import",
     "interchange.fcp7.export",
     "interchange.fcp7.import",
+    "interchange.fcpxml.export",
+    "interchange.fcpxml.import",
+    "interchange.aaf.export",
+    "interchange.aaf.import",
+    "interchange.omf.export",
+    "interchange.omf.import",
     "clips.place",
     "clips.move",
     "clips.link",
@@ -1939,6 +2003,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.trim",
     "clips.slip",
     "clips.roll",
+    "clips.slide",
     "tracks.set_enabled",
     "tracks.set_locked",
     "mixer.set_track_gain",

@@ -1179,7 +1179,12 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     }
     let interchange_destination = match &command {
         Command::Timeline(
-            Timeline::ExportEdl(args) | Timeline::ExportOtio(args) | Timeline::ExportFcp7(args),
+            Timeline::ExportEdl(args)
+            | Timeline::ExportOtio(args)
+            | Timeline::ExportFcp7(args)
+            | Timeline::ExportFcpxml(args)
+            | Timeline::ExportAaf(args)
+            | Timeline::ExportOmf(args),
         ) => args.out.clone(),
         Command::Interchange(Interchange::ExportAle { out, .. }) => out.clone(),
         _ => None,

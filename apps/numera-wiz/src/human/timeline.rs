@@ -1,5 +1,7 @@
 //! Typed finite timeline intent lowers through the shared canonical request port.
 use super::*;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use nw_domain::interchange::{self, BinaryTrackImport, OtioImportInput};
 use nw_domain::{projects as model, time::TimeRange};
 
 #[derive(Args)]
@@ -64,6 +66,12 @@ pub enum Timeline {
     ExportOtio(TrackExport),
     /// Export one selected video or frame-aligned audio track as Final Cut Pro 7 XML.
     ExportFcp7(TrackExport),
+    /// Export one selected track as Final Cut Pro XML.
+    ExportFcpxml(TrackExport),
+    /// Export one selected linked picture or PCM audio track as AAF.
+    ExportAaf(TrackExport),
+    /// Export one selected linked PCM audio track as OMF 2.
+    ExportOmf(TrackExport),
     /// Import a UTF-8 CMX 3600 cut list as one reversible edit.
     ImportEdl {
         #[command(flatten)]
@@ -84,6 +92,12 @@ pub enum Timeline {
     ImportOtio(TrackImport),
     /// Import one Final Cut Pro 7 XML track as one reversible edit.
     ImportFcp7(TrackImport),
+    /// Import one Final Cut Pro XML primary story as one reversible edit.
+    ImportFcpxml(TrackImport),
+    /// Import one linked AAF track as one reversible edit.
+    ImportAaf(TrackImport),
+    /// Import one linked OMF 2 audio track as one reversible edit.
+    ImportOmf(TrackImport),
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
         #[arg(long)]
@@ -154,6 +168,9 @@ impl Timeline {
             Self::ExportEdl(args) => args.prepare("interchange.edl.export"),
             Self::ExportOtio(args) => args.prepare("interchange.otio.export"),
             Self::ExportFcp7(args) => args.prepare("interchange.fcp7.export"),
+            Self::ExportFcpxml(args) => args.prepare("interchange.fcpxml.export"),
+            Self::ExportAaf(args) => args.prepare("interchange.aaf.export"),
+            Self::ExportOmf(args) => args.prepare("interchange.omf.export"),
             Self::ImportEdl {
                 context,
                 sequence,
@@ -180,6 +197,9 @@ impl Timeline {
             }
             Self::ImportOtio(args) => args.prepare("interchange.otio.import", "OTIO_INVALID"),
             Self::ImportFcp7(args) => args.prepare("interchange.fcp7.import", "FCP7_INVALID"),
+            Self::ImportFcpxml(args) => args.prepare("interchange.fcpxml.import", "FCPXML_INVALID"),
+            Self::ImportAaf(args) => args.prepare_binary("interchange.aaf.import"),
+            Self::ImportOmf(args) => args.prepare_binary("interchange.omf.import"),
             Self::PreviewSegment {
                 project,
                 revision,
@@ -287,21 +307,15 @@ pub struct TrackImport {
 
 impl TrackImport {
     fn prepare(self, command: &str, code: &'static str) -> Result<Request> {
-        let read = |path| {
-            read_cut_file(
-                path,
-                nw_domain::interchange::MAX_OTIO_BYTES,
-                "Track interchange input exceeds 96 KiB",
-            )
-        };
-        let sources = if let Some(path) = self.sources {
-            commands::parse(commands::decode_json(&read(path)?)?)?
-        } else {
-            Vec::new()
-        };
-        let document = String::from_utf8(read(self.file)?)
+        let sources = read_track_bindings(self.sources)?;
+        let document = read_cut_file(
+            self.file,
+            interchange::MAX_OTIO_BYTES,
+            "Track interchange input exceeds 96 KiB",
+        )?;
+        let document = String::from_utf8(document)
             .map_err(|_| DomainError::new(code, "Track interchange document must be UTF-8"))?;
-        let input = nw_domain::interchange::OtioImportInput {
+        let input = OtioImportInput {
             sequence_id: model::EntityId::parse(self.sequence)?,
             track_id: model::EntityId::parse(self.track)?,
             start: Some(super::projects::rational(&self.start)?),
@@ -310,6 +324,34 @@ impl TrackImport {
         };
         self.context.request(command, serde_json::to_value(input)?)
     }
+
+    fn prepare_binary(self, command: &str) -> Result<Request> {
+        let bytes = read_cut_file(
+            self.file,
+            interchange::MAX_BINARY_IMPORT_BYTES,
+            "Binary track document exceeds 512 KiB",
+        )?;
+        let input = BinaryTrackImport {
+            sequence_id: model::EntityId::parse(self.sequence)?,
+            track_id: model::EntityId::parse(self.track)?,
+            start: Some(super::projects::rational(&self.start)?),
+            document_base64: STANDARD.encode(bytes),
+            sources: read_track_bindings(self.sources)?,
+        };
+        self.context.request(command, serde_json::to_value(input)?)
+    }
+}
+
+fn read_track_bindings(path: Option<PathBuf>) -> Result<Vec<interchange::OtioSource>> {
+    let Some(path) = path else {
+        return Ok(Vec::new());
+    };
+    let bytes = read_cut_file(
+        path,
+        interchange::MAX_OTIO_BYTES,
+        "Track media bindings exceed 96 KiB",
+    )?;
+    Ok(commands::parse(commands::decode_json(&bytes)?)?)
 }
 
 fn read_cmx_file(path: PathBuf) -> Result<Vec<u8>> {
@@ -342,13 +384,21 @@ pub(super) async fn save_interchange(
             let value = response.result.as_ref().ok_or_else(|| {
                 DomainError::new("INVALID_RESPONSE", "Interchange result is missing")
             })?;
-            let text = value["document"].as_str().ok_or_else(|| {
-                DomainError::new("INVALID_RESPONSE", "Interchange document is missing")
-            })?;
             let digest = value["document_sha256"].as_str().ok_or_else(|| {
                 DomainError::new("INVALID_RESPONSE", "Interchange digest is missing")
             })?;
-            nw_platform::download::save_verified_document(path, text.as_bytes(), digest)
+            if matches!(request.command.id.as_str(), "interchange.aaf.export" | "interchange.omf.export") {
+                let encoded = value["document_base64"].as_str().ok_or_else(|| {
+                    DomainError::new("INVALID_RESPONSE", "Binary interchange document is missing")
+                })?;
+                let bytes = interchange::decode_binary_document(encoded, interchange::MAX_BINARY_BYTES)?;
+                nw_platform::download::save_verified_document(path, &bytes, digest)
+            } else {
+                let text = value["document"].as_str().ok_or_else(|| {
+                    DomainError::new("INVALID_RESPONSE", "Interchange document is missing")
+                })?;
+                nw_platform::download::save_verified_document(path, text.as_bytes(), digest)
+            }
         })();
         if let Err(error) = saved {
             return crate::print_response_value(Response::error(&request.request_id, error));

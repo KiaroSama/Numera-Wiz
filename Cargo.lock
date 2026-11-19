@@ -721,6 +721,68 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-aaf"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "craft-audio",
+ "craft-cfb",
+ "craft-timeline",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "craft-audio"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "craft-media",
+ "craft-xml",
+ "log",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "craft-cfb"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+
+[[package]]
+name = "craft-media"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "craft-time"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "craft-timeline"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "craft-time",
+]
+
+[[package]]
+name = "craft-xml"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17#dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17"
+dependencies = [
+ "quick-xml",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2307,6 +2369,7 @@ dependencies = [
 name = "nw-domain"
 version = "0.1.0-dev"
 dependencies = [
+ "base64 0.22.1",
  "hex",
  "quick-xml",
  "schemars",
@@ -2360,6 +2423,9 @@ name = "nw-service"
 version = "0.1.0-dev"
 dependencies = [
  "base64 0.22.1",
+ "craft-aaf",
+ "craft-cfb",
+ "craft-timeline",
  "hex",
  "nw-domain",
  "nw-engine",

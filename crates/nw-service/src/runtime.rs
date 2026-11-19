@@ -1,6 +1,7 @@
 //! The owner is the sole command authority, durable acceptor and scheduler.
 mod artifacts;
 mod batches;
+mod binary_interchange;
 mod maintenance;
 mod media;
 mod media_jobs;
@@ -696,6 +697,7 @@ impl Service {
             | "clips.trim"
             | "clips.slip"
             | "clips.roll"
+            | "clips.slide"
             | "clips.remove"
             | "tracks.set_enabled"
             | "tracks.set_locked"
@@ -707,7 +709,10 @@ impl Service {
             | "mixer.set_track_gain"
             | "interchange.edl.import"
             | "interchange.otio.import"
-            | "interchange.fcp7.import" => self.project_receipt_readable(context, &response)?,
+            | "interchange.fcp7.import"
+            | "interchange.fcpxml.import"
+            | "interchange.aaf.import"
+            | "interchange.omf.import" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1266,7 +1271,12 @@ impl Service {
                 )?;
                 return Ok(Response::success(&request.request_id, plan).bounded());
             }
-            "interchange.edl.export" | "interchange.otio.export" | "interchange.fcp7.export" => {
+            "interchange.edl.export"
+            | "interchange.otio.export"
+            | "interchange.fcp7.export"
+            | "interchange.fcpxml.export"
+            | "interchange.aaf.export"
+            | "interchange.omf.export" => {
                 let input: nw_domain::interchange::EdlInput = commands::parse(params)?;
                 let project = request.project.as_ref().ok_or_else(|| {
                     DomainError::new(
@@ -1281,21 +1291,36 @@ impl Service {
                     input.revision,
                     input.range,
                 )?;
-                if request.command.id == "interchange.edl.export" {
-                    value(&nw_domain::interchange::export_cmx3600(
+                drop(read);
+                match request.command.id.as_str() {
+                    "interchange.edl.export" => value(&nw_domain::interchange::export_cmx3600(
                         &capture,
                         &input.track_id,
-                    )?)?
-                } else if request.command.id == "interchange.fcp7.export" {
-                    value(&nw_domain::interchange::fcp7::export(
+                    )?)?,
+                    "interchange.fcp7.export" => value(&nw_domain::interchange::fcp7::export(
                         &capture,
                         &input.track_id,
-                    )?)?
-                } else {
-                    value(&nw_domain::interchange::export_otio(
+                    )?)?,
+                    "interchange.fcpxml.export" => value(&nw_domain::interchange::fcpxml::export(
                         &capture,
                         &input.track_id,
-                    )?)?
+                    )?)?,
+                    "interchange.aaf.export" | "interchange.omf.export" => {
+                        let format = if request.command.id == "interchange.aaf.export" {
+                            binary_interchange::Format::Aaf
+                        } else {
+                            binary_interchange::Format::Omf
+                        };
+                        value(&self.export_binary_track(
+                            &context,
+                            &request.command.id,
+                            format,
+                            &capture,
+                            &input.track_id,
+                            &cancellation,
+                        )?)?
+                    }
+                    _ => value(&nw_domain::interchange::export_otio(&capture, &input.track_id)?)?,
                 }
             }
             "timeline.preview_frame" => {
@@ -1365,6 +1390,7 @@ impl Service {
             | "clips.trim"
             | "clips.slip"
             | "clips.roll"
+            | "clips.slide"
             | "clips.remove"
             | "tracks.set_enabled"
             | "tracks.set_locked"
@@ -1375,6 +1401,9 @@ impl Service {
             | "interchange.edl.import"
             | "interchange.otio.import"
             | "interchange.fcp7.import"
+            | "interchange.fcpxml.import"
+            | "interchange.aaf.import"
+            | "interchange.omf.import"
             | "history.undo"
             | "history.redo" => {
                 drop(guard);

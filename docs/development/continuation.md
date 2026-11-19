@@ -2638,3 +2638,21 @@ checks. Avid Log Exchange exports allowlisted metadata from selected registered
 assets. Their hosted checks extend the existing owner journey. Which parts of
 CD20 remain open is recorded in the completion ledger.
 [Apple xmeml reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/) · [Avid log specification](https://resources.avid.com/SupportFiles/attach/XpressSupplement_v5_0.pdf)
+
+## Project track exchange and Slide
+
+Final Cut Pro XML adds a primary-story codec with exact rational seconds and
+explicit registered asset bindings. The external fixture and the two metadata
+export templates validate against Apple's published FCPXML 1.10 DTD.
+[Apple FCPXML DTD](https://developer.apple.com/documentation/professional-video-applications/document-type-definition)
+
+Linked AAF and OMF use the interchange libraries pinned by FilmCraft. The owner
+validates registered media before linking it, and FFmpeg retains all media
+processing. The edit reducer implements Slide as a single linked-triplet
+change and retains the middle clip's source window and duration.
+[FilmCraft dependency update](https://github.com/storytold/filmcraft/commit/2c2570f41d69b25332302539b9f294530838ee68) · [craft-libs revision](https://github.com/storytold/craft-libs/tree/dc6adc3fbd9cf39e4a8210f94106a5b0c3e26e17)
+
+The latest FFmWiz and MuxCls revisions update their Gitleaks handling. Numera's
+main branch already contains the corresponding Gitlink handling via PR 4.
+Their documentation supplies the owner's public donations link.
+[FFmWiz revision](https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6) · [MuxCls revision](https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2) · [Numera PR 4](https://github.com/KiaroSama/Numera-Wiz/pull/4)

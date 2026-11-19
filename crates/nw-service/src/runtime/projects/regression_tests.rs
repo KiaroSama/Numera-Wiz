@@ -1262,6 +1262,156 @@ pub(in crate::runtime) async fn linked_edits() {
         v["created"]["no_change"] = json!(true);
     });
     conformance.finish().await;
+    slide_moves_linked_clips_between_fixed_outer_edges().await;
+}
+
+async fn slide_moves_linked_clips_between_fixed_outer_edges() {
+    let fixture = Fixture::new().await;
+    let mut sides: [Vec<EntityId>; 3] = Default::default();
+    for track_seed in [&fixture.clips[0], &fixture.clips[2]] {
+        let track: Clip = fixture.entity(track_seed).payload("clip").unwrap();
+        for (side, clips) in sides.iter_mut().enumerate() {
+            let placed = fixture
+                .accept(fixture.request(
+                    "clips.place",
+                    &format!("slide-place-{}-{side}", track.track_id),
+                    json!({
+                        "sequence_id":track.sequence_id,"track_id":track.track_id,
+                        "source":{"kind":"solid_color","rgba":[0,0,0,1],"duration":{"num":"4","den":"1"}},
+                        "source_range":{"start":{"num":"1","den":"1"},"end":{"num":"2","den":"1"}},
+                        "sequence_start":{"num":(6 + side).to_string(),"den":"1"},"collision":"reject"
+                    }),
+                ))
+                .await;
+            clips.push(
+                EntityId::parse(placed["created"]["clip_ids"][0].as_str().unwrap().to_owned())
+                    .unwrap(),
+            );
+        }
+    }
+    let slide = |num: &str, den: &str| {
+        json!({
+            "left_id":sides[0][0],"clip_id":sides[1][0],"right_id":sides[2][0],
+            "delta":{"num":num,"den":den},"link_policy":"expand"
+        })
+    };
+    let mut gap = slide("1", "4");
+    gap["left_id"] = json!(fixture.clips[1]);
+    fixture
+        .reject_unchanged(
+            fixture.request("clips.slide", "slide-gap", gap),
+            "SLIDE_BOUNDARIES_REQUIRED",
+        )
+        .await;
+    for (side, clips) in sides.iter().enumerate() {
+        fixture
+            .accept(fixture.request(
+                "clips.link",
+                &format!("slide-link-{side}"),
+                json!({"clip_ids":clips,"link_policy":"expand"}),
+            ))
+            .await;
+        if side == 0 {
+            fixture
+                .reject_unchanged(
+                    fixture.request("clips.slide", "slide-partial-link", slide("1", "4")),
+                    "SLIDE_BOUNDARIES_REQUIRED",
+                )
+                .await;
+        }
+    }
+    for (key, delta, code) in [
+        ("slide-off-grid", slide("1", "8"), "OFF_GRID"),
+        ("slide-empty-neighbor", slide("1", "1"), "VALIDATION_ERROR"),
+    ] {
+        fixture
+            .reject_unchanged(fixture.request("clips.slide", key, delta), code)
+            .await;
+    }
+    let paired: Clip = fixture.entity(&sides[1][1]).payload("clip").unwrap();
+    for (key, locked) in [("slide-lock-track", true), ("slide-unlock-track", false)] {
+        fixture
+            .accept(fixture.request(
+                "tracks.set_locked",
+                key,
+                json!({"track_id":paired.track_id,"locked":locked}),
+            ))
+            .await;
+        if locked {
+            fixture
+                .reject_unchanged(
+                    fixture.request("clips.slide", "slide-locked-track", slide("1", "4")),
+                    "ENTITY_LOCKED",
+                )
+                .await;
+        }
+    }
+    let before: Vec<_> = sides.iter().flatten().map(|id| fixture.raw(id)).collect();
+    let unchanged = fixture
+        .accept(fixture.request("clips.slide", "slide-zero", slide("0", "1")))
+        .await;
+    assert_eq!(unchanged["no_change"], true);
+    assert_eq!(
+        before,
+        sides.iter().flatten().map(|id| fixture.raw(id)).collect::<Vec<_>>()
+    );
+
+    let request = fixture.request("clips.slide", "slide-linked-right", slide("1", "4"));
+    let accepted = fixture
+        .service
+        .dispatch(fixture.context.clone(), request.clone())
+        .await;
+    assert!(accepted.ok, "{:?}", accepted.error);
+    assert!(accepted.receipt_id.is_some());
+    let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+    assert_eq!(accepted.receipt_id, replay.receipt_id);
+    assert_eq!(accepted.result, replay.result);
+    assert_eq!(
+        accepted.result.unwrap()["changed_ids"].as_array().unwrap().len(),
+        6
+    );
+
+    let quarter_ticks = |ticks| nw_domain::time::Rational::new(ticks, 4).unwrap();
+    for ((side, id), raw) in sides
+        .iter()
+        .enumerate()
+        .flat_map(|(side, clips)| clips.iter().map(move |id| (side, id)))
+        .zip(&before)
+    {
+        let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
+        let original: Clip = original.payload("clip").unwrap();
+        let current: Clip = fixture.entity(id).payload("clip").unwrap();
+        let (start, end, source_in, source_out) =
+            [(24, 29, 4, 9), (29, 33, 4, 8), (33, 36, 5, 8)][side];
+        assert_eq!(current.sequence_start, quarter_ticks(start));
+        assert_eq!(current.end().unwrap(), quarter_ticks(end));
+        assert_eq!(current.source_range.start, quarter_ticks(source_in));
+        assert_eq!(current.source_range.end, quarter_ticks(source_out));
+        assert_eq!(current.source_id, original.source_id);
+        assert_eq!(current.occurrence_id, original.occurrence_id);
+        assert_eq!(current.link_group_id, original.link_group_id);
+    }
+    let after: Vec<_> = sides.iter().flatten().map(|id| fixture.raw(id)).collect();
+    for (command, key, expected) in [
+        ("history.undo", "slide-undo", &before),
+        ("history.redo", "slide-redo", &after),
+    ] {
+        fixture.accept(fixture.request(command, key, json!({}))).await;
+        for (id, raw) in sides.iter().flatten().zip(expected) {
+            assert_eq!(fixture.raw(id), *raw);
+        }
+    }
+    fixture
+        .accept(fixture.request("clips.slide", "slide-linked-left", slide("-1", "4")))
+        .await;
+    for (id, raw) in sides.iter().flatten().zip(before) {
+        let original: EntityEnvelope = serde_json::from_str(&raw).unwrap();
+        let original: Clip = original.payload("clip").unwrap();
+        let current: Clip = fixture.entity(id).payload("clip").unwrap();
+        assert_eq!(current.sequence_start, original.sequence_start);
+        assert_eq!(current.duration, original.duration);
+        assert_eq!(current.source_range, original.source_range);
+    }
 }
 
 /// Public topology must persist a real group and expand a move from one seed.

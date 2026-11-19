@@ -579,6 +579,9 @@ mod tests {
                     | "markers.wave_projection"
                     | "interchange.edl.export"
                     | "interchange.fcp7.export"
+                    | "interchange.fcpxml.export"
+                    | "interchange.aaf.export"
+                    | "interchange.omf.export"
                     | "interchange.otio.export"
             ) {
                 let requirement = &row["authorization_requirements"];
@@ -596,6 +599,8 @@ mod tests {
                 if matches!(
                     id,
                     "timeline.preview_frame"
+                        | "interchange.aaf.export"
+                        | "interchange.omf.export"
                         | nw_domain::preview::PROGRAM_SEGMENT_COMMAND
                         | "timeline.render_mixed"
                         | "markers.wave_projection"
@@ -618,6 +623,7 @@ mod tests {
                     | "clips.trim"
                     | "clips.slip"
                     | "clips.roll"
+                    | "clips.slide"
                     | "tracks.set_enabled"
                     | "tracks.set_locked"
                     | "timeline.remove_gap"
@@ -625,6 +631,9 @@ mod tests {
                     | "clips.join_through_edit"
                     | "interchange.edl.import"
                     | "interchange.fcp7.import"
+                    | "interchange.fcpxml.import"
+                    | "interchange.aaf.import"
+                    | "interchange.omf.import"
                     | "interchange.otio.import"
             ) {
                 let requirement = &row["authorization_requirements"];
@@ -643,8 +652,12 @@ mod tests {
                     id,
                     "clips.slip"
                         | "clips.roll"
+                        | "clips.slide"
                         | "interchange.edl.import"
                         | "interchange.fcp7.import"
+                        | "interchange.fcpxml.import"
+                        | "interchange.aaf.import"
+                        | "interchange.omf.import"
                         | "interchange.otio.import"
                 ) {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
@@ -745,12 +758,16 @@ mod tests {
             "clips.trim",
             "clips.slip",
             "clips.roll",
+            "clips.slide",
             "tracks.set_enabled",
             "tracks.set_locked",
             "timeline.remove_gap",
             "mixer.set_track_gain",
             "interchange.edl.import",
             "interchange.fcp7.import",
+            "interchange.fcpxml.import",
+            "interchange.aaf.import",
+            "interchange.omf.import",
             "interchange.otio.import",
             "clips.remove",
             "markers.place",
@@ -1357,6 +1374,7 @@ mod tests {
             ("clips.trim", vec![], true),
             ("clips.slip", vec![], true),
             ("clips.roll", vec![], true),
+            ("clips.slide", vec![], true),
             ("tracks.set_enabled", vec![], true),
             ("tracks.set_locked", vec![], true),
             ("timeline.remove_gap", vec![], true),
@@ -1368,6 +1386,21 @@ mod tests {
             ),
             (
                 "interchange.fcp7.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
+            (
+                "interchange.fcpxml.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
+            (
+                "interchange.aaf.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
+            (
+                "interchange.omf.import",
                 vec!["document_sha256", "source_ids", "clip_ids"],
                 false,
             ),

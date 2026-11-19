@@ -778,6 +778,44 @@ impl WizApp {
                     }
                 });
             }
+            self.project_slide_controls(ui, &group);
+        });
+    }
+
+    fn project_slide_controls(&mut self, ui: &mut egui::Ui, group: &Group) {
+        let (Some(clip_id), Some(clip)) = (&group.view.clip, &group.clip) else {
+            return;
+        };
+        if clip.locked {
+            return;
+        }
+        let Ok(end) = clip.end() else { return };
+        let left = group.viewport.items.iter().find(|neighbor| {
+            neighbor.track_id == clip.track_id
+                && neighbor.sequence_start.checked_add(neighbor.duration).ok()
+                    == Some(clip.sequence_start)
+        });
+        let right = group.viewport.items.iter().find(|neighbor| {
+            neighbor.track_id == clip.track_id && neighbor.sequence_start == end
+        });
+        let (Some(left), Some(right)) = (left, right) else {
+            return;
+        };
+        ui.collapsing("Slide clip between neighbors", |ui| {
+            rational(ui, "Shift clip by (seconds)", &mut self.projects.forms.slide_delta);
+            if ui.button("Apply slide").clicked() {
+                match self.projects.forms.slide_delta.value() {
+                    Ok(delta) => self.mutate_project(
+                        "clips.slide",
+                        json!({
+                            "left_id":left.id,"clip_id":clip_id,"right_id":right.id,
+                            "delta":delta,"link_policy":"expand"
+                        }),
+                        ui.ctx(),
+                    ),
+                    Err(error) => self.error = Some(error),
+                }
+            }
         });
     }
 
@@ -1184,7 +1222,13 @@ impl WizApp {
             }
         }
         if let Some(track) = &group.view.track {
-            for format in [TrackExchange::Otio, TrackExchange::Fcp7] {
+            for format in [
+                TrackExchange::Otio,
+                TrackExchange::Fcp7,
+                TrackExchange::Fcpxml,
+                TrackExchange::Aaf,
+                TrackExchange::Omf,
+            ] {
                 let (heading, copy, hint, export_command, import_command) = match format {
                     TrackExchange::Otio => (
                         "OpenTimelineIO",
@@ -1200,14 +1244,32 @@ impl WizApp {
                         "interchange.fcp7.export",
                         "interchange.fcp7.import",
                     ),
+                    TrackExchange::Fcpxml => (
+                        "Final Cut Pro XML",
+                        "Copy FCPXML",
+                        "Final Cut Pro XML",
+                        "interchange.fcpxml.export",
+                        "interchange.fcpxml.import",
+                    ),
+                    TrackExchange::Aaf => (
+                        "AAF",
+                        "Copy Base64 document",
+                        "Linked AAF document in Base64",
+                        "interchange.aaf.export",
+                        "interchange.aaf.import",
+                    ),
+                    TrackExchange::Omf => (
+                        "OMF 2",
+                        "Copy Base64 document",
+                        "Linked OMF 2 document in Base64",
+                        "interchange.omf.export",
+                        "interchange.omf.import",
+                    ),
                 };
                 ui.collapsing(heading, |ui| {
                     let ready = self.project_ready();
                     if ui.add_enabled(ready, egui::Button::new("Prepare track export")).clicked() {
-                        match format {
-                            TrackExchange::Otio => self.projects.otio = None,
-                            TrackExchange::Fcp7 => self.projects.fcp7 = None,
-                        }
+                        self.projects.track_documents.remove(&format);
                         self.query_with_project(
                             export_command,
                             json!({"sequence_id":sequence,"track_id":track,"revision":group.key.revision,"range":group.view.range}),
@@ -1216,11 +1278,7 @@ impl WizApp {
                             ui.ctx(),
                         );
                     }
-                    let export = match format {
-                        TrackExchange::Otio => &self.projects.otio,
-                        TrackExchange::Fcp7 => &self.projects.fcp7,
-                    };
-                    if let Some(document) = export {
+                    if let Some(document) = self.projects.track_documents.get(&format) {
                         ui.horizontal_wrapped(|ui| {
                             if ui.button(copy).clicked() {
                                 ui.ctx().copy_text(document.document.clone());
@@ -1233,20 +1291,17 @@ impl WizApp {
                             }
                         });
                     }
-                    let forms = &mut self.projects.forms;
-                    let (document, bindings) = match format {
-                        TrackExchange::Otio => (&mut forms.otio_document, &mut forms.otio_sources),
-                        TrackExchange::Fcp7 => (&mut forms.fcp7_document, &mut forms.fcp7_sources),
-                    };
-                    let limit = nw_domain::interchange::MAX_OTIO_BYTES;
+                    use nw_domain::interchange::{MAX_BINARY_IMPORT_BASE64_BYTES, MAX_OTIO_BYTES};
+                    let (document, bindings) = self.projects.forms.track_imports.entry(format).or_default();
+                    let document_limit = if format.is_binary() { MAX_BINARY_IMPORT_BASE64_BYTES } else { MAX_OTIO_BYTES };
                     ui.add(egui::TextEdit::multiline(document)
-                        .hint_text(hint).desired_rows(5).char_limit(limit));
+                        .hint_text(hint).desired_rows(5).char_limit(document_limit));
                     ui.add(egui::TextEdit::multiline(bindings)
-                        .hint_text("JSON media bindings for external clips").desired_rows(3).char_limit(limit));
+                        .hint_text("JSON media bindings for external clips").desired_rows(3).char_limit(MAX_OTIO_BYTES));
                     let can_apply = ready && !document.trim().is_empty();
                     if ui.add_enabled(can_apply, egui::Button::new("Import at range start")).clicked() {
-                        if document.len().max(bindings.len()) > limit {
-                            self.error = Some(format!("{heading} input exceeds 96 KiB"));
+                        if document.len() > document_limit || bindings.len() > MAX_OTIO_BYTES {
+                            self.error = Some(format!("{heading} document or media bindings exceed the size limit"));
                             return;
                         }
                         let sources = if bindings.trim().is_empty() {
@@ -1256,8 +1311,10 @@ impl WizApp {
                         };
                         match sources {
                             Ok(sources) => {
-                                let input = json!({"sequence_id":sequence,"track_id":track,
-                                    "start":group.view.range.start,"document":document.as_str(),"sources":sources});
+                                let field = if format.is_binary() { "document_base64" } else { "document" };
+                                let mut input = json!({"sequence_id":sequence,"track_id":track,
+                                    "start":group.view.range.start,"sources":sources});
+                                input[field] = json!(document.as_str());
                                 self.mutate_project(import_command, input, ui.ctx());
                             }
                             Err(error) => self.error = Some(error.message),
