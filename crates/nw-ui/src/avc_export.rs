@@ -110,7 +110,11 @@ impl WizApp {
                         }
                     });
                 let quantized = self.avc_export.codec == VideoCodec::Mpeg4;
-                let quality_label = if quantized { "Quantizer" } else { "Quality CRF" };
+                let quality_label = if quantized {
+                    "Quantizer"
+                } else {
+                    "Quality CRF"
+                };
                 ui.horizontal_wrapped(|ui| {
                     egui::ComboBox::from_id_salt("avc-rate-mode")
                         .selected_text(match self.avc_export.rate_mode {
@@ -151,9 +155,7 @@ impl WizApp {
                             .changed();
                     } else if quantized {
                         changed |= ui
-                            .add(
-                                egui::DragValue::new(&mut self.avc_export.quantizer).range(1..=31),
-                            )
+                            .add(egui::DragValue::new(&mut self.avc_export.quantizer).range(1..=31))
                             .changed();
                     } else {
                         changed |= ui

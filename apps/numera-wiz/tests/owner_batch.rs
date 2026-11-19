@@ -1313,14 +1313,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             "mp4",
             "strict_size",
         ),
-        (
-            "mpeg4",
-            "mpeg4",
-            Some("mp4v"),
-            "mp4",
-            "mp4",
-            "quality_vbr",
-        ),
+        ("mpeg4", "mpeg4", Some("mp4v"), "mp4", "mp4", "quality_vbr"),
         ("mpeg4", "mpeg4", None, "matroska", "mkv", "strict_size"),
     ] {
         let output = directory.join(format!("{codec}-export-{mode}.{extension}"));
@@ -1414,8 +1407,10 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     assert_eq!(picture["sample_aspect_ratio"], "4:3");
     let clock = video_milliseconds(picture, &packets(&components, &output).await[&0]);
     assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
-    results.push(json!({"job":quantizer_job["job_id"],"container":"mp4","codec":"mpeg4",
-        "quantizer":4,"presentation_ms":clock}));
+    results.push(
+        json!({"job":quantizer_job["job_id"],"container":"mp4","codec":"mpeg4",
+        "quantizer":4,"presentation_ms":clock}),
+    );
 
     for (mode, peak, buffer, crop, resize) in [
         ("quality_vbr", "1400k", "2800k", "crop=31,41,39,29", false),

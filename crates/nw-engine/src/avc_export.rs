@@ -577,7 +577,10 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         export.extend(["-preset", preset].map(str::to_owned));
     }
     export.extend(["-pix_fmt", "yuv420p"].map(str::to_owned));
-    if matches!(settings.codec, VideoCodec::H264 | VideoCodec::Hevc | VideoCodec::Mpeg4) {
+    if matches!(
+        settings.codec,
+        VideoCodec::H264 | VideoCodec::Hevc | VideoCodec::Mpeg4
+    ) {
         export.extend(["-bf".into(), "0".into()]);
     }
     export.extend(
