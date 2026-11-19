@@ -14,7 +14,7 @@ fn admitted(target: &str, group: &str, name: &str) -> bool {
         || name.len() > 128
         || !name
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.+".contains(&byte))
         || matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
         || (base.len() == 4
             && (base.starts_with("COM") || base.starts_with("LPT"))
@@ -77,7 +77,8 @@ pub fn generate() {
         let (group, name) = path
             .split_once('/')
             .expect("media asset directory and name");
-        assert!(admitted(&target, group, name) && paths.insert(path.to_ascii_lowercase()));
+        assert!(admitted(&target, group, name), "Invalid embedded media filename: {path:?}");
+        assert!(paths.insert(path.to_ascii_lowercase()), "Duplicate embedded media path: {path:?}");
         let sha = asset["sha256"].as_str().expect("media SHA-256");
         let bytes = asset["bytes"].as_u64().expect("media file size");
         assert!((1..=96 * 1024 * 1024).contains(&bytes));
