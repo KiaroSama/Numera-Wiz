@@ -26,6 +26,31 @@ impl Service {
         Ok((asset, source))
     }
 
+    fn complete_audio_analysis(
+        &self,
+        context: &Context,
+        asset: &Asset,
+        command: &str,
+        cancel: &CancellationToken,
+    ) -> Result<()> {
+        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Audio analysis cancelled before delivery",
+            ));
+        }
+        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(command)) {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "The audio analysis grant changed during measurement",
+            ));
+        }
+        self.object(context, &asset.id, &asset.creator)?;
+        self.path(context, Path::new(&asset.identity.path), false)?;
+        Ok(())
+    }
+
     pub(super) fn source_volume(
         &self,
         context: &Context,
@@ -39,25 +64,21 @@ impl Service {
             input.stream_index,
             cancel.clone(),
         ))?;
-        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
-        if cancel.is_cancelled() {
-            return Err(DomainError::new(
-                "CANCELLED",
-                "Volume measurement cancelled before delivery",
-            ));
-        }
-        if self
-            .policy(context)?
-            .as_ref()
-            .is_some_and(|policy| !policy.allows_command("media.analyze.volume"))
-        {
-            return Err(DomainError::new(
-                "PERMISSION_DENIED",
-                "Volume measurement grant changed during analysis",
-            ));
-        }
-        self.object(context, &asset.id, &asset.creator)?;
-        self.path(context, Path::new(&asset.identity.path), false)?;
+        self.complete_audio_analysis(context, &asset, "media.analyze.volume", &cancel)?;
+        Ok(result)
+    }
+
+    pub(super) fn source_loudness(
+        &self,
+        context: &Context,
+        input: nw_domain::audio_analysis::VolumeInput,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::audio_analysis::LoudnessMeasurement> {
+        let (asset, source) = self.analysis_source(context, &input.asset_id)?;
+        let result = tokio::runtime::Handle::current().block_on(self.engine()?.measure_loudness(
+            &asset, source, input.stream_index, cancel.clone(),
+        ))?;
+        self.complete_audio_analysis(context, &asset, "media.analyze.loudness", &cancel)?;
         Ok(result)
     }
 
@@ -75,25 +96,7 @@ impl Service {
                 &input.stream_indices,
                 cancel.clone(),
             ))?;
-        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
-        if cancel.is_cancelled() {
-            return Err(DomainError::new(
-                "CANCELLED",
-                "Audio comparison cancelled before delivery",
-            ));
-        }
-        if self
-            .policy(context)?
-            .as_ref()
-            .is_some_and(|policy| !policy.allows_command("media.analyze.audio_tracks"))
-        {
-            return Err(DomainError::new(
-                "PERMISSION_DENIED",
-                "Audio comparison grant changed during analysis",
-            ));
-        }
-        self.object(context, &asset.id, &asset.creator)?;
-        self.path(context, Path::new(&asset.identity.path), false)?;
+        self.complete_audio_analysis(context, &asset, "media.analyze.audio_tracks", &cancel)?;
         Ok(result)
     }
 

@@ -11,7 +11,7 @@ mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
-    audio_analysis::{AudioTrackReport, Decibels, MAX_TRACKS, VolumeMeasurement},
+    audio_analysis::{AudioTrackReport, Decibels, LoudnessMeasurement, MAX_TRACKS, VolumeMeasurement},
     commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
@@ -43,6 +43,7 @@ enum Action {
     ImportConfig(u64),
     SourcePreview,
     VolumeMeasurement,
+    LoudnessMeasurement,
     CompareAudio,
     WaveCues,
     ClearCapabilities,
@@ -141,6 +142,7 @@ pub struct WizApp {
     config_import: config_import::ConfigImportUi,
     source_preview: preview::SourcePreview,
     volume_measurement: Option<VolumeMeasurement>,
+    loudness_measurement: Option<LoudnessMeasurement>,
     compare_audio_indices: BTreeSet<u32>,
     audio_track_report: Option<AudioTrackReport>,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
@@ -328,6 +330,7 @@ impl WizApp {
             config_import: Default::default(),
             source_preview: Default::default(),
             volume_measurement: None,
+            loudness_measurement: None,
             compare_audio_indices: BTreeSet::new(),
             audio_track_report: None,
             wave_cues: None,
@@ -362,6 +365,7 @@ impl WizApp {
             self.chapter_global_tags = false;
             self.source_preview = Default::default();
             self.volume_measurement = None;
+            self.loudness_measurement = None;
             self.audio_track_report = None;
             self.compare_audio_indices = asset
                 .probe
@@ -831,6 +835,16 @@ impl WizApp {
                         self.volume_measurement = Some(measurement);
                     }
                 }
+                Action::LoudnessMeasurement => {
+                    let measurement: LoudnessMeasurement =
+                        serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    if self.selected_asset().is_some_and(|asset| {
+                        asset.id == measurement.asset_id
+                            && asset.identity.sha256 == measurement.source_sha256
+                    }) {
+                        self.loudness_measurement = Some(measurement);
+                    }
+                }
                 Action::CompareAudio => {
                     let report: AudioTrackReport =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -964,6 +978,18 @@ impl WizApp {
                                     ui.ctx(),
                                 );
                             }
+                            if ui.add_enabled(
+                                self.request_idle(),
+                                egui::Button::new(format!("Measure loudness {}", stream.index)),
+                            ).clicked() {
+                                self.loudness_measurement = None;
+                                self.query(
+                                    "media.analyze.loudness",
+                                    json!({"asset_id":asset.id,"stream_index":stream.index}),
+                                    Action::LoudnessMeasurement,
+                                    ui.ctx(),
+                                );
+                            }
                         });
                     }
                 });
@@ -1009,6 +1035,24 @@ impl WizApp {
                     display(&measurement.peak),
                     display(&measurement.rms),
                     measurement.samples_per_channel
+                ));
+            }
+            if let Some(measurement) = &self.loudness_measurement {
+                let integrated = measurement.integrated_centi_lufs.map_or_else(
+                    || "Below the measurement gate".into(),
+                    |value| format!("{:.2} LUFS", f64::from(value) / 100.0),
+                );
+                let true_peak = measurement.true_peak_centi_dbtp.map_or_else(
+                    || "No measurable peak".into(),
+                    |value| format!("{:.2} dBTP", f64::from(value) / 100.0),
+                );
+                ui.label(format!(
+                    "Stream {} · Integrated {} · True peak {} · Range {:.2} LU · Gate {:.2} LUFS",
+                    measurement.stream_index,
+                    integrated,
+                    true_peak,
+                    f64::from(measurement.range_centi_lu) / 100.0,
+                    f64::from(measurement.gate_centi_lufs) / 100.0
                 ));
             }
         });

@@ -51,6 +51,16 @@ fn assert_volume(result: &Value, asset: &Value) {
     assert_eq!(result["rms"], json!({"kind":"finite","micro_db":-21073778}));
 }
 
+fn assert_loudness(result: &Value, asset: &Value) {
+    assert_eq!(result["asset_id"], asset["id"]);
+    assert_eq!(result["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(result["stream_index"], 1);
+    assert_eq!(result["integrated_centi_lufs"], -2175);
+    assert_eq!(result["true_peak_centi_dbtp"], -1806);
+    assert_eq!(result["range_centi_lu"], 0);
+    assert_eq!(result["gate_centi_lufs"], -3175);
+}
+
 fn assert_audio_extraction(review: &Value) {
     let resolution = &review["resolution"];
     assert_eq!(resolution["action"], "remux");
@@ -165,6 +175,12 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
     let (chapter_asset, chapter_export) = chapter_roundtrip::verify(&cli, &media, &scope).await;
     let (wave_asset, wave_cues) = chapter_roundtrip::verify_wave_cues(&cli, &media, &scope).await;
+    let silent = cli.query("media.analyze.loudness", json!({"asset_id":wave_asset,"stream_index":0})).await;
+    assert_eq!(silent["asset_id"], wave_asset);
+    assert!(silent["integrated_centi_lufs"].is_null());
+    assert!(silent["true_peak_centi_dbtp"].is_null());
+    assert_eq!(silent["range_centi_lu"], 0);
+    assert_eq!(silent["gate_centi_lufs"], -7000);
     let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
     assert_eq!(exit, 0, "{before}");
     assert!(before["result"]["advertised"].is_null());
@@ -519,6 +535,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .await;
     assert_eq!(exit, 0, "{}", volume["error"]);
     assert_volume(&volume["result"], &asset);
+    let (loudness, exit) = cli.human(&[
+        "media", "analyze-loudness", "--asset", asset["id"].as_str().unwrap(), "--stream", "1",
+    ]).await;
+    assert_eq!(exit, 0, "{loudness}");
+    assert_loudness(&loudness["result"], &asset);
     let (source_preview, exit) = cli
         .human(&[
             "media",
@@ -1041,7 +1062,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
     }
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.loudness","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -1171,6 +1192,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         json!({})
     );
     assert_volume(&volume, &operator_asset);
+    assert_loudness(&call!(stdio, "media.analyze.loudness",
+        json!({"asset_id":operator_asset["id"],"stream_index":1}), json!({})), &operator_asset);
     let wrong_stream = stdio
         .call_tool(
             CallToolRequestParams::new("media.analyze.volume").with_arguments(
@@ -1772,6 +1795,8 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({})
         );
         assert_volume(&volume, &asset);
+        assert_loudness(&call!(http, "media.analyze.loudness",
+            json!({"asset_id":asset["id"],"stream_index":1}), json!({})), &asset);
         let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));
         assert_eq!(http_project_semantics, cli_project_semantics);
         let http_preview = call!(

@@ -94,6 +94,12 @@ and reports peak and RMS to six decimal places as integer millionths of a dBFS.
 A silent signal is represented as `{"kind":"silence"}`. The response includes
 the registered source digest and a decimal-string sample count per channel.
 
+`media.analyze.loudness` accepts the same registered asset and original
+stream index. It measures EBU R128 values through FFmpeg. The report expresses
+integrated loudness and gate in hundredths of a LUFS, true peak in hundredths
+of a dBTP and range in hundredths of an LU. The integrated value is null below
+the measurement gate. Digital silence returns a null true peak.
+
 `media.analyze.audio_tracks` accepts `asset_id` and two to sixteen distinct
 original audio indices in `stream_indices`. It compares SHA-256 measurements
 over packed `pcm_f64le` samples, sample rate and channel layout. The response

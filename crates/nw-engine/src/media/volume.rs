@@ -1,17 +1,19 @@
-//! Measure one admitted and hash-bound audio signal with the FFmpeg astats filter.
+//! Measure an admitted and hash-bound audio signal through fixed FFmpeg filters.
 use super::identities;
 use crate::{Engine, admission, blocking};
 use nw_domain::{
     DomainError, Result,
-    audio_analysis::{Decibels, VolumeMeasurement},
+    audio_analysis::{Decibels, LoudnessMeasurement, VolumeMeasurement},
     mux::StreamKind,
     records::Asset,
 };
 use nw_platform::{files::SourceStamp, process};
+use serde::Deserialize;
 use std::{path::Path, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 const FILTER: &str = "astats=metadata=0:reset=0:measure_perchannel=none:measure_overall=Peak_level+RMS_level+Number_of_samples";
+const LOUDNESS_FILTER: &str = "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json";
 
 fn level(text: &str) -> Option<Decibels> {
     if text == "-inf" {
@@ -74,6 +76,59 @@ fn measurements(stderr: &str) -> Option<(Decibels, Decibels, u64)> {
     ))
 }
 
+#[derive(Deserialize)]
+struct LoudnessOutput {
+    input_i: String,
+    input_tp: String,
+    input_lra: String,
+    input_thresh: String,
+}
+
+struct LoudnessValues {
+    integrated: Option<i32>,
+    true_peak: Option<i32>,
+    range: i32,
+    gate: i32,
+}
+
+fn hundredths(number: &str) -> Option<i32> {
+    let (negative, value) = number.strip_prefix('-').map_or((false, number), |value| (true, value));
+    let (whole, fraction) = value.split_once('.')?;
+    if whole.is_empty()
+        || fraction.len() != 2
+        || !whole.bytes().chain(fraction.bytes()).all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let total = whole.parse::<i32>().ok()?.checked_mul(100)?
+        .checked_add(fraction.parse::<i32>().ok()?)?;
+    Some(if negative { -total } else { total })
+}
+
+fn loudness_measurements(stderr: &str) -> Option<LoudnessValues> {
+    let start = stderr.rfind("\n{")? + 1;
+    let json = &stderr[start..];
+    let end = json.find("\n}")? + 2;
+    let output: LoudnessOutput = serde_json::from_str(&json[..end]).ok()?;
+    let finite = |number: &str| {
+        if number == "-inf" {
+            Some(None)
+        } else {
+            Some(Some(hundredths(number)?))
+        }
+    };
+    let range = hundredths(&output.input_lra)?;
+    if range < 0 {
+        return None;
+    }
+    Some(LoudnessValues {
+        integrated: finite(&output.input_i)?,
+        true_peak: finite(&output.input_tp)?,
+        range,
+        gate: hundredths(&output.input_thresh)?,
+    })
+}
+
 impl Engine {
     pub async fn measure_volume(
         &self,
@@ -82,6 +137,49 @@ impl Engine {
         stream_index: u32,
         cancel: CancellationToken,
     ) -> Result<VolumeMeasurement> {
+        let (source_sha256, (peak, rms, samples)) = self
+            .measure_registered_audio(asset, source, stream_index, cancel, FILTER, measurements)
+            .await?;
+        Ok(VolumeMeasurement {
+            asset_id: asset.id.clone(),
+            source_sha256,
+            stream_index,
+            peak,
+            rms,
+            samples_per_channel: samples.to_string(),
+        })
+    }
+
+    pub async fn measure_loudness(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        stream_index: u32,
+        cancel: CancellationToken,
+    ) -> Result<LoudnessMeasurement> {
+        let (source_sha256, scores) = self.measure_registered_audio(
+            asset, source, stream_index, cancel, LOUDNESS_FILTER, loudness_measurements,
+        ).await?;
+        Ok(LoudnessMeasurement {
+            asset_id: asset.id.clone(),
+            source_sha256,
+            stream_index,
+            integrated_centi_lufs: scores.integrated,
+            true_peak_centi_dbtp: scores.true_peak,
+            range_centi_lu: scores.range,
+            gate_centi_lufs: scores.gate,
+        })
+    }
+
+    async fn measure_registered_audio<T: Send + 'static>(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        stream_index: u32,
+        cancel: CancellationToken,
+        filter: &str,
+        parse: impl FnOnce(&str) -> Option<T>,
+    ) -> Result<(String, T)> {
         let admission::RegisteredInput {
             input,
             source,
@@ -118,7 +216,7 @@ impl Engine {
             "-map".to_owned(),
             format!("0:{stream_index}"),
         ]);
-        args.extend(["-af", FILTER, "-map_metadata", "-1", "-f", "null", "-"].map(str::to_owned));
+        args.extend(["-af", filter, "-map_metadata", "-1", "-f", "null", "-"].map(str::to_owned));
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone())
             .await
@@ -136,29 +234,21 @@ impl Engine {
         )
         .await;
         let report = ticket.finish(report)?;
-        let (peak, rms, samples) = measurements(&report.stderr_tail).ok_or_else(|| {
+        let measured = parse(&report.stderr_tail).ok_or_else(|| {
             DomainError::new(
                 "MEASUREMENT_UNAVAILABLE",
-                "FFmpeg returned no complete volume measurement",
+                "FFmpeg returned no complete audio measurement",
             )
         })?;
         identities(self, cancel.clone()).await?;
-        let asset_id = asset.id.clone();
         blocking(move || {
             if source.identity_with_limit(&cancel, length)? != expected {
                 return Err(DomainError::new(
                     "SOURCE_CHANGED",
-                    "Registered source changed during volume measurement",
+                    "Registered source changed during audio measurement",
                 ));
             }
-            Ok(VolumeMeasurement {
-                asset_id,
-                source_sha256: expected.sha256,
-                stream_index,
-                peak,
-                rms,
-                samples_per_channel: samples.to_string(),
-            })
+            Ok((expected.sha256, measured))
         })
         .await
     }

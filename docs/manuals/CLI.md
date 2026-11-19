@@ -58,6 +58,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `timeline preview-frame --project PROJECT --sequence SEQUENCE --revision REV --at TIME` | Decode the visible picture at one exact sequence-frame boundary, with `TIME` as an integer or fraction. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
+| `media analyze-loudness --asset ID --stream INDEX` | Measure integrated loudness, true peak, range and gating for a registered audio stream. |
 | `media compare-audio --asset ID --stream INDEX --stream INDEX` | Compare two to sixteen original audio tracks for matching decoded samples and formats. |
 | `media capabilities refresh --force` | Read advertised formats, codecs and filters and check a CPU FFV1 round trip. |
 | `media capabilities refresh --devices` | Also check H.264 and HEVC NVENC on the default NVIDIA device with owner authority. |

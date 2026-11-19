@@ -28,6 +28,20 @@ pub struct VolumeMeasurement {
     pub samples_per_channel: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LoudnessMeasurement {
+    pub asset_id: String,
+    pub source_sha256: String,
+    pub stream_index: u32,
+    /// EBU R128 integrated loudness in hundredths of a LUFS. Absent below the measurement gate.
+    pub integrated_centi_lufs: Option<i32>,
+    /// True peak in hundredths of a dBTP. Absent for a digital-silence signal.
+    pub true_peak_centi_dbtp: Option<i32>,
+    pub range_centi_lu: i32,
+    pub gate_centi_lufs: i32,
+}
+
 pub const MAX_TRACKS: usize = 16;
 
 #[derive(Deserialize, JsonSchema)]

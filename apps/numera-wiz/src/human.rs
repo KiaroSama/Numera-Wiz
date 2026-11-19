@@ -120,6 +120,13 @@ pub enum Media {
         #[arg(long)]
         stream: u32,
     },
+    /// Measure EBU R128 integrated loudness and true peak for one registered track.
+    AnalyzeLoudness {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+    },
     /// Compare decoded signal signatures for two or more original audio tracks.
     CompareAudio {
         #[arg(long)]
@@ -526,6 +533,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         ),
         Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
             "media.analyze.volume",
+            json!({"asset_id":asset,"stream_index":stream}),
+        ),
+        Command::Media(Media::AnalyzeLoudness { asset, stream }) => query(
+            "media.analyze.loudness",
             json!({"asset_id":asset,"stream_index":stream}),
         ),
         Command::Media(Media::CompareAudio { asset, streams }) => query(
