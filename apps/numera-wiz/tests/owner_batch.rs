@@ -1161,16 +1161,18 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let evidence = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
     std::fs::create_dir_all(&evidence).unwrap();
     let parent = media.directory.path();
-    let caption_facts =
-        run_media_fixture(parent, "caption burn", |path| async move { caption_burn(&path).await })
-            .await;
+    let caption_facts = run_media_fixture(parent, "caption burn", |path| async move {
+        caption_burn(&path).await
+    })
+    .await;
     let sample_edit_facts = run_media_fixture(parent, "PCM range edit", |path| async move {
         multirange_audio_edits(&path).await
     })
     .await;
-    let join_facts =
-        run_media_fixture(parent, "packet join", |path| async move { packet_join(&path).await })
-            .await;
+    let join_facts = run_media_fixture(parent, "packet join", |path| async move {
+        packet_join(&path).await
+    })
+    .await;
     let retime_facts = run_media_fixture(parent, "variable-rate retime", |path| async move {
         variable_picture_retime(&path).await
     })
