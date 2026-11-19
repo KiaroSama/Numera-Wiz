@@ -1742,8 +1742,8 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "streams.extract" | "jobs.plan" | "chapters.remove" | "chapters.import"
-            | "disposition.patch" | "metadata.patch" => {
+            "streams.clean" | "streams.extract" | "jobs.plan" | "chapters.remove"
+            | "chapters.import" | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
@@ -2398,7 +2398,10 @@ impl Service {
         let input = match command {
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params)?;
-                if self.policy(context)?.is_some_and(|policy| !policy.allows_command("streams.clean")) {
+                if self
+                    .policy(context)?
+                    .is_some_and(|policy| !policy.allows_command("streams.clean"))
+                {
                     return Err(DomainError::new(
                         "PERMISSION_DENIED",
                         "The configuration job also requires current streams.clean access",

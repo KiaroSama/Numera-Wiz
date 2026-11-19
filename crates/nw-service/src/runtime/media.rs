@@ -40,7 +40,11 @@ impl Service {
                 "Audio analysis cancelled before delivery",
             ));
         }
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(command)) {
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command(command))
+        {
             return Err(DomainError::new(
                 "PERMISSION_DENIED",
                 "The audio analysis grant changed during measurement",
@@ -75,9 +79,10 @@ impl Service {
         cancel: CancellationToken,
     ) -> Result<nw_domain::audio_analysis::LoudnessMeasurement> {
         let (asset, source) = self.analysis_source(context, &input.asset_id)?;
-        let result = tokio::runtime::Handle::current().block_on(self.engine()?.measure_loudness(
-            &asset, source, input.stream_index, cancel.clone(),
-        ))?;
+        let result = tokio::runtime::Handle::current().block_on(
+            self.engine()?
+                .measure_loudness(&asset, source, input.stream_index, cancel.clone()),
+        )?;
         self.complete_audio_analysis(context, &asset, "media.analyze.loudness", &cancel)?;
         Ok(result)
     }

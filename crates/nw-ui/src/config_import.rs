@@ -86,10 +86,12 @@ impl WizApp {
                 ui.ctx().copy_text(text);
             }
             if let Some(asset) = self.asset_detail.as_ref()
-                && ui.add_enabled(
-                    self.request_idle() && report["input_valid"] == true,
-                    egui::Button::new("Review packet-copy job for the selected source"),
-                ).clicked()
+                && ui
+                    .add_enabled(
+                        self.request_idle() && report["input_valid"] == true,
+                        egui::Button::new("Review packet-copy job for the selected source"),
+                    )
+                    .clicked()
             {
                 let params = json!({"asset_id":asset.id,"job_document":report["job"]});
                 self.changed();

@@ -120,9 +120,15 @@ impl ExtractSelector {
             .map(|stream| stream.index)
             .collect();
         eligible.sort_unstable();
-        eligible.get(self.ordinal as usize - 1).copied().ok_or_else(|| {
-            DomainError::new("STREAM_NOT_FOUND", "This asset does not have the selected track")
-        })
+        eligible
+            .get(self.ordinal as usize - 1)
+            .copied()
+            .ok_or_else(|| {
+                DomainError::new(
+                    "STREAM_NOT_FOUND",
+                    "This asset does not have the selected track",
+                )
+            })
     }
 
     fn validate(self) -> Result<()> {
@@ -712,13 +718,19 @@ mod tests {
         let mut raw = serde_json::to_value(&plan).unwrap();
         assert!(raw["items"][0].get("extraction").is_none());
         assert_eq!(
-            serde_json::from_value::<BatchPlan>(raw.clone()).unwrap().digest().unwrap(),
+            serde_json::from_value::<BatchPlan>(raw.clone())
+                .unwrap()
+                .digest()
+                .unwrap(),
             semantic,
         );
         raw["items"][0]["future_selection"] = true.into();
         assert!(serde_json::from_value::<BatchPlan>(raw).is_err());
         plan.items[0].extraction = Some(ReviewedExtraction {
-            selector: ExtractSelector { kind: ExtractKind::Audio, ordinal: 2 },
+            selector: ExtractSelector {
+                kind: ExtractKind::Audio,
+                ordinal: 2,
+            },
             source_index: None,
         });
         assert_ne!(plan.digest().unwrap(), semantic);

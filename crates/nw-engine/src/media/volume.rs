@@ -92,15 +92,23 @@ struct LoudnessValues {
 }
 
 fn hundredths(number: &str) -> Option<i32> {
-    let (negative, value) = number.strip_prefix('-').map_or((false, number), |value| (true, value));
+    let (negative, value) = number
+        .strip_prefix('-')
+        .map_or((false, number), |value| (true, value));
     let (whole, fraction) = value.split_once('.')?;
     if whole.is_empty()
         || fraction.len() != 2
-        || !whole.bytes().chain(fraction.bytes()).all(|byte| byte.is_ascii_digit())
+        || !whole
+            .bytes()
+            .chain(fraction.bytes())
+            .all(|byte| byte.is_ascii_digit())
     {
         return None;
     }
-    let total = whole.parse::<i32>().ok()?.checked_mul(100)?
+    let total = whole
+        .parse::<i32>()
+        .ok()?
+        .checked_mul(100)?
         .checked_add(fraction.parse::<i32>().ok()?)?;
     Some(if negative { -total } else { total })
 }
@@ -157,9 +165,16 @@ impl Engine {
         stream_index: u32,
         cancel: CancellationToken,
     ) -> Result<LoudnessMeasurement> {
-        let (source_sha256, scores) = self.measure_registered_audio(
-            asset, source, stream_index, cancel, LOUDNESS_FILTER, loudness_measurements,
-        ).await?;
+        let (source_sha256, scores) = self
+            .measure_registered_audio(
+                asset,
+                source,
+                stream_index,
+                cancel,
+                LOUDNESS_FILTER,
+                loudness_measurements,
+            )
+            .await?;
         Ok(LoudnessMeasurement {
             asset_id: asset.id.clone(),
             source_sha256,

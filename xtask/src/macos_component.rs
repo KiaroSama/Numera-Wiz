@@ -291,7 +291,8 @@ fn pkg_config_files(work: &Path, dependencies: &BuildInputs) -> Result<std::ffi:
                     );
                 }
                 if relocated != contents {
-                    allow_staged_write(&path).context("Make staged pkg-config metadata writable")?;
+                    allow_staged_write(&path)
+                        .context("Make staged pkg-config metadata writable")?;
                     fs::write(path, relocated).context("Write relocated pkg-config metadata")?;
                 }
             }
@@ -599,7 +600,8 @@ fn prepare_inputs(lock: &Value, work: &Path) -> Result<BuildInputs> {
 }
 
 fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result<()> {
-    let config = pkg_config_files(work, dependencies).context("Prepare native pkg-config search paths")?;
+    let config =
+        pkg_config_files(work, dependencies).context("Prepare native pkg-config search paths")?;
     let (sdk, standard_config) = sdk_metadata(work).context("Prepare native SDK metadata")?;
     let search = std::env::join_paths(std::env::split_paths(&config).chain([standard_config]))?;
     let lame = &dependencies.lame;
@@ -626,7 +628,9 @@ fn compile(source_dir: &Path, work: &Path, dependencies: &BuildInputs) -> Result
     if let Some(assembler) = &dependencies.assembler {
         configure.arg(format!("--x86asmexe={}", assembler.display()));
     }
-    let configured = configure.stdin(Stdio::null()).output()
+    let configured = configure
+        .stdin(Stdio::null())
+        .output()
         .context("Start FFmpeg configure with the locked macOS dependencies")?;
     let last = |bytes: &[u8]| bytes.len().saturating_sub(768);
     ensure!(

@@ -110,7 +110,10 @@ impl WizApp {
                 name: asset.display_name.clone(),
                 output: String::new(),
                 needs_output: true,
-                extract: ExtractSelector { kind: ExtractKind::Audio, ordinal: 1 },
+                extract: ExtractSelector {
+                    kind: ExtractKind::Audio,
+                    ordinal: 1,
+                },
             });
         } else {
             self.batch
@@ -185,13 +188,18 @@ impl WizApp {
         }
         if self.batch.extract {
             let input = ExtractBatchInput {
-                items: self.batch.candidates.iter().map(|item| ExtractBatchItem {
-                    target: ItemInput {
-                        asset_id: item.asset_id.clone(),
-                        output: item.output.clone(),
-                    },
-                    selector: item.extract,
-                }).collect(),
+                items: self
+                    .batch
+                    .candidates
+                    .iter()
+                    .map(|item| ExtractBatchItem {
+                        target: ItemInput {
+                            asset_id: item.asset_id.clone(),
+                            output: item.output.clone(),
+                        },
+                        selector: item.extract,
+                    })
+                    .collect(),
                 failure_policy: self.batch.failure,
             };
             match input.validate() {
@@ -201,7 +209,7 @@ impl WizApp {
                     Action::BatchPlan(self.batch.generation),
                     ctx,
                 ),
-                Err(error) => self.error = Some(format!("{}: {}",error.code,error.message)),
+                Err(error) => self.error = Some(format!("{}: {}", error.code, error.message)),
             }
             return;
         }
@@ -304,7 +312,11 @@ impl WizApp {
             return;
         }
         let mut open = true;
-        let title = if self.batch.extract { "Stream extraction batch" } else { "Cleanup batch" };
+        let title = if self.batch.extract {
+            "Stream extraction batch"
+        } else {
+            "Cleanup batch"
+        };
         egui::Window::new(title).id(egui::Id::new("Cleanup batch"))
             .default_pos(egui::pos2(24.0,160.0)).default_width(1040.0)
             .default_height(540.0).open(&mut open).show(ctx, |ui| {

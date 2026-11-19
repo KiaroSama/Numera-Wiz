@@ -132,7 +132,10 @@ impl Service {
         self.batch_child_command(context, "streams.extract")?;
         let items = self.review_batch_items(
             context,
-            input.items.iter().map(|item| (&item.target, Some(item.selector))),
+            input
+                .items
+                .iter()
+                .map(|item| (&item.target, Some(item.selector))),
             cancel,
             |item, selector| {
                 let selector = selector.ok_or_else(|| {
@@ -279,7 +282,8 @@ impl Service {
             items: reviewed.items,
         };
         plan.hash = plan.digest()?;
-        self.store.retain_media_batch_review(&plan, &reviewed.children)?;
+        self.store
+            .retain_media_batch_review(&plan, &reviewed.children)?;
         Ok(plan)
     }
     pub(super) fn read_batch_plan(

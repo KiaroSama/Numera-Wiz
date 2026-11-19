@@ -602,7 +602,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert!(!partial_outputs[1].exists());
 
     let folder_asset = |relative| {
-        folder_entries.iter().find(|entry| entry["relative_path"] == relative).unwrap()["asset_id"]
+        folder_entries
+            .iter()
+            .find(|entry| entry["relative_path"] == relative)
+            .unwrap()["asset_id"]
             .clone()
     };
     let extract_outputs = [
@@ -621,9 +624,18 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         ],
         "failure_policy":"continue_with_rejected"
     });
-    std::fs::write(&extract_file, serde_json::to_vec(&extraction_input).unwrap()).unwrap();
+    std::fs::write(
+        &extract_file,
+        serde_json::to_vec(&extraction_input).unwrap(),
+    )
+    .unwrap();
     let (extraction, status) = cli
-        .human(&["streams", "extract-batch", "--file", extract_file.to_str().unwrap()])
+        .human(&[
+            "streams",
+            "extract-batch",
+            "--file",
+            extract_file.to_str().unwrap(),
+        ])
         .await;
     assert_eq!(status, 0, "{extraction}");
     let extraction = &extraction["result"];
@@ -631,16 +643,22 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(extraction["items"][1]["extraction"]["source_index"], 2);
     assert_eq!(extraction["items"][2]["error"]["code"], "STREAM_NOT_FOUND");
     assert!(extraction["items"][2]["extraction"]["source_index"].is_null());
-    let extract_submit = cli.mutation(
-        &scope,
-        "extract-folder",
-        "batches.submit",
-        json!({"plan_id":extraction["id"],"plan_hash":extraction["hash"]}),
-    ).await;
+    let extract_submit = cli
+        .mutation(
+            &scope,
+            "extract-folder",
+            "batches.submit",
+            json!({"plan_id":extraction["id"],"plan_hash":extraction["hash"]}),
+        )
+        .await;
     assert_eq!(extract_submit["ok"], true, "{extract_submit}");
-    let (extract_result, status) = cli.human(&[
-        "batches", "wait", extract_submit["result"]["batch_id"].as_str().unwrap(),
-    ]).await;
+    let (extract_result, status) = cli
+        .human(&[
+            "batches",
+            "wait",
+            extract_submit["result"]["batch_id"].as_str().unwrap(),
+        ])
+        .await;
     assert_eq!(status, 9, "{extract_result}");
     assert_eq!(extract_result["result"]["succeeded"], 2);
     assert_eq!(extract_result["result"]["failed"], 1);
@@ -664,12 +682,23 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         ],
         "failure_policy":"reject_all"
     });
-    let sdk_extraction = call!(stdio, "streams.extract.batch_plan", sdk_extraction_input.clone(), json!({}));
+    let sdk_extraction = call!(
+        stdio,
+        "streams.extract.batch_plan",
+        sdk_extraction_input.clone(),
+        json!({})
+    );
     assert_eq!(sdk_extraction["items"][0]["extraction"]["source_index"], 2);
-    assert_eq!(sdk_extraction["items"][1]["error"]["code"], "STREAM_NOT_FOUND");
-    let denied_extract = sdk!(stdio, "batches.submit",
+    assert_eq!(
+        sdk_extraction["items"][1]["error"]["code"],
+        "STREAM_NOT_FOUND"
+    );
+    let denied_extract = sdk!(
+        stdio,
+        "batches.submit",
         json!({"plan_id":sdk_extraction["id"],"plan_hash":sdk_extraction["hash"]}),
-        json!({"replay_scope":sdk_scope,"idempotency_key":"extract-reject-all"}));
+        json!({"replay_scope":sdk_scope,"idempotency_key":"extract-reject-all"})
+    );
     assert_eq!(denied_extract["error"]["code"], "BATCH_REJECTED");
 
     let mut skip_intent = intent.clone();
@@ -850,7 +879,12 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         std::fs::read(&second).unwrap(),
         std::fs::read(&http_outputs[1]).unwrap()
     );
-    let http_extraction = call!(http, "streams.extract.batch_plan", sdk_extraction_input, json!({}));
+    let http_extraction = call!(
+        http,
+        "streams.extract.batch_plan",
+        sdk_extraction_input,
+        json!({})
+    );
     assert_eq!(http_extraction["hash"], sdk_extraction["hash"]);
     http.cancel().await.unwrap();
     server.start_kill().unwrap();

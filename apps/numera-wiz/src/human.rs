@@ -623,7 +623,8 @@ pub fn prepare(command: Command) -> Result<Request> {
             json!({"asset_id":asset,"stream_index":stream,"output":native_path(&out)?}),
         ),
         Command::Streams(Streams::ExtractBatch { file }) => {
-            let mut input: nw_domain::batches::ExtractBatchInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::batches::ExtractBatchInput =
+                commands::parse(document(&file)?)?;
             input.validate()?;
             for item in &mut input.items {
                 item.target.output = native_path(Path::new(&item.target.output))?;
@@ -642,7 +643,11 @@ pub fn prepare(command: Command) -> Result<Request> {
             let document = document(&file)?;
             let job = if let Some(job) = document.get("job") {
                 if document["input_valid"] != true {
-                    return Err(DomainError::new("INVALID_JOB_DOCUMENT", "Resolve the import errors before review").into());
+                    return Err(DomainError::new(
+                        "INVALID_JOB_DOCUMENT",
+                        "Resolve the import errors before review",
+                    )
+                    .into());
                 }
                 job.clone()
             } else {

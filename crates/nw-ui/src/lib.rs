@@ -11,7 +11,9 @@ mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
-    audio_analysis::{AudioTrackReport, Decibels, LoudnessMeasurement, MAX_TRACKS, VolumeMeasurement},
+    audio_analysis::{
+        AudioTrackReport, Decibels, LoudnessMeasurement, MAX_TRACKS, VolumeMeasurement,
+    },
     commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
@@ -978,10 +980,13 @@ impl WizApp {
                                     ui.ctx(),
                                 );
                             }
-                            if ui.add_enabled(
-                                self.request_idle(),
-                                egui::Button::new(format!("Measure loudness {}", stream.index)),
-                            ).clicked() {
+                            if ui
+                                .add_enabled(
+                                    self.request_idle(),
+                                    egui::Button::new(format!("Measure loudness {}", stream.index)),
+                                )
+                                .clicked()
+                            {
                                 self.loudness_measurement = None;
                                 self.query(
                                     "media.analyze.loudness",
