@@ -2662,3 +2662,20 @@ property definitions. It carries two cuts, three gaps and nonidentity
 object reference keys. Its SHA-256 is
 `cdcde89a6577d55830754b0d1b26b30c758786f99600ae49cf4106fe388da55c`.
 [OMF interchange specification](https://www.cubase.it/wp/wp-content/uploads/2014/12/omfspec21.pdf)
+
+On `4508d4a`, the hosted CLI wrote and reimported all three track formats. A
+separate Apple DTD check validated the Final Cut Pro XML picture range, pyaaf2
+read one 48 kHz AAF source sample between the expected fillers, and a separate
+Bento 2.0 inspection resolved the OMF reference tables and the same sample
+placement. The OMF fixture imported the two expected source intervals from
+the independently authored document. The owner journey then failed setting
+up the Slide source clips at a nonzero absolute stream origin. The fixture
+now places within the declared window and uses Slip to select the relative
+first frame before checking the Slide source handle.
+[Hosted exchange documents and source fixture run](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44633642890/artifacts/14583333347)
+
+The project editor also adds an atomic clip lock for linked clips and
+creation of nested bins with journaled Undo. Project inspection can search
+bin names through the current authenticated snapshot and its existing page
+budgets. The desktop, browser, CLI and MCP share the relevant project writes
+and read projections.

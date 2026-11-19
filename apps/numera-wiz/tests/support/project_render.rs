@@ -24,8 +24,9 @@ async fn edit(
     let response = cli.raw(&request).await;
     assert_eq!(
         response["ok"], true,
-        "Public compiler fixture edit failed: {}",
-        response["error"]["code"]
+        "Public compiler fixture edit {id} ({key}) failed: {} {}",
+        response["error"]["code"],
+        response["error"]["message"]
     );
     assert!(response["receipt_id"].is_string());
     response["result"].clone()
@@ -827,7 +828,7 @@ async fn verify_slid_registered_picture(
     let mut revision = sequence["revision"].as_str().unwrap().to_owned();
     let mut clips = Vec::new();
     for (side, (start, end, sequence_start)) in
-        [(0, 2, 0), (4, 5, 2), (0, 3, 3)].into_iter().enumerate()
+        [(4, 6, 0), (4, 5, 2), (4, 7, 3)].into_iter().enumerate()
     {
         let placed = edit(
             cli,
@@ -852,6 +853,19 @@ async fn verify_slid_registered_picture(
                 .to_owned(),
         );
     }
+    // Place uses the stream's probe-declared absolute window. Slip then selects
+    // the right clip's first frames on the asset-relative presentation clock.
+    let slipped = edit(
+        cli,
+        scope,
+        project,
+        &revision,
+        "slide-right-to-first-frame",
+        "clips.slip",
+        json!({"clip_ids":[clips[2]],"delta":quarter_ticks(-4),"link_policy":"expand"}),
+    )
+    .await;
+    let revision = slipped["revision"].as_str().unwrap();
     let args = |delta: &'static str, key: &'static str| {
         [
             "clips",
@@ -867,7 +881,7 @@ async fn verify_slid_registered_picture(
             "--project",
             project,
             "--expected-revision",
-            &revision,
+            revision,
             "--replay-scope",
             scope,
             "--idempotency-key",
