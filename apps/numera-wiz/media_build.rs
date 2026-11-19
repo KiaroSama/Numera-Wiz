@@ -1,11 +1,9 @@
-//! Validate the exact hosted Windows payload before embedding it into the application.
+//! Validate the exact hosted media payload before embedding it into the application.
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, env, fs, path::PathBuf};
 
-fn admitted(group: &str, name: &str) -> bool {
-    let Some((stem, extension)) = name.rsplit_once('.') else {
-        return false;
-    };
+fn admitted(target: &str, group: &str, name: &str) -> bool {
+    let (stem, extension) = name.rsplit_once('.').unwrap_or((name, ""));
     let base = stem
         .split('.')
         .next()
@@ -25,7 +23,16 @@ fn admitted(group: &str, name: &str) -> bool {
         return false;
     }
     match group {
-        "bin" => matches!(name, "ffmpeg.exe" | "ffprobe.exe") || extension == "dll",
+        "bin" => match target {
+            "x86_64-pc-windows-msvc" => matches!(name, "ffmpeg.exe" | "ffprobe.exe") || extension == "dll",
+            "aarch64-apple-darwin" | "x86_64-apple-darwin" => {
+                matches!(name, "ffmpeg" | "ffprobe") || extension == "dylib"
+            }
+            "x86_64-unknown-linux-gnu" => {
+                matches!(name, "ffmpeg" | "ffprobe") || name.ends_with(".so") || name.contains(".so.")
+            }
+            _ => false,
+        },
         "fonts" => matches!(extension, "ttf" | "otf"),
         _ => false,
     }
@@ -38,7 +45,7 @@ pub fn generate() {
         return;
     }
     assert_eq!(env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
-    assert_eq!(env::var("TARGET").as_deref(), Ok("x86_64-pc-windows-msvc"));
+    let target = env::var("TARGET").expect("Native Rust target");
     let directory =
         PathBuf::from(env::var_os("NW_EMBED_MEDIA_DIR").expect("Hosted media profile directory"))
             .canonicalize()
@@ -55,7 +62,7 @@ pub fn generate() {
         serde_json::from_slice(&fs::read(&manifest_path).expect("media manifest"))
             .expect("valid media manifest");
     assert_eq!(manifest["schema_version"], 1);
-    assert_eq!(manifest["target"], "x86_64-pc-windows-msvc");
+    assert_eq!(manifest["target"], target.as_str());
     let source = env::var("NW_SOURCE_SHA").expect("exact app source for embedded media");
     assert!(source.len() == 40 && source.bytes().all(|byte| byte.is_ascii_hexdigit()));
     assert_eq!(manifest["app_source"].as_str(), Some(source.as_str()));
@@ -70,7 +77,7 @@ pub fn generate() {
         let (group, name) = path
             .split_once('/')
             .expect("media asset directory and name");
-        assert!(admitted(group, name) && paths.insert(path.to_ascii_lowercase()));
+        assert!(admitted(&target, group, name) && paths.insert(path.to_ascii_lowercase()));
         let sha = asset["sha256"].as_str().expect("media SHA-256");
         let bytes = asset["bytes"].as_u64().expect("media file size");
         assert!((1..=96 * 1024 * 1024).contains(&bytes));
@@ -88,7 +95,10 @@ pub fn generate() {
             "EmbeddedFile {{ group: {group:?}, name: {name:?}, sha256: {sha:?}, bytes: include_bytes!({file:?}) }},\n"
         ));
     }
-    assert!(paths.contains("bin/ffmpeg.exe") && paths.contains("bin/ffprobe.exe"));
+    let suffix = if target == "x86_64-pc-windows-msvc" { ".exe" } else { "" };
+    for tool in ["ffmpeg", "ffprobe"] {
+        assert!(paths.contains(&format!("bin/{tool}{suffix}")));
+    }
     assert!(paths.iter().any(|path| path.starts_with("fonts/")));
     identity_records.sort_unstable();
     let profile = hex::encode(Sha256::digest(identity_records.concat()));

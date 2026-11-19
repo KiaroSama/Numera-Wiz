@@ -237,8 +237,8 @@ jobs:
         os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     # Preserve the Apple Silicon lane and previous-package artifact key.
     runs-on: ${{ matrix.os == 'macos-15' && 'macos-26' || matrix.os }}
-    # Allow for the Intel regression run and the separate Windows media build.
-    timeout-minutes: ${{ (matrix.os == 'macos-15-intel' || matrix.os == 'windows-2025') && 45 || 30 }}
+    # Allow for the native regressions and the separate macOS and Windows media builds.
+    timeout-minutes: ${{ matrix.os == 'macos-15' && 60 || (matrix.os == 'macos-15-intel' || matrix.os == 'windows-2025') && 45 || 30 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -408,12 +408,17 @@ jobs:
         run: cargo run --locked -p xtask -- verify-research
       - name: Prepare formatting evidence
         if: always()
+        shell: bash
         run: |
+          git diff --quiet -- crates apps xtask test-support
           cargo fmt --all
           cargo fmt --manifest-path xtask/security-scan/Cargo.toml --all
           cargo fmt --manifest-path xtask/schema-validator/Cargo.toml --all
           rustfmt --edition 2024 test-support/schema_validation.rs
           git diff --binary -- crates apps xtask test-support > formatting.patch
+          if test -s formatting.patch; then
+            git apply --reverse formatting.patch
+          fi
       - name: Save dependency and generated evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -442,6 +447,22 @@ jobs:
         with:
           name: numera-wiz-portable-windows-x64
           path: target/windows-component/build-*/delivery/
+          if-no-files-found: error
+          compression-level: 0
+      - name: Build and exercise the Apple Silicon app with embedded CPU media
+        id: macos-arm64-portable
+        if: ${{ !cancelled() && matrix.os == 'macos-15' && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
+        env:
+          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
+        run: cargo run --locked -p xtask -- build-standard-macos-arm64-profile
+      - name: Retain the Apple Silicon app with corresponding sources
+        if: ${{ !cancelled() && steps.macos-arm64-portable.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: numera-wiz-portable-macos-arm64
+          path: |
+            target/macos-component/build-*/delivery/*.tar.gz
+            target/macos-component/build-*/delivery/macos-portable-package.json
           if-no-files-found: error
           compression-level: 0
       - name: Save reusable compiler outputs even after a test failure

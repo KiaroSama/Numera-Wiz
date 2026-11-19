@@ -2,6 +2,8 @@
 use anyhow::{Context, Result, bail};
 mod ci_host;
 mod hygiene;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+mod macos_component;
 mod package;
 mod project_compatibility;
 mod toolchain_capture;
@@ -45,6 +47,8 @@ fn run() -> Result<()> {
         "ci-linux-dependencies" => ci_host::linux_dependencies(),
         "capture-linux-toolchain" => toolchain_capture::run(root),
         "build-standard-linux-profile" => toolchain_capture::bootstrap(root),
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        "build-standard-macos-arm64-profile" => macos_component::build(root),
         #[cfg(windows)]
         "build-standard-windows-profile" => windows_component::build(root),
         "help" => {
@@ -53,6 +57,8 @@ fn run() -> Result<()> {
             );
             #[cfg(windows)]
             println!("xtask build-standard-windows-profile");
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            println!("xtask build-standard-macos-arm64-profile");
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),

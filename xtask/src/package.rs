@@ -116,6 +116,25 @@ fn summary(message: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn macos_bundle(package: &Path, identifier: &str) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
+    let contents = package.join("Numera Wiz.app/Contents");
+    fs::create_dir_all(contents.join("MacOS"))?;
+    fs::create_dir_all(contents.join("Resources"))?;
+    fs::write(
+        contents.join("Info.plist"),
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleExecutable</key><string>numera-wiz</string><key>CFBundleIdentifier</key><string>org.numerawiz.{identifier}</string><key>CFBundleName</key><string>Numera Wiz</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>{}.{}.{}</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>15.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>\n",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH")
+        ),
+    )?;
+    Ok((
+        contents.join("MacOS/numera-wiz"),
+        contents.join("Resources"),
+    ))
+}
+
 /// Assemble review artifacts; this deliberately does not qualify or publish a release.
 pub fn development(root: &Path) -> Result<()> {
     let source = source(root)?;
@@ -147,22 +166,7 @@ pub fn development(root: &Path) -> Result<()> {
     let binary = root.join("target/debug").join(executable);
     let binary_identity = digest(&binary)?;
     let (binary_destination, resources) = if cfg!(target_os = "macos") {
-        let contents = package.join("Numera Wiz.app/Contents");
-        fs::create_dir_all(contents.join("MacOS"))?;
-        fs::create_dir_all(contents.join("Resources"))?;
-        fs::write(
-            contents.join("Info.plist"),
-            format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleExecutable</key><string>numera-wiz</string><key>CFBundleIdentifier</key><string>org.numerawiz.development</string><key>CFBundleName</key><string>Numera Wiz</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>{}.{}.{}</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>15.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>\n",
-                env!("CARGO_PKG_VERSION_MAJOR"),
-                env!("CARGO_PKG_VERSION_MINOR"),
-                env!("CARGO_PKG_VERSION_PATCH")
-            ),
-        )?;
-        (
-            contents.join("MacOS/numera-wiz"),
-            contents.join("Resources"),
-        )
+        macos_bundle(&package, "development")?
     } else {
         (package.join(executable), package.clone())
     };
