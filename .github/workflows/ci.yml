@@ -378,11 +378,28 @@ jobs:
           path: target/service-regressions.log
           if-no-files-found: error
       - name: Compile and run ordinary regressions
+        id: workspace-regressions
         if: ${{ !cancelled() }}
-        run: cargo test --locked --workspace --exclude nw-platform --exclude nw-service --all-targets --no-fail-fast
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --workspace --exclude nw-platform --exclude nw-service --all-targets --no-fail-fast 2>&1 | tee target/workspace-regressions.log
       - name: Lint implementation
+        id: workspace-lint
         if: ${{ !cancelled() }}
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --locked --workspace --all-targets -- -D warnings 2>&1 | tee target/workspace-lint.log
+      - name: Retain failed workspace diagnostics before packaging
+        if: ${{ !cancelled() && (steps.workspace-regressions.outcome == 'failure' || steps.workspace-lint.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: workspace-regressions-${{ matrix.os }}
+          path: |
+            target/workspace-regressions.log
+            target/workspace-lint.log
+          if-no-files-found: error
       - name: Lint independent schema validator
         if: ${{ !cancelled() }}
         run: cargo clippy --locked --manifest-path xtask/schema-validator/Cargo.toml --target-dir target/schema-validator --all-targets -- -D warnings
