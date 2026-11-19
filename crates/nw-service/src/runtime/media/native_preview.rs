@@ -161,7 +161,7 @@ impl Service {
         let audio = input.audio;
         let generation = self
             .native_preview_generation
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                 current.checked_add(1)
             })
             .map_err(|_| {

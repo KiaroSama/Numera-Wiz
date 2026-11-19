@@ -288,7 +288,7 @@ impl Service {
         let engine = self.engine()?;
         let segment = tokio::runtime::Handle::current().block_on(async {
             let (assets, staged) = stage_program_originals(
-                &engine,
+                engine,
                 &originals,
                 &workspace,
                 started,

@@ -7,8 +7,7 @@ use axum::{Extension, body::Body, extract::OriginalUri, http::HeaderValue};
 use bytes::Bytes;
 use http_body::Frame;
 use nw_domain::{DomainError, preview::ProgramPlaybackRequest};
-use nw_engine::BrowserMp4Part;
-use nw_service::BrowserProgramTransfer;
+use nw_service::{BrowserMp4Part, BrowserProgramTransfer};
 use std::{
     future::Future,
     pin::Pin,

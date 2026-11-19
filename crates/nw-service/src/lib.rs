@@ -10,6 +10,7 @@ pub use runtime::{
 };
 
 pub use nw_domain::commands::ACTIVE_COMMANDS;
+pub use nw_engine::BrowserMp4Part;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Principal {
     DiscoveryAgent,

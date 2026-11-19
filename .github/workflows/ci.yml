@@ -282,9 +282,21 @@ jobs:
       - name: Build the native desktop application
         id: native-build
         if: ${{ !cancelled() }}
+        shell: bash
         env:
           NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
-        run: cargo rustc --locked -p numera-wiz --bin numera-wiz --features ${{ steps.web-assets.outcome == 'success' && 'desktop,embedded-web' || 'desktop' }} -- -C strip=debuginfo
+          NW_NATIVE_FEATURES: ${{ steps.web-assets.outcome == 'success' && 'desktop,embedded-web' || 'desktop' }}
+        run: |
+          set -o pipefail
+          mkdir -p target
+          cargo rustc --locked -p numera-wiz --bin numera-wiz --features "$NW_NATIVE_FEATURES" -- -C strip=debuginfo 2>&1 | tee target/native-build.log
+      - name: Retain a failed native build log immediately
+        if: ${{ !cancelled() && steps.native-build.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-build-${{ matrix.os }}
+          path: target/native-build.log
+          if-no-files-found: error
       - name: Save exact native executables for the existing UI harness
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' && steps.web-assets.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
