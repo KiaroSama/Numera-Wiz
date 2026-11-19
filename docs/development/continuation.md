@@ -2581,3 +2581,19 @@ this source change. The published crate payload was not independently downloaded
 or compared with the Git tag. Hosted resolver, four-target Clippy/format and the
 existing store, platform, service, interface, package, raw-byte, GUI and all-13-job
 gates remain pending; the current redb adoption is not qualified or release-ready.
+
+## Standalone archive verification on `c6b21bf`
+
+Linux x64, Windows x64, macOS Apple Silicon and macOS Intel each launched
+through their bundled CPU component and exported the supplied one-second
+sample as H.264. The archived application, FFmpeg, ffprobe, package sources,
+sample and six agent configuration manifests matched the recorded identities.
+Windows published its compressed package at 411,688,452 bytes.
+[Linux](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/artifacts/14529185757) · [Windows](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/artifacts/14530160080) · [Apple Silicon](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/artifacts/14528253378) · [Intel](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/artifacts/14532701022)
+
+Actual Chrome and Linux desktop input passed clip placement, Link and Unlink,
+restoration of the same group with Undo and project reopen. The source media,
+CLI, MCP and artifact HTTP jobs passed. The first Windows attempt reported a
+filesystem error when the retained prior executable reopened the preserved
+project after the new executable closed. The other three package lifecycle
+journeys in that job passed. [Chrome](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/job/135555727831) · [Desktop](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602/job/135572009458) · [CI attempts](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44520643602)
