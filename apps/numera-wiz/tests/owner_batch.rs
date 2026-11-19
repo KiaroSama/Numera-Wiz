@@ -991,6 +991,22 @@ async fn variable_picture_retime(parent: &Path) -> Value {
     json!(decisions)
 }
 
+fn video_milliseconds(stream: &Value, rows: &[Value]) -> Vec<i64> {
+    let time_base = stream["time_base"].as_str().unwrap();
+    let (numerator, denominator) = time_base.split_once('/').unwrap();
+    let numerator: i64 = numerator.parse().unwrap();
+    let denominator: i64 = denominator.parse().unwrap();
+    assert!(numerator > 0 && denominator > 0);
+    rows.iter()
+        .map(|packet| {
+            let tick = packet["pts"].as_i64().unwrap();
+            let value = tick * numerator * 1000;
+            assert_eq!(value % denominator, 0);
+            value / denominator
+        })
+        .collect()
+}
+
 async fn cpu_avc_export(parent: &Path) -> Value {
     let components = std::path::PathBuf::from(
         std::env::var_os("NW_CAPTION_COMPONENTS")
@@ -1106,18 +1122,10 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         );
         assert_eq!(probe["streams"][1]["codec_name"], "aac");
         assert_eq!(probe["streams"][1]["sample_rate"], "48000");
-        let time_base = probe["streams"][0]["time_base"].as_str().unwrap();
-        let (numerator, denominator) = time_base.split_once('/').unwrap();
-        let numerator: i64 = numerator.parse().unwrap();
-        let denominator: i64 = denominator.parse().unwrap();
-        let clock: Vec<_> = packets(&components, &output).await[&0]
-            .iter()
-            .map(|packet| {
-                let value = packet["pts"].as_i64().unwrap() * numerator * 1000;
-                assert_eq!(value % denominator, 0);
-                value / denominator
-            })
-            .collect();
+        let clock = video_milliseconds(
+            &probe["streams"][0],
+            &packets(&components, &output).await[&0],
+        );
         assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
         results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
             "picture":"h264","audio":"aac","sample_aspect_ratio":expected_aspect,"geometry_transformed":transform}));
@@ -1322,7 +1330,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         if extension == "mp4" {
             assert_eq!(picture["codec_tag_string"], "hvc1");
         }
-        let clock = pts(&packets(&components, &output).await[&0]);
+        let clock = video_milliseconds(picture, &packets(&components, &output).await[&0]);
         assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
         results.push(
             json!({"job":accepted["job_id"],"container":container,"codec":"hevc",
