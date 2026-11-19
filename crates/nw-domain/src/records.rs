@@ -40,6 +40,11 @@ pub struct MediaProbe {
     pub chapters: serde_json::Value,
     pub verification_scope: String,
 }
+impl MediaProbe {
+    pub fn is_still_image(&self) -> bool {
+        matches!(self.format.as_str(), "png_pipe" | "jpeg_pipe")
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Asset {
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -1,5 +1,26 @@
 # Ordinary source handles
 
+## Single-file still intake
+
+PNG and JPEG signatures select `png_pipe` or `jpeg_pipe`. The worker opens
+the held regular file on descriptor 0 and passes only the `fd` protocol and
+the selected demuxer to FFmpeg. Registration requires one decoded picture
+in one packet, with a 32 MiB source limit and a 12,000,000-pixel decode limit.
+PNG admission checks the chunk envelope and rejects animation chunks and
+trailing bytes. JPEG admission requires the first top-level end-of-image
+marker at the end of the file. Both declare original video stream 0 and
+leave playback duration unspecified.
+
+The fixture and standard profiles explicitly enable zlib for PNG. Existing
+runtime import records retain the zlib provenance from the locked Linux and
+Windows distribution packages, the pinned Intel MacPorts inputs, or the
+Apple Silicon SDK system imports.
+
+The same registered asset supports frame 0 in source preview. Still duration,
+image sequences and general timeline still rendering require separate work.
+
+## Held ordinary file route
+
 The current ordinary input route classifies a bounded content prefix before
 probing, forces the captured demuxer, and denies automatic external dependencies.
 MOV admission also walks bounded box/reference records and rejects external URL,

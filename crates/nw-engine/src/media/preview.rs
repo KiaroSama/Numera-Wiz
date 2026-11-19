@@ -124,6 +124,13 @@ impl Engine {
             cancel.clone(),
         )
         .await?;
+        let still_image = asset.probe.is_still_image();
+        if still_image && !matches!(selection, FrameSelection::Index(0)) {
+            return Err(DomainError::new(
+                "FRAME_UNAVAILABLE",
+                "A registered still has only source frame zero",
+            ));
+        }
         let (width, height) = (preview::WIDTH, preview::HEIGHT);
         let (preserve_clock, trim) = match selection {
             FrameSelection::Index(frame) => (
@@ -134,8 +141,14 @@ impl Engine {
                 (true, format!("trim=start_pts={tick}:end_pts={}", tick + 1))
             }
         };
+        let scale = if still_image {
+            // The RGBA display can represent a one-pixel span in very narrow stills.
+            format!("scale=w='max(1,min({width},round({height}*dar)))':h='max(1,min({height},round({width}/dar)))':reset_sar=1")
+        } else {
+            format!("scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1")
+        };
         let filters = format!(
-            "{trim},setpts=PTS-STARTPTS,scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba"
+            "{trim},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba"
         );
         let mut args = [
             "-hide_banner",
@@ -154,6 +167,9 @@ impl Engine {
         .to_vec();
         if preserve_clock {
             args.push("-copyts".into());
+        }
+        if still_image {
+            args.extend(["-max_pixels", admission::MAX_STILL_PIXELS].map(String::from));
         }
         args.extend(input.options());
         args.extend([

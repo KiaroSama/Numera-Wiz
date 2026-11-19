@@ -194,6 +194,11 @@ decoded frame index. The JSON result includes the selected asset and content
 digest, dimensions and `rgba_base64`. The CPU decoder fits the picture to the
 preview area and fills any remaining space with black.
 
+`assets register` accepts a single static PNG or JPEG of up to 32 MiB and
+12,000,000 pixels. File contents determine the input format. For a registered
+still, use `media preview-frame --asset ID --stream 0 --frame 0`. Animated
+images and image sequences require a separate intake route.
+
 `disposition patch` addresses an original global stream index. Repeat `--add`
 and `--remove` for individual FFmpeg flags such as `comment`, `original` or
 `forced`. `--clear-all` clears flags on the selected stream before any additions.

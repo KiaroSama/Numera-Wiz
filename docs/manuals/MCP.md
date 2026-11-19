@@ -229,6 +229,9 @@ The result contains a 160 × 90 row-major RGBA image in `rgba_base64`, the sourc
 content digest and the selected stream/frame indices. The profile must have the
 command grant and access to the registered asset and its source path.
 
+Register a single static PNG or JPEG with `assets.register`. For either still,
+`media.preview_frame` uses `stream_index: 0` and `frame: 0`.
+
 `timeline.preview_frame` uses the exact project context and takes
 `sequence_id`, `revision` and rational `at` in seconds. The returned RGBA frame
 includes the active registered or solid-color clip identity, or a gap marker.

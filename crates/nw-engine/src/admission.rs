@@ -7,10 +7,14 @@ use nw_domain::{
 use nw_platform::files::{SourceStamp, io_error};
 use std::{
     fs::File,
-    io::{Read, Seek, SeekFrom},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom},
     path::Path,
 };
 use tokio_util::sync::CancellationToken;
+
+const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+const MAX_STILL_BYTES: u64 = 32 * 1024 * 1024;
+pub(super) const MAX_STILL_PIXELS: &str = "12000000";
 
 pub struct Input {
     pub file: File,
@@ -83,7 +87,8 @@ pub fn open(path: &Path, cancel: &tokio_util::sync::CancellationToken) -> Result
 /// Admit the already authorized source handle without reopening its native pathname.
 pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -> Result<Input> {
     check_cancel(cancel)?;
-    if !file.metadata().map_err(io_error)?.is_file() {
+    let metadata = file.metadata().map_err(io_error)?;
+    if !metadata.is_file() {
         return Err(DomainError::new(
             "INPUT_DENIED",
             "A regular source file is required",
@@ -100,12 +105,137 @@ pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -
         length += count;
     }
     let demuxer = classify(&prefix[..length])?;
-    if demuxer == "mov" {
-        let length = file.metadata().map_err(io_error)?.len();
-        mov_boxes(&mut file, 0, length, 0, &mut 0, cancel)?;
+    let length = metadata.len();
+    if still_codec(demuxer).is_some() && length > MAX_STILL_BYTES {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Single-file still admission supports up to 32 MiB of source bytes",
+        ));
+    }
+    match demuxer {
+        "mov" => mov_boxes(&mut file, 0, length, 0, &mut 0, cancel)?,
+        "png_pipe" => png_chunks(&mut file, length, cancel)?,
+        "jpeg_pipe" => jpeg_markers(&mut file, length, cancel)?,
+        _ => {}
     }
     file.seek(SeekFrom::Start(0)).map_err(io_error)?;
     Ok(Input { file, demuxer })
+}
+
+// png_pipe can decode the default picture of an APNG. Require a complete
+// static PNG envelope before exposing the descriptor, then let FFmpeg decode it.
+fn png_chunks(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()> {
+    let invalid = || DomainError::new("INVALID_PROBE", "Invalid single-file PNG chunk layout");
+    let mut start = PNG_SIGNATURE.len() as u64;
+    let mut image_data = false;
+    for index in 0..100_000 {
+        check_cancel(cancel)?;
+        if length.saturating_sub(start) < 12 {
+            return Err(invalid());
+        }
+        let mut header = [0; 8];
+        file.seek(SeekFrom::Start(start)).map_err(io_error)?;
+        file.read_exact(&mut header).map_err(io_error)?;
+        let bytes = u64::from(u32::from_be_bytes(
+            header[..4].try_into().expect("Four-byte PNG chunk length"),
+        ));
+        let kind = &header[4..];
+        if index == 0 && (kind != b"IHDR" || bytes != 13) {
+            return Err(invalid());
+        }
+        start += 12 + bytes;
+        if start > length {
+            return Err(invalid());
+        }
+        match kind {
+            b"acTL" | b"fcTL" | b"fdAT" => {
+                return Err(DomainError::new(
+                    "INPUT_ROUTE_REQUIRED",
+                    "Animated PNG requires a separate input route",
+                ));
+            }
+            b"IHDR" if index != 0 => return Err(invalid()),
+            b"IDAT" => image_data = true,
+            b"IEND" if bytes == 0 && start == length && image_data => return Ok(()),
+            b"IEND" => return Err(invalid()),
+            _ => {}
+        }
+    }
+    Err(DomainError::new(
+        "RESOURCE_LIMIT",
+        "Still admission exceeded 100000 PNG chunks",
+    ))
+}
+
+// The MJPEG decoder can synthesize a missing EOI or ignore trailing bytes.
+// Walk the JPEG envelope to require the first top-level EOI at EOF. Segment
+// payloads can hold embedded thumbnails; their bytes never form outer markers.
+fn jpeg_markers(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()> {
+    file.seek(SeekFrom::Start(2)).map_err(io_error)?;
+    // Include one byte beyond the measured envelope to detect a growing file.
+    let mut source = BufReader::new(file.take(length.saturating_sub(1)));
+    let mut scanning = false;
+    let mut saw_scan = false;
+    loop {
+        check_cancel(cancel)?;
+        if scanning {
+            loop {
+                check_cancel(cancel)?;
+                let bytes = source.fill_buf().map_err(io_error)?;
+                if bytes.is_empty() {
+                    return Err(invalid_jpeg());
+                }
+                let marker = bytes.iter().position(|byte| *byte == 0xff);
+                let skipped = marker.unwrap_or(bytes.len());
+                source.consume(skipped);
+                if marker.is_some() {
+                    break;
+                }
+            }
+        }
+        if jpeg_byte(&mut source)? != 0xff {
+            return Err(invalid_jpeg());
+        }
+        let mut marker = jpeg_byte(&mut source)?;
+        while marker == 0xff {
+            check_cancel(cancel)?;
+            marker = jpeg_byte(&mut source)?;
+        }
+        match marker {
+            0x00 | 0xd0..=0xd7 if scanning => continue,
+            0x01 => continue,
+            0xd9 if saw_scan && source.fill_buf().map_err(io_error)?.is_empty() => return Ok(()),
+            0xc0..=0xcf | 0xda..=0xfe => {
+                let mut size = [0; 2];
+                source.read_exact(&mut size).map_err(|_| invalid_jpeg())?;
+                let payload = u16::from_be_bytes(size)
+                    .checked_sub(2)
+                    .ok_or_else(invalid_jpeg)?;
+                let payload = u64::from(payload);
+                let skipped = std::io::copy(
+                    &mut source.by_ref().take(payload),
+                    &mut std::io::sink(),
+                )
+                .map_err(io_error)?;
+                if skipped != payload {
+                    return Err(invalid_jpeg());
+                }
+                scanning = marker == 0xda;
+                saw_scan |= scanning;
+            }
+            _ => return Err(invalid_jpeg()),
+        }
+    }
+}
+
+fn jpeg_byte(source: &mut impl Read) -> Result<u8> {
+    let mut value = [0];
+    source.read_exact(&mut value).map_err(|_| invalid_jpeg())?;
+    Ok(value[0])
+}
+
+fn invalid_jpeg() -> DomainError {
+    DomainError::new("INVALID_PROBE", "Invalid single-file JPEG marker layout")
 }
 
 fn check_cancel(cancel: &tokio_util::sync::CancellationToken) -> Result<()> {
@@ -251,6 +381,12 @@ fn mov_boxes(
 }
 
 fn classify(bytes: &[u8]) -> Result<&'static str> {
+    if bytes.starts_with(PNG_SIGNATURE) {
+        return Ok("png_pipe");
+    }
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        return Ok("jpeg_pipe");
+    }
     if bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
         return Ok("matroska");
     }
@@ -295,10 +431,20 @@ pub fn frozen_demuxer(format: &str) -> Result<&'static str> {
         "flac" => Ok("flac"),
         "mp3" => Ok("mp3"),
         "ogg" => Ok("ogg"),
+        "png_pipe" => Ok("png_pipe"),
+        "jpeg_pipe" => Ok("jpeg_pipe"),
         _ => Err(DomainError::new(
             "INPUT_ROUTE_REQUIRED",
             "The frozen probe has no admitted ordinary demuxer",
         )),
+    }
+}
+
+pub(super) fn still_codec(demuxer: &str) -> Option<&'static str> {
+    match demuxer {
+        "png_pipe" => Some("png"),
+        "jpeg_pipe" => Some("mjpeg"),
+        _ => None,
     }
 }
 

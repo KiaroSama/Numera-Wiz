@@ -8,6 +8,118 @@ mod fixture;
 mod mixed_render;
 use fixture::rules;
 
+async fn check_registered_stills(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
+    use nw_platform::files::SourceStamp;
+    use std::fs::{read, write};
+
+    let png = fixture::generate_still(media, "source-é-%03d.jpg", "png", "64x48").await;
+    let jpeg = fixture::generate_still(media, "source-索引.png", "mjpeg", "64x48").await;
+    for (path, format, codec, alpha) in [
+        (&png, "png_pipe", "png", 127),
+        (&jpeg, "jpeg_pipe", "mjpeg", 255),
+    ] {
+        let probe = engine.probe(path, token.clone()).await.unwrap();
+        let asset = engine
+            .register(path.clone(), "fixture-owner".into(), token.clone())
+            .await
+            .unwrap();
+        let observed = serde_json::to_value(&asset.probe).unwrap();
+        assert_eq!(observed, serde_json::to_value(probe).unwrap());
+        assert_eq!(asset.probe.format, format);
+        assert_eq!(asset.probe.container_duration, None);
+        let [stream] = asset.probe.streams.as_slice() else {
+            panic!("A still source must have one original picture stream");
+        };
+        assert_eq!(stream.index, 0);
+        assert_eq!(stream.kind, StreamKind::Video);
+        assert_eq!(stream.codec, codec);
+        assert!(!stream.attached_picture());
+        assert_eq!(observed["stream_details"]["0"]["width"], 64);
+        assert_eq!(observed["stream_details"]["0"]["height"], 48);
+        let source = SourceStamp::capture_resolved(path).unwrap();
+        let rgba = engine
+            .preview_registered_frame(&asset, source, 0, 0, token.clone())
+            .await
+            .unwrap();
+        assert_eq!(rgba.len(), nw_domain::preview::RGBA_BYTES);
+        assert_eq!(&rgba[..4], &[0, 0, 0, 255]);
+        let center = 4 * (nw_domain::preview::WIDTH * 45 + 80);
+        let pixel = &rgba[center..center + 4];
+        assert!(pixel[0] > 245 && pixel[1] < 10 && pixel[2] < 10);
+        assert_eq!(pixel[3], alpha);
+        let source = SourceStamp::capture_resolved(path).unwrap();
+        assert_eq!(
+            engine
+                .preview_registered_frame(&asset, source, 0, 1, token.clone())
+                .await
+                .unwrap_err()
+                .code,
+            "FRAME_UNAVAILABLE"
+        );
+    }
+
+    let narrow = fixture::generate_still(media, "narrow.png", "png", "1x1000").await;
+    let asset = engine
+        .register(narrow.clone(), "fixture-owner".into(), token.clone())
+        .await
+        .unwrap();
+    let pixels = engine
+        .preview_registered_frame(
+            &asset,
+            SourceStamp::capture_resolved(&narrow).unwrap(),
+            0,
+            0,
+            token.clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pixels.chunks_exact(4).filter(|pixel| pixel[0] > 245).count(),
+        nw_domain::preview::HEIGHT
+    );
+
+    let png = read(png).unwrap();
+    let jpeg = read(jpeg).unwrap();
+    let mut apng = png[..33].to_vec();
+    apng.extend(b"\0\0\0\x08acTL\0\0\0\x02\0\0\0\0\xf3\x8d\x93\x70");
+    apng.extend(&png[33..]);
+    let mut bad_png = png.clone();
+    bad_png[29] ^= 0xff;
+    for (name, bytes, code) in [
+        ("animated.png", apng, "INPUT_ROUTE_REQUIRED"),
+        ("concatenated.jpg", jpeg.repeat(2), "INVALID_PROBE"),
+        ("truncated.jpg", jpeg[..jpeg.len() - 2].to_vec(), "INVALID_PROBE"),
+        (
+            "trailing.jpg",
+            [jpeg.as_slice(), b"extra\xff\xd9"].concat(),
+            "INVALID_PROBE",
+        ),
+        ("bad-crc.png", bad_png, "INVALID_PROBE"),
+        (
+            "trailing.png",
+            [png.as_slice(), b"extra"].concat(),
+            "INVALID_PROBE",
+        ),
+        (
+            "manifest.jpg",
+            b"ffconcat version 1.0\nfile 'ungranted.jpg'".to_vec(),
+            "INPUT_ROUTE_REQUIRED",
+        ),
+    ] {
+        let path = media.directory.path().join(name);
+        write(&path, bytes).unwrap();
+        assert_eq!(
+            engine
+                .register(path, "fixture-owner".into(), token.clone())
+                .await
+                .unwrap_err()
+                .code,
+            code,
+            "{name}"
+        );
+    }
+}
+
 async fn check_normalized_pair(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
     use nw_engine::NormalizedWindow;
     use nw_platform::{
@@ -332,6 +444,7 @@ async fn actual_copy_and_order_metadata_remux() {
     let ffprobe = media.bin.join("ffprobe");
     let engine = Engine::new(ffmpeg.clone(), ffprobe.clone()).await.unwrap();
     let token = CancellationToken::new();
+    check_registered_stills(&engine, &media, &token).await;
     check_normalized_pair(&engine, &media, &token).await;
     mixed_render::exercise(&engine, &media, &token).await;
     let seek_source = directory.path().join("seek-index-é-索引.mp4");

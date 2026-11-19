@@ -132,6 +132,26 @@ impl Engine {
         ]
         .map(String::from)
         .to_vec();
+        let still_codec = admission::still_codec(input.demuxer);
+        if still_codec.is_some() {
+            // Both image-pipe demuxers can carry multiple images. Stop at the
+            // second packet and require exactly one fully decoded frame.
+            args.extend(
+                [
+                    "-read_intervals",
+                    "%+#2",
+                    "-count_packets",
+                    "-count_frames",
+                    "-threads",
+                    "1",
+                    "-max_pixels",
+                    admission::MAX_STILL_PIXELS,
+                    "-err_detect",
+                    "crccheck+explode",
+                ]
+                .map(String::from),
+            );
+        }
         args.extend(input.options());
         args.extend(["-i".into(), "fd:".into()]);
         let ticket = self.process_budget.acquire(&cancel).await?;
@@ -148,6 +168,27 @@ impl Engine {
         let value: Value = serde_json::from_slice(&result.stdout)
             .map_err(|e| DomainError::new("INVALID_PROBE", e.to_string()))?;
         let mut probe = parse_probe(value)?;
+        if let Some(codec) = still_codec {
+            let [stream] = probe.streams.as_slice() else {
+                return Err(invalid_still_probe());
+            };
+            let details = &probe.stream_details[&stream.index];
+            if !result.stderr_tail.is_empty()
+                || probe.format != input.demuxer
+                || stream.index != 0
+                || stream.kind != StreamKind::Video
+                || stream.codec != codec
+                || stream.attached_picture()
+                || details["nb_read_packets"] != "1"
+                || details["nb_read_frames"] != "1"
+                || details["width"].as_u64().unwrap_or(0) == 0
+                || details["height"].as_u64().unwrap_or(0) == 0
+            {
+                return Err(invalid_still_probe());
+            }
+            probe.container_duration = None;
+            probe.verification_scope = "One complete still picture decoded with a synthetic demuxer clock and unspecified playback duration".into();
+        }
         probe.probe_timeout = Some(deadline);
         Ok(probe)
     }
@@ -1031,6 +1072,13 @@ fn parse_tags(value: &Value) -> BTreeMap<String, String> {
         })
         .unwrap_or_default()
 }
+fn invalid_still_probe() -> DomainError {
+    DomainError::new(
+        "INVALID_PROBE",
+        "Still source must decode to exactly one complete picture within the admitted limits",
+    )
+}
+
 pub fn parse_probe(value: Value) -> Result<MediaProbe> {
     let format = value["format"]["format_name"]
         .as_str()

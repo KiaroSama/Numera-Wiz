@@ -89,6 +89,43 @@ pub async fn generate() -> Media {
         bin,
     }
 }
+
+#[allow(dead_code, reason = "Only still-image journeys use this shared fixture")]
+pub async fn generate_still(media: &Media, name: &str, codec: &str, size: &str) -> PathBuf {
+    let path = media.directory.path().join(name);
+    let source = format!("color=c=red@0.5:s={size}:d=1,format=rgba");
+    let args = [
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        &source,
+        "-frames:v",
+        "1",
+        "-c:v",
+        codec,
+        "-threads",
+        "1",
+        "-f",
+        "image2pipe",
+        path.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &args,
+        std::time::Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    path
+}
+
 pub async fn probe(bin: &Path, path: &Path) -> serde_json::Value {
     let mut args = [
         "-v",

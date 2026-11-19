@@ -23,6 +23,7 @@ impl WizApp {
             return;
         };
         let idle = self.request_idle();
+        let still_image = asset.probe.is_still_image();
         let mut request = None;
         ui.collapsing("Source frame preview", |ui| {
             let state = &mut self.source_preview;
@@ -30,23 +31,29 @@ impl WizApp {
             let mut changed = false;
             ui.add_enabled_ui(idle, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    egui::ComboBox::from_id_salt("source-preview-stream")
-                        .selected_text(format!("Video stream {stream}"))
-                        .show_ui(ui, |ui| {
-                            for video in std::iter::once(first).chain(videos) {
-                                changed |= ui
-                                    .selectable_value(
-                                        stream,
-                                        video.index,
-                                        format!("Video stream {}", video.index),
-                                    )
-                                    .changed();
-                            }
-                        });
-                    ui.label("Frame index");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut state.frame).range(0..=preview::MAX_FRAME))
-                        .changed();
+                    if still_image {
+                        *stream = first.index;
+                        state.frame = 0;
+                        ui.label("Still image");
+                    } else {
+                        egui::ComboBox::from_id_salt("source-preview-stream")
+                            .selected_text(format!("Video stream {stream}"))
+                            .show_ui(ui, |ui| {
+                                for video in std::iter::once(first).chain(videos) {
+                                    changed |= ui
+                                        .selectable_value(
+                                            stream,
+                                            video.index,
+                                            format!("Video stream {}", video.index),
+                                        )
+                                        .changed();
+                                }
+                            });
+                        ui.label("Frame index");
+                        changed |= ui
+                            .add(egui::DragValue::new(&mut state.frame).range(0..=preview::MAX_FRAME))
+                            .changed();
+                    }
                     if ui.button("Decode frame").clicked() {
                         request = Some((*stream, state.frame));
                     }

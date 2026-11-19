@@ -95,6 +95,8 @@ before reviewing the cleanup plan.
 Open **Source frame preview** in the Stream Cleanup form. Select an original
 video stream and a zero-based frame index, then choose **Decode frame**. The
 preview loads from the registered source and fits the picture in the display.
+For a single static PNG or JPEG, add the image with the usual file controls,
+then choose **Decode frame** to display its only picture.
 
 In **Projects**, open **Timeline frame** in the detail pane. Enter an exact
 sequence time and choose **Decode timeline frame**. The preview shows the

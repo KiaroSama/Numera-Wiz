@@ -42,6 +42,7 @@ const OPTIONS: &[&str] = &[
     "--enable-small",
     "--disable-protocols",
     "--enable-protocol=file,pipe,fd",
+    "--enable-zlib",
     "--enable-libx264",
     "--enable-libx265",
     "--enable-libdav1d",

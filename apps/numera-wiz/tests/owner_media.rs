@@ -737,6 +737,45 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .len(),
         nw_domain::preview::RGBA_BYTES
     );
+    let mut still_sources = Vec::new();
+    for (name, format, codec) in [
+        ("owner-picture.png", "png_pipe", "png"),
+        ("owner-picture.jpg", "jpeg_pipe", "mjpeg"),
+    ] {
+        let path = fixture::generate_still(&media, name, codec, "64x48").await;
+        let (registered, exit) = cli
+            .human(&[
+                "assets",
+                "register",
+                path.to_str().unwrap(),
+                "--replay-scope",
+                &scope,
+                "--idempotency-key",
+                name,
+            ])
+            .await;
+        assert_eq!(exit, 0, "{registered}");
+        let still = &registered["result"];
+        assert_eq!(still["probe"]["format"], format);
+        assert_eq!(still["probe"]["streams"][0]["codec"], codec);
+        let (preview, exit) = cli
+            .human(&[
+                "media",
+                "preview-frame",
+                "--asset",
+                still["id"].as_str().unwrap(),
+                "--stream",
+                "0",
+                "--frame",
+                "0",
+            ])
+            .await;
+        assert_eq!(exit, 0, "{}", preview["error"]);
+        let preview = preview["result"].clone();
+        assert_eq!(preview["source_sha256"], still["identity"]["sha256"]);
+        assert_eq!(preview["frame"], 0);
+        still_sources.push((path, still["probe"].clone(), preview));
+    }
     assert_eq!(
         asset["probe"]["probe_timeout"],
         json!({"mode":"finite","seconds":30})
@@ -1408,6 +1447,23 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         stdio_preview["rgba_base64"] == source_preview["rgba_base64"],
         "stdio preview pixels differ"
     );
+    for (ordinal, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
+        let still = call!(
+            stdio,
+            "assets.register",
+            json!({"path":path}),
+            json!({"replay_scope":operator_scope,"idempotency_key":format!("register-still-stdio-{ordinal}")})
+        );
+        assert_eq!(&still["probe"], probe);
+        let preview = call!(
+            stdio,
+            "media.preview_frame",
+            json!({"asset_id":still["id"],"stream_index":0,"frame":0}),
+            json!({})
+        );
+        assert_eq!(preview["source_sha256"], cli_preview["source_sha256"]);
+        assert!(preview["rgba_base64"] == cli_preview["rgba_base64"]);
+    }
     let stdio_project_semantics = project_sdk!(stdio, operator_scope, operator_asset, "stdio");
     assert_eq!(stdio_project_semantics, cli_project_semantics);
     let report = call!(
@@ -2021,6 +2077,23 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             http_preview["rgba_base64"] == source_preview["rgba_base64"],
             "HTTP preview pixels differ"
         );
+        for (index, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
+            let still = call!(
+                http,
+                "assets.register",
+                json!({"path":path}),
+                json!({"replay_scope":scope,"idempotency_key":format!("register-still-http-{ordinal}-{index}")})
+            );
+            assert_eq!(&still["probe"], probe);
+            let preview = call!(
+                http,
+                "media.preview_frame",
+                json!({"asset_id":still["id"],"stream_index":0,"frame":0}),
+                json!({})
+            );
+            assert_eq!(preview["source_sha256"], cli_preview["source_sha256"]);
+            assert!(preview["rgba_base64"] == cli_preview["rgba_base64"]);
+        }
         let report = call!(
             http,
             "streams.clean.report",

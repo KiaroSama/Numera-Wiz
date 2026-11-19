@@ -10,6 +10,14 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+The same owner registration and source preview now admit single-file PNG and
+JPEG by signature, using explicit image-pipe demuxers on the held `fd:`.
+An independent build of the pinned Linux fixture confirms one decoded
+packet/frame and a 160 × 90 RGBA preview per format, including PNG alpha.
+Production and fixture configurations explicitly enable zlib. Exact-source
+hosted application and platform package results, image sequences and general
+timeline still rendering remain open.
+
 [CI357](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799736) at
 `6442c80` passed the native Linux workspace, browser workspace, large HTTP
 artifact delivery, owner batch, CLI and both official MCP transports.
