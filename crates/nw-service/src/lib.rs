@@ -1368,6 +1368,10 @@ mod tests {
             ),
             (
                 "interchange.fcp7.import",
+                vec!["document_sha256", "source_ids", "clip_ids"],
+                false,
+            ),
+            (
                 "interchange.otio.import",
                 vec!["document_sha256", "source_ids", "clip_ids"],
                 false,
