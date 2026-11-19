@@ -4,7 +4,7 @@ use crate::{Engine, blocking, lower_remux, plan_digest, registered_object};
 use nw_domain::{
     DomainError, Result,
     audio_edit::{Edit, Piece},
-    mux::{CleanAction, CleanResolution, Stream, StreamKind},
+    mux::{CleanResolution, Stream, StreamKind},
     records::{Asset, MediaProbe, Plan},
 };
 use nw_platform::files;

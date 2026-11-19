@@ -1,6 +1,6 @@
 //! Verify picture-only retiming against the original decoded frame identities.
 use crate::output_profile::OutputProfile;
-use crate::{Engine, Result, blocking, io_error, lower_remux, plan_digest, registered_object};
+use crate::{Engine, Result, blocking, lower_remux, plan_digest, registered_object};
 use nw_domain::{
     DomainError,
     mux::{CleanResolution, Stream, StreamKind},

@@ -7,7 +7,6 @@ use nw_domain::{
     mux::{CleanAction, CleanResolution, Preservation, Stream, StreamKind, StreamOutcome},
     packet_cut::ffmpeg_time,
     records::{Asset, Plan},
-    time::Rational,
 };
 use nw_platform::files;
 use std::{io::Write, path::Path};
