@@ -85,6 +85,31 @@ fn reference_input(asset: &Value) -> Value {
     json!({"reference":selection,"candidate":selection,"frame_count":4})
 }
 
+async fn reference_variant(
+    cli: &Cli,
+    media: &fixture::Media,
+    scope: &str,
+    name: &str,
+    filter: &str,
+) -> Value {
+    let path = media.directory.path().join(format!("{name}.mkv"));
+    let output = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-nostdin", "-i"])
+        .arg(&media.source)
+        .args([
+            "-map", "0:v:0", "-vf", filter, "-c:v", "ffv1", "-threads", "1",
+            "-fps_mode", "passthrough", "-enc_time_base:v", "filter",
+        ])
+        .arg(&path)
+        .output()
+        .await
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let response = cli.mutation(scope, name, "assets.register", json!({"path":path})).await;
+    assert_eq!(response["ok"], true, "{response}");
+    response["result"].clone()
+}
+
 fn assert_identical_video(result: &Value, asset: &Value) {
     assert_eq!(result["reference"]["source_sha256"], asset["identity"]["sha256"]);
     assert_eq!(result["candidate"]["source_sha256"], asset["identity"]["sha256"]);
@@ -650,22 +675,9 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     ]).await;
     assert_eq!(exit, 0, "{quality}");
     assert_identical_video(&quality["result"], &asset);
-    let cut_path = media.directory.path().join("reference-cut.mkv");
-    let cut = tokio::process::Command::new(media.bin.join("ffmpeg"))
-        .args(["-v", "error", "-nostdin", "-i"])
-        .arg(&media.source)
-        .args([
-            "-map", "0:v:0", "-vf", "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
-            "-c:v", "ffv1", "-threads", "1",
-        ])
-        .arg(&cut_path)
-        .output()
-        .await
-        .unwrap();
-    assert!(cut.status.success(), "{}", String::from_utf8_lossy(&cut.stderr));
-    let cut_asset = cli.mutation(
-        &scope, "register-reference-cut", "assets.register", json!({"path":cut_path}),
-    ).await["result"].clone();
+    let cut_asset = reference_variant(
+        &cli, &media, &scope, "reference-cut", "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
+    ).await;
     let cut_alignment = cli.query("media.analyze.reference", json!({
         "reference":{"asset_id":asset["id"],"stream_index":0,"start_frame":1},
         "candidate":{"asset_id":cut_asset["id"],"stream_index":0,"start_frame":0},
@@ -678,6 +690,13 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert!(cut_alignment["frames"].as_array().unwrap().iter().all(|row| {
         row["psnr"]["kind"] == "identical" && row["ssim_millionths"] == 1_000_000
     }));
+    let irregular = reference_variant(
+        &cli, &media, &scope, "reference-irregular", r"setpts=PTS+if(eq(N\,2)\,3\,0)",
+    ).await;
+    let mut unequal_grid = reference_input(&asset);
+    unequal_grid["candidate"]["asset_id"] = irregular["id"].clone();
+    let (unequal_grid, _) = cli.raw_with_exit(&Request::query("media.analyze.reference", unequal_grid)).await;
+    assert_eq!(unequal_grid["error"]["code"], "REFERENCE_ALIGNMENT_REQUIRED");
     let mut shifted = reference_input(&asset);
     shifted["candidate"]["start_frame"] = 1.into();
     shifted["frame_count"] = 2.into();

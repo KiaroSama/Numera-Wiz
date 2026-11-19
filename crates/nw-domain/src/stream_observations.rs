@@ -73,7 +73,7 @@ pub struct Report {
     pub source_sha256: String,
     pub ffprobe_sha256: String,
     pub time_base: Rational,
-    /// Complete observation count from the selected stream, encoded as a decimal string.
+    /// Number of rows emitted by ffprobe for the selected stream, as a decimal string.
     pub observed: String,
     pub rows: Vec<Row>,
 }

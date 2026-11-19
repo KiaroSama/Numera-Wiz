@@ -119,7 +119,7 @@ impl Service {
         let assets = [&reference, &candidate];
         let result = tokio::runtime::Handle::current().block_on(self.engine()?.compare_video_windows(
             &input, assets, [reference_stamp, candidate_stamp],
-            self.root.join("scratch").join("reference-quality"), cancel.clone(),
+            self.root.join("runtime").join("reference-quality"), cancel.clone(),
         ))?;
         self.complete_analysis(context, &assets, "media.analyze.reference", &cancel)?;
         Ok(result)

@@ -27,13 +27,19 @@ struct StreamDigest {
     bytes: u64,
 }
 
-struct Ledger {
+/// Frame one bounded ffprobe JSON object at a time, including nested side data.
+pub(super) struct ProbeRecords {
+    root: &'static [u8],
     phase: u8,
     prefix: Vec<u8>,
     record: Vec<u8>,
     depth: usize,
     quoted: bool,
     escaped: bool,
+}
+
+struct Ledger {
+    records: ProbeRecords,
     clocks: BTreeMap<u32, Rational>,
     streams: BTreeMap<u32, StreamDigest>,
 }
@@ -65,124 +71,27 @@ impl Ledger {
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         Ok(Self {
-            phase: 0,
-            prefix: Vec::new(),
-            record: Vec::new(),
-            depth: 0,
-            quoted: false,
-            escaped: false,
+            records: ProbeRecords::new(b"{\"packets\":["),
             clocks,
             streams: BTreeMap::new(),
         })
     }
 
     fn feed(&mut self, bytes: &[u8]) -> Result<()> {
-        for &byte in bytes {
-            match self.phase {
-                0 => {
-                    if byte.is_ascii_whitespace() {
-                        continue;
-                    }
-                    self.prefix.push(byte);
-                    if self.prefix.len() > 32 {
-                        return Err(invalid("Unexpected packet JSON header"));
-                    }
-                    if byte == b'[' {
-                        if self.prefix != b"{\"packets\":[" {
-                            return Err(invalid("Unexpected packet JSON root"));
-                        }
-                        self.phase = 1;
-                    }
-                }
-                1 | 5 => {
-                    if byte.is_ascii_whitespace() {
-                        continue;
-                    }
-                    if byte == b']' && self.phase == 1 {
-                        self.phase = 4;
-                    } else if byte == b'{' {
-                        self.record.push(byte);
-                        self.depth = 1;
-                        self.phase = 2;
-                    } else {
-                        return Err(invalid("Expected a packet JSON object"));
-                    }
-                }
-                2 => {
-                    if self.record.len() >= 64 * 1024 {
-                        return Err(DomainError::new(
-                            "RESOURCE_LIMIT",
-                            "One packet verification record exceeded 64 KiB",
-                        ));
-                    }
-                    self.record.push(byte);
-                    if self.quoted {
-                        if self.escaped {
-                            self.escaped = false;
-                        } else if byte == b'\\' {
-                            self.escaped = true;
-                        } else if byte == b'"' {
-                            self.quoted = false;
-                        }
-                    } else {
-                        match byte {
-                            b'"' => self.quoted = true,
-                            b'{' | b'[' => {
-                                self.depth += 1;
-                                if self.depth > 64 {
-                                    return Err(invalid("Packet JSON nesting exceeded 64"));
-                                }
-                            }
-                            b'}' | b']' => {
-                                self.depth = self
-                                    .depth
-                                    .checked_sub(1)
-                                    .ok_or_else(|| invalid("Unbalanced packet JSON"))?;
-                                if self.depth == 0 {
-                                    let value = serde_json::from_slice(&self.record)
-                                        .map_err(|_| invalid("Invalid packet JSON record"))?;
-                                    self.packet(value)?;
-                                    self.record.clear();
-                                    self.phase = 3;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                3 => {
-                    if byte.is_ascii_whitespace() {
-                        continue;
-                    }
-                    match byte {
-                        b',' => self.phase = 5,
-                        b']' => self.phase = 4,
-                        _ => return Err(invalid("Unexpected bytes after a packet")),
-                    }
-                }
-                4 => {
-                    if byte.is_ascii_whitespace() {
-                        continue;
-                    }
-                    if byte != b'}' {
-                        return Err(invalid("Unexpected packet JSON suffix"));
-                    }
-                    self.phase = 6;
-                }
-                6 if byte.is_ascii_whitespace() => {}
-                _ => return Err(invalid("Trailing packet verification bytes")),
-            }
-        }
-        Ok(())
+        let Self { records, clocks, streams } = self;
+        records.feed(bytes, |value| Self::packet(clocks, streams, value))
     }
 
-    fn packet(&mut self, value: Value) -> Result<()> {
+    fn packet(
+        clocks: &BTreeMap<u32, Rational>,
+        streams: &mut BTreeMap<u32, StreamDigest>,
+        value: Value,
+    ) -> Result<()> {
         let index = value["stream_index"]
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
             .ok_or_else(|| invalid("Invalid packet stream index"))?;
-        let clock = *self
-            .clocks
+        let clock = *clocks
             .get(&index)
             .ok_or_else(|| invalid("Packet references an unobserved stream"))?;
         let hash = packet_sha256(&value["data_hash"])?;
@@ -205,7 +114,7 @@ impl Ledger {
         ]));
         let bytes =
             serde_json::to_vec(&record).map_err(|_| invalid("Packet digest encoding failed"))?;
-        let stream = self.streams.entry(index).or_default();
+        let stream = streams.entry(index).or_default();
         stream.packets = stream
             .packets
             .checked_add(1)
@@ -220,8 +129,130 @@ impl Ledger {
     }
 
     fn finish(&self) -> Result<()> {
+        self.records.finish()
+    }
+}
+
+impl ProbeRecords {
+    pub(super) fn new(root: &'static [u8]) -> Self {
+        Self {
+            root,
+            phase: 0,
+            prefix: Vec::new(),
+            record: Vec::new(),
+            depth: 0,
+            quoted: false,
+            escaped: false,
+        }
+    }
+
+    pub(super) fn feed(
+        &mut self,
+        bytes: &[u8],
+        mut accept: impl FnMut(Value) -> Result<()>,
+    ) -> Result<()> {
+        for &byte in bytes {
+            match self.phase {
+                0 => {
+                    if byte.is_ascii_whitespace() {
+                        continue;
+                    }
+                    self.prefix.push(byte);
+                    if self.prefix.len() > 32 {
+                        return Err(invalid("Unexpected ffprobe JSON header"));
+                    }
+                    if byte == b'[' {
+                        if self.prefix != self.root {
+                            return Err(invalid("Unexpected ffprobe JSON root"));
+                        }
+                        self.phase = 1;
+                    }
+                }
+                1 | 5 => {
+                    if byte.is_ascii_whitespace() {
+                        continue;
+                    }
+                    if byte == b']' && self.phase == 1 {
+                        self.phase = 4;
+                    } else if byte == b'{' {
+                        self.record.push(byte);
+                        self.depth = 1;
+                        self.phase = 2;
+                    } else {
+                        return Err(invalid("Expected a ffprobe JSON object"));
+                    }
+                }
+                2 => {
+                    if self.record.len() >= 64 * 1024 {
+                        return Err(DomainError::new(
+                            "RESOURCE_LIMIT",
+                            "One ffprobe record exceeded 64 KiB",
+                        ));
+                    }
+                    self.record.push(byte);
+                    if self.quoted {
+                        if self.escaped {
+                            self.escaped = false;
+                        } else if byte == b'\\' {
+                            self.escaped = true;
+                        } else if byte == b'"' {
+                            self.quoted = false;
+                        }
+                    } else {
+                        match byte {
+                            b'"' => self.quoted = true,
+                            b'{' | b'[' => {
+                                self.depth += 1;
+                                if self.depth > 64 {
+                                    return Err(invalid("ffprobe JSON nesting exceeded 64"));
+                                }
+                            }
+                            b'}' | b']' => {
+                                self.depth = self
+                                    .depth
+                                    .checked_sub(1)
+                                    .ok_or_else(|| invalid("Unbalanced ffprobe JSON"))?;
+                                if self.depth == 0 {
+                                    let value = serde_json::from_slice(&self.record)
+                                        .map_err(|_| invalid("Invalid ffprobe JSON record"))?;
+                                    accept(value)?;
+                                    self.record.clear();
+                                    self.phase = 3;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                3 => {
+                    if byte.is_ascii_whitespace() {
+                        continue;
+                    }
+                    match byte {
+                        b',' => self.phase = 5,
+                        b']' => self.phase = 4,
+                        _ => return Err(invalid("Unexpected bytes after an ffprobe record")),
+                    }
+                }
+                4 => {
+                    if byte.is_ascii_whitespace() {
+                        continue;
+                    }
+                    if byte != b'}' {
+                        return Err(invalid("Unexpected ffprobe JSON suffix"));
+                    }
+                    self.phase = 6;
+                }
+                6 if byte.is_ascii_whitespace() => {}
+                _ => return Err(invalid("Trailing ffprobe output bytes")),
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn finish(&self) -> Result<()> {
         if self.phase != 6 {
-            return Err(invalid("Truncated packet verification JSON"));
+            return Err(invalid("Truncated ffprobe JSON"));
         }
         Ok(())
     }
@@ -439,12 +470,7 @@ mod tests {
     use super::*;
     fn ledger() -> Ledger {
         Ledger {
-            phase: 0,
-            prefix: Vec::new(),
-            record: Vec::new(),
-            depth: 0,
-            quoted: false,
-            escaped: false,
+            records: ProbeRecords::new(b"{\"packets\":["),
             clocks: [(0, Rational::new(1, 1000).unwrap())].into(),
             streams: BTreeMap::new(),
         }
@@ -472,6 +498,17 @@ mod tests {
         );
         let mut parser = ledger();
         assert!(parser.feed(b"{\"packets\":[{},]}").is_err());
+        let mut parser = ProbeRecords::new(b"{\"frames\":[");
+        let recording = br#"{"frames":[{"stream_index":0,"pts":503,"side_data_list":[{"timecodes":[{"value":"01:02:03:04"}]}]}]}"#;
+        let mut frames = Vec::new();
+        for chunk in recording.chunks(3) {
+            parser.feed(chunk, |frame| {
+                frames.push(frame);
+                Ok(())
+            }).unwrap();
+        }
+        parser.finish().unwrap();
+        assert_eq!(frames[0]["pts"], 503);
     }
     #[test]
     fn packet_clock_comparison_uses_exact_rationals() {

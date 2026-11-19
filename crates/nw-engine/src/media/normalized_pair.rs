@@ -29,6 +29,11 @@ pub enum NormalizedWindow {
     AudioSamples(Range<u64>),
 }
 
+struct NormalizationPolicy {
+    stdout_bytes: usize,
+    require_stable_video_format: bool,
+}
+
 impl Engine {
     /// Decode a registered window through its held seekable source. The result
     /// is a single-stream candidate for independent verification before use.
@@ -40,8 +45,18 @@ impl Engine {
         window: NormalizedWindow,
         cancel: CancellationToken,
     ) -> Result<Vec<u8>> {
-        self.normalize_window(asset, source, stream_index, window, CANDIDATE_LIMIT, cancel)
-            .await
+        self.normalize_window(
+            asset,
+            source,
+            stream_index,
+            window,
+            NormalizationPolicy {
+                stdout_bytes: CANDIDATE_LIMIT,
+                require_stable_video_format: false,
+            },
+            cancel,
+        )
+        .await
     }
 
     async fn normalize_window(
@@ -50,7 +65,7 @@ impl Engine {
         source: SourceStamp,
         stream_index: u32,
         window: NormalizedWindow,
-        output_limit: usize,
+        policy: NormalizationPolicy,
         cancel: CancellationToken,
     ) -> Result<Vec<u8>> {
         let (range, kind, filter_flag, filter, encoding) = match &window {
@@ -69,6 +84,8 @@ impl Engine {
                     "rgba",
                     "-fps_mode",
                     "passthrough",
+                    "-enc_time_base:v",
+                    "filter",
                 ][..],
             ),
             NormalizedWindow::AudioSamples(range) => (
@@ -99,7 +116,11 @@ impl Engine {
             "-hide_banner",
             "-nostdin",
             "-v",
-            "error",
+            if policy.require_stable_video_format {
+                "warning"
+            } else {
+                "error"
+            },
             "-xerror",
             "-max_alloc",
             "67108864",
@@ -110,6 +131,11 @@ impl Engine {
         ]
         .map(String::from)
         .to_vec();
+        if policy.require_stable_video_format {
+            // Preserve the trim counter. Dropped changed inputs produce a warning
+            // that makes the requested frame identities inadmissible below.
+            args.extend(["-drop_changed", "1"].map(String::from));
+        }
         args.extend(input.options());
         args.extend([
             "-i".into(),
@@ -149,12 +175,21 @@ impl Engine {
             Path::new(&self.ffmpeg.path),
             &args,
             Duration::from_secs(30),
-            output_limit,
+            policy.stdout_bytes,
             input.file,
             cancel.clone(),
         )
         .await;
         let output = ticket.finish(result)?;
+        if policy.require_stable_video_format
+            && (output.diagnostic_bytes > 4096
+                || output.stderr_tail.contains("Avoiding reinit; dropping frame"))
+        {
+            return Err(DomainError::new(
+                "REFERENCE_ALIGNMENT_REQUIRED",
+                "The video format changed during frame selection or its diagnostic budget was exceeded",
+            ));
+        }
         if output.stdout.is_empty() {
             return Err(DomainError::new(
                 "PROCESS_OUTPUT_REJECTED",

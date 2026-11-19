@@ -1,5 +1,5 @@
 //! Compare equal presentation grids with fixed FFmpeg RGB metric filters.
-use super::{NormalizedWindow, StreamSignature, single_stream};
+use super::{NormalizationPolicy, NormalizedWindow, StreamSignature, single_stream};
 use crate::{Engine, blocking, media::identities};
 use nw_domain::{
     DomainError, Result,
@@ -10,10 +10,14 @@ use nw_domain::{
 };
 use nw_platform::{files::{self, SourceStamp}, process, security};
 use serde_json::Value;
-use std::{fs::{self, File}, path::{Path, PathBuf}, time::Duration};
+use std::{fs::File, path::{Path, PathBuf}, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 const WINDOW_BYTES: usize = 8 * 1024 * 1024;
+const WINDOW_POLICY: NormalizationPolicy = NormalizationPolicy {
+    stdout_bytes: WINDOW_BYTES,
+    require_stable_video_format: true,
+};
 const CONTAINER_RESERVE: u64 = 64 * 1024;
 const GRAPH: &str = concat!(
     "[0:v]format=gbrp,split=2[rp][rs];",
@@ -43,6 +47,9 @@ fn geometry(reference: &Value, candidate: &Value, frames: u32) -> Result<(u32, u
     };
     let width = dimension("width")?;
     let height = dimension("height")?;
+    if width < 8 || height < 8 {
+        return Err(misaligned("SSIM requires video at least 8 × 8 pixels"));
+    }
     let bytes = u64::from(width).checked_mul(u64::from(height))
         .and_then(|pixels| pixels.checked_mul(u64::from(frames) * 4));
     if bytes.is_none_or(|bytes| bytes > WINDOW_BYTES as u64 - CONTAINER_RESERVE) {
@@ -111,7 +118,7 @@ fn stage(scratch: &Path, windows: [Vec<u8>; 2], cancel: &CancellationToken) -> R
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        builder.permissions(fs::Permissions::from_mode(0o700));
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
     }
     let directory = builder.tempdir_in(root).map_err(files::io_error)?;
     let paths = ["reference.nut", "candidate.nut"].map(|name| directory.path().join(name));
@@ -145,11 +152,11 @@ impl Engine {
         let [reference_stamp, candidate_stamp] = stamps;
         let reference_bytes = self.normalize_window(
             reference, reference_stamp, input.reference.stream_index,
-            NormalizedWindow::VideoFrames(reference_window), WINDOW_BYTES, cancel.clone(),
+            NormalizedWindow::VideoFrames(reference_window), WINDOW_POLICY, cancel.clone(),
         ).await?;
         let candidate_bytes = self.normalize_window(
             candidate, candidate_stamp, input.candidate.stream_index,
-            NormalizedWindow::VideoFrames(candidate_window), WINDOW_BYTES, cancel.clone(),
+            NormalizedWindow::VideoFrames(candidate_window), WINDOW_POLICY, cancel.clone(),
         ).await?;
         let (_directory, staged) = blocking({
             let cancel = cancel.clone();

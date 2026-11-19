@@ -1,6 +1,6 @@
 //! Stream ffprobe records while retaining only the requested observation rows.
 use super::identities;
-use crate::{Engine, admission, blocking};
+use crate::{Engine, admission, blocking, preservation::{self, ProbeRecords}};
 use nw_domain::{
     DomainError, Result,
     mux::StreamKind,
@@ -9,8 +9,8 @@ use nw_domain::{
     time::Rational,
 };
 use nw_platform::{files::SourceStamp, process};
+use serde_json::Value;
 use std::{
-    collections::BTreeMap,
     ops::Range,
     path::Path,
     sync::{Arc, Mutex},
@@ -18,7 +18,6 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-const MAX_RECORD_BYTES: usize = 1024;
 const MAX_SCAN_BYTES: u64 = 128 * 1024 * 1024;
 const PACKET_FIELDS: &str = "packet=stream_index,pts,dts,duration,size,flags,data_hash:packet_tags=:packet_side_data_list=:packet_side_data=";
 const FRAME_FIELDS: &str = "frame=stream_index,pts,pkt_dts,duration,key_frame,pict_type,width,height,nb_samples:frame_tags=:frame_side_data_list=:frame_side_data=:frame_side_data_components=:frame_side_data_component=:frame_side_data_pieces=:frame_side_data_piece=";
@@ -32,93 +31,56 @@ struct Scan {
     stream_index: u32,
     clock: Rational,
     window: Range<u64>,
-    record: Vec<u8>,
     observed: u64,
     rows: Vec<Row>,
 }
 
 impl Scan {
-    fn feed(&mut self, bytes: &[u8]) -> Result<()> {
-        for part in bytes.split_inclusive(|byte| *byte == b'\n') {
-            if self.record.len() + part.len() > MAX_RECORD_BYTES {
-                return Err(DomainError::new(
-                    "RESOURCE_LIMIT",
-                    "An observation row exceeded 1 KiB",
-                ));
-            }
-            self.record.extend_from_slice(part);
-            if part.ends_with(b"\n") {
-                let line = std::str::from_utf8(&self.record).map_err(|_| malformed())?;
-                let row = self.row(line.trim_end_matches(['\r', '\n']))?;
-                if self.window.contains(&self.observed) {
-                    self.rows.push(row);
-                }
-                self.observed += 1;
-                self.record.clear();
-            }
+    fn accept(&mut self, record: Value) -> Result<()> {
+        if record["stream_index"].as_u64() != Some(u64::from(self.stream_index)) {
+            return Err(malformed());
         }
+        if self.window.contains(&self.observed) {
+            let row = self.row(&record)?;
+            self.rows.push(row);
+        }
+        self.observed += 1;
         Ok(())
     }
 
-    fn row(&self, line: &str) -> Result<Row> {
-        let prefix = match self.kind {
-            Kind::Packets => "packet|",
-            Kind::Frames => "frame|",
-        };
-        let mut fields = BTreeMap::new();
-        // The compact writer can leave a separator for an empty side-data section.
-        let fields_text = line.strip_prefix(prefix).ok_or_else(malformed)?;
-        for field in fields_text.trim_end_matches('|').split('|') {
-            let (key, value) = field.split_once('=').ok_or_else(malformed)?;
-            if fields.insert(key, value).is_some() {
-                return Err(malformed());
-            }
-        }
-        let read = |key| fields.get(key).copied().filter(|value| *value != "N/A");
-        if read("stream_index").and_then(|value| value.parse().ok()) != Some(self.stream_index) {
-            return Err(malformed());
-        }
-        let count = |key| {
-            read(key)
-                .map(|value| value.parse::<u32>().map_err(|_| malformed()))
+    fn row(&self, record: &Value) -> Result<Row> {
+        let count = |key: &str| {
+            preservation::integer(&record[key])?
+                .map(|number| u32::try_from(number).map_err(|_| malformed()))
                 .transpose()
         };
-        let timestamp = |key| {
-            read(key)
-                .map(|value| {
-                    Rational::new(value.parse::<i64>().map_err(|_| malformed())?, 1)?
-                        .checked_mul(self.clock)
-                })
-                .transpose()
-        };
+        let timestamp = |key: &str| preservation::timestamp(&record[key], self.clock);
         let detail = match self.kind {
             Kind::Packets => {
-                let bytes = read("size")
-                    .and_then(|value| value.parse::<u64>().ok())
+                let bytes = preservation::integer(&record["size"])?
+                    .and_then(|bytes| u64::try_from(bytes).ok())
                     .ok_or_else(malformed)?;
-                let flags = read("flags")
+                let flags = record["flags"]
+                    .as_str()
                     .filter(|value| {
                         (1..=16).contains(&value.len())
                             && value.bytes().all(|byte| byte == b'_' || byte.is_ascii_uppercase())
                     })
                     .ok_or_else(malformed)?;
-                let hash = read("data_hash")
-                    .and_then(|value| value.strip_prefix("SHA256:"))
-                    .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
-                    .ok_or_else(malformed)?;
+                let hash = preservation::packet_sha256(&record["data_hash"])?;
                 Detail::Packet {
                     bytes: bytes.to_string(),
                     flags: flags.into(),
-                    data_sha256: hash.to_ascii_lowercase(),
+                    data_sha256: hash[7..].to_ascii_lowercase(),
                 }
             }
             Kind::Frames => Detail::Frame {
-                key_frame: match read("key_frame") {
-                    Some("0") => false,
-                    Some("1") => true,
+                key_frame: match record["key_frame"].as_u64() {
+                    Some(0) => false,
+                    Some(1) => true,
                     _ => return Err(malformed()),
                 },
-                picture_type: read("pict_type").map(str::to_owned),
+                picture_type: record["pict_type"].as_str().map(str::to_owned),
                 width: count("width")?,
                 height: count("height")?,
                 samples_per_channel: count("nb_samples")?,
@@ -207,18 +169,24 @@ impl Engine {
             ],
         };
         args.extend(options.iter().map(|option| (*option).to_owned()));
-        args.extend(["-of", "compact=print_section=1:nokey=0"].map(str::to_owned));
+        args.extend(["-of", "json=compact=1:string_validation=fail"].map(str::to_owned));
         args.extend(input.options());
         args.extend(["-i", "fd:"].map(str::to_owned));
-        let all = Arc::new(Mutex::new(Scan {
-            kind: selection.kind,
-            stream_index: selection.stream_index,
-            clock,
-            window,
-            record: Vec::new(),
-            observed: 0,
-            rows: Vec::new(),
-        }));
+        let root: &'static [u8] = match selection.kind {
+            Kind::Packets => b"{\"packets\":[",
+            Kind::Frames => b"{\"frames\":[",
+        };
+        let all = Arc::new(Mutex::new((
+            ProbeRecords::new(root),
+            Scan {
+                kind: selection.kind,
+                stream_index: selection.stream_index,
+                clock,
+                window,
+                observed: 0,
+                rows: Vec::new(),
+            },
+        )));
         let consumer = all.clone();
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone())
@@ -236,22 +204,30 @@ impl Engine {
                 stdout_bytes: MAX_SCAN_BYTES,
                 stderr_bytes: 4096,
             },
-            Box::new(move |bytes| consumer.lock().map_err(|_| malformed())?.feed(bytes)),
+            Box::new(move |bytes| {
+                let mut state = consumer.lock().map_err(|_| malformed())?;
+                let (records, scan) = &mut *state;
+                records.feed(bytes, |record| scan.accept(record))
+            }),
             cancel.clone(),
         )
         .await;
-        if !ticket.finish(output)?.stderr.is_empty() {
+        if ticket.finish(output)?.diagnostic_bytes != 0 {
             return Err(DomainError::new(
                 "INVALID_PROBE",
                 "ffprobe reported an error during the scan",
             ));
         }
-        let scan = Arc::try_unwrap(all)
+        let (records, scan) = Arc::try_unwrap(all)
             .map_err(|_| malformed())?
             .into_inner()
             .map_err(|_| malformed())?;
-        if !scan.record.is_empty() {
-            return Err(malformed());
+        records.finish()?;
+        if selection.kind == Kind::Frames && scan.observed == 0 {
+            return Err(DomainError::new(
+                "FRAME_UNAVAILABLE",
+                "ffprobe returned no decoded frames for the registered stream",
+            ));
         }
         identities(self, cancel.clone()).await?;
         blocking(move || {

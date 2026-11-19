@@ -103,14 +103,15 @@ the measurement gate. Digital silence returns a null true peak.
 `media.analyze.reference` takes `reference` and `candidate` windows with
 `asset_id`, `stream_index` and zero-based `start_frame`, plus `frame_count`
 from one to eight. The registered video geometry and the decoded presentation
-grids must agree. Each score has the exact relative time and both original
+grids must agree. The engine preserves the decoder clock and rejects format
+changes during frame selection. Each score has the exact relative time and both original
 frame indices. PSNR is in hundredths of a dB or `{"kind":"identical"}`.
 SSIM is reported in millionths. The scores describe decoded 8-bit RGB.
 
 `media.analyze.stream` takes `asset_id`, `stream_index`, `kind` (`packets` or
 `frames`), zero-based `first` and a `limit` from one to 64. The owner scans the
-selected stream through ffprobe, returning the complete count as a decimal
-string plus the requested rows. Times are exact rationals on the registered
+selected stream through ffprobe, returning the number of rows emitted as a
+decimal string plus the requested rows. Times are exact rationals on the registered
 stream clock. Packet hashes are SHA-256 of the original payloads. A scan that
 reaches a processing limit returns a typed error.
 
