@@ -249,7 +249,7 @@ pub(crate) fn qualify_portable_export(
         &document,
         serde_json::to_vec_pretty(&json!({
             "asset_id":asset,"output":output,"settings":{
-                "video_stream":0,"container":"mp4","crf":18,"preset":"balanced","audio":{"kind":"none"}
+                "video_stream":0,"container":"mp4","crf":18,"preset":"balanced","audio":{"kind":"drop"}
             }
         }))?,
     )?;

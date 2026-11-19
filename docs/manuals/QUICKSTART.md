@@ -23,7 +23,7 @@ asset=$(nw assets register "$resources/examples/quickstart/clip.mkv" \
   --replay-scope "$scope" --idempotency-key quickstart-register | jq -er '.result.id')
 jq -n --arg asset "$asset" --arg out "$work/output.mp4" '{
   asset_id: $asset, output: $out,
-  settings: {video_stream: 0, container: "mp4", crf: 18, preset: "balanced", audio: {kind: "none"}}
+  settings: {video_stream: 0, container: "mp4", crf: 18, preset: "balanced", audio: {kind: "drop"}}
 }' > "$work/encode.json"
 plan=$(nw media encode --file "$work/encode.json" | jq -er '.result.id')
 nw plans inspect "$plan" > "$work/review.json"
@@ -63,7 +63,7 @@ $request = Join-Path $work 'encode.json'
 @{
   asset_id = $asset
   output = Join-Path $work 'output.mp4'
-  settings = @{ video_stream = 0; container = 'mp4'; crf = 18; preset = 'balanced'; audio = @{ kind = 'none' } }
+  settings = @{ video_stream = 0; container = 'mp4'; crf = 18; preset = 'balanced'; audio = @{ kind = 'drop' } }
 } | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 $request
 $plan = (nw media encode --file $request).result.id
 $review = (nw plans inspect $plan).result
