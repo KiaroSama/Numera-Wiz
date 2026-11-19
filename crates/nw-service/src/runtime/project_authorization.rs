@@ -139,9 +139,11 @@ impl Service {
                 // Version1 observations retain their original closed project command set.
                 // Other tools can publish static requirements without changing this codec.
                 .filter(|requirement| {
-                    PROJECT_TARGET_COMMANDS.contains(&requirement.command_id.as_str())
-                        || ["projects.create", "projects.list"]
-                            .contains(&requirement.command_id.as_str())
+                    match requirement.command_id.as_str() {
+                        "projects.create" | "projects.list" => true,
+                        "clips.trim" => false,
+                        command => PROJECT_TARGET_COMMANDS.contains(&command),
+                    }
                 })
                 .map(|requirement| {
                     let reasons = if policy
