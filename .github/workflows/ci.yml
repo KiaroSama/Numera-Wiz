@@ -122,6 +122,7 @@ jobs:
           if-no-files-found: error
   browser:
     needs: [web, media]
+    if: ${{ !cancelled() && needs.media.outputs.fixture_ready == 'true' && needs.web.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -167,7 +168,7 @@ jobs:
           if-no-files-found: error
   native-ui:
     needs: [checks, media, web]
-    if: ${{ !cancelled() && needs.media.result == 'success' && needs.web.result == 'success' }}
+    if: ${{ !cancelled() && needs.media.outputs.fixture_ready == 'true' && needs.web.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -494,10 +495,12 @@ jobs:
           key: ${{ steps.rust-cache.outputs.cache-primary-key }}
 
   media:
+    needs: [web]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
-      portable_component: ${{ steps.retain-standard-linux.outcome }}
+      fixture_ready: ${{ steps.fixture-build.outcome == 'success' && steps.fixture-retain.outcome == 'success' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -524,6 +527,7 @@ jobs:
       - name: Install toolchain
         run: rustup toolchain install 1.99.1 --profile minimal
       - name: Build the identified CPU fixture component profile
+        id: fixture-build
         run: cargo run --locked -p xtask -- build-fixture-profile
       - name: Execute actual media preservation regressions
         env:
@@ -536,6 +540,7 @@ jobs:
           NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
         run: cargo test --locked -p nw-service --lib runtime::read_model::tests::page_byte_ceiling_wins_over_row_count_without_truncating_items -- --exact --nocapture
       - name: Save fixture components and actual configuration
+        id: fixture-retain
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -603,8 +608,47 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        id: portable-linux-web
+        if: ${{ !cancelled() && steps.retain-standard-linux.outcome == 'success' && needs.web.result == 'success' }}
+        with:
+          name: embedded-web
+          path: target/web-ui
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        id: portable-linux-component
+        if: ${{ !cancelled() && steps.portable-linux-web.outcome == 'success' }}
+        with:
+          name: linux-x64-ffmpeg-component
+          path: target/qualified-linux-component
+      - name: Install Linux desktop build dependencies for the standalone app
+        id: portable-linux-dependencies
+        if: ${{ !cancelled() && steps.portable-linux-component.outcome == 'success' }}
+        run: cargo run --locked -p xtask -- ci-linux-dependencies desktop
+      - name: Build and exercise the Linux app with embedded CPU media
+        id: portable-linux-app
+        if: ${{ !cancelled() && steps.portable-linux-dependencies.outcome == 'success' }}
+        env:
+          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
+        run: cargo run --locked -p xtask -- package-standard-linux-application
+      - name: Retain bounded Linux application packaging evidence
+        if: ${{ !cancelled() && steps.portable-linux-app.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-portable-failure-x64
+          path: target/linux-portable/build-*/failure.json
+          if-no-files-found: warn
+      - name: Retain the Linux app with corresponding sources
+        if: ${{ !cancelled() && steps.portable-linux-app.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: numera-wiz-portable-linux-x64
+          path: target/linux-portable/build-*/delivery/
+          if-no-files-found: error
+          compression-level: 0
+
   owner-batch:
     needs: [media]
+    if: ${{ !cancelled() && needs.media.outputs.fixture_ready == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -644,6 +688,7 @@ jobs:
 
   owner-transports:
     needs: [media]
+    if: ${{ !cancelled() && needs.media.outputs.fixture_ready == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -740,43 +785,6 @@ jobs:
           name: artifact-http-evidence-linux
           path: target/owner-evidence/
           if-no-files-found: error
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        id: portable-linux-web
-        if: ${{ !cancelled() && needs.media.outputs.portable_component == 'success' && needs.web.result == 'success' }}
-        with:
-          name: embedded-web
-          path: target/web-ui
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        id: portable-linux-component
-        if: ${{ !cancelled() && steps.portable-linux-web.outcome == 'success' }}
-        with:
-          name: linux-x64-ffmpeg-component
-          path: target/qualified-linux-component
-      - name: Install Linux desktop build dependencies for the standalone app
-        id: portable-linux-dependencies
-        if: ${{ !cancelled() && steps.portable-linux-component.outcome == 'success' }}
-        run: cargo run --locked -p xtask -- ci-linux-dependencies desktop
-      - name: Build and exercise the Linux app with embedded CPU media
-        id: portable-linux-app
-        if: ${{ !cancelled() && steps.portable-linux-dependencies.outcome == 'success' }}
-        env:
-          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
-        run: cargo run --locked -p xtask -- package-standard-linux-application
-      - name: Retain bounded Linux application packaging evidence
-        if: ${{ !cancelled() && steps.portable-linux-app.outcome == 'failure' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: linux-portable-failure-x64
-          path: target/linux-portable/build-*/failure.json
-          if-no-files-found: warn
-      - name: Retain the Linux app with corresponding sources
-        if: ${{ !cancelled() && steps.portable-linux-app.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: numera-wiz-portable-linux-x64
-          path: target/linux-portable/build-*/delivery/
-          if-no-files-found: error
-          compression-level: 0
       - name: Record this exact head and current-attempt required job results
         if: always()
         env:
