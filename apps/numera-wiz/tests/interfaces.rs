@@ -24,7 +24,7 @@ fn retain_owner_logs(data: &std::path::Path, label: &str) -> evidence::RetainLog
 #[test]
 fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     let _case = OWNER_CASE.blocking_lock();
-    let path =
+    let request_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clean-resolve.json");
     let data = tempfile::tempdir().unwrap();
     let packaged = data.path().join("Numera Wiz.app/Contents/MacOS/numera-wiz");
@@ -133,7 +133,7 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
         .arg("--data-dir")
         .arg(data.path())
         .args(["request", "--file"])
-        .arg(path)
+        .arg(request_path)
         .output()
         .unwrap();
     assert!(

@@ -147,7 +147,7 @@ impl Timeline {
                     nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
                     serde_json::to_value(input)?,
                 );
-                request.project = Some(ProjectRef {
+                request.project = Some(commands::ProjectRef {
                     id: project,
                     expected_revision: None,
                 });
