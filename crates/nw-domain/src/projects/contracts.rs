@@ -489,16 +489,15 @@ pub fn inspect(sequence_only: bool) -> Value {
                 ),
             ]),
         );
-        defs.insert(
-            "TrackSummary".into(),
-            object([
-                ("id", reference("Id")),
-                ("kind", enumeration(&["video", "audio"])),
-                ("name", string()),
-                ("order", uint32()),
-                ("clip_count", count()),
-            ]),
-        );
+        let mut track = object([
+            ("id", reference("Id")),
+            ("kind", enumeration(&["video", "audio"])),
+            ("name", string()),
+            ("order", uint32()),
+            ("clip_count", count()),
+        ]);
+        track["properties"]["enabled"] = boolean();
+        defs.insert("TrackSummary".into(), track);
         defs.insert(
             "ClipSummary".into(),
             object([
