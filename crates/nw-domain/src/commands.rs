@@ -1889,6 +1889,9 @@ mod strict_json_tests {
 
 /// The single active-handler set; planned DTOs remain separate from offered tools.
 pub const ACTIVE_COMMANDS: &[&str] = &[
+    // Keep the discovery tools on the first MCP page as the registry grows.
+    "commands.list",
+    "commands.schema",
     "projects.list",
     "projects.create",
     "projects.inspect",
@@ -1951,8 +1954,6 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "artifacts.manifest",
     "artifacts.read_chunk",
     "logs.status",
-    "commands.list",
-    "commands.schema",
     "streams.clean.resolve",
     "config.import.ffmwiz",
     "streams.clean.report",
