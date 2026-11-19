@@ -638,7 +638,13 @@ impl WizApp {
     }
     pub(super) fn project_request_failed(&mut self, action: Action) {
         #[cfg(target_arch = "wasm32")]
-        if matches!(action, Action::Project(ProjectAction { phase: Phase::ProgramSegment, .. })) {
+        if matches!(
+            action,
+            Action::Project(ProjectAction {
+                phase: Phase::ProgramSegment,
+                ..
+            })
+        ) {
             return;
         }
         if matches!(
@@ -1005,25 +1011,39 @@ impl WizApp {
             #[cfg(target_arch = "wasm32")]
             Phase::ProgramSegment => {
                 use nw_domain::preview::{ProgramSegment, ProgramSegmentInput};
-                let expected: ProgramSegmentInput =
-                    serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+                let expected: ProgramSegmentInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
                 let segment: ProgramSegment =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
-                let group = self.projects.group.as_ref().ok_or("No displayed project for playback")?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed project for playback")?;
                 if segment.selection != expected
                     || segment.project_id.as_str() != group.key.project
-                    || group.view.sequence.as_deref() != Some(segment.selection.sequence_id.as_str())
+                    || group.view.sequence.as_deref()
+                        != Some(segment.selection.sequence_id.as_str())
                     || segment.selection.revision.to_string() != group.key.revision
                     || self.projects.forms.preview_at.value().ok() != Some(expected.range.start)
                 {
-                    return Err("Playback capture differs from the displayed project or timeline time".into());
+                    return Err(
+                        "Playback capture differs from the displayed project or timeline time"
+                            .into(),
+                    );
                 }
-                self.client.open_browser_playback(segment.playback, "Timeline preview");
+                self.client
+                    .open_browser_playback(segment.playback, "Timeline preview");
                 return Ok(());
             }
             Phase::EdlExport => {
-                let edl: nw_domain::interchange::EdlExport = serde_json::from_value(result).map_err(|error| error.to_string())?;
-                let group = self.projects.group.as_ref().ok_or("No displayed sequence for the EDL export")?;
+                let edl: nw_domain::interchange::EdlExport =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let group = self
+                    .projects
+                    .group
+                    .as_ref()
+                    .ok_or("No displayed sequence for the EDL export")?;
                 if edl.project_id.as_str() != group.key.project
                     || group.view.sequence.as_deref() != Some(edl.sequence_id.as_str())
                     || group.view.track.as_deref() != Some(edl.track_id.as_str())
@@ -1031,7 +1051,10 @@ impl WizApp {
                     || edl.range != group.view.range
                     || nw_domain::projects::hash(edl.document.as_bytes()) != edl.document_sha256
                 {
-                    return Err("EDL differs from the displayed revision, track, range or accepted digest".into());
+                    return Err(
+                        "EDL differs from the displayed revision, track, range or accepted digest"
+                            .into(),
+                    );
                 }
                 self.projects.edl = Some(edl);
                 return Ok(());

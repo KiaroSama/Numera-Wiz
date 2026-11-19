@@ -258,12 +258,19 @@ impl BrowserSegment {
     }
 }
 
-
 pub(super) fn append_browser_audio(args: &mut Vec<String>) {
     args.extend(
         [
-            "-c:a", "aac", "-profile:a", "aac_low", "-ar", "48000",
-            "-ac", "2", "-b:a", "128k",
+            "-c:a",
+            "aac",
+            "-profile:a",
+            "aac_low",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-b:a",
+            "128k",
         ]
         .map(str::to_owned),
     );

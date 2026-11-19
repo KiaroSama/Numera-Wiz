@@ -4,8 +4,7 @@ use nw_domain::{
     media::{MixedCapture, OccurrenceSource, capture_mixed},
     preview::{
         MAX_SOURCE_SEGMENT_BYTES, PROGRAM_SEGMENT_COMMAND, ProgramSegment, ProgramSegmentInput,
-        SOURCE_SEGMENT_SECONDS,
-        SegmentBytes, SegmentPlayback, SourceSegment, SourceSegmentInput,
+        SOURCE_SEGMENT_SECONDS, SegmentBytes, SegmentPlayback, SourceSegment, SourceSegmentInput,
     },
     time::{Rational, TimeRange},
 };
@@ -68,8 +67,7 @@ impl Service {
         let mut segments = self.browser_segments.lock().map_err(|_| lock_error())?;
         let now = Instant::now();
         segments.retain(|_, entry| now < entry.expires);
-        if segments.len() >= MAX_SEGMENTS
-            && !segments.values().any(|entry| entry.owned_by(context))
+        if segments.len() >= MAX_SEGMENTS && !segments.values().any(|entry| entry.owned_by(context))
         {
             return Err(no_space());
         }
@@ -127,8 +125,13 @@ impl Service {
         let started = Instant::now();
         let _capacity = self.browser_capture_slot(context)?;
         selection.range.validate()?;
-        if selection.range.end.checked_sub(selection.range.start)? > Rational::new(SOURCE_SEGMENT_SECONDS, 1)? {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Choose at most two seconds for program preview"));
+        if selection.range.end.checked_sub(selection.range.start)?
+            > Rational::new(SOURCE_SEGMENT_SECONDS, 1)?
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Choose at most two seconds for program preview",
+            ));
         }
         let capture = self.browser_program_capture(context, project, &selection)?;
         let clips = || capture.tracks.iter().flat_map(|track| &track.clips);
@@ -139,22 +142,35 @@ impl Service {
             })
             .collect::<BTreeSet<_>>()
             .len();
-        if asset_count > PROGRAM_ORIGINALS || capture.settings.width > 1920
-            || capture.settings.height > 1080 || capture.settings.frame_rate > Rational::new(60, 1)?
+        if asset_count > PROGRAM_ORIGINALS
+            || capture.settings.width > 1920
+            || capture.settings.height > 1080
+            || capture.settings.frame_rate > Rational::new(60, 1)?
         {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Program preview exceeds its source count, raster or frame rate limit"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Program preview exceeds its source count, raster or frame rate limit",
+            ));
         }
         let originals = Arc::new(self.bind_mixed_inputs(context, clips(), &cancel)?);
         let capture_sha256 = capture_fingerprint(&capture)?;
-        let path = nw_platform::security::private_directory(&self.root.join("runtime").join("browser-program"))?;
-        self.store.require_media_space(&path, PROGRAM_STAGE_BYTES * asset_count as u64)?;
+        let path = nw_platform::security::private_directory(
+            &self.root.join("runtime").join("browser-program"),
+        )?;
+        self.store
+            .require_media_space(&path, PROGRAM_STAGE_BYTES * asset_count as u64)?;
         let workspace = files::DirectoryStamp::capture_resolved(&path)?;
         let engine = self.engine()?;
         let limits = |max_bytes| {
             let deadline = PROGRAM_DEADLINE
                 .checked_sub(started.elapsed())
                 .filter(|left| !left.is_zero())
-                .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Program preview preparation exceeded its deadline"))?;
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "PROCESS_TIMEOUT",
+                        "Program preview preparation exceeded its deadline",
+                    )
+                })?;
             Ok::<_, DomainError>(nw_engine::MixedProcessLimits {
                 workspace: &workspace,
                 max_bytes,
@@ -168,18 +184,31 @@ impl Service {
             for held in originals.originals.values() {
                 let asset = &held.asset;
                 let source = files::SourceStamp::capture_open_resolved(
-                    Path::new(&asset.identity.path), held.stamp.try_clone_file()?,
+                    Path::new(&asset.identity.path),
+                    held.stamp.try_clone_file()?,
                 )?;
-                let streams = originals.bindings.iter()
+                let streams = originals
+                    .bindings
+                    .iter()
                     .filter(|binding| binding.asset_id == asset.id)
                     .cloned()
                     .collect::<Vec<_>>();
-                staged.push(engine.stage_mixed_original(asset, source, &streams, limits(PROGRAM_STAGE_BYTES)?).await?);
+                staged.push(
+                    engine
+                        .stage_mixed_original(asset, source, &streams, limits(PROGRAM_STAGE_BYTES)?)
+                        .await?,
+                );
                 assets.push(asset);
             }
-            engine.browser_program_segment(
-                &capture, &originals.bindings, &assets, staged, limits(MAX_SOURCE_SEGMENT_BYTES as u64)?,
-            ).await
+            engine
+                .browser_program_segment(
+                    &capture,
+                    &originals.bindings,
+                    &assets,
+                    staged,
+                    limits(MAX_SOURCE_SEGMENT_BYTES as u64)?,
+                )
+                .await
         })?;
         let authority = SegmentAuthority::Program {
             project: project.into(),
@@ -189,7 +218,10 @@ impl Service {
         };
         let _publication = self.mutation.lock().map_err(|_| lock_error())?;
         if cancel.is_cancelled() {
-            return Err(DomainError::new("CANCELLED", "Program preview was cancelled before delivery"));
+            return Err(DomainError::new(
+                "CANCELLED",
+                "Program preview was cancelled before delivery",
+            ));
         }
         self.recheck_program_segment(context, &authority)?;
         let playback = self.retain_browser_segment(context, segment, authority)?;
@@ -208,22 +240,45 @@ impl Service {
         selection: &ProgramSegmentInput,
     ) -> Result<MixedCapture> {
         let read = self.read_project(context, project, ObjectAction::Read)?;
-        capture_mixed(&read, &selection.sequence_id, selection.revision, selection.range)
+        capture_mixed(
+            &read,
+            &selection.sequence_id,
+            selection.revision,
+            selection.range,
+        )
     }
 
     /// The caller holds the mutation guard through checked delivery.
-    fn recheck_program_segment(&self, context: &Context, authority: &SegmentAuthority) -> Result<()> {
+    fn recheck_program_segment(
+        &self,
+        context: &Context,
+        authority: &SegmentAuthority,
+    ) -> Result<()> {
         let SegmentAuthority::Program {
-            project, selection, capture_sha256, originals,
-        } = authority else {
+            project,
+            selection,
+            capture_sha256,
+            originals,
+        } = authority
+        else {
             return Err(DomainError::object_not_found());
         };
-        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command(PROGRAM_SEGMENT_COMMAND)) {
-            return Err(DomainError::new("PERMISSION_DENIED", "Program preview access changed"));
+        if self
+            .policy(context)?
+            .as_ref()
+            .is_some_and(|policy| !policy.allows_command(PROGRAM_SEGMENT_COMMAND))
+        {
+            return Err(DomainError::new(
+                "PERMISSION_DENIED",
+                "Program preview access changed",
+            ));
         }
         let current = self.browser_program_capture(context, project, selection)?;
         if capture_fingerprint(&current)? != *capture_sha256 {
-            return Err(DomainError::new("STALE_REVISION", "Program preview no longer matches the project"));
+            return Err(DomainError::new(
+                "STALE_REVISION",
+                "Program preview no longer matches the project",
+            ));
         }
         originals.revalidate(self, context)
     }
@@ -254,7 +309,8 @@ impl Service {
         let now = Instant::now();
         segments.retain(|_, entry| now < entry.expires);
         if segments.len() >= MAX_SEGMENTS {
-            let replace = segments.iter()
+            let replace = segments
+                .iter()
                 .filter(|(_, entry)| entry.owned_by(context))
                 .min_by_key(|(_, entry)| entry.expires)
                 .map(|(id, _)| id.clone())
@@ -274,19 +330,34 @@ impl Service {
             let mut segments = self.browser_segments.lock().map_err(|_| lock_error())?;
             let now = Instant::now();
             segments.retain(|_, entry| now < entry.expires);
-            let entry = segments.get(id)
+            let entry = segments
+                .get(id)
                 .filter(|entry| entry.owned_by(context))
                 .ok_or_else(DomainError::object_not_found)?;
             (entry.segment.clone(), entry.authority.clone())
         };
         match &authority {
-            SegmentAuthority::Source { asset_id, sha256, stamp } => {
-                let asset: Asset = self.store.get(&named("asset", asset_id)?)?
+            SegmentAuthority::Source {
+                asset_id,
+                sha256,
+                stamp,
+            } => {
+                let asset: Asset = self
+                    .store
+                    .get(&named("asset", asset_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
                 if asset.identity.sha256 != *sha256 {
-                    return Err(DomainError::new("SOURCE_CHANGED", "The registered preview source changed"));
+                    return Err(DomainError::new(
+                        "SOURCE_CHANGED",
+                        "The registered preview source changed",
+                    ));
                 }
-                self.complete_analysis(context, &[&asset], SOURCE_COMMAND, &CancellationToken::new())?;
+                self.complete_analysis(
+                    context,
+                    &[&asset],
+                    SOURCE_COMMAND,
+                    &CancellationToken::new(),
+                )?;
                 stamp.revalidate()?;
             }
             SegmentAuthority::Program { .. } => {
@@ -299,7 +370,11 @@ impl Service {
 }
 
 fn capture_fingerprint(capture: &MixedCapture) -> Result<String> {
-    let encoded = serde_json::to_vec(capture)
-        .map_err(|_| DomainError::new("SERIALIZATION_FAILED", "Program capture identity is unavailable"))?;
+    let encoded = serde_json::to_vec(capture).map_err(|_| {
+        DomainError::new(
+            "SERIALIZATION_FAILED",
+            "Program capture identity is unavailable",
+        )
+    })?;
     Ok(nw_domain::projects::hash(&encoded))
 }

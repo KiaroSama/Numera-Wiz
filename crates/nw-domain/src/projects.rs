@@ -571,7 +571,8 @@ impl EntityEnvelope {
             return Ok(0);
         }
         let raw = &self.extensions[TRACK_GAIN_EXTENSION];
-        let gain = serde_json::from_str::<i16>(raw.get()).map_err(|_| invalid("Invalid track gain field"))?;
+        let gain = serde_json::from_str::<i16>(raw.get())
+            .map_err(|_| invalid("Invalid track gain field"))?;
         validate_track_gain(gain)?;
         if gain == 0 {
             return Err(invalid("Unity gain uses the original track codec"));
@@ -585,7 +586,11 @@ impl EntityEnvelope {
             self.extensions.remove(TRACK_GAIN_EXTENSION);
         } else {
             self.kind_version = 2;
-            self.extensions.insert(TRACK_GAIN_EXTENSION.into(), serde_json::value::to_raw_value(&gain).map_err(|error| invalid(error.to_string()))?);
+            self.extensions.insert(
+                TRACK_GAIN_EXTENSION.into(),
+                serde_json::value::to_raw_value(&gain)
+                    .map_err(|error| invalid(error.to_string()))?,
+            );
         }
         Ok(())
     }
@@ -617,7 +622,10 @@ impl EntityEnvelope {
     }
     pub fn payload<T: DeserializeOwned>(&self, kind: &str) -> Result<T> {
         self.validate()?;
-        if self.envelope_version != 1 || (self.kind_version != 1 && !self.gain_track_codec()) || self.kind != kind {
+        if self.envelope_version != 1
+            || (self.kind_version != 1 && !self.gain_track_codec())
+            || self.kind != kind
+        {
             return Err(DomainError::new(
                 "UNSUPPORTED_SEMANTIC_NODE",
                 "A supported entity codec is required",

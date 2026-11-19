@@ -91,14 +91,26 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
-            | crate::preview::PROGRAM_SEGMENT_COMMAND
+        | crate::preview::PROGRAM_SEGMENT_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => Some(ProjectAction::Read),
-        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-        | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
-            Some(ProjectAction::Edit)
-        }
+        "sequences.create"
+        | "clips.place"
+        | "clips.move"
+        | "clips.link"
+        | "clips.unlink"
+        | "clips.split"
+        | "clips.join_through_edit"
+        | "clips.trim"
+        | "clips.slip"
+        | "clips.remove"
+        | "tracks.set_enabled"
+        | "markers.place"
+        | "markers.remove"
+        | "timeline.remove_gap"
+        | "mixer.set_track_gain"
+        | "history.undo"
+        | "history.redo" => Some(ProjectAction::Edit),
         _ => return None,
     };
     let write = project_action == Some(ProjectAction::Edit);

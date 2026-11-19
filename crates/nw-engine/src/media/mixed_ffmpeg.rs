@@ -1,6 +1,7 @@
 //! Closed FFmpeg composition for reviewed opaque video and mixed PCM windows.
 use super::{
-    BrowserSegment, Listing, browser_preview::{append_browser_audio, append_browser_output},
+    BrowserSegment, Listing,
+    browser_preview::{append_browser_audio, append_browser_output},
     identities, listing,
 };
 use crate::{
@@ -10,8 +11,8 @@ use crate::{
 use nw_domain::{
     DomainError, Result,
     media::{
-        AudioLayout, BoundSource, CapturedOccurrence, MediaPlanV2, MixedCapture, MixedGraph, MixedTools,
-        OccurrenceSource, compile_mixed_graph,
+        AudioLayout, BoundSource, CapturedOccurrence, MediaPlanV2, MixedCapture, MixedGraph,
+        MixedTools, OccurrenceSource, compile_mixed_graph,
     },
     mux::StreamKind,
     records::{Asset, FileIdentity, NativeObjectIdentity},
@@ -184,9 +185,7 @@ async fn validate_staged_inputs(
         ));
     }
     for (asset, stage) in assets.iter().zip(staged) {
-        let streams = sources
-            .iter()
-            .filter(|stream| stream.asset_id == asset.id);
+        let streams = sources.iter().filter(|stream| stream.asset_id == asset.id);
         if asset.id != stage.asset_id
             || !streams
                 .map(|stream| stream.stream_index)
@@ -253,7 +252,11 @@ fn composition_invocation(
 }
 
 impl Engine {
-    pub async fn qualify_mixed_compiler(&self, gain_required: bool, cancel: CancellationToken) -> Result<MixedTools> {
+    pub async fn qualify_mixed_compiler(
+        &self,
+        gain_required: bool,
+        cancel: CancellationToken,
+    ) -> Result<MixedTools> {
         let qualified = self.qualify_media_compiler(cancel.clone()).await?;
         let available = listing(self, "-filters", Listing::Filters, cancel.clone()).await?;
         if MIXED_FILTERS.iter().any(|name| !available.contains(*name))
@@ -426,24 +429,44 @@ impl Engine {
         staged: Vec<StagedMixedInput>,
         limits: MixedProcessLimits<'_>,
     ) -> Result<BrowserSegment> {
-        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let MixedProcessLimits {
+            workspace,
+            max_bytes,
+            deadline,
+            cancel,
+        } = limits;
         let started = Instant::now();
         let remaining = || {
-            deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
-                .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Browser program preview exceeded its complete deadline"))
+            deadline
+                .checked_sub(started.elapsed())
+                .filter(|left| !left.is_zero())
+                .ok_or_else(|| {
+                    DomainError::new(
+                        "PROCESS_TIMEOUT",
+                        "Browser program preview exceeded its complete deadline",
+                    )
+                })
         };
         let limit = max_bytes.min(nw_domain::preview::MAX_SOURCE_SEGMENT_BYTES as u64) as usize;
         let maximum = Rational::new(nw_domain::preview::SOURCE_SEGMENT_SECONDS, 1)?;
-        if limit == 0 || capture.range.end.checked_sub(capture.range.start)? > maximum
-            || capture.settings.width > 1920 || capture.settings.height > 1080
+        if limit == 0
+            || capture.range.end.checked_sub(capture.range.start)? > maximum
+            || capture.settings.width > 1920
+            || capture.settings.height > 1080
         {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Browser program window exceeds its size or duration budget"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Browser program window exceeds its size or duration budget",
+            ));
         }
         let graph = compile_mixed_graph(capture)?;
         validate_staged_inputs(sources, assets, &staged, &cancel).await?;
-        let MixedFiltergraph { mut script, audio_extents } =
-            compose_filtergraph(capture, &graph, sources, assets)?;
-        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let MixedFiltergraph {
+            mut script,
+            audio_extents,
+        } = compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel)
+            .await?;
         script.push_str(concat!(
             ";\n[outv]scale=320:180:force_original_aspect_ratio=decrease:force_divisible_by=2:",
             "flags=lanczos:out_color_matrix=bt709:in_range=full:out_range=limited,format=yuv420p,",
@@ -461,17 +484,28 @@ impl Engine {
             Ok(left) => left,
             Err(error) => return ticket.finish(Err(error)),
         };
-        let result = process::run(Path::new(&self.ffmpeg.path), &args, left, limit, cancel.clone()).await;
+        let result = process::run(
+            Path::new(&self.ffmpeg.path),
+            &args,
+            left,
+            limit,
+            cancel.clone(),
+        )
+        .await;
         let output = match ticket.finish(result) {
             Ok(output) => output,
             Err(error) => {
                 if uncertain(&error) {
                     if sidecar.keep().is_err() {
-                        tracing::error!("Could not retain the browser composition graph for process settlement");
+                        tracing::error!(
+                            "Could not retain the browser composition graph for process settlement"
+                        );
                     }
                     for input in staged {
                         if input.retain().is_err() {
-                            tracing::error!("Could not retain a browser composition input for process settlement");
+                            tracing::error!(
+                                "Could not retain a browser composition input for process settlement"
+                            );
                         }
                     }
                 }
@@ -511,8 +545,15 @@ impl Engine {
                     )
                 })
         };
-        let gain_required = plan.payload.graph.audio.iter().any(|span| span.gain_centidb != 0);
-        let current = self.qualify_mixed_compiler(gain_required, cancel.clone()).await?;
+        let gain_required = plan
+            .payload
+            .graph
+            .audio
+            .iter()
+            .any(|span| span.gain_centidb != 0);
+        let current = self
+            .qualify_mixed_compiler(gain_required, cancel.clone())
+            .await?;
         if current != plan.payload.tools
             || max_bytes == 0
             || current.ffmpeg.sha256 != self.ffmpeg.sha256
@@ -527,7 +568,8 @@ impl Engine {
             script,
             audio_extents,
         } = mixed_filtergraph(plan, assets)?;
-        self.verify_mixed_extents(staged, audio_extents, remaining, &cancel).await?;
+        self.verify_mixed_extents(staged, audio_extents, remaining, &cancel)
+            .await?;
         let file = tempfile::Builder::new()
             .prefix("payload")
             .rand_bytes(0)
@@ -1128,7 +1170,12 @@ impl<'a> Inputs<'a> {
 /// The execution phase freezes input handles, demuxers and component identity.
 fn mixed_filtergraph(plan: &MediaPlanV2, assets: &[&Asset]) -> Result<MixedFiltergraph> {
     plan.validate_hash()?;
-    compose_filtergraph(&plan.payload.capture, &plan.payload.graph, &plan.payload.sources, assets)
+    compose_filtergraph(
+        &plan.payload.capture,
+        &plan.payload.graph,
+        &plan.payload.sources,
+        assets,
+    )
 }
 
 fn compose_filtergraph(
@@ -1237,7 +1284,11 @@ fn compose_filtergraph(
         if gain != 0 {
             let magnitude = gain.unsigned_abs();
             let sign = if gain < 0 { "-" } else { "" };
-            volume = format!("volume={sign}{}.{:02}dB:precision=float,", magnitude / 100, magnitude % 100);
+            volume = format!(
+                "volume={sign}{}.{:02}dB:precision=float,",
+                magnitude / 100,
+                magnitude % 100
+            );
         }
         chains.push(format!("[{input}:{index}]atrim=start_sample={start}:end_sample={end},asetpts=N/SR/TB,aresample={sample_rate},aformat=sample_fmts=s16:channel_layouts={layout},atrim=end_sample={count},{volume}adelay={delay}S:all=1{label}"));
         audio_labels.push_str(&label);

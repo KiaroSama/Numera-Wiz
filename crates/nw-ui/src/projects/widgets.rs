@@ -388,18 +388,30 @@ impl WizApp {
                     }
                 }
                 if let Some(sequence) = &group.view.sequence {
-                    let all_tracks: Vec<_> = group.tracks.items.iter().map(|track| track.id.as_str()).collect();
+                    let all_tracks: Vec<_> = group
+                        .tracks
+                        .items
+                        .iter()
+                        .map(|track| track.id.as_str())
+                        .collect();
                     let complete = group.tracks.next.is_none()
                         && group.tracks.accuracy == "exact"
                         && group.tracks.total == all_tracks.len()
                         && (1..=16).contains(&all_tracks.len());
-                    let selected = group.view.track.as_deref().filter(|_| group.track.is_some());
+                    let selected = group
+                        .view
+                        .track
+                        .as_deref()
+                        .filter(|_| group.track.is_some());
                     if let Some(track) = selected
                         && ui.button("Close gap on selected track").clicked()
                     {
                         self.close_timeline_gap(sequence, &[track], ui.ctx());
                     }
-                    if complete && all_tracks.len() > 1 && ui.button("Close gap across all tracks").clicked() {
+                    if complete
+                        && all_tracks.len() > 1
+                        && ui.button("Close gap across all tracks").clicked()
+                    {
                         self.close_timeline_gap(sequence, &all_tracks, ui.ctx());
                     }
                 }

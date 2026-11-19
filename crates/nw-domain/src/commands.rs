@@ -208,11 +208,23 @@ fn project_context(id: &str) -> ProjectContextRule {
         | crate::preview::PROGRAM_SEGMENT_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => ProjectContextRule::RequiredRead,
-        "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
-        | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-        | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
-            ProjectContextRule::RequiredWrite
-        }
+        "sequences.create"
+        | "clips.place"
+        | "clips.move"
+        | "clips.link"
+        | "clips.unlink"
+        | "clips.split"
+        | "clips.join_through_edit"
+        | "clips.trim"
+        | "clips.slip"
+        | "clips.remove"
+        | "tracks.set_enabled"
+        | "markers.place"
+        | "markers.remove"
+        | "timeline.remove_gap"
+        | "mixer.set_track_gain"
+        | "history.undo"
+        | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
     }
 }
@@ -257,9 +269,9 @@ fn result_schema(id: &str) -> Option<Value> {
         | "streams.extract.folder_batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
         ),
-        "interchange.edl.export" => Some(
-            serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"),
-        ),
+        "interchange.edl.export" => {
+            Some(serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"))
+        }
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -269,9 +281,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "previews.source_segment" => {
             Some(serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"))
         }
-        crate::preview::PROGRAM_SEGMENT_COMMAND => Some(
-            serde_json::to_value(schema_for!(crate::preview::ProgramSegment)).expect("schema"),
-        ),
+        crate::preview::PROGRAM_SEGMENT_COMMAND => {
+            Some(serde_json::to_value(schema_for!(crate::preview::ProgramSegment)).expect("schema"))
+        }
         "timeline.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }
@@ -325,10 +337,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "clips.move" | "clips.trim" | "clips.slip" | "tracks.set_enabled" | "timeline.remove_gap"
-        | "mixer.set_track_gain" => {
-            Some(contracts::edit(EditResult::Move))
-        }
+        "clips.move"
+        | "clips.trim"
+        | "clips.slip"
+        | "tracks.set_enabled"
+        | "timeline.remove_gap"
+        | "mixer.set_track_gain" => Some(contracts::edit(EditResult::Move)),
         "clips.link" => Some(contracts::edit(EditResult::Link)),
         "clips.unlink" => Some(contracts::edit(EditResult::Unlink)),
         "clips.split" => Some(contracts::edit(EditResult::Split)),

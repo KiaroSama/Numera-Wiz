@@ -55,12 +55,28 @@ impl Command {
         }
         let mut args = vec!["--data-dir".into(), config_path(&root)?];
         if let Some(directory) = components_dir {
-            args.extend(["--components-dir".into(), config_path(&std::path::absolute(directory)?)?]);
+            args.extend([
+                "--components-dir".into(),
+                config_path(&std::path::absolute(directory)?)?,
+            ]);
         }
-        args.extend(["--access-profile", profile, "bridge", "--transport", "stdio"].map(str::to_owned));
+        args.extend(
+            [
+                "--access-profile",
+                profile,
+                "bridge",
+                "--transport",
+                "stdio",
+            ]
+            .map(str::to_owned),
+        );
         let document = client.configuration(&config_path(&executable)?, &args)?;
         if let Some(path) = output {
-            nw_platform::security::write_private(&std::path::absolute(path)?, document.as_bytes(), false)?;
+            nw_platform::security::write_private(
+                &std::path::absolute(path)?,
+                document.as_bytes(),
+                false,
+            )?;
         } else {
             std::io::stdout().lock().write_all(document.as_bytes())?;
         }
@@ -95,7 +111,11 @@ impl Client {
 fn config_path(path: &Path) -> Result<String> {
     let text = nw_platform::files::path_text(path)?;
     if !path.is_absolute() || text.chars().any(char::is_control) {
-        return Err(DomainError::new("VALIDATION_ERROR", "Configuration uses absolute text paths without control characters").into());
+        return Err(DomainError::new(
+            "VALIDATION_ERROR",
+            "Configuration uses absolute text paths without control characters",
+        )
+        .into());
     }
     Ok(text)
 }

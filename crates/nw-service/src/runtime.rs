@@ -676,12 +676,24 @@ impl Service {
             return Ok(response);
         };
         let readable = match request.command.id.as_str() {
-            "projects.create" | "sequences.create" | "clips.place" | "clips.move"
-            | "clips.link" | "clips.unlink" | "clips.split" | "clips.join_through_edit" | "clips.trim" | "clips.slip"
-            | "clips.remove" | "tracks.set_enabled" | "history.undo" | "history.redo"
-            | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" => {
-                self.project_receipt_readable(context, &response)?
-            }
+            "projects.create"
+            | "sequences.create"
+            | "clips.place"
+            | "clips.move"
+            | "clips.link"
+            | "clips.unlink"
+            | "clips.split"
+            | "clips.join_through_edit"
+            | "clips.trim"
+            | "clips.slip"
+            | "clips.remove"
+            | "tracks.set_enabled"
+            | "history.undo"
+            | "history.redo"
+            | "markers.place"
+            | "markers.remove"
+            | "timeline.remove_gap"
+            | "mixer.set_track_gain" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1246,8 +1258,16 @@ impl Service {
                     DomainError::new("VALIDATION_ERROR", "EDL export requires a project context")
                 })?;
                 let read = self.read_project(&context, &project.id, ObjectAction::Read)?;
-                let capture = nw_domain::media::capture_mixed(&read, &input.sequence_id, input.revision, input.range)?;
-                value(&nw_domain::interchange::export_cmx3600(&capture, &input.track_id)?)?
+                let capture = nw_domain::media::capture_mixed(
+                    &read,
+                    &input.sequence_id,
+                    input.revision,
+                    input.range,
+                )?;
+                value(&nw_domain::interchange::export_cmx3600(
+                    &capture,
+                    &input.track_id,
+                )?)?
             }
             "timeline.preview_frame" => {
                 drop(guard);
@@ -1262,10 +1282,16 @@ impl Service {
             nw_domain::preview::PROGRAM_SEGMENT_COMMAND => {
                 drop(guard);
                 let project = request.project.as_ref().ok_or_else(|| {
-                    DomainError::new("VALIDATION_ERROR", "Program preview requires a project context")
+                    DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Program preview requires a project context",
+                    )
                 })?;
                 let segment = self.prepare_browser_program_segment(
-                    &context, &project.id, commands::parse(params)?, cancellation,
+                    &context,
+                    &project.id,
+                    commands::parse(params)?,
+                    cancellation,
                 )?;
                 return Ok(Response::success(&request.request_id, value(&segment)?).bounded());
             }
@@ -1284,10 +1310,26 @@ impl Service {
                 read_model::InventoryKind::Projects,
                 &cancellation,
             )?,
-            "projects.create" | "projects.inspect" | "sequences.create" | "sequences.inspect"
-            | "clips.place" | "clips.move" | "clips.link" | "clips.unlink" | "clips.split" | "clips.join_through_edit"
-            | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-            | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
+            "projects.create"
+            | "projects.inspect"
+            | "sequences.create"
+            | "sequences.inspect"
+            | "clips.place"
+            | "clips.move"
+            | "clips.link"
+            | "clips.unlink"
+            | "clips.split"
+            | "clips.join_through_edit"
+            | "clips.trim"
+            | "clips.slip"
+            | "clips.remove"
+            | "tracks.set_enabled"
+            | "markers.place"
+            | "markers.remove"
+            | "timeline.remove_gap"
+            | "mixer.set_track_gain"
+            | "history.undo"
+            | "history.redo" => {
                 drop(guard);
                 return self.project_command(&context, &request, &cancellation);
             }

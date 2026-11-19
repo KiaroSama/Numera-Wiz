@@ -433,12 +433,24 @@ pub enum Tracks {
 impl Tracks {
     pub(super) fn prepare(self) -> Result<Request> {
         match self {
-            Self::SetEnabled { context, track, enabled } => {
-                context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
-            }
-            Self::SetGain { context, track, centidb } => {
+            Self::SetEnabled {
+                context,
+                track,
+                enabled,
+            } => context.request(
+                "tracks.set_enabled",
+                json!({"track_id":track,"enabled":enabled}),
+            ),
+            Self::SetGain {
+                context,
+                track,
+                centidb,
+            } => {
                 model::validate_track_gain(centidb)?;
-                context.request("mixer.set_track_gain", json!({"track_id":track,"gain_centidb":centidb}))
+                context.request(
+                    "mixer.set_track_gain",
+                    json!({"track_id":track,"gain_centidb":centidb}),
+                )
             }
         }
     }

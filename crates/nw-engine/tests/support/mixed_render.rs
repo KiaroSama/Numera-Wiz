@@ -219,12 +219,15 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
     records.settings.frame_rate = Rational::new(24, 1).unwrap();
     records.tracks[0].clips[0].source = OccurrenceSource::SolidColor { rgb: [0, 0, 0] };
     let edl = nw_domain::interchange::export_cmx3600(&records, &records.tracks[0].id).unwrap();
-    assert_eq!(edl.document, concat!(
-        "TITLE: NUMERA WIZ\nFCM: NON-DROP FRAME\n\n",
-        "001  BL       V     C        00:00:00:00 00:00:00:12 00:00:00:00 00:00:00:12\n",
-        "002  R0000001 V     C        00:00:01:06 00:00:02:00 00:00:00:12 00:00:01:06\n",
-        "003  BL       V     C        00:00:00:00 00:00:00:18 00:00:01:06 00:00:02:00\n",
-    ));
+    assert_eq!(
+        edl.document,
+        concat!(
+            "TITLE: NUMERA WIZ\nFCM: NON-DROP FRAME\n\n",
+            "001  BL       V     C        00:00:00:00 00:00:00:12 00:00:00:00 00:00:00:12\n",
+            "002  R0000001 V     C        00:00:01:06 00:00:02:00 00:00:00:12 00:00:01:06\n",
+            "003  BL       V     C        00:00:00:00 00:00:00:18 00:00:01:06 00:00:02:00\n",
+        )
+    );
     assert_eq!(edl.reels.len(), 1);
     assert_eq!(edl.reels[0].name, "R0000001");
     assert_eq!(edl.reels[0].asset_id, picture.id);
@@ -238,7 +241,10 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
         &request,
         capture,
         bindings,
-        engine.qualify_mixed_compiler(false, token.clone()).await.unwrap(),
+        engine
+            .qualify_mixed_compiler(false, token.clone())
+            .await
+            .unwrap(),
         MixedReview {
             root_id: id().as_str(),
             application_build: &"c".repeat(64),
@@ -349,24 +355,63 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
         &request,
         gained,
         plan.payload.sources.clone(),
-        engine.qualify_mixed_compiler(true, token.clone()).await.unwrap(),
+        engine
+            .qualify_mixed_compiler(true, token.clone())
+            .await
+            .unwrap(),
         MixedReview {
-            root_id: id().as_str(), application_build: &"c".repeat(64),
-            principal: "fixture", id: id().as_str(), now: 10,
+            root_id: id().as_str(),
+            application_build: &"c".repeat(64),
+            principal: "fixture",
+            id: id().as_str(),
+            now: 10,
         },
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(gained.payload.graph.audio[0].gain_centidb, -2000);
-    let audible = engine.verify_mixed_candidate(&gained, &originals, &staged, limits()).await.unwrap();
+    let audible = engine
+        .verify_mixed_candidate(&gained, &originals, &staged, limits())
+        .await
+        .unwrap();
     let mut attenuated = vec![0_f32; 96000];
     for (path, first, output, scale) in [(&audio, 12000, 24000, 0.1_f32), (&av, 0, 36000, 1.0)] {
-        let bytes = ffmpeg(engine, &["-i", path.to_str().unwrap(), "-map", "0:a:0", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"], token).await;
-        for (index, sample) in bytes[2*first..2*(first+24000)].as_chunks::<2>().0.iter().enumerate() {
-            attenuated[output+index] += f32::from(i16::from_le_bytes(*sample)) * scale;
+        let bytes = ffmpeg(
+            engine,
+            &[
+                "-i",
+                path.to_str().unwrap(),
+                "-map",
+                "0:a:0",
+                "-c:a",
+                "pcm_s16le",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            token,
+        )
+        .await;
+        for (index, sample) in bytes[2 * first..2 * (first + 24000)]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .enumerate()
+        {
+            attenuated[output + index] += f32::from(i16::from_le_bytes(*sample)) * scale;
         }
     }
-    let independent = attenuated.into_iter().flat_map(|sample| (sample.round_ties_even() as i16).to_le_bytes()).collect::<Vec<_>>();
-    assert_eq!(audible.proof().pcm_sha256, hex::encode(Sha256::digest(&independent)));
-    assert_ne!(audible.proof().pcm_sha256, hex::encode(Sha256::digest(&expected_pcm)));
+    let independent = attenuated
+        .into_iter()
+        .flat_map(|sample| (sample.round_ties_even() as i16).to_le_bytes())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        audible.proof().pcm_sha256,
+        hex::encode(Sha256::digest(&independent))
+    );
+    assert_ne!(
+        audible.proof().pcm_sha256,
+        hex::encode(Sha256::digest(&expected_pcm))
+    );
     drop(audible);
     drop(staged);
 

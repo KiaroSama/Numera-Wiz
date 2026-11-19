@@ -16,26 +16,42 @@ use std::{
 
 /// Save a bounded client document after checking its digest and the flushed bytes.
 pub fn save_verified_document(output: &Path, bytes: &[u8], sha256: &str) -> Result<()> {
-    if bytes.is_empty() || bytes.len() > nw_domain::commands::MAX_RESULT_BYTES
+    if bytes.is_empty()
+        || bytes.len() > nw_domain::commands::MAX_RESULT_BYTES
         || hex::encode(Sha256::digest(bytes)) != sha256
     {
-        return Err(DomainError::new("ARTIFACT_CHANGED", "Client document differs from its accepted digest"));
+        return Err(DomainError::new(
+            "ARTIFACT_CHANGED",
+            "Client document differs from its accepted digest",
+        ));
     }
     let output = output_path(output)?;
-    let parent = DirectoryStamp::capture_resolved(output.parent().expect("Resolved output parent"))?;
-    let mut file = tempfile::Builder::new().prefix(".numera-wiz-document-").tempfile_in(parent.path()).map_err(io_error)?;
+    let parent =
+        DirectoryStamp::capture_resolved(output.parent().expect("Resolved output parent"))?;
+    let mut file = tempfile::Builder::new()
+        .prefix(".numera-wiz-document-")
+        .tempfile_in(parent.path())
+        .map_err(io_error)?;
     file.write_all(bytes).map_err(io_error)?;
     file.as_file().sync_all().map_err(io_error)?;
     file.as_file_mut().rewind().map_err(io_error)?;
     let mut checked = Vec::new();
-    file.as_file_mut().take((bytes.len() + 1) as u64).read_to_end(&mut checked).map_err(io_error)?;
+    file.as_file_mut()
+        .take((bytes.len() + 1) as u64)
+        .read_to_end(&mut checked)
+        .map_err(io_error)?;
     if checked != bytes {
-        return Err(DomainError::new("ARTIFACT_CHANGED", "Flushed client document differs from its accepted bytes"));
+        return Err(DomainError::new(
+            "ARTIFACT_CHANGED",
+            "Flushed client document differs from its accepted bytes",
+        ));
     }
     let destination = crate::claims::Destination::reviewed(&output, &parent.object_identity()?)?;
     let claims = crate::claims::DestinationClaims::try_acquire(vec![destination])?;
     let staging = RetainedStaging::new(file)?;
-    let publication = claims.revalidate().and_then(|()| staging.publish_no_replace(&parent, &output));
+    let publication = claims
+        .revalidate()
+        .and_then(|()| staging.publish_no_replace(&parent, &output));
     if staging.remove_owned_name().is_err() {
         tracing::warn!("Client document staging cleanup pending");
     }

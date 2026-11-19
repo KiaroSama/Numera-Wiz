@@ -147,7 +147,8 @@ impl WizApp {
         {
             return Err("The preview does not match the selected video and audio streams".into());
         }
-        self.client.open_browser_playback(reply.into(), "Source preview");
+        self.client
+            .open_browser_playback(reply.into(), "Source preview");
         Ok(())
     }
 

@@ -443,19 +443,27 @@ pub fn program_window(
 ) -> Result<TimeRange> {
     use crate::projects::grid_tick;
     let maximum_rate = Rational::new(60, 1)?;
-    let invalid = || DomainError::new(
-        "INVALID_RANGE", "Program playback needs a start aligned to the video and audio clocks",
-    );
+    let invalid = || {
+        DomainError::new(
+            "INVALID_RANGE",
+            "Program playback needs a start aligned to the video and audio clocks",
+        )
+    };
     if frame_rate <= Rational::ZERO || frame_rate > maximum_rate {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Program playback supports at most 60 frames per second"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Program playback supports at most 60 frames per second",
+        ));
     }
     let sample_grid = Rational::new(i64::from(sample_rate), 1)?;
     grid_tick(start, frame_rate).map_err(|_| invalid())?;
     grid_tick(start, sample_grid).map_err(|_| invalid())?;
     let counts = frame_rate.checked_mul(Rational::new(SOURCE_SEGMENT_SECONDS, 1)?)?;
     for frames in (1..=counts.numerator() / counts.denominator()).rev() {
-        let duration = Rational::new(frames, 1)?
-            .checked_mul(Rational::new(frame_rate.denominator(), frame_rate.numerator())?)?;
+        let duration = Rational::new(frames, 1)?.checked_mul(Rational::new(
+            frame_rate.denominator(),
+            frame_rate.numerator(),
+        )?)?;
         let end = start.checked_add(duration)?;
         if grid_tick(end, sample_grid).is_ok() {
             return Ok(TimeRange { start, end });

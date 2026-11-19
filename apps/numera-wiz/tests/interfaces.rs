@@ -59,13 +59,19 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     let configure = |client: &str| {
         let mut command = Command::new(env!("CARGO_BIN_EXE_numera-wiz"));
         command
-            .arg("--data-dir").arg(&setup_root)
-            .arg("--components-dir").arg(&setup_components)
+            .arg("--data-dir")
+            .arg(&setup_root)
+            .arg("--components-dir")
+            .arg(&setup_components)
             .args(["agents", "setup", "--client", client]);
         command
     };
     let actual = configure("cursor").output().unwrap();
-    assert!(actual.status.success(), "{}", String::from_utf8_lossy(&actual.stderr));
+    assert!(
+        actual.status.success(),
+        "{}",
+        String::from_utf8_lossy(&actual.stderr)
+    );
     let config: serde_json::Value = serde_json::from_slice(&actual.stdout).unwrap();
     let server = &config["mcpServers"]["numera-wiz"];
     let executable = std::path::Path::new(server["command"].as_str().unwrap());
@@ -73,28 +79,52 @@ fn cli_stdout_is_canonical_json_and_index_zero_survives() {
     assert_eq!(server["type"], "stdio");
     let root = std::path::absolute(&setup_root).unwrap();
     let components = std::path::absolute(&setup_components).unwrap();
-    assert_eq!(server["args"], serde_json::json!([
-        "--data-dir", root, "--components-dir", components,
-        "--access-profile", "agent", "bridge", "--transport", "stdio"
-    ]));
+    assert_eq!(
+        server["args"],
+        serde_json::json!([
+            "--data-dir",
+            root,
+            "--components-dir",
+            components,
+            "--access-profile",
+            "agent",
+            "bridge",
+            "--transport",
+            "stdio"
+        ])
+    );
     assert!(!setup_root.exists() && !setup_components.exists());
 
     let path = data.path().join("agent-config").join("codex-mcp.toml");
-    let saved = configure("codex").arg("--output").arg(&path).output().unwrap();
-    assert!(saved.status.success(), "{}", String::from_utf8_lossy(&saved.stderr));
+    let saved = configure("codex")
+        .arg("--output")
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(
+        saved.status.success(),
+        "{}",
+        String::from_utf8_lossy(&saved.stderr)
+    );
     assert!(saved.stdout.is_empty());
     let existing = std::fs::read_to_string(&path).unwrap();
     let lines = existing.lines().collect::<Vec<_>>();
     assert_eq!(lines[0], "[mcp_servers.numera-wiz]");
     assert_eq!(
-        serde_json::from_str::<serde_json::Value>(lines[1].strip_prefix("command = ").unwrap()).unwrap(),
+        serde_json::from_str::<serde_json::Value>(lines[1].strip_prefix("command = ").unwrap())
+            .unwrap(),
         server["command"],
     );
     assert_eq!(
-        serde_json::from_str::<serde_json::Value>(lines[2].strip_prefix("args = ").unwrap()).unwrap(),
+        serde_json::from_str::<serde_json::Value>(lines[2].strip_prefix("args = ").unwrap())
+            .unwrap(),
         server["args"],
     );
-    let collision = configure("claude").arg("--output").arg(&path).output().unwrap();
+    let collision = configure("claude")
+        .arg("--output")
+        .arg(&path)
+        .output()
+        .unwrap();
     assert!(!collision.status.success());
     assert_eq!(std::fs::read_to_string(path).unwrap(), existing);
     assert!(!setup_root.exists());

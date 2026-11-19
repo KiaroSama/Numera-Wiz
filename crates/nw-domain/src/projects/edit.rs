@@ -348,24 +348,52 @@ fn validate_link_group_candidate<R: ProjectRead>(read: &R, candidate: &EntityId)
     Ok(())
 }
 fn through_edit_required() -> DomainError {
-    DomainError::new("THROUGH_EDIT_REQUIRED", "Select adjacent halves of the same original source on every linked track")
+    DomainError::new(
+        "THROUGH_EDIT_REQUIRED",
+        "Select adjacent halves of the same original source on every linked track",
+    )
 }
 
-fn through_edit_tracks<R: ProjectRead>(read: &R, seed: &EntityId) -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
+fn through_edit_tracks<R: ProjectRead>(
+    read: &R,
+    seed: &EntityId,
+) -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
     let mut tracks = BTreeMap::new();
     for entity in link_selection(read, std::slice::from_ref(seed), 1)? {
         let clip: Clip = entity.payload("clip")?;
-        let fields: BTreeMap<String, Box<serde_json::value::RawValue>> = serde_json::from_str(&entity.payload_json)
-            .map_err(|error| invalid(error.to_string()))?;
+        let fields: BTreeMap<String, Box<serde_json::value::RawValue>> =
+            serde_json::from_str(&entity.payload_json)
+                .map_err(|error| invalid(error.to_string()))?;
         if !entity.extensions.is_empty()
-            || entity.references.iter().any(|reference| !matches!(reference.role.as_str(), "ownership" | "source"))
-            || fields.keys().any(|key| !matches!(key.as_str(),
-                "sequence_id" | "track_id" | "source_id" | "occurrence_id" | "source_range"
-                | "sequence_start" | "duration" | "rate" | "link_group_id" | "locked"))
+            || entity
+                .references
+                .iter()
+                .any(|reference| !matches!(reference.role.as_str(), "ownership" | "source"))
+            || fields.keys().any(|key| {
+                !matches!(
+                    key.as_str(),
+                    "sequence_id"
+                        | "track_id"
+                        | "source_id"
+                        | "occurrence_id"
+                        | "source_range"
+                        | "sequence_start"
+                        | "duration"
+                        | "rate"
+                        | "link_group_id"
+                        | "locked"
+                )
+            })
         {
-            return Err(DomainError::new("UNSUPPORTED_SEMANTIC_NODE", "Through-edit join requires unmodified clip and link semantics"));
+            return Err(DomainError::new(
+                "UNSUPPORTED_SEMANTIC_NODE",
+                "Through-edit join requires unmodified clip and link semantics",
+            ));
         }
-        if tracks.insert(clip.track_id.clone(), (entity, clip)).is_some() {
+        if tracks
+            .insert(clip.track_id.clone(), (entity, clip))
+            .is_some()
+        {
             return Err(through_edit_required());
         }
     }
@@ -691,10 +719,13 @@ pub fn resolve_edit<R: ProjectRead>(
                 return Err(through_edit_required());
             }
             if left.len() > MAX_CHANGES / 3 {
-                return Err(limit("Through-edit join exceeds its track and clip change budget"));
+                return Err(limit(
+                    "Through-edit join exceeds its track and clip change budget",
+                ));
             }
             for (track, (mut entity, mut clip)) in left {
-                let (following_entity, following) = right.remove(&track).ok_or_else(through_edit_required)?;
+                let (following_entity, following) =
+                    right.remove(&track).ok_or_else(through_edit_required)?;
                 edit.clip_context(&clip)?;
                 edit.clip_context(&following)?;
                 if clip.sequence_id != following.sequence_id
@@ -703,7 +734,9 @@ pub fn resolve_edit<R: ProjectRead>(
                     || clip.source_range.end != following.source_range.start
                     || entity.enabled != following_entity.enabled
                     || entity.label != following_entity.label
-                    || !read.dependents(&following_entity.id, MAX_CLOSURE)?.is_empty()
+                    || !read
+                        .dependents(&following_entity.id, MAX_CLOSURE)?
+                        .is_empty()
                 {
                     return Err(through_edit_required());
                 }
@@ -786,24 +819,43 @@ pub fn resolve_edit<R: ProjectRead>(
                 let track_entity = edit.get(track_id)?;
                 track_entity.semantics()?;
                 let track: Track = track_entity.payload("track")?;
-                if track.sequence_id != input.sequence_id || track_entity.owner_id.as_ref() != Some(&input.sequence_id) {
+                if track.sequence_id != input.sequence_id
+                    || track_entity.owner_id.as_ref() != Some(&input.sequence_id)
+                {
                     return Err(invalid("Every selected track must belong to the sequence"));
                 }
                 if track.locked {
-                    return Err(DomainError::new("ENTITY_LOCKED", "A selected track is locked"));
+                    return Err(DomainError::new(
+                        "ENTITY_LOCKED",
+                        "A selected track is locked",
+                    ));
                 }
                 grid_tick(input.range.start, track.grid)?;
                 grid_tick(input.range.end, track.grid)?;
-                for entity in read.following(&input.sequence_id, track_id, input.range.start, MAX_CHANGES - selected.len())? {
+                for entity in read.following(
+                    &input.sequence_id,
+                    track_id,
+                    input.range.start,
+                    MAX_CHANGES - selected.len(),
+                )? {
                     let clip: Clip = entity.payload("clip")?;
                     if clip.sequence_id != input.sequence_id || clip.track_id != *track_id {
-                        return Err(DomainError::new("PROJECT_CORRUPT", "The clip index differs from its timeline owner"));
+                        return Err(DomainError::new(
+                            "PROJECT_CORRUPT",
+                            "The clip index differs from its timeline owner",
+                        ));
                     }
                     if clip.sequence_start < input.range.end {
-                        return Err(DomainError::new("GAP_NOT_EMPTY", "A selected track contains material in the requested gap"));
+                        return Err(DomainError::new(
+                            "GAP_NOT_EMPTY",
+                            "A selected track contains material in the requested gap",
+                        ));
                     }
                     if !selected.insert(entity.id) {
-                        return Err(DomainError::new("PROJECT_CORRUPT", "The clip index contains a repeated occurrence"));
+                        return Err(DomainError::new(
+                            "PROJECT_CORRUPT",
+                            "The clip index contains a repeated occurrence",
+                        ));
                     }
                 }
             }
@@ -860,7 +912,10 @@ pub fn resolve_edit<R: ProjectRead>(
                 return Err(invalid("Track ownership differs from its sequence"));
             }
             if track.locked || sequence.payload::<Sequence>("sequence")?.locked {
-                return Err(DomainError::new("ENTITY_LOCKED", "Edit touches a locked track or sequence"));
+                return Err(DomainError::new(
+                    "ENTITY_LOCKED",
+                    "Edit touches a locked track or sequence",
+                ));
             }
             if entity.track_gain_centidb()? != input.gain_centidb {
                 entity.set_track_gain(input.gain_centidb)?;

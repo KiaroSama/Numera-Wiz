@@ -139,7 +139,10 @@ impl Service {
             cancel,
         )?;
         let engine = self.engine()?;
-        let gain_required = capture.tracks.iter().any(|track| track.gain_centidb != 0 && !track.clips.is_empty());
+        let gain_required = capture
+            .tracks
+            .iter()
+            .any(|track| track.gain_centidb != 0 && !track.clips.is_empty());
         let tools = tokio::runtime::Handle::current()
             .block_on(engine.qualify_mixed_compiler(gain_required, cancel.clone()))?;
         let build =

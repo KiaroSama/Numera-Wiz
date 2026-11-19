@@ -818,7 +818,9 @@ impl ProjectReadSnapshot {
             let upper_tick = upper_time.numerator() / upper_time.denominator();
             format!(
                 "{prefix}{:016x}/",
-                upper_tick.checked_add(1).ok_or_else(|| domain::limit("Viewport grid overflow"))?
+                upper_tick
+                    .checked_add(1)
+                    .ok_or_else(|| domain::limit("Viewport grid overflow"))?
             )
         } else {
             format!("{prefix}\u{10ffff}")
@@ -1031,7 +1033,9 @@ impl ProjectRead for ProjectReadSnapshot {
     ) -> Result<Vec<EntityEnvelope>> {
         let (rows, more) = self.clip_rows(sequence, track, from, None, None, limit)?;
         if more || rows.len() > limit {
-            return Err(domain::limit("Gap closure exceeds the permitted clip count"));
+            return Err(domain::limit(
+                "Gap closure exceeds the permitted clip count",
+            ));
         }
         rows.iter().map(|(_, clip)| self.entity(&clip.id)).collect()
     }

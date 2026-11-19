@@ -206,7 +206,10 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
     assert!(scope.ok);
     let mut registration =
         Request::query("assets.register", json!({"upload_id":completed.upload_id}));
-    let scope = scope.result.unwrap()["replay_scope"].as_str().unwrap().to_owned();
+    let scope = scope.result.unwrap()["replay_scope"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     registration.replay_scope = Some(scope.clone());
     registration.idempotency_key = Some("hosted-browser-playback-source".into());
     let registered = service.dispatch(browser.clone(), registration).await;
@@ -260,46 +263,111 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         reqwest::Method::POST,
         &format!("{route}/execute/async"),
         json!({"script":CHROME_SEGMENT,"args":[bearer,null,null,selected.request]}),
-    ).await;
-    assert_eq!(program_report["ok"], true, "Actual Chrome program preview: {program_report}");
+    )
+    .await;
+    assert_eq!(
+        program_report["ok"], true,
+        "Actual Chrome program preview: {program_report}"
+    );
     assert_eq!(program_report["width"], 320);
     assert_eq!(program_report["height"], 180);
     assert_eq!(program_report["position"], 1.125);
     assert_eq!(program_report["start"], 0.0);
     assert!((1.9..=2.05).contains(&program_report["end"].as_f64().unwrap()));
-    let plane = |frame: usize, color: usize| program_report["pixels"][frame][color].as_u64().unwrap();
+    let plane =
+        |frame: usize, color: usize| program_report["pixels"][frame][color].as_u64().unwrap();
     assert!(plane(0, 0) > 180 && plane(0, 2) < 20, "{program_report}");
     assert!(plane(1, 2) > 180 && plane(1, 0) < 20, "{program_report}");
     let program_url = format!(
         "{}/api/v1/previews/{}/mp4",
-        fixture.endpoint, program_report["manifest"]["segment_id"].as_str().unwrap(),
+        fixture.endpoint,
+        program_report["manifest"]["segment_id"].as_str().unwrap(),
     );
-    let preview = client.get(&program_url).bearer_auth(bearer).send().await.unwrap()
-        .error_for_status().unwrap().bytes().await.unwrap();
+    let preview = client
+        .get(&program_url)
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
     let saved = fixture.root.path().join("checked-browser-program.mp4");
     std::fs::write(&saved, &preview).unwrap();
-    let mut decode = ["-hide_banner", "-nostdin", "-v", "error", "-i"].map(str::to_owned).to_vec();
+    let mut decode = ["-hide_banner", "-nostdin", "-v", "error", "-i"]
+        .map(str::to_owned)
+        .to_vec();
     decode.push(saved.to_str().unwrap().into());
-    decode.extend(["-map", "0:a:0", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"].map(str::to_owned));
+    decode.extend(
+        [
+            "-map",
+            "0:a:0",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "s16le",
+            "pipe:1",
+        ]
+        .map(str::to_owned),
+    );
     let pcm = nw_platform::process::run(
-        &program, &decode, Duration::from_secs(10), 512 * 1024, CancellationToken::new(),
-    ).await.unwrap().stdout;
+        &program,
+        &decode,
+        Duration::from_secs(10),
+        512 * 1024,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap()
+    .stdout;
     let peak = |start: usize, end: usize| {
-        pcm[start * 4..end * 4].chunks_exact(2).map(|sample| {
-            i16::from_le_bytes([sample[0], sample[1]]).unsigned_abs()
-        }).max().unwrap()
+        pcm[start * 4..end * 4]
+            .chunks_exact(2)
+            .map(|sample| i16::from_le_bytes([sample[0], sample[1]]).unsigned_abs())
+            .max()
+            .unwrap()
     };
-    let peaks = [peak(1_000, 20_000), peak(28_000, 68_000), peak(77_000, 95_000)];
-    assert!(peaks[0] < 90 && peaks[1] > 2_000 && peaks[2] < 90, "{peaks:?}");
+    let peaks = [
+        peak(1_000, 20_000),
+        peak(28_000, 68_000),
+        peak(77_000, 95_000),
+    ];
+    assert!(
+        peaks[0] < 90 && peaks[1] > 2_000 && peaks[2] < 90,
+        "{peaks:?}"
+    );
 
     let revision = project_edit(
-        service, &browser, &scope, "browser-program-invalidate", "clips.place",
-        Some(ProjectRef { id: selected.project, expected_revision: Some("4".into()) }),
-        color_place(&selected.sequence, &selected.picture, [0.0, 0.65, 0.0, 1.0], 2),
-    ).await;
+        service,
+        &browser,
+        &scope,
+        "browser-program-invalidate",
+        "clips.place",
+        Some(ProjectRef {
+            id: selected.project,
+            expected_revision: Some("4".into()),
+        }),
+        color_place(
+            &selected.sequence,
+            &selected.picture,
+            [0.0, 0.65, 0.0, 1.0],
+            2,
+        ),
+    )
+    .await;
     assert_eq!(revision["revision"], "5", "{revision}");
-    let stale = client.get(program_url).bearer_auth(bearer).send().await.unwrap();
-    assert_eq!(stale.json::<Value>().await.unwrap()["error"]["code"], "STALE_REVISION");
+    let stale = client
+        .get(program_url)
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        stale.json::<Value>().await.unwrap()["error"]["code"],
+        "STALE_REVISION"
+    );
 
     let last = reports.last().unwrap();
     let segment = format!(
@@ -346,28 +414,59 @@ struct ProgramFixture {
     request: Request,
 }
 
-async fn program_fixture(service: &Service, context: &Context, scope: &str, asset: &Value) -> ProgramFixture {
+async fn program_fixture(
+    service: &Service,
+    context: &Context,
+    scope: &str,
+    asset: &Value,
+) -> ProgramFixture {
     let project = project_edit(
-        service, context, scope, "browser-program-project", "projects.create", None,
+        service,
+        context,
+        scope,
+        "browser-program-project",
+        "projects.create",
+        None,
         json!({"name":"Browser program window"}),
-    ).await["project_id"].as_str().unwrap().to_owned();
-    let edit_context = |revision: &str| Some(ProjectRef {
-        id: project.clone(),
-        expected_revision: Some(revision.into()),
-    });
+    )
+    .await["project_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let edit_context = |revision: &str| {
+        Some(ProjectRef {
+            id: project.clone(),
+            expected_revision: Some(revision.into()),
+        })
+    };
     let created = project_edit(
         service, context, scope, "browser-program-sequence", "sequences.create", edit_context("0"),
         json!({"name":"Picture and sound","settings":{
             "width":640,"height":360,"frame_rate":t(24,1),"sample_rate":48000,"audio_layout":"stereo"
         },"tracks":[{"kind":"video","name":"Picture"},{"kind":"audio","name":"Audio"}]}),
     ).await;
-    let sequence = created["created"]["sequence_id"].as_str().unwrap().to_owned();
-    let picture = created["created"]["tracks"][0]["id"].as_str().unwrap().to_owned();
-    for (revision, color, place) in [("1", [0.82, 0.0, 0.0, 1.0], 0), ("2", [0.0, 0.0, 0.82, 1.0], 1)] {
+    let sequence = created["created"]["sequence_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let picture = created["created"]["tracks"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (revision, color, place) in [
+        ("1", [0.82, 0.0, 0.0, 1.0], 0),
+        ("2", [0.0, 0.0, 0.82, 1.0], 1),
+    ] {
         project_edit(
-            service, context, scope, &format!("browser-program-picture-{place}"),
-            "clips.place", edit_context(revision), color_place(&sequence, &picture, color, place),
-        ).await;
+            service,
+            context,
+            scope,
+            &format!("browser-program-picture-{place}"),
+            "clips.place",
+            edit_context(revision),
+            color_place(&sequence, &picture, color, place),
+        )
+        .await;
     }
     project_edit(
         service, context, scope, "browser-program-sound", "clips.place", edit_context("3"),
@@ -379,8 +478,16 @@ async fn program_fixture(service: &Service, context: &Context, scope: &str, asse
         nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
         json!({"sequence_id":sequence,"revision":"4","range":{"start":t(0,1),"end":t(2,1)}}),
     );
-    request.project = Some(ProjectRef { id: project.clone(), expected_revision: None });
-    ProgramFixture { project, sequence, picture, request }
+    request.project = Some(ProjectRef {
+        id: project.clone(),
+        expected_revision: None,
+    });
+    ProgramFixture {
+        project,
+        sequence,
+        picture,
+        request,
+    }
 }
 
 fn t(num: u32, den: u32) -> Value {
@@ -409,7 +516,11 @@ async fn project_edit(
     request.replay_scope = Some(scope.into());
     request.idempotency_key = Some(key.into());
     let response = service.dispatch(context.clone(), request).await;
-    assert!(response.ok, "Program fixture edit {command}: {:?}", response.error);
+    assert!(
+        response.ok,
+        "Program fixture edit {command}: {:?}",
+        response.error
+    );
     assert!(response.receipt_id.is_some());
     response.result.unwrap()
 }

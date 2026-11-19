@@ -545,7 +545,11 @@ mod tests {
             "source_path_and_identity",
         ];
         let mut count = 0;
-        for query in ["timeline.render", "timeline.preview_frame", nw_domain::preview::PROGRAM_SEGMENT_COMMAND] {
+        for query in [
+            "timeline.render",
+            "timeline.preview_frame",
+            nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
+        ] {
             assert_eq!(
                 result["commands"]
                     .as_array()
@@ -1072,7 +1076,12 @@ mod tests {
                         "bin_page" => fields(root, item, &["id", "kind", "name"]),
                         "track_page" => {
                             let required = ["id", "kind", "name", "order", "clip_count"];
-                            fields_with_optional(root, item, &required, &["enabled", "gain_centidb"]);
+                            fields_with_optional(
+                                root,
+                                item,
+                                &required,
+                                &["enabled", "gain_centidb"],
+                            );
                             assert!(permits_keys(root, item, &required));
                             assert!(permits_keys(
                                 root,

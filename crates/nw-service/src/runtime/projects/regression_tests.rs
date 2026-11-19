@@ -851,27 +851,59 @@ pub(in crate::runtime) async fn linked_edits() {
         assert_eq!(fixture.raw(id), raw);
     }
     let through = Fixture::new().await;
-    through.accept(through.request("clips.link", "link-through-edit", json!({
-        "clip_ids":[through.clips[0],through.clips[2]],"link_policy":"expand"
-    }))).await;
+    through
+        .accept(through.request(
+            "clips.link",
+            "link-through-edit",
+            json!({
+                "clip_ids":[through.clips[0],through.clips[2]],"link_policy":"expand"
+            }),
+        ))
+        .await;
     let first_ids = [&through.clips[0], &through.clips[2]];
     let before_split: Vec<_> = first_ids.iter().map(|id| through.entity(id)).collect();
     let split = through.accept(through.request("clips.split", "split-through-edit", json!({
         "clip_id":through.clips[0],"at_sequence":{"num":"1","den":"2"},"link_policy":"expand"
     }))).await;
-    let right_ids: Vec<_> = split["created"]["clip_ids"].as_array().unwrap().iter()
-        .map(|id| EntityId::parse(id.as_str().unwrap().to_owned()).unwrap()).collect();
+    let right_ids: Vec<_> = split["created"]["clip_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| EntityId::parse(id.as_str().unwrap().to_owned()).unwrap())
+        .collect();
     let left_clip: Clip = before_split[0].payload("clip").unwrap();
-    let right = right_ids.iter().find(|id| {
-        through.entity(id).payload::<Clip>("clip").unwrap().track_id == left_clip.track_id
-    }).unwrap();
-    through.reject_unchanged(through.request("clips.join_through_edit", "refuse-different-source", json!({
-        "left_id":through.clips[0],"right_id":through.clips[1]
-    })), "THROUGH_EDIT_REQUIRED").await;
-    let split_images: Vec<_> = first_ids.into_iter().chain(right_ids.iter()).map(|id| (id.clone(), through.raw(id))).collect();
-    let joined = through.accept(through.request("clips.join_through_edit", "join-original-halves", json!({
-        "left_id":through.clips[0],"right_id":right
-    }))).await;
+    let right = right_ids
+        .iter()
+        .find(|id| {
+            through.entity(id).payload::<Clip>("clip").unwrap().track_id == left_clip.track_id
+        })
+        .unwrap();
+    through
+        .reject_unchanged(
+            through.request(
+                "clips.join_through_edit",
+                "refuse-different-source",
+                json!({
+                    "left_id":through.clips[0],"right_id":through.clips[1]
+                }),
+            ),
+            "THROUGH_EDIT_REQUIRED",
+        )
+        .await;
+    let split_images: Vec<_> = first_ids
+        .into_iter()
+        .chain(right_ids.iter())
+        .map(|id| (id.clone(), through.raw(id)))
+        .collect();
+    let joined = through
+        .accept(through.request(
+            "clips.join_through_edit",
+            "join-original-halves",
+            json!({
+                "left_id":through.clips[0],"right_id":right
+            }),
+        ))
+        .await;
     assert_eq!(joined["changed_ids"].as_array().unwrap().len(), 6);
     for original in before_split {
         let before: Clip = original.payload("clip").unwrap();
@@ -883,43 +915,98 @@ pub(in crate::runtime) async fn linked_edits() {
         assert_eq!(after.link_group_id, before.link_group_id);
     }
     {
-        let read = through.service.store.project_read(through.project.as_str()).unwrap();
-        assert!(right_ids.iter().all(|id| read.raw_entity(id).unwrap().is_none()));
+        let read = through
+            .service
+            .store
+            .project_read(through.project.as_str())
+            .unwrap();
+        assert!(
+            right_ids
+                .iter()
+                .all(|id| read.raw_entity(id).unwrap().is_none())
+        );
     }
-    through.accept(through.request("history.undo", "restore-through-split", json!({}))).await;
+    through
+        .accept(through.request("history.undo", "restore-through-split", json!({})))
+        .await;
     for (id, raw) in split_images {
         assert_eq!(through.raw(&id), raw);
     }
     let gap_fixture = Fixture::new().await;
-    let left: Clip = gap_fixture.entity(&gap_fixture.clips[1]).payload("clip").unwrap();
-    let right: Clip = gap_fixture.entity(&gap_fixture.clips[2]).payload("clip").unwrap();
-    gap_fixture.accept(gap_fixture.move_request(2, 16, "move-gap-linked-tail")).await;
-    gap_fixture.accept(gap_fixture.request("clips.link", "link-gap-tail", json!({
-        "clip_ids":[gap_fixture.clips[1],gap_fixture.clips[2]],"link_policy":"expand"
-    }))).await;
-    let close_gap = |tracks, start| json!({
-        "sequence_id":left.sequence_id,"track_ids":tracks,
-        "range":{"start":{"num":start,"den":"1"},"end":{"num":"4","den":"1"}}
-    });
+    let left: Clip = gap_fixture
+        .entity(&gap_fixture.clips[1])
+        .payload("clip")
+        .unwrap();
+    let right: Clip = gap_fixture
+        .entity(&gap_fixture.clips[2])
+        .payload("clip")
+        .unwrap();
+    gap_fixture
+        .accept(gap_fixture.move_request(2, 16, "move-gap-linked-tail"))
+        .await;
+    gap_fixture
+        .accept(gap_fixture.request(
+            "clips.link",
+            "link-gap-tail",
+            json!({
+                "clip_ids":[gap_fixture.clips[1],gap_fixture.clips[2]],"link_policy":"expand"
+            }),
+        ))
+        .await;
+    let close_gap = |tracks, start| {
+        json!({
+            "sequence_id":left.sequence_id,"track_ids":tracks,
+            "range":{"start":{"num":start,"den":"1"},"end":{"num":"4","den":"1"}}
+        })
+    };
     let both = [&left.track_id, &right.track_id];
-    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-not-empty", close_gap(both, "0")), "GAP_NOT_EMPTY").await;
-    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-link-outside", close_gap([&left.track_id, &left.track_id], "1")), "VALIDATION_ERROR").await;
+    gap_fixture
+        .reject_unchanged(
+            gap_fixture.request("timeline.remove_gap", "gap-not-empty", close_gap(both, "0")),
+            "GAP_NOT_EMPTY",
+        )
+        .await;
+    gap_fixture
+        .reject_unchanged(
+            gap_fixture.request(
+                "timeline.remove_gap",
+                "gap-link-outside",
+                close_gap([&left.track_id, &left.track_id], "1"),
+            ),
+            "VALIDATION_ERROR",
+        )
+        .await;
     let mut one_track = close_gap(both, "1");
     one_track["track_ids"] = json!([left.track_id]);
-    gap_fixture.reject_unchanged(gap_fixture.request("timeline.remove_gap", "gap-link-other-track", one_track), "LINKED_TRACKS_REQUIRED").await;
-    let before: Vec<_> = gap_fixture.clips[1..3].iter().map(|id| gap_fixture.raw(id)).collect();
-    let actual = gap_fixture.accept(gap_fixture.request("timeline.remove_gap", "close-gap", close_gap(both, "1"))).await;
+    gap_fixture
+        .reject_unchanged(
+            gap_fixture.request("timeline.remove_gap", "gap-link-other-track", one_track),
+            "LINKED_TRACKS_REQUIRED",
+        )
+        .await;
+    let before: Vec<_> = gap_fixture.clips[1..3]
+        .iter()
+        .map(|id| gap_fixture.raw(id))
+        .collect();
+    let actual = gap_fixture
+        .accept(gap_fixture.request("timeline.remove_gap", "close-gap", close_gap(both, "1")))
+        .await;
     assert_eq!(actual["changed_ids"].as_array().unwrap().len(), 2);
     for (id, raw) in gap_fixture.clips[1..3].iter().zip(&before) {
         let original: EntityEnvelope = serde_json::from_str(raw).unwrap();
         let original: Clip = original.payload("clip").unwrap();
         let after: Clip = gap_fixture.entity(id).payload("clip").unwrap();
-        assert_eq!(after.sequence_start, nw_domain::time::Rational::new(1, 1).unwrap());
+        assert_eq!(
+            after.sequence_start,
+            nw_domain::time::Rational::new(1, 1).unwrap()
+        );
         assert_eq!(after.source_range, original.source_range);
         assert_eq!(after.duration, original.duration);
         assert_eq!(after.link_group_id, original.link_group_id);
     }
-    gap_fixture.accept(gap_fixture.request("history.undo", "undo-close-gap", json!({}))).await;
+    gap_fixture
+        .accept(gap_fixture.request("history.undo", "undo-close-gap", json!({})))
+        .await;
     for (id, raw) in gap_fixture.clips[1..3].iter().zip(before) {
         assert_eq!(gap_fixture.raw(id), raw);
     }
@@ -928,29 +1015,79 @@ pub(in crate::runtime) async fn linked_edits() {
         "name":"Gain fixture","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
         "tracks":[{"kind":"audio","name":"Bus"},{"kind":"video","name":"Video"}]
     }))).await;
-    let audio = EntityId::parse(sequence["created"]["tracks"][0]["id"].as_str().unwrap().to_owned()).unwrap();
+    let audio = EntityId::parse(
+        sequence["created"]["tracks"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    )
+    .unwrap();
     let picture = &sequence["created"]["tracks"][1]["id"];
     let original = mixer.raw(&audio);
-    mixer.reject_unchanged(mixer.request("mixer.set_track_gain", "reject-picture-gain", json!({"track_id":picture,"gain_centidb":600})), "VALIDATION_ERROR").await;
-    mixer.reject_unchanged(mixer.request("mixer.set_track_gain", "reject-overgain", json!({"track_id":audio,"gain_centidb":3000})), "VALIDATION_ERROR").await;
-    let adjusted = mixer.accept(mixer.request("mixer.set_track_gain", "attenuate-bus", json!({"track_id":audio,"gain_centidb":-2000}))).await;
+    mixer
+        .reject_unchanged(
+            mixer.request(
+                "mixer.set_track_gain",
+                "reject-picture-gain",
+                json!({"track_id":picture,"gain_centidb":600}),
+            ),
+            "VALIDATION_ERROR",
+        )
+        .await;
+    mixer
+        .reject_unchanged(
+            mixer.request(
+                "mixer.set_track_gain",
+                "reject-overgain",
+                json!({"track_id":audio,"gain_centidb":3000}),
+            ),
+            "VALIDATION_ERROR",
+        )
+        .await;
+    let adjusted = mixer
+        .accept(mixer.request(
+            "mixer.set_track_gain",
+            "attenuate-bus",
+            json!({"track_id":audio,"gain_centidb":-2000}),
+        ))
+        .await;
     assert_eq!(adjusted["changed_ids"], json!([audio]));
     let track = mixer.entity(&audio);
     assert_eq!(track.kind_version, 2);
     assert_eq!(track.track_gain_centidb().unwrap(), -2000);
     {
         let payload: Track = track.payload("track").unwrap();
-        let read = mixer.service.store.project_read(mixer.project.as_str()).unwrap();
-        let rows = read.track_page(&payload.sequence_id, None, 16, 65536).unwrap();
-        let projected = rows.items.iter().find(|row| row["id"] == audio.as_str()).unwrap();
+        let read = mixer
+            .service
+            .store
+            .project_read(mixer.project.as_str())
+            .unwrap();
+        let rows = read
+            .track_page(&payload.sequence_id, None, 16, 65536)
+            .unwrap();
+        let projected = rows
+            .items
+            .iter()
+            .find(|row| row["id"] == audio.as_str())
+            .unwrap();
         assert_eq!(projected["gain_centidb"], -2000);
     }
     let changed = mixer.raw(&audio);
-    mixer.accept(mixer.request("history.undo", "restore-unity-gain", json!({}))).await;
+    mixer
+        .accept(mixer.request("history.undo", "restore-unity-gain", json!({})))
+        .await;
     assert_eq!(mixer.raw(&audio), original);
-    mixer.accept(mixer.request("history.redo", "restore-track-attenuation", json!({}))).await;
+    mixer
+        .accept(mixer.request("history.redo", "restore-track-attenuation", json!({})))
+        .await;
     assert_eq!(mixer.raw(&audio), changed);
-    mixer.accept(mixer.request("mixer.set_track_gain", "reset-track-level", json!({"track_id":audio,"gain_centidb":0}))).await;
+    mixer
+        .accept(mixer.request(
+            "mixer.set_track_gain",
+            "reset-track-level",
+            json!({"track_id":audio,"gain_centidb":0}),
+        ))
+        .await;
     assert_eq!(mixer.raw(&audio), original);
     let track_fixture = Fixture::new().await;
     let clip: Clip = track_fixture

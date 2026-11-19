@@ -226,7 +226,12 @@ pub fn compile_mixed_graph(capture: &MixedCapture) -> Result<MixedGraph> {
         .tracks
         .iter()
         .filter(|track| track.kind == TrackKind::Audio)
-        .flat_map(|track| track.clips.iter().map(move |clip| (track.gain_centidb, clip)))
+        .flat_map(|track| {
+            track
+                .clips
+                .iter()
+                .map(move |clip| (track.gain_centidb, clip))
+        })
         .map(|(gain_centidb, clip)| {
             let range = clip.sequence_range;
             Ok(AudioSpan {
