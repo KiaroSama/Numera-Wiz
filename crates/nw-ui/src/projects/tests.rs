@@ -125,6 +125,7 @@ pub(crate) fn controller_cases() {
     cleanup_guards();
     focused_button_actions();
     focused_folder_scan();
+    folder_batch_review_and_submit();
     bounded_handle_tracking();
     full_projection_and_exact_forms();
     later_page_selection_keeps_exact_target();
@@ -651,6 +652,89 @@ fn focused_folder_scan() {
         port.empty(),
         "Restored Scan focus without new input must not resubmit"
     );
+}
+fn folder_batch_review_and_submit() {
+    let (mut app, port, ctx) = boot();
+    app.scope = Some(scope());
+    app.folder.open = true;
+    let folder_hash = "ab".repeat(32);
+    let source = "/controller-fixture/intake";
+    let output = "/controller-fixture/export";
+    let snapshot = json!({
+        "schema_version":1,"id":"folder","hash":folder_hash,"created_at":"0","root":source,
+        "input":{"path":source,"recursive":false,"exclude_relative":[],"companion_policy":"inventory"},
+        "limits":nw_domain::ingest::FolderIntakeLimits::default(),"complete":true,
+        "visited_entries":2,"visited_directories":1,"scan_error":null,
+        "entries":[
+            {"index":0,"relative_path":"example.mkv","kind":"media","outcome":"registered",
+                "identity":null,"source_object":null,"asset_id":"asset","error":null},
+            {"index":1,"relative_path":"notes.txt","kind":"companion","outcome":"companion_inventoried",
+                "identity":null,"source_object":null,"asset_id":null,"error":null}
+        ]
+    });
+    app.query(
+        "assets.folder_inspect",
+        json!({"id":"folder"}),
+        Action::FolderInspect,
+        &ctx,
+    );
+    port.complete(snapshot.clone());
+    app.receive(&ctx);
+    let snapshot = serde_json::from_value(snapshot).unwrap();
+    app.review_folder_batch(&snapshot, output, &ctx);
+    let (review, reply) = port.pop();
+    assert_eq!(review.command.id, "streams.clean.folder_batch_plan");
+    assert_eq!(review.params["snapshot_id"], "folder");
+    assert_eq!(review.params["snapshot_hash"], folder_hash);
+    assert_eq!(review.params["output_root"], output);
+    assert!(review.replay_scope.is_none() && review.idempotency_key.is_none());
+    assert!(port.empty(), "Folder review must not submit a batch");
+    let plan_hash = "cd".repeat(32);
+    reply(Ok(Response::success(
+        &review.request_id,
+        json!({
+            "snapshot_id":"folder","snapshot_hash":folder_hash,
+            "excluded":[{"index":1,"outcome":"companion_inventoried"}],
+            "plan":{"schema_version":1,"id":"folder-plan","hash":plan_hash,"created_at":"0",
+                "expires_at":"999","failure_policy":"reject_all","unresolved_policy":"reject",
+                "unresolved":[],"items":[{
+                    "index":0,"asset_id":"asset","source_sha256":"ab","source_bytes":"1",
+                    "output_name":"media-01-example.mkv","output_path":format!("{output}/media-01-example.mkv"),
+                    "plan":{"id":"child","hash":"cd"},"action":"copy_unchanged","error":null
+                }]}
+        }),
+    )));
+    app.receive(&ctx);
+    assert!(app.batch.open && app.batch.is_folder_review() && !app.folder.open);
+    app.batch_select(&AssetSummary::from(&fixture_asset()), true);
+    assert!(app.batch.candidates.is_empty());
+    assert!(port.empty(), "Opening the folder review must not submit");
+    app.run_reviewed_batch(&ctx);
+    let (submit, reply) = port.pop();
+    assert_eq!(submit.command.id, "batches.submit");
+    assert_eq!(
+        submit.params,
+        json!({"plan_id":"folder-plan","plan_hash":plan_hash})
+    );
+    assert_eq!(submit.replay_scope.as_deref(), Some(scope().as_str()));
+    assert_eq!(
+        submit.idempotency_key.as_deref(),
+        Some(submit.request_id.as_str())
+    );
+    reply(Err("Unknown folder batch acknowledgement".into()));
+    app.receive(&ctx);
+    app.run_reviewed_batch(&ctx);
+    assert!(port.empty());
+    app.retry_pending(&ctx);
+    let retried = port.accept(json!({"batch_id":"folder-batch"}));
+    assert_eq!(
+        serde_json::to_vec(&retried).unwrap(),
+        serde_json::to_vec(&submit).unwrap()
+    );
+    app.receive(&ctx);
+    assert!(app.request_idle() && port.empty());
+    app.run_reviewed_batch(&ctx);
+    assert!(port.empty(), "Accepted folder plan must not be submitted again");
 }
 fn changed_ticket_is_tracked() {
     let (mut app, port, ctx) = ready();

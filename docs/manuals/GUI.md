@@ -212,10 +212,14 @@ recursion, exact relative exclusions and companion inventory/exclusion, then
 register with the existing durable retry mechanism.
 A browser picker uploads selected file bytes; it does not grant a native folder.
 Inspect a retained snapshot ID to review its hash, completeness, bounds and
-per-file outcomes. Open a successfully registered asset or include it in the
-existing cleanup batch; review and submit that batch separately. Companion
-inventory does not create copied companion outputs. Current folder controls
-require their own hosted interaction evidence before claiming GUI qualification.
+per-file outcomes. Open a successfully registered asset or include it in an
+explicit cleanup batch. To review all registered video in a complete,
+failure-free snapshot, enter an existing authorized output directory in a
+separate tree and select **Review folder cleanup batch**. The batch window shows
+the frozen snapshot, exclusions and member destinations. Select **Run reviewed
+batch** after checking them. **Return to explicit candidates** leaves the
+folder review. Companion inventory is visible among excluded rows. The
+folder-derived review awaits hosted interaction evidence.
 
 
 ## Project clip groups

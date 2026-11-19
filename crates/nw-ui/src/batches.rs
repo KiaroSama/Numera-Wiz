@@ -3,9 +3,11 @@ use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
     batches::{
-        BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, ExtractBatchInput,
-        ExtractBatchItem, ExtractKind, ExtractSelector, FailurePolicy, ItemInput, UnresolvedPolicy,
+        BatchPlanReview, BatchResult, BatchSummary, CleanBatchInput, CleanFolderBatchInput,
+        ExtractBatchInput, ExtractBatchItem, ExtractKind, ExtractSelector, FailurePolicy,
+        FolderBatchExclusion, FolderBatchReview, ItemInput, UnresolvedPolicy,
     },
+    ingest::FolderReview,
     views::{AssetSummary, SnapshotPage},
 };
 use serde_json::{Value, json};
@@ -42,6 +44,18 @@ fn state_label(state: &Option<nw_domain::records::JobState>) -> &'static str {
     }
 }
 
+fn plan_can_submit(plan: &BatchPlanReview) -> bool {
+    (plan.failure_policy == FailurePolicy::ContinueWithRejected
+        || plan.items.iter().all(|item| item.error.is_none()))
+        && (plan.unresolved_policy == UnresolvedPolicy::PerFileNoMatch || plan.unresolved.is_empty())
+}
+
+struct FolderBatchMode {
+    snapshot: Arc<FolderReview>,
+    requested_output_root: String,
+    excluded: Vec<FolderBatchExclusion>,
+}
+
 pub(super) struct Candidate {
     asset_id: String,
     name: String,
@@ -57,6 +71,7 @@ pub(super) struct BatchUi {
     failure: FailurePolicy,
     unresolved: UnresolvedPolicy,
     plan: Option<Arc<BatchPlanReview>>,
+    folder: Option<FolderBatchMode>,
     active: Option<String>,
     result: Option<Arc<BatchResult>>,
     history: Vec<BatchSummary>,
@@ -74,6 +89,7 @@ impl Default for BatchUi {
             failure: FailurePolicy::RejectAll,
             unresolved: UnresolvedPolicy::Reject,
             plan: None,
+            folder: None,
             active: None,
             result: None,
             history: Vec::new(),
@@ -86,7 +102,12 @@ impl Default for BatchUi {
 impl BatchUi {
     pub(super) fn invalidate(&mut self) {
         self.generation = self.generation.wrapping_add(1);
-        self.plan = None;
+        if self.folder.is_none() {
+            self.plan = None;
+        }
+    }
+    pub(super) fn is_folder_review(&self) -> bool {
+        self.folder.is_some()
     }
     pub(super) fn contains(&self, id: &str) -> bool {
         self.candidates.iter().any(|item| item.asset_id == id)
@@ -94,7 +115,7 @@ impl BatchUi {
 }
 impl WizApp {
     pub(super) fn batch_select(&mut self, asset: &AssetSummary, included: bool) {
-        if self.projects.active || self.pending.is_some() {
+        if self.projects.active || self.pending.is_some() || self.batch.is_folder_review() {
             return;
         }
         if included {
@@ -126,11 +147,12 @@ impl WizApp {
         if !self.cleanup_actions_allowed(ctx) || self.waiting || self.pending.is_some() {
             return;
         }
-        if let Some(index) = self
-            .batch
-            .candidates
-            .iter()
-            .position(|item| item.needs_output)
+        if !self.batch.is_folder_review()
+            && let Some(index) = self
+                .batch
+                .candidates
+                .iter()
+                .position(|item| item.needs_output)
         {
             let item = &mut self.batch.candidates[index];
             item.needs_output = false;
@@ -172,7 +194,7 @@ impl WizApp {
             && !self.folder.open
             && !self.waiting
             && self.pending.is_none()
-            && let Some(plan) = self.batch.plan.clone()
+            && let Some(plan) = self.batch.plan.clone().filter(|plan| plan_can_submit(plan))
         {
             self.mutate(
                 "batches.submit",
@@ -183,7 +205,7 @@ impl WizApp {
         }
     }
     fn review_batch(&mut self, ctx: &egui::Context) {
-        if !self.cleanup_actions_allowed(ctx) || self.folder.open {
+        if !self.cleanup_actions_allowed(ctx) || self.folder.open || self.batch.is_folder_review() {
             return;
         }
         if self.batch.extract {
@@ -243,6 +265,106 @@ impl WizApp {
                 ctx,
             ),
             Err(error) => self.error = Some(error),
+        }
+    }
+    pub(super) fn review_folder_batch(
+        &mut self,
+        snapshot: &FolderReview,
+        output_root: &str,
+        ctx: &egui::Context,
+    ) {
+        if !self.cleanup_actions_allowed(ctx) {
+            return;
+        }
+        let input = self.normalized_intent().and_then(|intent| {
+            let input = CleanFolderBatchInput {
+                snapshot_id: snapshot.id.clone(),
+                snapshot_hash: snapshot.hash.clone(),
+                output_root: output_root.into(),
+                intent,
+                file_times: self.file_times,
+                execution_limits: self.execution_limits.clone(),
+                failure_policy: self.batch.failure,
+                unresolved_policy: self.batch.unresolved,
+            };
+            input
+                .validate()
+                .map_err(|error| format!("{}: {}", error.code, error.message))?;
+            Ok(input)
+        });
+        match input {
+            Ok(input) => self.query(
+                "streams.clean.folder_batch_plan",
+                json!(input),
+                Action::FolderBatchPlan(self.batch.generation),
+                ctx,
+            ),
+            Err(error) => self.error = Some(error),
+        }
+    }
+    pub(super) fn open_folder_batch(
+        &mut self,
+        generation: u64,
+        snapshot: Arc<FolderReview>,
+        requested_output_root: String,
+        review: FolderBatchReview,
+    ) {
+        if generation != self.batch.generation {
+            self.status = "Cleanup controls changed while planning. Review the folder again.".into();
+            return;
+        }
+        self.batch.folder = Some(FolderBatchMode {
+            snapshot,
+            requested_output_root,
+            excluded: review.excluded,
+        });
+        self.batch.plan = Some(Arc::new(review.plan));
+        self.batch.open = true;
+        self.close_folder();
+        self.status =
+            "Folder batch reviewed. Inspect the destinations and exclusions before running.".into();
+    }
+
+    pub(super) fn batch_policy_controls(&mut self, ui: &mut egui::Ui, include_unresolved: bool) {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Rejected candidates");
+            changed |= ui
+                .selectable_value(
+                    &mut self.batch.failure,
+                    FailurePolicy::RejectAll,
+                    "Refuse the batch",
+                )
+                .changed();
+            changed |= ui
+                .selectable_value(
+                    &mut self.batch.failure,
+                    FailurePolicy::ContinueWithRejected,
+                    "Keep rejected rows and run accepted files",
+                )
+                .changed();
+        });
+        if include_unresolved {
+            ui.horizontal(|ui| {
+                ui.label("Indices absent from every eligible stream");
+                changed |= ui
+                    .selectable_value(
+                        &mut self.batch.unresolved,
+                        UnresolvedPolicy::Reject,
+                        "Refuse submission",
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut self.batch.unresolved,
+                        UnresolvedPolicy::PerFileNoMatch,
+                        "Apply each file's explicit no-match policy",
+                    )
+                    .changed();
+            });
+        }
+        if changed {
+            self.batch.invalidate();
         }
     }
     pub(super) fn receive_batch(&mut self, action: Action, result: Value) -> Result<(), String> {
@@ -307,12 +429,87 @@ impl WizApp {
         }
         Ok(())
     }
+    fn explicit_batch_controls(&mut self, ui: &mut egui::Ui, idle: bool) {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            if self.batch.extract {
+                ui.label("Select each track by its one-based ordinal and give it a distinct .mkv path.");
+            } else {
+                ui.label("Select files with the media checkboxes. The current stream selection, file-time policy and execution limits apply to every candidate.");
+            }
+            changed |= ui.add_enabled(idle, egui::Checkbox::new(&mut self.batch.extract, "Extract streams")).changed();
+        });
+        if !self.batch.extract {
+            let times = match self.file_times {
+                nw_domain::file_times::FileTimeRequest::New => "New timestamps",
+                nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
+                nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
+            };
+            ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
+        }
+        let mut add = None;
+        let mut remove = None;
+        let more_outputs = self.batch.candidates.len() < nw_domain::batches::MAX_BATCH_ITEMS;
+        ui.add_enabled_ui(idle,|ui| {
+            self.batch_policy_controls(ui, !self.batch.extract);
+            egui::ScrollArea::vertical().id_salt("batch-candidates").max_height(150.0).show(ui,|ui| {
+                for (index,item) in self.batch.candidates.iter_mut().enumerate() {
+                    ui.push_id(index,|ui| {
+                        if self.batch.extract {
+                            ui.horizontal(|ui| {
+                                let selected = item.extract.kind;
+                                egui::ComboBox::from_id_salt("extract-kind")
+                                    .selected_text(format!("{selected:?}"))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Video, "Video");
+                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Audio, "Audio");
+                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Subtitle, "Subtitle");
+                                    });
+                                changed |= selected != item.extract.kind;
+                                changed |= ui.add(egui::DragValue::new(&mut item.extract.ordinal).range(1..=256).prefix("Track ")).changed();
+                                if ui.add_enabled(more_outputs, egui::Button::new("Add output for this file")).clicked() {
+                                    add = Some(Candidate {
+                                        asset_id: item.asset_id.clone(),
+                                        name: item.name.clone(),
+                                        output: String::new(),
+                                        needs_output: false,
+                                        extract: item.extract,
+                                    });
+                                }
+                                if ui.button("Remove output").clicked() {
+                                    remove = Some(index);
+                                }
+                            });
+                        }
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{}. {}",index+1,item.name));
+                            changed |= ui.add(egui::TextEdit::singleline(&mut item.output)
+                                .char_limit(16384).desired_width(620.0).hint_text("Reviewed engine output path")).changed();
+                        });
+                    });
+                }
+            });
+        });
+        if let Some(item) = add {
+            self.batch.candidates.push(item);
+            changed = true;
+        }
+        if let Some(index) = remove {
+            self.batch.candidates.remove(index);
+            changed = true;
+        }
+        if changed { self.batch.invalidate(); }
+    }
+
     pub(super) fn batch_window(&mut self, ctx: &egui::Context) {
         if self.projects.active || !self.batch.open {
             return;
         }
         let mut open = true;
-        let title = if self.batch.extract {
+        let folder_mode = self.batch.is_folder_review();
+        let title = if folder_mode {
+            "Folder cleanup batch"
+        } else if self.batch.extract {
             "Stream extraction batch"
         } else {
             "Cleanup batch"
@@ -322,99 +519,44 @@ impl WizApp {
             .default_height(540.0).open(&mut open).show(ctx, |ui| {
                 let idle = !self.waiting && self.pending.is_none();
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(idle && !self.batch.candidates.is_empty()
+                    if !folder_mode && ui.add_enabled(idle && !self.batch.candidates.is_empty()
                         && self.batch.candidates.iter().all(|item| !item.output.is_empty() && !item.needs_output),
                         egui::Button::new("Review batch")).clicked() { self.review_batch(ui.ctx()); }
-                    let eligible = self.batch.plan.as_ref().is_some_and(|plan| {
-                        (plan.failure_policy == FailurePolicy::ContinueWithRejected || plan.items.iter().all(|item| item.error.is_none()))
-                        && (plan.unresolved_policy == UnresolvedPolicy::PerFileNoMatch || plan.unresolved.is_empty())
-                    });
+                    let eligible = self.batch.plan.as_deref().is_some_and(plan_can_submit);
                     if ui.add_enabled(idle && eligible,egui::Button::new("Run reviewed batch")).clicked() { self.run_reviewed_batch(ui.ctx()); }
                     if ui.add_enabled(idle,egui::Button::new("Refresh batch history")).clicked() {
                         self.query("batches.list",json!({"replace_snapshot":self.batch.snapshot}),Action::BatchHistory,ui.ctx());
                     }
-                    ui.label(format!("{} explicit candidates",self.batch.candidates.len()));
-                });
-                let mut changed = false;
-                ui.horizontal(|ui| {
-                    if self.batch.extract {
-                        ui.label("Select each track by its one-based ordinal and give it a distinct .mkv path.");
-                    } else {
-                        ui.label("Select files with the media checkboxes. The current stream selection, file-time policy and execution limits apply to every candidate.");
-                    }
-                    changed |= ui.add_enabled(idle, egui::Checkbox::new(&mut self.batch.extract, "Extract streams")).changed();
-                });
-                if !self.batch.extract {
-                    let times = match self.file_times {
-                        nw_domain::file_times::FileTimeRequest::New => "New timestamps",
-                        nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
-                        nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
-                    };
-                    ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
-                }
-                let mut add = None;
-                let mut remove = None;
-                let more_outputs = self.batch.candidates.len() < nw_domain::batches::MAX_BATCH_ITEMS;
-                ui.add_enabled_ui(idle,|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Rejected candidates");
-                        changed |= ui.selectable_value(&mut self.batch.failure,FailurePolicy::RejectAll,"Refuse the batch").changed();
-                        changed |= ui.selectable_value(&mut self.batch.failure,FailurePolicy::ContinueWithRejected,"Keep rejected rows and run accepted files").changed();
-                    });
-                    if !self.batch.extract {
-                        ui.horizontal(|ui| {
-                            ui.label("Indices absent from every eligible stream");
-                            changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::Reject,"Refuse submission").changed();
-                            changed |= ui.selectable_value(&mut self.batch.unresolved,UnresolvedPolicy::PerFileNoMatch,"Apply each file's explicit no-match policy").changed();
-                        });
-                    }
-                    egui::ScrollArea::vertical().id_salt("batch-candidates").max_height(150.0).show(ui,|ui| {
-                        for (index,item) in self.batch.candidates.iter_mut().enumerate() {
-                            ui.push_id(index,|ui| {
-                                if self.batch.extract {
-                                    ui.horizontal(|ui| {
-                                        let selected = item.extract.kind;
-                                        egui::ComboBox::from_id_salt("extract-kind")
-                                            .selected_text(format!("{selected:?}"))
-                                            .show_ui(ui, |ui| {
-                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Video, "Video");
-                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Audio, "Audio");
-                                                ui.selectable_value(&mut item.extract.kind, ExtractKind::Subtitle, "Subtitle");
-                                            });
-                                        changed |= selected != item.extract.kind;
-                                        changed |= ui.add(egui::DragValue::new(&mut item.extract.ordinal).range(1..=256).prefix("Track ")).changed();
-                                        if ui.add_enabled(more_outputs, egui::Button::new("Add output for this file")).clicked() {
-                                            add = Some(Candidate {
-                                                asset_id: item.asset_id.clone(),
-                                                name: item.name.clone(),
-                                                output: String::new(),
-                                                needs_output: false,
-                                                extract: item.extract,
-                                            });
-                                        }
-                                        if ui.button("Remove output").clicked() {
-                                            remove = Some(index);
-                                        }
-                                    });
-                                }
-                                ui.horizontal(|ui| {
-                                    ui.label(format!("{}. {}",index+1,item.name));
-                                    changed |= ui.add(egui::TextEdit::singleline(&mut item.output)
-                                        .char_limit(16384).desired_width(620.0).hint_text("Reviewed engine output path")).changed();
-                                });
-                            });
+                    if folder_mode {
+                        if ui.add_enabled(idle, egui::Button::new("Return to explicit candidates")).clicked() {
+                            self.batch.folder = None;
+                            self.batch.invalidate();
                         }
-                    });
+                    } else {
+                        ui.label(format!("{} explicit candidates",self.batch.candidates.len()));
+                    }
                 });
-                if let Some(item) = add {
-                    self.batch.candidates.push(item);
-                    changed = true;
+                if let Some(folder) = &self.batch.folder {
+                    ui.label(format!("Retained folder snapshot {}", folder.snapshot.id));
+                    ui.monospace(&folder.snapshot.hash);
+                    ui.label(format!("Source directory: {}", folder.snapshot.root));
+                    ui.label(format!("Requested output directory: {}", folder.requested_output_root));
+                    ui.collapsing(format!("{} excluded snapshot rows", folder.excluded.len()), |ui| {
+                        egui::ScrollArea::vertical().id_salt("folder-batch-exclusions").max_height(120.0).show(ui, |ui| {
+                            for exclusion in &folder.excluded {
+                                if let Some(entry) = folder.snapshot.entries.get(exclusion.index as usize) {
+                                    ui.label(format!(
+                                        "{} · {}",
+                                        entry.relative_path,
+                                        crate::folders::outcome_label(exclusion.outcome),
+                                    ));
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    self.explicit_batch_controls(ui, idle);
                 }
-                if let Some(index) = remove {
-                    self.batch.candidates.remove(index);
-                    changed = true;
-                }
-                if changed { self.batch.invalidate(); }
                 if let Some(plan) = self.batch.plan.clone() {
                     ui.separator();
                     ui.label(format!("Reviewed proposal: {}",plan.id));
@@ -431,6 +573,9 @@ impl WizApp {
                                     self.query("plans.inspect",json!({"id":reference.id}),Action::Inspect,ui.ctx());
                                 }
                             });
+                            if folder_mode && let Some(output) = &item.output_path {
+                                ui.monospace(output);
+                            }
                             if let Some(extraction) = item.extraction {
                                 ui.label(format!(
                                     "{:?} track {}{}",

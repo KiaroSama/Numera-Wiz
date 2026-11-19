@@ -65,6 +65,7 @@ enum Action {
     FolderInspect,
     FolderOpenAsset,
     FolderBatchAsset,
+    FolderBatchPlan(u64),
 }
 struct Pending {
     request: Request,
@@ -499,6 +500,7 @@ impl WizApp {
             | Action::BatchSubmit
             | Action::Register
             | Action::Intake
+            | Action::FolderBatchPlan(_)
             | Action::FolderRegister => !ctx.text_edit_focused(),
             _ => true,
         }
@@ -823,6 +825,13 @@ impl WizApp {
                 | Action::FolderBatchAsset => {
                     self.receive_folder(received.action, result, ctx)?;
                 }
+                Action::FolderBatchPlan(generation) => {
+                    let request = &completed
+                        .as_ref()
+                        .ok_or("Folder batch review has no captured request")?
+                        .request;
+                    self.receive_folder_batch_plan(generation, request, result)?;
+                }
                 Action::Inspect => {
                     self.inspect =
                         serde_json::to_string_pretty(&result).map_err(|error| error.to_string())?;
@@ -894,6 +903,7 @@ impl WizApp {
         if let Err(error) = parsed {
             self.error = Some(format!("Invalid owner response: {error}"));
             self.project_request_failed(received.action);
+            self.folder_request_failed(received.action);
             if matches!(
                 received.action,
                 Action::Project(projects::ProjectAction {
@@ -1087,10 +1097,12 @@ impl WizApp {
             {
                 self.refresh_assets(ui.ctx());
             }
-            if ui
-                .button(format!("Batch ({})", self.batch.candidates.len()))
-                .clicked()
-            {
+            let batch_label = if self.batch.is_folder_review() {
+                "Folder batch".to_owned()
+            } else {
+                format!("Batch ({})", self.batch.candidates.len())
+            };
+            if ui.button(batch_label).clicked() {
                 self.batch.open = true;
             }
         });
@@ -1121,7 +1133,9 @@ impl WizApp {
                         let mut included = self.batch.contains(&asset.id);
                         if ui
                             .add_enabled(
-                                !self.waiting && self.pending.is_none(),
+                                !self.waiting
+                                    && self.pending.is_none()
+                                    && !self.batch.is_folder_review(),
                                 egui::Checkbox::without_text(&mut included),
                             )
                             .on_hover_text("Include in cleanup batch")

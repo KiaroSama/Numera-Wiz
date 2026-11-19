@@ -2,6 +2,8 @@
 use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
+    batches::{CleanFolderBatchInput, FolderBatchReview},
+    commands::Request,
     ingest::{
         CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits,
         FolderReview, RegisterFolderInput,
@@ -19,6 +21,7 @@ pub(super) struct FolderUi {
     exclusions: String,
     inventory_companions: bool,
     snapshot_id: String,
+    batch_output_root: String,
     review: Option<Arc<FolderReview>>,
     tab: FolderTab,
     focus: Option<FolderFocus>,
@@ -34,6 +37,7 @@ enum FolderFocus {
     Scan,
     Inspect,
     Open(String),
+    ReviewBatch,
     Retry,
 }
 impl Default for FolderUi {
@@ -45,6 +49,7 @@ impl Default for FolderUi {
             exclusions: String::new(),
             inventory_companions: true,
             snapshot_id: String::new(),
+            batch_output_root: String::new(),
             review: None,
             tab: FolderTab::Source,
             focus: None,
@@ -60,7 +65,7 @@ fn kind_label(kind: FolderEntryKind) -> &'static str {
         FolderEntryKind::Other => "Other entry",
     }
 }
-fn outcome_label(outcome: FolderEntryOutcome) -> &'static str {
+pub(super) fn outcome_label(outcome: FolderEntryOutcome) -> &'static str {
     match outcome {
         FolderEntryOutcome::Registered => "Registered",
         FolderEntryOutcome::ProbeFailed => "Probe failed",
@@ -207,6 +212,45 @@ impl WizApp {
         Ok(())
     }
 
+    pub(super) fn receive_folder_batch_plan(
+        &mut self,
+        generation: u64,
+        request: &Request,
+        result: Value,
+    ) -> Result<(), String> {
+        let input: CleanFolderBatchInput =
+            serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+        let review: FolderBatchReview =
+            serde_json::from_value(result).map_err(|error| error.to_string())?;
+        let snapshot = self
+            .folder
+            .review
+            .clone()
+            .filter(|snapshot| {
+                snapshot.id == input.snapshot_id && snapshot.hash == input.snapshot_hash
+            })
+            .ok_or("Folder batch review requires the captured snapshot")?;
+        if review.snapshot_id != snapshot.id || review.snapshot_hash != snapshot.hash {
+            return Err("Folder batch proposed a different snapshot".into());
+        }
+        let excluded = snapshot
+            .entries
+            .iter()
+            .filter(|entry| entry.outcome != FolderEntryOutcome::Registered)
+            .map(|entry| (entry.index, entry.outcome));
+        let registered = snapshot
+            .entries
+            .iter()
+            .filter_map(|entry| entry.asset_id.as_deref());
+        if !excluded.eq(review.excluded.iter().map(|row| (row.index, row.outcome)))
+            || !registered.eq(review.plan.items.iter().map(|item| item.asset_id.as_str()))
+        {
+            return Err("Folder batch does not account for the captured snapshot entries".into());
+        }
+        self.open_folder_batch(generation, snapshot, input.output_root, review);
+        Ok(())
+    }
+
     pub(super) fn folder_controls(&mut self, ui: &mut egui::Ui) {
         if self.projects.active {
             return;
@@ -241,9 +285,12 @@ impl WizApp {
                 | Action::FolderInspect
                 | Action::FolderOpenAsset
                 | Action::FolderBatchAsset
+                | Action::FolderBatchPlan(_)
         ) {
             self.folder.focus = Some(if self.pending.is_some() {
                 FolderFocus::Retry
+            } else if matches!(action, Action::FolderBatchPlan(_)) {
+                FolderFocus::ReviewBatch
             } else if self.folder.review.is_some() {
                 FolderFocus::Inspect
             } else {
@@ -497,7 +544,7 @@ impl WizApp {
                         }
                         if ui
                             .add_enabled(
-                                idle && !self.batch.contains(id),
+                                idle && !self.batch.is_folder_review() && !self.batch.contains(id),
                                 egui::Button::new("Include in cleanup batch"),
                             )
                             .clicked()
@@ -516,6 +563,52 @@ impl WizApp {
                 }
                 ui.separator();
             });
+        }
+        self.folder_batch_controls(ui, review, idle);
+    }
+
+    fn folder_batch_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.separator();
+        ui.strong("Folder cleanup batch");
+        if !snapshot.complete
+            || snapshot.entries.iter().any(|entry| {
+                matches!(
+                    entry.outcome,
+                    FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+                )
+            })
+        {
+            ui.label("Resolve failed or incomplete intake and scan again before folder batch review.");
+            return;
+        }
+        if !snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == FolderEntryOutcome::Registered)
+        {
+            ui.label("This snapshot has no registered video to review.");
+            return;
+        }
+        ui.label("Existing authorized engine directory in a separate tree");
+        ui.add_enabled_ui(idle, |ui| {
+            reveal_focus(&ui.add(
+                egui::TextEdit::singleline(&mut self.folder.batch_output_root)
+                    .id(egui::Id::unique("folder-batch-output-directory"))
+                    .char_limit(4096)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("Absolute output directory"),
+            ));
+            self.batch_policy_controls(ui, true);
+        });
+        ui.small("The current cleanup stream selection, file times and execution limits apply.");
+        let review = ui.add_enabled(
+            idle && !self.folder.batch_output_root.is_empty(),
+            egui::Button::new("Review folder cleanup batch"),
+        );
+        self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
+        if review.clicked() {
+            let root = self.folder.batch_output_root.clone();
+            self.review_folder_batch(snapshot, &root, ui.ctx());
         }
     }
 }

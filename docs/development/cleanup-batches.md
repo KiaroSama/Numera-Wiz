@@ -110,10 +110,12 @@ ordinary retained batch review. Inspect or submit that exact ID and hash using
 the standard batch commands. The retained snapshot remains the reference for
 the full intake inventory. Review creates no directories or media files.
 
-This development slice covers registered video cleanup through CLI and MCP.
+The shared native/browser Folder intake window can also review a complete
+snapshot into the batch window. That mode shows frozen member decisions and
+excluded snapshot rows, and uses the ordinary Run and retry controls.
 Output-tree reproduction and in-source output exclusion, companion copying,
-partial intake failure composition, mixed audio and encode workflows, and
-direct folder-derived batch controls in the native/browser workspace remain open.
+partial intake failure composition, and mixed audio and encode workflows remain
+open. This slice awaits hosted transport and GUI qualification on its source.
 
 The new records currently use the development schema-2 root. Stopped-generation
 compatibility, downgrade rejection and migration remain mandatory before release.
