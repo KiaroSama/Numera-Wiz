@@ -73,6 +73,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `chapters inspect --asset ID` | Read exact chapter ticks, time bases and tags from the registered probe. |
 | `chapters wave-cues --asset ID` | Read original RIFF or RF64 cue sample offsets, recorded region lengths and labels. |
 | `chapters export --asset ID` | Return UTF-8 FFmetadata and its SHA-256 digest. |
+| `interchange export-ale --asset ID [--asset ID] [--frame-rate 24] [--out PATH]` | Export selected registered asset metadata as an Avid Log Exchange document with its digest. |
 | `chapters import --asset ID --out PATH --ffmetadata CHAPTERS.txt` | Review a chapter replacement in a new Matroska file. Add `--include-global-metadata` to apply authored container tags from the document. |
 | `chapters remove --asset ID --out PATH` | Review a stream-copy plan that removes chapters and preserves the retained streams and their metadata. |
 | `metadata patch --asset ID --out PATH --patch PATCH.json` | Review explicit changes to container tags or to one original stream in a new Matroska file. |

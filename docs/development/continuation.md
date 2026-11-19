@@ -2627,3 +2627,14 @@ The reviewed FFmpeg Skill 3.15.1 update adds CI checks for regressions in
 earlier fixes. Numera retains the original hosted test entry points and
 keeps the prior CMX cut-list journey beside the new OTIO checks.
 [FFmpeg Skill 3.15.1 changes](https://github.com/kajisho5/ffmpeg-skill/compare/5055a42...364f2d5210870987dacddfea887787038a6f54ac)
+
+The exact `02e3c9f` Linux owner journey exported and reimported video and PCM
+tracks through the real CLI. The OpenTimelineIO 0.18.1 adapter independently
+decoded and serialized both documents. The audio cut retained one 48 kHz sample.
+[Authenticated owner test documents](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44592314954/artifacts/14566700352)
+
+Final Cut Pro 7 XML uses the same atomic track placement and media identity
+checks. Avid Log Exchange exports allowlisted metadata from selected registered
+assets. Their hosted checks extend the existing owner journey. Which parts of
+CD20 remain open is recorded in the completion ledger.
+[Apple xmeml reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/) · [Avid log specification](https://resources.avid.com/SupportFiles/attach/XpressSupplement_v5_0.pdf)

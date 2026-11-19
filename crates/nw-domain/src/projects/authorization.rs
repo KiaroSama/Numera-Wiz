@@ -95,7 +95,8 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export"
-        | "interchange.otio.export" => Some(ProjectAction::Read),
+        | "interchange.otio.export"
+        | "interchange.fcp7.export" => Some(ProjectAction::Read),
         "sequences.create"
         | "clips.place"
         | "clips.move"
@@ -114,6 +115,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.remove_gap"
         | "mixer.set_track_gain"
         | "interchange.edl.import"
+        | "interchange.fcp7.import"
         | "interchange.otio.import"
         | "history.undo"
         | "history.redo" => Some(ProjectAction::Edit),
@@ -137,6 +139,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
             | "timeline.render_mixed"
             | "markers.wave_projection"
             | "interchange.edl.export"
+            | "interchange.fcp7.export"
             | "interchange.otio.export"
     );
     if write || timeline_query {
@@ -155,6 +158,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         command,
         "clips.place"
             | "interchange.edl.import"
+            | "interchange.fcp7.import"
             | "interchange.otio.import"
             | "clips.slip"
             | "clips.roll"

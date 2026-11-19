@@ -23,6 +23,12 @@ const GROUP_BYTES: usize = 2 * 1024 * 1024;
 const TRACKED_HANDLES: usize = 4;
 const BINDINGS: usize = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TrackExchange {
+    Otio,
+    Fcp7,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Phase {
     Catalog,
     Summary,
@@ -43,7 +49,7 @@ pub(super) enum Phase {
     #[cfg(target_arch = "wasm32")]
     ProgramSegment,
     EdlExport,
-    OtioExport,
+    TrackExport(TrackExchange),
     MixedReview,
     MixedSubmit,
     Markers,
@@ -219,6 +225,7 @@ pub(super) struct ProjectsUi {
     native_picture: Option<NativePictureView>,
     edl: Option<nw_domain::interchange::EdlExport>,
     otio: Option<nw_domain::interchange::OtioExport>,
+    fcp7: Option<nw_domain::interchange::OtioExport>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
     wave_projection: Option<nw_domain::projects::wave_projection::Projection>,
@@ -245,6 +252,9 @@ impl ProjectsUi {
         self.otio = None;
         self.forms.otio_document.clear();
         self.forms.otio_sources.clear();
+        self.fcp7 = None;
+        self.forms.fcp7_document.clear();
+        self.forms.fcp7_sources.clear();
         self.mixed_review = None;
         self.marker_page = None;
         self.wave_projection = None;
@@ -686,7 +696,7 @@ impl WizApp {
             Action::Project(ProjectAction {
                 phase: Phase::PreviewFrame
                     | Phase::EdlExport
-                    | Phase::OtioExport
+                    | Phase::TrackExport(_)
                     | Phase::MixedReview
                     | Phase::MixedSubmit
                     | Phase::Markers
@@ -1094,27 +1104,30 @@ impl WizApp {
                 self.projects.edl = Some(edl);
                 return Ok(());
             }
-            Phase::OtioExport => {
-                let otio: nw_domain::interchange::OtioExport =
+            Phase::TrackExport(format) => {
+                let doc: nw_domain::interchange::OtioExport =
                     serde_json::from_value(result).map_err(|error| error.to_string())?;
                 let group = self
                     .projects
                     .group
                     .as_ref()
-                    .ok_or("No displayed sequence for the OTIO export")?;
-                if otio.project_id.as_str() != group.key.project
-                    || group.view.sequence.as_deref() != Some(otio.sequence_id.as_str())
-                    || group.view.track.as_deref() != Some(otio.track_id.as_str())
-                    || otio.revision.to_string() != group.key.revision
-                    || otio.range != group.view.range
-                    || nw_domain::projects::hash(otio.document.as_bytes()) != otio.document_sha256
+                    .ok_or("No displayed sequence for the track export")?;
+                if doc.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(doc.sequence_id.as_str())
+                    || group.view.track.as_deref() != Some(doc.track_id.as_str())
+                    || doc.revision.to_string() != group.key.revision
+                    || doc.range != group.view.range
+                    || nw_domain::projects::hash(doc.document.as_bytes()) != doc.document_sha256
                 {
                     return Err(
-                        "OTIO differs from the displayed revision, track, range or accepted digest"
+                        "Track document differs from the displayed revision, track, range or accepted digest"
                             .into(),
                     );
                 }
-                self.projects.otio = Some(otio);
+                match format {
+                    TrackExchange::Otio => self.projects.otio = Some(doc),
+                    TrackExchange::Fcp7 => self.projects.fcp7 = Some(doc),
+                }
                 return Ok(());
             }
             Phase::MixedReview => {

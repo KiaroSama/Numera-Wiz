@@ -66,6 +66,7 @@ enum Action {
     CompareVideo,
     StreamObservations,
     WaveCues,
+    AleDocument,
     ClearCapabilities,
     ArtifactManifest,
     SelectionReport(u64),
@@ -177,6 +178,8 @@ pub struct WizApp {
     audio_edit: audio_edit::AudioEditUi,
     avc_export: avc_export::AvcUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
+    ale_rate: nw_domain::interchange::ale::Rate,
+    ale_document: Option<nw_domain::interchange::ale::Export>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
     save_inbox: Arc<Mutex<Option<Result<nw_domain::download::SaveReceipt, String>>>>,
@@ -375,6 +378,8 @@ impl WizApp {
             audio_edit: Default::default(),
             avc_export: Default::default(),
             wave_cues: None,
+            ale_rate: Default::default(),
+            ale_document: None,
             artifact_manifest: None,
             save_control: None,
             save_inbox: Arc::new(Mutex::new(None)),
@@ -406,6 +411,7 @@ impl WizApp {
             self.metadata = Default::default();
             self.chapter_document.clear();
             self.chapter_global_tags = false;
+            self.ale_document = None;
             self.source_preview = Default::default();
             self.volume_measurement = None;
             self.loudness_measurement = None;
@@ -934,6 +940,12 @@ impl WizApp {
                         self.wave_cues = Some(cues);
                     }
                 }
+                Action::AleDocument => {
+                    self.ale_document = Some(
+                        serde_json::from_value(result).map_err(|error| error.to_string())?,
+                    );
+                    self.status = "Avid Log Exchange document is ready.".into();
+                }
                 Action::ClearCapabilities => {
                     let cleared: nw_domain::capabilities::ClearResult =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -989,6 +1001,42 @@ impl WizApp {
                         self.query("streams.extract", json!({"asset_id":asset.id,"stream_index":stream.index,"output":self.output}),
                             Action::Plan(self.generation), ui.ctx());
                     }
+                }
+            });
+        });
+    }
+
+    fn ale_panel(&mut self, ui: &mut egui::Ui, asset: &Asset) {
+        use nw_domain::interchange::ale::Rate;
+
+        egui::CollapsingHeader::new("Avid Log Exchange").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Log FPS");
+                egui::ComboBox::from_id_salt("ale-log-fps")
+                    .selected_text(self.ale_rate.label())
+                    .show_ui(ui, |ui| {
+                        for rate in Rate::ALL {
+                            ui.selectable_value(&mut self.ale_rate, rate, rate.label());
+                        }
+                    });
+                if ui
+                    .add_enabled(self.request_idle(), egui::Button::new("Prepare ALE"))
+                    .clicked()
+                {
+                    self.ale_document = None;
+                    self.query(
+                        "interchange.ale.export",
+                        json!({"asset_ids":[asset.id],"frame_rate":self.ale_rate}),
+                        Action::AleDocument,
+                        ui.ctx(),
+                    );
+                }
+                if let Some(document) = &self.ale_document
+                    && document.asset_ids.as_slice() == [asset.id.as_str()]
+                    && document.frame_rate == self.ale_rate
+                    && ui.button("Copy ALE").clicked()
+                {
+                    ui.ctx().copy_text(document.document.clone());
                 }
             });
         });
@@ -1603,6 +1651,7 @@ impl eframe::App for WizApp {
             self.capability_panel(ui);
             self.config_import_panel(ui);
             if let Some(asset) = self.selected_asset() {
+                self.ale_panel(ui, &asset);
                 self.volume_panel(ui, &asset);
                 self.extraction_panel(ui, &asset);
                 self.reference_panel(ui, &asset);

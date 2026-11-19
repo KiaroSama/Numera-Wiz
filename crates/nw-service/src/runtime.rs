@@ -706,7 +706,8 @@ impl Service {
             | "timeline.remove_gap"
             | "mixer.set_track_gain"
             | "interchange.edl.import"
-            | "interchange.otio.import" => self.project_receipt_readable(context, &response)?,
+            | "interchange.otio.import"
+            | "interchange.fcp7.import" => self.project_receipt_readable(context, &response)?,
             "assets.register_folder" => self.folder_receipt_readable(context, &response)?,
             "assets.register" => {
                 let asset: Asset = commands::parse(response.result.clone().ok_or_else(|| {
@@ -1265,7 +1266,7 @@ impl Service {
                 )?;
                 return Ok(Response::success(&request.request_id, plan).bounded());
             }
-            "interchange.edl.export" | "interchange.otio.export" => {
+            "interchange.edl.export" | "interchange.otio.export" | "interchange.fcp7.export" => {
                 let input: nw_domain::interchange::EdlInput = commands::parse(params)?;
                 let project = request.project.as_ref().ok_or_else(|| {
                     DomainError::new(
@@ -1285,6 +1286,8 @@ impl Service {
                         &capture,
                         &input.track_id,
                     )?)?
+                } else if request.command.id == "interchange.fcp7.export" {
+                    value(&nw_domain::interchange::fcp7::export(&capture, &input.track_id)?)?
                 } else {
                     value(&nw_domain::interchange::export_otio(
                         &capture,
@@ -1368,6 +1371,7 @@ impl Service {
             | "mixer.set_track_gain"
             | "interchange.edl.import"
             | "interchange.otio.import"
+            | "interchange.fcp7.import"
             | "history.undo"
             | "history.redo" => {
                 drop(guard);
@@ -1827,6 +1831,22 @@ impl Service {
                 read_model::InventoryKind::Assets,
                 &cancellation,
             )?,
+            "interchange.ale.export" => {
+                let input: nw_domain::interchange::ale::Input = commands::parse(params)?;
+                input.validate()?;
+                let mut assets = Vec::with_capacity(input.asset_ids.len());
+                for id in &input.asset_ids {
+                    if cancellation.is_cancelled() {
+                        return Err(DomainError::new("CANCELLED", "ALE export was cancelled"));
+                    }
+                    let asset: Asset = self.store.get(&named("asset", id)?)?
+                        .ok_or_else(DomainError::object_not_found)?;
+                    self.object(&context, &asset.id, &asset.creator)?;
+                    self.path(&context, Path::new(&asset.identity.path), false)?;
+                    assets.push(asset);
+                }
+                value(&nw_domain::interchange::ale::export(&input, &assets)?)?
+            }
             "assets.inspect" | "chapters.inspect" | "chapters.export" => {
                 let (id, include_global_metadata) = if request.command.id == "chapters.export" {
                     let input: nw_domain::chapters::ExportInput = commands::parse(params)?;

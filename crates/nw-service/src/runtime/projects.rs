@@ -360,6 +360,7 @@ impl Service {
                     | "clips.roll"
                     | "interchange.edl.import"
                     | "interchange.otio.import"
+                    | "interchange.fcp7.import"
             ) {
                 Some(
                     self.batch_preflights
@@ -414,7 +415,7 @@ impl Service {
                         }
                         ProjectEditIntent::Place(Box::new(input), source)
                     }
-                    "interchange.edl.import" | "interchange.otio.import" => {
+                    "interchange.edl.import" | "interchange.otio.import" | "interchange.fcp7.import" => {
                         use nw_domain::interchange::{CutTrack, parse_cmx3600, parse_otio};
                         let params = request.params.clone();
                         let (target, document_sha256, cuts) =
@@ -422,6 +423,13 @@ impl Service {
                                 let import = parse_cmx3600(commands::parse(params)?)?;
                                 (
                                     CutTrack::Edl(import.frames_per_second),
+                                    import.document_sha256,
+                                    import.cuts,
+                                )
+                            } else if request.command.id == "interchange.fcp7.import" {
+                                let import = nw_domain::interchange::fcp7::import(commands::parse(params)?)?;
+                                (
+                                    CutTrack::Fcp7 { kind: import.kind, range: import.range },
                                     import.document_sha256,
                                     import.cuts,
                                 )

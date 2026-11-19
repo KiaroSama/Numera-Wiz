@@ -418,6 +418,44 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         ),
         wave_cues
     );
+    let ale_path = media.directory.path().join("selected-assets.ale");
+    let (ale, exit) = cli
+        .human(&[
+            "interchange",
+            "export-ale",
+            "--asset",
+            &wave_asset,
+            "--out",
+            ale_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{ale}");
+    let ale = &ale["result"];
+    let expected = concat!(
+        "Heading\r\nFIELD_DELIM\tTABS\r\nVIDEO_FORMAT\t1080\r\n",
+        "AUDIO_FORMAT\t48kHz\r\nFPS\t24\r\n\r\nColumn\r\n",
+        "Name\tTracks\tStart\tEnd\tTape\tScene\tTake\tComments\tSource File\r\n\r\nData\r\n",
+        "rf64-cue.wav\tA1\t00:00:00:00\t00:00:01:00\t\t\t\trf64-cue.wav\r\n"
+    );
+    assert_eq!(ale["document"], expected);
+    assert_eq!(std::fs::read_to_string(&ale_path).unwrap(), expected);
+    if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
+        std::fs::copy(&ale_path, std::path::PathBuf::from(evidence_dir).join("selected-assets.ale")).unwrap();
+    }
+    let duplicates = cli.raw(&Request::query(
+        "interchange.ale.export",
+        json!({"asset_ids":[wave_asset,wave_asset]}),
+    )).await;
+    assert_eq!(duplicates["error"]["code"], "ALE_UNREPRESENTABLE");
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "interchange.ale.export",
+            json!({"asset_ids":[wave_asset]}),
+            json!({})
+        ),
+        *ale
+    );
     let metadata = json!({"asset_id":chapter_asset,"output":media.directory.path().join("sdk-metadata-review.mkv"),"patch":{
         "target":{"scope":"stream","index":2},"set":{"title":"Reviewed by MCP"}
     }});
@@ -1581,7 +1619,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
     }
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","previews.observe","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","previews.observe","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","interchange.ale.export","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -2367,6 +2405,20 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .as_str()
             .unwrap()
             .to_owned();
+        let scoped_wave = call!(
+            http,
+            "assets.register",
+            json!({"path":media.directory.path().join("rf64-cue.wav")}),
+            json!({"replay_scope":scope,"idempotency_key":format!("register-ale-http-{ordinal}")})
+        );
+        let scoped_ale = call!(
+            http,
+            "interchange.ale.export",
+            json!({"asset_ids":[scoped_wave["id"]]}),
+            json!({})
+        );
+        assert_eq!(scoped_ale["document_sha256"], ale["document_sha256"]);
+        assert_eq!(scoped_ale["document"], expected);
         let asset = call!(
             http,
             "assets.register",

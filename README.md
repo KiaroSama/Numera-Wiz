@@ -68,6 +68,9 @@ export and continuous preview remain in development.
   execution, cancellation, recovery and verified no-replace output publication.
 - CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped
   operator profiles, bounded artifact transfer and verified client Save As.
+- [Track and asset exchange](docs/manuals/PROJECTS.md#exchange-a-track-with-opentimelineio)
+  includes selected-track CMX 3600, OpenTimelineIO and Final Cut Pro 7 XML,
+  plus Avid Log Exchange metadata for registered sources.
 - [Project state editing](docs/manuals/PROJECTS.md) through shared CLI/MCP commands:
   authorized catalog discovery, exact sequence grids, place/move/split/lift,
   link/unlink, atomic history/receipts and bounded revision snapshots. Shared

@@ -1,6 +1,9 @@
-//! Bounded interchange documents for committed project tracks.
+//! Bounded interchange documents for registered assets and committed project tracks.
+pub mod ale;
+pub mod fcp7;
 mod import;
 mod otio;
+mod xml;
 use crate::{
     DomainError, Result,
     media::{MixedCapture, OccurrenceSource},
@@ -19,6 +22,7 @@ use std::{collections::BTreeMap, fmt::Write};
 pub enum CutTrack {
     Edl(Rational),
     Otio { kind: TrackKind, range: TimeRange },
+    Fcp7 { kind: TrackKind, range: TimeRange },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

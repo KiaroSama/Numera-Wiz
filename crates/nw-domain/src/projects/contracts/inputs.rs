@@ -102,7 +102,9 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
                 | "mixer.set_track_gain"
                 | "interchange.edl.export"
                 | "interchange.edl.import"
+                | "interchange.fcp7.export"
                 | "interchange.otio.export"
+                | "interchange.fcp7.import"
                 | "interchange.otio.import"
                 | "clips.join_through_edit"
         )
@@ -186,7 +188,9 @@ pub fn refine(command: &str, mut schema: Value) -> Value {
         | "timeline.remove_gap"
         | "mixer.set_track_gain"
         | "interchange.edl.export"
+        | "interchange.fcp7.export"
         | "interchange.otio.export"
+        | "interchange.fcp7.import"
         | "interchange.otio.import"
         | "clips.join_through_edit" => {} // Typed parameters.
         "clips.split" => enumeration(&mut schema, "link_policy", &["expand"]),

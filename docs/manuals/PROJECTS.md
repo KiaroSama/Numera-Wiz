@@ -374,6 +374,43 @@ transitions, effects, markers, alternate references and unresolved media
 require separate conversion. The format follows the official OTIO schema.
 [OpenTimelineIO schema](https://opentimelineio.readthedocs.io/en/v0.18.1/tutorials/otio-serialized-schema.html)
 
+## Exchange a track with Final Cut Pro 7 XML
+
+Open **Final Cut Pro 7 XML** on a selected track in the Projects workspace.
+Prepare the visible range, then copy the XML and its media bindings. The CLI
+uses the same selection with `timeline export-fcp7` and `timeline import-fcp7`.
+The request parameters match those of the corresponding OTIO commands. MCP
+uses `interchange.fcp7.export` and `interchange.fcp7.import`.
+
+The supported xmeml v4 and v5 subset contains one video or audio track with
+registered-media cuts on a whole-frame grid. Record positions and duration
+preserve the gaps, including trailing empty space. Every imported `pathurl`
+must match an explicit registered media binding. The exporter supplies an
+opaque placeholder for each source. Relink the files in the receiving editor.
+The 96 KiB document and 63-cut limits also apply to this format.
+[Apple Final Cut Pro XML reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/)
+
+## Export an Avid clip log
+
+In the media workspace, select a source and open **Avid Log Exchange**. Set
+**Log FPS**, prepare the document and choose **Copy ALE**. To export several
+registered sources in one file, repeat `--asset` on the CLI. The optional
+`--out` verifies the digest and writes to a new path.
+
+```text
+numera-wiz interchange export-ale --asset FIRST --asset SECOND --frame-rate 25 --out selected.ale
+```
+
+MCP uses `interchange.ale.export` with `asset_ids` and optional `frame_rate`.
+The log uses UTF-8, tab-separated fields and CRLF. Each row describes picture
+and audio channels, its Start and exclusive End, source filename and known
+tape, scene, take and comment metadata. Pick the log FPS that matches the
+source's non-drop timecode. Sources without timecode start at zero and end
+at the first log frame that covers their full registered duration. Select
+up to 64 assets with a common audio sample rate. The supported rates are
+22.05, 24, 44.1 and 48 kHz. Source filenames support manual relinking without
+exposing absolute paths. [Avid log specification, Appendix D](https://resources.avid.com/SupportFiles/attach/XpressSupplement_v5_0.pdf)
+
 ## Audio track gain
 
 Select an audio track and open **Track gain**. Set the gain in hundredths of a

@@ -578,6 +578,7 @@ mod tests {
                     | "timeline.render_mixed"
                     | "markers.wave_projection"
                     | "interchange.edl.export"
+                    | "interchange.fcp7.export"
                     | "interchange.otio.export"
             ) {
                 let requirement = &row["authorization_requirements"];
@@ -623,6 +624,7 @@ mod tests {
                     | "mixer.set_track_gain"
                     | "clips.join_through_edit"
                     | "interchange.edl.import"
+                    | "interchange.fcp7.import"
                     | "interchange.otio.import"
             ) {
                 let requirement = &row["authorization_requirements"];
@@ -642,6 +644,7 @@ mod tests {
                     "clips.slip"
                         | "clips.roll"
                         | "interchange.edl.import"
+                        | "interchange.fcp7.import"
                         | "interchange.otio.import"
                 ) {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
@@ -747,6 +750,7 @@ mod tests {
             "timeline.remove_gap",
             "mixer.set_track_gain",
             "interchange.edl.import",
+            "interchange.fcp7.import",
             "interchange.otio.import",
             "clips.remove",
             "markers.place",
@@ -1363,6 +1367,7 @@ mod tests {
                 false,
             ),
             (
+                "interchange.fcp7.import",
                 "interchange.otio.import",
                 vec!["document_sha256", "source_ids", "clip_ids"],
                 false,

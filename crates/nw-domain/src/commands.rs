@@ -209,7 +209,8 @@ fn project_context(id: &str) -> ProjectContextRule {
         | crate::preview::PROGRAM_PLAYBACK_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export"
-        | "interchange.otio.export" => ProjectContextRule::RequiredRead,
+        | "interchange.otio.export"
+        | "interchange.fcp7.export" => ProjectContextRule::RequiredRead,
         "sequences.create"
         | "clips.place"
         | "clips.move"
@@ -229,6 +230,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "mixer.set_track_gain"
         | "interchange.edl.import"
         | "interchange.otio.import"
+        | "interchange.fcp7.import"
         | "history.undo"
         | "history.redo" => ProjectContextRule::RequiredWrite,
         _ => ProjectContextRule::Forbidden,
@@ -278,9 +280,12 @@ fn result_schema(id: &str) -> Option<Value> {
         "interchange.edl.export" => {
             Some(serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"))
         }
-        "interchange.otio.export" => {
+        "interchange.otio.export" | "interchange.fcp7.export" => {
             Some(serde_json::to_value(schema_for!(crate::interchange::OtioExport)).expect("schema"))
         }
+        "interchange.ale.export" => Some(
+            serde_json::to_value(schema_for!(crate::interchange::ale::Export)).expect("schema"),
+        ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
@@ -350,7 +355,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "sequences.inspect" => Some(contracts::inspect(true)),
         "sequences.create" => Some(contracts::edit(EditResult::Sequence)),
         "clips.place" => Some(contracts::edit(EditResult::Place)),
-        "interchange.edl.import" | "interchange.otio.import" => {
+        "interchange.edl.import" | "interchange.otio.import" | "interchange.fcp7.import" => {
             Some(contracts::edit(EditResult::ImportCuts))
         }
         "clips.move"
@@ -635,6 +640,18 @@ fn build_registry() -> Vec<Descriptor> {
         row!(
             "interchange.otio.import",
             "Apply one OpenTimelineIO track as a reversible edit with explicit media bindings",
+            DurableMutation,
+            crate::interchange::OtioImportInput
+        ),
+        row!(
+            "interchange.fcp7.export",
+            "Export one committed track as Final Cut Pro 7 XML with media bindings",
+            Query,
+            crate::interchange::EdlInput
+        ),
+        row!(
+            "interchange.fcp7.import",
+            "Apply one Final Cut Pro 7 XML track as a reversible edit with media bindings",
             DurableMutation,
             crate::interchange::OtioImportInput
         ),
@@ -1159,6 +1176,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Export an FFmetadata chapter document with its content digest",
             Query,
             crate::chapters::ExportInput
+        ),
+        row!(
+            "interchange.ale.export",
+            "Export an Avid Log Exchange document for authorized registered assets",
+            Query,
+            crate::interchange::ale::Input
         ),
         row!(
             "chapters.remove",
@@ -1905,6 +1928,8 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "interchange.edl.import",
     "interchange.otio.export",
     "interchange.otio.import",
+    "interchange.fcp7.export",
+    "interchange.fcp7.import",
     "clips.place",
     "clips.move",
     "clips.link",
@@ -1992,6 +2017,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "chapters.inspect",
     "chapters.wave_cues",
     "chapters.export",
+    "interchange.ale.export",
     "chapters.remove",
     "chapters.import",
     "disposition.patch",

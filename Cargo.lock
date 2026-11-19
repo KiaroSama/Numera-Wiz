@@ -2308,6 +2308,7 @@ name = "nw-domain"
 version = "0.1.0-dev"
 dependencies = [
  "hex",
+ "quick-xml",
  "schemars",
  "serde",
  "serde_json",

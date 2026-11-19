@@ -101,6 +101,11 @@ enum Mode {
         #[command(subcommand)]
         command: human::Chapters,
     },
+    /// Export media metadata for exchange with other editors.
+    Interchange {
+        #[command(subcommand)]
+        command: human::Interchange,
+    },
     /// Review container and stream tag edits.
     Metadata {
         #[command(subcommand)]
@@ -381,6 +386,9 @@ async fn run() -> Result<()> {
                 Some(Mode::Previews { command }) => human::run(&client, human::Command::Previews(command)).await,
                 Some(Mode::Chapters { command }) => {
                     human::run(&client, human::Command::Chapters(command)).await
+                }
+                Some(Mode::Interchange { command }) => {
+                    human::run(&client, human::Command::Interchange(command)).await
                 }
                 Some(Mode::Metadata { command }) => {
                     human::run(&client, human::Command::Metadata(command)).await

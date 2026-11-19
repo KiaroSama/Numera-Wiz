@@ -608,11 +608,14 @@ pub fn resolve_edit<R: ProjectRead>(
                         ));
                     }
                 }
-                CutTrack::Otio { kind, range } => {
+                CutTrack::Otio { kind, range } | CutTrack::Fcp7 { kind, range } => {
                     if track.sequence_id != sequence_id || track.kind != kind {
                         return Err(DomainError::new(
-                            "OTIO_TRACK_MISMATCH",
-                            "OTIO and destination track kinds must match",
+                            match target {
+                                CutTrack::Fcp7 { .. } => "FCP7_TRACK_MISMATCH",
+                                _ => "OTIO_TRACK_MISMATCH",
+                            },
+                            "Source and destination track kinds must match",
                         ));
                     }
                     range.validate()?;
@@ -624,7 +627,7 @@ pub fn resolve_edit<R: ProjectRead>(
                     {
                         return Err(DomainError::new(
                             "CLIP_COLLISION",
-                            "The OTIO destination range must be empty",
+                            "The interchange destination range must be empty",
                         ));
                     }
                 }

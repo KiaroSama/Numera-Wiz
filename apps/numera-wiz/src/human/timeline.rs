@@ -62,6 +62,8 @@ pub enum Timeline {
     ExportEdl(TrackExport),
     /// Export one selected video or audio track as OpenTimelineIO.
     ExportOtio(TrackExport),
+    /// Export one selected video or frame-aligned audio track as Final Cut Pro 7 XML.
+    ExportFcp7(TrackExport),
     /// Import a UTF-8 CMX 3600 cut list as one reversible edit.
     ImportEdl {
         #[command(flatten)]
@@ -79,21 +81,9 @@ pub enum Timeline {
         reels: Option<PathBuf>,
     },
     /// Import one OpenTimelineIO track as one reversible edit.
-    ImportOtio {
-        #[command(flatten)]
-        context: super::projects::WriteContext,
-        #[arg(long)]
-        sequence: String,
-        #[arg(long)]
-        track: String,
-        #[arg(long, default_value = "0")]
-        start: String,
-        #[arg(long)]
-        file: PathBuf,
-        /// JSON array binding each media URL to a registered asset, stream and digest.
-        #[arg(long)]
-        sources: Option<PathBuf>,
-    },
+    ImportOtio(TrackImport),
+    /// Import one Final Cut Pro 7 XML track as one reversible edit.
+    ImportFcp7(TrackImport),
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
         #[arg(long)]
@@ -163,6 +153,7 @@ impl Timeline {
             }
             Self::ExportEdl(args) => args.prepare("interchange.edl.export"),
             Self::ExportOtio(args) => args.prepare("interchange.otio.export"),
+            Self::ExportFcp7(args) => args.prepare("interchange.fcp7.export"),
             Self::ImportEdl {
                 context,
                 sequence,
@@ -187,37 +178,8 @@ impl Timeline {
                 };
                 context.request("interchange.edl.import", serde_json::to_value(input)?)
             }
-            Self::ImportOtio {
-                context,
-                sequence,
-                track,
-                start,
-                file,
-                sources,
-            } => {
-                let read_otio = |path| {
-                    read_cut_file(
-                        path,
-                        nw_domain::interchange::MAX_OTIO_BYTES,
-                        "OTIO input file exceeds 96 KiB",
-                    )
-                };
-                let sources = if let Some(path) = sources {
-                    commands::parse(commands::decode_json(&read_otio(path)?)?)?
-                } else {
-                    Vec::new()
-                };
-                let document = String::from_utf8(read_otio(file)?)
-                    .map_err(|_| DomainError::new("OTIO_INVALID", "OTIO document must be UTF-8"))?;
-                let input = nw_domain::interchange::OtioImportInput {
-                    sequence_id: model::EntityId::parse(sequence)?,
-                    track_id: model::EntityId::parse(track)?,
-                    start: Some(super::projects::rational(&start)?),
-                    document,
-                    sources,
-                };
-                context.request("interchange.otio.import", serde_json::to_value(input)?)
-            }
+            Self::ImportOtio(args) => args.prepare("interchange.otio.import", "OTIO_INVALID"),
+            Self::ImportFcp7(args) => args.prepare("interchange.fcp7.import", "FCP7_INVALID"),
             Self::PreviewSegment {
                 project,
                 revision,
@@ -303,6 +265,50 @@ impl Timeline {
                 Ok(request)
             }
         }
+    }
+}
+
+#[derive(Args)]
+pub struct TrackImport {
+    #[command(flatten)]
+    context: super::projects::WriteContext,
+    #[arg(long)]
+    sequence: String,
+    #[arg(long)]
+    track: String,
+    #[arg(long, default_value = "0")]
+    start: String,
+    #[arg(long)]
+    file: PathBuf,
+    /// JSON array binding each media URL to a registered asset, stream and digest.
+    #[arg(long)]
+    sources: Option<PathBuf>,
+}
+
+impl TrackImport {
+    fn prepare(self, command: &str, code: &'static str) -> Result<Request> {
+        let read = |path| {
+            read_cut_file(
+                path,
+                nw_domain::interchange::MAX_OTIO_BYTES,
+                "Track interchange input exceeds 96 KiB",
+            )
+        };
+        let sources = if let Some(path) = self.sources {
+            commands::parse(commands::decode_json(&read(path)?)?)?
+        } else {
+            Vec::new()
+        };
+        let document = String::from_utf8(read(self.file)?)
+            .map_err(|_| DomainError::new(code, "Track interchange document must be UTF-8"))?;
+        let input = nw_domain::interchange::OtioImportInput {
+            sequence_id: model::EntityId::parse(self.sequence)?,
+            track_id: model::EntityId::parse(self.track)?,
+            start: Some(super::projects::rational(&self.start)?),
+            document,
+            sources,
+        };
+        self.context.request(command, serde_json::to_value(input)?)
     }
 }
 
