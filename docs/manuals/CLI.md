@@ -1000,6 +1000,14 @@ presentation times and dimensions. Selected AAC retains the original
 mono or stereo rate and verifies the coded timing. Review and submit
 the returned plan ID and hash.
 
+The optional `settings.picture` object accepts an even-coordinate crop,
+quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final
+`resize`. For example, set `resize` to
+`{"width":1280,"height":720,"aspect":"preserve_display"}` to retain the
+display aspect through sample aspect signaling. Use `square_pixels` to
+make the specified width and height the display aspect. Operations run in
+crop, rotation, flip and resize order. Original frame timestamps are verified.
+
 ### Encode a registered folder
 
 Capture a folder with `assets register-folder`, then run

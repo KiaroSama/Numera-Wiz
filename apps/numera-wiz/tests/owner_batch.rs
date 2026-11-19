@@ -1020,14 +1020,25 @@ async fn cpu_avc_export(parent: &Path) -> Value {
     let original_probe = fixture::probe(&components, &path).await;
     assert_eq!(original_probe["streams"][0]["color_range"], "tv");
     let mut results = Vec::new();
-    for (container, extension) in [("mp4", "mp4"), ("matroska", "mkv")] {
-        let output = directory.join(format!("avc-export.{extension}"));
-        let input = json!({"asset_id":original["id"],"output":output,"settings":{
+    for (label, container, extension, transform) in [
+        ("mp4", "mp4", "mp4", false),
+        ("matroska", "matroska", "mkv", false),
+        ("picture", "mp4", "mp4", true),
+    ] {
+        let output = directory.join(format!("avc-{label}.{extension}"));
+        let mut input = json!({"asset_id":original["id"],"output":output,"settings":{
             "video_stream":0,"container":container,"crf":18,"preset":"balanced",
             "audio":{"kind":"aac","stream_index":1,"bitrate_kbps":128}
         }});
+        if transform {
+            input["settings"]["picture"] = json!({
+                "crop":{"width":240,"height":120,"x":40,"y":30},
+                "rotation":"clockwise","flip_horizontal":true,
+                "resize":{"width":160,"height":200,"aspect":"preserve_display"}
+            });
+        }
         let plan = cli.query("media.encode", input.clone()).await;
-        let document = directory.join(format!("avc-{container}.json"));
+        let document = directory.join(format!("avc-{label}.json"));
         std::fs::write(&document, serde_json::to_vec(&input).unwrap()).unwrap();
         let (typed, code) = cli
             .human(&["media", "encode", "--file", document.to_str().unwrap()])
@@ -1037,7 +1048,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let job = accepted(
             &cli,
             &scope,
-            &format!("run-avc-{container}"),
+            &format!("run-avc-{label}"),
             "jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
         )
@@ -1045,7 +1056,13 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         succeeded(&cli, &job).await;
         let probe = fixture::probe(&components, &output).await;
         assert_eq!(probe["streams"][0]["codec_name"], "h264");
-        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], "4:3");
+        let expected_aspect = if transform { "15:32" } else { "4:3" };
+        assert_eq!(probe["streams"][0]["sample_aspect_ratio"], expected_aspect);
+        if transform {
+            assert_eq!(probe["streams"][0]["width"], 160);
+            assert_eq!(probe["streams"][0]["height"], 200);
+            assert_eq!(probe["streams"][0]["display_aspect_ratio"], "3:8");
+        }
         let range = &probe["streams"][0]["color_range"];
         assert!(
             range == "tv" || (container == "mp4" && (range.is_null() || range == "unknown")),
@@ -1063,13 +1080,10 @@ async fn cpu_avc_export(parent: &Path) -> Value {
                 let value = packet["pts"].as_i64().unwrap() * numerator * 1000;
                 assert_eq!(value % denominator, 0);
                 value / denominator
-            })
-            .collect();
-        assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
-        results.push(
-            json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
-            "picture":"h264","audio":"aac","sample_aspect_ratio":"4:3"}),
-        );
+            }).collect();
+        assert_eq!(clock, [0,32,120,224,376,512]);
+        results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
+            "picture":"h264","audio":"aac","sample_aspect_ratio":expected_aspect,"geometry_transformed":transform}));
     }
     let intake = directory.join("encode-intake");
     let output_root = directory.join("encode-outputs");

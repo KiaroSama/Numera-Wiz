@@ -644,6 +644,14 @@ impl WizApp {
                             "Audio {stream_index} to AAC at {bitrate_kbps} kbps"
                         ));
                     }
+                    if let Some(picture) = encode.picture {
+                        if let Some(crop) = picture.crop {
+                            ui.label(format!("Crop {} × {} from ({}, {})", crop.width, crop.height, crop.x, crop.y));
+                        }
+                        if let Some(resize) = picture.resize {
+                            ui.label(format!("Resize to {} × {}", resize.width, resize.height));
+                        }
+                    }
                 }
                 if let Some(retime) = &plan.video_retime
                     && let Ok(clock) = retime.output_clock()

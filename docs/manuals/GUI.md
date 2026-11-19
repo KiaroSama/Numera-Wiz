@@ -359,6 +359,10 @@ Use **Encode H.264 video** on a registered SDR Matroska FFV1 asset.
 Choose the picture, optional AAC audio, quality and CPU preset. Enter a
 new MP4 or Matroska destination, then review and run the job.
 
+Enable **Transform the picture** for crop, rotation, horizontal or vertical
+flip and resize. For resize, choose whether to preserve the display aspect
+or use square pixels at the new dimensions.
+
 For a registered folder, open **Encode the folder as H.264** in the folder
 review. Set an existing destination outside the intake folder, choose the
 container, quality and audio handling, and use **Review folder encode**.
