@@ -12,11 +12,11 @@ struct BrowserClient {
     bearer: String,
 }
 impl CommandClient for BrowserClient {
-    fn open_source_segment(&self, segment: nw_domain::preview::SourceSegment) {
-        source_segment::open(&self.origin, &self.bearer, segment);
+    fn open_browser_playback(&self, segment: nw_domain::preview::SegmentPlayback, label: &'static str) {
+        source_segment::open(&self.origin, &self.bearer, segment, label);
     }
 
-    fn close_source_segment(&self) {
+    fn close_browser_playback(&self) {
         source_segment::close();
     }
 

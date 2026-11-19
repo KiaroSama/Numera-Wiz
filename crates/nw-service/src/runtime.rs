@@ -1202,6 +1202,7 @@ impl Service {
                 "media.preview_frame",
                 nw_domain::preview::OBSERVE_COMMAND,
                 "previews.source_segment",
+                nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
                 "capabilities.refresh",
                 "chapters.remove",
                 "chapters.import",
@@ -1257,6 +1258,16 @@ impl Service {
                     cancellation.clone(),
                 )?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
+            }
+            nw_domain::preview::PROGRAM_SEGMENT_COMMAND => {
+                drop(guard);
+                let project = request.project.as_ref().ok_or_else(|| {
+                    DomainError::new("VALIDATION_ERROR", "Program preview requires a project context")
+                })?;
+                let segment = self.prepare_browser_program_segment(
+                    &context, &project.id, commands::parse(params)?, cancellation,
+                )?;
+                return Ok(Response::success(&request.request_id, value(&segment)?).bounded());
             }
             "markers.wave_projection" => {
                 drop(guard);

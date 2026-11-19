@@ -360,6 +360,7 @@ pub struct SourceSegmentInput {
     pub audio_stream: Option<u32>,
 }
 
+pub const PROGRAM_SEGMENT_COMMAND: &str = "previews.program_segment";
 pub const SOURCE_SEGMENT_SECONDS: i64 = 2;
 pub const MAX_SOURCE_SEGMENT_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_SOURCE_SEGMENT_FRAGMENTS: usize = 8;
@@ -386,4 +387,79 @@ pub struct SourceSegment {
     pub fragments: Vec<SegmentBytes>,
     pub expires_in_seconds: u32,
     pub requested_range: crate::time::TimeRange,
+}
+
+/// Capture a finite interval shared by the browser preview and export graph.
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramSegmentInput {
+    pub sequence_id: EntityId,
+    pub revision: Revision,
+    pub range: TimeRange,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramSegment {
+    pub project_id: ProjectId,
+    pub selection: ProgramSegmentInput,
+    pub capture_sha256: String,
+    pub playback: SegmentPlayback,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SegmentPlayback {
+    pub segment_id: String,
+    pub sha256: String,
+    #[schemars(range(min = 1, max = 2097152))]
+    pub bytes: u32,
+    pub mime_type: String,
+    pub initialization: SegmentBytes,
+    #[schemars(length(min = 1, max = 8))]
+    pub fragments: Vec<SegmentBytes>,
+    pub expires_in_seconds: u32,
+}
+
+impl From<SourceSegment> for SegmentPlayback {
+    fn from(segment: SourceSegment) -> Self {
+        Self {
+            segment_id: segment.segment_id,
+            sha256: segment.sha256,
+            bytes: segment.bytes,
+            mime_type: segment.mime_type,
+            initialization: segment.initialization,
+            fragments: segment.fragments,
+            expires_in_seconds: segment.expires_in_seconds,
+        }
+    }
+}
+
+/// Return the largest admissible short window starting at an exact monitor time.
+pub fn program_window(
+    start: Rational,
+    frame_rate: Rational,
+    sample_rate: u32,
+) -> Result<TimeRange> {
+    use crate::projects::grid_tick;
+    let maximum_rate = Rational::new(60, 1)?;
+    let invalid = || DomainError::new(
+        "INVALID_RANGE", "Program playback needs a start aligned to the video and audio clocks",
+    );
+    if frame_rate <= Rational::ZERO || frame_rate > maximum_rate {
+        return Err(DomainError::new("RESOURCE_LIMIT", "Program playback supports at most 60 frames per second"));
+    }
+    let sample_grid = Rational::new(i64::from(sample_rate), 1)?;
+    grid_tick(start, frame_rate).map_err(|_| invalid())?;
+    grid_tick(start, sample_grid).map_err(|_| invalid())?;
+    let counts = frame_rate.checked_mul(Rational::new(SOURCE_SEGMENT_SECONDS, 1)?)?;
+    for frames in (1..=counts.numerator() / counts.denominator()).rev() {
+        let duration = Rational::new(frames, 1)?
+            .checked_mul(Rational::new(frame_rate.denominator(), frame_rate.numerator())?)?;
+        let end = start.checked_add(duration)?;
+        if grid_tick(end, sample_grid).is_ok() {
+            return Ok(TimeRange { start, end });
+        }
+    }
+    Err(invalid())
 }

@@ -258,6 +258,63 @@ impl BrowserSegment {
     }
 }
 
+
+pub(super) fn append_browser_audio(args: &mut Vec<String>) {
+    args.extend(
+        [
+            "-c:a", "aac", "-profile:a", "aac_low", "-ar", "48000",
+            "-ac", "2", "-b:a", "128k",
+        ]
+        .map(str::to_owned),
+    );
+}
+
+pub(super) fn append_browser_output(args: &mut Vec<String>) {
+    args.extend(
+        [
+            "-map_metadata",
+            "-1",
+            "-map_chapters",
+            "-1",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-tune",
+            "zerolatency",
+            "-profile:v",
+            "baseline",
+            "-level:v",
+            "3.1",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads:v",
+            "1",
+            "-g",
+            "60",
+            "-bf",
+            "0",
+            "-sc_threshold",
+            "0",
+            "-force_key_frames",
+            "expr:gte(t,n_forced*0.5)",
+            "-fps_mode:v",
+            "passthrough",
+            "-enc_time_base:v",
+            "filter",
+            "-avoid_negative_ts",
+            "disabled",
+            "-use_editlist",
+            "1",
+            "-movflags",
+            "+frag_keyframe+delay_moov+default_base_moof+skip_trailer",
+            "-f",
+            "mp4",
+            "pipe:1",
+        ]
+        .map(str::to_owned),
+    );
+}
 impl Engine {
     /// Encode the first two seconds of an explicitly selected SDR source.
     pub async fn browser_source_segment(
@@ -346,72 +403,11 @@ impl Engine {
         ]);
         if let Some(index) = audio_stream {
             args.extend(["-map".into(), format!("0:{index}")]);
-            args.extend(
-                [
-                    "-af",
-                    "atrim=start=0:end=2",
-                    "-c:a",
-                    "aac",
-                    "-profile:a",
-                    "aac_low",
-                    "-ar",
-                    "48000",
-                    "-ac",
-                    "2",
-                    "-b:a",
-                    "128k",
-                ]
-                .map(str::to_owned),
-            );
+            args.extend(["-af", "atrim=start=0:end=2"].map(str::to_owned));
+            append_browser_audio(&mut args);
         }
-        args.extend(
-            [
-                "-map_metadata",
-                "-1",
-                "-map_chapters",
-                "-1",
-                "-t",
-                "2",
-                "-vf",
-                VIDEO_FILTER,
-                "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
-                "-tune",
-                "zerolatency",
-                "-profile:v",
-                "baseline",
-                "-level:v",
-                "3.1",
-                "-pix_fmt",
-                "yuv420p",
-                "-threads:v",
-                "1",
-                "-g",
-                "60",
-                "-bf",
-                "0",
-                "-sc_threshold",
-                "0",
-                "-force_key_frames",
-                "expr:gte(t,n_forced*0.5)",
-                "-fps_mode:v",
-                "passthrough",
-                "-enc_time_base:v",
-                "filter",
-                "-avoid_negative_ts",
-                "disabled",
-                "-use_editlist",
-                "1",
-                "-movflags",
-                "+frag_keyframe+delay_moov+default_base_moof+skip_trailer",
-                "-f",
-                "mp4",
-                "pipe:1",
-            ]
-            .map(str::to_owned),
-        );
+        args.extend(["-t", "2", "-vf", VIDEO_FILTER].map(str::to_owned));
+        append_browser_output(&mut args);
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone())
             .await

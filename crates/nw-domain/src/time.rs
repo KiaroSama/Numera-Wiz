@@ -172,6 +172,16 @@ mod tests {
     }
     #[test]
     fn wire_is_lossless_and_invalid_values_fail() {
+        let ntsc = Rational::new(30_000, 1_001).unwrap();
+        let window = crate::preview::program_window(Rational::ZERO, ntsc, 48_000).unwrap();
+        assert_eq!(window.end, Rational::new(11_011, 6_000).unwrap());
+        assert_eq!(crate::projects::grid_tick(window.end, ntsc).unwrap(), 55);
+        assert_eq!(
+            crate::preview::program_window(Rational::new(1_001, 30_000).unwrap(), ntsc, 48_000)
+                .unwrap_err()
+                .code,
+            "INVALID_RANGE"
+        );
         let value = Rational::new(i64::MIN, 2).unwrap();
         assert_eq!(
             serde_json::from_str::<Rational>(&serde_json::to_string(&value).unwrap()).unwrap(),

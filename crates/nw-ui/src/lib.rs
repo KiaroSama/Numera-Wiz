@@ -397,7 +397,7 @@ impl WizApp {
     fn select_asset(&mut self, asset: &Asset, ctx: &egui::Context) {
         if self.asset_detail.as_ref().map(|previous| &previous.id) != Some(&asset.id) {
             #[cfg(target_arch = "wasm32")]
-            self.client.close_source_segment();
+            self.client.close_browser_playback();
             self.intent.disposition_patches.clear();
             self.metadata = Default::default();
             self.chapter_document.clear();

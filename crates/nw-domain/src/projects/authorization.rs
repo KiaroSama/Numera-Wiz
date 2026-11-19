@@ -91,6 +91,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
+            | crate::preview::PROGRAM_SEGMENT_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
@@ -113,6 +114,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         command,
         "timeline.render"
             | "timeline.preview_frame"
+            | crate::preview::PROGRAM_SEGMENT_COMMAND
             | "timeline.render_mixed"
             | "markers.wave_projection"
             | "interchange.edl.export"
@@ -134,6 +136,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         "clips.place"
             | "clips.slip"
             | "timeline.preview_frame"
+            | crate::preview::PROGRAM_SEGMENT_COMMAND
             | "timeline.render_mixed"
             | "markers.wave_projection"
     ) {

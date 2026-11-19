@@ -216,7 +216,7 @@ pub(super) async fn preview_segment(
         authority.check()?;
         let segment = owner
             .service
-            .browser_source_bytes(&authority.context, &id)?;
+            .browser_segment_bytes(&authority.context, &id)?;
         authority.check()?;
         Ok::<_, DomainError>(segment)
     })

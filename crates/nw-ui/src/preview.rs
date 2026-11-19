@@ -118,7 +118,7 @@ impl WizApp {
         }
         #[cfg(target_arch = "wasm32")]
         if let Some((video_stream, audio_stream)) = playback {
-            self.client.close_source_segment();
+            self.client.close_browser_playback();
             self.query(
                 "previews.source_segment",
                 json!({"asset_id":asset.id,"video_stream":video_stream,"audio_stream":audio_stream}),
@@ -147,7 +147,7 @@ impl WizApp {
         {
             return Err("The preview does not match the selected video and audio streams".into());
         }
-        self.client.open_source_segment(reply);
+        self.client.open_browser_playback(reply.into(), "Source preview");
         Ok(())
     }
 

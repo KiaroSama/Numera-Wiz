@@ -40,6 +40,8 @@ pub(super) enum Phase {
     Assets,
     Asset,
     PreviewFrame,
+    #[cfg(target_arch = "wasm32")]
+    ProgramSegment,
     EdlExport,
     MixedReview,
     MixedSubmit,
@@ -366,6 +368,8 @@ impl WizApp {
         if !self.request_idle() {
             return;
         }
+        #[cfg(target_arch = "wasm32")]
+        self.client.close_browser_playback();
         self.projects.prune_handles();
         let retain_seeds = match (&target, &self.projects.clip_selection) {
             (Navigation::Open(view), Some(selection)) => {
@@ -537,6 +541,8 @@ impl WizApp {
         };
         let action = self.project_action(Phase::Mutation);
         if self.mutate_with_project(command, params, Some(reference), action, ctx) {
+            #[cfg(target_arch = "wasm32")]
+            self.client.close_browser_playback();
             self.projects.stale = true;
         }
     }
@@ -631,6 +637,10 @@ impl WizApp {
         Ok(true)
     }
     pub(super) fn project_request_failed(&mut self, action: Action) {
+        #[cfg(target_arch = "wasm32")]
+        if matches!(action, Action::Project(ProjectAction { phase: Phase::ProgramSegment, .. })) {
+            return;
+        }
         if matches!(
             action,
             Action::Project(ProjectAction {
@@ -990,6 +1000,25 @@ impl WizApp {
                     egui::TextureOptions::LINEAR,
                 );
                 self.projects.preview_frame = Some((frame.at, texture));
+                return Ok(());
+            }
+            #[cfg(target_arch = "wasm32")]
+            Phase::ProgramSegment => {
+                use nw_domain::preview::{ProgramSegment, ProgramSegmentInput};
+                let expected: ProgramSegmentInput =
+                    serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+                let segment: ProgramSegment =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let group = self.projects.group.as_ref().ok_or("No displayed project for playback")?;
+                if segment.selection != expected
+                    || segment.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(segment.selection.sequence_id.as_str())
+                    || segment.selection.revision.to_string() != group.key.revision
+                    || self.projects.forms.preview_at.value().ok() != Some(expected.range.start)
+                {
+                    return Err("Playback capture differs from the displayed project or timeline time".into());
+                }
+                self.client.open_browser_playback(segment.playback, "Timeline preview");
                 return Ok(());
             }
             Phase::EdlExport => {

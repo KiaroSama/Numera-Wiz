@@ -46,6 +46,19 @@ pub enum Timeline {
         #[arg(long)]
         at: String,
     },
+    /// Prepare a short, authenticated program preview manifest.
+    PreviewSegment {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long, default_value = "0")]
+        start: String,
+        #[arg(long)]
+        end: String,
+    },
     /// Review a lossless FFV1/PCM export.
     Render {
         #[arg(long)]
@@ -91,6 +104,24 @@ impl Timeline {
                 input.range.validate()?;
                 let mut request = query("interchange.edl.export", serde_json::to_value(input)?);
                 request.project = Some(commands::ProjectRef { id: project, expected_revision: None });
+                Ok(request)
+            }
+            Self::PreviewSegment { project, revision, sequence, start, end } => {
+                model::validate_id(&project)?;
+                let input = nw_domain::preview::ProgramSegmentInput {
+                    sequence_id: model::EntityId::parse(sequence)?,
+                    revision: model::Revision::parse(&revision)?,
+                    range: TimeRange {
+                        start: super::projects::rational(&start)?,
+                        end: super::projects::rational(&end)?,
+                    },
+                };
+                input.range.validate()?;
+                let mut request = query(
+                    nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
+                    serde_json::to_value(input)?,
+                );
+                request.project = Some(ProjectRef { id: project, expected_revision: None });
                 Ok(request)
             }
             Self::PreviewFrame {

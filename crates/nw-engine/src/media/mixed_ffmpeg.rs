@@ -1,5 +1,8 @@
 //! Closed FFmpeg composition for reviewed opaque video and mixed PCM windows.
-use super::{Listing, identities, listing};
+use super::{
+    BrowserSegment, Listing, browser_preview::{append_browser_audio, append_browser_output},
+    identities, listing,
+};
 use crate::{
     Engine, Observer, OutputDestination, PublicationStaging, VerifiedOutput, admission, blocking,
     publish_output,
@@ -7,7 +10,8 @@ use crate::{
 use nw_domain::{
     DomainError, Result,
     media::{
-        AudioLayout, BoundSource, CapturedOccurrence, MediaPlanV2, MixedTools, OccurrenceSource,
+        AudioLayout, BoundSource, CapturedOccurrence, MediaPlanV2, MixedCapture, MixedGraph, MixedTools,
+        OccurrenceSource, compile_mixed_graph,
     },
     mux::StreamKind,
     records::{Asset, FileIdentity, NativeObjectIdentity},
@@ -166,6 +170,86 @@ fn retain_candidate_on_error<T>(
             Err(error)
         }
     }
+}
+
+async fn validate_staged_inputs(
+    sources: &[BoundSource],
+    assets: &[&Asset],
+    staged: &[StagedMixedInput],
+    cancel: &CancellationToken,
+) -> Result<()> {
+    if assets.len() != staged.len() {
+        return Err(invalid(
+            "Mixed original set differs from admitted staged inputs",
+        ));
+    }
+    for (asset, stage) in assets.iter().zip(staged) {
+        let streams = sources
+            .iter()
+            .filter(|stream| stream.asset_id == asset.id);
+        if asset.id != stage.asset_id
+            || !streams
+                .map(|stream| stream.stream_index)
+                .eq(stage.stream_indices.iter().copied())
+        {
+            return Err(invalid(
+                "Normalized stream order differs from the reviewed physical inputs",
+            ));
+        }
+        stage.revalidate(cancel).await?;
+    }
+    Ok(())
+}
+
+fn composition_invocation(
+    workspace: &DirectoryStamp,
+    staged: &[StagedMixedInput],
+    script: &str,
+) -> Result<(tempfile::NamedTempFile, Vec<String>)> {
+    let mut graph = tempfile::Builder::new()
+        .prefix(".numera-owned-mixed-filter-")
+        .tempfile_in(workspace.path())
+        .map_err(files::io_error)?;
+    graph
+        .write_all(script.as_bytes())
+        .map_err(files::io_error)?;
+    graph.as_file().sync_all().map_err(files::io_error)?;
+    let mut args = [
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-xerror",
+        "-y",
+        "-copyts",
+        "-max_alloc",
+    ]
+    .map(String::from)
+    .to_vec();
+    args.extend([
+        nw_domain::media::MIXED_FFV1_ALLOCATION_BYTES.to_string(),
+        "-filter_complex_threads".into(),
+        "1".into(),
+    ]);
+    for stage in staged {
+        args.extend(
+            [
+                "-protocol_whitelist",
+                "file",
+                "-format_whitelist",
+                "nut",
+                "-threads",
+                "1",
+                "-f",
+                "nut",
+                "-i",
+            ]
+            .map(String::from),
+        );
+        args.push(format!("file:{}", files::path_text(stage.path())?));
+    }
+    args.extend(["-/filter_complex".into(), files::path_text(graph.path())?]);
+    Ok((graph, args))
 }
 
 impl Engine {
@@ -332,6 +416,74 @@ impl Engine {
         .await
     }
 
+    /// Encode one exact program window using the export composition, followed
+    /// by the browser's bounded SDR display and stereo audition filters.
+    pub async fn browser_program_segment(
+        &self,
+        capture: &MixedCapture,
+        sources: &[BoundSource],
+        assets: &[&Asset],
+        staged: Vec<StagedMixedInput>,
+        limits: MixedProcessLimits<'_>,
+    ) -> Result<BrowserSegment> {
+        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let started = Instant::now();
+        let remaining = || {
+            deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
+                .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Browser program preview exceeded its complete deadline"))
+        };
+        let limit = max_bytes.min(nw_domain::preview::MAX_SOURCE_SEGMENT_BYTES as u64) as usize;
+        let maximum = Rational::new(nw_domain::preview::SOURCE_SEGMENT_SECONDS, 1)?;
+        if limit == 0 || capture.range.end.checked_sub(capture.range.start)? > maximum
+            || capture.settings.width > 1920 || capture.settings.height > 1080
+        {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Browser program window exceeds its size or duration budget"));
+        }
+        let graph = compile_mixed_graph(capture)?;
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        let MixedFiltergraph { mut script, audio_extents } =
+            compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        script.push_str(concat!(
+            ";\n[outv]scale=320:180:force_original_aspect_ratio=decrease:force_divisible_by=2:",
+            "flags=lanczos:out_color_matrix=bt709:in_range=full:out_range=limited,format=yuv420p,",
+            "pad=320:180:(ow-iw)/2:(oh-ih)/2:black,setsar=1,",
+            "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709[viewv]",
+        ));
+        let (sidecar, mut args) = composition_invocation(workspace, &staged, &script)?;
+        args.extend(["-map", "[viewv]", "-map", "[outa]"].map(str::to_owned));
+        append_browser_audio(&mut args);
+        append_browser_output(&mut args);
+        workspace.revalidate()?;
+        identities(self, cancel.clone()).await?;
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let left = match remaining() {
+            Ok(left) => left,
+            Err(error) => return ticket.finish(Err(error)),
+        };
+        let result = process::run(Path::new(&self.ffmpeg.path), &args, left, limit, cancel.clone()).await;
+        let output = match ticket.finish(result) {
+            Ok(output) => output,
+            Err(error) => {
+                if uncertain(&error) {
+                    if sidecar.keep().is_err() {
+                        tracing::error!("Could not retain the browser composition graph for process settlement");
+                    }
+                    for input in staged {
+                        if input.retain().is_err() {
+                            tracing::error!("Could not retain a browser composition input for process settlement");
+                        }
+                    }
+                }
+                return Err(error);
+            }
+        };
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        workspace.revalidate()?;
+        identities(self, cancel.clone()).await?;
+        BrowserSegment::verify(output.stdout, true)
+    }
+
     /// Compose verified normalized inputs into one owned candidate. The caller
     /// commits its independent signal proof before attempting publication.
     pub async fn verify_mixed_candidate(
@@ -369,104 +521,20 @@ impl Engine {
                 "Mixed components or output reservation differ from the review",
             ));
         }
-        if assets.len() != staged.len() {
-            return Err(invalid(
-                "Mixed original set differs from admitted staged inputs",
-            ));
-        }
-        for (asset, stage) in assets.iter().zip(staged) {
-            let streams = plan
-                .payload
-                .sources
-                .iter()
-                .filter(|stream| stream.asset_id == asset.id);
-            if asset.id != stage.asset_id
-                || !streams
-                    .map(|stream| stream.stream_index)
-                    .eq(stage.stream_indices.iter().copied())
-            {
-                return Err(invalid(
-                    "Normalized stream order differs from the reviewed physical inputs",
-                ));
-            }
-            stage.revalidate(&cancel).await?;
-        }
+        validate_staged_inputs(&plan.payload.sources, assets, staged, &cancel).await?;
         workspace.revalidate()?;
         let MixedFiltergraph {
             script,
             audio_extents,
         } = mixed_filtergraph(plan, assets)?;
-        for extent in audio_extents {
-            let stage = &staged[extent.input];
-            let source = SourceStamp::capture_open_resolved(
-                stage.path(),
-                stage.stage.as_file().try_clone().map_err(files::io_error)?,
-            )?;
-            let index = format!("0:{}", extent.index);
-            let stop = format!("atrim=end_sample={}", extent.samples);
-            let expected = extent
-                .samples
-                .checked_mul(2 * extent.channels)
-                .ok_or_else(|| invalid("Normalized audio sample verification overflow"))?;
-            self.verify_mixed_decode(
-                &source,
-                [index.as_str(), "pcm_s16le", "-sample_fmt", "s16", "s16le"],
-                expected,
-                remaining()?,
-                &cancel,
-                Some(&stop),
-            )
-            .await?;
-        }
-        let mut graph = tempfile::Builder::new()
-            .prefix(".numera-owned-mixed-filter-")
-            .tempfile_in(workspace.path())
-            .map_err(files::io_error)?;
-        graph
-            .write_all(script.as_bytes())
-            .map_err(files::io_error)?;
-        graph.as_file().sync_all().map_err(files::io_error)?;
+        self.verify_mixed_extents(staged, audio_extents, remaining, &cancel).await?;
         let file = tempfile::Builder::new()
             .prefix("payload")
             .rand_bytes(0)
             .suffix(".mkv")
             .tempfile_in(workspace.path())
             .map_err(files::io_error)?;
-        let mut args = [
-            "-hide_banner",
-            "-nostdin",
-            "-v",
-            "error",
-            "-xerror",
-            "-y",
-            "-copyts",
-            "-max_alloc",
-        ]
-        .map(String::from)
-        .to_vec();
-        args.extend([
-            nw_domain::media::MIXED_FFV1_ALLOCATION_BYTES.to_string(),
-            "-filter_complex_threads".into(),
-            "1".into(),
-        ]);
-        for stage in staged {
-            args.extend(
-                [
-                    "-protocol_whitelist",
-                    "file",
-                    "-format_whitelist",
-                    "nut",
-                    "-threads",
-                    "1",
-                    "-f",
-                    "nut",
-                    "-i",
-                ]
-                .map(String::from),
-            );
-            args.push(format!("file:{}", files::path_text(stage.path())?));
-        }
-        args.extend(["-/filter_complex".into(), files::path_text(graph.path())?]);
+        let (graph, mut args) = composition_invocation(workspace, staged, &script)?;
         args.extend(
             [
                 "-map",
@@ -631,6 +699,38 @@ impl Engine {
                 pcm_sha256,
             },
         })
+    }
+
+    async fn verify_mixed_extents(
+        &self,
+        staged: &[StagedMixedInput],
+        audio_extents: Vec<AudioExtent>,
+        remaining: impl Fn() -> Result<Duration>,
+        cancel: &CancellationToken,
+    ) -> Result<()> {
+        for extent in audio_extents {
+            let stage = &staged[extent.input];
+            let source = SourceStamp::capture_open_resolved(
+                stage.path(),
+                stage.stage.as_file().try_clone().map_err(files::io_error)?,
+            )?;
+            let index = format!("0:{}", extent.index);
+            let stop = format!("atrim=end_sample={}", extent.samples);
+            let expected = extent
+                .samples
+                .checked_mul(2 * extent.channels)
+                .ok_or_else(|| invalid("Normalized audio sample verification overflow"))?;
+            self.verify_mixed_decode(
+                &source,
+                [index.as_str(), "pcm_s16le", "-sample_fmt", "s16", "s16le"],
+                expected,
+                remaining()?,
+                cancel,
+                Some(&stop),
+            )
+            .await?;
+        }
+        Ok(())
     }
 
     async fn verify_mixed_clocks(
@@ -935,7 +1035,11 @@ struct Inputs<'a> {
 }
 
 impl<'a> Inputs<'a> {
-    fn new(plan: &'a MediaPlanV2, assets: &'a [&'a Asset]) -> Result<Self> {
+    fn new(
+        capture: &'a MixedCapture,
+        sources: &'a [BoundSource],
+        assets: &'a [&'a Asset],
+    ) -> Result<Self> {
         let indexed: BTreeMap<_, _> = assets
             .iter()
             .enumerate()
@@ -943,7 +1047,7 @@ impl<'a> Inputs<'a> {
             .collect();
         let mut streams = BTreeMap::new();
         let mut next_stream = BTreeMap::new();
-        for stream in &plan.payload.sources {
+        for stream in sources {
             let (_, original) = indexed
                 .get(stream.asset_id.as_str())
                 .ok_or_else(|| invalid("Mixed asset is missing from the admitted inputs"))?;
@@ -972,9 +1076,7 @@ impl<'a> Inputs<'a> {
                 "Admitted rendering inputs differ from the exact reviewed asset set",
             ));
         }
-        let clips = plan
-            .payload
-            .capture
+        let clips = capture
             .tracks
             .iter()
             .flat_map(|track| &track.clips)
@@ -1026,9 +1128,16 @@ impl<'a> Inputs<'a> {
 /// The execution phase freezes input handles, demuxers and component identity.
 fn mixed_filtergraph(plan: &MediaPlanV2, assets: &[&Asset]) -> Result<MixedFiltergraph> {
     plan.validate_hash()?;
-    let inputs = Inputs::new(plan, assets)?;
-    let capture = &plan.payload.capture;
-    let graph = &plan.payload.graph;
+    compose_filtergraph(&plan.payload.capture, &plan.payload.graph, &plan.payload.sources, assets)
+}
+
+fn compose_filtergraph(
+    capture: &MixedCapture,
+    graph: &MixedGraph,
+    sources: &[BoundSource],
+    assets: &[&Asset],
+) -> Result<MixedFiltergraph> {
+    let inputs = Inputs::new(capture, sources, assets)?;
     let (width, height) = (capture.settings.width, capture.settings.height);
     let rate = capture.settings.frame_rate;
     let fps = format!("{}/{}", rate.numerator(), rate.denominator());

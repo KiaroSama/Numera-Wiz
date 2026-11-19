@@ -790,6 +790,29 @@ impl WizApp {
                     None => {}
                 }
             });
+            #[cfg(target_arch = "wasm32")]
+            if let Some(settings) = group.sequence.as_ref().map(|sequence| &sequence.settings)
+                && crate::web::source_segment::supported()
+                && ui.add_enabled(idle, egui::Button::new("Prepare timeline playback")).clicked()
+            {
+                let window = self.projects.forms.preview_at.value().and_then(|start| {
+                    nw_domain::preview::program_window(start, settings.frame_rate, settings.sample_rate)
+                        .map_err(|error| error.message)
+                });
+                match window {
+                    Ok(range) => {
+                        self.client.close_browser_playback();
+                        self.query_with_project(
+                            nw_domain::preview::PROGRAM_SEGMENT_COMMAND,
+                            json!({"sequence_id":sequence,"revision":group.key.revision,"range":range}),
+                            Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                            self.project_action(Phase::ProgramSegment),
+                            ui.ctx(),
+                        );
+                    }
+                    Err(error) => self.error = Some(error),
+                }
+            }
             if let Some((at, texture)) = &self.projects.preview_frame
                 && self.projects.forms.preview_at.value().ok() == Some(*at)
             {

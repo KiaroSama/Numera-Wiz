@@ -7,9 +7,9 @@ pub trait CommandClient: Send + Sync {
     #[cfg(target_arch = "wasm32")]
     fn upload_dropped(&self, file: web_sys::File, reply: Reply);
     #[cfg(target_arch = "wasm32")]
-    fn open_source_segment(&self, segment: nw_domain::preview::SourceSegment);
+    fn open_browser_playback(&self, segment: nw_domain::preview::SegmentPlayback, label: &'static str);
     #[cfg(target_arch = "wasm32")]
-    fn close_source_segment(&self);
+    fn close_browser_playback(&self);
     fn save_artifact(
         &self,
         manifest: nw_domain::artifacts::ArtifactManifest,

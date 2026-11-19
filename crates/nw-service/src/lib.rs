@@ -545,7 +545,7 @@ mod tests {
             "source_path_and_identity",
         ];
         let mut count = 0;
-        for query in ["timeline.render", "timeline.preview_frame"] {
+        for query in ["timeline.render", "timeline.preview_frame", nw_domain::preview::PROGRAM_SEGMENT_COMMAND] {
             assert_eq!(
                 result["commands"]
                     .as_array()
@@ -564,6 +564,7 @@ mod tests {
                 id,
                 "timeline.render"
                     | "timeline.preview_frame"
+                    | nw_domain::preview::PROGRAM_SEGMENT_COMMAND
                     | "timeline.render_mixed"
                     | "markers.wave_projection"
                     | "interchange.edl.export"
@@ -582,7 +583,10 @@ mod tests {
                 ];
                 if matches!(
                     id,
-                    "timeline.preview_frame" | "timeline.render_mixed" | "markers.wave_projection"
+                    "timeline.preview_frame"
+                        | nw_domain::preview::PROGRAM_SEGMENT_COMMAND
+                        | "timeline.render_mixed"
+                        | "markers.wave_projection"
                 ) {
                     gates.extend(["source_object_rights", "source_path_and_identity"]);
                 }

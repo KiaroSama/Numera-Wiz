@@ -5,10 +5,9 @@ database and share one service across CLI, MCP and the shared native/browser
 workspace. Human controls provide authorized catalog discovery, project and
 sequence creation, solid-color and registered-source placement, move/split/lift,
 bounded clip selection, Link/Unlink, Undo/Redo, explicit stale-view Refresh and
-catalog reopen. The new Link/Unlink controls await hosted native/Chrome input
-qualification. Portable project files, full checkpoints, decoded preview, export
-and the complete editor remain required work. Creating a
-solid-color binding here does not produce a video file.
+catalog reopen. Link and Unlink passed hosted native and Chrome input
+journeys at the review checkpoint. Portable project files, full checkpoints,
+continuous playback, general export and the complete editor remain required work.
 
 ## Commands and identity
 
@@ -28,6 +27,7 @@ solid-color binding here does not produce a video file.
 | `clips.trim` | `clips trim` | Shorten linked clips from the beginning or end. |
 | `clips.slip` | `clips slip` | Move linked source windows while retaining timeline positions and durations. |
 | `clips.remove` | `clips remove` | Lift clips without moving neighboring material. |
+| `previews.program_segment` | `timeline preview-segment` | Prepare a short picture and sound window from one captured sequence revision. |
 | `history.undo` | `history undo` | Apply the retained original inverse at a new revision. |
 | `history.redo` | `history redo` | Reapply the retained original at a new revision. |
 
@@ -274,6 +274,32 @@ MCP uses `mixer.set_track_gain` with `track_id` and `gain_centidb`, from −9,60
 to +2,400. The track page includes the gain for tracks with an adjustment.
 Current mixed exports use the FFmpeg `volume` filter for an adjusted track.
 The track record carries a codec version that requires gain support from the reader.
+
+## Browser timeline playback
+
+Open **Timeline frame** in the browser workspace, set **Sequence time (seconds)**
+and choose **Prepare timeline playback**. The browser presents a play control
+once the selected window is ready. The start and exclusive endpoint share the
+sequence's frame and sample grids. The window runs for up to two seconds.
+
+The owner composes enabled tracks with the same graph used by mixed export.
+Playback uses 320 × 180 limited-range BT.709 AVC and stereo 48 kHz AAC when the
+browser supports that MediaSource profile. The original material and export
+settings stay attached to the project. This short-window route accepts up to
+four registered originals, a 1920 × 1080 sequence and 60 frames per second.
+Continuous playback and native audio playback remain in development.
+
+The typed CLI returns the browser playback manifest.
+
+```text
+numera-wiz timeline preview-segment --project PROJECT --revision REVISION --sequence SEQUENCE --start 0 --end 2
+```
+
+MCP exposes `previews.program_segment` with the project context, exact range
+and revision. The same principal fetches the short-lived bytes from
+`/api/v1/previews/{segment_id}/mp4` with its HTTP bearer. The owner checks
+project revision and source authority again at delivery. An existing access
+profile needs an explicit grant for the new command.
 
 ## Timeline markers
 

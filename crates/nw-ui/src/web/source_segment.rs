@@ -2,7 +2,7 @@
 use super::{Deadline, js_error};
 use js_sys::{Promise, Reflect, Uint8Array};
 use nw_domain::preview::{
-    MAX_SOURCE_SEGMENT_BYTES, MAX_SOURCE_SEGMENT_FRAGMENTS, SegmentBytes, SourceSegment,
+    MAX_SOURCE_SEGMENT_BYTES, MAX_SOURCE_SEGMENT_FRAGMENTS, SegmentBytes, SegmentPlayback,
 };
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
@@ -142,7 +142,7 @@ async fn fetch_segment(
     window: &web_sys::Window,
     origin: &str,
     bearer: &str,
-    manifest: &SourceSegment,
+    manifest: &SegmentPlayback,
     signal: &AbortSignal,
 ) -> Result<Vec<u8>, JsValue> {
     let expected = manifest.bytes as usize;
@@ -220,7 +220,8 @@ async fn fetch_segment(
 async fn play(
     origin: &str,
     bearer: &str,
-    manifest: SourceSegment,
+    manifest: SegmentPlayback,
+    label: &'static str,
     controller: AbortController,
     id: Rc<()>,
 ) -> Result<Playback, JsValue> {
@@ -241,7 +242,7 @@ async fn play(
         return Err(JsValue::from_str("Invalid MP4 fragment count"));
     }
     let panel = document.create_element("section")?;
-    panel.set_attribute("aria-label", "Source preview")?;
+    panel.set_attribute("aria-label", label)?;
     panel.set_attribute("style", "position:fixed;right:20px;bottom:20px;z-index:1000;background:#202020;color:#eee;padding:12px;border:1px solid #555;max-width:calc(100vw - 40px)")?;
     let video: HtmlVideoElement = document.create_element("video")?.dyn_into()?;
     video.set_attribute(
@@ -344,7 +345,7 @@ async fn play(
     Ok(playback)
 }
 
-pub(super) fn open(origin: &str, bearer: &str, manifest: SourceSegment) {
+pub(super) fn open(origin: &str, bearer: &str, manifest: SegmentPlayback, label: &'static str) {
     let Ok(controller) = AbortController::new() else {
         return;
     };
@@ -359,7 +360,7 @@ pub(super) fn open(origin: &str, bearer: &str, manifest: SourceSegment) {
     drop(previous);
     let (origin, bearer) = (origin.to_owned(), bearer.to_owned());
     wasm_bindgen_futures::spawn_local(async move {
-        let result = play(&origin, &bearer, manifest, controller, id.clone()).await;
+        let result = play(&origin, &bearer, manifest, label, controller, id.clone()).await;
         if !is_active(&id) {
             return;
         }

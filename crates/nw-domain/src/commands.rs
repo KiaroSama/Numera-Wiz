@@ -205,6 +205,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
+        | crate::preview::PROGRAM_SEGMENT_COMMAND
         | "timeline.render_mixed"
         | "interchange.edl.export" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
@@ -268,6 +269,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "previews.source_segment" => {
             Some(serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"))
         }
+        crate::preview::PROGRAM_SEGMENT_COMMAND => Some(
+            serde_json::to_value(schema_for!(crate::preview::ProgramSegment)).expect("schema"),
+        ),
         "timeline.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }
@@ -979,6 +983,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Prepare a temporary 2-second browser segment from selected registered SDR streams",
             Query,
             crate::preview::SourceSegmentInput
+        ),
+        row!(
+            "previews.program_segment",
+            "Prepare a bounded browser playback window from the selected project revision",
+            Query,
+            crate::preview::ProgramSegmentInput
         ),
         row!(
             "media.analyze.volume",
@@ -1900,6 +1910,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.preview_frame",
     crate::preview::OBSERVE_COMMAND,
     "previews.source_segment",
+    crate::preview::PROGRAM_SEGMENT_COMMAND,
     "capabilities.inspect",
     "capabilities.refresh",
     "capabilities.clear",
