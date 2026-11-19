@@ -29,8 +29,45 @@
     {
       "subject_id": "R05",
       "subject_kind": "requirement",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "standalone_cpu_first_launch",
+          "commit": "4db81a61634d0f24db4d705354df173afd63e67c",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/job/135313739245",
+          "artifact_sha256": "a775e9e0d0817036ee86b9b62cb38e400c9dd99c5827fe3c22559a3d350e4be9",
+          "asserted_domain": "Linux x64 native package with embedded FFmpeg and ffprobe",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The first launch exercised CPU FFV1. Independent archive verification matched the ELF executable, corresponding sources and both embedded helper digests."
+        },
+        {
+          "boundary": "standalone_cpu_first_launch",
+          "commit": "4db81a61634d0f24db4d705354df173afd63e67c",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/job/135313739356",
+          "artifact_sha256": "79d0ef9c6ee00071c1bff5751833d3e6cfd65d9150749989b9bd370d8dba9627",
+          "asserted_domain": "Windows x64 native package with embedded FFmpeg and ffprobe",
+          "platforms": ["windows-2025"],
+          "observed_outcome": "The first launch exercised CPU FFV1. Independent archive verification matched the PE executable, corresponding sources and both embedded helper digests."
+        },
+        {
+          "boundary": "standalone_cpu_first_launch",
+          "commit": "4db81a61634d0f24db4d705354df173afd63e67c",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/job/135313739388",
+          "artifact_sha256": "c9cf9735f403bb589522fe21eb8f58eddd4e8ee7dfd2b0a73caf0c6eff32cb4f",
+          "asserted_domain": "macOS Apple Silicon native package with embedded FFmpeg and ffprobe",
+          "platforms": ["macos-15"],
+          "observed_outcome": "The first launch exercised CPU FFV1. Independent archive verification matched the ARM64 Mach-O executable, corresponding sources and both embedded helper digests."
+        },
+        {
+          "boundary": "standalone_cpu_first_launch",
+          "commit": "4db81a61634d0f24db4d705354df173afd63e67c",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/job/135313739320",
+          "artifact_sha256": "9c6c0f25a8c4563023390f0828800704fca85bc4c584e094dbbcc699174b4a07",
+          "asserted_domain": "macOS Intel native package with embedded FFmpeg and ffprobe",
+          "platforms": ["macos-15-intel"],
+          "observed_outcome": "The first launch exercised CPU FFV1. Independent archive verification matched the x64 Mach-O executable, corresponding sources and both embedded helper digests."
+        }
+      ]
     },
     {
       "subject_id": "R06",
@@ -95,8 +132,17 @@
     {
       "subject_id": "R16",
       "subject_kind": "requirement",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "unit_and_development_transport_media",
+          "commit": "4db81a61634d0f24db4d705354df173afd63e67c",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802",
+          "asserted_domain": "Exact-source Rust builds, 179 inventoried test entrypoints, and all 13 expanded jobs",
+          "platforms": ["ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel"],
+          "observed_outcome": "All jobs passed. The run retained native and browser interaction, real CLI and SDK transport media, large HTTP transfer and the first-launch CPU exercises. The same source passed Gitleaks."
+        }
+      ]
     },
     {
       "subject_id": "R17",

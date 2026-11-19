@@ -76,6 +76,11 @@ and Intel macOS artifact ZIP digests, executable architecture and digest,
 corresponding-source archive, and exact FFmpeg and ffprobe hashes recorded
 by the application. [CI367](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802)
 
+All 13 jobs in that run passed, including the actual native and Chrome
+workspace journeys, typed CLI and both official MCP clients, the media and
+scanner fixtures, and the larger-than-memory HTTP transfer. Gitleaks also
+passed on the exact source. [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44455302458)
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original
