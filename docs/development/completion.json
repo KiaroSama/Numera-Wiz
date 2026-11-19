@@ -143,8 +143,20 @@
     {
       "subject_id": "F02",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "transport_media",
+          "commit": "6442c808c7086c8cf2ebdb7527e305b29f4ca743",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799736/job/135258844191",
+          "artifact_sha256": "869c103009af0f9a9fa3111dc34876ec8cfdf507d6a60ba527f0da7e330c1b68",
+          "asserted_domain": "Typed FFmWiz job input through hosted CLI and MCP clients",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "The hosted owner journey exercised the typed 40-key FFmWiz import through CLI and both official MCP transports. Deterministic compilation of the full imported job family remains open."
+        }
+      ]
     },
     {
       "subject_id": "F03",
@@ -167,14 +179,26 @@
     {
       "subject_id": "F06",
       "subject_kind": "workflow",
-      "status": "planned",
+      "status": "in_progress",
       "evidence": []
     },
     {
       "subject_id": "F07",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "transport_media",
+          "commit": "6442c808c7086c8cf2ebdb7527e305b29f4ca743",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799736/job/135258844191",
+          "artifact_sha256": "869c103009af0f9a9fa3111dc34876ec8cfdf507d6a60ba527f0da7e330c1b68",
+          "asserted_domain": "Registered stream volume and FFmpeg capability observation",
+          "platforms": [
+            "ubuntu-24.04"
+          ],
+          "observed_outcome": "CLI and official stdio and HTTP MCP clients returned 48000 decoded samples with peak -18.063656 dBFS and RMS -21.073778 dBFS. The fixture identified its LGPL-2.1-or-later terms. Full normalization remains open."
+        }
+      ]
     },
     {
       "subject_id": "F08",

@@ -10,6 +10,18 @@ files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
 ## Metadata, preview and hosted evidence
 
+[CI357](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799736) at
+`6442c80` passed the native Linux workspace, browser workspace, large HTTP
+artifact delivery, owner batch, CLI and both official MCP transports.
+The pinned Linux FFmpeg component passed its relocation and media exercises.
+The standalone Linux app linked with the embedded component and failed its
+first-launch capability check. The Windows app also linked with embedded
+media before first-launch qualification failed. The Apple Silicon ordinary
+desktop build and tests passed, with portable packaging still failing.
+[Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799721) passed
+on that commit. The portable jobs now retain bounded failure reports, and
+the macOS Intel job has its own pinned inputs.
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original
