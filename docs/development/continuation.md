@@ -19,9 +19,10 @@ downloaded files. Hosted qualification for the extended walkthrough is pending.
 All four standalone packages from `aed3798` passed the CPU FFV1 first launch
 on their target runners. Download verification matched the GitHub archive
 SHA-256, the application identity and executable architecture, FFmpeg and
-ffprobe identities, and the matching source archive. The exact source also
-passed native regressions, the real Chrome journey and both official MCP
-transports. [CI391 packages and results](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064)
+ffprobe identities, and the matching source archive. All 13 Rust CI jobs and
+Gitleaks passed on that exact source. The run exercised the real native and
+Chrome workspaces, both official MCP transports, and large-artifact HTTP
+publication, cancellation and revocation. [CI391 packages and results](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505869064) · [Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44505868812)
 
 At the same source, the owner-batch report confirms the original packet
 digests for extracted tracks, preservation of missing-track and scan failures,
