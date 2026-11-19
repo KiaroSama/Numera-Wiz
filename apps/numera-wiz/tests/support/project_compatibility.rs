@@ -1025,6 +1025,21 @@ fn legacy_owner_filesystem_error(diagnostics: &str) -> Option<u32> {
 // Independent literal formatter records exercise the same pure helper used by
 // Owner::start. These are part of the existing package entry, never new tests.
 fn owner_stderr_diagnostic_cases() {
+    let temporary = tempfile::tempdir().unwrap();
+    let record = temporary.path().join("owner.json");
+    let none = owner_record_stamp(&record);
+    assert!(none.is_none());
+    fs::write(&record, b"fixture-first").unwrap();
+    let first = owner_record_stamp(&record).expect("Fixture record stamp");
+    assert!(!owner_record_replaced(&record, Some(first)));
+    let changed_time = first.1 + Duration::from_secs(2);
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&record)
+        .unwrap()
+        .set_times(fs::FileTimes::new().set_modified(changed_time))
+        .unwrap();
+    assert!(owner_record_replaced(&record, Some(first)));
     assert_eq!(
         legacy_owner_filesystem_error(
             "[2026-11-19T00:00:00.000Z] [ERROR] Operation failed code=FILESYSTEM_ERROR error=FILESYSTEM_ERROR: Synthetic I/O failure (os error 32)\r\n"
@@ -1473,6 +1488,15 @@ async fn response_bytes(mut response: reqwest::Response) -> Result<Value> {
     }
     Ok(serde_json::from_slice(&bytes)?)
 }
+fn owner_record_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
+    let metadata = fs::symlink_metadata(path).ok()?;
+    metadata.is_file().then_some((metadata.len(), metadata.modified().ok()?))
+}
+
+fn owner_record_replaced(path: &Path, previous: Option<(u64, std::time::SystemTime)>) -> bool {
+    previous.is_none() || owner_record_stamp(path).is_some_and(|stamp| Some(stamp) != previous)
+}
+
 struct Owner {
     child: Child,
     stderr: tokio::task::JoinHandle<Result<Captured>>,
@@ -1493,6 +1517,13 @@ impl Owner {
         evidence: &Evidence,
     ) -> Result<Self> {
         binary.verify()?;
+        let record_path = root.join("runtime/owner.json");
+        // The immutable Windows package can publish its record by replacement
+        // while a previous generation's record is still present. Wait for the
+        // new file metadata before opening it for the full ACL and identity checks.
+        let previous_record = cfg!(windows)
+            .then(|| owner_record_stamp(&record_path))
+            .flatten();
         let mut child = Command::new(&binary.path)
             .arg("--data-dir")
             .arg(root)
@@ -1518,7 +1549,8 @@ impl Owner {
                     evidence.record(json!({"phase":"owner-premature-exit","binary":binary.label,"exit_code":status.code(),"source":binary.source,"expected_build":binary.identity["sha256"]}))?;
                     anyhow::bail!("Controlled owner exited before readiness");
                 }
-                if let Ok(bytes) = security::read_private(&root.join("runtime/owner.json"), 16384)
+                if owner_record_replaced(&record_path, previous_record)
+                    && let Ok(bytes) = security::read_private(&record_path, 16384)
                     && let Ok(record) = serde_json::from_slice::<OwnerRecord>(&bytes)
                     && record.build == binary.hash()? && !prior_epochs.contains(&record.epoch)
                 {
@@ -1573,7 +1605,7 @@ impl Owner {
                         && captured.total == captured.bytes.len() as u64)
                         .then(|| legacy_owner_filesystem_error(&diagnostics))
                         .flatten();
-                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes,"startup_stdout":startup_stdout,"startup_stderr":owner_stderr_diagnostic(&captured, reaped),"legacy_filesystem_os_error":legacy_filesystem_os_error}))?;
+                    evidence.record(json!({"phase":"owner-start-failed","binary":binary.label,"exit_code":observed.as_ref().and_then(|status| status.code()),"cleanup_killed_owned_child":observed.is_none(),"stderr_bytes":captured.total,"retained_stderr_sha256":sha(&captured.bytes),"recognized_error_codes":codes,"startup_stdout":startup_stdout,"startup_stderr":owner_stderr_diagnostic(&captured, reaped),"legacy_filesystem_os_error":legacy_filesystem_os_error,"previous_record_replaced":previous_record.map(|stamp| owner_record_replaced(&record_path, Some(stamp)))}))?;
                 }
                 return Err(match failure {
                     Ok(Err(error)) => error,
