@@ -1490,7 +1490,9 @@ async fn response_bytes(mut response: reqwest::Response) -> Result<Value> {
 }
 fn owner_record_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
     let metadata = fs::symlink_metadata(path).ok()?;
-    metadata.is_file().then_some((metadata.len(), metadata.modified().ok()?))
+    metadata
+        .is_file()
+        .then_some((metadata.len(), metadata.modified().ok()?))
 }
 
 fn owner_record_replaced(path: &Path, previous: Option<(u64, std::time::SystemTime)>) -> bool {
