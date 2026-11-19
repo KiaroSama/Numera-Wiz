@@ -2,6 +2,8 @@
 use anyhow::{Context, Result, bail};
 mod ci_host;
 mod hygiene;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod linux_portable;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod macos_component;
 mod package;
@@ -47,6 +49,8 @@ fn run() -> Result<()> {
         "ci-linux-dependencies" => ci_host::linux_dependencies(),
         "capture-linux-toolchain" => toolchain_capture::run(root),
         "build-standard-linux-profile" => toolchain_capture::bootstrap(root),
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        "package-standard-linux-application" => linux_portable::build(root),
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         "build-standard-macos-arm64-profile" => macos_component::build(root),
         #[cfg(windows)]
@@ -59,6 +63,8 @@ fn run() -> Result<()> {
             println!("xtask build-standard-windows-profile");
             #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
             println!("xtask build-standard-macos-arm64-profile");
+            #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+            println!("xtask package-standard-linux-application");
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),

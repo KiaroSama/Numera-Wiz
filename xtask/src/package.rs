@@ -9,7 +9,7 @@ use std::{
     process::Command,
 };
 
-fn output(command: &mut Command) -> Result<Vec<u8>> {
+pub(crate) fn output(command: &mut Command) -> Result<Vec<u8>> {
     tracing::info!(argv = ?command, "Running development packaging tool");
     let result = command.output().context("start packaging tool")?;
     if !result.status.success() {
@@ -55,6 +55,36 @@ pub(crate) fn digest(path: &Path) -> Result<Value> {
         bytes = bytes.checked_add(count as u64).context("file byte count")?;
     }
     Ok(json!({"bytes": bytes, "sha256": hex::encode(hash.finalize())}))
+}
+
+#[cfg(any(
+    windows,
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<std::path::PathBuf> {
+    let cargo = std::env::var_os("CARGO").context("Exact Rust build executable")?;
+    let target = root.join("target");
+    let status = Command::new(cargo)
+        .current_dir(root)
+        .env("NW_EMBED_MEDIA_DIR", profile)
+        .args([
+            "rustc",
+            "--locked",
+            "-p",
+            "numera-wiz",
+            "--bin",
+            "numera-wiz",
+            "--features",
+            "desktop,embedded-web,embedded-media",
+            "--target-dir",
+        ])
+        .arg(&target)
+        .args(["--", "-C", "strip=debuginfo"])
+        .status()?;
+    anyhow::ensure!(status.success(), "Build the application with the same-source media component");
+    let suffix = std::env::consts::EXE_SUFFIX;
+    Ok(target.join("debug").join(format!("numera-wiz{suffix}")))
 }
 
 fn write_json(path: &Path, value: &Value) -> Result<()> {

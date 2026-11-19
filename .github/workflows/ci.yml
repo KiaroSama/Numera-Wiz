@@ -688,7 +688,7 @@ jobs:
     needs: [dependency-lock, formatting, web, browser, native-ui, checks, media, owner-batch, owner-transports]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       NW_FIXTURE_COMPONENTS: ${{ github.workspace }}/target/fixture-components/bin
     steps:
@@ -723,6 +723,36 @@ jobs:
           name: artifact-http-evidence-linux
           path: target/owner-evidence/
           if-no-files-found: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        id: portable-linux-web
+        if: ${{ !cancelled() && needs.media.result == 'success' && needs.web.result == 'success' }}
+        with:
+          name: embedded-web
+          path: target/web-ui
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        id: portable-linux-component
+        if: ${{ !cancelled() && steps.portable-linux-web.outcome == 'success' }}
+        with:
+          name: linux-x64-ffmpeg-component
+          path: target/qualified-linux-component
+      - name: Install Linux desktop build dependencies for the standalone app
+        id: portable-linux-dependencies
+        if: ${{ !cancelled() && steps.portable-linux-component.outcome == 'success' }}
+        run: cargo run --locked -p xtask -- ci-linux-dependencies desktop
+      - name: Build and exercise the Linux app with embedded CPU media
+        id: portable-linux-app
+        if: ${{ !cancelled() && steps.portable-linux-dependencies.outcome == 'success' }}
+        env:
+          NW_EMBED_WEB_DIR: ${{ github.workspace }}/target/web-ui
+        run: cargo run --locked -p xtask -- package-standard-linux-application
+      - name: Retain the Linux app with corresponding sources
+        if: ${{ !cancelled() && steps.portable-linux-app.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: numera-wiz-portable-linux-x64
+          path: target/linux-portable/build-*/delivery/
+          if-no-files-found: error
+          compression-level: 0
       - name: Record this exact head and current-attempt required job results
         if: always()
         env:

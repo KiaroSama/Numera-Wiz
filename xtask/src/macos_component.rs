@@ -453,17 +453,11 @@ pub fn build(root: &Path) -> Result<()> {
 }
 
 fn deliver(root: &Path, work: &Path, profile: &Path, source_dir: &Path, manifest: &Value) -> Result<()> {
-    let cargo = std::env::var_os("CARGO").context("Exact Rust build executable")?;
-    let target = root.join("target");
-    let status = Command::new(cargo).current_dir(root).env("NW_EMBED_MEDIA_DIR", profile)
-        .args(["rustc", "--locked", "-p", "numera-wiz", "--bin", "numera-wiz", "--features",
-            "desktop,embedded-web,embedded-media", "--target-dir"])
-        .arg(&target).args(["--", "-C", "strip=debuginfo"]).status()?;
-    ensure!(status.success(), "Build the macOS app with the same-source media component");
+    let binary = crate::package::build_portable_executable(root, profile)?;
     let delivery = work.join("delivery");
     fs::create_dir(&delivery)?;
     let (executable, resources) = crate::package::macos_bundle(&delivery, "cpu-development")?;
-    fs::copy(target.join("debug/numera-wiz"), &executable)?;
+    fs::copy(binary, &executable)?;
     fs::copy(root.join("LICENSE"), resources.join("Numera-Wiz.LICENSE.txt"))?;
     fs::copy(root.join("THIRD-PARTY-NOTICES.md"), resources.join("THIRD-PARTY-NOTICES.md"))?;
     fs::copy(source_dir.join("COPYING.GPLv3"), resources.join("FFmpeg.GPLv3.txt"))?;

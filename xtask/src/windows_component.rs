@@ -431,33 +431,11 @@ fn corresponding_sources(
 }
 
 fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Result<()> {
-    let cargo = env::var_os("CARGO").context("Exact Rust build executable")?;
-    let target = root.join("target");
-    let status = Command::new(cargo)
-        .current_dir(root)
-        .env("NW_EMBED_MEDIA_DIR", profile)
-        .args([
-            "rustc",
-            "--locked",
-            "-p",
-            "numera-wiz",
-            "--bin",
-            "numera-wiz",
-            "--features",
-            "desktop,embedded-web,embedded-media",
-            "--target-dir",
-        ])
-        .arg(&target)
-        .args(["--", "-C", "strip=debuginfo"])
-        .status()?;
-    ensure!(
-        status.success(),
-        "Portable Windows application build failed"
-    );
+    let binary = crate::package::build_portable_executable(root, profile)?;
     let delivery = work.join("delivery");
     fs::create_dir(&delivery)?;
     let executable = delivery.join("numera-wiz.exe");
-    fs::copy(target.join("debug/numera-wiz.exe"), &executable)?;
+    fs::copy(binary, &executable)?;
     let isolated_state = work.join("first-launch-state");
     let smoke = execute(
         Command::new(&executable)
