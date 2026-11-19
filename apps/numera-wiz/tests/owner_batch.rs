@@ -450,7 +450,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     }));
     let folder_items = sdk_folder_batch["plan"]["items"].as_array().unwrap();
     assert_eq!(folder_items.len(), 2);
-    assert_ne!(folder_items[0]["output_name"], folder_items[1]["output_name"]);
+    assert_ne!(
+        folder_items[0]["output_name"],
+        folder_items[1]["output_name"]
+    );
     for item in folder_items {
         assert_eq!(item["action"], "copy_unchanged");
         let name = item["output_name"].as_str().unwrap();
@@ -1044,7 +1047,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(folder_group_result["succeeded"], 2);
     for (item, source) in folder_items.iter().zip([&media.source, &second]) {
         let output = folder_destination.join(item["output_name"].as_str().unwrap());
-        assert_eq!(std::fs::read(output).unwrap(), std::fs::read(source).unwrap());
+        assert_eq!(
+            std::fs::read(output).unwrap(),
+            std::fs::read(source).unwrap()
+        );
     }
     let destination_collision = call!(
         http,

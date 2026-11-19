@@ -1,6 +1,9 @@
 //! Stream ffprobe records while retaining only the requested observation rows.
 use super::identities;
-use crate::{Engine, admission, blocking, preservation::{self, ProbeRecords}};
+use crate::{
+    Engine, admission, blocking,
+    preservation::{self, ProbeRecords},
+};
 use nw_domain::{
     DomainError, Result,
     mux::StreamKind,
@@ -64,7 +67,9 @@ impl Scan {
                     .as_str()
                     .filter(|value| {
                         (1..=16).contains(&value.len())
-                            && value.bytes().all(|byte| byte == b'_' || byte.is_ascii_uppercase())
+                            && value
+                                .bytes()
+                                .all(|byte| byte == b'_' || byte.is_ascii_uppercase())
                     })
                     .ok_or_else(malformed)?;
                 let hash = preservation::packet_sha256(&record["data_hash"])?;
@@ -121,7 +126,8 @@ impl Engine {
                 "Attachments have no timed observation stream",
             ));
         }
-        if selection.kind == Kind::Frames && !matches!(role, StreamKind::Video | StreamKind::Audio) {
+        if selection.kind == Kind::Frames && !matches!(role, StreamKind::Video | StreamKind::Audio)
+        {
             return Err(DomainError::new(
                 "INPUT_DENIED",
                 "Decoded frame observation requires a video or audio stream",
@@ -146,8 +152,14 @@ impl Engine {
             source,
             expected,
             length,
-        } = admission::registered_stream(asset, source, selection.stream_index, role, cancel.clone())
-            .await?;
+        } = admission::registered_stream(
+            asset,
+            source,
+            selection.stream_index,
+            role,
+            cancel.clone(),
+        )
+        .await?;
         let mut args = ["-v", "error", "-max_alloc", "67108864", "-select_streams"]
             .map(str::to_owned)
             .to_vec();

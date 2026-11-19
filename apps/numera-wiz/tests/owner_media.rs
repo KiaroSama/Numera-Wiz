@@ -97,22 +97,44 @@ async fn reference_variant(
         .args(["-v", "error", "-nostdin", "-i"])
         .arg(&media.source)
         .args([
-            "-map", "0:v:0", "-vf", filter, "-c:v", "ffv1", "-threads", "1",
-            "-fps_mode", "passthrough", "-enc_time_base:v", "filter",
+            "-map",
+            "0:v:0",
+            "-vf",
+            filter,
+            "-c:v",
+            "ffv1",
+            "-threads",
+            "1",
+            "-fps_mode",
+            "passthrough",
+            "-enc_time_base:v",
+            "filter",
         ])
         .arg(&path)
         .output()
         .await
         .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let response = cli.mutation(scope, name, "assets.register", json!({"path":path})).await;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let response = cli
+        .mutation(scope, name, "assets.register", json!({"path":path}))
+        .await;
     assert_eq!(response["ok"], true, "{response}");
     response["result"].clone()
 }
 
 fn assert_identical_video(result: &Value, asset: &Value) {
-    assert_eq!(result["reference"]["source_sha256"], asset["identity"]["sha256"]);
-    assert_eq!(result["candidate"]["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(
+        result["reference"]["source_sha256"],
+        asset["identity"]["sha256"]
+    );
+    assert_eq!(
+        result["candidate"]["source_sha256"],
+        asset["identity"]["sha256"]
+    );
     assert_eq!(result["width"], 64);
     assert_eq!(result["height"], 48);
     assert_eq!(result["sample_basis"], "decoded_rgb8");
@@ -647,57 +669,140 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{loudness}");
     assert_loudness(&loudness["result"], &asset);
     let asset_id = asset["id"].as_str().unwrap();
-    let (packets, exit) = cli.human(&[
-        "media", "analyze-stream", "--asset", asset_id, "--stream", "0", "--kind", "packets",
-        "--first", "1", "--limit", "2",
-    ]).await;
+    let (packets, exit) = cli
+        .human(&[
+            "media",
+            "analyze-stream",
+            "--asset",
+            asset_id,
+            "--stream",
+            "0",
+            "--kind",
+            "packets",
+            "--first",
+            "1",
+            "--limit",
+            "2",
+        ])
+        .await;
     assert_eq!(exit, 0, "{packets}");
     let packet_report = &packets["result"];
     assert_eq!(packet_report["observed"], "4");
     let rows = packet_report["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 2);
     let independent = tokio::process::Command::new(media.bin.join("ffprobe"))
-        .args(["-v", "error", "-select_streams", "0", "-show_packets", "-show_data_hash", "sha256", "-of", "json"])
-        .arg(&media.source).output().await.unwrap();
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "0",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-of",
+            "json",
+        ])
+        .arg(&media.source)
+        .output()
+        .await
+        .unwrap();
     assert!(independent.status.success());
     let original: Value = serde_json::from_slice(&independent.stdout).unwrap();
     for (index, row) in rows.iter().enumerate() {
         let packet = &original["packets"][index + 1];
         assert_eq!(row["ordinal"], (index + 1).to_string());
         assert_eq!(row["detail"]["bytes"], packet["size"]);
-        assert_eq!(row["detail"]["data_sha256"], packet["data_hash"].as_str().unwrap().strip_prefix("SHA256:").unwrap());
+        assert_eq!(
+            row["detail"]["data_sha256"],
+            packet["data_hash"]
+                .as_str()
+                .unwrap()
+                .strip_prefix("SHA256:")
+                .unwrap()
+        );
     }
-    let frames = cli.query("media.analyze.stream", frame_observation_input(&asset)).await;
+    let frames = cli
+        .query("media.analyze.stream", frame_observation_input(&asset))
+        .await;
     assert_frame_observations(&frames, &asset);
-    let (quality, exit) = cli.human(&[
-        "media", "compare-video", "--reference", asset_id, "--reference-stream", "0",
-        "--candidate", asset_id, "--candidate-stream", "0", "--frames", "4",
-    ]).await;
+    let (quality, exit) = cli
+        .human(&[
+            "media",
+            "compare-video",
+            "--reference",
+            asset_id,
+            "--reference-stream",
+            "0",
+            "--candidate",
+            asset_id,
+            "--candidate-stream",
+            "0",
+            "--frames",
+            "4",
+        ])
+        .await;
     assert_eq!(exit, 0, "{quality}");
     assert_identical_video(&quality["result"], &asset);
     let cut_asset = reference_variant(
-        &cli, &media, &scope, "reference-cut", "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
-    ).await;
-    let cut_alignment = cli.query("media.analyze.reference", json!({
-        "reference":{"asset_id":asset["id"],"stream_index":0,"start_frame":1},
-        "candidate":{"asset_id":cut_asset["id"],"stream_index":0,"start_frame":0},
-        "frame_count":2,
-    })).await;
-    assert_ne!(cut_alignment["reference"]["source_sha256"], cut_alignment["candidate"]["source_sha256"]);
+        &cli,
+        &media,
+        &scope,
+        "reference-cut",
+        "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
+    )
+    .await;
+    let cut_alignment = cli
+        .query(
+            "media.analyze.reference",
+            json!({
+                "reference":{"asset_id":asset["id"],"stream_index":0,"start_frame":1},
+                "candidate":{"asset_id":cut_asset["id"],"stream_index":0,"start_frame":0},
+                "frame_count":2,
+            }),
+        )
+        .await;
+    assert_ne!(
+        cut_alignment["reference"]["source_sha256"],
+        cut_alignment["candidate"]["source_sha256"]
+    );
     assert_eq!(cut_alignment["frames"][0]["reference_frame"], 1);
     assert_eq!(cut_alignment["frames"][0]["candidate_frame"], 0);
-    assert_eq!(cut_alignment["frames"][1]["offset"], json!({"num":"1","den":"4"}));
-    assert!(cut_alignment["frames"].as_array().unwrap().iter().all(|row| {
-        row["psnr"]["kind"] == "identical" && row["ssim_millionths"] == 1_000_000
-    }));
+    assert_eq!(
+        cut_alignment["frames"][1]["offset"],
+        json!({"num":"1","den":"4"})
+    );
+    assert!(
+        cut_alignment["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| {
+                row["psnr"]["kind"] == "identical" && row["ssim_millionths"] == 1_000_000
+            })
+    );
     let irregular = reference_variant(
-        &cli, &media, &scope, "reference-irregular", r"setpts=PTS+if(eq(N\,2)\,3\,0)",
-    ).await;
+        &cli,
+        &media,
+        &scope,
+        "reference-irregular",
+        r"setpts=PTS+if(eq(N\,2)\,3\,0)",
+    )
+    .await;
     let mut unequal_grid = reference_input(&asset);
     unequal_grid["candidate"]["asset_id"] = irregular["id"].clone();
-    let (unequal_grid, _) = cli.raw_with_exit(&Request::query("media.analyze.reference", unequal_grid)).await;
-    assert_eq!(unequal_grid["error"]["code"], "REFERENCE_ALIGNMENT_REQUIRED");
-    assert!(unequal_grid["error"]["message"].as_str().unwrap().contains("relative presentation grid"));
+    let (unequal_grid, _) = cli
+        .raw_with_exit(&Request::query("media.analyze.reference", unequal_grid))
+        .await;
+    assert_eq!(
+        unequal_grid["error"]["code"],
+        "REFERENCE_ALIGNMENT_REQUIRED"
+    );
+    assert!(
+        unequal_grid["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("relative presentation grid")
+    );
     let mut shifted = reference_input(&asset);
     shifted["candidate"]["start_frame"] = 1.into();
     shifted["frame_count"] = 2.into();
@@ -706,12 +811,19 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(shifted["frames"][1]["candidate_frame"], 2);
     assert!(shifted["frames"].as_array().unwrap().iter().any(|row| {
         row["psnr"]["kind"] == "finite"
-            && row["ssim_millionths"].as_i64().is_some_and(|score| score < 1_000_000)
+            && row["ssim_millionths"]
+                .as_i64()
+                .is_some_and(|score| score < 1_000_000)
     }));
     let mut partial_quality = reference_input(&asset);
     partial_quality["candidate"]["start_frame"] = 1.into();
-    let (partial_quality, _) = cli.raw_with_exit(&Request::query("media.analyze.reference", partial_quality)).await;
-    assert_eq!(partial_quality["error"]["code"], "REFERENCE_ALIGNMENT_REQUIRED");
+    let (partial_quality, _) = cli
+        .raw_with_exit(&Request::query("media.analyze.reference", partial_quality))
+        .await;
+    assert_eq!(
+        partial_quality["error"]["code"],
+        "REFERENCE_ALIGNMENT_REQUIRED"
+    );
     let (source_preview, exit) = cli
         .human(&[
             "media",
@@ -1418,11 +1530,21 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         &operator_asset,
     );
     assert_identical_video(
-        &call!(stdio, "media.analyze.reference", reference_input(&operator_asset), json!({})),
+        &call!(
+            stdio,
+            "media.analyze.reference",
+            reference_input(&operator_asset),
+            json!({})
+        ),
         &operator_asset,
     );
     assert_frame_observations(
-        &call!(stdio, "media.analyze.stream", frame_observation_input(&operator_asset), json!({})),
+        &call!(
+            stdio,
+            "media.analyze.stream",
+            frame_observation_input(&operator_asset),
+            json!({})
+        ),
         &operator_asset,
     );
     let wrong_stream = stdio
@@ -2058,11 +2180,21 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             &asset,
         );
         assert_identical_video(
-            &call!(http, "media.analyze.reference", reference_input(&asset), json!({})),
+            &call!(
+                http,
+                "media.analyze.reference",
+                reference_input(&asset),
+                json!({})
+            ),
             &asset,
         );
         assert_frame_observations(
-            &call!(http, "media.analyze.stream", frame_observation_input(&asset), json!({})),
+            &call!(
+                http,
+                "media.analyze.stream",
+                frame_observation_input(&asset),
+                json!({})
+            ),
             &asset,
         );
         let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));

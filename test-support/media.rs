@@ -90,7 +90,10 @@ pub async fn generate() -> Media {
     }
 }
 
-#[allow(dead_code, reason = "Only still-image journeys use this shared fixture")]
+#[allow(
+    dead_code,
+    reason = "Only still-image journeys use this shared fixture"
+)]
 pub async fn generate_still(media: &Media, name: &str, codec: &str, size: &str) -> PathBuf {
     let path = media.directory.path().join(name);
     let source = format!("color=c=red@0.5:s={size}:d=1,format=rgba");

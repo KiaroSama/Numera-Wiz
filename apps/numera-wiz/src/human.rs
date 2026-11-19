@@ -580,23 +580,50 @@ pub fn prepare(command: Command) -> Result<Request> {
             "media.analyze.loudness",
             json!({"asset_id":asset,"stream_index":stream}),
         ),
-        Command::Media(Media::AnalyzeStream { asset, stream, kind, first, limit }) => {
+        Command::Media(Media::AnalyzeStream {
+            asset,
+            stream,
+            kind,
+            first,
+            limit,
+        }) => {
             use nw_domain::stream_observations::{Input, Kind};
             let kind = match kind {
                 ObservationKind::Packets => Kind::Packets,
                 ObservationKind::Frames => Kind::Frames,
             };
-            query("media.analyze.stream", serde_json::to_value(Input {
-                asset_id: asset, stream_index: stream, kind, first, limit,
-            })?)
+            query(
+                "media.analyze.stream",
+                serde_json::to_value(Input {
+                    asset_id: asset,
+                    stream_index: stream,
+                    kind,
+                    first,
+                    limit,
+                })?,
+            )
         }
         Command::Media(Media::CompareVideo {
-            reference, reference_stream, reference_start, candidate, candidate_stream, candidate_start, frames,
+            reference,
+            reference_stream,
+            reference_start,
+            candidate,
+            candidate_stream,
+            candidate_start,
+            frames,
         }) => {
             use nw_domain::reference_metrics::{CompareInput, Window};
             let input = CompareInput {
-                reference: Window { asset_id: reference, stream_index: reference_stream, start_frame: reference_start },
-                candidate: Window { asset_id: candidate, stream_index: candidate_stream, start_frame: candidate_start },
+                reference: Window {
+                    asset_id: reference,
+                    stream_index: reference_stream,
+                    start_frame: reference_start,
+                },
+                candidate: Window {
+                    asset_id: candidate,
+                    stream_index: candidate_stream,
+                    start_frame: candidate_start,
+                },
                 frame_count: frames,
             };
             input.frame_ranges()?;

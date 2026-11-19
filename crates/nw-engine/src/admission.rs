@@ -212,11 +212,9 @@ fn jpeg_markers(file: &mut File, length: u64, cancel: &CancellationToken) -> Res
                     .checked_sub(2)
                     .ok_or_else(invalid_jpeg)?;
                 let payload = u64::from(payload);
-                let skipped = std::io::copy(
-                    &mut source.by_ref().take(payload),
-                    &mut std::io::sink(),
-                )
-                .map_err(io_error)?;
+                let skipped =
+                    std::io::copy(&mut source.by_ref().take(payload), &mut std::io::sink())
+                        .map_err(io_error)?;
                 if skipped != payload {
                     return Err(invalid_jpeg());
                 }

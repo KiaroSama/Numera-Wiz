@@ -143,9 +143,13 @@ impl Engine {
         };
         let scale = if still_image {
             // The RGBA display can represent a one-pixel span in very narrow stills.
-            format!("scale=w='max(1,min({width},round({height}*dar)))':h='max(1,min({height},round({width}/dar)))':reset_sar=1")
+            format!(
+                "scale=w='max(1,min({width},round({height}*dar)))':h='max(1,min({height},round({width}/dar)))':reset_sar=1"
+            )
         } else {
-            format!("scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1")
+            format!(
+                "scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1"
+            )
         };
         let filters = format!(
             "{trim},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba"

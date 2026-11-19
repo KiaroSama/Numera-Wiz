@@ -51,7 +51,10 @@ impl WizApp {
                             });
                         ui.label("Frame index");
                         changed |= ui
-                            .add(egui::DragValue::new(&mut state.frame).range(0..=preview::MAX_FRAME))
+                            .add(
+                                egui::DragValue::new(&mut state.frame)
+                                    .range(0..=preview::MAX_FRAME),
+                            )
                             .changed();
                     }
                     if ui.button("Decode frame").clicked() {

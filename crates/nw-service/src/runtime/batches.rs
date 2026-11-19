@@ -155,7 +155,9 @@ impl Service {
         if failed != 0 {
             return Err(DomainError::new(
                 "FOLDER_INTAKE_FAILED",
-                format!("Folder intake retained {failed} failed entries; inspect and resolve them before review"),
+                format!(
+                    "Folder intake retained {failed} failed entries; inspect and resolve them before review"
+                ),
             ));
         }
         if !snapshot
@@ -218,7 +220,10 @@ impl Service {
         let mut excluded = Vec::new();
         for entry in &snapshot.entries {
             if cancel.is_cancelled() {
-                return Err(DomainError::new("CANCELLED", "Folder batch review cancelled"));
+                return Err(DomainError::new(
+                    "CANCELLED",
+                    "Folder batch review cancelled",
+                ));
             }
             if entry.outcome != FolderEntryOutcome::Registered {
                 excluded.push(FolderBatchExclusion {
@@ -235,7 +240,8 @@ impl Service {
                 .get(&named("asset", id)?)?
                 .ok_or_else(DomainError::object_not_found)?;
             self.object(context, id, &asset.creator)?;
-            let expected_path = source_root.join(entry.relative_path.split('/').collect::<PathBuf>());
+            let expected_path =
+                source_root.join(entry.relative_path.split('/').collect::<PathBuf>());
             if asset.id != id
                 || asset.creator != snapshot.creator
                 || Some(&asset.identity) != entry.identity.as_ref()
@@ -251,7 +257,9 @@ impl Service {
             items.push(ItemInput {
                 asset_id: id.into(),
                 output: files::path_text(
-                    &output.path().join(folder_output_name(entry.index, &expected_path)?),
+                    &output
+                        .path()
+                        .join(folder_output_name(entry.index, &expected_path)?),
                 )?,
             });
         }

@@ -1446,7 +1446,9 @@ impl Service {
             "media.analyze.reference" => {
                 drop(guard);
                 let comparison = self.compare_source_video(
-                    &context, commands::parse(params)?, cancellation.clone(),
+                    &context,
+                    commands::parse(params)?,
+                    cancellation.clone(),
                 )?;
                 return Ok(Response::success(&request.request_id, value(&comparison)?).bounded());
             }

@@ -47,7 +47,8 @@ fn state_label(state: &Option<nw_domain::records::JobState>) -> &'static str {
 fn plan_can_submit(plan: &BatchPlanReview) -> bool {
     (plan.failure_policy == FailurePolicy::ContinueWithRejected
         || plan.items.iter().all(|item| item.error.is_none()))
-        && (plan.unresolved_policy == UnresolvedPolicy::PerFileNoMatch || plan.unresolved.is_empty())
+        && (plan.unresolved_policy == UnresolvedPolicy::PerFileNoMatch
+            || plan.unresolved.is_empty())
 }
 
 struct FolderBatchMode {
@@ -310,7 +311,8 @@ impl WizApp {
         review: FolderBatchReview,
     ) {
         if generation != self.batch.generation {
-            self.status = "Cleanup controls changed while planning. Review the folder again.".into();
+            self.status =
+                "Cleanup controls changed while planning. Review the folder again.".into();
             return;
         }
         self.batch.folder = Some(FolderBatchMode {
@@ -442,53 +444,94 @@ impl WizApp {
         if !self.batch.extract {
             let times = match self.file_times {
                 nw_domain::file_times::FileTimeRequest::New => "New timestamps",
-                nw_domain::file_times::FileTimeRequest::PreserveBestEffort => "Preserve timestamps (best effort)",
-                nw_domain::file_times::FileTimeRequest::RequireReviewed => "Require reviewed timestamps",
+                nw_domain::file_times::FileTimeRequest::PreserveBestEffort => {
+                    "Preserve timestamps (best effort)"
+                }
+                nw_domain::file_times::FileTimeRequest::RequireReviewed => {
+                    "Require reviewed timestamps"
+                }
             };
-            ui.label(format!("File times: {times} | Probe limit: {} | Operation limit: {}",deadline_label(self.execution_limits.probe),deadline_label(self.execution_limits.operation)));
+            ui.label(format!(
+                "File times: {times} | Probe limit: {} | Operation limit: {}",
+                deadline_label(self.execution_limits.probe),
+                deadline_label(self.execution_limits.operation)
+            ));
         }
         let mut add = None;
         let mut remove = None;
         let more_outputs = self.batch.candidates.len() < nw_domain::batches::MAX_BATCH_ITEMS;
-        ui.add_enabled_ui(idle,|ui| {
+        ui.add_enabled_ui(idle, |ui| {
             self.batch_policy_controls(ui, !self.batch.extract);
-            egui::ScrollArea::vertical().id_salt("batch-candidates").max_height(150.0).show(ui,|ui| {
-                for (index,item) in self.batch.candidates.iter_mut().enumerate() {
-                    ui.push_id(index,|ui| {
-                        if self.batch.extract {
+            egui::ScrollArea::vertical()
+                .id_salt("batch-candidates")
+                .max_height(150.0)
+                .show(ui, |ui| {
+                    for (index, item) in self.batch.candidates.iter_mut().enumerate() {
+                        ui.push_id(index, |ui| {
+                            if self.batch.extract {
+                                ui.horizontal(|ui| {
+                                    let selected = item.extract.kind;
+                                    egui::ComboBox::from_id_salt("extract-kind")
+                                        .selected_text(format!("{selected:?}"))
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(
+                                                &mut item.extract.kind,
+                                                ExtractKind::Video,
+                                                "Video",
+                                            );
+                                            ui.selectable_value(
+                                                &mut item.extract.kind,
+                                                ExtractKind::Audio,
+                                                "Audio",
+                                            );
+                                            ui.selectable_value(
+                                                &mut item.extract.kind,
+                                                ExtractKind::Subtitle,
+                                                "Subtitle",
+                                            );
+                                        });
+                                    changed |= selected != item.extract.kind;
+                                    changed |= ui
+                                        .add(
+                                            egui::DragValue::new(&mut item.extract.ordinal)
+                                                .range(1..=256)
+                                                .prefix("Track "),
+                                        )
+                                        .changed();
+                                    if ui
+                                        .add_enabled(
+                                            more_outputs,
+                                            egui::Button::new("Add output for this file"),
+                                        )
+                                        .clicked()
+                                    {
+                                        add = Some(Candidate {
+                                            asset_id: item.asset_id.clone(),
+                                            name: item.name.clone(),
+                                            output: String::new(),
+                                            needs_output: false,
+                                            extract: item.extract,
+                                        });
+                                    }
+                                    if ui.button("Remove output").clicked() {
+                                        remove = Some(index);
+                                    }
+                                });
+                            }
                             ui.horizontal(|ui| {
-                                let selected = item.extract.kind;
-                                egui::ComboBox::from_id_salt("extract-kind")
-                                    .selected_text(format!("{selected:?}"))
-                                    .show_ui(ui, |ui| {
-                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Video, "Video");
-                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Audio, "Audio");
-                                        ui.selectable_value(&mut item.extract.kind, ExtractKind::Subtitle, "Subtitle");
-                                    });
-                                changed |= selected != item.extract.kind;
-                                changed |= ui.add(egui::DragValue::new(&mut item.extract.ordinal).range(1..=256).prefix("Track ")).changed();
-                                if ui.add_enabled(more_outputs, egui::Button::new("Add output for this file")).clicked() {
-                                    add = Some(Candidate {
-                                        asset_id: item.asset_id.clone(),
-                                        name: item.name.clone(),
-                                        output: String::new(),
-                                        needs_output: false,
-                                        extract: item.extract,
-                                    });
-                                }
-                                if ui.button("Remove output").clicked() {
-                                    remove = Some(index);
-                                }
+                                ui.label(format!("{}. {}", index + 1, item.name));
+                                changed |= ui
+                                    .add(
+                                        egui::TextEdit::singleline(&mut item.output)
+                                            .char_limit(16384)
+                                            .desired_width(620.0)
+                                            .hint_text("Reviewed engine output path"),
+                                    )
+                                    .changed();
                             });
-                        }
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{}. {}",index+1,item.name));
-                            changed |= ui.add(egui::TextEdit::singleline(&mut item.output)
-                                .char_limit(16384).desired_width(620.0).hint_text("Reviewed engine output path")).changed();
                         });
-                    });
-                }
-            });
+                    }
+                });
         });
         if let Some(item) = add {
             self.batch.candidates.push(item);
@@ -498,7 +541,9 @@ impl WizApp {
             self.batch.candidates.remove(index);
             changed = true;
         }
-        if changed { self.batch.invalidate(); }
+        if changed {
+            self.batch.invalidate();
+        }
     }
 
     pub(super) fn batch_window(&mut self, ctx: &egui::Context) {

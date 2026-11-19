@@ -52,7 +52,10 @@ impl WizApp {
                         .iter()
                         .filter(|stream| allowed(stream, state.kind))
                         .collect::<Vec<_>>();
-                    if !streams.iter().any(|stream| Some(stream.index) == state.stream) {
+                    if !streams
+                        .iter()
+                        .any(|stream| Some(stream.index) == state.stream)
+                    {
                         state.stream = streams.first().map(|stream| stream.index);
                     }
                     let Some(stream) = &mut state.stream else {
@@ -115,11 +118,21 @@ impl WizApp {
                                     time(row.duration),
                                 ));
                                 match &row.detail {
-                                    Detail::Packet { bytes, flags, data_sha256 } => {
+                                    Detail::Packet {
+                                        bytes,
+                                        flags,
+                                        data_sha256,
+                                    } => {
                                         ui.label(format!("{bytes} bytes · {flags}"))
                                             .on_hover_text(data_sha256.as_str());
                                     }
-                                    Detail::Frame { key_frame, picture_type, width, height, samples_per_channel } => {
+                                    Detail::Frame {
+                                        key_frame,
+                                        picture_type,
+                                        width,
+                                        height,
+                                        samples_per_channel,
+                                    } => {
                                         if *key_frame {
                                             ui.label("Key frame");
                                         }

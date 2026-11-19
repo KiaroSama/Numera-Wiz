@@ -183,7 +183,9 @@ impl Engine {
         let output = ticket.finish(result)?;
         if policy.require_stable_video_format
             && (output.diagnostic_bytes > 4096
-                || output.stderr_tail.contains("Avoiding reinit; dropping frame"))
+                || output
+                    .stderr_tail
+                    .contains("Avoiding reinit; dropping frame"))
         {
             return Err(DomainError::new(
                 "REFERENCE_ALIGNMENT_REQUIRED",

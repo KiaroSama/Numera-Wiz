@@ -230,7 +230,8 @@ fn result_schema(id: &str) -> Option<Value> {
                 .expect("schema"),
         ),
         "media.analyze.reference" => Some(
-            serde_json::to_value(schema_for!(crate::reference_metrics::Comparison)).expect("schema"),
+            serde_json::to_value(schema_for!(crate::reference_metrics::Comparison))
+                .expect("schema"),
         ),
         "media.analyze.stream" => Some(
             serde_json::to_value(schema_for!(crate::stream_observations::Report)).expect("schema"),

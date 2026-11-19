@@ -734,7 +734,10 @@ fn folder_batch_review_and_submit() {
     app.receive(&ctx);
     assert!(app.request_idle() && port.empty());
     app.run_reviewed_batch(&ctx);
-    assert!(port.empty(), "Accepted folder plan must not be submitted again");
+    assert!(
+        port.empty(),
+        "Accepted folder plan must not be submitted again"
+    );
 }
 fn changed_ticket_is_tracked() {
     let (mut app, port, ctx) = ready();

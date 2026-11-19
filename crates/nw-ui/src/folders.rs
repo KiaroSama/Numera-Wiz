@@ -578,7 +578,9 @@ impl WizApp {
                 )
             })
         {
-            ui.label("Resolve failed or incomplete intake and scan again before folder batch review.");
+            ui.label(
+                "Resolve failed or incomplete intake and scan again before folder batch review.",
+            );
             return;
         }
         if !snapshot
@@ -591,13 +593,15 @@ impl WizApp {
         }
         ui.label("Existing authorized engine directory in a separate tree");
         ui.add_enabled_ui(idle, |ui| {
-            reveal_focus(&ui.add(
-                egui::TextEdit::singleline(&mut self.folder.batch_output_root)
-                    .id(egui::Id::unique("folder-batch-output-directory"))
-                    .char_limit(4096)
-                    .desired_width(f32::INFINITY)
-                    .hint_text("Absolute output directory"),
-            ));
+            reveal_focus(
+                &ui.add(
+                    egui::TextEdit::singleline(&mut self.folder.batch_output_root)
+                        .id(egui::Id::unique("folder-batch-output-directory"))
+                        .char_limit(4096)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("Absolute output directory"),
+                ),
+            );
             self.batch_policy_controls(ui, true);
         });
         ui.small("The current cleanup stream selection, file times and execution limits apply.");

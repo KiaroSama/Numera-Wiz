@@ -78,7 +78,11 @@ impl Ledger {
     }
 
     fn feed(&mut self, bytes: &[u8]) -> Result<()> {
-        let Self { records, clocks, streams } = self;
+        let Self {
+            records,
+            clocks,
+            streams,
+        } = self;
         records.feed(bytes, |value| Self::packet(clocks, streams, value))
     }
 
@@ -502,10 +506,12 @@ mod tests {
         let recording = br#"{"frames":[{"stream_index":0,"pts":503,"side_data_list":[{"timecodes":[{"value":"01:02:03:04"}]}]}]}"#;
         let mut frames = Vec::new();
         for chunk in recording.chunks(3) {
-            parser.feed(chunk, |frame| {
-                frames.push(frame);
-                Ok(())
-            }).unwrap();
+            parser
+                .feed(chunk, |frame| {
+                    frames.push(frame);
+                    Ok(())
+                })
+                .unwrap();
         }
         parser.finish().unwrap();
         assert_eq!(frames[0]["pts"], 503);

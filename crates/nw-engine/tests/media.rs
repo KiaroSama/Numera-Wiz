@@ -8,7 +8,11 @@ mod fixture;
 mod mixed_render;
 use fixture::rules;
 
-async fn check_registered_stills(engine: &Engine, media: &fixture::Media, token: &CancellationToken) {
+async fn check_registered_stills(
+    engine: &Engine,
+    media: &fixture::Media,
+    token: &CancellationToken,
+) {
     use nw_platform::files::SourceStamp;
     use std::fs::{read, write};
 
@@ -74,7 +78,10 @@ async fn check_registered_stills(engine: &Engine, media: &fixture::Media, token:
         .await
         .unwrap();
     assert_eq!(
-        pixels.chunks_exact(4).filter(|pixel| pixel[0] > 245).count(),
+        pixels
+            .chunks_exact(4)
+            .filter(|pixel| pixel[0] > 245)
+            .count(),
         nw_domain::preview::HEIGHT
     );
 
@@ -88,7 +95,11 @@ async fn check_registered_stills(engine: &Engine, media: &fixture::Media, token:
     for (name, bytes, code) in [
         ("animated.png", apng, "INPUT_ROUTE_REQUIRED"),
         ("concatenated.jpg", jpeg.repeat(2), "INVALID_PROBE"),
-        ("truncated.jpg", jpeg[..jpeg.len() - 2].to_vec(), "INVALID_PROBE"),
+        (
+            "truncated.jpg",
+            jpeg[..jpeg.len() - 2].to_vec(),
+            "INVALID_PROBE",
+        ),
         (
             "trailing.jpg",
             [jpeg.as_slice(), b"extra\xff\xd9"].concat(),

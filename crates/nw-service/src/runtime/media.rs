@@ -114,13 +114,19 @@ impl Service {
         cancel: CancellationToken,
     ) -> Result<nw_domain::reference_metrics::Comparison> {
         input.frame_ranges()?;
-        let (reference, reference_stamp) = self.analysis_source(context, &input.reference.asset_id)?;
-        let (candidate, candidate_stamp) = self.analysis_source(context, &input.candidate.asset_id)?;
+        let (reference, reference_stamp) =
+            self.analysis_source(context, &input.reference.asset_id)?;
+        let (candidate, candidate_stamp) =
+            self.analysis_source(context, &input.candidate.asset_id)?;
         let assets = [&reference, &candidate];
-        let result = tokio::runtime::Handle::current().block_on(self.engine()?.compare_video_windows(
-            &input, assets, [reference_stamp, candidate_stamp],
-            self.root.join("runtime").join("reference-quality"), cancel.clone(),
-        ))?;
+        let result =
+            tokio::runtime::Handle::current().block_on(self.engine()?.compare_video_windows(
+                &input,
+                assets,
+                [reference_stamp, candidate_stamp],
+                self.root.join("runtime").join("reference-quality"),
+                cancel.clone(),
+            ))?;
         self.complete_analysis(context, &assets, "media.analyze.reference", &cancel)?;
         Ok(result)
     }
@@ -132,9 +138,12 @@ impl Service {
         cancel: CancellationToken,
     ) -> Result<nw_domain::stream_observations::Report> {
         let (asset, source) = self.analysis_source(context, &input.asset_id)?;
-        let report = tokio::runtime::Handle::current().block_on(
-            self.engine()?.observe_stream(&asset, source, input, cancel.clone()),
-        )?;
+        let report = tokio::runtime::Handle::current().block_on(self.engine()?.observe_stream(
+            &asset,
+            source,
+            input,
+            cancel.clone(),
+        ))?;
         self.complete_analysis(context, &[&asset], "media.analyze.stream", &cancel)?;
         Ok(report)
     }

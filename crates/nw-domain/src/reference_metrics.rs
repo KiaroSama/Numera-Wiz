@@ -27,14 +27,20 @@ pub struct CompareInput {
 impl CompareInput {
     pub fn frame_ranges(&self) -> Result<[Range<u64>; 2]> {
         let invalid = || {
-            DomainError::new("INVALID_RANGE", "Choose one to eight bounded decoded frames per source")
+            DomainError::new(
+                "INVALID_RANGE",
+                "Choose one to eight bounded decoded frames per source",
+            )
         };
         if !(1..=MAX_COMPARISON_FRAMES).contains(&self.frame_count) {
             return Err(invalid());
         }
         let window = |source: &Window| -> Result<Range<u64>> {
-            let end = source.start_frame.checked_add(u64::from(self.frame_count))
-                .filter(|end| *end <= i64::MAX as u64).ok_or_else(invalid)?;
+            let end = source
+                .start_frame
+                .checked_add(u64::from(self.frame_count))
+                .filter(|end| *end <= i64::MAX as u64)
+                .ok_or_else(invalid)?;
             Ok(source.start_frame..end)
         };
         Ok([window(&self.reference)?, window(&self.candidate)?])
