@@ -1125,7 +1125,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         ),
     ] {
         let output = directory.join(format!("imported-{mode}.mp4"));
-        let resolution = if resize { "stretch:160x120" } else { "n" };
+        let resolution = if resize { "160x120" } else { "n" };
         let look = if resize {
             "denoise=light,blur=medium"
         } else {
@@ -1140,7 +1140,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let plan = cli.query("jobs.plan", json!({"asset_id": original["id"], "job_document":import["job"]})).await;
         let mut picture = json!({"crop":{"width":240,"height":120,"x":40,"y":30}});
         if resize {
-            picture["resize"] = json!({"width":160,"height":120,"aspect":"square_pixels"});
+            picture["resize"] = json!({"width":160,"height":120,"aspect":"fit"});
             picture["look"] = json!({"denoise":"light","detail":{"kind":"blur","strength":"medium"}});
         } else {
             picture["flip_horizontal"] = json!(true);
@@ -1161,6 +1161,8 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let graph = options.windows(2).find(|pair| pair[0] == "-filter:v").unwrap()[1]
             .as_str().unwrap();
         let expected_filters = if resize {
+            assert!(graph.contains("force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1"));
+            assert!(graph.contains("pad=160:120:(ow-iw)/2:(oh-ih)/2"));
             "hqdn3d=2:1.5:3:2.25,boxblur=5:1"
         } else {
             "eq=brightness=1/16:contrast=9/8:saturation=0/1:gamma=5/4,hqdn3d=4:3:6:4.5,unsharp=5:5:0.5:5:5:0.0"
@@ -1176,9 +1178,13 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         assert_eq!(probe["streams"][0]["height"], 120);
         assert_eq!(probe["streams"][0]["sample_aspect_ratio"], aspect);
         assert_eq!(probe["streams"][0]["codec_name"], "h264");
-        if !resize {
-            let rgb = caption_frame(&components, &output, "0.120").await;
-            assert_eq!(rgb.len(), width * 120 * 3);
+        let rgb = caption_frame(&components, &output, "0.120").await;
+        assert_eq!(rgb.len(), width * 120 * 3);
+        if resize {
+            let center = 60 * width * 3;
+            assert!(rgb[..width * 3].iter().all(|&byte| byte <= 8));
+            assert!(rgb[center..center + width * 3].iter().any(|&byte| byte > 32));
+        } else {
             assert!(rgb.chunks_exact(3).all(|pixel| {
                 // A few codes of chroma rounding survive the lossy CPU profile.
                 pixel.iter().max().unwrap() - pixel.iter().min().unwrap() <= 8

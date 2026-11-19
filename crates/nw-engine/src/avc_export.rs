@@ -142,11 +142,18 @@ fn picture_filter(facts: &serde_json::Value, settings: &Encode) -> Result<(Raste
             ResizeAspect::PreserveDisplay => output.sar.checked_mul(Rational::new(
                 output.width as i64 * height, output.height as i64 * width,
             )?)?,
-            ResizeAspect::SquarePixels => Rational::new(1, 1)?,
+            ResizeAspect::SquarePixels | ResizeAspect::Fit => Rational::new(1, 1)?,
         };
         output.width = u64::from(resize.width);
         output.height = u64::from(resize.height);
-        filters.push(format!("scale={width}:{height}:flags=lanczos"));
+        if resize.aspect == ResizeAspect::Fit {
+            filters.push(format!(
+                "scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1:flags=lanczos"
+            ));
+            filters.push(format!("pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"));
+        } else {
+            filters.push(format!("scale={width}:{height}:flags=lanczos"));
+        }
     }
     if output.width > 4096 || output.height > 2160
         || output.sar.numerator() > i64::from(u16::MAX) || output.sar.denominator() > i64::from(u16::MAX)

@@ -1016,6 +1016,8 @@ audio bitrate. Specify crop margins as `crop=top,left,right,bottom` or with
 settings. The importer aligns the crop to the 4:2:0 grid. The output retains
 the original sample aspect with `resolution=n`. An explicit
 `stretch:WIDTHxHEIGHT` emits square pixels.
+Without the `stretch:` prefix, `WIDTHxHEIGHT` fits the original display
+aspect into a square-pixel frame and adds padding where needed.
 The CPU profile imports the admitted `video_look` rotation, flips, grayscale,
 color adjustments, denoise, and one of sharpen or blur.
 
@@ -1025,7 +1027,9 @@ quarter-turn `rotation`, `flip_horizontal`, `flip_vertical` and a final
 `{"width":1280,"height":720,"aspect":"preserve_display"}` to retain the
 display aspect through sample aspect signaling. Use `square_pixels` to
 make the specified width and height the display aspect. Operations run in
-crop, rotation, flip and resize order. Original frame timestamps are verified.
+crop, rotation, flip and resize order. Use `fit` for a square-pixel frame that
+contains the original display aspect with padding. Original frame timestamps
+are verified.
 To adjust the resulting picture, add a `look` object under `settings.picture`.
 Brightness, contrast, saturation and gamma use rational values such as
 `{"num":"1","den":"16"}` for brightness. Denoise and detail each offer light,

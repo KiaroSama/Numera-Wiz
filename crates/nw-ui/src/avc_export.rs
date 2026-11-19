@@ -165,6 +165,7 @@ fn picture_controls(ui: &mut egui::Ui, picture: &mut PictureTransform, original:
             changed |= dimension(ui, "Height", &mut resize.height, 2..=2160);
             changed |= ui.radio_value(&mut resize.aspect, ResizeAspect::PreserveDisplay, "Preserve display aspect").changed();
             changed |= ui.radio_value(&mut resize.aspect, ResizeAspect::SquarePixels, "Square pixels").changed();
+            changed |= ui.radio_value(&mut resize.aspect, ResizeAspect::Fit, "Fit with padding").changed();
         });
     }
     let mut look = picture.look.is_some();

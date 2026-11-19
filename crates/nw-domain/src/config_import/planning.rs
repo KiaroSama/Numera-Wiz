@@ -216,7 +216,10 @@ impl ImportedJob {
                 | ("crop_top" | "crop_left" | "crop_bottom" | "crop_right", Setting::Integer { .. }) => true,
                 ("subtitle_tracks", Setting::Tracks { selection: TrackChoice::None }) => true,
                 ("resolution" | "fps" | "color_range" | "audio_sample_rate" | "video_speed" | "audio_speed", Setting::Source) => true,
-                ("resolution", Setting::Geometry { mode: super::ScaleMode::Stretch, width: Some(_), height: Some(_) }) => true,
+                ("resolution", Setting::Geometry {
+                    mode: super::ScaleMode::Stretch | super::ScaleMode::Fit,
+                    width: Some(_), height: Some(_),
+                }) => true,
                 ("video_speed" | "audio_speed", Setting::Scalar { value }) => value.numerator() == value.denominator(),
                 ("audio_speed", Setting::Choice { value }) => value == "match_video",
                 ("video_look", Setting::Effects { .. }) => true,
@@ -258,11 +261,16 @@ impl ImportedJob {
         let details = asset.probe.stream_details.get(&picture.index).ok_or_else(|| missing("input_path"))?;
         let crop = self.avc_crop(details)?;
         let resize = match self.get("resolution") {
-            Some(Setting::Geometry { width: Some(width), height: Some(height), .. }) => Some(Resize {
-                width: *width,
-                height: *height,
-                aspect: ResizeAspect::SquarePixels,
-            }),
+            Some(Setting::Geometry { mode, width: Some(width), height: Some(height) }) => {
+                Some(Resize {
+                    width: *width,
+                    height: *height,
+                    aspect: match mode {
+                        super::ScaleMode::Fit => ResizeAspect::Fit,
+                        _ => ResizeAspect::SquarePixels,
+                    },
+                })
+            }
             _ => None,
         };
         let audio = match self.get("audio_tracks") {

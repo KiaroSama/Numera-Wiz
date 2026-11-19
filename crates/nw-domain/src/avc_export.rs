@@ -143,6 +143,7 @@ pub struct Resize {
 pub enum ResizeAspect {
     PreserveDisplay,
     SquarePixels,
+    Fit,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
