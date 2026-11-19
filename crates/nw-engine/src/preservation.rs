@@ -113,12 +113,16 @@ impl Ledger {
             .as_str()
             .ok_or_else(|| invalid("Missing packet flags"))?;
         if let Some(window) = window {
-            let pts = pts.ok_or_else(|| invalid("Packet cuts require an original presentation timestamp"))?;
+            let pts = pts
+                .ok_or_else(|| invalid("Packet cuts require an original presentation timestamp"))?;
             if !window.contains(pts) {
                 return Ok(());
             }
             if dts != Some(pts) {
-                return Err(DomainError::new("COPY_BOUNDARY_UNQUALIFIED", "This packet cut needs identical presentation and decode times"));
+                return Err(DomainError::new(
+                    "COPY_BOUNDARY_UNQUALIFIED",
+                    "This packet cut needs identical presentation and decode times",
+                ));
             }
         }
         let record = canonical(json!([
@@ -392,18 +396,33 @@ pub(super) async fn check_cut(
     cancel: CancellationToken,
 ) -> Result<()> {
     let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
-    let ledger = scan(engine, Path::new(&source.identity.path), &source.probe,
-        cancel, &observer, nw_domain::execution::CleanupLimits::default().operation, Some(window)).await?;
+    let ledger = scan(
+        engine,
+        Path::new(&source.identity.path),
+        &source.probe,
+        cancel,
+        &observer,
+        nw_domain::execution::CleanupLimits::default().operation,
+        Some(window),
+    )
+    .await?;
     validate_cut(&ledger, &source.probe, window)
 }
 
 fn validate_cut(ledger: &Ledger, probe: &MediaProbe, range: TimeRange) -> Result<()> {
     for stream in &probe.streams {
-        if stream.kind == nw_domain::mux::StreamKind::Video && !stream.attached_picture()
-            && ledger.streams.get(&stream.index).and_then(|observed| observed.first)
+        if stream.kind == nw_domain::mux::StreamKind::Video
+            && !stream.attached_picture()
+            && ledger
+                .streams
+                .get(&stream.index)
+                .and_then(|observed| observed.first)
                 != Some((range.start, true))
         {
-            return Err(DomainError::new("COPY_BOUNDARY_UNQUALIFIED", "Start must match an original keyframe on each retained picture stream"));
+            return Err(DomainError::new(
+                "COPY_BOUNDARY_UNQUALIFIED",
+                "Start must match an original keyframe on each retained picture stream",
+            ));
         }
     }
     Ok(())
@@ -419,7 +438,9 @@ pub async fn verify(
     observer: &Observer,
 ) -> Result<String> {
     if additional_paths.len() != plan.added_tracks.len() {
-        return Err(invalid("Staged input count differs from the frozen stream map"));
+        return Err(invalid(
+            "Staged input count differs from the frozen stream map",
+        ));
     }
     let operation = plan.execution_limits.clone().unwrap_or_default().operation;
     let primary = (
@@ -427,41 +448,68 @@ pub async fn verify(
         &plan.source.probe,
         plan.resolution.streams.as_slice(),
     );
-    let additional = additional_paths.iter().zip(&plan.added_tracks).map(|(path, input)| {
-        (*path, &input.source.probe, input.tracks.as_slice())
-    });
+    let additional = additional_paths
+        .iter()
+        .zip(&plan.added_tracks)
+        .map(|(path, input)| (*path, &input.source.probe, input.tracks.as_slice()));
     let mut inputs = Vec::with_capacity(1 + additional_paths.len());
     for (source_path, probe, streams) in std::iter::once(primary).chain(additional) {
-        let ledger = scan(engine, source_path, probe, cancel.clone(), observer, operation, plan.packet_cut).await?;
+        let ledger = scan(
+            engine,
+            source_path,
+            probe,
+            cancel.clone(),
+            observer,
+            operation,
+            plan.packet_cut,
+        )
+        .await?;
         if let Some(range) = plan.packet_cut {
             validate_cut(&ledger, probe, range)?;
         }
         inputs.push((ledger, probe, streams));
     }
-    let output = scan(engine, path, observed, cancel.clone(), observer, operation, None).await?;
+    let output = scan(
+        engine,
+        path,
+        observed,
+        cancel.clone(),
+        observer,
+        operation,
+        None,
+    )
+    .await?;
     let mut packets = 0u64;
     let mut bytes = 0u64;
     let mut mapped_output = observed.streams.iter();
     for (slot, (source, probe, streams)) in inputs.into_iter().enumerate() {
         for stream in streams {
-            let output_index = mapped_output.next()
-                .ok_or_else(|| invalid("Missing verified output stream"))?.index;
+            let output_index = mapped_output
+                .next()
+                .ok_or_else(|| invalid("Missing verified output stream"))?
+                .index;
             let name = format!("Input {slot} stream {}", stream.index);
             let left = source.streams.get(&stream.index);
             let right = output.streams.get(&output_index);
             match (left, right) {
-                (Some(left), Some(right)) if left.packets == right.packets
-                    && left.bytes == right.bytes
-                    && left.hash.clone().finalize() == right.hash.clone().finalize() => {
-                    packets = packets.checked_add(left.packets)
+                (Some(left), Some(right))
+                    if left.packets == right.packets
+                        && left.bytes == right.bytes
+                        && left.hash.clone().finalize() == right.hash.clone().finalize() =>
+                {
+                    packets = packets
+                        .checked_add(left.packets)
                         .ok_or_else(|| invalid("Packet count overflow"))?;
-                    bytes = bytes.checked_add(left.bytes)
+                    bytes = bytes
+                        .checked_add(left.bytes)
                         .ok_or_else(|| invalid("Packet byte count overflow"))?;
                 }
                 (None, None) => {}
-                _ => return Err(invalid(&format!(
-                    "{name} packet payload, timing, flags or exposed side data changed"
-                ))),
+                _ => {
+                    return Err(invalid(&format!(
+                        "{name} packet payload, timing, flags or exposed side data changed"
+                    )));
+                }
             }
             verify_codec(probe, stream.index, observed, output_index, &name)?;
         }
@@ -481,15 +529,35 @@ fn verify_codec(
     output_index: u32,
     source_name: &str,
 ) -> Result<()> {
-    let left = source.stream_details.get(&source_index)
+    let left = source
+        .stream_details
+        .get(&source_index)
         .ok_or_else(|| invalid("Missing frozen source codec parameters"))?;
-    let right = output.stream_details.get(&output_index)
+    let right = output
+        .stream_details
+        .get(&output_index)
         .ok_or_else(|| invalid("Missing output codec parameters"))?;
     for field in [
-        "codec_name", "codec_type", "profile", "level", "width", "height", "pix_fmt",
-        "sample_aspect_ratio", "sample_fmt", "sample_rate", "channels", "channel_layout",
-        "bits_per_sample", "color_range", "color_space", "color_transfer", "color_primaries",
-        "chroma_location", "extradata_hash", "side_data_list",
+        "codec_name",
+        "codec_type",
+        "profile",
+        "level",
+        "width",
+        "height",
+        "pix_fmt",
+        "sample_aspect_ratio",
+        "sample_fmt",
+        "sample_rate",
+        "channels",
+        "channel_layout",
+        "bits_per_sample",
+        "color_range",
+        "color_space",
+        "color_transfer",
+        "color_primaries",
+        "chroma_location",
+        "extradata_hash",
+        "side_data_list",
     ] {
         if canonical(left[field].clone()) != canonical(right[field].clone()) {
             return Err(invalid(&format!(

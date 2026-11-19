@@ -1099,32 +1099,56 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let append_audio = media.directory.path().join("append-external-audio.mkv");
     std::fs::copy(&media.source, &append_audio).unwrap();
     let append_captions = media.directory.path().join("زیرنویس-append.srt");
-    std::fs::write(&append_captions, "1\n00:00:00,125 --> 00:00:00,950\nنمونهٔ فارسی\n").unwrap();
+    std::fs::write(
+        &append_captions,
+        "1\n00:00:00,125 --> 00:00:00,950\nنمونهٔ فارسی\n",
+    )
+    .unwrap();
     let append_translation = media.directory.path().join("append-translation.srt");
-    std::fs::write(&append_translation, "1\n00:00:00,250 --> 00:00:00,875\nEnglish translation\n").unwrap();
+    std::fs::write(
+        &append_translation,
+        "1\n00:00:00,250 --> 00:00:00,875\nEnglish translation\n",
+    )
+    .unwrap();
     let mut added_assets = Vec::new();
-    for (ordinal, file) in [&append_audio, &append_captions, &append_translation].into_iter().enumerate() {
+    for (ordinal, file) in [&append_audio, &append_captions, &append_translation]
+        .into_iter()
+        .enumerate()
+    {
         added_assets.push(call!(
-            stdio, "assets.register", json!({"path":file}),
+            stdio,
+            "assets.register",
+            json!({"path":file}),
             json!({"replay_scope":sdk_scope,"idempotency_key":format!("append-file-{ordinal}")})
         ));
     }
     let appended = media.directory.path().join("append-verified.mkv");
     let append_request = json!({"target":sdk_assets[0]["id"],"output":appended,"conversion":"forbid",
-        "additions":[
-            {"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
-                {"stream_index":1,"language":"eng","title":"External one","disposition":[]},
-                {"stream_index":2,"language":"fas","title":"صدای دوم","disposition":["comment"]}]}},
-            {"asset_id":added_assets[1]["id"],"selector":{"kind":"explicit","tracks":[
-                {"stream_index":0,"language":"fas","title":"زیرنویس","disposition":[]}]}},
-            {"asset_id":added_assets[2]["id"],"selector":{"kind":"explicit","tracks":[
-                {"stream_index":0,"language":"eng","title":"English","disposition":["forced"]}]}}
-        ]});
+    "additions":[
+        {"asset_id":added_assets[0]["id"],"selector":{"kind":"explicit","tracks":[
+            {"stream_index":1,"language":"eng","title":"External one","disposition":[]},
+            {"stream_index":2,"language":"fas","title":"صدای دوم","disposition":["comment"]}]}},
+        {"asset_id":added_assets[1]["id"],"selector":{"kind":"explicit","tracks":[
+            {"stream_index":0,"language":"fas","title":"زیرنویس","disposition":[]}]}},
+        {"asset_id":added_assets[2]["id"],"selector":{"kind":"explicit","tracks":[
+            {"stream_index":0,"language":"eng","title":"English","disposition":["forced"]}]}}
+    ]});
     let append_document = media.directory.path().join("append-tracks.json");
-    std::fs::write(&append_document, serde_json::to_vec(&append_request).unwrap()).unwrap();
-    let (cli_append, code) = cli.human(&[
-        "--access-profile", "batch-operator", "streams", "add", "--file", append_document.to_str().unwrap(),
-    ]).await;
+    std::fs::write(
+        &append_document,
+        serde_json::to_vec(&append_request).unwrap(),
+    )
+    .unwrap();
+    let (cli_append, code) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "streams",
+            "add",
+            "--file",
+            append_document.to_str().unwrap(),
+        ])
+        .await;
     assert_eq!(code, 0, "{cli_append}");
     let stdio_append = call!(stdio, "streams.add", append_request.clone(), json!({}));
     let http_append = call!(http, "streams.add", append_request.clone(), json!({}));
@@ -1145,13 +1169,19 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(refused["error"]["code"], "INCOMPATIBLE_PRESERVATION");
     assert!(!unqualified.exists());
     assert!(!appended.exists());
-    let append_job = call!(http, "jobs.submit",
+    let append_job = call!(
+        http,
+        "jobs.submit",
         json!({"plan_id":http_append["id"],"plan_hash":http_append["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"append-verified"}));
+        json!({"replay_scope":http_scope,"idempotency_key":"append-verified"})
+    );
     cli.completed(append_job["job_id"].as_str().unwrap()).await;
     let appended_probe = fixture::probe(&media.bin, &appended).await;
     assert_eq!(appended_probe["streams"].as_array().unwrap().len(), 7);
-    assert_eq!(appended_probe["streams"][3]["tags"]["title"], "External one");
+    assert_eq!(
+        appended_probe["streams"][3]["tags"]["title"],
+        "External one"
+    );
     assert_eq!(appended_probe["streams"][4]["tags"]["title"], "صدای دوم");
     assert_eq!(appended_probe["streams"][4]["disposition"]["comment"], 1);
     assert_eq!(appended_probe["streams"][5]["tags"]["language"], "fas");
@@ -1162,9 +1192,17 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let subrip = packets(&media.bin, &append_captions).await;
     let translation = packets(&media.bin, &append_translation).await;
     for (output, (original, index)) in [
-        (&original_packets, 0u64),(&original_packets,1),(&original_packets,2),
-        (&original_packets,1),(&original_packets,2),(&subrip,0),(&translation,0),
-    ].into_iter().enumerate() {
+        (&original_packets, 0u64),
+        (&original_packets, 1),
+        (&original_packets, 2),
+        (&original_packets, 1),
+        (&original_packets, 2),
+        (&subrip, 0),
+        (&translation, 0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut expected = original[&index].clone();
         for packet in &mut expected {
             packet["stream_index"] = json!(output);
@@ -1174,13 +1212,39 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
 
     let gop_source = media.directory.path().join("cut-keyframe-grid.mkv");
     let mut gop_args = [
-        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
-        "testsrc2=size=96x64:rate=8:duration=2", "-c:v", "ffv1", "-g", "4", "-f", "matroska",
-    ].map(str::to_owned).to_vec();
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=8:duration=2",
+        "-c:v",
+        "ffv1",
+        "-g",
+        "4",
+        "-f",
+        "matroska",
+    ]
+    .map(str::to_owned)
+    .to_vec();
     gop_args.push(gop_source.to_str().unwrap().into());
-    nw_platform::process::run(&media.bin.join("ffmpeg"), &gop_args, Duration::from_secs(30), 4096, CancellationToken::new()).await.unwrap();
-    let cut_source = call!(stdio, "assets.register", json!({"path":gop_source}),
-        json!({"replay_scope":sdk_scope,"idempotency_key":"register-cut-grid"}));
+    nw_platform::process::run(
+        &media.bin.join("ffmpeg"),
+        &gop_args,
+        Duration::from_secs(30),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let cut_source = call!(
+        stdio,
+        "assets.register",
+        json!({"path":gop_source}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"register-cut-grid"})
+    );
     let cut_output = media.directory.path().join("verified-packet-cut.mkv");
     let cut = json!({"asset_id":cut_source["id"], "output":cut_output, "chapters":"drop",
         "range":{"start":{"num":"1","den":"2"},"end":{"num":"3","den":"2"}}});
@@ -1189,24 +1253,43 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let rejected_cut = sdk!(http, "media.cut", mid_gop, json!({}));
     assert_eq!(rejected_cut["error"]["code"], "COPY_BOUNDARY_UNQUALIFIED");
     assert!(!cut_output.exists());
-    let (typed_cut, code) = cli.human(&[
-        "--access-profile", "batch-operator", "media", "cut", "--asset", cut_source["id"].as_str().unwrap(),
-        "--start", "1/2", "--end", "3/2", "--out", cut_output.to_str().unwrap(), "--drop-chapters",
-    ]).await;
+    let (typed_cut, code) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "media",
+            "cut",
+            "--asset",
+            cut_source["id"].as_str().unwrap(),
+            "--start",
+            "1/2",
+            "--end",
+            "3/2",
+            "--out",
+            cut_output.to_str().unwrap(),
+            "--drop-chapters",
+        ])
+        .await;
     assert_eq!(code, 0, "{typed_cut}");
     let stdio_cut = call!(stdio, "media.cut", cut.clone(), json!({}));
     let http_cut = call!(http, "media.cut", cut.clone(), json!({}));
     assert_eq!(http_cut["packet_cut"], cut["range"]);
     assert_eq!(typed_cut["result"]["hash"], stdio_cut["hash"]);
     assert_eq!(stdio_cut["hash"], http_cut["hash"]);
-    let cut_job = call!(http, "jobs.submit", json!({"plan_id":http_cut["id"],"plan_hash":http_cut["hash"]}),
-        json!({"replay_scope":http_scope,"idempotency_key":"keyframe-copy-cut"}));
+    let cut_job = call!(
+        http,
+        "jobs.submit",
+        json!({"plan_id":http_cut["id"],"plan_hash":http_cut["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"keyframe-copy-cut"})
+    );
     cli.completed(cut_job["job_id"].as_str().unwrap()).await;
     let source_packets = packets(&media.bin, &gop_source).await;
     let cut_packets = packets(&media.bin, &cut_output).await;
-    let expected_cut: Vec<_> = source_packets[&0].iter().filter(|packet| {
-        (500..1500).contains(&packet["pts"].as_i64().unwrap())
-    }).cloned().collect();
+    let expected_cut: Vec<_> = source_packets[&0]
+        .iter()
+        .filter(|packet| (500..1500).contains(&packet["pts"].as_i64().unwrap()))
+        .cloned()
+        .collect();
     assert_eq!(expected_cut.len(), 8);
     assert_eq!(cut_packets[&0], expected_cut);
     http.cancel().await.unwrap();

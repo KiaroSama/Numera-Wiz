@@ -145,26 +145,56 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
             bytes: source_bytes.len().to_string(),
             sha256: Some(source_hash.clone()),
         })
-        .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     let completed: nw_domain::ingest::UploadTicket = client
-        .put(format!("{}/api/v1/uploads/{}", fixture.endpoint, upload.upload_id))
+        .put(format!(
+            "{}/api/v1/uploads/{}",
+            fixture.endpoint, upload.upload_id
+        ))
         .bearer_auth(bearer)
         .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
         .body(source_bytes)
-        .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(completed.upload_id, upload.upload_id);
 
     let service = &fixture.owner.service;
     let browser = service.profile_context("browser").unwrap();
     let scope = service
-        .dispatch(browser.clone(), Request::query("access.replay_scope.create", json!({})))
+        .dispatch(
+            browser.clone(),
+            Request::query("access.replay_scope.create", json!({})),
+        )
         .await;
     assert!(scope.ok);
-    let mut registration = Request::query("assets.register", json!({"upload_id":completed.upload_id}));
-    registration.replay_scope = Some(scope.result.unwrap()["replay_scope"].as_str().unwrap().to_owned());
+    let mut registration =
+        Request::query("assets.register", json!({"upload_id":completed.upload_id}));
+    registration.replay_scope = Some(
+        scope.result.unwrap()["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    );
     registration.idempotency_key = Some("hosted-browser-playback-source".into());
     let registered = service.dispatch(browser, registration).await;
-    assert!(registered.ok, "Registered preview source: {:?}", registered.error);
+    assert!(
+        registered.ok,
+        "Registered preview source: {:?}",
+        registered.error
+    );
     let asset = registered.result.unwrap();
     assert_eq!(asset["identity"]["sha256"], source_hash);
     driver(

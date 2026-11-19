@@ -665,12 +665,24 @@ impl Engine {
         let staging_name = files::path_text(staging.path())?;
         let additions = track_append::stage(
             &plan.added_tracks,
-            staging.path().parent().expect("Owned staging directory").to_owned(),
+            staging
+                .path()
+                .parent()
+                .expect("Owned staging directory")
+                .to_owned(),
             cancel.clone(),
-        ).await?;
-        let added_paths = additions.iter().enumerate().map(|(index, input)| {
-            Ok((track_append::placeholder(index), format!("file:{}", files::path_text(input.path())?)))
-        }).collect::<Result<BTreeMap<_, _>>>()?;
+        )
+        .await?;
+        let added_paths = additions
+            .iter()
+            .enumerate()
+            .map(|(index, input)| {
+                Ok((
+                    track_append::placeholder(index),
+                    format!("file:{}", files::path_text(input.path())?),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
         let sidecar = if let Some(import) = &plan.resolution.chapter_import {
             Some(stage_chapter_sidecar(import, staging.path(), &cancel).await?)
         } else {
@@ -741,7 +753,10 @@ impl Engine {
             plan,
             staging.path(),
             &observed,
-            &additions.iter().map(track_append::StagedInput::path).collect::<Vec<_>>(),
+            &additions
+                .iter()
+                .map(track_append::StagedInput::path)
+                .collect::<Vec<_>>(),
             cancel.clone(),
             &observer,
         )
@@ -779,7 +794,11 @@ impl Engine {
                 file: staging,
                 identity: actual,
                 sources: std::iter::once(source_stamp)
-                    .chain(additions.into_iter().map(track_append::StagedInput::into_source))
+                    .chain(
+                        additions
+                            .into_iter()
+                            .map(track_append::StagedInput::into_source),
+                    )
                     .collect(),
             },
             plan,
@@ -1343,8 +1362,17 @@ fn lower_with_additions(
     args.extend(["-i".into(), "fd:".into()]);
     for (index, added) in additions.iter().enumerate() {
         let demuxer = admission::frozen_demuxer(&added.source.probe.format)?;
-        args.extend(["-protocol_whitelist", "file", "-format_whitelist", demuxer, "-f", demuxer]
-            .map(str::to_owned));
+        args.extend(
+            [
+                "-protocol_whitelist",
+                "file",
+                "-format_whitelist",
+                demuxer,
+                "-f",
+                demuxer,
+            ]
+            .map(str::to_owned),
+        );
         if demuxer == "mov" {
             args.extend(["-enable_drefs", "0", "-use_absolute_path", "0"].map(str::to_owned));
         }
@@ -1364,9 +1392,15 @@ fn lower_with_additions(
         );
     }
     let mapped = std::iter::once((asset, resolution.streams.as_slice()))
-        .chain(additions.iter().map(|added| (&added.source, added.tracks.as_slice())))
+        .chain(
+            additions
+                .iter()
+                .map(|added| (&added.source, added.tracks.as_slice())),
+        )
         .enumerate()
-        .flat_map(|(slot, (asset, streams))| streams.iter().map(move |stream| (slot, asset, stream)));
+        .flat_map(|(slot, (asset, streams))| {
+            streams.iter().map(move |stream| (slot, asset, stream))
+        });
     for (slot, _, stream) in mapped.clone() {
         args.extend(["-map".into(), format!("{slot}:{}", stream.index)]);
     }

@@ -71,7 +71,13 @@ impl Addition {
             return Err(invalid("External track source identity differs"));
         }
         let tracks = match self.selector {
-            Selection::All {} => source.probe.streams.iter().filter(|track| eligible(track)).cloned().collect(),
+            Selection::All {} => source
+                .probe
+                .streams
+                .iter()
+                .filter(|track| eligible(track))
+                .cloned()
+                .collect(),
             Selection::Explicit { tracks } => tracks
                 .into_iter()
                 .map(|request| resolve_track(&source, request))
@@ -84,24 +90,34 @@ impl Addition {
 }
 
 fn resolve_track(source: &Asset, request: RequestedTrack) -> Result<Stream> {
-    let mut track = source.probe.streams.iter()
+    let mut track = source
+        .probe
+        .streams
+        .iter()
         .find(|stream| stream.index == request.stream_index && eligible(stream))
         .ok_or_else(|| invalid("Append selection requires an original audio or subtitle stream"))?
         .clone();
     if let Some(title) = request.title {
         if title.is_empty() || title.len() > 1024 || title.contains('\0') {
-            return Err(invalid("Track title requires 1–1024 UTF-8 bytes without NUL"));
+            return Err(invalid(
+                "Track title requires 1–1024 UTF-8 bytes without NUL",
+            ));
         }
         track.tags.insert("title".into(), title);
     }
     if let Some(language) = request.language {
         if language.len() != 3 || !language.bytes().all(|byte| byte.is_ascii_lowercase()) {
-            return Err(invalid("Track language requires a lowercase ISO 639-2 code"));
+            return Err(invalid(
+                "Track language requires a lowercase ISO 639-2 code",
+            ));
         }
         track.tags.insert("language".into(), language);
     }
     if let Some(disposition) = request.disposition {
-        if disposition.iter().any(|value| !crate::dispositions::PATCH_FLAGS.contains(&value.as_str())) {
+        if disposition
+            .iter()
+            .any(|value| !crate::dispositions::PATCH_FLAGS.contains(&value.as_str()))
+        {
             return Err(invalid("Append disposition contains an unsupported flag"));
         }
         track.dispositions = disposition;
@@ -112,16 +128,22 @@ fn resolve_track(source: &Asset, request: RequestedTrack) -> Result<Stream> {
 impl AddedInput {
     fn validate(&self) -> Result<()> {
         let mut indices = BTreeSet::new();
-        if self.source.source_object.is_none() || self.tracks.is_empty()
+        if self.source.source_object.is_none()
+            || self.tracks.is_empty()
             || self.tracks.len() > MAX_ADDED_TRACKS
             || self.tracks.iter().any(|track| {
-                !indices.insert(track.index) || !eligible(track)
+                !indices.insert(track.index)
+                    || !eligible(track)
                     || !self.source.probe.streams.iter().any(|original| {
-                        original.index == track.index && original.kind == track.kind && original.codec == track.codec
+                        original.index == track.index
+                            && original.kind == track.kind
+                            && original.codec == track.codec
                     })
             })
         {
-            return Err(invalid("An addition needs distinct registered audio or subtitle tracks"));
+            return Err(invalid(
+                "An addition needs distinct registered audio or subtitle tracks",
+            ));
         }
         Ok(())
     }
@@ -136,18 +158,32 @@ pub fn validate_sources(primary: &Asset, additions: &[AddedInput], output: &str)
     let mut bytes = 0u64;
     for addition in additions {
         addition.validate()?;
-        if objects.contains(&&addition.source.source_object) || addition.source.identity.path == output {
-            return Err(invalid("All external inputs need distinct physical identities"));
+        if objects.contains(&&addition.source.source_object)
+            || addition.source.identity.path == output
+        {
+            return Err(invalid(
+                "All external inputs need distinct physical identities",
+            ));
         }
         objects.push(&addition.source.source_object);
         tracks += addition.tracks.len();
-        let length = addition.source.identity.bytes.parse::<u64>().ok()
+        let length = addition
+            .source
+            .identity
+            .bytes
+            .parse::<u64>()
+            .ok()
             .filter(|length| length.to_string() == addition.source.identity.bytes)
             .ok_or_else(|| invalid("External input length is invalid"))?;
-        bytes = bytes.checked_add(length).ok_or_else(|| invalid("External input length overflows"))?;
+        bytes = bytes
+            .checked_add(length)
+            .ok_or_else(|| invalid("External input length overflows"))?;
     }
     if tracks > MAX_ADDED_TRACKS || bytes > MAX_STAGED_BYTES {
-        return Err(DomainError::new("RESOURCE_LIMIT", "Track addition exceeds the admitted track or scratch limit"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Track addition exceeds the admitted track or scratch limit",
+        ));
     }
     Ok(())
 }

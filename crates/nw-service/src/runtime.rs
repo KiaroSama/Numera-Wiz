@@ -555,16 +555,22 @@ impl Service {
         );
         let mut first_output_index = plan.resolution.streams.len();
         for (slot, input) in plan.added_tracks.iter().enumerate() {
-            if self.object(context, &input.source.id, &input.source.creator).is_ok()
-                && self.path(context, Path::new(&input.source.identity.path), false).is_ok()
+            if self
+                .object(context, &input.source.id, &input.source.creator)
+                .is_ok()
+                && self
+                    .path(context, Path::new(&input.source.identity.path), false)
+                    .is_ok()
             {
-                review.added_tracks.push(nw_domain::views::AddedTrackReview {
-                    input_slot: slot + 1,
-                    source_id: input.source.id.clone(),
-                    source_sha256: input.source.identity.sha256.clone(),
-                    first_output_index,
-                    streams: input.tracks.clone(),
-                });
+                review
+                    .added_tracks
+                    .push(nw_domain::views::AddedTrackReview {
+                        input_slot: slot + 1,
+                        source_id: input.source.id.clone(),
+                        source_sha256: input.source.identity.sha256.clone(),
+                        first_output_index,
+                        streams: input.tracks.clone(),
+                    });
             }
             first_output_index += input.tracks.len();
         }
@@ -713,17 +719,26 @@ impl Service {
         }
         for input in &plan.added_tracks {
             let source = &input.source;
-            let recorded: Asset = self.store.get(&named("asset", &source.id)?)?
+            let recorded: Asset = self
+                .store
+                .get(&named("asset", &source.id)?)?
                 .ok_or_else(DomainError::object_not_found)?;
             self.object(context, &recorded.id, &recorded.creator)?;
-            if recorded.id != source.id || recorded.identity != source.identity
+            if recorded.id != source.id
+                || recorded.identity != source.identity
                 || recorded.source_object != source.source_object
             {
-                return Err(DomainError::new("SOURCE_CHANGED", "External source differs from its registered identity"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "External source differs from its registered identity",
+                ));
             }
             let chosen = self.path(context, Path::new(&source.identity.path), false)?;
             if chosen != Path::new(&source.identity.path) {
-                return Err(DomainError::new("SOURCE_CHANGED", "External source canonical path changed"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "External source canonical path changed",
+                ));
             }
             let object = source.source_object.as_ref().ok_or_else(|| {
                 DomainError::new("INVALID_PLAN", "External source native identity is absent")
@@ -1811,42 +1826,80 @@ impl Service {
             }
             "media.cut" => {
                 let input: nw_domain::packet_cut::CutInput = commands::parse(params)?;
-                let bound: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                let bound: Asset = self
+                    .store
+                    .get(&named("asset", &input.asset_id)?)?
                     .ok_or_else(DomainError::object_not_found)?;
                 self.object(&context, &bound.id, &bound.creator)?;
                 self.path(&context, Path::new(&bound.identity.path), false)?;
                 self.path(&context, Path::new(&input.output), true)?;
-                let permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
-                    DomainError::new("RESOURCE_LIMIT", "Packet cut inspection capacity is full")
-                })?;
+                let permit = self
+                    .batch_preflights
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| {
+                        DomainError::new("RESOURCE_LIMIT", "Packet cut inspection capacity is full")
+                    })?;
                 drop(guard);
                 let inspected = runtime.block_on(self.engine()?.inspect_packet_cut(
-                    &bound, input.range, cancellation.clone()))?;
+                    &bound,
+                    input.range,
+                    cancellation.clone(),
+                ))?;
                 let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
                 if cancellation.is_cancelled() {
-                    return Err(DomainError::new("CANCELLED", "Packet cut review was cancelled"));
+                    return Err(DomainError::new(
+                        "CANCELLED",
+                        "Packet cut review was cancelled",
+                    ));
                 }
-                if self.policy(&context)?.is_some_and(|policy| !policy.allows_command("media.cut")) {
-                    return Err(DomainError::new("PERMISSION_DENIED", "Packet cut access changed during inspection"));
+                if self
+                    .policy(&context)?
+                    .is_some_and(|policy| !policy.allows_command("media.cut"))
+                {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "Packet cut access changed during inspection",
+                    ));
                 }
                 inspected.revalidate()?;
-                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output,
-                    Default::default(), |engine, current, output| {
-                        if current.identity != bound.identity || current.source_object != bound.source_object {
-                            return Err(DomainError::new("SOURCE_CHANGED", "Registered cut source changed during inspection"));
+                let plan = self.prepare_native_copy(
+                    &context,
+                    &input.asset_id,
+                    &input.output,
+                    Default::default(),
+                    |engine, current, output| {
+                        if current.identity != bound.identity
+                            || current.source_object != bound.source_object
+                        {
+                            return Err(DomainError::new(
+                                "SOURCE_CHANGED",
+                                "Registered cut source changed during inspection",
+                            ));
                         }
-                        engine.packet_cut_plan_at(current, output, input.range, &context.principal, self.clock.now()?)
-                    })?;
+                        engine.packet_cut_plan_at(
+                            current,
+                            output,
+                            input.range,
+                            &context.principal,
+                            self.clock.now()?,
+                        )
+                    },
+                )?;
                 inspected.revalidate()?;
-                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                let response = Response::success(
+                    &request.request_id,
+                    value(&self.plan_review(&context, &plan)?)?,
+                )
+                .bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
                 drop(permit);
                 return Ok(response);
             }
-            "streams.clean" | "streams.add" | "streams.extract" | "jobs.plan" | "chapters.remove"
-            | "chapters.import" | "disposition.patch" | "metadata.patch" => {
+            "streams.clean" | "streams.add" | "streams.extract" | "jobs.plan"
+            | "chapters.remove" | "chapters.import" | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
                     &request.request_id,
@@ -2152,9 +2205,13 @@ impl Service {
                     for input in &plan.added_tracks {
                         let identity = &input.source.identity;
                         let object = input.source.source_object.as_ref().ok_or_else(|| {
-                            DomainError::new("INVALID_PLAN", "External source native identity is absent")
+                            DomainError::new(
+                                "INVALID_PLAN",
+                                "External source native identity is absent",
+                            )
                         })?;
-                        let stamp = files::SourceStamp::capture_resolved(Path::new(&identity.path))?;
+                        let stamp =
+                            files::SourceStamp::capture_resolved(Path::new(&identity.path))?;
                         stamp.require_object(object)?;
                         files::revalidate(identity, &cancellation)?;
                         stamp.revalidate()?;
@@ -2522,18 +2579,41 @@ impl Service {
         let input = match command {
             "streams.add" => {
                 let input: nw_domain::track_append::AppendInput = commands::parse(params)?;
-                if !(1..=nw_domain::track_append::MAX_ADDED_INPUTS).contains(&input.additions.len()) {
-                    return Err(DomainError::new("VALIDATION_ERROR", "Add 1–4 external audio or subtitle inputs"));
+                if !(1..=nw_domain::track_append::MAX_ADDED_INPUTS).contains(&input.additions.len())
+                {
+                    return Err(DomainError::new(
+                        "VALIDATION_ERROR",
+                        "Add 1–4 external audio or subtitle inputs",
+                    ));
                 }
-                let inputs = input.additions.into_iter().map(|addition| {
-                    let source: Asset = self.store.get(&named("asset", &addition.asset_id)?)?
-                        .ok_or_else(DomainError::object_not_found)?;
-                    self.object(context, &source.id, &source.creator)?;
-                    self.path(context, Path::new(&source.identity.path), false)?;
-                    addition.resolve(source)
-                }).collect::<Result<Vec<_>>>()?;
-                return self.prepare_native_copy(context, &input.target, &input.output, Default::default(),
-                    |engine, primary, output| engine.append_tracks_plan_at(primary, inputs, output, &context.principal, now));
+                let inputs = input
+                    .additions
+                    .into_iter()
+                    .map(|addition| {
+                        let source: Asset = self
+                            .store
+                            .get(&named("asset", &addition.asset_id)?)?
+                            .ok_or_else(DomainError::object_not_found)?;
+                        self.object(context, &source.id, &source.creator)?;
+                        self.path(context, Path::new(&source.identity.path), false)?;
+                        addition.resolve(source)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                return self.prepare_native_copy(
+                    context,
+                    &input.target,
+                    &input.output,
+                    Default::default(),
+                    |engine, primary, output| {
+                        engine.append_tracks_plan_at(
+                            primary,
+                            inputs,
+                            output,
+                            &context.principal,
+                            now,
+                        )
+                    },
+                );
             }
             "jobs.plan" => {
                 let input: nw_domain::config_import::PlanInput = commands::parse(params)?;

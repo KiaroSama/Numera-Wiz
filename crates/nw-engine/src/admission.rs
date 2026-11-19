@@ -136,16 +136,23 @@ fn cue_timestamp(value: &str) -> Option<u32> {
     }
     let digits = |range: std::ops::Range<usize>| -> Option<u32> {
         raw.get(range)?.iter().try_fold(0, |total, digit| {
-            digit.is_ascii_digit().then(|| total * 10 + u32::from(digit - b'0'))
+            digit
+                .is_ascii_digit()
+                .then(|| total * 10 + u32::from(digit - b'0'))
         })
     };
-    let (hours, minutes, seconds, millis) = (digits(0..2)?, digits(3..5)?, digits(6..8)?, digits(9..12)?);
+    let (hours, minutes, seconds, millis) =
+        (digits(0..2)?, digits(3..5)?, digits(6..8)?, digits(9..12)?);
     (minutes < 60 && seconds < 60).then(|| ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis)
 }
 
 fn cue_time(line: &str) -> bool {
-    let Some((start, end)) = line.split_once("-->") else { return false; };
-    cue_timestamp(start.trim()).zip(cue_timestamp(end.trim())).is_some_and(|(a, b)| a < b)
+    let Some((start, end)) = line.split_once("-->") else {
+        return false;
+    };
+    cue_timestamp(start.trim())
+        .zip(cue_timestamp(end.trim()))
+        .is_some_and(|(a, b)| a < b)
 }
 
 fn subrip_prefix(bytes: &[u8]) -> bool {
@@ -158,17 +165,32 @@ fn subrip_prefix(bytes: &[u8]) -> bool {
 
 fn subrip(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()> {
     if length > MAX_SUBRIP_BYTES {
-        return Err(DomainError::new("RESOURCE_LIMIT", "A SubRip source may contain at most 4 MiB"));
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "A SubRip source may contain at most 4 MiB",
+        ));
     }
-    let invalid = || DomainError::new("INVALID_PROBE", "Expected a finite UTF-8 SubRip cue document");
+    let invalid = || {
+        DomainError::new(
+            "INVALID_PROBE",
+            "Expected a finite UTF-8 SubRip cue document",
+        )
+    };
     file.seek(SeekFrom::Start(0)).map_err(io_error)?;
     let mut bytes = Vec::with_capacity(length as usize);
-    file.take(length + 1).read_to_end(&mut bytes).map_err(io_error)?;
+    file.take(length + 1)
+        .read_to_end(&mut bytes)
+        .map_err(io_error)?;
     if bytes.len() as u64 != length {
         return Err(invalid());
     }
-    let text = std::str::from_utf8(&bytes).map_err(|_| invalid())?.trim_start_matches('\u{feff}');
-    if text.chars().any(|value| value.is_control() && !matches!(value, '\n' | '\r' | '\t')) {
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| invalid())?
+        .trim_start_matches('\u{feff}');
+    if text
+        .chars()
+        .any(|value| value.is_control() && !matches!(value, '\n' | '\r' | '\t'))
+    {
         return Err(invalid());
     }
     let mut lines = text.lines();
@@ -181,7 +203,10 @@ fn subrip(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()
         if !cue_number(number) || !lines.next().is_some_and(cue_time) {
             return Err(invalid());
         }
-        let mut body = lines.by_ref().take_while(|line| !line.trim().is_empty()).peekable();
+        let mut body = lines
+            .by_ref()
+            .take_while(|line| !line.trim().is_empty())
+            .peekable();
         if body.peek().is_none() || body.any(|line| line.len() > 4096) {
             return Err(invalid());
         }

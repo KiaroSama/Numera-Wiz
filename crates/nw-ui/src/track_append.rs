@@ -15,7 +15,12 @@ pub(super) struct TrackAppendUi {
 
 impl WizApp {
     pub(super) fn track_append_panel(&mut self, ui: &mut egui::Ui, primary: &Asset) {
-        if !primary.probe.format.split(',').any(|format| format == "matroska") {
+        if !primary
+            .probe
+            .format
+            .split(',')
+            .any(|format| format == "matroska")
+        {
             return;
         }
         let idle = self.request_idle();
@@ -58,11 +63,18 @@ impl WizApp {
             return;
         }
         let additions = if self.track_append.explicit.trim().is_empty() {
-            self.track_append.sources.iter().map(|asset| Addition {
-                asset_id: asset.clone(), selector: Selection::All {},
-            }).collect()
+            self.track_append
+                .sources
+                .iter()
+                .map(|asset| Addition {
+                    asset_id: asset.clone(),
+                    selector: Selection::All {},
+                })
+                .collect()
         } else {
-            match commands::decode_json(self.track_append.explicit.as_bytes()).and_then(commands::parse) {
+            match commands::decode_json(self.track_append.explicit.as_bytes())
+                .and_then(commands::parse)
+            {
                 Ok(additions) => additions,
                 Err(error) => {
                     self.error = Some(error.message);
@@ -71,8 +83,16 @@ impl WizApp {
             }
         };
         let document = AppendInput {
-            target: primary.id.clone(), additions, output: self.output.clone(), conversion: Conversion::Forbid,
+            target: primary.id.clone(),
+            additions,
+            output: self.output.clone(),
+            conversion: Conversion::Forbid,
         };
-        self.query("streams.add", serde_json::json!(document), Action::Plan(self.generation), ui.ctx());
+        self.query(
+            "streams.add",
+            serde_json::json!(document),
+            Action::Plan(self.generation),
+            ui.ctx(),
+        );
     }
 }

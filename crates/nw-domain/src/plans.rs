@@ -113,10 +113,13 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     }
     if let Some(range) = plan.packet_cut {
         crate::packet_cut::validate(range)?;
-        if !plan.added_tracks.is_empty() || plan.resolution.preservation.chapters
+        if !plan.added_tracks.is_empty()
+            || plan.resolution.preservation.chapters
             || plan.resolution.chapter_import.is_some()
         {
-            return Err(invalid("A packet cut requires one source and an explicit chapter drop policy"));
+            return Err(invalid(
+                "A packet cut requires one source and an explicit chapter drop policy",
+            ));
         }
     }
     let rights = plan
@@ -166,7 +169,9 @@ fn digest_value(mut value: Value) -> Result<String> {
     semantic_source(source);
     if let Some(inputs) = object.get_mut("added_tracks").and_then(Value::as_array_mut) {
         for input in inputs {
-            let source = input.get_mut("source").and_then(Value::as_object_mut)
+            let source = input
+                .get_mut("source")
+                .and_then(Value::as_object_mut)
                 .ok_or_else(|| invalid("Added track source must be an object"))?;
             semantic_source(source);
         }

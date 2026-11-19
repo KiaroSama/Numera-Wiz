@@ -1,5 +1,8 @@
 //! An absolute packet-clock interval for verified stream copy.
-use crate::{DomainError, Result, time::{Rational, TimeRange}};
+use crate::{
+    DomainError, Result,
+    time::{Rational, TimeRange},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +25,10 @@ pub fn ffmpeg_time(value: Rational) -> Result<String> {
     let scaled = i128::from(value.numerator()) * 1_000_000;
     let denominator = i128::from(value.denominator());
     if scaled < 0 || scaled % denominator != 0 || scaled / denominator > i128::from(i64::MAX) {
-        return Err(DomainError::new("INVALID_TIME", "Packet-cut endpoints must be exact nonnegative FFmpeg microseconds"));
+        return Err(DomainError::new(
+            "INVALID_TIME",
+            "Packet-cut endpoints must be exact nonnegative FFmpeg microseconds",
+        ));
     }
     let us = scaled / denominator;
     Ok(format!("{}.{:06}", us / 1_000_000, us % 1_000_000))

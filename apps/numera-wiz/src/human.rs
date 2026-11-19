@@ -605,17 +605,32 @@ pub fn prepare(command: Command) -> Result<Request> {
             probe.apply(&mut params)?;
             query("media.probe", params)
         }
-        Command::Media(Media::Cut { asset, start, end, out, drop_chapters }) => {
+        Command::Media(Media::Cut {
+            asset,
+            start,
+            end,
+            out,
+            drop_chapters,
+        }) => {
             if !drop_chapters {
-                return Err(anyhow::anyhow!("Select --drop-chapters for this packet-copy policy"));
+                return Err(anyhow::anyhow!(
+                    "Select --drop-chapters for this packet-copy policy"
+                ));
             }
             let range = nw_domain::time::TimeRange {
-                start: projects::rational(&start)?, end: projects::rational(&end)?,
+                start: projects::rational(&start)?,
+                end: projects::rational(&end)?,
             };
             nw_domain::packet_cut::validate(range)?;
-            query("media.cut", json!(nw_domain::packet_cut::CutInput {
-                asset_id: asset, range, output: native_path(&out)?, chapters: nw_domain::packet_cut::ChapterPolicy::Drop,
-            }))
+            query(
+                "media.cut",
+                json!(nw_domain::packet_cut::CutInput {
+                    asset_id: asset,
+                    range,
+                    output: native_path(&out)?,
+                    chapters: nw_domain::packet_cut::ChapterPolicy::Drop,
+                }),
+            )
         }
         Command::Media(Media::PreviewFrame {
             asset,
@@ -784,7 +799,8 @@ pub fn prepare(command: Command) -> Result<Request> {
             query("streams.clean", params)
         }
         Command::Streams(Streams::Add { file }) => {
-            let mut input: nw_domain::track_append::AppendInput = commands::parse(document(&file)?)?;
+            let mut input: nw_domain::track_append::AppendInput =
+                commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("streams.add", serde_json::to_value(input)?)
         }

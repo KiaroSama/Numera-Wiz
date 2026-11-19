@@ -622,8 +622,13 @@ impl WizApp {
                 ui.label("Destination");
                 ui.label(plan.output_path.as_deref().unwrap_or(&plan.output_name));
                 if let Some(range) = plan.packet_cut {
-                    ui.label(format!("Source packets from {}/{} to {}/{} seconds, end exclusive",
-                        range.start.numerator(), range.start.denominator(), range.end.numerator(), range.end.denominator()));
+                    ui.label(format!(
+                        "Source packets from {}/{} to {}/{} seconds, end exclusive",
+                        range.start.numerator(),
+                        range.start.denominator(),
+                        range.end.numerator(),
+                        range.end.denominator()
+                    ));
                 }
                 ui.separator();
                 for outcome in &plan.resolution.outcomes {
@@ -637,8 +642,13 @@ impl WizApp {
                 }
                 for input in &plan.added_tracks {
                     for (offset, stream) in input.streams.iter().enumerate() {
-                        ui.label(format!("Input {} {:?} stream {} → output {}", input.input_slot,
-                            stream.kind, stream.index, input.first_output_index + offset));
+                        ui.label(format!(
+                            "Input {} {:?} stream {} → output {}",
+                            input.input_slot,
+                            stream.kind,
+                            stream.index,
+                            input.first_output_index + offset
+                        ));
                         if let Some(title) = stream.tags.get("title") {
                             ui.small(title);
                         }

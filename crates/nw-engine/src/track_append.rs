@@ -1,5 +1,7 @@
 //! Frozen strict-copy layouts and privately staged extra inputs.
-use super::{Engine, Result, blocking, io_error, lower_with_additions, plan_digest, registered_object};
+use super::{
+    Engine, Result, blocking, io_error, lower_with_additions, plan_digest, registered_object,
+};
 use nw_domain::{
     DomainError,
     execution::DeadlinePolicy,
@@ -26,16 +28,30 @@ impl Engine {
         creator: &str,
         now: u64,
     ) -> Result<Plan> {
-        let mut plan = self.review_stream_copy(primary, output, Default::default(), creator, now, |streams| {
-            let mut resolution = mux::resolve(streams, &CleanIntent::preserving_all())?;
-            resolution.action = CleanAction::Remux;
-            resolution.reasons.push("Append the reviewed external audio and subtitles without conversion".into());
-            Ok(resolution)
-        })?;
+        let mut plan = self.review_stream_copy(
+            primary,
+            output,
+            Default::default(),
+            creator,
+            now,
+            |streams| {
+                let mut resolution = mux::resolve(streams, &CleanIntent::preserving_all())?;
+                resolution.action = CleanAction::Remux;
+                resolution.reasons.push(
+                    "Append the reviewed external audio and subtitles without conversion".into(),
+                );
+                Ok(resolution)
+            },
+        )?;
         plan.added_tracks = additions;
         validate_sources(&plan.source, &plan.added_tracks, &plan.output)?;
         validate_track_additions(&plan, OutputProfile::Matroska)?;
-        plan.argv_template = lower_with_additions(&plan.source, &plan.resolution, OutputProfile::Matroska, &plan.added_tracks)?;
+        plan.argv_template = lower_with_additions(
+            &plan.source,
+            &plan.resolution,
+            OutputProfile::Matroska,
+            &plan.added_tracks,
+        )?;
         plan.hash = plan_digest(&plan)?;
         self.validate_plan(&plan)?;
         Ok(plan)
@@ -100,16 +116,40 @@ pub(super) async fn stage(
     let inputs = inputs.to_vec();
     blocking(move || {
         if nw_platform::security::private_directory(&parent)? != parent {
-            return Err(DomainError::new("TARGET_CHANGED", "Track input staging changed location"));
+            return Err(DomainError::new(
+                "TARGET_CHANGED",
+                "Track input staging changed location",
+            ));
         }
         let deadline = DeadlinePolicy::Finite { seconds: 600 };
-        inputs.iter().map(|input| {
-            let source = &input.source;
-            let object = registered_object(source)?;
-            let file = tempfile::Builder::new().prefix("track-input-").tempfile_in(&parent).map_err(io_error)?;
-            let (file, _, source) = files::copy_into_staging_observed(&source.identity, object, file, &cancel, deadline, &mut |_| Ok(()))?;
-            let staged = files::SourceStamp::capture_open_resolved(file.path(), file.as_file().try_clone().map_err(io_error)?)?;
-            Ok(StagedInput { staged, file, source })
-        }).collect()
-    }).await
+        inputs
+            .iter()
+            .map(|input| {
+                let source = &input.source;
+                let object = registered_object(source)?;
+                let file = tempfile::Builder::new()
+                    .prefix("track-input-")
+                    .tempfile_in(&parent)
+                    .map_err(io_error)?;
+                let (file, _, source) = files::copy_into_staging_observed(
+                    &source.identity,
+                    object,
+                    file,
+                    &cancel,
+                    deadline,
+                    &mut |_| Ok(()),
+                )?;
+                let staged = files::SourceStamp::capture_open_resolved(
+                    file.path(),
+                    file.as_file().try_clone().map_err(io_error)?,
+                )?;
+                Ok(StagedInput {
+                    staged,
+                    file,
+                    source,
+                })
+            })
+            .collect()
+    })
+    .await
 }
