@@ -624,6 +624,7 @@ mod tests {
                     | "clips.slip"
                     | "clips.roll"
                     | "clips.slide"
+                    | "clips.set_locked"
                     | "tracks.set_enabled"
                     | "tracks.set_locked"
                     | "timeline.remove_gap"
@@ -759,6 +760,7 @@ mod tests {
             "clips.slip",
             "clips.roll",
             "clips.slide",
+            "clips.set_locked",
             "tracks.set_enabled",
             "tracks.set_locked",
             "timeline.remove_gap",
@@ -1375,6 +1377,7 @@ mod tests {
             ("clips.slip", vec![], true),
             ("clips.roll", vec![], true),
             ("clips.slide", vec![], true),
+            ("clips.set_locked", vec![], true),
             ("tracks.set_enabled", vec![], true),
             ("tracks.set_locked", vec![], true),
             ("timeline.remove_gap", vec![], true),

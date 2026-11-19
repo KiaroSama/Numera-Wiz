@@ -225,6 +225,7 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "clips.slip"
         | "clips.roll"
         | "clips.slide"
+        | "clips.set_locked"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
@@ -377,6 +378,7 @@ fn result_schema(id: &str) -> Option<Value> {
         | "clips.slip"
         | "clips.roll"
         | "clips.slide"
+        | "clips.set_locked"
         | "tracks.set_enabled"
         | "tracks.set_locked"
         | "timeline.remove_gap"
@@ -735,6 +737,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Set the current track edit lock and retain its inverse",
             DurableMutation,
             crate::projects::SetTrackLockedInput
+        ),
+        row!(
+            "clips.set_locked",
+            "Lock or unlock the selected clips and their linked companions",
+            DurableMutation,
+            crate::projects::SetClipLockedInput
         ),
         row!(
             "clips.remove",
@@ -2003,6 +2011,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "clips.slip",
     "clips.roll",
     "clips.slide",
+    "clips.set_locked",
     "tracks.set_enabled",
     "tracks.set_locked",
     "mixer.set_track_gain",

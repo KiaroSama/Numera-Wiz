@@ -881,6 +881,26 @@ async fn verify_slid_registered_picture(
     let (slid, status) = cli.human(&args("1/4", "slide-picture-right")).await;
     assert_eq!(status, 0, "{slid}");
     assert_eq!(slid["result"]["changed_ids"].as_array().unwrap().len(), 3);
+    let (locked, status) = cli
+        .human(&[
+            "clips",
+            "set-locked",
+            "--clip",
+            &clips[1],
+            "--locked",
+            "true",
+            "--project",
+            project,
+            "--expected-revision",
+            slid["result"]["revision"].as_str().unwrap(),
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "slide-lock-picture",
+        ])
+        .await;
+    assert_eq!(status, 0, "{locked}");
+    assert_eq!(locked["result"]["changed_ids"], json!([clips[1]]));
     let (observed, status) = cli
         .human(&[
             "timeline",
@@ -888,7 +908,7 @@ async fn verify_slid_registered_picture(
             "--project",
             project,
             "--revision",
-            slid["result"]["revision"].as_str().unwrap(),
+            locked["result"]["revision"].as_str().unwrap(),
             "--sequence",
             sequence_id,
             "--at",

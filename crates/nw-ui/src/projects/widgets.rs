@@ -705,7 +705,11 @@ impl WizApp {
             }
         }
         ui.separator();
-        ui.add_enabled_ui(ready,|ui| {
+        let ready_on_track = ready
+            && group.track.as_ref().is_some_and(|track| !track.locked)
+            && group.sequence.as_ref().is_some_and(|sequence| !sequence.locked);
+        let edit_ready = ready_on_track && !clip.locked;
+        ui.add_enabled_ui(edit_ready,|ui| {
             rational(ui,"Move by (seconds)",&mut self.projects.forms.delta);
             if ui.button("Move selected clip").clicked() {
                 match self.projects.forms.delta.value() {
@@ -723,9 +727,24 @@ impl WizApp {
             if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
         });
         self.project_link_controls(ui, &group);
+        let lock_label = if clip.locked {
+            "Unlock clip"
+        } else {
+            "Lock clip"
+        };
+        if ui
+            .add_enabled(ready_on_track, egui::Button::new(lock_label))
+            .clicked()
+        {
+            self.mutate_project(
+                "clips.set_locked",
+                json!({"clip_ids":[group.view.clip],"locked":!clip.locked,"link_policy":"expand"}),
+                ui.ctx(),
+            );
+        }
         self.timeline_preview(ui, &group);
         self.timeline_markers(ui, &group);
-        ui.add_enabled_ui(ready, |ui| {
+        ui.add_enabled_ui(edit_ready, |ui| {
             ui.collapsing("Trim linked clips", |ui| {
                 rational(ui, "Trim from beginning (seconds)", &mut self.projects.forms.trim_head);
                 rational(ui, "Trim from end (seconds)", &mut self.projects.forms.trim_tail);

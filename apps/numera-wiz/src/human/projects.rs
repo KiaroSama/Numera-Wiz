@@ -400,6 +400,16 @@ pub enum Clips {
         #[arg(long, allow_hyphen_values = true)]
         delta: String,
     },
+    /// Lock or unlock the selected clips and their linked companions.
+    #[command(name = "set-locked")]
+    Locked {
+        #[command(flatten)]
+        context: WriteContext,
+        #[arg(long = "clip", required = true)]
+        clips: Vec<String>,
+        #[arg(long, required = true, action = clap::ArgAction::Set)]
+        locked: bool,
+    },
     Remove {
         #[command(flatten)]
         context: WriteContext,
@@ -436,6 +446,9 @@ impl Clips {
             })),
             Self::Trim { context, clips, head, tail } => context.request("clips.trim", json!({"clip_ids":clips,"head":rational(&head)?,"tail":rational(&tail)?,"link_policy":"expand"})),
             Self::Slip { context, clips, delta } => context.request("clips.slip", json!({"clip_ids":clips,"delta":rational(&delta)?,"link_policy":"expand"})),
+            Self::Locked { context, clips, locked } => context.request("clips.set_locked", json!({
+                "clip_ids":clips,"locked":locked,"link_policy":"expand"
+            })),
             Self::Remove { context, clips } => context.request("clips.remove", json!({"clip_ids":clips,"mode":"lift","link_policy":"expand"})),
         }
     }

@@ -255,6 +255,21 @@ numera-wiz tracks set-locked TRACK --locked true --project PROJECT --expected-re
 The MCP command is `tracks.set_locked` with `track_id` and `locked`.
 The track page includes `locked: true` for a committed lock.
 
+## Lock or unlock clips
+
+Select a clip and choose **Lock clip** or **Unlock clip** in **Selected detail**.
+The command applies to the clip and its linked companions. A locked track or
+sequence blocks the operation. Unlock the enclosing track before changing a
+clip lock. Locked clips continue to play and render, and the lock change can be
+undone or redone.
+
+```text
+numera-wiz clips set-locked --clip CLIP --locked true --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key lock-clip
+```
+
+Repeat `--clip` for multiple selections. Use `--locked false` to unlock.
+MCP `clips.set_locked` takes `clip_ids`, `locked` and `link_policy:"expand"`.
+
 ## Roll a cut between adjacent clips
 
 Select the clip before the cut and open **Roll cut to next clip**. Enter a

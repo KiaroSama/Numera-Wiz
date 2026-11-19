@@ -684,6 +684,9 @@ impl Service {
                     "clips.slide" => {
                         ProjectEditIntent::Slide(commands::parse(request.params.clone())?)
                     }
+                    "clips.set_locked" => {
+                        ProjectEditIntent::SetClipLocked(commands::parse(request.params.clone())?)
+                    }
                     "timeline.remove_gap" => {
                         ProjectEditIntent::RemoveGap(commands::parse(request.params.clone())?)
                     }
@@ -717,6 +720,7 @@ impl Service {
             let (patch, created, history_action) = if let Some(intent) = intent {
                 let id_budget = match &intent {
                     ProjectEditIntent::Unlink(_)
+                    | ProjectEditIntent::SetClipLocked(_)
                     | ProjectEditIntent::Trim(_)
                     | ProjectEditIntent::JoinThroughEdit(_)
                     | ProjectEditIntent::Slip(_)

@@ -53,6 +53,7 @@ pub enum ProjectEditIntent {
     Move(MoveInput),
     Link(LinkInput),
     Unlink(UnlinkInput),
+    SetClipLocked(SetClipLockedInput),
     Split(SplitInput),
     JoinThroughEdit(JoinThroughEditInput),
     Roll(RollInput),
@@ -1146,6 +1147,20 @@ pub fn resolve_edit<R: ProjectRead>(
             }
             json!({})
         }
+        ProjectEditIntent::SetClipLocked(input) => {
+            let selected = match input.link_policy {
+                LinkPolicy::Expand => link_selection(read, &input.clip_ids, 1)?,
+            };
+            // Even an already-correct selection must pass the enclosing lock and semantic checks.
+            check_affected_closure(read, &unchanged_patch(read, &selected)?, true)?;
+            for mut entity in selected {
+                if entity.payload::<Clip>("clip")?.locked != input.locked {
+                    entity.update(&json!({"locked":input.locked}))?;
+                    edit.set(entity)?;
+                }
+            }
+            json!({})
+        }
         ProjectEditIntent::SetTrackGain(input) => {
             validate_track_gain(input.gain_centidb)?;
             let mut entity = edit.get(&input.track_id)?;
@@ -1187,6 +1202,12 @@ pub fn resolve_edit<R: ProjectRead>(
 }
 // Validate a semantic no-op against the same complete closure without rewriting its bytes.
 fn validate_unchanged<R: ProjectRead>(read: &R, selected: &[EntityEnvelope]) -> Result<()> {
+    let patch = unchanged_patch(read, selected)?;
+    check_compatibility(read, &patch)?;
+    validate_patch_clips(read, &patch)
+}
+
+fn unchanged_patch<R: ProjectRead>(read: &R, selected: &[EntityEnvelope]) -> Result<ProjectPatch> {
     let changes = selected
         .iter()
         .map(|entity| {
@@ -1200,9 +1221,7 @@ fn validate_unchanged<R: ProjectRead>(read: &R, selected: &[EntityEnvelope]) -> 
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    let patch = ProjectPatch { changes };
-    check_compatibility(read, &patch)?;
-    validate_patch_clips(read, &patch)
+    Ok(ProjectPatch { changes })
 }
 /// A lock change may pass its own track's lock check only when it changes
 /// exactly that bit. Inverse patches satisfy the same rule without a command
@@ -1232,9 +1251,47 @@ fn track_lock_transition(patch: &ProjectPatch) -> Result<Option<&EntityId>> {
     Ok((before.bytes()? == after.bytes()?).then_some(&change.id))
 }
 
+// Only a patch made entirely of clip lock-bit changes can pass the clip locks in its closure.
+// Normalizing just that field also admits inverse patches that restore a missing legacy lock bit.
+fn clip_lock_transition(patch: &ProjectPatch) -> Result<bool> {
+    if patch.changes.is_empty() {
+        return Ok(false);
+    }
+    for change in &patch.changes {
+        let (Some(before), Some(after)) = (&change.before, &change.after) else {
+            return Ok(false);
+        };
+        let mut before: EntityEnvelope =
+            serde_json::from_str(before).map_err(|error| invalid(error.to_string()))?;
+        let mut after: EntityEnvelope =
+            serde_json::from_str(after).map_err(|error| invalid(error.to_string()))?;
+        if before.kind != "clip" || after.kind != "clip" || !before.known() || !after.known() {
+            return Ok(false);
+        }
+        if before.payload::<Clip>("clip")?.locked == after.payload::<Clip>("clip")?.locked {
+            return Ok(false);
+        }
+        let normalized = json!({"locked": false});
+        before.update(&normalized)?;
+        after.update(&normalized)?;
+        if before.bytes()? != after.bytes()? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// Check both images of the affected closure. Ownership visits ancestors, never siblings.
 pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Result<()> {
     read.header().writable()?;
+    check_affected_closure(read, patch, clip_lock_transition(patch)?)
+}
+
+fn check_affected_closure<R: ProjectRead>(
+    read: &R,
+    patch: &ProjectPatch,
+    allow_clip_locks: bool,
+) -> Result<()> {
     let lock_transition = track_lock_transition(patch)?;
     let mut queue: VecDeque<_> = patch.changes.iter().map(|c| c.id.clone()).collect();
     queue.push_back(read.header().root_bin_id.clone());
@@ -1291,7 +1348,7 @@ pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Re
                         if let Some(group) = clip.link_group_id {
                             queue.extend(read.dependents(&group, MAX_CLOSURE)?);
                         }
-                        clip.locked
+                        clip.locked && !allow_clip_locks
                     }
                     _ => false,
                 }
@@ -1329,6 +1386,10 @@ pub fn check_compatibility<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Re
     Ok(())
 }
 pub fn validate_patch_clips<R: ProjectRead>(read: &R, patch: &ProjectPatch) -> Result<()> {
+    if clip_lock_transition(patch)? {
+        // The lock flag is independent of clip timing, source and collision checks.
+        return Ok(());
+    }
     let lock_transition = track_lock_transition(patch)?;
     let edit = Edit {
         read,

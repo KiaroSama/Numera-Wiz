@@ -1263,6 +1263,136 @@ pub(in crate::runtime) async fn linked_edits() {
     });
     conformance.finish().await;
     slide_moves_linked_clips_between_fixed_outer_edges().await;
+    clip_locks_change_only_the_linked_lock_flags().await;
+}
+
+async fn clip_locks_change_only_the_linked_lock_flags() {
+    let fixture = Fixture::new().await;
+    let ids = [&fixture.clips[0], &fixture.clips[2]];
+    fixture
+        .accept(fixture.request(
+            "clips.link",
+            "link-clip-lock-fixture",
+            json!({"clip_ids":ids,"link_policy":"expand"}),
+        ))
+        .await;
+    let mut extended = fixture.entity(ids[0]);
+    let extension = r#"{"exact":900719925474099312345678901,"escaped":"\u0061"}"#;
+    extended
+        .update(&BTreeMap::from([(
+            "opaque",
+            serde_json::value::RawValue::from_string(extension.to_owned()).unwrap(),
+        )]))
+        .unwrap();
+    fixture.install_future_envelope(extended);
+    let set = |locked| json!({"clip_ids":[ids[0]],"locked":locked,"link_policy":"expand"});
+    let member: Clip = fixture.entity(ids[1]).payload("clip").unwrap();
+    let track_lock = |locked| json!({"track_id":member.track_id,"locked":locked});
+    fixture
+        .accept(fixture.request("tracks.set_locked", "clip-parent-lock", track_lock(true)))
+        .await;
+    fixture
+        .reject_unchanged(
+            fixture.request("clips.set_locked", "locked-parent-clip-lock", set(true)),
+            "ENTITY_LOCKED",
+        )
+        .await;
+    fixture
+        .accept(fixture.request("tracks.set_locked", "clip-parent-unlock", track_lock(false)))
+        .await;
+    let sequence = fixture.entity(&member.sequence_id);
+    let mut locked_sequence = sequence.clone();
+    locked_sequence.update(&json!({"locked":true})).unwrap();
+    fixture.install_future_envelope(locked_sequence);
+    fixture
+        .reject_unchanged(
+            fixture.request("clips.set_locked", "locked-sequence-clip-noop", set(false)),
+            "ENTITY_LOCKED",
+        )
+        .await;
+    fixture.install_future_envelope(sequence);
+    let before = ids.map(|id| fixture.raw(id));
+    let request = fixture.request("clips.set_locked", "lock-linked-clips", set(true));
+    let accepted = fixture
+        .service
+        .dispatch(fixture.context.clone(), request.clone())
+        .await;
+    assert!(accepted.ok, "{:?}", accepted.error);
+    assert!(accepted.receipt_id.is_some());
+    let replay = fixture.service.dispatch(fixture.context.clone(), request).await;
+    assert_eq!(accepted.receipt_id, replay.receipt_id);
+    assert_eq!(accepted.result, replay.result);
+    assert_eq!(accepted.result.unwrap()["changed_ids"].as_array().unwrap().len(), 2);
+    for id in ids {
+        assert!(fixture.entity(id).payload::<Clip>("clip").unwrap().locked);
+    }
+    assert!(fixture.entity(ids[0]).payload_json.contains(extension));
+    let locked = ids.map(|id| fixture.raw(id));
+    let unchanged = fixture
+        .accept(fixture.request("clips.set_locked", "repeat-clip-lock", set(true)))
+        .await;
+    assert_eq!(unchanged["no_change"], true);
+    assert_eq!(ids.map(|id| fixture.raw(id)), locked);
+    fixture
+        .reject_unchanged(
+            fixture.move_request(2, 1, "move-locked-clip"),
+            "ENTITY_LOCKED",
+        )
+        .await;
+
+    {
+        let mut forged = fixture.entity(ids[0]);
+        forged.update(&json!({"locked":false})).unwrap();
+        forged.label = "Changed along with the lock".into();
+        let read = fixture
+            .service
+            .store
+            .project_read(fixture.project.as_str())
+            .unwrap();
+        let patch = ProjectPatch {
+            changes: vec![EntityChange {
+                id: ids[0].clone(),
+                before: Some(locked[0].clone()),
+                after: Some(forged.bytes().unwrap()),
+            }],
+        };
+        assert_eq!(
+            check_compatibility(&read, &patch).unwrap_err().code,
+            "ENTITY_LOCKED"
+        );
+    }
+    fixture
+        .accept(fixture.request("history.undo", "undo-clip-locks", json!({})))
+        .await;
+    assert_eq!(ids.map(|id| fixture.raw(id)), before);
+    fixture
+        .accept(fixture.request("history.redo", "redo-clip-locks", json!({})))
+        .await;
+    assert_eq!(ids.map(|id| fixture.raw(id)), locked);
+    fixture
+        .accept(fixture.request("clips.set_locked", "unlock-linked-clips", set(false)))
+        .await;
+    assert_eq!(ids.map(|id| fixture.raw(id)), before);
+
+    let mut legacy = fixture.entity(ids[0]);
+    let mut fields: BTreeMap<String, Box<serde_json::value::RawValue>> =
+        serde_json::from_str(&legacy.payload_json).unwrap();
+    fields.remove("locked");
+    legacy.payload_json = serde_json::to_string(&fields).unwrap();
+    legacy.payload_sha256 = domain::hash(legacy.payload_json.as_bytes());
+    let mut companion = fixture.entity(ids[1]);
+    companion.update(&json!({"locked":true})).unwrap();
+    fixture.install_envelopes(vec![legacy, companion]);
+    let mixed = ids.map(|id| fixture.raw(id));
+    let result = fixture
+        .accept(fixture.request("clips.set_locked", "complete-mixed-clip-lock", set(true)))
+        .await;
+    assert_eq!(result["changed_ids"], json!([ids[0]]));
+    assert_eq!(fixture.raw(ids[1]), mixed[1]);
+    fixture
+        .accept(fixture.request("history.undo", "undo-mixed-clip-lock", json!({})))
+        .await;
+    assert_eq!(ids.map(|id| fixture.raw(id)), mixed);
 }
 
 async fn slide_moves_linked_clips_between_fixed_outer_edges() {

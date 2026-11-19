@@ -825,6 +825,14 @@ pub struct UnlinkInput {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct SetClipLockedInput {
+    #[schemars(length(min = 1, max = 128), extend("uniqueItems" = true))]
+    pub clip_ids: Vec<EntityId>,
+    pub locked: bool,
+    pub link_policy: LinkPolicy,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SplitInput {
     pub clip_id: EntityId,
     pub at_sequence: Rational,

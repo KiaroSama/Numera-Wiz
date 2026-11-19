@@ -111,6 +111,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "clips.slip"
         | "clips.roll"
         | "clips.slide"
+        | "clips.set_locked"
         | "clips.remove"
         | "tracks.set_enabled"
         | "tracks.set_locked"
