@@ -535,6 +535,12 @@ impl WizApp {
                     Err(error)=>self.error=Some(error),
                 }
             }
+            if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
+        });
+        self.project_link_controls(ui, &group);
+        self.timeline_preview(ui, &group);
+        self.timeline_markers(ui, &group);
+        ui.add_enabled_ui(ready, |ui| {
             ui.collapsing("Trim linked clips", |ui| {
                 rational(ui, "Trim from beginning (seconds)", &mut self.projects.forms.trim_head);
                 rational(ui, "Trim from end (seconds)", &mut self.projects.forms.trim_tail);
@@ -547,11 +553,7 @@ impl WizApp {
                     }
                 }
             });
-            if ui.button("Lift selected clip").clicked() { self.mutate_project("clips.remove",json!({"clip_ids":[group.view.clip],"mode":"lift","link_policy":"expand"}),ui.ctx()); }
         });
-        self.project_link_controls(ui, &group);
-        self.timeline_preview(ui, &group);
-        self.timeline_markers(ui, &group);
     }
 
     fn timeline_markers(&mut self, ui: &mut egui::Ui, group: &Group) {
