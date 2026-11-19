@@ -267,7 +267,9 @@ pub(super) async fn sinks(program: &Path) {
                 "CANCELLED"
             } else {
                 "VERIFICATION_FAILED"
-            }
+            },
+            "{}",
+            failure.cause
         );
         match &failure.settlement {
             Settlement::Closed(closed) => {

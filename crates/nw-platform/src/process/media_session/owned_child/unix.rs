@@ -91,13 +91,13 @@ impl OwnedChild {
             if (cancel || observation.is_some()) && !self.group_signal_finished {
                 match rustix::process::kill_process_group(group, Signal::KILL) {
                     Ok(()) | Err(rustix::io::Errno::SRCH) => self.group_signal_finished = true,
-                    // XNU skips zombies in group signaling. An exited primary
-                    // can therefore leave a group that returns EPERM until
-                    // it is reaped. The same error can mean an inaccessible
-                    // live member, so it does not establish group absence.
+                    // XNU skips zombies in group signaling. The primary can
+                    // exit between waitid and killpg. Keep its group anchored
+                    // until the next observation, and require group absence
+                    // independently after reaping the primary.
                     #[cfg(target_os = "macos")]
-                    Err(rustix::io::Errno::PERM) if observation.is_some() => {
-                        self.group_signal_finished = true;
+                    Err(rustix::io::Errno::PERM) => {
+                        self.group_signal_finished = observation.is_some();
                     }
                     Err(e) => return Err(error("TREE_TERMINATION_UNCERTAIN", &e.to_string())),
                 }
