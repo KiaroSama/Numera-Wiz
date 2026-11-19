@@ -1079,6 +1079,18 @@ pub(in crate::runtime) async fn public_link_producer() {
         descriptor["project_context"], "required_write",
         "{listed:?}"
     );
+    assert!(descriptor.get("params_schema").is_none(), "{listed:?}");
+    let schema = service
+        .dispatch(
+            context.clone(),
+            Request::query("commands.schema", json!({"id":"clips.link"})),
+        )
+        .await;
+    assert!(
+        schema.ok && schema.error.is_none() && schema.receipt_id.is_none(),
+        "{schema:?}"
+    );
+    let descriptor = schema.result.as_ref().unwrap();
     assert_eq!(
         descriptor["params_schema"]["additionalProperties"], false,
         "{listed:?}"
@@ -1114,17 +1126,6 @@ pub(in crate::runtime) async fn public_link_producer() {
         1,
         "{listed:?}"
     );
-    let schema = service
-        .dispatch(
-            context.clone(),
-            Request::query("commands.schema", json!({"id":"clips.link"})),
-        )
-        .await;
-    assert!(
-        schema.ok && schema.error.is_none() && schema.receipt_id.is_none(),
-        "{schema:?}"
-    );
-    assert_eq!(schema.result.as_ref(), Some(descriptor), "{schema:?}");
     {
         let command = "clips.unlink";
         let descriptor = descriptors
@@ -1133,16 +1134,28 @@ pub(in crate::runtime) async fn public_link_producer() {
             .unwrap_or_else(|| panic!("{listed:?}"));
         assert_eq!(descriptor["version"], 1, "{listed:?}");
         assert_eq!(descriptor["descriptor_schema_version"], 2, "{listed:?}");
+        assert_eq!(descriptor["state_class"], "durable_mutation", "{listed:?}");
+        assert_eq!(
+            descriptor["project_context"], "required_write",
+            "{listed:?}"
+        );
+        assert!(descriptor.get("result_schema").is_none(), "{listed:?}");
+        let schema = service
+            .dispatch(
+                context.clone(),
+                Request::query("commands.schema", json!({"id":command})),
+            )
+            .await;
+        assert!(
+            schema.ok && schema.error.is_none() && schema.receipt_id.is_none(),
+            "{schema:?}"
+        );
+        let descriptor = schema.result.as_ref().unwrap();
         assert!(
             descriptor
                 .get("result_schema")
                 .and_then(serde_json::Value::as_object)
                 .is_some_and(|schema| !schema.is_empty()),
-            "{listed:?}"
-        );
-        assert_eq!(descriptor["state_class"], "durable_mutation", "{listed:?}");
-        assert_eq!(
-            descriptor["project_context"], "required_write",
             "{listed:?}"
         );
         let params = &descriptor["params_schema"];
@@ -1187,17 +1200,6 @@ pub(in crate::runtime) async fn public_link_producer() {
             1,
             "{listed:?}"
         );
-        let schema = service
-            .dispatch(
-                context.clone(),
-                Request::query("commands.schema", json!({"id":command})),
-            )
-            .await;
-        assert!(
-            schema.ok && schema.error.is_none() && schema.receipt_id.is_none(),
-            "{schema:?}"
-        );
-        assert_eq!(schema.result.as_ref(), Some(descriptor), "{schema:?}");
     }
 
     // The prior hosted A failure was this real Link request's UNKNOWN_COMMAND.

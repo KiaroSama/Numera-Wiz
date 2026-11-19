@@ -181,8 +181,12 @@ impl Adapter<'_> {
                 .iter()
                 .find(|row| row["id"] == id)
                 .expect("SCHEMA_TRANSPORT_DISCOVERY_ID");
-            assert!(
-                &response["result"] == row,
+            let mut metadata = response["result"].as_object().expect("descriptor").clone();
+            assert!(metadata.remove("params_schema").is_some());
+            assert!(metadata.remove("result_schema").is_some());
+            assert_eq!(
+                &Value::Object(metadata),
+                row,
                 "SCHEMA_TRANSPORT_DISCOVERY_EQUAL"
             );
             schemas.push(

@@ -1,6 +1,7 @@
 //! Actual prior/current packaged executables, exercised only by required hosted checks.
 //! Synthetic cleanup plans are storage/digest fixtures and are never submitted as jobs.
 use anyhow::{Context, Result, ensure};
+use nw_domain::commands::{self, Descriptor};
 use nw_platform::{files::RootLock, security};
 use nw_store::{
     generations::{GenerationLocation, RootLease},
@@ -1568,11 +1569,22 @@ impl Owner {
         let registry = owner
             .command(&query("commands.list", json!({})), evidence)
             .await?;
-        let fingerprint = sha(&serde_json::to_vec(&ordered(
-            registry["result"]["commands"].clone(),
-        ))?);
+        let result = &registry["result"];
+        let fingerprint = if binary.label == "current" {
+            let registered = commands::active_registry();
+            let expected: Vec<_> = registered.iter().map(Descriptor::catalog_entry).collect();
+            let fingerprint = commands::registry_fingerprint();
+            ensure!(
+                result["commands"] == serde_json::to_value(expected)?
+                    && result["registry_fingerprint"] == fingerprint,
+                "Actual current catalog or registry fingerprint differs from the compiled registry"
+            );
+            fingerprint
+        } else {
+            sha(&serde_json::to_vec(&ordered(result["commands"].clone()))?)
+        };
         ensure!(
-            registry["result"]["commands"].is_array() && fingerprint == owner.record.registry,
+            result["commands"].is_array() && fingerprint == owner.record.registry,
             "Actual binary registry fingerprint differs from health"
         );
         evidence.record(json!({"phase":"owner-ready","binary":binary.label,"source":binary.source,"canonical_root":root,"root_id":owner.record.root_id,"epoch":owner.record.epoch,"build":owner.record.build,"registry":fingerprint}))?;

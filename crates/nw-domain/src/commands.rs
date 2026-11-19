@@ -338,6 +338,36 @@ pub struct Descriptor {
     #[serde(default, skip_serializing_if = "ProjectContextRule::forbidden")]
     pub project_context: ProjectContextRule,
 }
+
+#[derive(Serialize)]
+pub struct CommandCatalogEntry<'a> {
+    descriptor_schema_version: u32,
+    id: &'a str,
+    version: u32,
+    label: &'a str,
+    state_class: StateClass,
+    qualification: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    authorization_requirements: Option<&'a crate::projects::authorization::AuthorizationRequirements>,
+    #[serde(skip_serializing_if = "ProjectContextRule::forbidden")]
+    project_context: ProjectContextRule,
+}
+
+impl Descriptor {
+    pub fn catalog_entry(&self) -> CommandCatalogEntry<'_> {
+        CommandCatalogEntry {
+            descriptor_schema_version: self.descriptor_schema_version,
+            id: &self.id,
+            version: self.version,
+            label: &self.label,
+            state_class: self.state_class,
+            qualification: &self.qualification,
+            authorization_requirements: self.authorization_requirements.as_ref(),
+            project_context: self.project_context,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Empty {}
@@ -1724,12 +1754,18 @@ pub fn active_registry() -> Vec<Descriptor> {
         .collect()
 }
 pub fn registry_fingerprint() -> String {
-    use sha2::{Digest, Sha256};
-    let value =
-        canonical_order(serde_json::to_value(active_registry()).expect("registry serializes"));
-    hex::encode(Sha256::digest(
-        serde_json::to_vec(&value).expect("registry serializes"),
-    ))
+    static FINGERPRINT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    FINGERPRINT
+        .get_or_init(|| {
+            use sha2::{Digest, Sha256};
+            let value = canonical_order(
+                serde_json::to_value(active_registry()).expect("registry serializes"),
+            );
+            hex::encode(Sha256::digest(
+                serde_json::to_vec(&value).expect("registry serializes"),
+            ))
+        })
+        .clone()
 }
 
 #[cfg(test)]

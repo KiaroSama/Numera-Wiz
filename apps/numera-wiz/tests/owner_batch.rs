@@ -142,10 +142,11 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(status, 0, "{scope}");
     let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
     let intake = media.directory.path().join("intake-folder");
+    let second_relative = "nested-é/-first-فارسی.mkv";
     std::fs::create_dir_all(intake.join("nested-é")).unwrap();
     std::fs::create_dir_all(intake.join("excluded")).unwrap();
     std::fs::copy(&media.source, intake.join("-first-فارسی.mkv")).unwrap();
-    std::fs::copy(&second, intake.join("nested-é/-first-فارسی.mkv")).unwrap();
+    std::fs::copy(&second, intake.join(second_relative)).unwrap();
     std::fs::write(
         intake.join("broken.mkv"),
         b"Unsupported media remains visible",
@@ -743,7 +744,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         folder_entries
             .iter()
             .find(|entry| entry["relative_path"] == relative)
-            .unwrap()["asset_id"]
+            .unwrap_or_else(|| panic!("Folder snapshot is missing {relative}"))["asset_id"]
             .clone()
     };
     let extract_outputs = [
@@ -753,7 +754,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     ];
     let extract_file = media.directory.path().join("extract-batch.json");
     let first_id = folder_asset("-first-فارسی.mkv");
-    let second_id = folder_asset("nested-é/second.mkv");
+    let second_id = folder_asset(second_relative);
     let extraction_input = json!({
         "items":[
             {"target":{"asset_id":first_id,"output":extract_outputs[0]},"selector":{"kind":"video","ordinal":1}},

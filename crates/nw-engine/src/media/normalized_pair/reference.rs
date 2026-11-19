@@ -148,15 +148,14 @@ fn parse_scores(bytes: &[u8], count: usize) -> Option<Vec<(Psnr, i32)>> {
             if psnr.get_mut(frame)?.replace(score).is_some() {
                 return None;
             }
-        } else if let Some(value) = fields.iter().find_map(|field| field.strip_prefix("All:")) {
+        } else {
+            let value = fields.iter().find_map(|field| field.strip_prefix("All:"))?;
             let score = decimal(value, 6)?;
             if !(-1_000_000..=1_000_000).contains(&score)
                 || ssim.get_mut(frame)?.replace(score).is_some()
             {
                 return None;
             }
-        } else {
-            return None;
         }
     }
     psnr.into_iter()

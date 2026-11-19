@@ -324,8 +324,8 @@ The 13 project-family descriptors also publish static
 `authorization_requirements`. These describe project action and request gates,
 without caller facts. Authenticated runtime `commands.list` adds a separate
 13-action `authorization` overlay that observes exact command allowance only;
-without a project context, Read/Edit remain unchecked. `commands.schema` stays
-a direct static descriptor. Pure static discovery and MCP tool metadata never
+without a project context, Read/Edit remain unchecked. `commands.schema` returns
+the full static descriptor for a single catalog entry. Pure static discovery and MCP tool metadata never
 manufacture owner authority. Live observations do not enter the static registry
 fingerprint.
 

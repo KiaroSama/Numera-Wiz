@@ -211,8 +211,9 @@ issue/revoke, scoped internal credential issuance, media probe, source
 registration/list/inspect/output suggestion, bounded cleanup selection reports,
 cleanup planning/inspection and job
 submit/inspect/list/cancel, artifact list/manifest/chunk retrieval and owner log
-status. `commands.list` and `commands.schema` return generated
-current parameter schemas. This list does not promise the remaining mandate scope.
+status. `commands list` returns all active command IDs, metadata and the registry
+fingerprint in one bounded response. Run `commands schema <id>` for the current
+parameter schema and any published result schema.
 
 A query has the following envelope:
 

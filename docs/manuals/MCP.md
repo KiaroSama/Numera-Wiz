@@ -72,6 +72,9 @@ publication or compensation. Forced disconnects still leave outcome uncertainty.
 `nextCursor` with a `tools/list` request containing that `cursor` until the
 response omits `nextCursor`. The official Rust SDK's `list_all_tools()` does
 this automatically. Each JSON-RPC page fits within the 256 KiB response budget.
+The `commands.list` tool returns the complete catalog of active command IDs,
+metadata and the registry fingerprint in one bounded response. Call
+`commands.schema` with an ID for its generated parameter and result schemas.
 Tool input uses
 `{"params":{...}}` and optional `context`. For example, discovery is
 `{"params":{}}`. A durable call has this shape:

@@ -42,9 +42,17 @@ impl CommandService {
             match request.command.id.as_str() {
                 "commands.list" => {
                     let _: Empty = commands::parse(request.params)?;
-                    Ok(
-                        serde_json::json!({"commands":commands::registry().into_iter().filter(|d|ACTIVE_COMMANDS.contains(&d.id.as_str())).collect::<Vec<_>>(),"release":"development_only","full_release":"blocked"}),
-                    )
+                    let registry = commands::active_registry();
+                    let entries: Vec<_> = registry
+                        .iter()
+                        .map(commands::Descriptor::catalog_entry)
+                        .collect();
+                    Ok(serde_json::json!({
+                        "commands": entries,
+                        "registry_fingerprint": commands::registry_fingerprint(),
+                        "release": "development_only",
+                        "full_release": "blocked"
+                    }))
                 }
                 "commands.schema" => {
                     let params: IdInput = commands::parse(request.params)?;
@@ -110,6 +118,14 @@ fn project_schema_batch(suite: u16, expected: &[u16]) -> schema_validation::Batc
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn catalog_fields(descriptor: &serde_json::Value) -> serde_json::Value {
+        let mut fields = descriptor.as_object().expect("complete descriptor").clone();
+        assert!(fields.remove("params_schema").is_some());
+        fields.remove("result_schema");
+        serde_json::Value::Object(fields)
+    }
+
     #[test]
     fn discovery_agent_never_inherits_local_user_authority() {
         let request = Request::query("streams.clean.resolve", serde_json::json!({}));
@@ -155,6 +171,16 @@ mod tests {
             .get("commands")
             .and_then(serde_json::Value::as_array)
             .unwrap_or_else(|| panic!("commands.list must contain commands: {list_response:?}"));
+        let active = commands::active_registry();
+        let expected: Vec<_> = active
+            .iter()
+            .map(|descriptor| catalog_fields(&serde_json::to_value(descriptor).unwrap()))
+            .collect();
+        assert_eq!(listed_commands, &expected);
+        assert_eq!(
+            list.get("registry_fingerprint").and_then(serde_json::Value::as_str),
+            Some(commands::registry_fingerprint().as_str())
+        );
         for id in ["projects.create", "clips.link"] {
             assert_eq!(
                 listed_commands
@@ -562,7 +588,8 @@ mod tests {
                     Principal::DiscoveryAgent,
                     Request::query("commands.schema", serde_json::json!({"id":id})),
                 );
-                assert!(schema.ok && schema.result.as_ref() == Some(row));
+                assert!(schema.ok);
+                assert_eq!(&catalog_fields(&schema.result.unwrap()), row);
                 continue;
             }
             if matches!(id, "markers.place" | "markers.remove") {
@@ -646,7 +673,8 @@ mod tests {
                 Principal::DiscoveryAgent,
                 Request::query("commands.schema", serde_json::json!({"id":id})),
             );
-            assert!(schema.ok && schema.result.as_ref() == Some(row));
+            assert!(schema.ok);
+            assert_eq!(&catalog_fields(&schema.result.unwrap()), row);
         }
         assert_eq!(count, 13);
         let local = CommandService.dispatch(
@@ -716,6 +744,7 @@ mod tests {
         }
 
         let mut largest_schema_bytes = 0;
+        let mut result_schemas = std::collections::BTreeMap::new();
         for id in ids {
             let schema_response = CommandService.dispatch(
                 Principal::DiscoveryAgent,
@@ -768,8 +797,9 @@ mod tests {
                 .find(|row| row.get("id").and_then(serde_json::Value::as_str) == Some(id))
                 .expect("Project family descriptor row was counted above");
             assert_eq!(
-                descriptor, row,
-                "Project family commands.schema must equal its commands.list row for {id}"
+                &catalog_fields(descriptor),
+                row,
+                "Project family commands.schema metadata must match its catalog row for {id}"
             );
             assert!(
                 descriptor
@@ -794,6 +824,7 @@ mod tests {
                 "Project family result_schema exceeds the byte budget for {id}: {schema_bytes}"
             );
             largest_schema_bytes = largest_schema_bytes.max(schema_bytes);
+            assert!(result_schemas.insert(id, result_schema.clone()).is_none());
             let mut pending = vec![result_schema];
             let mut visited = 0;
             while let Some(node) = pending.pop() {
@@ -872,10 +903,7 @@ mod tests {
                     .all(|key| keys.contains(&key.as_str().expect("required key")))
         }
         let schema = |id: &str| -> &Value {
-            &rows
-                .iter()
-                .find(|row| row["id"] == id)
-                .expect("listed command")["result_schema"]
+            result_schemas.get(id).expect("published result schema")
         };
         let catalog = schema("projects.list");
         fields(
