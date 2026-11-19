@@ -183,8 +183,18 @@
     {
       "subject_id": "F01",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "cpu_avc_with_original_variable_picture_clock",
+          "commit": "a7f01b50247c9709a291a7ca44067c0fd9dffc66",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/job/135456899921",
+          "artifact_sha256": "fd3f1c0fff1950b0a1d30532dc5cb5c88f14d797e5270ca5d3dadcdcb3b10785",
+          "asserted_domain": "CPU H.264 with selected AAC to MP4 and Matroska",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "Both published files retained the same six original presentation times and 4:3 sample aspect. Output used the authenticated CPU component."
+        }
+      ]
     },
     {
       "subject_id": "F02",
@@ -233,6 +243,15 @@
           "asserted_domain": "Disjoint-output cleanup from a frozen folder scan",
           "platforms": ["ubuntu-24.04"],
           "observed_outcome": "The native CLI and official MCP transports matched the review. Both files published byte-identical copies, with three exclusions and no replacement."
+        },
+        {
+          "boundary": "retained_folder_cpu_avc_batch",
+          "commit": "a7f01b50247c9709a291a7ca44067c0fd9dffc66",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/job/135456899921",
+          "artifact_sha256": "fd3f1c0fff1950b0a1d30532dc5cb5c88f14d797e5270ca5d3dadcdcb3b10785",
+          "asserted_domain": "Two independently verified retained-folder H.264/AAC outputs",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "Two inputs with colliding source basenames published to distinct reviewed MP4 destinations. The batch excluded its inventoried companion."
         }
       ]
     },
@@ -295,8 +314,18 @@
     {
       "subject_id": "F09",
       "subject_kind": "workflow",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        {
+          "boundary": "offline_right_to_left_subrip_and_hdr_conversion",
+          "commit": "a7f01b50247c9709a291a7ca44067c0fd9dffc66",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131/job/135456899921",
+          "artifact_sha256": "fd3f1c0fff1950b0a1d30532dc5cb5c88f14d797e5270ca5d3dadcdcb3b10785",
+          "asserted_domain": "External SDR SubRip and embedded PQ and HLG SubRip",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "All three outputs retained the original sample aspect and selected audio packets. PQ and HLG converted to BT.709. The Persian, Hebrew and English punctuation results matched their direction-mark references."
+        }
+      ]
     },
     {
       "subject_id": "F10",

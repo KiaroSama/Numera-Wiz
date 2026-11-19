@@ -83,7 +83,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `streams extract-folder --file FOLDER-EXTRACTION.json` | Resolve one track type and ordinal per source in a retained folder snapshot, with derived Matroska destinations in a separate directory. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
-| `jobs plan --asset ID --file IMPORT.json` | Review a versioned FFmWiz packet-copy job against its registered source. |
+| `jobs plan --asset ID --file IMPORT.json` | Review an admitted FFmWiz packet-copy, FFV1 retime or H.264 job against its registered source. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
 | `jobs cancel ID --replay-scope SCOPE --idempotency-key KEY` | Request cancellation of the selected accepted job. |

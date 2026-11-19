@@ -1104,7 +1104,7 @@ fn build_registry() -> Vec<Descriptor> {
         ),
         row!(
             "jobs.plan",
-            "Review an imported FFmWiz packet-copy job against its registered media source",
+            "Review an admitted FFmWiz job against its registered media source",
             Query,
             crate::config_import::PlanInput
         ),

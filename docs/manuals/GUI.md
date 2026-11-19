@@ -325,7 +325,7 @@ batch run and inspection controls apply.
 
 Select a registered source and expand **Import FFmWiz settings**. Paste the
 configuration and set the directory used to resolve media paths. Review the
-diagnostics, then choose **Review packet-copy job for the selected source**.
+diagnostics, then choose **Review imported job for the selected source**.
 The selected file must match the configuration input. Review the planned
 destination and retained streams before choosing **Run reviewed plan**.
 

@@ -433,7 +433,7 @@ pub enum Plans {
 }
 #[derive(Subcommand)]
 pub enum Jobs {
-    /// Review the packet-copy job from a versioned FFmWiz import report.
+    /// Review an admitted job from a versioned FFmWiz import report.
     Plan {
         #[arg(long)]
         asset: String,

@@ -89,7 +89,7 @@ impl WizApp {
                 && ui
                     .add_enabled(
                         self.request_idle() && report["input_valid"] == true,
-                        egui::Button::new("Review packet-copy job for the selected source"),
+                        egui::Button::new("Review imported job for the selected source"),
                     )
                     .clicked()
             {
