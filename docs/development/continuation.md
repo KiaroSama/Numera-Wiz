@@ -69,6 +69,13 @@ formats. Filters still require pad signatures, and pixel formats still require
 a component count. The first-launch gate continues to require the exercised
 CPU round trip and matching embedded component hashes on each platform.
 
+The four native builds at `4db81a61634d0f24db4d705354df173afd63e67c`
+passed their ordinary regressions and standalone first-launch FFV1 exercises.
+Independent verification checked the Linux and Windows x64, Apple Silicon
+and Intel macOS artifact ZIP digests, executable architecture and digest,
+corresponding-source archive, and exact FFmpeg and ffprobe hashes recorded
+by the application. [CI367](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802)
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original

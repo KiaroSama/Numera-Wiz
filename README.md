@@ -107,8 +107,15 @@ Owner hardware qualification uses matching prebuilt artifacts.
 The [Linux x64 CPU component build](docs/development/linux-cpu-component.md)
 produces a separate relocatable FFmpeg/ffprobe package with private libraries,
 offline fonts, matching source archives and executable qualification evidence.
-The [Linux x64 standalone CI artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14496316587)
-passed its first-launch FFV1 round trip with the exact embedded media executables.
+The standalone CPU packages from `4db81a6` passed their first-launch FFV1
+round trip with the exact embedded media executables.
+
+| Target | Standalone CI artifact |
+| --- | --- |
+| Linux x64 | [Linux package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14496316587) |
+| Windows x64 | [Windows package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14497081280) |
+| macOS Apple Silicon | [Apple Silicon package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14495948523) |
+| macOS Intel | [Intel package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44450379802/artifacts/14497440777) |
 
 The macOS app bundle stores application state in
 `~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another

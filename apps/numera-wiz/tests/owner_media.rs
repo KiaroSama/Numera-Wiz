@@ -697,6 +697,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     unequal_grid["candidate"]["asset_id"] = irregular["id"].clone();
     let (unequal_grid, _) = cli.raw_with_exit(&Request::query("media.analyze.reference", unequal_grid)).await;
     assert_eq!(unequal_grid["error"]["code"], "REFERENCE_ALIGNMENT_REQUIRED");
+    assert!(unequal_grid["error"]["message"].as_str().unwrap().contains("relative presentation grid"));
     let mut shifted = reference_input(&asset);
     shifted["candidate"]["start_frame"] = 1.into();
     shifted["frame_count"] = 2.into();
