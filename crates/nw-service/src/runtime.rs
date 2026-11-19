@@ -1127,6 +1127,7 @@ impl Service {
                 "media.cut",
                 "media.analyze.volume",
                 "media.analyze.loudness",
+                "audio.normalize",
                 "media.analyze.reference",
                 "media.analyze.stream",
                 "media.analyze.audio_tracks",
@@ -1824,6 +1825,42 @@ impl Service {
                     ));
                 }
                 value(&report.finish()?)?
+            }
+            "audio.normalize" => {
+                let input: nw_domain::audio_normalization::NormalizeInput = commands::parse(params)?;
+                nw_domain::audio_normalization::validate_requests(&input.tracks)?;
+                let bound: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(&context, &bound.id, &bound.creator)?;
+                self.path(&context, Path::new(&bound.identity.path), false)?;
+                self.path(&context, Path::new(&input.output), true)?;
+                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+                    DomainError::new("RESOURCE_LIMIT", "Loudness review capacity is full")
+                })?;
+                drop(guard);
+                let (tracks, inspected) = runtime.block_on(self.engine()?.inspect_normalization(
+                    &bound, &input.tracks, cancellation.clone()))?;
+                let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+                if cancellation.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Loudness review was cancelled"));
+                }
+                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("audio.normalize")) {
+                    return Err(DomainError::new("PERMISSION_DENIED", "Loudness review access changed during measurement"));
+                }
+                inspected.revalidate()?;
+                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output,
+                    Default::default(), |engine, current, output| {
+                        if current.identity != bound.identity || current.source_object != bound.source_object {
+                            return Err(DomainError::new("SOURCE_CHANGED", "Original normalized audio source changed during measurement"));
+                        }
+                        engine.normalization_plan_at(current, output, tracks, &context.principal, self.clock.now()?)
+                    })?;
+                inspected.revalidate()?;
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
+                if response.ok {
+                    self.store.put(&named("plan", &plan.id)?, &plan)?;
+                }
+                return Ok(response);
             }
             "media.cut" => {
                 let input: nw_domain::packet_cut::CutInput = commands::parse(params)?;
@@ -3622,6 +3659,7 @@ mod tests {
             },
         };
         let plan = Plan {
+            audio_normalization: Vec::new(),
             packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: None,

@@ -591,6 +591,7 @@ async fn unrelated_inventories() {
         let asset = super::tests::asset(&id, &owner.principal);
         f.service.store.put(&format!("asset/{id}"), &asset).unwrap();
         let plan = Plan {
+            audio_normalization: Vec::new(),
             packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: None,

@@ -251,6 +251,21 @@ Use `streams replace --file replace.json` with the same `target`, `output` and
 audio stream. `metadata` accepts `preserve` or `strip_global`. Omit `remove`
 and `additions` for a metadata-only job with `strip_global`.
 
+### Normalize two PCM tracks independently
+
+Run `media normalize --file normalize.json` with an authorized registered MKV,
+a new `.mkv` destination, and one or two original PCM audio indices. Omitting
+settings chooses −16 LUFS, −1.5 dBTP and an 11 LU range limit.
+
+```json
+{"asset_id":"ID","output":"/absolute/new.mkv","tracks":[{"stream_index":1},{"stream_index":2}]}
+```
+
+The review measures each signal and freezes its gain. On submission, FFmpeg
+applies each gain to its own output track. The owner measures the staged
+output again and checks its peak, loudness, original start and PCM sample
+count before publication. Existing copy validation applies to unselected tracks.
+
 ### Cut by original packet boundaries
 
 For a registered Matroska source, use

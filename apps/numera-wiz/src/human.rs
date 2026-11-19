@@ -114,6 +114,11 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
+    /// Measure and review independent loudness normalization of selected PCM tracks.
+    Normalize {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Inspect and refresh FFmpeg capabilities.
     #[command(subcommand)]
     Capabilities(Capabilities),
@@ -609,6 +614,12 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut params = json!({"path":native_path(&path)?});
             probe.apply(&mut params)?;
             query("media.probe", params)
+        }
+        Command::Media(Media::Normalize { file }) => {
+            let mut input: nw_domain::audio_normalization::NormalizeInput = commands::parse(document(&file)?)?;
+            nw_domain::audio_normalization::validate_requests(&input.tracks)?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("audio.normalize", serde_json::to_value(input)?)
         }
         Command::Media(Media::Cut {
             asset,

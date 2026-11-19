@@ -491,6 +491,16 @@ pub async fn verify(
             let name = format!("Input {slot} stream {}", stream.index);
             let left = source.streams.get(&stream.index);
             let right = output.streams.get(&output_index);
+            if slot == 0 && plan.audio_normalization.iter().any(|track| track.request.stream_index == stream.index) {
+                let samples_match = left.zip(right).is_some_and(|(left, right)| {
+                    left.bytes > 0 && left.bytes == right.bytes && left.first.map(|v| v.0) == right.first.map(|v| v.0)
+                });
+                if !samples_match {
+                    return Err(invalid("Normalized PCM sample count or start differs from the original"));
+                }
+                verify_codec(probe, stream.index, observed, output_index, &name)?;
+                continue;
+            }
             match (left, right) {
                 (Some(left), Some(right))
                     if left.packets == right.packets

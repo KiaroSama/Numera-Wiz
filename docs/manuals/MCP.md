@@ -279,6 +279,12 @@ global metadata policy. A request with `metadata: "strip_global"` can omit both
 track arrays. The review reports one output position for each retained or added
 stream and no output position for a dropped track.
 
+`audio.normalize` accepts `asset_id`, `output`, and one or two `tracks` with
+original `stream_index` values. Each track may specify `settings` containing
+`integrated_centi_lufs`, `true_peak_centi_dbtp`, and `range_centi_lu`. Review its
+independent measurements through `audio_normalization` in the result, then
+submit the frozen plan and inspect the completed job for verified output levels.
+
 ## Packet copy cut
 
 `media.cut` takes `asset_id`, `output`, `chapters: "drop"`, and a `range` with

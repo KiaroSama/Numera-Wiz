@@ -1336,6 +1336,65 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     cli.completed(strip_job["job_id"].as_str().unwrap()).await;
     assert!(fixture::probe(&media.bin, &strip_output).await["format"]["tags"]["title"].is_null());
     assert_eq!(packets(&media.bin, &strip_output).await, original_packets);
+
+    let normalize_source = media.directory.path().join("different-loudness.mkv");
+    let mut sampled = [
+        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+        "testsrc2=size=64x48:rate=4:duration=5", "-f", "lavfi", "-i",
+        "sine=frequency=440:sample_rate=48000:duration=5", "-f", "lavfi", "-i",
+        "sine=frequency=950:sample_rate=48000:duration=5", "-f", "lavfi", "-i",
+        "sine=frequency=650:sample_rate=48000:duration=5", "-filter_complex", "[2:a]volume=0.1[quiet]",
+        "-map", "0:v", "-map", "1:a", "-map", "[quiet]", "-map", "3:a", "-c:v", "ffv1", "-c:a", "pcm_s16le", "-f", "matroska",
+    ].map(str::to_owned).to_vec();
+    sampled.push(normalize_source.to_str().unwrap().into());
+    nw_platform::process::run(&media.bin.join("ffmpeg"), &sampled, Duration::from_secs(30), 4096,
+        CancellationToken::new()).await.unwrap();
+    let audio = call!(stdio, "assets.register", json!({"path":normalize_source}),
+        json!({"replay_scope":sdk_scope,"idempotency_key":"distinct-normalization-tracks"}));
+    let normalize_output = media.directory.path().join("normalized-independently.mkv");
+    let normalize = json!({"asset_id":audio["id"],"output":normalize_output,
+        "tracks":[{"stream_index":1},{"stream_index":2}]});
+    let normalize_document = media.directory.path().join("normalize.json");
+    std::fs::write(&normalize_document, serde_json::to_vec(&normalize).unwrap()).unwrap();
+    let (typed_normalize, code) = cli.human(&[
+        "--access-profile", "batch-operator", "media", "normalize", "--file", normalize_document.to_str().unwrap(),
+    ]).await;
+    assert_eq!(code, 0, "{typed_normalize}");
+    let stdio_normalize = call!(stdio, "audio.normalize", normalize.clone(), json!({}));
+    let http_normalize = call!(http, "audio.normalize", normalize, json!({}));
+    assert_eq!(typed_normalize["result"]["hash"], stdio_normalize["hash"]);
+    assert_eq!(stdio_normalize["hash"], http_normalize["hash"]);
+    let measurements = http_normalize["audio_normalization"].as_array().unwrap();
+    assert_eq!(measurements.len(), 2);
+    let first = measurements[0]["measurement"]["integrated_centi_lufs"].as_i64().unwrap();
+    let second = measurements[1]["measurement"]["integrated_centi_lufs"].as_i64().unwrap();
+    assert!((first - second).abs() > 1500);
+    let normalized_job = call!(http, "jobs.submit", json!({"plan_id":http_normalize["id"],"plan_hash":http_normalize["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"verified-independent-normalization"}));
+    cli.completed(normalized_job["job_id"].as_str().unwrap()).await;
+    let input_packets = packets(&media.bin, &normalize_source).await;
+    let output_packets = packets(&media.bin, &normalize_output).await;
+    assert_eq!(input_packets[&0], output_packets[&0]);
+    assert_eq!(input_packets[&3], output_packets[&3]);
+    let mut independently_measured = Vec::new();
+    for index in [1, 2] {
+        let bytes = |packets: &[Value]| packets.iter().map(|packet| packet["size"].as_str().unwrap().parse::<u64>().unwrap()).sum::<u64>();
+        assert_eq!(bytes(&input_packets[&index]), bytes(&output_packets[&index]));
+        let args = [
+            "-hide_banner".into(), "-nostdin".into(), "-nostats".into(), "-v".into(), "info".into(), "-i".into(),
+            normalize_output.to_str().unwrap().into(), "-map".into(), format!("0:{index}"), "-af".into(),
+            "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json".into(), "-f".into(), "null".into(), "-".into(),
+        ];
+        let result = nw_platform::process::run(&media.bin.join("ffmpeg"), &args, Duration::from_secs(20), 4096,
+            CancellationToken::new()).await.unwrap();
+        let start = result.stderr_tail.rfind("\n{").unwrap() + 1;
+        let end = result.stderr_tail.rfind("\n}").unwrap() + 2;
+        let stats: Value = serde_json::from_str(&result.stderr_tail[start..end]).unwrap();
+        let lufs = stats["input_i"].as_str().unwrap().parse::<f64>().unwrap();
+        let peak = stats["input_tp"].as_str().unwrap().parse::<f64>().unwrap();
+        assert!((lufs + 16.0).abs() <= 0.4 && peak <= -1.5);
+        independently_measured.push(json!({"stream":index,"integrated_lufs":lufs,"true_peak_dbtp":peak}));
+    }
     http.cancel().await.unwrap();
     server.start_kill().unwrap();
     server.wait().await.unwrap();
@@ -1363,6 +1422,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             "original_packet_timing_and_digest_match":true,"matching_plan_across_cli_stdio_http":true},
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
+        "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
+            "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},
         "scope":"Retained video-folder cleanup to a disjoint destination; companion copying, output trees, mixed audio/encode workflows, replacement and GUI batching remain separate qualification"});
     std::fs::write(
         evidence.join("batch-media-report.json"),

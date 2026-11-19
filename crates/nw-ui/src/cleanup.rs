@@ -630,6 +630,11 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
+                for track in &plan.audio_normalization {
+                    ui.label(format!("Audio {} · measured {:.2} LUFS · target {:.2} LUFS",
+                        track.request.stream_index, f64::from(track.measurement.integrated_centi_lufs) / 100.0,
+                        f64::from(track.request.settings.integrated_centi_lufs) / 100.0));
+                }
                 ui.separator();
                 for outcome in &plan.resolution.outcomes {
                     ui.label(match outcome.output_index {

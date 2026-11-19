@@ -1,5 +1,6 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
+mod audio_normalization;
 mod budget;
 mod capabilities;
 mod media;
@@ -423,6 +424,7 @@ impl Engine {
         }
         source_stamp.revalidate()?;
         let mut plan = Plan {
+            audio_normalization: Vec::new(),
             packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
@@ -470,7 +472,8 @@ impl Engine {
         } else {
             OutputProfile::Matroska
         };
-        if plan.verification_scope != profile.scope() {
+        let expected_scope = if plan.audio_normalization.is_empty() { profile.scope() } else { audio_normalization::SCOPE };
+        if plan.verification_scope != expected_scope {
             return Err(DomainError::new(
                 "INVALID_PLAN",
                 "Review a fresh plan for the current verification contract",
@@ -492,6 +495,8 @@ impl Engine {
         if plan.resolution.action == CleanAction::Remux {
             let expected = if plan.packet_cut.is_some() {
                 packet_cut::invocation(plan, profile)?
+            } else if !plan.audio_normalization.is_empty() {
+                audio_normalization::invocation(plan, profile)?
             } else {
                 lower_with_additions(&plan.source, &plan.resolution, profile, &plan.added_tracks)?
             };
@@ -748,7 +753,7 @@ impl Engine {
             )
             .await?;
         verify_structure(plan, &observed)?;
-        let verification = preservation::verify(
+        let mut verification = preservation::verify(
             self,
             plan,
             staging.path(),
@@ -767,6 +772,12 @@ impl Engine {
         let stage_path = staging.path().to_owned();
         let token = cancel.clone();
         let actual = blocking(move || files::identity(&stage_path, &token)).await?;
+        if !plan.audio_normalization.is_empty() {
+            let measured = self.verify_normalization(plan, &observed, &actual, cancel.clone()).await?;
+            verification.push(' ');
+            verification.push_str(&measured.join(". "));
+            verification.push('.');
+        }
         let source = plan.source.identity.clone();
         let token = cancel.clone();
         let source_stamp = blocking(move || {

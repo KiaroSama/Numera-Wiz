@@ -118,6 +118,10 @@ individual stream indices, language, title and disposition overrides. Choose
 reviewed plan. **Remove original tracks** selects audio or subtitle streams to
 drop. **Strip global metadata** can be used by itself or with the track changes.
 
+For selected PCM s16le mono or stereo tracks, open **Normalize PCM audio
+loudness**, select up to two tracks and set each target and peak limit. Choose
+**Measure and review**. The review lists each original measurement and target.
+
 ## Packet copy cut
 
 Select a registered Matroska video and enter a new `.mkv` destination. In

@@ -138,6 +138,34 @@ fn loudness_measurements(stderr: &str) -> Option<LoudnessValues> {
 }
 
 impl Engine {
+    pub async fn measure_normalization_track(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        request: nw_domain::audio_normalization::TrackRequest,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::audio_normalization::Track> {
+        use nw_domain::audio_normalization::{FirstPass, Track};
+        request.settings.validate()?;
+        let graph = format!("{}:print_format=json", request.settings.loudnorm());
+        let (_, measured) = self.measure_registered_audio(asset, source, request.stream_index,
+            cancel, &graph, loudness_measurements).await?;
+        let (Some(integrated), Some(peak)) = (measured.integrated, measured.true_peak) else {
+            return Err(DomainError::new("NORMALIZATION_UNQUALIFIED", "Source signal did not produce finite first-pass loudness facts"));
+        };
+        let track = Track {
+            request,
+            measurement: FirstPass {
+                integrated_centi_lufs: integrated,
+                true_peak_centi_dbtp: peak,
+                range_centi_lu: measured.range,
+                gate_centi_lufs: measured.gate,
+            },
+        };
+        track.validate()?;
+        Ok(track)
+    }
+
     pub async fn measure_volume(
         &self,
         asset: &Asset,

@@ -65,6 +65,8 @@ pub struct JobSummary {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PlanReview {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audio_normalization: Vec<crate::audio_normalization::Track>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packet_cut: Option<crate::time::TimeRange>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -130,6 +132,7 @@ impl PlanReview {
     ) -> Self {
         Self {
             packet_cut: plan.packet_cut,
+            audio_normalization: plan.audio_normalization.clone(),
             added_tracks: Vec::new(),
             source_probe_timeout: plan.source.probe.probe_timeout,
             execution_limits: plan.execution_limits.clone(),

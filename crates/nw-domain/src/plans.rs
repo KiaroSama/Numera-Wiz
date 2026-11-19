@@ -73,6 +73,7 @@ fn invalid(message: &str) -> DomainError {
 pub fn digest(plan: &Plan) -> Result<String> {
     match plan.schema_version {
         1 if plan.required_rights.is_none()
+            && plan.audio_normalization.is_empty()
             && plan.packet_cut.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
@@ -120,6 +121,16 @@ pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
             return Err(invalid(
                 "A packet cut requires one source and an explicit chapter drop policy",
             ));
+        }
+    }
+    if !plan.audio_normalization.is_empty() {
+        if !plan.added_tracks.is_empty() || plan.packet_cut.is_some() {
+            return Err(invalid("Audio normalization uses one uncut original source"));
+        }
+        let requests = plan.audio_normalization.iter().map(|track| track.request).collect::<Vec<_>>();
+        crate::audio_normalization::validate_requests(&requests)?;
+        for track in &plan.audio_normalization {
+            track.validate()?;
         }
     }
     let rights = plan
@@ -247,6 +258,7 @@ mod tests {
         };
         let output = "/exports/output.mkv".to_owned();
         let mut plan = Plan {
+            audio_normalization: Vec::new(),
             packet_cut: None,
             added_tracks: Vec::new(),
             execution_limits: None,

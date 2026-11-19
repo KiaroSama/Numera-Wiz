@@ -7,6 +7,7 @@ mod config_import;
 mod folders;
 mod jobs;
 mod observations;
+mod normalize;
 mod packet_cut;
 mod preview;
 mod projects;
@@ -160,6 +161,7 @@ pub struct WizApp {
     observations: observations::ObservationUi,
     track_append: track_append::TrackAppendUi,
     packet_cut: packet_cut::CutForm,
+    normalize: normalize::NormalizeUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -352,6 +354,7 @@ impl WizApp {
             observations: Default::default(),
             track_append: Default::default(),
             packet_cut: Default::default(),
+            normalize: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -392,6 +395,7 @@ impl WizApp {
             self.observations = Default::default();
             self.track_append = Default::default();
             self.packet_cut = Default::default();
+            self.normalize = Default::default();
             self.compare_audio_indices = asset
                 .probe
                 .streams
@@ -1581,6 +1585,7 @@ impl eframe::App for WizApp {
                 self.observations_panel(ui, &asset);
                 self.track_append_panel(ui, &asset);
                 self.packet_cut_panel(ui, &asset);
+                self.normalize_panel(ui, &asset);
             }
         });
         if !self.folder.open {

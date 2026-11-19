@@ -272,7 +272,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-bsf=pcm_rechunk",
         "--enable-parser=png,mjpeg",
         "--enable-indev=lavfi",
-        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm,split,psnr,ssim,showinfo,sidedata",
+        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm,volume,split,psnr,ssim,showinfo,sidedata",
         "--enable-swscale",
         "--enable-swresample",
     ];
