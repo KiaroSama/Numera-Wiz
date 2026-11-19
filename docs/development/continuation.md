@@ -14,7 +14,22 @@ The [first-export walkthrough](../manuals/QUICKSTART.md) includes a generated
 four-frame source and Linux, macOS and PowerShell examples. Each standalone
 packager runs the same typed CLI sequence with the shipped media sample. It
 records the reviewed plan hash and independently compares the published and
-downloaded files. Hosted qualification for the extended walkthrough is pending.
+downloaded files. On `241ca51`, the Linux x64 standalone application completed
+the first export and verified the saved bytes. Archive inspection matched the
+sample, manual, six agent manifests and the packaged executable.
+[Linux first-export artifact](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/artifacts/14526695217)
+
+On the same commit, a folder cleanup batch kept the relative paths of two
+Unicode-named videos and published the exact companion bytes. The CLI and both
+MCP transports produced the same review hash. A changed companion was refused
+before acceptance and existing destination files kept their original bytes.
+[Folder cleanup evidence](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/artifacts/14527335519)
+
+The official MCP run on `241ca51` exercised inline PNG timeline observations
+and PCM WAVE delivery. It compared the decoded PNG to the original rendered
+pixels and checked the captured sequence interval and source presentation time.
+The WAVE requests preserved the selected original samples and produced standard
+audio content over stdio and direct HTTP. [MCP transport run](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135538118743)
 
 All four standalone packages from `aed3798` passed the CPU FFV1 first launch
 on their target runners. Download verification matched the GitHub archive

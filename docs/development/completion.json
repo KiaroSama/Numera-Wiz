@@ -73,7 +73,17 @@
       "subject_id": "R06",
       "subject_kind": "requirement",
       "status": "in_progress",
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "standalone_cli_first_export",
+          "commit": "241ca51f7fcb8e6cf56fb54a6d8a62a267704b26",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135532000512",
+          "artifact_sha256": "191cc90e39b5573b0a78906b9de93058237a2b70c32c158ca4b9e30fdfd11108",
+          "asserted_domain": "Linux x64 standalone first export through its documented typed CLI",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The packaged application registered the bundled sample, reviewed and submitted the exact H.264 plan, then saved a byte-identical verified copy. Archive inspection matched the sample, guide and six agent manifests."
+        }
+      ]
     },
     {
       "subject_id": "R07",
@@ -349,7 +359,17 @@
       "subject_id": "F08",
       "subject_kind": "workflow",
       "status": "in_progress",
-      "evidence": []
+      "evidence": [
+        {
+          "boundary": "retained_relative_cleanup_and_companion_copy",
+          "commit": "241ca51f7fcb8e6cf56fb54a6d8a62a267704b26",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44515441775/job/135538118637",
+          "artifact_sha256": "a31ab4748c4b4931f3d8fc9020f01a7bda03093773f22bf2c214a35d8091cd9d",
+          "asserted_domain": "Retained cleanup snapshot with relative directories, Unicode names and one authorized companion",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The typed CLI and both official MCP transports agreed on the review hash. The batch published two byte-identical videos and one exact companion copy. Existing destinations were retained, occupied names received a number and a changed companion was refused before acceptance."
+        }
+      ]
     },
     {
       "subject_id": "F09",
