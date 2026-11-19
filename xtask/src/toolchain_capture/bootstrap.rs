@@ -229,9 +229,23 @@ fn download(
     }
     command.args(["--", url]);
     let response = process::run(&mut command, deadline, seconds + 5, Some(&partial))?;
-    response
-        .success()
-        .with_context(|| format!("Fetch {}", output.display()))?;
+    if response.failure.is_none() && response.status.code() == Some(28) {
+        let initial = response.success().expect_err("curl transfer timed out");
+        fs::remove_file(&partial).context("Discard the incomplete locked archive before retry")?;
+        tracing::warn!(
+            archive = ?output.file_name(),
+            "Locked archive transfer timed out, retrying once"
+        );
+        process::run(&mut command, deadline, seconds + 5, Some(&partial))?
+            .success()
+            .with_context(|| {
+                format!("Retry fetch {}; initial transfer: {initial}", output.display())
+            })?;
+    } else {
+        response
+            .success()
+            .with_context(|| format!("Fetch {}", output.display()))?;
+    }
     verify(&partial, size, expected_sha256)?;
     fs::rename(&partial, output)?;
     Ok(())

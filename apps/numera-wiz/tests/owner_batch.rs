@@ -1188,13 +1188,13 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         ("picture_retime", &retime_facts),
         ("cpu_avc_export", &avc_facts),
     ];
-    let completed: BTreeMap<_, _> = cases
+    let media_fixture_results: BTreeMap<_, _> = cases
         .iter()
         .map(|(name, facts)| (*name, facts.is_some()))
         .collect();
     std::fs::write(
         evidence.join("independent-media-cases.json"),
-        serde_json::to_vec_pretty(&completed).unwrap(),
+        serde_json::to_vec_pretty(&media_fixture_results).unwrap(),
     )
     .unwrap();
     let second = media.directory.path().join("second-é.mkv");
@@ -2710,5 +2710,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     .unwrap();
     println!("NW_BATCH_MEDIA_REPORT={report}");
     lost_ack::verify(&media, Some(&second)).await;
-    assert!(completed.values().all(|passed| *passed), "{completed:?}");
+    assert!(
+        media_fixture_results.values().all(|passed| *passed),
+        "{media_fixture_results:?}"
+    );
 }
