@@ -38,8 +38,20 @@ fn page_label<T>(page: &Page<T>) -> String {
         }
     )
 }
+
+fn shortcut(ctx: &egui::Context, modifiers: egui::Modifiers, key: egui::Key) -> bool {
+    ctx.input_mut(|input| {
+        let admitted = input.events.iter().any(|event| matches!(event,
+            egui::Event::Key { key: current, pressed: true, repeat: false, modifiers: active, .. }
+            if *current == key && active.shift == modifiers.shift && active.alt == modifiers.alt
+                && active.matches_logically(modifiers)));
+        admitted && input.consume_key(modifiers, key)
+    })
+}
+
 impl WizApp {
     pub(crate) fn project_workspace(&mut self, ui: &mut egui::Ui) {
+        self.project_history_keys(ui.ctx());
         let escape = ui
             .ctx()
             .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
@@ -73,6 +85,65 @@ impl WizApp {
         }
         self.project_sequence_window(ui.ctx());
         self.project_source_window(ui.ctx());
+    }
+
+    fn project_history_keys(&mut self, ctx: &egui::Context) {
+        if !self.project_ready() || ctx.text_edit_focused()
+            || self.projects.sequence_form || self.projects.source_form
+        {
+            return;
+        }
+        let group = self.projects.group.as_ref().expect("Ready project");
+        let command = egui::Modifiers::COMMAND;
+        let shifted_command = egui::Modifiers { shift: true, ..command };
+        if group.summary["history"]["can_undo"] == true
+            && shortcut(ctx, command, egui::Key::Z)
+        {
+            self.mutate_project("history.undo", json!({}), ctx);
+        } else if group.summary["history"]["can_redo"] == true
+            && shortcut(ctx, shifted_command, egui::Key::Z)
+        {
+            self.mutate_project("history.redo", json!({}), ctx);
+        }
+    }
+
+    fn timeline_keys(&mut self, ui: &egui::Ui, group: &Group) {
+        let ctx = ui.ctx();
+        if let Some(position) = ui.input(|input| {
+            input.pointer.any_pressed().then(|| input.pointer.interact_pos()).flatten()
+        }) {
+            self.projects.timeline_key_scope = ui.max_rect().contains(position);
+        }
+        if !self.projects.timeline_key_scope || !self.project_ready()
+            || ctx.text_edit_focused() || self.projects.sequence_form || self.projects.source_form
+        {
+            return;
+        }
+        if let (Some(id), Some(clip)) = (&group.view.clip, &group.clip)
+            && !clip.locked && group.track.as_ref().is_some_and(|track| !track.locked)
+            && (shortcut(ctx, egui::Modifiers::NONE, egui::Key::Backspace)
+                || shortcut(ctx, egui::Modifiers::NONE, egui::Key::Delete))
+        {
+            self.mutate_project("clips.remove", json!({"clip_ids":[id],"mode":"lift","link_policy":"expand"}), ctx);
+            return;
+        }
+        let Ok(at) = self.projects.forms.preview_at.value() else {
+            return;
+        };
+        let Some(clip) = group.viewport.items.iter().find(|clip| {
+            clip.sequence_start <= at && clip.sequence_start.checked_add(clip.duration).is_ok_and(|end| at < end)
+        }) else {
+            return;
+        };
+        if shortcut(ctx, egui::Modifiers::NONE, egui::Key::D) {
+            let mut view = group.view.clone();
+            view.clip = Some(clip.id.to_string());
+            self.project_reselect(view, ctx);
+        } else if clip.sequence_start < at && group.track.as_ref().is_some_and(|track| {
+            !track.locked && nw_domain::projects::grid_tick(at, track.grid).is_ok()
+        }) && shortcut(ctx, egui::Modifiers::COMMAND, egui::Key::K) {
+            self.mutate_project("clips.split", json!({"clip_id":clip.id,"at_sequence":at,"link_policy":"expand"}), ctx);
+        }
     }
     fn project_status(&mut self, ui: &mut egui::Ui) {
         ui.label(if self.waiting {
@@ -328,6 +399,7 @@ impl WizApp {
         let Some(group) = self.projects.group.clone() else {
             return;
         };
+        self.timeline_keys(ui, &group);
         let ready = self.project_ready();
         ui.heading("Sequence");
         if let Some(sequence) = &group.sequence {
@@ -368,6 +440,7 @@ impl WizApp {
                         group.summary["history"]["can_undo"] == true,
                         egui::Button::new("Undo"),
                     )
+                    .on_hover_text("Command/Ctrl+Z")
                     .clicked()
                 {
                     self.mutate_project("history.undo", json!({}), ui.ctx());
@@ -377,6 +450,7 @@ impl WizApp {
                         group.summary["history"]["can_redo"] == true,
                         egui::Button::new("Redo"),
                     )
+                    .on_hover_text("Command/Ctrl+Shift+Z")
                     .clicked()
                 {
                     self.mutate_project("history.redo", json!({}), ui.ctx());

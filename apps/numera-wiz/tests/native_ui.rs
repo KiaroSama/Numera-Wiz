@@ -970,6 +970,8 @@ impl project_workbench::Driver for NativeProjects<'_> {
             project_workbench::Key::Escape => "Escape",
             project_workbench::Key::CtrlEnter => "ctrl+Return",
             project_workbench::Key::CtrlShiftEnter => "ctrl+shift+Return",
+            project_workbench::Key::CtrlZ => "ctrl+z",
+            project_workbench::Key::CtrlShiftZ => "ctrl+shift+z",
         };
         input(&["key", "--clearmodifiers", key]).await;
     }

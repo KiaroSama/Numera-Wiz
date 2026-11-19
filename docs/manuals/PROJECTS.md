@@ -255,6 +255,18 @@ numera-wiz tracks set-locked TRACK --locked true --project PROJECT --expected-re
 The MCP command is `tracks.set_locked` with `track_id` and `locked`.
 The track page includes `locked: true` for a committed lock.
 
+## Project keyboard shortcuts
+
+Use Command on macOS and Ctrl on Windows or Linux. Command/Ctrl+Z undoes
+the current project edit and Command/Ctrl+Shift+Z redoes it. Both follow the
+same revision and access checks as the buttons.
+
+Click the timeline to activate its shortcuts. `D` selects the clip under the
+exact time shown in **Timeline frame**. Command/Ctrl+K splits there when the
+position is inside an editable clip. Backspace or Delete lifts the selected
+clip. Edit fields retain their keyboard input. If the browser captures the
+split shortcut, **Split selected clip** accepts the same exact time.
+
 ## Export a CMX 3600 cut list
 
 Select an enabled picture track in a sequence at 24, 25 or 30 fps. Set an

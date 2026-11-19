@@ -154,12 +154,14 @@ impl shared::Driver for BrowserProjects<'_> {
         self.painted().await;
     }
     async fn key(&mut self, key: shared::Key) {
-        if matches!(key, shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter) {
-            let keys: &[&str] = if matches!(key, shared::Key::CtrlShiftEnter) {
-                &["\u{E009}", "\u{E008}", "\u{E007}"]
-            } else {
-                &["\u{E009}", "\u{E007}"]
-            };
+        let chord: Option<&[&str]> = match key {
+            shared::Key::CtrlEnter => Some(&["\u{E009}", "\u{E007}"]),
+            shared::Key::CtrlShiftEnter => Some(&["\u{E009}", "\u{E008}", "\u{E007}"]),
+            shared::Key::CtrlZ => Some(&["\u{E009}", "z"]),
+            shared::Key::CtrlShiftZ => Some(&["\u{E009}", "\u{E008}", "z"]),
+            _ => None,
+        };
+        if let Some(keys) = chord {
             let actions = keys
                 .iter()
                 .map(|value| json!({"type":"keyDown","value":value}))
@@ -182,7 +184,7 @@ impl shared::Driver for BrowserProjects<'_> {
                 shared::Key::Tab => "\u{E004}",
                 shared::Key::Space => " ",
                 shared::Key::Escape => "\u{E00C}",
-                shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter => unreachable!(),
+                shared::Key::CtrlEnter | shared::Key::CtrlShiftEnter | shared::Key::CtrlZ | shared::Key::CtrlShiftZ => unreachable!(),
             };
             browser_key(self.client, self.base, self.route, value).await;
         }

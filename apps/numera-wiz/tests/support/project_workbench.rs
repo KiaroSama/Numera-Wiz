@@ -47,6 +47,8 @@ pub enum Key {
     Escape,
     CtrlEnter,
     CtrlShiftEnter,
+    CtrlZ,
+    CtrlShiftZ,
 }
 #[derive(Clone, Copy)]
 pub enum Policy {
@@ -909,7 +911,11 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
         group_clip(driver, graph, row, clip, binding, None).await;
     }
     driver.screenshot("group-unlinked").await;
-    let undo = activate(driver, 390, 100, "history.undo", 8).await;
+    driver.mark().await;
+    driver.key(Key::CtrlZ).await;
+    let undo = driver.observed("history.undo").await;
+    assert_eq!(undo.code, "OK");
+    driver.loaded(8).await;
     assert_eq!(
         undo.expected_revision.as_deref(),
         Some(graph.revision.as_str())
@@ -920,7 +926,11 @@ async fn clip_group_journey<D: Driver>(driver: &mut D, graph: &mut Graph, name: 
         group_clip(driver, graph, row, clip, binding, Some(&group)).await;
     }
     driver.screenshot("group-undo-same-identity").await;
-    let redo = activate(driver, 435, 100, "history.redo", 8).await;
+    driver.mark().await;
+    driver.key(Key::CtrlShiftZ).await;
+    let redo = driver.observed("history.redo").await;
+    assert_eq!(redo.code, "OK");
+    driver.loaded(8).await;
     assert_eq!(
         redo.expected_revision.as_deref(),
         Some(graph.revision.as_str())

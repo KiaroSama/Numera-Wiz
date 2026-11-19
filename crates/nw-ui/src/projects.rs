@@ -212,6 +212,7 @@ pub(super) struct ProjectsUi {
     acceptance: Option<String>,
     focus_catalog: bool,
     clip_selection: Option<ClipSelection>,
+    timeline_key_scope: bool,
     preview_frame: Option<(Rational, egui::TextureHandle)>,
     #[cfg(not(target_arch = "wasm32"))]
     native_picture: Option<NativePictureView>,
@@ -423,6 +424,7 @@ impl WizApp {
         if matches!(target, Navigation::Catalog | Navigation::Cleanup) {
             self.projects.sequence_form = false;
             self.projects.source_form = false;
+            self.projects.timeline_key_scope = false;
         }
         self.projects.stale = self.projects.group.is_some();
         self.projects.terminal_failure = false;
