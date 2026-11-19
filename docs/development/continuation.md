@@ -22,6 +22,19 @@ desktop build and tests passed, with portable packaging still failing.
 on that commit. The portable jobs now retain bounded failure reports, and
 the macOS Intel job has its own pinned inputs.
 
+[CI359](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44439728409)
+found an unresolved reference in the offline bootstrap worker. The worker
+now calls the shared failure reporter. The staged Unix media directory is
+created with owner-only permissions, as required by its existing verifier.
+The Linux first-launch exercise uses the same protected-directory helper.
+
+The MacPorts input lock's upstream revision and digest refer to a public
+archive verification key. That Ed25519 key was downloaded from the pinned
+official MacPorts revision and independently verified all 64 locked vendor
+archives. Gitleaks still reports both historical matches. The classifier
+reviews them only at those two lines, with the matching rule and the
+complete verified historical file digest.
+
 [CI329](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44388206616) passed
 all thirteen required jobs on `cbc8c9d`. It verified the four native builds
 and regressions, real native and Chrome input, registered frame and original

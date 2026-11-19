@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository }}
-          ref: b4c747acd88817da7f99e006047376b88306c008
+          ref: 0113d09d089b7c94d87e91cb55b9cf69377cdf19
           path: security-tool-source
           fetch-depth: 1
           persist-credentials: false
