@@ -1313,6 +1313,15 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             "mp4",
             "strict_size",
         ),
+        (
+            "mpeg4",
+            "mpeg4",
+            Some("mp4v"),
+            "mp4",
+            "mp4",
+            "quality_vbr",
+        ),
+        ("mpeg4", "mpeg4", None, "matroska", "mkv", "strict_size"),
     ] {
         let output = directory.join(format!("{codec}-export-{mode}.{extension}"));
         let settings = json!({
@@ -1363,7 +1372,11 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let picture = &observed["streams"][0];
         assert_eq!(picture["codec_name"], codec);
         assert_eq!(picture["sample_aspect_ratio"], "4:3");
-        assert_eq!(picture["color_range"], "tv");
+        if codec == "mpeg4" && container == "mp4" {
+            assert!(picture["color_range"].is_null() || picture["color_range"] == "tv");
+        } else {
+            assert_eq!(picture["color_range"], "tv");
+        }
         if let Some(tag) = tag {
             assert_eq!(picture["codec_tag_string"], tag);
         }
@@ -1374,6 +1387,35 @@ async fn cpu_avc_export(parent: &Path) -> Value {
           "presentation_ms":clock,"matching_import_plan":true}),
         );
     }
+
+    let output = directory.join("mpeg4-export-quantizer.mp4");
+    let plan = cli
+        .query(
+            "media.encode",
+            json!({"asset_id":original["id"],"output":output,"settings":{
+                "video_stream":0,"container":"mp4","codec":"mpeg4","quantizer":4,
+                "preset":"balanced","audio":{"kind":"drop"}
+            }}),
+        )
+        .await;
+    let quantizer_job = accepted(
+        &cli,
+        &scope,
+        "run-mpeg4-quantizer",
+        "jobs.submit",
+        json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+    )
+    .await;
+    succeeded(&cli, &quantizer_job).await;
+    let observed = fixture::probe(&components, &output).await;
+    let picture = &observed["streams"][0];
+    assert_eq!(picture["codec_name"], "mpeg4");
+    assert_eq!(picture["codec_tag_string"], "mp4v");
+    assert_eq!(picture["sample_aspect_ratio"], "4:3");
+    let clock = video_milliseconds(picture, &packets(&components, &output).await[&0]);
+    assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
+    results.push(json!({"job":quantizer_job["job_id"],"container":"mp4","codec":"mpeg4",
+        "quantizer":4,"presentation_ms":clock}));
 
     for (mode, peak, buffer, crop, resize) in [
         ("quality_vbr", "1400k", "2800k", "crop=31,41,39,29", false),

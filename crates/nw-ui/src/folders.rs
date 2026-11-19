@@ -31,6 +31,7 @@ pub(super) struct FolderUi {
     encode_container: Container,
     encode_codec: VideoCodec,
     encode_crf: u8,
+    encode_quantizer: u8,
     encode_preset: Preset,
     encode_audio: bool,
     extract: ExtractSelector,
@@ -67,6 +68,7 @@ impl Default for FolderUi {
             encode_container: Container::Mp4,
             encode_codec: VideoCodec::H264,
             encode_crf: 18,
+            encode_quantizer: 4,
             encode_preset: Preset::Balanced,
             encode_audio: true,
             extract: ExtractSelector {
@@ -714,14 +716,22 @@ impl WizApp {
                     ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Hevc, "HEVC");
                     ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Av1, "AV1");
                     ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Vp9, "VP9");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Mpeg4, "MPEG-4");
                     ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
                     ui.radio_value(
                         &mut self.folder.encode_container,
                         Container::Matroska,
                         "Matroska",
                     );
-                    ui.label("Quality CRF");
-                    ui.add(egui::DragValue::new(&mut self.folder.encode_crf).range(1..=51));
+                    if self.folder.encode_codec == VideoCodec::Mpeg4 {
+                        ui.label("Quantizer");
+                        ui.add(
+                            egui::DragValue::new(&mut self.folder.encode_quantizer).range(1..=31),
+                        );
+                    } else {
+                        ui.label("Quality CRF");
+                        ui.add(egui::DragValue::new(&mut self.folder.encode_crf).range(1..=51));
+                    }
                     egui::ComboBox::from_id_salt("folder-encode-preset")
                         .selected_text(format!("{:?}", self.folder.encode_preset))
                         .show_ui(ui, |ui| {
@@ -745,13 +755,15 @@ impl WizApp {
                     )
                     .clicked()
                 {
+                    let quantized = self.folder.encode_codec == VideoCodec::Mpeg4;
                     let settings = FolderEncodeInput {
                         snapshot_id: snapshot.id.clone(),
                         snapshot_hash: snapshot.hash.clone(),
                         output_root: self.folder.batch_output_root.clone(),
                         container: self.folder.encode_container,
                         codec: self.folder.encode_codec,
-                        crf: self.folder.encode_crf,
+                        crf: (!quantized).then_some(self.folder.encode_crf),
+                        quantizer: quantized.then_some(self.folder.encode_quantizer),
                         preset: self.folder.encode_preset,
                         audio: if self.folder.encode_audio {
                             FolderAudio::Aac {

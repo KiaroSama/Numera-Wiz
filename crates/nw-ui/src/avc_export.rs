@@ -16,6 +16,7 @@ pub(super) struct AvcUi {
     audio: Option<u32>,
     bitrate: u16,
     crf: u8,
+    quantizer: u8,
     codec: VideoCodec,
     average_kbps: u32,
     rate_mode: Option<RateMode>,
@@ -30,6 +31,7 @@ impl Default for AvcUi {
             audio: None,
             bitrate: 128,
             crf: 18,
+            quantizer: 4,
             codec: VideoCodec::H264,
             average_kbps: 2000,
             rate_mode: None,
@@ -49,7 +51,7 @@ impl WizApp {
                 item.kind == StreamKind::Video
                     && matches!(
                         item.codec.as_str(),
-                        "ffv1" | "h264" | "hevc" | "av1" | "vp9"
+                        "ffv1" | "h264" | "hevc" | "av1" | "vp9" | "mpeg4"
                     )
                     && !item.attached_picture()
             })
@@ -89,6 +91,9 @@ impl WizApp {
                     changed |= ui
                         .radio_value(&mut self.avc_export.codec, VideoCodec::Vp9, "VP9")
                         .changed();
+                    changed |= ui
+                        .radio_value(&mut self.avc_export.codec, VideoCodec::Mpeg4, "MPEG-4")
+                        .changed();
                 });
                 let chosen = self.avc_export.picture.get_or_insert(pictures[0].index);
                 egui::ComboBox::from_id_salt("avc-picture")
@@ -104,10 +109,12 @@ impl WizApp {
                                 .changed();
                         }
                     });
+                let quantized = self.avc_export.codec == VideoCodec::Mpeg4;
+                let quality_label = if quantized { "Quantizer" } else { "Quality CRF" };
                 ui.horizontal_wrapped(|ui| {
                     egui::ComboBox::from_id_salt("avc-rate-mode")
                         .selected_text(match self.avc_export.rate_mode {
-                            None => "Quality CRF",
+                            None => quality_label,
                             Some(RateMode::QualityVbr) => "Variable bitrate",
                             Some(RateMode::StrictSize) => "Bitrate with peak cap",
                         })
@@ -116,7 +123,7 @@ impl WizApp {
                                 .selectable_value(
                                     &mut self.avc_export.rate_mode,
                                     None,
-                                    "Quality CRF",
+                                    quality_label,
                                 )
                                 .changed();
                             changed |= ui
@@ -140,6 +147,12 @@ impl WizApp {
                                 egui::DragValue::new(&mut self.avc_export.average_kbps)
                                     .range(64..=100000)
                                     .suffix(" kbps"),
+                            )
+                            .changed();
+                    } else if quantized {
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut self.avc_export.quantizer).range(1..=31),
                             )
                             .changed();
                     } else {
@@ -226,15 +239,14 @@ impl WizApp {
             self.changed();
         }
         if review {
+            let quality = self.avc_export.rate_mode.is_none();
+            let quantized = self.avc_export.codec == VideoCodec::Mpeg4;
             let settings = Encode {
                 video_stream: self.avc_export.picture.expect("Registered picture stream"),
                 container: container.expect("Reviewed destination extension"),
                 codec: self.avc_export.codec,
-                crf: self
-                    .avc_export
-                    .rate_mode
-                    .is_none()
-                    .then_some(self.avc_export.crf),
+                crf: (quality && !quantized).then_some(self.avc_export.crf),
+                quantizer: (quality && quantized).then_some(self.avc_export.quantizer),
                 bitrate: self.avc_export.rate_mode.map(|mode| Bitrate {
                     average_kbps: self.avc_export.average_kbps,
                     mode,

@@ -18,6 +18,7 @@ pub(super) const SCOPE: &str = "Verify source and AVC output picture counts and 
 const HEVC_SCOPE: &str = "Verify source and HEVC output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies hvc1 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
 const AV1_SCOPE: &str = "Verify source and AV1 output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies av01 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
 const VP9_SCOPE: &str = "Verify source and VP9 output picture counts and presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies vp09 signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
+const MPEG4_SCOPE: &str = "Verify source and MPEG-4 Part 2 output picture counts, presentation clocks, raster, aspect and observed SDR signaling. MP4 verifies mp4v signaling. Optional AAC output verifies original rate, channel count and bounded coded audio timing.";
 
 pub(super) fn scope(codec: VideoCodec) -> &'static str {
     match codec {
@@ -25,6 +26,7 @@ pub(super) fn scope(codec: VideoCodec) -> &'static str {
         VideoCodec::Hevc => HEVC_SCOPE,
         VideoCodec::Av1 => AV1_SCOPE,
         VideoCodec::Vp9 => VP9_SCOPE,
+        VideoCodec::Mpeg4 => MPEG4_SCOPE,
     }
 }
 
@@ -254,11 +256,11 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
         || picture.attached_picture()
         || !matches!(
             picture.codec.as_str(),
-            "ffv1" | "h264" | "hevc" | "av1" | "vp9"
+            "ffv1" | "h264" | "hevc" | "av1" | "vp9" | "mpeg4"
         )
     {
         return Err(unavailable(
-            "Choose an original SDR FFV1, H.264, HEVC, AV1 or VP9 picture",
+            "Choose an original SDR FFV1, H.264, HEVC, AV1, VP9 or MPEG-4 picture",
         ));
     }
     if let Audio::Aac { stream_index, .. } = settings.audio {
@@ -410,7 +412,7 @@ impl Engine {
         let output_picture = stream(observed, primary.index)?;
         let original_is_compressed = matches!(
             plan.resolution.streams[0].codec.as_str(),
-            "h264" | "hevc" | "av1" | "vp9"
+            "h264" | "hevc" | "av1" | "vp9" | "mpeg4"
         );
         if let Some(tag) = mp4_codec_tag(encode)
             && output_picture["codec_tag_string"] != tag
@@ -439,7 +441,10 @@ impl Engine {
             let implicit_limited_range = field == "color_range"
                 && (expected == "tv"
                     || (original_is_compressed
-                        || matches!(encode.codec, VideoCodec::Av1 | VideoCodec::Vp9))
+                        || matches!(
+                            encode.codec,
+                            VideoCodec::Av1 | VideoCodec::Vp9 | VideoCodec::Mpeg4
+                        ))
                         && missing(expected))
                 && (actual == "tv" || missing(actual));
             if !(expected == actual
@@ -472,6 +477,7 @@ fn mp4_codec_tag(settings: &Encode) -> Option<&'static str> {
         (Container::Mp4, VideoCodec::Hevc) => Some("hvc1"),
         (Container::Mp4, VideoCodec::Av1) => Some("av01"),
         (Container::Mp4, VideoCodec::Vp9) => Some("vp09"),
+        (Container::Mp4, VideoCodec::Mpeg4) => Some("mp4v"),
         _ => None,
     }
 }
@@ -512,6 +518,11 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
     }
     admit(&plan.source, &plan.resolution)?;
     let clock = crate::preservation::stream_clock(&plan.source.probe, settings.video_stream)?;
+    if settings.codec == VideoCodec::Mpeg4 && clock.denominator() > i64::from(u16::MAX) {
+        return Err(unavailable(
+            "MPEG-4 Part 2 requires an original time base with at most 65535 ticks per second",
+        ));
+    }
     if settings.container == Container::Matroska && 1000 % clock.denominator() != 0 {
         return Err(unavailable(
             "Use MP4 for original stream timestamps that may require sub-millisecond precision",
@@ -524,6 +535,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
         (VideoCodec::Vp9, Preset::Fast) => "4",
         (VideoCodec::Vp9, Preset::Balanced) => "2",
         (VideoCodec::Vp9, Preset::Slow) => "0",
+        (VideoCodec::Mpeg4, Preset::Fast) => "simple",
+        (VideoCodec::Mpeg4, Preset::Balanced) => "bits",
+        (VideoCodec::Mpeg4, Preset::Slow) => "rd",
         (_, Preset::Fast) => "fast",
         (_, Preset::Balanced) => "medium",
         (_, Preset::Slow) => "slow",
@@ -557,11 +571,13 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
             ]
             .map(str::to_owned),
         );
+    } else if settings.codec == VideoCodec::Mpeg4 {
+        export.extend(["-mbd", preset].map(str::to_owned));
     } else {
         export.extend(["-preset", preset].map(str::to_owned));
     }
     export.extend(["-pix_fmt", "yuv420p"].map(str::to_owned));
-    if matches!(settings.codec, VideoCodec::H264 | VideoCodec::Hevc) {
+    if matches!(settings.codec, VideoCodec::H264 | VideoCodec::Hevc | VideoCodec::Mpeg4) {
         export.extend(["-bf".into(), "0".into()]);
     }
     export.extend(
@@ -601,6 +617,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
             export.extend(["-b:v".into(), "0".into()]);
         }
     }
+    if let Some(quantizer) = settings.quantizer {
+        export.extend(["-q:v".into(), quantizer.to_string()]);
+    }
     if let Some(bitrate) = settings.bitrate {
         let (peak, buffer) = bitrate.limits();
         export.extend([
@@ -611,7 +630,9 @@ pub(super) fn invocation(plan: &Plan, output_profile: OutputProfile) -> Result<V
             "-bufsize:v".into(),
             format!("{buffer}k"),
         ]);
-        if settings.codec == VideoCodec::Vp9 && bitrate.mode == RateMode::StrictSize {
+        if matches!(settings.codec, VideoCodec::Vp9 | VideoCodec::Mpeg4)
+            && bitrate.mode == RateMode::StrictSize
+        {
             export.extend(["-minrate:v".into(), format!("{}k", bitrate.average_kbps)]);
         }
     }

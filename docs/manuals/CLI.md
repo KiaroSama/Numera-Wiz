@@ -86,7 +86,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `streams extract-folder --file FOLDER-EXTRACTION.json` | Resolve one track type and ordinal per source in a retained folder snapshot, with derived Matroska destinations in a separate directory. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
-| `jobs plan --asset ID --file IMPORT.json` | Review an admitted FFmWiz packet-copy, FFV1 retime, H.264, HEVC, AV1 or VP9 job against its registered source. |
+| `jobs plan --asset ID --file IMPORT.json` | Review an admitted FFmWiz packet-copy, FFV1 retime, H.264, HEVC, AV1, VP9 or MPEG-4 job against its registered source. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
 | `jobs cancel ID --replay-scope SCOPE --idempotency-key KEY` | Request cancellation of the selected accepted job. |
@@ -1007,12 +1007,12 @@ For an imported FFmWiz FFV1 picture job, set `audio_tracks=none` and
 Fields outside the picture-only profile receive field-specific errors.
 
 
-### Encode H.264, HEVC, AV1 or VP9 with optional AAC
+### Encode H.264, HEVC, AV1, VP9 or MPEG-4 with optional AAC
 
 Use `numera-wiz media encode --file export.json` with a registered
-SDR FFV1, H.264, HEVC, AV1 or VP9 picture in Matroska or self-contained MP4/MOV. Choose a
-new MP4 or Matroska destination. Use MP4 when the original clock may
-contain sub-millisecond timestamps.
+SDR FFV1, H.264, HEVC, AV1, VP9 or MPEG-4 picture in Matroska or self-contained
+MP4/MOV. Choose a new MP4 or Matroska destination. Use MP4 for original
+sub-millisecond timestamps.
 
 ```json
 {
@@ -1035,20 +1035,23 @@ mono or stereo rate and verifies the coded timing. Review and submit
 the returned plan ID and hash.
 
 The default codec is H.264. Set `"codec":"hevc"` for `libx265`,
-`"codec":"av1"` for `libsvtav1`, or `"codec":"vp9"` for `libvpx-vp9`.
-MP4 verifies the `hvc1`, `av01` or `vp09` sample entry. AV1 takes an output
-raster of at least 64 × 64. For folder jobs, place `codec` next to `container`
-in the request.
+`"codec":"av1"` for `libsvtav1`, `"codec":"vp9"` for `libvpx-vp9`, or
+`"codec":"mpeg4"` for the FFmpeg MPEG-4 Part 2 encoder. MP4 verifies the
+`hvc1`, `av01`, `vp09` or `mp4v` sample entry. AV1 takes a raster of at least
+64 × 64. MPEG-4 Part 2 uses an original time base of at most 65,535 ticks per
+second. Choose `quantizer` from 1 to 31 for MPEG-4 quality mode. For folder
+jobs, place `codec` next to `container` and provide `crf` or `quantizer` as
+appropriate.
 
 For an average bitrate, supply `"bitrate":{"average_kbps":2000,"mode":"quality_vbr"}`
 in `settings` and omit `crf`. `quality_vbr` uses twice the average as the peak
 and four times the average as the buffer. `strict_size` caps the peak at the
 average and uses twice the average as the buffer. AV1 uses SVT's low-delay
-CBR mode for `strict_size`. VP9 uses equal minimum, average and peak rates
-for `strict_size` and uses constant-quality mode with zero target bitrate
-when a CRF is selected.
+CBR mode for `strict_size`. VP9 and MPEG-4 use equal minimum, average and
+peak rates for `strict_size`. VP9 uses constant-quality mode with zero target
+bitrate when a CRF is selected.
 
-`jobs.plan` also accepts a reviewed FFmWiz CPU H.264, HEVC, AV1 or VP9 profile with an explicit
+`jobs.plan` also accepts a reviewed FFmWiz CPU H.264, HEVC, AV1, VP9 or MPEG-4 profile with an explicit
 video bitrate, `use_gpu=n`, `keep_source_metadata=n` and `subtitle_tracks=none`.
 Choose `audio_tracks=none` or one original audio ordinal with AAC and an explicit
 audio bitrate. Specify crop margins as `crop=top,left,right,bottom` or with

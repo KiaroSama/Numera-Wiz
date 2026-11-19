@@ -22,6 +22,9 @@ pub struct Encode {
     #[schemars(range(min = 1, max = 51))]
     pub crf: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1, max = 31))]
+    pub quantizer: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<Bitrate>,
     pub preset: Preset,
     pub audio: Audio,
@@ -37,6 +40,7 @@ pub enum VideoCodec {
     Hevc,
     Av1,
     Vp9,
+    Mpeg4,
 }
 
 impl VideoCodec {
@@ -50,6 +54,7 @@ impl VideoCodec {
             Self::Hevc => "libx265",
             Self::Av1 => "libsvtav1",
             Self::Vp9 => "libvpx-vp9",
+            Self::Mpeg4 => "mpeg4",
         }
     }
 
@@ -59,6 +64,7 @@ impl VideoCodec {
             Self::Hevc => "hevc",
             Self::Av1 => "av1",
             Self::Vp9 => "vp9",
+            Self::Mpeg4 => "mpeg4",
         }
     }
 }
@@ -210,13 +216,15 @@ pub enum Audio {
 
 impl Encode {
     pub fn validate(&self) -> Result<()> {
-        match (self.crf, self.bitrate) {
-            (Some(crf), None) if (1..=51).contains(&crf) => {}
-            (None, Some(bitrate)) if (64..=100000).contains(&bitrate.average_kbps) => {}
+        let mpeg4 = self.codec == VideoCodec::Mpeg4;
+        match (self.crf, self.quantizer, self.bitrate) {
+            (Some(crf), None, None) if !mpeg4 && (1..=51).contains(&crf) => {}
+            (None, Some(value), None) if mpeg4 && (1..=31).contains(&value) => {}
+            (None, None, Some(bitrate)) if (64..=100000).contains(&bitrate.average_kbps) => {}
             _ => {
                 return Err(DomainError::new(
                     "VALIDATION_ERROR",
-                    "Choose one CRF from 1 to 51 or an average bitrate from 64 to 100000 kbps",
+                    "Choose a CRF from 1 to 51, an MPEG-4 quantizer from 1 to 31, or a bitrate from 64 to 100000 kbps",
                 ));
             }
         }
@@ -296,8 +304,12 @@ pub struct FolderEncodeInput {
     pub container: Container,
     #[serde(default, skip_serializing_if = "VideoCodec::is_h264")]
     pub codec: VideoCodec,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(range(min = 1, max = 51))]
-    pub crf: u8,
+    pub crf: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1, max = 31))]
+    pub quantizer: Option<u8>,
     pub preset: Preset,
     pub audio: FolderAudio,
     pub failure_policy: crate::batches::FailurePolicy,
@@ -363,7 +375,8 @@ impl FolderEncodeInput {
             video_stream: picture.index,
             container: self.container,
             codec: self.codec,
-            crf: Some(self.crf),
+            crf: self.crf,
+            quantizer: self.quantizer,
             bitrate: None,
             preset: self.preset,
             audio,

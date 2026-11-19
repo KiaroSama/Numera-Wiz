@@ -48,8 +48,9 @@ export and continuous preview remain in development.
   measured loudness.
 - Cut or split compatible Matroska files at original keyframes and review
   ordered copy joins of compatible sources.
-- Export registered SDR FFV1, H.264, HEVC, AV1 or VP9 media as CPU H.264, HEVC,
-  AV1 or VP9 in MP4 or Matroska, with optional AAC and verified presentation times.
+- Export registered SDR FFV1, H.264, HEVC, AV1, VP9 or MPEG-4 media as CPU H.264,
+  HEVC, AV1, VP9 or MPEG-4 Part 2 in MP4 or Matroska, with optional AAC and
+  verified presentation times.
 - Burn embedded or external SubRip with the offline DejaVu Sans font. Review
   lossless FFV1 output with original SDR signaling or a PQ/HLG-to-BT.709 tone map.
 - Edit ordered PCM sample ranges with independent reversal and tempo controls.

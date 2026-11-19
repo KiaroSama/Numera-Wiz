@@ -649,6 +649,7 @@ pub(super) async fn verify_avc_timing(
         nw_domain::avc_export::VideoCodec::Hevc => "HEVC",
         nw_domain::avc_export::VideoCodec::Av1 => "AV1",
         nw_domain::avc_export::VideoCodec::Vp9 => "VP9",
+        nw_domain::avc_export::VideoCodec::Mpeg4 => "MPEG-4 Part 2",
     };
     let deadline = plan.execution_limits.clone().unwrap_or_default().operation;
     let source = scan(

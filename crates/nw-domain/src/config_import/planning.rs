@@ -153,6 +153,7 @@ impl ImportedJob {
             "hevc" | "libx265" => Some(VideoCodec::Hevc),
             "av1" | "libsvtav1" => Some(VideoCodec::Av1),
             "vp9" | "libvpx-vp9" => Some(VideoCodec::Vp9),
+            "mpeg4" | "mpeg-4" | "mp4v" => Some(VideoCodec::Mpeg4),
             _ => None,
         }
     }
@@ -356,7 +357,7 @@ impl ImportedJob {
         else {
             return Err(DomainError::new(
                 "INVALID_JOB_DOCUMENT",
-                "Use a version 1 FFmWiz profile with CPU H.264, HEVC, AV1 or VP9",
+                "Use a version 1 FFmWiz profile with CPU H.264, HEVC, AV1, VP9 or MPEG-4",
             ));
         };
         let source = self.imported_source()?;
@@ -532,6 +533,7 @@ impl ImportedJob {
             video_stream: picture.index,
             container,
             crf: None,
+            quantizer: None,
             bitrate: Some(Bitrate { average_kbps, mode }),
             preset: Preset::Balanced,
             audio,
