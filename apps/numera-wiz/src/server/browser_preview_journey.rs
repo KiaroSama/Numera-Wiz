@@ -7,6 +7,47 @@ use std::{io::Write, path::Path, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 const COMPONENTS: &str = "NW_BROWSER_PREVIEW_COMPONENTS";
+const CHROME_CONTINUOUS: &str = r#"
+const [bearer, input, finish] = arguments;
+function waiting(video, name, start) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(name + ' deadline')), 4500);
+        video.addEventListener(name, () => { clearTimeout(timer); resolve(); }, {once: true});
+        video.addEventListener('error', () => { clearTimeout(timer); reject(new Error('video decode')); }, {once: true});
+        start();
+    });
+}
+(async () => {
+    const response = await fetch('/api/v1/previews/program', {
+        method: 'POST', redirect: 'error',
+        headers: {'Authorization': `Bearer ${bearer}`, 'Content-Type': 'application/json'},
+        body: JSON.stringify(input)
+    });
+    if (!response.ok || response.headers.get('Cache-Control') !== 'no-store') throw new Error('Program stream unavailable');
+    const bytes = await response.blob();
+    if (bytes.size < 1 || bytes.size > 2 * 1024 * 1024) throw new Error('Unexpected sample extent');
+    const url = URL.createObjectURL(bytes);
+    const video = document.createElement('video');
+    video.muted = true;
+    document.body.append(video);
+    try {
+        await waiting(video, 'loadeddata', () => video.src = url);
+        await waiting(video, 'seeked', () => video.currentTime = 5.5);
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 180;
+        const image = canvas.getContext('2d', {willReadFrequently: true});
+        image.drawImage(video, 0, 0);
+        finish({ok: true, duration: video.duration, at: video.currentTime,
+            pixel: Array.from(image.getImageData(160, 90, 1, 1).data)});
+    } finally {
+        video.removeAttribute('src');
+        video.load();
+        video.remove();
+        URL.revokeObjectURL(url);
+    }
+})().catch(error => finish({ok: false, code: error.message}));
+"#;
 const CHROME_SEGMENT: &str = r#"
 const [bearer, asset, audio, program, finish] = arguments;
 const headers = {'Authorization': `Bearer ${bearer}`};
@@ -407,6 +448,17 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         late.iter().all(|channel| *channel <= 8),
         "The gap at 5.5 seconds must decode as black"
     );
+    let long_browser = driver(
+        client,
+        base,
+        reqwest::Method::POST,
+        &format!("{route}/execute/async"),
+        json!({"script":CHROME_CONTINUOUS,"args":[bearer,playback_input]}),
+    ).await;
+    assert_eq!(long_browser["ok"], true, "Chrome continuous playback: {long_browser}");
+    assert_eq!(long_browser["at"], 5.5);
+    assert!((5.9..=6.1).contains(&long_browser["duration"].as_f64().unwrap()));
+    assert!(long_browser["pixel"].as_array().unwrap()[..3].iter().all(|channel| channel.as_u64().unwrap() <= 8));
 
     let revision = project_edit(
         service,
@@ -481,7 +533,7 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         serde_json::to_vec_pretty(
             &json!({"cases":reports,"missing_bearer_denied":true,"changed_source_denied":true,
                     "program":{"chrome":program_report,"decoded_audio_window_peaks":peaks,"stale_revision_denied":true,
-                        "continuous":{"bytes":streamed.len(),"verified_frame_index":132,"stale_revision_denied":true}}}),
+                        "continuous":{"bytes":streamed.len(),"verified_frame_index":132,"stale_revision_denied":true,"chrome":long_browser}}}),
         )
         .unwrap(),
     )
