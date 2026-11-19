@@ -6,12 +6,98 @@ use nw_domain::{
     records::Asset, time::Rational,
 };
 use nw_platform::{files::SourceStamp, process};
-use std::{path::Path, time::Duration};
+use std::{io::Cursor, path::Path, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 enum FrameSelection {
     Index(u32),
     OriginalTick(i64),
+}
+
+#[derive(Clone, Copy)]
+enum OutputKind {
+    Raw,
+    Png,
+}
+
+pub struct ObservedPng {
+    pub bytes: Vec<u8>,
+    pub timing: Option<preview::FrameTiming>,
+    pub graph_sha256: String,
+}
+
+fn timing_unavailable() -> DomainError {
+    DomainError::new(
+        "FRAME_UNAVAILABLE",
+        "The emitted frame's original timing could not be verified",
+    )
+}
+
+fn frame_timing(log: &str) -> Result<preview::FrameTiming> {
+    let mut clock = None;
+    let mut frame = None;
+    for line in log.lines() {
+        let Some(line) = line
+            .strip_prefix("[Parsed_showinfo_1 @ ")
+            .and_then(|line| line.split_once("] "))
+            .map(|(_, text)| text)
+        else {
+            continue;
+        };
+        if let Some(time_base) = line.strip_prefix("config in time_base: ") {
+            let (ratio, _) = time_base.split_once(',').ok_or_else(timing_unavailable)?;
+            let (num, den) = ratio.split_once('/').ok_or_else(timing_unavailable)?;
+            let ratio = Rational::new(
+                num.parse().map_err(|_| timing_unavailable())?,
+                den.parse().map_err(|_| timing_unavailable())?,
+            )?;
+            if ratio <= Rational::ZERO || clock.replace(ratio).is_some() {
+                return Err(timing_unavailable());
+            }
+        } else if let Some(body) = line.strip_prefix("n:")
+            && frame.replace(body).is_some()
+        {
+            return Err(timing_unavailable());
+        }
+    }
+    let clock = clock.ok_or_else(timing_unavailable)?;
+    let (ordinal, fields) = frame
+        .and_then(|line| line.split_once(" pts:"))
+        .ok_or_else(timing_unavailable)?;
+    let (pts, fields) = fields
+        .split_once(" pts_time:")
+        .ok_or_else(timing_unavailable)?;
+    let (_, fields) = fields
+        .split_once(" duration:")
+        .ok_or_else(timing_unavailable)?;
+    let (duration, _) = fields
+        .split_once(" duration_time:")
+        .ok_or_else(timing_unavailable)?;
+    if ordinal.trim() != "0" {
+        return Err(timing_unavailable());
+    }
+    let timestamp = |ticks: &str| -> Result<Rational> {
+        let ticks = ticks.trim().parse().map_err(|_| timing_unavailable())?;
+        clock.checked_mul(Rational::new(ticks, 1)?)
+    };
+    let pts = (pts.trim() != "NOPTS")
+        .then(|| timestamp(pts))
+        .transpose()?;
+    let duration = timestamp(duration)?;
+    if duration < Rational::ZERO {
+        return Err(timing_unavailable());
+    }
+    Ok(preview::FrameTiming {
+        time_base: clock,
+        pts,
+        duration: (duration > Rational::ZERO).then_some(duration),
+    })
+}
+
+struct PreviewBuffer {
+    bytes: Vec<u8>,
+    timing: Option<preview::FrameTiming>,
+    graph_sha256: Option<String>,
 }
 
 impl Engine {
@@ -23,6 +109,39 @@ impl Engine {
         frame: u32,
         cancel: CancellationToken,
     ) -> Result<Vec<u8>> {
+        Ok(self
+            .registered_frame(asset, source, stream_index, frame, OutputKind::Raw, cancel)
+            .await?
+            .bytes)
+    }
+
+    pub async fn observe_registered_png(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        stream_index: u32,
+        frame: u32,
+        cancel: CancellationToken,
+    ) -> Result<ObservedPng> {
+        let result = self
+            .registered_frame(asset, source, stream_index, frame, OutputKind::Png, cancel)
+            .await?;
+        Ok(ObservedPng {
+            bytes: result.bytes,
+            timing: result.timing,
+            graph_sha256: result.graph_sha256.ok_or_else(timing_unavailable)?,
+        })
+    }
+
+    async fn registered_frame(
+        &self,
+        asset: &Asset,
+        source: SourceStamp,
+        stream_index: u32,
+        frame: u32,
+        format: OutputKind,
+        cancel: CancellationToken,
+    ) -> Result<PreviewBuffer> {
         if frame > preview::MAX_FRAME {
             return Err(DomainError::new(
                 "INVALID_RANGE",
@@ -34,6 +153,7 @@ impl Engine {
             source,
             stream_index,
             FrameSelection::Index(frame),
+            format,
             cancel,
         )
         .await
@@ -69,14 +189,17 @@ impl Engine {
                 "No exact original video tick covers the selected timeline point",
             ));
         }
-        self.preview_selected_frame(
-            asset,
-            source,
-            binding.stream_index,
-            FrameSelection::OriginalTick(tick.numerator()),
-            cancel,
-        )
-        .await
+        Ok(self
+            .preview_selected_frame(
+                asset,
+                source,
+                binding.stream_index,
+                FrameSelection::OriginalTick(tick.numerator()),
+                OutputKind::Raw,
+                cancel,
+            )
+            .await?
+            .bytes)
     }
 
     async fn preview_selected_frame(
@@ -85,10 +208,18 @@ impl Engine {
         source: SourceStamp,
         stream_index: u32,
         selection: FrameSelection,
+        format: OutputKind,
         cancel: CancellationToken,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<PreviewBuffer> {
         let phase = cancel.child_token();
-        let request = self.decode_preview(asset, source, stream_index, selection, phase.clone());
+        let request = self.decode_preview(
+            asset,
+            source,
+            stream_index,
+            selection,
+            format,
+            phase.clone(),
+        );
         tokio::pin!(request);
         tokio::select! {
             result = &mut request => result,
@@ -109,8 +240,9 @@ impl Engine {
         source: SourceStamp,
         stream_index: u32,
         selection: FrameSelection,
+        format: OutputKind,
         cancel: CancellationToken,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<PreviewBuffer> {
         let admission::RegisteredInput {
             input,
             source,
@@ -151,14 +283,25 @@ impl Engine {
                 "scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1"
             )
         };
-        let filters = format!(
-            "{trim},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba"
-        );
+        let observe_time = matches!(format, OutputKind::Png) && !still_image;
+        let showinfo = if observe_time {
+            ",showinfo=checksum=0"
+        } else {
+            ""
+        };
+        // PNG can carry source EXIF and ICC side data. The bounded monitor
+        // image carries the prepared pixels and encoder-generated signaling.
+        let remove_side_data = if matches!(format, OutputKind::Png) {
+            ",sidedata=mode=delete"
+        } else {
+            ""
+        };
+        let filters = format!("{trim}{showinfo},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba{remove_side_data}");
         let mut args = [
             "-hide_banner",
             "-nostdin",
             "-v",
-            "error",
+            if observe_time { "info" } else { "error" },
             "-xerror",
             "-max_alloc",
             "67108864",
@@ -169,7 +312,10 @@ impl Engine {
         ]
         .map(String::from)
         .to_vec();
-        if preserve_clock {
+        if observe_time {
+            args.push("-nostats".into());
+        }
+        if preserve_clock || observe_time {
             args.push("-copyts".into());
         }
         if still_image {
@@ -184,22 +330,33 @@ impl Engine {
             "-vf".into(),
             filters,
         ]);
+        let codec = match format {
+            OutputKind::Raw => "rawvideo",
+            OutputKind::Png => "png",
+        };
         args.extend(
-            [
-                "-frames:v",
-                "1",
-                "-c:v",
-                "rawvideo",
-                "-threads",
-                "1",
-                "-pix_fmt",
-                "rgba",
-                "-f",
-                "rawvideo",
-                "pipe:1",
-            ]
-            .map(String::from),
+            ["-frames:v", "1", "-c:v", codec, "-threads", "1", "-pix_fmt", "rgba"]
+                .map(String::from),
         );
+        let (container, output_budget) = match format {
+            OutputKind::Raw => ("rawvideo", preview::RGBA_BYTES),
+            OutputKind::Png => {
+                args.extend(
+                    ["-map_metadata", "-1", "-map_chapters", "-1", "-fps_mode", "passthrough"]
+                        .map(String::from),
+                );
+                ("image2pipe", preview::MAX_INLINE_PNG_BYTES)
+            }
+        };
+        args.extend(["-f", container, "pipe:1"].map(String::from));
+        let graph_sha256 = if matches!(format, OutputKind::Png) {
+            let graph = serde_json::to_vec(&args).map_err(|_| {
+                DomainError::new("INVALID_PLAN", "Observation graph identity is unavailable")
+            })?;
+            Some(nw_domain::projects::hash(&graph))
+        } else {
+            None
+        };
         let ticket = self.process_budget.acquire(&cancel).await?;
         if let Err(error) = identities(self, cancel.clone())
             .await
@@ -211,18 +368,30 @@ impl Engine {
             Path::new(&self.ffmpeg.path),
             &args,
             Duration::from_secs(7),
-            preview::RGBA_BYTES,
+            output_budget,
             input.file,
             cancel.clone(),
         )
         .await;
-        let pixels = ticket.finish(result)?.stdout;
-        if pixels.len() != preview::RGBA_BYTES {
-            return Err(DomainError::new(
-                "FRAME_UNAVAILABLE",
-                "The registered stream returned no complete preview frame",
-            ));
+        let output = ticket.finish(result)?;
+        match format {
+            OutputKind::Raw if output.stdout.len() != preview::RGBA_BYTES => {
+                return Err(DomainError::new(
+                    "FRAME_UNAVAILABLE",
+                    "The registered stream returned no complete preview frame",
+                ));
+            }
+            OutputKind::Png => verify_png(&output.stdout, &cancel)?,
+            OutputKind::Raw => {}
         }
+        // Timing evidence must include the entire bounded diagnostic, including
+        // any early filter graph reinitialization that could reset frame counts.
+        if observe_time && output.diagnostic_bytes > 64 * 1024 {
+            return Err(timing_unavailable());
+        }
+        let timing = observe_time
+            .then(|| frame_timing(&output.stderr_tail))
+            .transpose()?;
         identities(self, cancel.clone()).await?;
         blocking(move || {
             if source.identity_with_limit(&cancel, length)? != expected {
@@ -231,8 +400,38 @@ impl Engine {
                     "Registered source changed during frame preview",
                 ));
             }
-            Ok(pixels)
+            Ok(PreviewBuffer {
+                bytes: output.stdout,
+                timing,
+                graph_sha256,
+            })
         })
         .await
     }
+}
+
+fn verify_png(bytes: &[u8], cancel: &CancellationToken) -> Result<()> {
+    let invalid = || {
+        DomainError::new(
+            "FRAME_UNAVAILABLE",
+            "The encoder returned no complete preview PNG",
+        )
+    };
+    let width = (preview::WIDTH as u32).to_be_bytes();
+    let height = (preview::HEIGHT as u32).to_be_bytes();
+    if !bytes.starts_with(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR")
+        || bytes.get(16..20) != Some(width.as_slice())
+        || bytes.get(20..24) != Some(height.as_slice())
+        || bytes.get(24..26) != Some(b"\x08\x06".as_slice())
+        || !bytes.ends_with(b"\0\0\0\0IEND\xaeB\x60\x82")
+    {
+        return Err(invalid());
+    }
+    admission::png_chunks(&mut Cursor::new(bytes), bytes.len() as u64, cancel).map_err(|error| {
+        if error.code == "CANCELLED" {
+            error
+        } else {
+            invalid()
+        }
+    })
 }

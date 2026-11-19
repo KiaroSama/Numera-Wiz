@@ -124,7 +124,11 @@ pub fn from_file(mut file: File, cancel: &tokio_util::sync::CancellationToken) -
 
 // png_pipe can decode the default picture of an APNG. Require a complete
 // static PNG envelope before exposing the descriptor, then let FFmpeg decode it.
-fn png_chunks(file: &mut File, length: u64, cancel: &CancellationToken) -> Result<()> {
+pub(super) fn png_chunks(
+    file: &mut (impl Read + Seek),
+    length: u64,
+    cancel: &CancellationToken,
+) -> Result<()> {
     let invalid = || DomainError::new("INVALID_PROBE", "Invalid single-file PNG chunk layout");
     let mut start = PNG_SIGNATURE.len() as u64;
     let mut image_data = false;

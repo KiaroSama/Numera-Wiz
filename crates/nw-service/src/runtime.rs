@@ -1076,6 +1076,7 @@ impl Service {
                 "media.analyze.stream",
                 "media.analyze.audio_tracks",
                 "media.preview_frame",
+                nw_domain::preview::OBSERVE_COMMAND,
                 "capabilities.refresh",
                 "chapters.remove",
                 "chapters.import",
@@ -1430,6 +1431,11 @@ impl Service {
                 let frame =
                     self.source_preview(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&frame)?).bounded());
+            }
+            nw_domain::preview::OBSERVE_COMMAND => {
+                drop(guard);
+                let still = self.observe_still(&context, commands::parse(params)?, cancellation)?;
+                return Ok(Response::success(&request.request_id, value(&still)?).bounded());
             }
             "media.analyze.volume" => {
                 drop(guard);

@@ -82,6 +82,10 @@ enum Mode {
         #[command(subcommand)]
         command: human::Media,
     },
+    Previews {
+        #[command(subcommand)]
+        command: human::Previews,
+    },
     /// Inspect and export chapters from a registered media file.
     Chapters {
         #[command(subcommand)]
@@ -356,6 +360,7 @@ async fn run() -> Result<()> {
                     human::run(&client, human::Command::History(command)).await
                 }
                 Some(Mode::Media { command }) => human::run(&client, human::Command::Media(command)).await,
+                Some(Mode::Previews { command }) => human::run(&client, human::Command::Previews(command)).await,
                 Some(Mode::Chapters { command }) => {
                     human::run(&client, human::Command::Chapters(command)).await
                 }

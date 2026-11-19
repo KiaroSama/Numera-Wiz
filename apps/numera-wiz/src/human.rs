@@ -165,6 +165,19 @@ pub enum Media {
         streams: Vec<u32>,
     },
 }
+
+#[derive(Subcommand)]
+pub enum Previews {
+    /// Observe a single registered source frame as a lossless 160 × 90 PNG.
+    Observe {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        stream: u32,
+        #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=1_000_000))]
+        frame: u32,
+    },
+}
 #[derive(Clone, Copy, clap::ValueEnum)]
 pub enum ObservationKind {
     Packets,
@@ -446,6 +459,7 @@ pub enum Command {
     Markers(Markers),
     History(History),
     Media(Media),
+    Previews(Previews),
     Chapters(Chapters),
     Metadata(Metadata),
     Disposition(Disposition),
@@ -571,6 +585,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         }) => query(
             "media.preview_frame",
             json!({"asset_id":asset,"stream_index":stream,"frame":frame}),
+        ),
+        Command::Previews(Previews::Observe { asset, stream, frame }) => query(
+            nw_domain::preview::OBSERVE_COMMAND,
+            serde_json::to_value(nw_domain::preview::ObserveInput::source(asset, stream, frame))?,
         ),
         Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
             "media.analyze.volume",

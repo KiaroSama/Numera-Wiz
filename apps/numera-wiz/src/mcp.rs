@@ -1,4 +1,7 @@
-use nw_domain::commands::{self, Request};
+use nw_domain::{
+    commands::{self, Request},
+    preview,
+};
 use nw_service::{ACTIVE_COMMANDS, Context, Service};
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use std::{borrow::Cow, sync::Arc};
@@ -109,7 +112,12 @@ fn tool(name: &str) -> Option<Tool> {
         descriptor.label,
         Arc::new(schema.as_object()?.clone()),
     );
-    if let Some(result) = descriptor.result_schema {
+    let result_schema = if name == preview::OBSERVE_COMMAND {
+        Some(serde_json::to_value(schemars::schema_for!(preview::ObservationMetadata)).ok()?)
+    } else {
+        descriptor.result_schema
+    };
+    if let Some(result) = result_schema {
         let output = schema::response(result)?;
         tool = tool.with_raw_output_schema(Arc::new(output.as_object()?.clone()));
     }
@@ -308,6 +316,7 @@ impl ServerHandler for Bridge {
         canonical.project = metadata.project;
         canonical.replay_scope = metadata.replay_scope;
         canonical.idempotency_key = metadata.idempotency_key;
+        let observation = canonical.command.id == preview::OBSERVE_COMMAND;
         let issuance = crate::access::credential_file::is_issue(&canonical.command.id);
         if credential_file.is_some() && !issuance {
             return Err(ErrorData::invalid_params(
@@ -361,6 +370,9 @@ impl ServerHandler for Bridge {
         } else {
             self.execute(canonical, &context).await?
         };
+        if observation && response.ok {
+            return Ok(observation_result(response, &context)?.into());
+        }
         let value = serde_json::to_value(&response)
             .map_err(|_| ErrorData::internal_error("Response serialization failed", None))?;
         let mut result = if response.ok {
@@ -375,6 +387,38 @@ impl ServerHandler for Bridge {
         })];
         Ok(result.into())
     }
+}
+
+fn observation_result(
+    mut response: commands::Response,
+    context: &RequestContext<RoleServer>,
+) -> Result<CallToolResult, ErrorData> {
+    let invalid = || ErrorData::internal_error("Invalid inline observation result", None);
+    let still: preview::InlineObservation =
+        commands::parse(response.result.take().ok_or_else(invalid)?).map_err(|_| invalid())?;
+    let bytes = still.metadata.encoded_byte_count;
+    if !(1..=preview::MAX_INLINE_PNG_BYTES).contains(&bytes)
+        || still.png_base64.len() != bytes.div_ceil(3) * 4
+        || still.metadata.mime_type != preview::PNG_MIME_TYPE
+    {
+        return Err(invalid());
+    }
+    response.result = Some(serde_json::to_value(&still.metadata).map_err(|_| invalid())?);
+    let structured = serde_json::to_value(&response).map_err(|_| invalid())?;
+    if serde_json::to_vec(&structured).map_err(|_| invalid())?.len()
+        > preview::MAX_OBSERVATION_METADATA_BYTES
+    {
+        return Err(invalid());
+    }
+    let mut result = CallToolResult::structured(structured);
+    result.content = vec![ContentBlock::image(still.png_base64, preview::PNG_MIME_TYPE)];
+    let envelope = serde_json::json!({"jsonrpc":"2.0","id":&context.id,"result":&result});
+    if serde_json::to_vec(&envelope).map_err(|_| invalid())?.len()
+        >= preview::MAX_MCP_OBSERVATION_BYTES
+    {
+        return Err(invalid());
+    }
+    Ok(result)
 }
 
 fn resource_error(response: commands::Response) -> ErrorData {

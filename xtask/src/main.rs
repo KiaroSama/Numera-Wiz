@@ -128,6 +128,10 @@ fn schemas(root: &Path) -> Result<()> {
         ))?,
     )?;
     fs::write(
+        path.join("media-observation.schema.json"),
+        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::preview::InlineObservation))?,
+    )?;
+    fs::write(
         path.join("execution-plan.schema.json"),
         serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::records::Plan))?,
     )?;
@@ -261,7 +265,7 @@ fn build_fixture_profile(root: &Path) -> Result<()> {
         "--enable-decoder=ffv1,mpeg4,pcm_s16le,subrip,wrapped_avframe,rawvideo,png,mjpeg",
         "--enable-parser=png,mjpeg",
         "--enable-indev=lavfi",
-        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm,split,psnr,ssim",
+        "--enable-filter=testsrc2,sine,anull,null,aformat,format,aresample,scale,pad,setsar,select,color,trim,setpts,settb,concat,anullsrc,atrim,asettb,asetpts,setparams,adelay,amix,fps,astats,loudnorm,split,psnr,ssim,showinfo,sidedata",
         "--enable-swscale",
         "--enable-swresample",
     ];

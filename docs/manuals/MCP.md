@@ -235,6 +235,20 @@ command grant and access to the registered asset and its source path.
 Register a single static PNG or JPEG with `assets.register`. For either still,
 `media.preview_frame` uses `stream_index: 0` and `frame: 0`.
 
+`previews.observe` returns one standard MCP `image` block with MIME type
+`image/png`. `structuredContent.result` carries the observation metadata,
+including the original source digest, physical stream and decoded frame
+indices, source-frame timing when available, graph and component digests,
+and the delivered PNG length and digest. It requires the command grant,
+the asset read grant, and access to the registered source path.
+
+The supported parameters are `kind: "still"`, a `target` with `kind:
+"registered_source"`, `asset_id`, `stream_index` and `frame_index`,
+`frame_selection: "decoded_index"`, `source_policy: "original_required"`,
+`display_profile: "source_monitor_rgba8"`, `fit: "contain"`, `encoding:
+{"format":"png"}` and `delivery: "inline"`. This response-scoped mode
+uses the 160 × 90 source monitor and caps PNG bytes at 96 KiB before base64.
+
 `timeline.preview_frame` uses the exact project context and takes
 `sequence_id`, `revision` and rational `at` in seconds. The returned RGBA frame
 includes the active registered or solid-color clip identity, or a gap marker.
@@ -310,8 +324,8 @@ running public origin using its own bearer header. Single ranges, strong digest
 If-Match and no-store attachment delivery support controlled resumption. Stdio
 can read chunks through its existing private bridge without starting public HTTP.
 Do not transmit the private runtime record/token or put credentials in query URLs.
-These transfer handlers do not yet provide previews.observe image/audio content;
-that separate observation and graph/revision qualification remains required.
+Observation artifact manifests, expiry, sequence-revision observations and
+short audio observation require separate qualification.
 
 ## Evidence and scope
 

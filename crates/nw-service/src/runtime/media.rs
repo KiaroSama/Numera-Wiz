@@ -200,6 +200,73 @@ impl Service {
         })
     }
 
+    pub(super) fn observe_still(
+        &self,
+        context: &Context,
+        input: nw_domain::preview::ObserveInput,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::preview::InlineObservation> {
+        use nw_domain::preview::{
+            self, InlineObservation, ObservationMetadata, ObserveInput, ObserveTarget,
+        };
+
+        let ObserveInput::Still {
+            target,
+            frame_selection,
+            source_policy,
+            display_profile,
+            fit,
+            encoding,
+            delivery,
+        } = input;
+        let ObserveTarget::RegisteredSource {
+            ref asset_id,
+            stream_index,
+            frame_index,
+        } = target;
+        let (asset, source) = self.analysis_source(context, asset_id)?;
+        let engine = self.engine()?;
+        let observed = tokio::runtime::Handle::current().block_on(
+            engine.observe_registered_png(&asset, source, stream_index, frame_index, cancel.clone()),
+        )?;
+        let metadata = ObservationMetadata {
+            observation_id: Uuid::new_v4().to_string(),
+            target,
+            actual_frame_index: frame_index,
+            timing: observed.timing,
+            source_sha256: asset.identity.sha256.clone(),
+            component_sha256: engine.ffmpeg.sha256.clone(),
+            graph_sha256: observed.graph_sha256,
+            frame_selection,
+            source_policy,
+            display_profile,
+            fit,
+            encoding,
+            delivery,
+            width: preview::WIDTH,
+            height: preview::HEIGHT,
+            mime_type: preview::PNG_MIME_TYPE.into(),
+            encoded_byte_count: observed.bytes.len(),
+            encoded_sha256: nw_domain::projects::hash(&observed.bytes),
+        };
+        if serde_json::to_vec(&metadata)
+            .map_err(|_| DomainError::new("SERIALIZATION_FAILED", "Invalid observation metadata"))?
+            .len()
+            > preview::MAX_OBSERVATION_METADATA_BYTES
+        {
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Observation metadata exceeds its 64 KiB budget",
+            ));
+        }
+        let still = InlineObservation {
+            metadata,
+            png_base64: STANDARD.encode(&observed.bytes),
+        };
+        self.complete_analysis(context, &[&asset], preview::OBSERVE_COMMAND, &cancel)?;
+        Ok(still)
+    }
+
     pub(super) fn component_capabilities(
         &self,
         command: &str,

@@ -55,6 +55,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `commands list` / `commands schema ID` | Inspect the active registry and one parameter schema. |
 | `media probe PATH` | Probe an authorized source. |
 | `media preview-frame --asset ID --stream INDEX --frame N` | Decode the selected video frame into a bounded 160 × 90 RGBA preview. |
+| `previews observe --asset ID --stream INDEX --frame N` | Return an inline PNG from the registered source monitor with exact observation metadata. |
 | `timeline preview-frame --project PROJECT --sequence SEQUENCE --revision REV --at TIME` | Decode the visible picture at one exact sequence-frame boundary, with `TIME` as an integer or fraction. |
 | `media capabilities inspect` | Read the FFmpeg/ffprobe fingerprints and cached component observations. |
 | `media analyze-volume --asset ID --stream INDEX` | Measure peak, RMS and decoded samples per channel for one registered audio stream. |
@@ -198,6 +199,13 @@ preview area and fills any remaining space with black.
 12,000,000 pixels. File contents determine the input format. For a registered
 still, use `media preview-frame --asset ID --stream 0 --frame 0`. Animated
 images and image sequences require a separate intake route.
+
+`previews observe` selects the same original registered source stream and
+zero-based decoded frame index. Its JSON result contains a 160 × 90 PNG in
+`png_base64` and metadata covering the source digest, emitted frame index,
+original timing when available, graph and component digests, and the PNG
+byte count and digest. The source monitor fits the picture inside black
+padding. Each response carries up to 96 KiB of PNG bytes before base64.
 
 `disposition patch` addresses an original global stream index. Repeat `--add`
 and `--remove` for individual FFmpeg flags such as `comment`, `original` or

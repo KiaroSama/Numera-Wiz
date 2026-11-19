@@ -13,6 +13,7 @@ pub use media::mixed_ffmpeg::{
     VerifiedMixedCandidate,
 };
 pub use media::normalized_pair::NormalizedWindow;
+pub use media::preview::ObservedPng;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},

@@ -3,7 +3,7 @@ mod audio_tracks;
 pub(super) mod execution;
 pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;
-mod preview;
+pub(super) mod preview;
 mod stream_observations;
 pub(super) mod verification;
 mod volume;

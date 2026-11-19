@@ -18,6 +18,15 @@ Production and fixture configurations explicitly enable zlib. Exact-source
 hosted application and platform package results, image sequences and general
 timeline still rendering remain open.
 
+The headless `previews.observe` inline route accepts an explicit registered
+source and decoded frame index. It uses the source monitor graph and returns
+the exact selected frame with a bounded lossless PNG. Timed sources report
+the frame's original presentation time and duration when present. Official
+MCP returns standard image content with a separate metadata envelope. The
+independent FFmpeg 9.0.2 fixture compared decoded PNG and raw monitor pixels.
+Sequence-revision observation, audio, observation artifacts and expiry,
+manifest fallback, and hosted application verification remain open.
+
 [CI357](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44432799736) at
 `6442c80` passed the native Linux workspace, browser workspace, large HTTP
 artifact delivery, owner batch, CLI and both official MCP transports.

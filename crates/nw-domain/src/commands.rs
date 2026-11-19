@@ -252,6 +252,9 @@ fn result_schema(id: &str) -> Option<Value> {
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
         }
+        crate::preview::OBSERVE_COMMAND => Some(
+            serde_json::to_value(schema_for!(crate::preview::InlineObservation)).expect("schema"),
+        ),
         "timeline.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }
@@ -855,6 +858,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Decode one bounded frame from a registered video stream",
             Query,
             crate::preview::FrameInput
+        ),
+        row!(
+            "previews.observe",
+            "Observe one lossless inline PNG from an authorized registered source",
+            Query,
+            crate::preview::ObserveInput
         ),
         row!(
             "media.analyze.volume",
@@ -1722,6 +1731,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.analyze.stream",
     "media.analyze.audio_tracks",
     "media.preview_frame",
+    crate::preview::OBSERVE_COMMAND,
     "capabilities.inspect",
     "capabilities.refresh",
     "capabilities.clear",

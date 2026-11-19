@@ -10,6 +10,11 @@ pub const WIDTH: usize = 160;
 pub const HEIGHT: usize = 90;
 pub const RGBA_BYTES: usize = WIDTH * HEIGHT * 4;
 pub const MAX_FRAME: u32 = 1_000_000;
+pub const OBSERVE_COMMAND: &str = "previews.observe";
+pub const MAX_INLINE_PNG_BYTES: usize = 96 * 1024;
+pub const MAX_OBSERVATION_METADATA_BYTES: usize = 64 * 1024;
+pub const MAX_MCP_OBSERVATION_BYTES: usize = 768 * 1024;
+pub const PNG_MIME_TYPE: &str = "image/png";
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -69,4 +74,121 @@ pub struct TimelineFrame {
     pub height: usize,
     #[schemars(length(min = 76800, max = 76800))]
     pub rgba_base64: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ObserveInput {
+    Still {
+        target: ObserveTarget,
+        frame_selection: FrameSelection,
+        source_policy: SourcePolicy,
+        display_profile: DisplayProfile,
+        fit: Fit,
+        encoding: Encoding,
+        delivery: Delivery,
+    },
+}
+impl ObserveInput {
+    pub fn source(asset_id: String, stream_index: u32, frame_index: u32) -> Self {
+        Self::Still {
+            target: ObserveTarget::RegisteredSource {
+                asset_id,
+                stream_index,
+                frame_index,
+            },
+            frame_selection: FrameSelection::DecodedIndex,
+            source_policy: SourcePolicy::OriginalRequired,
+            display_profile: DisplayProfile::SourceMonitorRgba8,
+            fit: Fit::Contain,
+            encoding: Encoding::Png {},
+            delivery: Delivery::Inline,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ObserveTarget {
+    RegisteredSource {
+        asset_id: String,
+        stream_index: u32,
+        #[schemars(range(max = 1000000))]
+        frame_index: u32,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FrameSelection {
+    DecodedIndex,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePolicy {
+    OriginalRequired,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayProfile {
+    SourceMonitorRgba8,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Fit {
+    Contain,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "format", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Encoding {
+    Png {},
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Delivery {
+    Inline,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FrameTiming {
+    pub time_base: Rational,
+    pub pts: Option<Rational>,
+    pub duration: Option<Rational>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObservationMetadata {
+    pub observation_id: String,
+    pub target: ObserveTarget,
+    pub actual_frame_index: u32,
+    pub timing: Option<FrameTiming>,
+    pub source_sha256: String,
+    pub component_sha256: String,
+    pub graph_sha256: String,
+    pub frame_selection: FrameSelection,
+    pub source_policy: SourcePolicy,
+    pub display_profile: DisplayProfile,
+    pub fit: Fit,
+    pub encoding: Encoding,
+    pub delivery: Delivery,
+    pub width: usize,
+    pub height: usize,
+    pub mime_type: String,
+    pub encoded_byte_count: usize,
+    pub encoded_sha256: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InlineObservation {
+    pub metadata: ObservationMetadata,
+    #[schemars(length(min = 1, max = 131072))]
+    pub png_base64: String,
 }

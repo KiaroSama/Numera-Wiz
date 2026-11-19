@@ -80,6 +80,39 @@ fn assert_frame_observations(report: &Value, asset: &Value) {
     assert_eq!(rows[1]["pts"], json!({"num":"1","den":"2"}));
 }
 
+fn still_observation_input(asset: &Value) -> Value {
+    json!({
+        "kind":"still",
+        "target":{"kind":"registered_source","asset_id":asset["id"],"stream_index":0,"frame_index":2},
+        "frame_selection":"decoded_index","source_policy":"original_required",
+        "display_profile":"source_monitor_rgba8","fit":"contain",
+        "encoding":{"format":"png"},"delivery":"inline",
+    })
+}
+
+fn assert_mcp_still(result: Value, asset: &Value, expected: &Value) {
+    let response = &result["structuredContent"];
+    assert_eq!(response["ok"], true, "{}", response["error"]);
+    let content = result["content"].as_array().unwrap();
+    assert_eq!(content.len(), 1);
+    assert_eq!(content[0]["type"], "image");
+    assert_eq!(content[0]["mimeType"], "image/png");
+    assert!(content[0]["data"] == expected["png_base64"]);
+    let mut metadata = response["result"].clone();
+    assert_eq!(metadata["target"]["asset_id"], asset["id"]);
+    metadata["target"]["asset_id"] = expected["metadata"]["target"]["asset_id"].clone();
+    let mut expected = expected["metadata"].clone();
+    let id = metadata
+        .as_object_mut()
+        .unwrap()
+        .remove("observation_id")
+        .unwrap();
+    uuid::Uuid::parse_str(id.as_str().unwrap()).unwrap();
+    expected.as_object_mut().unwrap().remove("observation_id");
+    assert_eq!(metadata, expected);
+    assert!(serde_json::to_vec(&result).unwrap().len() < 768 * 1024);
+}
+
 fn reference_input(asset: &Value) -> Value {
     let selection = json!({"asset_id":asset["id"],"stream_index":0,"start_frame":0});
     json!({"reference":selection,"candidate":selection,"frame_count":4})
@@ -849,6 +882,61 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             .len(),
         nw_domain::preview::RGBA_BYTES
     );
+    let (observed_still, exit) = cli
+        .human(&[
+            "previews",
+            "observe",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "0",
+            "--frame",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{}", observed_still["error"]);
+    let observed_still = &observed_still["result"];
+    let metadata = &observed_still["metadata"];
+    assert_eq!(metadata["target"], still_observation_input(&asset)["target"]);
+    assert_eq!(metadata["actual_frame_index"], 2);
+    assert_eq!(metadata["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(metadata["timing"]["time_base"], json!({"num":"1","den":"1000"}));
+    assert_eq!(metadata["timing"]["pts"], json!({"num":"1","den":"2"}));
+    assert_eq!(metadata["timing"]["duration"], json!({"num":"1","den":"4"}));
+    assert_eq!(metadata["width"], nw_domain::preview::WIDTH);
+    assert_eq!(metadata["height"], nw_domain::preview::HEIGHT);
+    let observed_png = STANDARD
+        .decode(observed_still["png_base64"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(metadata["encoded_byte_count"], observed_png.len());
+    assert_eq!(
+        metadata["encoded_sha256"],
+        nw_domain::projects::hash(&observed_png)
+    );
+    let observed_path = media.directory.path().join("observed-still.png");
+    std::fs::write(&observed_path, observed_png).unwrap();
+    let rgba = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-f", "png_pipe", "-i"])
+        .arg(&observed_path)
+        .args([
+            "-map", "0:0", "-frames:v", "1", "-c:v", "rawvideo", "-pix_fmt", "rgba", "-f", "rawvideo", "pipe:1",
+        ])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        rgba.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rgba.stderr)
+    );
+    assert!(STANDARD.encode(rgba.stdout) == source_preview["rgba_base64"]);
+    let mut unsupported = still_observation_input(&asset);
+    unsupported["encoding"] = json!({"format":"jpeg","quality":85});
+    let (unsupported, _) = cli
+        .raw_with_exit(&Request::query("previews.observe", unsupported))
+        .await;
+    assert_eq!(unsupported["error"]["code"], "VALIDATION_ERROR");
+    assert!(unsupported.get("result").is_none());
     let mut still_sources = Vec::new();
     for (name, format, codec) in [
         ("owner-picture.png", "png_pipe", "png"),
@@ -886,6 +974,11 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         let preview = preview["result"].clone();
         assert_eq!(preview["source_sha256"], still["identity"]["sha256"]);
         assert_eq!(preview["frame"], 0);
+        let mut input = still_observation_input(still);
+        input["target"]["frame_index"] = 0.into();
+        let observation = cli.query("previews.observe", input).await;
+        assert_eq!(observation["metadata"]["actual_frame_index"], 0);
+        assert!(observation["metadata"]["timing"].is_null());
         still_sources.push((path, still["probe"].clone(), preview));
     }
     assert_eq!(
@@ -1385,7 +1478,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
     }
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","previews.observe","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -1446,6 +1539,19 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         serde_json::to_value(private_preview).unwrap()["structuredContent"]["error"]["code"],
         "OBJECT_NOT_FOUND"
     );
+    let private_still = stdio
+        .call_tool(
+            CallToolRequestParams::new("previews.observe")
+                .with_arguments(rmcp::object!({"params": still_observation_input(&asset)})),
+        )
+        .await
+        .unwrap();
+    let private_still = serde_json::to_value(private_still).unwrap();
+    assert_eq!(
+        private_still["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
+    assert_eq!(private_still["content"][0]["type"], "text");
     let observed = call!(
         stdio,
         "media.probe",
@@ -1568,6 +1674,19 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert!(
         stdio_preview["rgba_base64"] == source_preview["rgba_base64"],
         "stdio preview pixels differ"
+    );
+    let stdio_still = stdio
+        .call_tool(
+            CallToolRequestParams::new("previews.observe").with_arguments(
+                rmcp::object!({"params": still_observation_input(&operator_asset)}),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_mcp_still(
+        serde_json::to_value(stdio_still).unwrap(),
+        &operator_asset,
+        observed_still,
     );
     for (ordinal, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
         let still = call!(
@@ -2208,6 +2327,18 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         assert!(
             http_preview["rgba_base64"] == source_preview["rgba_base64"],
             "HTTP preview pixels differ"
+        );
+        let http_still = http
+            .call_tool(
+                CallToolRequestParams::new("previews.observe")
+                    .with_arguments(rmcp::object!({"params": still_observation_input(&asset)})),
+            )
+            .await
+            .unwrap();
+        assert_mcp_still(
+            serde_json::to_value(http_still).unwrap(),
+            &asset,
+            observed_still,
         );
         for (index, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
             let still = call!(
