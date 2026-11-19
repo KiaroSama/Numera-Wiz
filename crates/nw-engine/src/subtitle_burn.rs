@@ -480,7 +480,7 @@ impl Engine {
             "{prefix}subtitles=filename={}:fontsdir={}:force_style={}:wrap_unicode=1",
             escape_option(&files::path_text(&output)?),
             escape_option(&files::path_text(&font_dir)?),
-            escape_option("FontName=DejaVu Sans")
+            escape_option("FontName=DejaVu Sans,Encoding=-1")
         );
         Ok(StagedCaption {
             _directory: directory,

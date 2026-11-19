@@ -138,7 +138,7 @@ async fn caption_frame(components: &Path, path: &Path, time: &str) -> Vec<u8> {
         &components.join("ffmpeg"),
         &arguments,
         Duration::from_secs(30),
-        96 * 64 * 3,
+        320 * 160 * 3,
         CancellationToken::new(),
     )
     .await
@@ -343,6 +343,38 @@ async fn caption_burn(parent: &Path) -> Value {
             "non_square_sar_preserved":true,"independent_audio_packet_equality":true,
             "caption_picture_sha256":hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&frame))}),
         );
+    }
+    let black = directory.join("punctuation-reference.mkv");
+    let generate = [
+        "-v", "error", "-f", "lavfi", "-i", "color=black:s=320x160:r=8:d=2",
+        "-c:v", "ffv1", black.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &generate, Duration::from_secs(30),
+        4096, CancellationToken::new()).await.unwrap();
+    let picture = cli.mutation(&scope, "register-punctuation-reference", "assets.register", json!({"path":black})).await;
+    for (language, caption, mark) in [
+        ("fa", "سلام این آزمون است؟", '\u{200f}'),
+        ("he", "שלום זה מבחן?", '\u{200f}'),
+        ("en", "Hello, this works?", '\u{200e}'),
+    ] {
+        let sidecar = directory.join(format!("reading-order-{language}.srt"));
+        let content = format!("1\n00:00:00,000 --> 00:00:00,950\n{caption}\n\n2\n00:00:01,000 --> 00:00:01,950\n{mark}{caption}{mark}\n");
+        std::fs::write(&sidecar, content).unwrap();
+        let captions = cli.mutation(&scope, &format!("register-punctuation-{language}"),
+            "assets.register", json!({"path":sidecar})).await;
+        let output = directory.join(format!("reading-order-{language}.mkv"));
+        let params = json!({"asset_id":picture["id"],"video_stream":0,"output":output,
+            "subtitle":{"kind":"external","asset_id":captions["id"]},"audio":{"kind":"none"},
+            "color":{"kind":"preserve_sdr"},"quality":"lossless_ffv1"});
+        let plan = cli.query("subtitles.burn", params).await;
+        let job = cli.mutation(&scope, &format!("render-punctuation-{language}"), "jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        cli.completed(job["job_id"].as_str().unwrap()).await;
+        let plain = caption_frame(&components, &output, "0.5").await;
+        let explicit = caption_frame(&components, &output, "1.5").await;
+        let black_frame = caption_frame(&components, &black, "0.5").await;
+        assert!(plain != black_frame && plain == explicit, "Punctuation placement differs in {language}");
+        cases.push(json!({"language":language,"reading_order":"whole_event","matched_direction_mark_reference":true}));
     }
     json!(cases)
 }

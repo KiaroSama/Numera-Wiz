@@ -119,3 +119,30 @@ EffectCraft moves OpenEXR scanline writing to `craft-exr` and moves PSD hue and
 levels block construction to `craft-psd`, with byte-level writer regressions.
 These changes inform the pending interchange and image workflows. FFmWiz and
 MuxCls remain at the previously reviewed revisions. [FilmCraft change](https://github.com/storytold/filmcraft/commit/f67d38b35cc5af6853ef5a6921ccba014512694b) · [EffectCraft comparison](https://github.com/storytold/effectcraft/compare/686fb3fa0485ab4af74c60e343203572fc37138f...665bfac0b33904b1dcda6de889f43f43a94ad3f8)
+
+
+## November 19, 06:34 UTC follow-up
+
+FFmWiz and MuxCls remain at `b4968caf` and `1269bd71`. FilmCraft,
+EffectCraft, Vidonex and Shotcut remain at the revisions reviewed above.
+FFmpeg's newest stable release remains 9.0.2. The observed development
+head includes RTP AV1 reassembly work. Numera's held local-file media
+routes use the stable tools. [FFmpeg development head](https://github.com/FFmpeg/FFmpeg/commit/4da74f951349f82e77cebc00be64423ccf8f6844)
+
+FFmpeg Skill's latest changes cover Chinese phrase wrapping, observed
+picture geometry and right-to-left caption punctuation. Numera's
+SubRip route lets libass determine reading order across each whole
+caption using `Encoding=-1`. The hosted journey compares ordinary cues
+and cues with explicit direction marks in the same FFmpeg output.
+The independent FFmpeg comparison reproduced equal visible pictures in
+Persian, Arabic, Hebrew and English. The default layout gave a
+different Hebrew picture for the marked and unmarked question.
+[FFmpeg Skill changes](https://github.com/kajisho5/ffmpeg-skill/compare/b8fbd1ce844883ecf678be2386ce1ad92692de1d...828efbb3a861e2e51529f60246741d13590c86a0)
+
+Craft Libraries now tests JPEG XL capability against the enabled codec.
+JPEG XL decoding remains pending in Numera's admitted image profiles.
+rmcp remains at 3.11.0. redb 5.0 changes its file-lock protocol, backend
+return types and read-only range lifetimes. Numera currently uses redb
+4.6.0 across its store and prior-package trials. A major upgrade needs
+a verified prior-package open and handoff across the supported systems.
+[Craft Libraries change](https://github.com/storytold/craft-libs/commit/56c3c833bb869a140271e2aceec2112322cacc58) · [redb 5.0 changes](https://github.com/cberner/redb/releases/tag/v5.0.0)
