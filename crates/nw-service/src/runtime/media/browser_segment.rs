@@ -43,19 +43,30 @@ impl Service {
         selection: SourceSegmentInput,
         cancel: CancellationToken,
     ) -> Result<SourceSegment> {
-        let _capacity = self.browser_captures.clone().try_acquire_owned().map_err(|_| no_space())?;
+        let _capacity = self
+            .browser_captures
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| no_space())?;
         {
             let mut segments = self.browser_segments.lock().map_err(|_| lock_error())?;
             let now = Instant::now();
             segments.retain(|_, entry| now < entry.expires);
-            if segments.len() >= MAX_SEGMENTS && !segments.values().any(|entry| entry.owned_by(context)) {
+            if segments.len() >= MAX_SEGMENTS
+                && !segments.values().any(|entry| entry.owned_by(context))
+            {
                 return Err(no_space());
             }
         }
         let (asset, source) = self.analysis_source(context, &selection.asset_id)?;
-        let (segment, source) = tokio::runtime::Handle::current().block_on(self.engine()?.browser_source_segment(
-            &asset, source, selection.video_stream, selection.audio_stream, cancel.clone(),
-        ))?;
+        let (segment, source) =
+            tokio::runtime::Handle::current().block_on(self.engine()?.browser_source_segment(
+                &asset,
+                source,
+                selection.video_stream,
+                selection.audio_stream,
+                cancel.clone(),
+            ))?;
         self.complete_analysis(context, &[&asset], COMMAND, &cancel)?;
         let manifest = SourceSegment {
             segment_id: Uuid::new_v4().to_string(),
@@ -84,7 +95,9 @@ impl Service {
         let now = Instant::now();
         segments.retain(|_, entry| now < entry.expires);
         if segments.len() >= MAX_SEGMENTS {
-            let replace = segments.iter().filter(|(_, entry)| entry.owned_by(context))
+            let replace = segments
+                .iter()
+                .filter(|(_, entry)| entry.owned_by(context))
                 .min_by_key(|(_, entry)| entry.expires)
                 .map(|(id, _)| id.clone())
                 .ok_or_else(no_space)?;
@@ -103,14 +116,25 @@ impl Service {
             let mut segments = self.browser_segments.lock().map_err(|_| lock_error())?;
             let now = Instant::now();
             segments.retain(|_, entry| now < entry.expires);
-            let entry = segments.get(id).filter(|entry| entry.owned_by(context))
+            let entry = segments
+                .get(id)
+                .filter(|entry| entry.owned_by(context))
                 .ok_or_else(DomainError::object_not_found)?;
-            (entry.manifest.clone(), entry.segment.clone(), entry.source.clone())
+            (
+                entry.manifest.clone(),
+                entry.segment.clone(),
+                entry.source.clone(),
+            )
         };
-        let asset: Asset = self.store.get(&named("asset", &manifest.selection.asset_id)?)?
+        let asset: Asset = self
+            .store
+            .get(&named("asset", &manifest.selection.asset_id)?)?
             .ok_or_else(DomainError::object_not_found)?;
         if asset.identity.sha256 != manifest.source_sha256 {
-            return Err(DomainError::new("SOURCE_CHANGED", "The registered preview source changed"));
+            return Err(DomainError::new(
+                "SOURCE_CHANGED",
+                "The registered preview source changed",
+            ));
         }
         self.complete_analysis(context, &[&asset], COMMAND, &CancellationToken::new())?;
         source.revalidate()?;

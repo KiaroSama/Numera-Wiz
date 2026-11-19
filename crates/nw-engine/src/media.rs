@@ -8,8 +8,8 @@ pub(super) mod preview;
 mod stream_observations;
 pub(super) mod verification;
 mod volume;
-pub use browser_preview::BrowserSegment;
 use super::{Engine, blocking};
+pub use browser_preview::BrowserSegment;
 use nw_domain::{
     DomainError, Result,
     media::{ComponentIdentity, ENCODERS, FILTERS, MUXERS, MediaTools},

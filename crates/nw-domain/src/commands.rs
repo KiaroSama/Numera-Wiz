@@ -255,9 +255,9 @@ fn result_schema(id: &str) -> Option<Value> {
         crate::preview::OBSERVE_COMMAND => Some(
             serde_json::to_value(schema_for!(crate::preview::InlineObservation)).expect("schema"),
         ),
-        "previews.source_segment" => Some(
-            serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"),
-        ),
+        "previews.source_segment" => {
+            Some(serde_json::to_value(schema_for!(crate::preview::SourceSegment)).expect("schema"))
+        }
         "timeline.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::TimelineFrame)).expect("schema"))
         }

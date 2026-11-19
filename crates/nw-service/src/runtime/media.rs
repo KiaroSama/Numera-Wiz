@@ -7,8 +7,8 @@ use nw_domain::{
 };
 use std::time::{Duration, Instant};
 
-pub(super) mod mixed;
 mod browser_segment;
+pub(super) mod mixed;
 pub(super) use browser_segment::BrowserSegmentLease;
 mod timeline_preview;
 
@@ -228,9 +228,14 @@ impl Service {
         } = target;
         let (asset, source) = self.analysis_source(context, asset_id)?;
         let engine = self.engine()?;
-        let observed = tokio::runtime::Handle::current().block_on(
-            engine.observe_registered_png(&asset, source, stream_index, frame_index, cancel.clone()),
-        )?;
+        let observed =
+            tokio::runtime::Handle::current().block_on(engine.observe_registered_png(
+                &asset,
+                source,
+                stream_index,
+                frame_index,
+                cancel.clone(),
+            ))?;
         let metadata = ObservationMetadata {
             observation_id: Uuid::new_v4().to_string(),
             target,

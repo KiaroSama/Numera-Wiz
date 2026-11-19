@@ -75,60 +75,160 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
     let source = fixture.root.path().join("assets/browser-playback.mkv");
     let program = Path::new(&components).join("ffmpeg");
     let mut args = [
-        "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
-        "testsrc2=size=320x180:rate=24:duration=3", "-f", "lavfi", "-i",
-        "sine=frequency=650:sample_rate=48000:duration=3", "-map", "0:v:0", "-map", "1:a:0",
-        "-vf", "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709",
-        "-af", "aformat=channel_layouts=stereo", "-c:v", "ffv1", "-threads:v", "1", "-c:a", "flac",
-        "-f", "matroska",
-    ].map(str::to_owned).to_vec();
+        "-hide_banner",
+        "-nostdin",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=320x180:rate=24:duration=3",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=650:sample_rate=48000:duration=3",
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-vf",
+        "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709",
+        "-af",
+        "aformat=channel_layouts=stereo",
+        "-c:v",
+        "ffv1",
+        "-threads:v",
+        "1",
+        "-c:a",
+        "flac",
+        "-f",
+        "matroska",
+    ]
+    .map(str::to_owned)
+    .to_vec();
     args.push(source.to_str().unwrap().to_owned());
-    nw_platform::process::run(&program, &args, Duration::from_secs(15), 4096, CancellationToken::new())
-        .await.expect("Generate selected stereo source for Chrome playback");
+    nw_platform::process::run(
+        &program,
+        &args,
+        Duration::from_secs(15),
+        4096,
+        CancellationToken::new(),
+    )
+    .await
+    .expect("Generate selected stereo source for Chrome playback");
 
     let service = &fixture.owner.service;
     let browser = service.profile_context("browser").unwrap();
-    let scope = service.dispatch(browser.clone(), Request::query("access.replay_scope.create", json!({}))).await;
+    let scope = service
+        .dispatch(
+            browser.clone(),
+            Request::query("access.replay_scope.create", json!({})),
+        )
+        .await;
     assert!(scope.ok);
     let mut registration = Request::query("assets.register", json!({"path":source}));
-    registration.replay_scope = Some(scope.result.unwrap()["replay_scope"].as_str().unwrap().to_owned());
+    registration.replay_scope = Some(
+        scope.result.unwrap()["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    );
     registration.idempotency_key = Some("hosted-browser-playback-source".into());
     let registered = service.dispatch(browser, registration).await;
-    assert!(registered.ok, "Registered preview source: {:?}", registered.error);
+    assert!(
+        registered.ok,
+        "Registered preview source: {:?}",
+        registered.error
+    );
     let asset = registered.result.unwrap();
 
     let paired = pairing(&fixture).await;
-    let proof = paired.split_once("#pair=").expect("Fixture pairing proof").1;
-    let credential: Value = client.post(format!("{}/api/v1/pairing/exchange", fixture.endpoint))
+    let proof = paired
+        .split_once("#pair=")
+        .expect("Fixture pairing proof")
+        .1;
+    let credential: Value = client
+        .post(format!("{}/api/v1/pairing/exchange", fixture.endpoint))
         .header(reqwest::header::ORIGIN, &fixture.endpoint)
         .json(&json!({"proof":proof}))
-        .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     let bearer = credential["bearer"].as_str().unwrap();
-    driver(client, base, reqwest::Method::POST, &format!("{route}/url"),
-        json!({"url":format!("{}/", fixture.endpoint)})).await;
+    driver(
+        client,
+        base,
+        reqwest::Method::POST,
+        &format!("{route}/url"),
+        json!({"url":format!("{}/", fixture.endpoint)}),
+    )
+    .await;
 
     let mut reports = Vec::new();
     for audio in [None, Some(1u32)] {
-        let report = driver(client, base, reqwest::Method::POST, &format!("{route}/execute/async"),
-            json!({"script":CHROME_SEGMENT,"args":[bearer,asset["id"],audio]})).await;
+        let report = driver(
+            client,
+            base,
+            reqwest::Method::POST,
+            &format!("{route}/execute/async"),
+            json!({"script":CHROME_SEGMENT,"args":[bearer,asset["id"],audio]}),
+        )
+        .await;
         assert_eq!(report["ok"], true, "Actual Chrome source preview: {report}");
         assert_eq!(report["width"], 320);
         assert_eq!(report["height"], 180);
         assert_eq!(report["position"], 1.125);
         assert_eq!(report["start"], 0.0);
-        assert!((1.9..=2.05).contains(&report["end"].as_f64().unwrap()), "{report}");
+        assert!(
+            (1.9..=2.05).contains(&report["end"].as_f64().unwrap()),
+            "{report}"
+        );
         assert!(report["frames"].as_u64().unwrap() > 0, "{report}");
-        assert_eq!(report["manifest"]["source_sha256"], asset["identity"]["sha256"]);
+        assert_eq!(
+            report["manifest"]["source_sha256"],
+            asset["identity"]["sha256"]
+        );
         reports.push(report);
     }
 
     let last = reports.last().unwrap();
-    let segment = format!("{}/api/v1/previews/{}/mp4", fixture.endpoint, last["manifest"]["segment_id"].as_str().unwrap());
-    assert_eq!(client.get(&segment).send().await.unwrap().status(), reqwest::StatusCode::UNAUTHORIZED);
-    std::fs::OpenOptions::new().append(true).open(&source).unwrap().write_all(b"changed").unwrap();
-    let denied = client.get(&segment).bearer_auth(bearer).send().await.unwrap();
+    let segment = format!(
+        "{}/api/v1/previews/{}/mp4",
+        fixture.endpoint,
+        last["manifest"]["segment_id"].as_str().unwrap()
+    );
+    assert_eq!(
+        client.get(&segment).send().await.unwrap().status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(&source)
+        .unwrap()
+        .write_all(b"changed")
+        .unwrap();
+    let denied = client
+        .get(&segment)
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .unwrap();
     assert_eq!(denied.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert_eq!(denied.json::<Value>().await.unwrap()["error"]["code"], "SOURCE_CHANGED");
-    std::fs::write(evidence.join("source-preview-chrome.json"),
-        serde_json::to_vec_pretty(&json!({"cases":reports,"missing_bearer_denied":true,"changed_source_denied":true})).unwrap()).unwrap();
+    assert_eq!(
+        denied.json::<Value>().await.unwrap()["error"]["code"],
+        "SOURCE_CHANGED"
+    );
+    std::fs::write(
+        evidence.join("source-preview-chrome.json"),
+        serde_json::to_vec_pretty(
+            &json!({"cases":reports,"missing_bearer_denied":true,"changed_source_denied":true}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
 }

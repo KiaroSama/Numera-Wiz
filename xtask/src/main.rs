@@ -66,7 +66,9 @@ fn run() -> Result<()> {
             #[cfg(target_os = "macos")]
             println!("xtask build-standard-macos-profile");
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-            println!("xtask package-standard-linux-application | prepare-browser-preview-components");
+            println!(
+                "xtask package-standard-linux-application | prepare-browser-preview-components"
+            );
             Ok(())
         }
         _ => bail!("Unknown task: {task}"),
@@ -131,7 +133,9 @@ fn schemas(root: &Path) -> Result<()> {
     )?;
     fs::write(
         path.join("media-observation.schema.json"),
-        serde_json::to_vec_pretty(&schemars::schema_for!(nw_domain::preview::InlineObservation))?,
+        serde_json::to_vec_pretty(&schemars::schema_for!(
+            nw_domain::preview::InlineObservation
+        ))?,
     )?;
     fs::write(
         path.join("execution-plan.schema.json"),

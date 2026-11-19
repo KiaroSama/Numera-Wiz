@@ -595,13 +595,27 @@ pub fn prepare(command: Command) -> Result<Request> {
             "media.preview_frame",
             json!({"asset_id":asset,"stream_index":stream,"frame":frame}),
         ),
-        Command::Previews(Previews::Observe { asset, stream, frame }) => query(
+        Command::Previews(Previews::Observe {
+            asset,
+            stream,
+            frame,
+        }) => query(
             nw_domain::preview::OBSERVE_COMMAND,
-            serde_json::to_value(nw_domain::preview::ObserveInput::source(asset, stream, frame))?,
+            serde_json::to_value(nw_domain::preview::ObserveInput::source(
+                asset, stream, frame,
+            ))?,
         ),
-        Command::Media(Media::PreviewSegment { asset, video_stream, audio_stream }) => query(
+        Command::Media(Media::PreviewSegment {
+            asset,
+            video_stream,
+            audio_stream,
+        }) => query(
             "previews.source_segment",
-            json!(nw_domain::preview::SourceSegmentInput { asset_id: asset, video_stream, audio_stream }),
+            json!(nw_domain::preview::SourceSegmentInput {
+                asset_id: asset,
+                video_stream,
+                audio_stream
+            }),
         ),
         Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
             "media.analyze.volume",

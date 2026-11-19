@@ -296,7 +296,9 @@ impl Engine {
         } else {
             ""
         };
-        let filters = format!("{trim}{showinfo},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba{remove_side_data}");
+        let filters = format!(
+            "{trim}{showinfo},setpts=PTS-STARTPTS,{scale},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,format=rgba{remove_side_data}"
+        );
         let mut args = [
             "-hide_banner",
             "-nostdin",
@@ -335,15 +337,31 @@ impl Engine {
             OutputKind::Png => "png",
         };
         args.extend(
-            ["-frames:v", "1", "-c:v", codec, "-threads", "1", "-pix_fmt", "rgba"]
-                .map(String::from),
+            [
+                "-frames:v",
+                "1",
+                "-c:v",
+                codec,
+                "-threads",
+                "1",
+                "-pix_fmt",
+                "rgba",
+            ]
+            .map(String::from),
         );
         let (container, output_budget) = match format {
             OutputKind::Raw => ("rawvideo", preview::RGBA_BYTES),
             OutputKind::Png => {
                 args.extend(
-                    ["-map_metadata", "-1", "-map_chapters", "-1", "-fps_mode", "passthrough"]
-                        .map(String::from),
+                    [
+                        "-map_metadata",
+                        "-1",
+                        "-map_chapters",
+                        "-1",
+                        "-fps_mode",
+                        "passthrough",
+                    ]
+                    .map(String::from),
                 );
                 ("image2pipe", preview::MAX_INLINE_PNG_BYTES)
             }

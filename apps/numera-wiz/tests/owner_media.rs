@@ -897,10 +897,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     assert_eq!(exit, 0, "{}", observed_still["error"]);
     let observed_still = &observed_still["result"];
     let metadata = &observed_still["metadata"];
-    assert_eq!(metadata["target"], still_observation_input(&asset)["target"]);
+    assert_eq!(
+        metadata["target"],
+        still_observation_input(&asset)["target"]
+    );
     assert_eq!(metadata["actual_frame_index"], 2);
     assert_eq!(metadata["source_sha256"], asset["identity"]["sha256"]);
-    assert_eq!(metadata["timing"]["time_base"], json!({"num":"1","den":"1000"}));
+    assert_eq!(
+        metadata["timing"]["time_base"],
+        json!({"num":"1","den":"1000"})
+    );
     assert_eq!(metadata["timing"]["pts"], json!({"num":"1","den":"2"}));
     assert_eq!(metadata["timing"]["duration"], json!({"num":"1","den":"4"}));
     assert_eq!(metadata["width"], nw_domain::preview::WIDTH);
@@ -919,7 +925,17 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         .args(["-v", "error", "-f", "png_pipe", "-i"])
         .arg(&observed_path)
         .args([
-            "-map", "0:0", "-frames:v", "1", "-c:v", "rawvideo", "-pix_fmt", "rgba", "-f", "rawvideo", "pipe:1",
+            "-map",
+            "0:0",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-f",
+            "rawvideo",
+            "pipe:1",
         ])
         .output()
         .await

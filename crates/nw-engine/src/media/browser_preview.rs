@@ -2,7 +2,8 @@
 use super::identities;
 use crate::{Engine, admission, blocking, preservation};
 use nw_domain::{
-    DomainError, Result, mux::StreamKind,
+    DomainError, Result,
+    mux::StreamKind,
     preview::{MAX_SOURCE_SEGMENT_BYTES, MAX_SOURCE_SEGMENT_FRAGMENTS},
     records::Asset,
 };
@@ -46,13 +47,20 @@ fn take_box<'a>(remaining: &mut &'a [u8]) -> Result<Option<BoxRef<'a>>> {
     };
     let size = u32::from_be_bytes(header[..4].try_into().expect("MP4 box size"));
     let (header_bytes, size) = match size {
-        0 => return Err(invalid("Open-ended MP4 boxes are outside the preview profile")),
+        0 => {
+            return Err(invalid(
+                "Open-ended MP4 boxes are outside the preview profile",
+            ));
+        }
         1 => {
             let Some(header) = source.first_chunk::<16>() else {
                 return Err(invalid("Truncated extended MP4 box header"));
             };
             let size = u64::from_be_bytes(header[8..].try_into().expect("Extended MP4 box size"));
-            (16, usize::try_from(size).map_err(|_| invalid("Unrepresentable MP4 box size"))?)
+            (
+                16,
+                usize::try_from(size).map_err(|_| invalid("Unrepresentable MP4 box size"))?,
+            )
         }
         size => (8, size as usize),
     };
@@ -62,7 +70,10 @@ fn take_box<'a>(remaining: &mut &'a [u8]) -> Result<Option<BoxRef<'a>>> {
     let kind = header[4..8].try_into().expect("MP4 box type");
     let (data, rest) = source.split_at(size);
     *remaining = rest;
-    Ok(Some(BoxRef { kind, payload: &data[header_bytes..] }))
+    Ok(Some(BoxRef {
+        kind,
+        payload: &data[header_bytes..],
+    }))
 }
 
 fn descriptor(mut source: &[u8], expected: u8) -> Result<&[u8]> {
@@ -81,24 +92,41 @@ fn descriptor(mut source: &[u8], expected: u8) -> Result<&[u8]> {
         source = tail;
         bytes = bytes * 128 + usize::from(size & 0x7f);
         if size < 128 {
-            return source.get(..bytes).ok_or_else(|| invalid("Truncated MP4 audio descriptor"));
+            return source
+                .get(..bytes)
+                .ok_or_else(|| invalid("Truncated MP4 audio descriptor"));
         }
     }
     Err(invalid("MP4 audio descriptor size exceeds four bytes"))
 }
 
 fn verify_aac(track: &[u8], entry: &[u8]) -> Result<()> {
-    let extensions = entry.get(28..).ok_or_else(|| invalid("Incomplete AAC sample entry"))?;
+    let extensions = entry
+        .get(28..)
+        .ok_or_else(|| invalid("Incomplete AAC sample entry"))?;
     let esds = child(extensions, *b"esds")?;
-    let es = descriptor(esds.strip_prefix(&[0, 0, 0, 0]).ok_or_else(|| invalid("Unsupported AAC descriptor version"))?, 0x03)?;
+    let es = descriptor(
+        esds.strip_prefix(&[0, 0, 0, 0])
+            .ok_or_else(|| invalid("Unsupported AAC descriptor version"))?,
+        0x03,
+    )?;
     if es.get(2) != Some(&0) {
         return Err(invalid("Unexpected AAC descriptor flags"));
     }
-    let decoder = descriptor(es.get(3..).ok_or_else(|| invalid("Incomplete AAC elementary stream"))?, 0x04)?;
+    let decoder = descriptor(
+        es.get(3..)
+            .ok_or_else(|| invalid("Incomplete AAC elementary stream"))?,
+        0x04,
+    )?;
     if !decoder.starts_with(&[0x40, 0x15]) {
         return Err(invalid("Preview sound requires AAC"));
     }
-    let config = descriptor(decoder.get(13..).ok_or_else(|| invalid("Incomplete AAC decoder configuration"))?, 0x05)?;
+    let config = descriptor(
+        decoder
+            .get(13..)
+            .ok_or_else(|| invalid("Incomplete AAC decoder configuration"))?,
+        0x05,
+    )?;
     if !config.starts_with(&[0x11, 0x90]) {
         return Err(invalid("Preview sound requires 48 kHz stereo AAC-LC"));
     }
@@ -142,13 +170,21 @@ fn codec_list(mut movie: &[u8], sound_expected: bool) -> Result<String> {
         }
         match &sample.kind {
             b"avc1" if video.is_none() => {
-                let extensions = sample.payload.get(78..).ok_or_else(|| invalid("Incomplete AVC sample entry"))?;
+                let extensions = sample
+                    .payload
+                    .get(78..)
+                    .ok_or_else(|| invalid("Incomplete AVC sample entry"))?;
                 let avc = child(extensions, *b"avcC")?;
-                let config = avc.first_chunk::<7>().ok_or_else(|| invalid("Incomplete AVC configuration"))?;
+                let config = avc
+                    .first_chunk::<7>()
+                    .ok_or_else(|| invalid("Incomplete AVC configuration"))?;
                 if config[0] != 1 || config[1] != 66 || config[3] > 31 {
                     return Err(invalid("Preview MP4 requires bounded AVC Baseline video"));
                 }
-                video = Some(format!("avc1.{:02X}{:02X}{:02X}", config[1], config[2], config[3]));
+                video = Some(format!(
+                    "avc1.{:02X}{:02X}{:02X}",
+                    config[1], config[2], config[3]
+                ));
             }
             b"mp4a" if sound_expected && !audio => {
                 verify_aac(node.payload, sample.payload)?;
@@ -168,7 +204,10 @@ fn codec_list(mut movie: &[u8], sound_expected: bool) -> Result<String> {
 impl BrowserSegment {
     pub fn verify(bytes: Vec<u8>, sound_expected: bool) -> Result<Self> {
         if bytes.len() > MAX_SOURCE_SEGMENT_BYTES {
-            return Err(DomainError::new("RESOURCE_LIMIT", "Browser preview segment exceeded 2 MiB"));
+            return Err(DomainError::new(
+                "RESOURCE_LIMIT",
+                "Browser preview segment exceeded 2 MiB",
+            ));
         }
         let mut remaining = bytes.as_slice();
         let file = take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 file type"))?;
@@ -185,8 +224,10 @@ impl BrowserSegment {
         let mut fragments = Vec::new();
         while !remaining.is_empty() {
             let start = bytes.len() - remaining.len();
-            let fragment = take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment header"))?;
-            let media = take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment payload"))?;
+            let fragment =
+                take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment header"))?;
+            let media =
+                take_box(&mut remaining)?.ok_or_else(|| invalid("Missing MP4 fragment payload"))?;
             if fragments.len() >= MAX_SOURCE_SEGMENT_FRAGMENTS
                 || fragment.kind != *b"moof"
                 || fragment.payload.len() > MAX_FRAGMENT_HEADERS
@@ -208,7 +249,12 @@ impl BrowserSegment {
         if fragments.is_empty() {
             return Err(invalid("Preview MP4 has no media fragments"));
         }
-        Ok(Self { bytes, initialization, fragments, mime_type })
+        Ok(Self {
+            bytes,
+            initialization,
+            fragments,
+            mime_type,
+        })
     }
 }
 
@@ -222,20 +268,36 @@ impl Engine {
         audio_stream: Option<u32>,
         cancel: CancellationToken,
     ) -> Result<(BrowserSegment, SourceStamp)> {
-        let unsupported = || DomainError::new(
-            "BROWSER_PREVIEW_UNAVAILABLE",
-            "This preview profile needs zero-origin limited BT.709 video and optional zero-origin stereo 48 kHz audio",
-        );
-        let video = asset.probe.stream_details.get(&video_stream).ok_or_else(unsupported)?;
-        if ["color_space", "color_transfer", "color_primaries"].iter().any(|field| video[*field] != "bt709")
+        let unsupported = || {
+            DomainError::new(
+                "BROWSER_PREVIEW_UNAVAILABLE",
+                "This preview profile needs zero-origin limited BT.709 video and optional zero-origin stereo 48 kHz audio",
+            )
+        };
+        let video = asset
+            .probe
+            .stream_details
+            .get(&video_stream)
+            .ok_or_else(unsupported)?;
+        if ["color_space", "color_transfer", "color_primaries"]
+            .iter()
+            .any(|field| video[*field] != "bt709")
             || video["color_range"] != "tv"
             || preservation::integer(&video["start_pts"])? != Some(0)
         {
             return Err(unsupported());
         }
         if let Some(index) = audio_stream {
-            let detail = asset.probe.stream_details.get(&index).ok_or_else(unsupported)?;
-            if !asset.probe.streams.iter().any(|stream| stream.index == index && stream.kind == StreamKind::Audio)
+            let detail = asset
+                .probe
+                .stream_details
+                .get(&index)
+                .ok_or_else(unsupported)?;
+            if !asset
+                .probe
+                .streams
+                .iter()
+                .any(|stream| stream.index == index && stream.kind == StreamKind::Audio)
                 || preservation::integer(&detail["sample_rate"])? != Some(48000)
                 || detail["channels"] != 2
                 || detail["channel_layout"] != "stereo"
@@ -244,48 +306,147 @@ impl Engine {
                 return Err(unsupported());
             }
         }
-        let admission::RegisteredInput { input, source, expected, length } =
-            admission::registered_stream(asset, source, video_stream, StreamKind::Video, cancel.clone()).await?;
+        let admission::RegisteredInput {
+            input,
+            source,
+            expected,
+            length,
+        } = admission::registered_stream(
+            asset,
+            source,
+            video_stream,
+            StreamKind::Video,
+            cancel.clone(),
+        )
+        .await?;
         let mut args = [
-            "-hide_banner", "-nostdin", "-v", "warning", "-xerror", "-copyts", "-max_alloc", "67108864",
-            "-threads", "1", "-filter_threads", "1", "-drop_changed", "1",
-        ].map(str::to_owned).to_vec();
+            "-hide_banner",
+            "-nostdin",
+            "-v",
+            "warning",
+            "-xerror",
+            "-copyts",
+            "-max_alloc",
+            "67108864",
+            "-threads",
+            "1",
+            "-filter_threads",
+            "1",
+            "-drop_changed",
+            "1",
+        ]
+        .map(str::to_owned)
+        .to_vec();
         args.extend(input.options());
-        args.extend(["-i".into(), "fd:".into(), "-map".into(), format!("0:{video_stream}")]);
+        args.extend([
+            "-i".into(),
+            "fd:".into(),
+            "-map".into(),
+            format!("0:{video_stream}"),
+        ]);
         if let Some(index) = audio_stream {
             args.extend(["-map".into(), format!("0:{index}")]);
-            args.extend([
-                "-af", "atrim=start=0:end=2", "-c:a", "aac", "-profile:a", "aac_low",
-                "-ar", "48000", "-ac", "2", "-b:a", "128k",
-            ].map(str::to_owned));
+            args.extend(
+                [
+                    "-af",
+                    "atrim=start=0:end=2",
+                    "-c:a",
+                    "aac",
+                    "-profile:a",
+                    "aac_low",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    "128k",
+                ]
+                .map(str::to_owned),
+            );
         }
-        args.extend([
-            "-map_metadata", "-1", "-map_chapters", "-1", "-t", "2", "-vf", VIDEO_FILTER,
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-            "-profile:v", "baseline", "-level:v", "3.1", "-pix_fmt", "yuv420p", "-threads:v", "1",
-            "-g", "60", "-bf", "0", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*0.5)",
-            "-fps_mode:v", "passthrough", "-enc_time_base:v", "filter",
-            "-avoid_negative_ts", "disabled", "-use_editlist", "1",
-            "-movflags", "+frag_keyframe+delay_moov+default_base_moof+skip_trailer", "-f", "mp4", "pipe:1",
-        ].map(str::to_owned));
+        args.extend(
+            [
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
+                "-t",
+                "2",
+                "-vf",
+                VIDEO_FILTER,
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-tune",
+                "zerolatency",
+                "-profile:v",
+                "baseline",
+                "-level:v",
+                "3.1",
+                "-pix_fmt",
+                "yuv420p",
+                "-threads:v",
+                "1",
+                "-g",
+                "60",
+                "-bf",
+                "0",
+                "-sc_threshold",
+                "0",
+                "-force_key_frames",
+                "expr:gte(t,n_forced*0.5)",
+                "-fps_mode:v",
+                "passthrough",
+                "-enc_time_base:v",
+                "filter",
+                "-avoid_negative_ts",
+                "disabled",
+                "-use_editlist",
+                "1",
+                "-movflags",
+                "+frag_keyframe+delay_moov+default_base_moof+skip_trailer",
+                "-f",
+                "mp4",
+                "pipe:1",
+            ]
+            .map(str::to_owned),
+        );
         let ticket = self.process_budget.acquire(&cancel).await?;
-        if let Err(error) = identities(self, cancel.clone()).await.and_then(|_| source.revalidate()) {
+        if let Err(error) = identities(self, cancel.clone())
+            .await
+            .and_then(|_| source.revalidate())
+        {
             return ticket.finish(Err(error));
         }
         let process = process::run_readonly(
-            Path::new(&self.ffmpeg.path), &args, Duration::from_secs(12), MAX_SOURCE_SEGMENT_BYTES, input.file, cancel.clone(),
-        ).await;
+            Path::new(&self.ffmpeg.path),
+            &args,
+            Duration::from_secs(12),
+            MAX_SOURCE_SEGMENT_BYTES,
+            input.file,
+            cancel.clone(),
+        )
+        .await;
         let output = ticket.finish(process)?;
-        if output.diagnostic_bytes > 4096 || output.stderr_tail.contains("Avoiding reinit; dropping frame") {
+        if output.diagnostic_bytes > 4096
+            || output
+                .stderr_tail
+                .contains("Avoiding reinit; dropping frame")
+        {
             return Err(invalid("The preview source format changed while decoding"));
         }
         let verified = BrowserSegment::verify(output.stdout, audio_stream.is_some())?;
         identities(self, cancel.clone()).await?;
         blocking(move || {
             if source.identity_with_limit(&cancel, length)? != expected {
-                return Err(DomainError::new("SOURCE_CHANGED", "Registered source changed during preview capture"));
+                return Err(DomainError::new(
+                    "SOURCE_CHANGED",
+                    "Registered source changed during preview capture",
+                ));
             }
             Ok((verified, source))
-        }).await
+        })
+        .await
     }
 }

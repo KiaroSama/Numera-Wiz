@@ -7,6 +7,7 @@ mod output_profile;
 mod preservation;
 mod progress;
 mod wave_cues;
+pub use media::BrowserSegment;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
 pub use media::mixed_ffmpeg::{
     MixedProcessLimits, MixedPublishRequest, MixedSignalProof, StagedMixedInput,
@@ -14,7 +15,6 @@ pub use media::mixed_ffmpeg::{
 };
 pub use media::normalized_pair::NormalizedWindow;
 pub use media::preview::ObservedPng;
-pub use media::BrowserSegment;
 use nw_domain::{
     DomainError, Result,
     mux::{self, CleanAction, CleanIntent, Stream, StreamKind},

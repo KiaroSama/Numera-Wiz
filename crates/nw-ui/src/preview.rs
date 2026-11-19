@@ -77,10 +77,14 @@ impl WizApp {
                                 ui.selectable_value(&mut state.audio_stream, None, "No sound");
                                 for audio in asset.probe.streams.iter().filter(|stream| {
                                     stream.kind == StreamKind::Audio
-                                        && asset.probe.stream_details.get(&stream.index).is_some_and(
-                                            |detail| detail["channel_layout"] == "stereo"
-                                                && detail["sample_rate"] == "48000",
-                                        )
+                                        && asset
+                                            .probe
+                                            .stream_details
+                                            .get(&stream.index)
+                                            .is_some_and(|detail| {
+                                                detail["channel_layout"] == "stereo"
+                                                    && detail["sample_rate"] == "48000"
+                                            })
                                 }) {
                                     ui.selectable_value(
                                         &mut state.audio_stream,

@@ -405,13 +405,18 @@ fn observation_result(
     }
     response.result = Some(serde_json::to_value(&still.metadata).map_err(|_| invalid())?);
     let structured = serde_json::to_value(&response).map_err(|_| invalid())?;
-    if serde_json::to_vec(&structured).map_err(|_| invalid())?.len()
+    if serde_json::to_vec(&structured)
+        .map_err(|_| invalid())?
+        .len()
         > preview::MAX_OBSERVATION_METADATA_BYTES
     {
         return Err(invalid());
     }
     let mut result = CallToolResult::structured(structured);
-    result.content = vec![ContentBlock::image(still.png_base64, preview::PNG_MIME_TYPE)];
+    result.content = vec![ContentBlock::image(
+        still.png_base64,
+        preview::PNG_MIME_TYPE,
+    )];
     let envelope = serde_json::json!({"jsonrpc":"2.0","id":&context.id,"result":&result});
     if serde_json::to_vec(&envelope).map_err(|_| invalid())?.len()
         >= preview::MAX_MCP_OBSERVATION_BYTES

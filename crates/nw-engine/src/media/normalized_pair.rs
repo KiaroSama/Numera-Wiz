@@ -352,7 +352,9 @@ impl Engine {
             move || {
                 let length = input.metadata().map_err(files::io_error)?.len();
                 if length > NUT_VERIFICATION_BYTES {
-                    return Err(invalid_pair("NUT candidate exceeded the verification byte limit"));
+                    return Err(invalid_pair(
+                        "NUT candidate exceeded the verification byte limit",
+                    ));
                 }
                 let (declarations, ledger) = {
                     let bounded = BufReader::new((&mut input).take(length + 1));
@@ -360,13 +362,18 @@ impl Engine {
                     let mut ledger = Vec::new();
                     loop {
                         if cancel.is_cancelled() {
-                            return Err(DomainError::new("CANCELLED", "NUT verification cancelled"));
+                            return Err(DomainError::new(
+                                "CANCELLED",
+                                "NUT verification cancelled",
+                            ));
                         }
                         let Some(packet) = reader.next_packet()? else {
                             break;
                         };
                         if ledger.len() == NUT_VERIFICATION_PACKETS {
-                            return Err(invalid_pair("NUT candidate exceeded the packet inventory limit"));
+                            return Err(invalid_pair(
+                                "NUT candidate exceeded the packet inventory limit",
+                            ));
                         }
                         ledger.push(WirePacket {
                             stream: packet.stream,
@@ -376,7 +383,9 @@ impl Engine {
                         });
                     }
                     if reader.position() != length {
-                        return Err(invalid_pair("NUT candidate changed length during verification"));
+                        return Err(invalid_pair(
+                            "NUT candidate changed length during verification",
+                        ));
                     }
                     (reader.streams().to_vec(), ledger)
                 };
@@ -456,16 +465,19 @@ fn verify_wire_report(
                     && probe["width"].as_u64() == Some(u64::from(width))
                     && probe["height"].as_u64() == Some(u64::from(height))
             }
-            nut::Format::PcmS16 { sample_rate, channels } => {
-                probe_audio_matches(probe, "pcm_s16le", "s16", sample_rate, channels)
-            }
+            nut::Format::PcmS16 {
+                sample_rate,
+                channels,
+            } => probe_audio_matches(probe, "pcm_s16le", "s16", sample_rate, channels),
             nut::Format::StereoPcmF32 => probe_audio_matches(probe, "pcm_f32le", "flt", 48_000, 2),
         };
         if !format_matches
             || probe["index"].as_u64() != Some(index as u64)
             || ratio(probe["time_base"].as_str().unwrap_or_default())? != declared.clock
         {
-            return Err(invalid_pair("NUT wire and ffprobe stream declarations differ"));
+            return Err(invalid_pair(
+                "NUT wire and ffprobe stream declarations differ",
+            ));
         }
     }
     for (packet, probe) in ledger.iter().zip(probe_packets) {

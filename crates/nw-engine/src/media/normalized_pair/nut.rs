@@ -68,7 +68,11 @@ fn signed(input: &mut impl Read) -> Result<i64> {
     let value = unsigned(input)?;
     let magnitude = i64::try_from((value >> 1) + (value & 1))
         .map_err(|_| invalid("NUT signed integer overflow"))?;
-    Ok(if value & 1 == 0 { -magnitude } else { magnitude })
+    Ok(if value & 1 == 0 {
+        -magnitude
+    } else {
+        magnitude
+    })
 }
 
 fn bounded(input: &mut impl Read, max: u64) -> Result<u64> {
@@ -188,7 +192,12 @@ pub(super) struct Stream {
 }
 
 impl Stream {
-    fn parse(mut body: &[u8], main: &MainHeader, index: usize, packet_limit: usize) -> Result<Self> {
+    fn parse(
+        mut body: &[u8],
+        main: &MainHeader,
+        index: usize,
+        packet_limit: usize,
+    ) -> Result<Self> {
         if unsigned(&mut body)? != index as u64 {
             return Err(invalid("Unexpected NUT stream index"));
         }
@@ -220,9 +229,7 @@ impl Stream {
             }
             (1, b"PSD\x10" | b"PFD\x20") => {
                 let sample_rate = positive(&mut body)?;
-                if unsigned(&mut body)? != 1
-                    || clock != Rational::new(1, i64::from(sample_rate))?
-                {
+                if unsigned(&mut body)? != 1 || clock != Rational::new(1, i64::from(sample_rate))? {
                     return Err(invalid("Invalid NUT PCM sample clock"));
                 }
                 let channels = positive(&mut body)?;
@@ -239,7 +246,9 @@ impl Stream {
             _ => return Err(invalid("Unsupported NUT preview codec")),
         };
         if !body.is_empty()
-            || format.unit_bytes().is_none_or(|unit| unit > packet_limit as u64)
+            || format
+                .unit_bytes()
+                .is_none_or(|unit| unit > packet_limit as u64)
         {
             return Err(invalid("NUT stream shape exceeds the packet profile"));
         }
@@ -290,7 +299,9 @@ impl MainHeader {
         let max_distance = bounded(&mut body, 65_536)?;
         let clock_count = bounded(&mut body, MAX_TIME_BASES)?;
         if stream_count == 0 || max_distance == 0 || clock_count == 0 {
-            return Err(invalid("NUT main header omits its stream or clock configuration"));
+            return Err(invalid(
+                "NUT main header omits its stream or clock configuration",
+            ));
         }
         let mut time_bases = Vec::new();
         for _ in 0..clock_count {
@@ -395,7 +406,9 @@ impl MainHeader {
             }
         }
         if !body.is_empty()
-            || codes.iter().any(|code| code.header_index >= elision_headers.len())
+            || codes
+                .iter()
+                .any(|code| code.header_index >= elision_headers.len())
         {
             return Err(invalid("Invalid NUT main header elision table"));
         }
@@ -480,7 +493,9 @@ impl<R: Read> NutReader<R> {
         let start = self.wire.position;
         loop {
             if self.wire.position - start > MAX_CONTROL_BURST {
-                return Err(invalid("NUT control traffic exceeded the packet staging budget"));
+                return Err(invalid(
+                    "NUT control traffic exceeded the packet staging budget",
+                ));
             }
             let Some(first) = next_byte(&mut self.wire)? else {
                 break;
@@ -520,12 +535,8 @@ impl<R: Read> NutReader<R> {
         }
         for (index, stream) in self.streams.iter().enumerate() {
             self.wire.expect_startcode(STREAM)?;
-            let repeated = Stream::parse(
-                &self.wire.control(STREAM)?,
-                &main,
-                index,
-                self.packet_limit,
-            )?;
+            let repeated =
+                Stream::parse(&self.wire.control(STREAM)?, &main, index, self.packet_limit)?;
             if *stream != repeated {
                 return Err(invalid("Repeated NUT stream header changed"));
             }
@@ -583,7 +594,8 @@ impl<R: Read> NutReader<R> {
             let numerator = i128::from(ticks)
                 * i128::from(clock.numerator())
                 * i128::from(stream.clock.denominator());
-            let denominator = i128::from(clock.denominator()) * i128::from(stream.clock.numerator());
+            let denominator =
+                i128::from(clock.denominator()) * i128::from(stream.clock.numerator());
             *predictor = (numerator / denominator)
                 .try_into()
                 .map_err(|_| invalid("NUT syncpoint clock conversion overflow"))?;
@@ -641,7 +653,9 @@ impl<R: Read> NutReader<R> {
                 .ok_or_else(|| invalid("NUT packet size overflow"))?;
         }
         if size > self.packet_limit as u64 || !declaration.format.accepts(size) {
-            return Err(invalid("NUT packet size differs from its stream shape or limit"));
+            return Err(invalid(
+                "NUT packet size differs from its stream shape or limit",
+            ));
         }
         if flags & MATCH_TIME != 0 {
             signed(&mut self.wire)?;
@@ -688,8 +702,7 @@ impl<R: Read> NutReader<R> {
 fn reconstruct_pts(coded: u64, shift: u32, previous: i64) -> Result<i64> {
     let modulus = 1_u64 << shift;
     if coded >= modulus {
-        return i64::try_from(coded - modulus)
-            .map_err(|_| invalid("NUT full PTS overflow"));
+        return i64::try_from(coded - modulus).map_err(|_| invalid("NUT full PTS overflow"));
     }
     let mask = i128::from(modulus - 1);
     let center = i128::from(previous) - mask / 2;
