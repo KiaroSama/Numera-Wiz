@@ -342,13 +342,38 @@ fn capture(config: &Value, raw: &mut Raw, report: &mut Value, deadline: Instant)
             // The signed compressed size sets the transfer allowance. The
             // worker deadline and the individual byte limit still cap it.
             let transfer_seconds = 20 + size.div_ceil(512 * 1024).min(40);
-            let output = recorded(
+            let mut output = recorded(
                 raw,
                 &format!("download-{pocket}-{component}"),
                 &mut download,
                 deadline,
                 transfer_seconds,
             )?;
+            // Retry a transport timeout once within the same capture deadline.
+            // The URL, archive key, expected size and signed SHA-256 stay bound.
+            let timed_out = [&output.stderr, &output.stdout]
+                .into_iter()
+                .any(|diagnostic| {
+                    diagnostic
+                        .windows(b"Connection timed out".len())
+                        .any(|row| row == b"Connection timed out")
+                });
+            if !output.status.success() && timed_out {
+                if destination.exists() {
+                    raw.copy(
+                        &format!("metadata/{pocket}/{component}/timed-out-index.xz"),
+                        &destination,
+                    )?;
+                    fs::remove_file(&destination)?;
+                }
+                output = recorded(
+                    raw,
+                    &format!("download-{pocket}-{component}-retry"),
+                    &mut download,
+                    deadline,
+                    transfer_seconds,
+                )?;
+            }
             let compressed = if destination.exists() {
                 Some(raw.copy(
                     &format!("metadata/{pocket}/{component}/Packages.xz"),
