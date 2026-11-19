@@ -629,8 +629,8 @@ impl WizApp {
                 FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
             )
         });
-        if intake_failed {
-            ui.label("Resolve failed intake before reviewing folder cleanup or H.264 export.");
+        if intake_failed && self.batch.failure == nw_domain::batches::FailurePolicy::RejectAll {
+            ui.label("Resolve failed intake or allow the registered files to proceed.");
         } else {
             ui.small("The current cleanup stream selection, file times and execution limits apply.");
             let review = ui.add_enabled(
@@ -642,6 +642,8 @@ impl WizApp {
                 let root = self.folder.batch_output_root.clone();
                 self.review_folder_batch(snapshot, &root, ui.ctx());
             }
+        }
+        if !intake_failed {
             self.folder_encode_controls(ui, snapshot, idle);
         }
         self.folder_extract_controls(ui, snapshot, idle);

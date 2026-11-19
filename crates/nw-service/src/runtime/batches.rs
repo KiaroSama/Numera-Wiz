@@ -178,7 +178,7 @@ impl Service {
                 )
             })
             .count();
-        if failed != 0 {
+        if failed != 0 && input.failure_policy == FailurePolicy::RejectAll {
             return Err(DomainError::new(
                 "FOLDER_INTAKE_FAILED",
                 format!(

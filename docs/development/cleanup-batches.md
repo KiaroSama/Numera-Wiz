@@ -103,9 +103,11 @@ filename per registered video from the snapshot row number and a bounded
 portable stem, keeping the original extension. Name collisions with an
 existing file or directory become ordinary `OUTPUT_COLLISION` rows.
 
-The folder review rejects incomplete intake, any failed intake row, or an empty
-registered set. Its `excluded` array identifies the intentionally excluded or
-inventory-only snapshot rows by zero-based index and outcome. Its `plan` is the
+The folder review requires complete enumeration and at least one registered
+source. `reject_all` refuses a snapshot with failed intake rows.
+`continue_with_rejected` reviews the registered sources and retains failed
+intake rows in `excluded` alongside other excluded or inventoried rows.
+Each excluded row provides its zero-based snapshot index and outcome. Its `plan` is the
 ordinary retained batch review. Inspect or submit that exact ID and hash using
 the standard batch commands. The retained snapshot remains the reference for
 the full intake inventory. Review creates no directories or media files.
@@ -114,7 +116,7 @@ The shared native/browser Folder intake window can also review a complete
 snapshot into the batch window. That mode shows frozen member decisions and
 excluded snapshot rows, and uses the ordinary Run and retry controls.
 Output-tree reproduction and in-source output exclusion, companion copying,
-partial intake failure composition, and mixed audio and encode workflows remain
+and mixed audio and encode workflows remain
 open. This slice awaits hosted transport and GUI qualification on its source.
 
 The new records currently use the development schema-2 root. Stopped-generation

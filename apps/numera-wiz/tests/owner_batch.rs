@@ -1572,6 +1572,23 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         json!({})
     );
     assert_eq!(rejected_intake["error"]["code"], "FOLDER_INTAKE_FAILED");
+    let mut partial_intake = folder_batch_input(&sdk_folder, &folder_destination);
+    partial_intake["failure_policy"] = json!("continue_with_rejected");
+    let partial_intake = call!(
+        stdio,
+        "streams.clean.folder_batch_plan",
+        partial_intake,
+        json!({})
+    );
+    assert_eq!(partial_intake["plan"]["items"].as_array().unwrap().len(), 2);
+    assert!(
+        partial_intake["excluded"].as_array().unwrap().iter().any(|entry| {
+            entry["outcome"] == "probe_failed"
+                && sdk_folder["entries"][entry["index"].as_u64().unwrap() as usize]["relative_path"]
+                    == "broken.mkv"
+        })
+    );
+    assert_eq!(std::fs::read_dir(&folder_destination).unwrap().count(), 0);
     let foreign_intake = sdk!(
         stdio,
         "streams.clean.folder_batch_plan",
