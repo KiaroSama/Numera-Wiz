@@ -246,7 +246,7 @@ async fn fetch_program(
     options.set_redirect(RequestRedirect::Error);
     options.set_credentials(RequestCredentials::Omit);
     options.set_signal(Some(signal));
-    options.set_body(Some(body.as_ref()));
+    options.set_body(body.as_ref());
     let request = Request::new_with_str_and_init(&format!("{origin}/api/v1/previews/program"), &options)?;
     request.headers().set("Authorization", &format!("Bearer {bearer}"))?;
     request.headers().set("Content-Type", "application/json")?;
