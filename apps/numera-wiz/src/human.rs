@@ -1157,8 +1157,17 @@ pub async fn run(client: &NativeClient, command: Command) -> Result<()> {
     if let Command::Batches(Batches::Wait { id }) = &command {
         return wait_batch(client, id).await;
     }
+    let edl_destination = match &command {
+        Command::Timeline(Timeline::ExportEdl { out, .. }) => out.clone(),
+        _ => None,
+    };
     match prepare(command) {
-        Ok(request) => print_response(client, request).await,
+        Ok(request) => {
+            if let Some(path) = edl_destination {
+                return timeline::save_edl(client, request, &path).await;
+            }
+            print_response(client, request).await
+        }
         Err(error) => {
             let public = error
                 .downcast_ref::<DomainError>()

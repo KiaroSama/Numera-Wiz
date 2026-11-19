@@ -494,7 +494,10 @@ async fn print_response(client: &NativeClient, request: Request) -> Result<()> {
         );
         return Err(error.into());
     }
-    let result = client.request(&request).await?;
+    print_response_value(client.request(&request).await?)
+}
+
+fn print_response_value(result: nw_domain::commands::Response) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(&result)?);
     if !result.ok {
         return Err(result

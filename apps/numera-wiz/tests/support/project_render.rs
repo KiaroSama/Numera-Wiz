@@ -606,6 +606,40 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
         assert_eq!(observed["result"]["origin"]["clip_id"], clip);
         assert_eq!(observed["result"]["rgba_base64"], frame["rgba_base64"]);
     }
+    let film = edit(cli, scope, project, "4", "edl-create-sequence", "sequences.create", json!({
+        "name":"CMX cuts", "settings":{"width":64,"height":48,"frame_rate":{"num":"24","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
+        "tracks":[{"kind":"video","name":"V1"}]
+    })).await;
+    let film_id = film["created"]["sequence_id"].as_str().unwrap();
+    let film_track = film["created"]["tracks"][0]["id"].as_str().unwrap();
+    edit(cli, scope, project, "5", "edl-place-picture", "clips.place", json!({
+        "sequence_id":film_id,"track_id":film_track,
+        "source":{"kind":"registered","asset_id":asset_id,"stream_index":0},
+        "source_range":{"start":{"num":"1","den":"1"},"end":{"num":"3","den":"2"}},
+        "sequence_start":{"num":"1","den":"2"},"collision":"reject"
+    })).await;
+    let destination = media.directory.path().join("cuts.edl");
+    let args = [
+        "timeline", "export-edl", "--project", project, "--revision", "6",
+        "--sequence", film_id, "--track", film_track, "--end", "1",
+        "--out", destination.to_str().unwrap(),
+    ];
+    let (edl, status) = cli.human(&args).await;
+    assert_eq!(status, 0, "{edl}");
+    let edl = &edl["result"];
+    assert_eq!(edl["reels"][0]["asset_id"], asset_id);
+    let text = edl["document"].as_str().unwrap();
+    assert_eq!(text, concat!(
+        "TITLE: NUMERA WIZ\nFCM: NON-DROP FRAME\n\n",
+        "001  BL       V     C        00:00:00:00 00:00:00:12 00:00:00:00 00:00:00:12\n",
+        "002  R0000001 V     C        00:00:01:00 00:00:01:12 00:00:00:12 00:00:01:00\n",
+    ));
+    assert_eq!(edl["document_sha256"], nw_domain::projects::hash(text.as_bytes()));
+    assert_eq!(std::fs::read(&destination).unwrap(), text.as_bytes());
+    std::fs::write(&destination, b"keep the existing cut list").unwrap();
+    let (refusal, status) = cli.human(&args).await;
+    assert_ne!(status, 0, "{refusal}");
+    assert_eq!(std::fs::read(destination).unwrap(), b"keep the existing cut list");
 }
 
 async fn enable_mixed(cli: &Cli, scope: &str, key: &str) -> String {

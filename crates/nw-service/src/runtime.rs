@@ -1239,6 +1239,15 @@ impl Service {
                 )?;
                 return Ok(Response::success(&request.request_id, plan).bounded());
             }
+            "interchange.edl.export" => {
+                let input: nw_domain::interchange::EdlInput = commands::parse(params)?;
+                let project = request.project.as_ref().ok_or_else(|| {
+                    DomainError::new("VALIDATION_ERROR", "EDL export requires a project context")
+                })?;
+                let read = self.read_project(&context, &project.id, ObjectAction::Read)?;
+                let capture = nw_domain::media::capture_mixed(&read, &input.sequence_id, input.revision, input.range)?;
+                value(&nw_domain::interchange::export_cmx3600(&capture, &input.track_id)?)?
+            }
             "timeline.preview_frame" => {
                 drop(guard);
                 let frame = self.timeline_frame(

@@ -224,6 +224,25 @@ MCP exposes the same edit as `tracks.set_enabled` with `track_id` and
 `enabled` parameters. Use its ordinary project write context. The
 `sequences.inspect` track page includes each track's committed `enabled` state.
 
+## Export a CMX 3600 cut list
+
+Select an enabled picture track in a sequence at 24, 25 or 30 fps. Set an
+exact visible range, open **Export picture track as EDL**, and prepare the
+cut list. **Copy EDL** copies the file text. **Copy reel map** attaches each
+short reel name to the registered asset ID, physical stream index and source
+digest for relinking.
+
+```text
+numera-wiz timeline export-edl --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 8 --out cuts.edl
+```
+
+`--out` saves the checked document to a new client-side file. Existing
+files are preserved. The CLI and MCP `interchange.edl.export` return the same document and reel
+map under `document` and `reels`. Record timecodes use sequence time and source
+timecodes use the registered asset origin. The export uses non-drop timecode,
+unit-rate cuts and black events for gaps. Color generators and timing outside
+the admitted grid return an error. The selected-track export covers picture cuts.
+
 ## Audio track gain
 
 Select an audio track and open **Track gain**. Set the gain in hundredths of a

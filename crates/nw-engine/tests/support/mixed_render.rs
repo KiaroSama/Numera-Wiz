@@ -215,6 +215,21 @@ pub(crate) async fn exercise(engine: &Engine, media: &fixture::Media, token: &Ca
         facts,
         tracks,
     };
+    let mut records = capture.clone();
+    records.settings.frame_rate = Rational::new(24, 1).unwrap();
+    records.tracks[0].clips[0].source = OccurrenceSource::SolidColor { rgb: [0, 0, 0] };
+    let edl = nw_domain::interchange::export_cmx3600(&records, &records.tracks[0].id).unwrap();
+    assert_eq!(edl.document, concat!(
+        "TITLE: NUMERA WIZ\nFCM: NON-DROP FRAME\n\n",
+        "001  BL       V     C        00:00:00:00 00:00:00:12 00:00:00:00 00:00:00:12\n",
+        "002  R0000001 V     C        00:00:01:06 00:00:02:00 00:00:00:12 00:00:01:06\n",
+        "003  BL       V     C        00:00:00:00 00:00:00:18 00:00:01:06 00:00:02:00\n",
+    ));
+    assert_eq!(edl.reels.len(), 1);
+    assert_eq!(edl.reels[0].name, "R0000001");
+    assert_eq!(edl.reels[0].asset_id, picture.id);
+    assert_eq!(edl.reels[0].stream_index, 0);
+    assert!(nw_domain::interchange::export_cmx3600(&capture, &capture.tracks[0].id).is_err());
     let request: RenderContractV2 = serde_json::from_value(json!({
         "contract_kind":"media_v2","sequence_id":sequence,"revision":"4","range":capture.range,
         "output":{"container":"matroska","video_codec":"ffv1","audio_codec":"pcm_s16le","destination":{"kind":"download"}},

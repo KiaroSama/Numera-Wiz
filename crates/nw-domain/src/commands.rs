@@ -205,7 +205,8 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
-        | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
+        | "timeline.render_mixed"
+        | "interchange.edl.export" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
@@ -254,6 +255,9 @@ fn result_schema(id: &str) -> Option<Value> {
         | "streams.clean.folder_batch_plan"
         | "streams.extract.folder_batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
+        ),
+        "interchange.edl.export" => Some(
+            serde_json::to_value(schema_for!(crate::interchange::EdlExport)).expect("schema"),
         ),
         "media.preview_frame" => {
             Some(serde_json::to_value(schema_for!(crate::preview::Frame)).expect("schema"))
@@ -561,6 +565,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Shift the source windows of linked clips while retaining their timeline positions",
             DurableMutation,
             crate::projects::SlipInput
+        ),
+        row!(
+            "interchange.edl.export",
+            "Export one committed picture track as a non-drop CMX 3600 cut list",
+            Query,
+            crate::interchange::EdlInput
         ),
         row!(
             "timeline.remove_gap",
@@ -1804,6 +1814,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "timeline.preview_frame",
     "timeline.render_mixed",
     "timeline.remove_gap",
+    "interchange.edl.export",
     "clips.place",
     "clips.move",
     "clips.link",

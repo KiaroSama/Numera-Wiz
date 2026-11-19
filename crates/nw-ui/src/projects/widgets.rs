@@ -791,6 +791,36 @@ impl WizApp {
                 ui.image((texture.id(), egui::vec2(width, height)));
             }
         });
+        if let (Some(track), Some(settings)) = (&group.view.track, &group.track)
+            && settings.kind == TrackKind::Video
+        {
+            ui.collapsing("Export picture track as EDL", |ui| {
+                let ready = self.project_ready();
+                if ui.add_enabled(ready, egui::Button::new("Prepare cut list")).clicked() {
+                    self.projects.edl = None;
+                    self.query_with_project(
+                        "interchange.edl.export",
+                        json!({"sequence_id":sequence,"track_id":track,"revision":group.key.revision,"range":group.view.range}),
+                        Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                        self.project_action(Phase::EdlExport),
+                        ui.ctx(),
+                    );
+                }
+                if let Some(edl) = &self.projects.edl {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.button("Copy EDL").clicked() {
+                            ui.ctx().copy_text(edl.document.clone());
+                        }
+                        if ui.button("Copy reel map").clicked() {
+                            match serde_json::to_string_pretty(&edl.reels) {
+                                Ok(text) => ui.ctx().copy_text(text),
+                                Err(error) => self.error = Some(error.to_string()),
+                            }
+                        }
+                    });
+                }
+            });
+        }
         ui.collapsing("Export timeline range", |ui| {
             let idle = self.request_idle() && !self.projects.stale && !self.projects.source_form;
             ui.label(format!("{}–{} seconds · FFV1 / PCM", exact(group.view.range.start), exact(group.view.range.end)));

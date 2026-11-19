@@ -17,6 +17,24 @@ pub enum Timeline {
         #[arg(long)]
         end: String,
     },
+    /// Export one selected picture track as a CMX 3600 cut list.
+    ExportEdl {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        sequence: String,
+        #[arg(long)]
+        track: String,
+        #[arg(long, default_value = "0")]
+        start: String,
+        #[arg(long)]
+        end: String,
+        /// Save the verified cut list to a new client-side file.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Decode the visible source at one exact sequence time.
     PreviewFrame {
         #[arg(long)]
@@ -61,6 +79,19 @@ impl Timeline {
                     "sequence_id":sequence,"track_ids":tracks,"range":range
                 }))?;
                 context.request("timeline.remove_gap", serde_json::to_value(input)?)
+            }
+            Self::ExportEdl { project, revision, sequence, track, start, end, out: _ } => {
+                model::validate_id(&project)?;
+                let input = nw_domain::interchange::EdlInput {
+                    sequence_id: model::EntityId::parse(sequence)?,
+                    track_id: model::EntityId::parse(track)?,
+                    revision: model::Revision::parse(&revision)?,
+                    range: TimeRange { start: super::projects::rational(&start)?, end: super::projects::rational(&end)? },
+                };
+                input.range.validate()?;
+                let mut request = query("interchange.edl.export", serde_json::to_value(input)?);
+                request.project = Some(commands::ProjectRef { id: project, expected_revision: None });
+                Ok(request)
             }
             Self::PreviewFrame {
                 project,
@@ -118,4 +149,21 @@ impl Timeline {
             }
         }
     }
+}
+
+
+pub(super) async fn save_edl(client: &NativeClient, request: Request, path: &Path) -> Result<()> {
+    let response = client.request(&request).await?;
+    if response.ok {
+        let saved: Result<(), DomainError> = (|| {
+            let value = response.result.as_ref().ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL result is missing"))?;
+            let text = value["document"].as_str().ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL document is missing"))?;
+            let digest = value["document_sha256"].as_str().ok_or_else(|| DomainError::new("INVALID_RESPONSE", "EDL digest is missing"))?;
+            nw_platform::download::save_verified_document(path, text.as_bytes(), digest)
+        })();
+        if let Err(error) = saved {
+            return crate::print_response_value(Response::error(&request.request_id, error));
+        }
+    }
+    crate::print_response_value(response)
 }

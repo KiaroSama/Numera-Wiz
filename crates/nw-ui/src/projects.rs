@@ -40,6 +40,7 @@ pub(super) enum Phase {
     Assets,
     Asset,
     PreviewFrame,
+    EdlExport,
     MixedReview,
     MixedSubmit,
     Markers,
@@ -195,6 +196,7 @@ pub(super) struct ProjectsUi {
     focus_catalog: bool,
     clip_selection: Option<ClipSelection>,
     preview_frame: Option<(Rational, egui::TextureHandle)>,
+    edl: Option<nw_domain::interchange::EdlExport>,
     mixed_review: Option<nw_domain::media::MediaPlanV2>,
     marker_page: Option<Page<MarkerSummary>>,
     wave_projection: Option<nw_domain::projects::wave_projection::Projection>,
@@ -211,6 +213,7 @@ impl ProjectsUi {
     }
     fn advance(&mut self) -> Result<u64, String> {
         self.preview_frame = None;
+        self.edl = None;
         self.mixed_review = None;
         self.marker_page = None;
         self.wave_projection = None;
@@ -632,6 +635,7 @@ impl WizApp {
             action,
             Action::Project(ProjectAction {
                 phase: Phase::PreviewFrame
+                    | Phase::EdlExport
                     | Phase::MixedReview
                     | Phase::MixedSubmit
                     | Phase::Markers
@@ -986,6 +990,21 @@ impl WizApp {
                     egui::TextureOptions::LINEAR,
                 );
                 self.projects.preview_frame = Some((frame.at, texture));
+                return Ok(());
+            }
+            Phase::EdlExport => {
+                let edl: nw_domain::interchange::EdlExport = serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let group = self.projects.group.as_ref().ok_or("No displayed sequence for the EDL export")?;
+                if edl.project_id.as_str() != group.key.project
+                    || group.view.sequence.as_deref() != Some(edl.sequence_id.as_str())
+                    || group.view.track.as_deref() != Some(edl.track_id.as_str())
+                    || edl.revision.to_string() != group.key.revision
+                    || edl.range != group.view.range
+                    || nw_domain::projects::hash(edl.document.as_bytes()) != edl.document_sha256
+                {
+                    return Err("EDL differs from the displayed revision, track, range or accepted digest".into());
+                }
+                self.projects.edl = Some(edl);
                 return Ok(());
             }
             Phase::MixedReview => {

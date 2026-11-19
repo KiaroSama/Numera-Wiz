@@ -566,6 +566,7 @@ mod tests {
                     | "timeline.preview_frame"
                     | "timeline.render_mixed"
                     | "markers.wave_projection"
+                    | "interchange.edl.export"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["schema_version"], 1);

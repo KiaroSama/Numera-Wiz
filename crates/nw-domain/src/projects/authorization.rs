@@ -91,7 +91,8 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "markers.wave_projection"
         | "timeline.render"
         | "timeline.preview_frame"
-        | "timeline.render_mixed" => Some(ProjectAction::Read),
+        | "timeline.render_mixed"
+        | "interchange.edl.export" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
         | "markers.place" | "markers.remove" | "timeline.remove_gap" | "mixer.set_track_gain" | "history.undo" | "history.redo" => {
@@ -114,6 +115,7 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
             | "timeline.preview_frame"
             | "timeline.render_mixed"
             | "markers.wave_projection"
+            | "interchange.edl.export"
     );
     if write || timeline_query {
         request_gates.push(RequestGate::ExpectedRevision);
