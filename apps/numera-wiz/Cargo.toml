@@ -8,7 +8,7 @@ license.workspace = true
 workspace = true
 [features]
 default = []
-desktop = ["dep:nw-ui", "dep:eframe", "dep:rfd"]
+desktop = ["dep:nw-ui", "dep:eframe", "dep:rfd", "dep:cpal"]
 embedded-web = []
 embedded-media = []
 [dependencies]
@@ -37,6 +37,7 @@ subtle = "2.6"
 http-body = "1"
 bytes = "1"
 rfd = { version = "=0.17.2", optional = true }
+cpal = { version = "=0.18.2", default-features = false, optional = true }
 [dev-dependencies]
 redb.workspace = true
 base64 = "=0.22.1"

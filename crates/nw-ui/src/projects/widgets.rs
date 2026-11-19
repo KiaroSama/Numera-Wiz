@@ -773,30 +773,37 @@ impl WizApp {
             self.projects.native_picture = None;
         }
         let playing = self.projects.native_picture.as_ref().is_some_and(|view| view.active);
-        if playing && ui.button("Stop picture preview").clicked() {
+        ui.add_enabled(idle && !playing, egui::Checkbox::new(
+            &mut self.projects.forms.native_preview_sound, "Sound",
+        ));
+        if playing && ui.button("Stop playback").clicked() {
             self.projects.native_picture = None;
         } else if !playing
-            && ui.add_enabled(idle, egui::Button::new("Play picture window")).clicked()
+            && ui.add_enabled(idle, egui::Button::new("Play timeline window")).clicked()
         {
-            use nw_domain::{preview::native_wire::OpenRequest, projects::{EntityId, ProjectId, Revision, grid_tick}};
+            use nw_domain::{preview::{native_wire::OpenRequest, program_window}, projects::{EntityId, ProjectId, Revision}};
             let prepare = || -> Result<OpenRequest, String> {
                 let settings = &group.sequence.as_ref().ok_or("Select a sequence")?.settings;
                 let start = self.projects.forms.preview_at.value()?;
-                grid_tick(start, settings.frame_rate).map_err(|error| error.message)?;
-                let rate = settings.frame_rate;
-                let counts = rate.checked_mul(Rational::new(2, 1).expect("Preview window length"))
+                let audio = self.projects.forms.native_preview_sound;
+                let sample_rate = settings.sample_rate;
+                if sample_rate == 0 {
+                    return Err("The selected sequence has no sample clock".into());
+                }
+                let common_sample_grid = if audio {
+                    let ratio = Rational::new(i64::from(sample_rate), 48_000).map_err(|error| error.message)?;
+                    sample_rate / ratio.numerator() as u32
+                } else {
+                    sample_rate
+                };
+                let range = program_window(start, settings.frame_rate, common_sample_grid)
                     .map_err(|error| error.message)?;
-                let frames = counts.numerator() / counts.denominator();
-                let delta = Rational::new(rate.denominator(), rate.numerator())
-                    .and_then(|period| period.checked_mul(Rational::new(frames, 1)?))
-                    .map_err(|error| error.message)?;
-                let end = start.checked_add(delta).map_err(|error| error.message)?;
                 Ok(OpenRequest {
                     project_id: ProjectId::parse(group.key.project.clone()).map_err(|error| error.message)?,
                     sequence_id: EntityId::parse(sequence).map_err(|error| error.message)?,
                     revision: Revision::parse(&group.key.revision).map_err(|error| error.message)?,
-                    range: TimeRange { start, end },
-                    width: 320, height: 180, audio: false,
+                    range,
+                    width: 320, height: 180, audio,
                 })
             };
             match prepare() {

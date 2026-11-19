@@ -70,6 +70,8 @@ pub(super) struct Forms {
     pub preview_at: ExactForm,
     pub edl_document: String,
     pub edl_reels: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub native_preview_sound: bool,
     pub marker_name: String,
     pub marker_at: ExactForm,
     pub marker_length: ExactForm,
@@ -104,6 +106,8 @@ impl Default for Forms {
             preview_at: ExactForm::new("0", "1"),
             edl_document: String::new(),
             edl_reels: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            native_preview_sound: true,
             marker_name: String::new(),
             marker_at: ExactForm::new("0", "1"),
             marker_length: ExactForm::new("0", "1"),

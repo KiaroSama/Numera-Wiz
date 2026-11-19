@@ -1,6 +1,8 @@
 //! Native adapters reconnect to the selected owner without lending owner authority to an agent.
 mod download;
 #[cfg(feature = "desktop")]
+mod native_audio;
+#[cfg(feature = "desktop")]
 mod native_picture;
 use anyhow::{Context as _, Result};
 use nw_domain::commands::{Request, Response};
@@ -895,6 +897,8 @@ mod binding_tests {
         assert_eq!(binding.root_id.as_deref(), Some("root-original"));
         assert_eq!(binding.principal.as_deref(), Some("principal-original"));
         credential_lifecycle_bookkeeping();
+        #[cfg(feature = "desktop")]
+        super::native_audio::exercise_device_clock();
 
         // The private startup channel accepts only finite canonical frames, even
         // when an error's code, context or message contains arbitrary content.

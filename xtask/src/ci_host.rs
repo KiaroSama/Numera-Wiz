@@ -32,6 +32,7 @@ pub fn linux_dependencies() -> Result<()> {
             "libwayland-dev",
             "libegl1-mesa-dev",
             "libgl1-mesa-dev",
+            "libasound2-dev",
         ],
         "browser" => &[
             "xvfb",
