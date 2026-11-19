@@ -1075,6 +1075,7 @@ impl Service {
         if self.execution_quarantined.load(Ordering::Acquire)
             && [
                 "jobs.submit",
+                "jobs.plan",
                 "batches.submit",
                 "timeline.render",
                 "timeline.render_mixed",
@@ -1734,7 +1735,7 @@ impl Service {
                 }
                 value(&report.finish()?)?
             }
-            "streams.clean" | "streams.extract" | "chapters.remove" | "chapters.import"
+            "streams.clean" | "streams.extract" | "jobs.plan" | "chapters.remove" | "chapters.import"
             | "disposition.patch" | "metadata.patch" => {
                 let plan = self.prepare_copy_review(&context, &request.command.id, params, now)?;
                 let response = Response::success(
@@ -2388,6 +2389,36 @@ impl Service {
         now: u64,
     ) -> Result<Plan> {
         let input = match command {
+            "jobs.plan" => {
+                let input: nw_domain::config_import::PlanInput = commands::parse(params)?;
+                if self.policy(context)?.is_some_and(|policy| !policy.allows_command("streams.clean")) {
+                    return Err(DomainError::new(
+                        "PERMISSION_DENIED",
+                        "The configuration job also requires current streams.clean access",
+                    ));
+                }
+                let (declared_input, output) = input.job_document.copy_paths()?;
+                let declared_input = self.path(context, declared_input, false)?;
+                return self.prepare_native_copy(
+                    context,
+                    &input.asset_id,
+                    &files::path_text(output)?,
+                    Default::default(),
+                    |engine, asset, output| {
+                        if Path::new(&asset.identity.path) != declared_input.as_path() {
+                            return Err(DomainError::new(
+                                "JOB_SOURCE_MISMATCH",
+                                "The configuration input path must identify the selected registered source",
+                            ));
+                        }
+                        let intent = input.job_document.copy_intent(&asset.probe.streams)?;
+                        engine.clean_plan_with_file_times_at(
+                            asset, output, &intent, nw_domain::file_times::FileTimeRequest::default(),
+                            &context.principal, now,
+                        )
+                    },
+                );
+            }
             "streams.extract" => {
                 let input: commands::ExtractInput = commands::parse(params)?;
                 return self.prepare_native_copy(

@@ -77,6 +77,7 @@ strict schemas and typed JSON responses as request/MCP. Run any command with
 | `streams extract --asset ID --stream INDEX --out PATH.mkv` | Review packet-copy extraction of a single original video, audio or subtitle stream. Submit the reviewed plan separately. |
 | `streams extract-batch --file EXTRACTION.json` | Review up to 64 distinct Matroska outputs from registered files, including assets registered from a folder. |
 | `plans inspect ID` | Inspect the exact admitted plan and its hash. |
+| `jobs plan --asset ID --file IMPORT.json` | Review a versioned FFmWiz packet-copy job against its registered source. |
 | `jobs submit --plan ID --plan-hash HASH --replay-scope SCOPE --idempotency-key KEY` | Submit the reviewed immutable plan. |
 | `jobs inspect ID` / `jobs list` | Inspect execution or page authorized jobs. |
 | `jobs cancel ID --replay-scope SCOPE --idempotency-key KEY` | Request cancellation of the selected accepted job. |
@@ -163,10 +164,19 @@ The desktop and browser workspaces also have an **Import FFmWiz settings** panel
 in Stream Cleanup. Paste the configuration and enter its directory on the media
 engine to review the same settings and line diagnostics.
 
-Agents can call `config.import.ffmwiz` with an inline `source`, an absolute
-`base_directory` and `compatibility_profile` set to `ffmwiz_v1`. Import returns a
-versioned settings document. Native job planning handles authorization, media
-probing and execution.
+Register the media source, then use its ID to review an admitted packet-copy
+configuration. The import must name that source and its new output. Set both
+codecs to `copy` and choose the audio and subtitle tracks explicitly. FFmWiz
+numeric track choices start at zero within each stream type.
+
+```text
+numera-wiz jobs plan --asset REGISTERED_ID --file imported-job.json
+```
+
+The planner returns the same review and semantic hash as an equivalent
+`streams clean` request. Submit the reviewed ID and hash with `jobs submit`.
+Missing fields and settings that require an encode or analysis profile return
+a field error immediately. Import itself continues to describe all 40 fields.
 
 ## Canonical operations
 

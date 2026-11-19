@@ -8,25 +8,30 @@ pub(super) struct ConfigImportUi {
     source: String,
     base_directory: String,
     pub(super) report: Option<Value>,
+    pub(super) generation: u64,
 }
 
 impl WizApp {
     pub(super) fn config_import_panel(&mut self, ui: &mut egui::Ui) {
         egui::CollapsingHeader::new("Import FFmWiz settings").show(ui, |ui| {
             ui.label("Configuration directory on the media engine");
-            ui.add(
+            let directory = ui.add(
                 egui::TextEdit::singleline(&mut self.config_import.base_directory)
                     .char_limit(4096)
                     .hint_text("Absolute path")
                     .desired_width(f32::INFINITY),
             );
             ui.label("Configuration text");
-            ui.add(
+            let source = ui.add(
                 egui::TextEdit::multiline(&mut self.config_import.source)
                     .desired_rows(5)
                     .char_limit(CONFIG_BYTES)
                     .desired_width(f32::INFINITY),
             );
+            if directory.changed() || source.changed() {
+                self.config_import.report = None;
+                self.config_import.generation = self.config_import.generation.wrapping_add(1);
+            }
             let ready = self.request_idle()
                 && !self.config_import.base_directory.trim().is_empty()
                 && !self.config_import.source.trim().is_empty()
@@ -43,7 +48,7 @@ impl WizApp {
                         "base_directory":self.config_import.base_directory.trim(),
                         "compatibility_profile":CompatibilityProfile::FfmwizV1,
                     }),
-                    Action::ImportConfig,
+                    Action::ImportConfig(self.config_import.generation),
                     ui.ctx(),
                 );
             }
@@ -79,6 +84,16 @@ impl WizApp {
                 && let Ok(text) = serde_json::to_string_pretty(report)
             {
                 ui.ctx().copy_text(text);
+            }
+            if let Some(asset) = self.asset_detail.as_ref()
+                && ui.add_enabled(
+                    self.request_idle() && report["input_valid"] == true,
+                    egui::Button::new("Review packet-copy job for the selected source"),
+                ).clicked()
+            {
+                let params = json!({"asset_id":asset.id,"job_document":report["job"]});
+                self.changed();
+                self.query("jobs.plan", params, Action::Plan(self.generation), ui.ctx());
             }
         });
     }

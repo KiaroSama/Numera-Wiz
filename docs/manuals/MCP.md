@@ -114,6 +114,13 @@ resolved original index or rejection. Set `failure_policy` to `reject_all`
 or `continue_with_rejected`. With both extraction commands granted, review
 the batch and submit its ID and hash through `batches.submit`.
 
+Call `config.import.ffmwiz` with the UTF-8 configuration text as `source`,
+an absolute `base_directory` and `compatibility_profile` set to `ffmwiz_v1`.
+Review the returned diagnostics. For an admitted packet-copy configuration,
+pass the returned `job` as `job_document` to `jobs.plan` with the registered
+`asset_id` that matches its input. The profile needs `jobs.plan` and
+`streams.clean`. This returns the ordinary reviewed plan for `jobs.submit`.
+
 ## Engine capability reports
 
 Grant `capabilities.inspect`, `capabilities.refresh` or `capabilities.clear`

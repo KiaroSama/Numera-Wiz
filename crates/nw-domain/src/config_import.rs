@@ -4,6 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 
+mod planning;
+pub use planning::PlanInput;
+
 pub const CONFIG_BYTES: usize = 64 * 1024;
 const MAX_LINES: usize = 1024;
 
@@ -36,7 +39,8 @@ pub struct Diagnostic {
     pub code: &'static str,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ImportedJob {
     pub version: u32,
     pub compatibility_profile: CompatibilityProfile,
@@ -50,14 +54,15 @@ pub struct ImportReport {
     pub input_valid: bool,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ImportedField {
     pub line: usize,
     pub value: Setting,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Setting {
     Source,
     Copy,
@@ -109,7 +114,7 @@ pub enum Setting {
     },
 }
 
-#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GainUnit {
     Factor,
@@ -117,7 +122,7 @@ pub enum GainUnit {
     Decibels,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScaleMode {
     ClosestEdge,
@@ -127,8 +132,8 @@ pub enum ScaleMode {
     Stretch,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TrackChoice {
     All,
     None,
@@ -136,15 +141,16 @@ pub enum TrackChoice {
     Analyze { duplicates: bool, silence: bool },
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Effect {
     pub name: String,
     pub amount: Option<Rational>,
     pub strength: Option<String>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum QuickOutput {
     Gif { frame_rate: u32, width: u32 },
     Boomerang,

@@ -229,7 +229,7 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
         ),
-        "streams.extract" => {
+        "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
         "streams.extract.batch_plan" => Some(
@@ -924,6 +924,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Review distinct video, audio and subtitle outputs by per-file track ordinal",
             Query,
             crate::batches::ExtractBatchInput
+        ),
+        row!(
+            "jobs.plan",
+            "Review an imported FFmWiz packet-copy job against its registered media source",
+            Query,
+            crate::config_import::PlanInput
         ),
         row!(
             "plans.inspect",
@@ -1663,6 +1669,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "streams.extract",
     "streams.extract.batch_plan",
     "plans.inspect",
+    "jobs.plan",
     "jobs.submit",
     "jobs.inspect",
     "jobs.list",

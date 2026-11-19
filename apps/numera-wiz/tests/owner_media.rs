@@ -475,6 +475,38 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
     );
     assert_eq!(registered["ok"], true, "{registered}");
     let asset = registered["result"].clone();
+    let declarative = cli.query(
+        "config.import.ffmwiz",
+        json!({"source":"input_path=source.mkv\noutput_path=config-copy.mkv\noutput_format=n\nvideo_codec=copy\naudio_codec=copy\naudio_tracks=1,0\nsubtitle_tracks=none\n",
+            "base_directory":config_directory,"compatibility_profile":"ffmwiz_v1"}),
+    ).await;
+    assert_eq!(declarative["input_valid"], true);
+    let job_file = config_directory.join("copy-job.json");
+    std::fs::write(&job_file, serde_json::to_vec(&declarative).unwrap()).unwrap();
+    let (config_plan, exit) = cli.human(&["jobs", "plan", "--asset", asset["id"].as_str().unwrap(),
+        "--file", job_file.to_str().unwrap()]).await;
+    assert_eq!(exit, 0, "{config_plan}");
+    let config_plan = &config_plan["result"];
+    let mut equivalent = nw_domain::mux::CleanIntent::preserving_all();
+    equivalent.audio_selection.selector = nw_domain::mux::Selector::SourceIndices { values: vec![2, 1] };
+    equivalent.audio_selection.no_match = nw_domain::mux::NoMatch::Reject;
+    equivalent.audio_order = vec![2, 1];
+    equivalent.subtitle_selection.selector = nw_domain::mux::Selector::None;
+    let planned_output = config_directory.join("config-copy.mkv");
+    let ordinary = cli.query(
+        "streams.clean",
+        json!({"asset_id":asset["id"],"intent":equivalent,"output":planned_output}),
+    ).await;
+    assert_eq!(ordinary["hash"], config_plan["hash"]);
+    assert_eq!(config_plan["resolution"]["streams"].as_array().unwrap().iter()
+        .map(|stream| stream["index"].as_u64().unwrap()).collect::<Vec<_>>(), [0, 2, 1]);
+    let mut incomplete = declarative["job"].clone();
+    incomplete["settings"].as_object_mut().unwrap().remove("output_path");
+    let (incomplete, _) = cli.raw_with_exit(&Request::query("jobs.plan",
+        json!({"asset_id":asset["id"],"job_document":incomplete}))).await;
+    assert_eq!(incomplete["error"]["code"], "JOB_FIELD_REQUIRED");
+    assert_eq!(incomplete["error"]["field"], "job_document.settings.output_path");
+    assert!(!planned_output.exists());
     let (volume, exit) = cli
         .human(&[
             "media",
@@ -1009,7 +1041,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
     }
 
-    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","media.analyze.volume","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
     assert_eq!(
         cli.mutation(
             &scope,
@@ -1112,6 +1144,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         "assets.register",
         json!({"path":media.source}),
         json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
+    );
+    assert_eq!(
+        call!(stdio, "jobs.plan", json!({"asset_id":operator_asset["id"],"job_document":declarative["job"]}), json!({}))["hash"],
+        config_plan["hash"],
     );
     let compared = call!(
         stdio,
@@ -1710,6 +1746,10 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
             json!({"path":media.source}),
             json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
         );
+        assert_eq!(
+            call!(http, "jobs.plan", json!({"asset_id":asset["id"],"job_document":declarative["job"]}), json!({}))["hash"],
+            config_plan["hash"],
+        );
         let compared = call!(
             http,
             "media.analyze.audio_tracks",
@@ -1804,6 +1844,16 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         );
         http.cancel().await.unwrap();
     }
+    let configured = cli.mutation(
+        &scope, "configured-copy", "jobs.submit",
+        json!({"plan_id":config_plan["id"],"plan_hash":config_plan["hash"]}),
+    ).await;
+    assert_eq!(configured["ok"], true, "{configured}");
+    let completed_config = cli.completed(configured["result"]["job_id"].as_str().unwrap()).await;
+    assert_eq!(completed_config["state"], "succeeded", "{completed_config}");
+    let projected = fixture::probe(&media.bin, &planned_output).await;
+    assert_eq!(projected["streams"][1]["tags"]["language"], "fas");
+    assert_eq!(projected["streams"][2]["tags"]["language"], "eng");
 
     // Browser intake bytes use their own bounded route; canonical registration/job
     // acceptance still uses the same official SDK and durable receipt contracts.

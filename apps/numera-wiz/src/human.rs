@@ -305,6 +305,13 @@ pub enum Plans {
 }
 #[derive(Subcommand)]
 pub enum Jobs {
+    /// Review the packet-copy job from a versioned FFmWiz import report.
+    Plan {
+        #[arg(long)]
+        asset: String,
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Observe an accepted job; Ctrl+C stops waiting while the owner keeps the job.
     Wait {
         id: String,
@@ -620,6 +627,20 @@ pub fn prepare(command: Command) -> Result<Request> {
             json!({"asset_ids":assets,"intent":intent(&intent_file)?}),
         ),
         Command::Plans(Plans::Inspect { id }) => query("plans.inspect", json!({"id":id})),
+        Command::Jobs(Jobs::Plan { asset, file }) => {
+            let document = document(&file)?;
+            let job = if let Some(job) = document.get("job") {
+                if document["input_valid"] != true {
+                    return Err(DomainError::new("INVALID_JOB_DOCUMENT", "Resolve the import errors before review").into());
+                }
+                job.clone()
+            } else {
+                document
+            };
+            let job: nw_domain::config_import::ImportedJob = commands::parse(job)?;
+            job.copy_paths()?;
+            query("jobs.plan", json!({"asset_id":asset,"job_document":job}))
+        }
         Command::Jobs(Jobs::Submit {
             plan,
             plan_hash,

@@ -264,3 +264,11 @@ track type and one-based ordinal for each row, and enter a distinct new
 `.mkv` path. **Add output for this file** adds another track from the same
 source. Review the resolved original indices and the rejected rows before
 running the batch. The batch shows each completed output on its own row.
+
+## Review a configuration
+
+Select a registered source and expand **Import FFmWiz settings**. Paste the
+configuration and set the directory used to resolve media paths. Review the
+diagnostics, then choose **Review packet-copy job for the selected source**.
+The selected file must match the configuration input. Review the planned
+destination and retained streams before choosing **Run reviewed plan**.

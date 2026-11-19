@@ -40,7 +40,7 @@ enum Action {
     Cancel,
     Inspect,
     Capabilities,
-    ImportConfig,
+    ImportConfig(u64),
     SourcePreview,
     VolumeMeasurement,
     CompareAudio,
@@ -815,7 +815,11 @@ impl WizApp {
                     self.capability_report =
                         Some(serde_json::from_value(result).map_err(|error| error.to_string())?);
                 }
-                Action::ImportConfig => self.config_import.report = Some(result),
+                Action::ImportConfig(generation) => {
+                    if generation == self.config_import.generation {
+                        self.config_import.report = Some(result);
+                    }
+                }
                 Action::SourcePreview => self.accept_source_preview(result, ctx)?,
                 Action::VolumeMeasurement => {
                     let measurement: VolumeMeasurement =
