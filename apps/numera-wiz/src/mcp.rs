@@ -3,6 +3,9 @@ use nw_service::{ACTIVE_COMMANDS, Context, Service};
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use std::{borrow::Cow, sync::Arc};
 mod schema;
+const TOOL_CURSOR_PREFIX: &str = "tools-v1-";
+// Keep page boundaries independent of request IDs and reserve the JSON-RPC envelope.
+const TOOL_PAGE_BYTES: usize = commands::MAX_RESULT_BYTES - 1024;
 #[derive(Clone)]
 pub struct Bridge {
     backend: Backend,
@@ -132,40 +135,65 @@ impl ServerHandler for Bridge {
     }
     async fn list_tools(
         &self,
-        _request: Option<PaginatedRequestParams>,
+        request: Option<PaginatedRequestParams>,
         context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let tools = ACTIVE_COMMANDS
-            .iter()
-            .map(|id| {
-                tool(id).ok_or_else(|| {
-                    ErrorData::internal_error(
-                        "The complete tool registry could not be constructed",
-                        None,
-                    )
+        let offset = match request.and_then(|params| params.cursor) {
+            None => 0,
+            Some(cursor) => cursor
+                .strip_prefix(TOOL_CURSOR_PREFIX)
+                .filter(|offset| {
+                    offset.len() <= 8 && offset.bytes().all(|byte| byte.is_ascii_digit())
                 })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let result = ListToolsResult::with_all_items(tools);
-        let result_bytes = serde_json::to_vec(&result)
-            .map_err(|_| ErrorData::internal_error("Tool registry serialization failed", None))?
+                .and_then(|offset| offset.parse::<usize>().ok())
+                .filter(|offset| (1..ACTIVE_COMMANDS.len()).contains(offset))
+                .ok_or_else(|| ErrorData::invalid_params("Invalid tool discovery cursor", None))?,
+        };
+        let mut result = ListToolsResult::with_all_items(Vec::new());
+        // Measure an empty page with the longest possible continuation cursor.
+        result.next_cursor = Some(format!("{TOOL_CURSOR_PREFIX}{}", ACTIVE_COMMANDS.len()));
+        let serialization_error =
+            || ErrorData::internal_error("Tool registry serialization failed", None);
+        let mut page_bytes = serde_json::to_vec(&result)
+            .map_err(|_| serialization_error())?
             .len();
+        result.next_cursor = None;
+        for (index, id) in ACTIVE_COMMANDS.iter().enumerate().skip(offset) {
+            let entry = tool(id).ok_or_else(|| {
+                ErrorData::internal_error("The active tool could not be constructed", None)
+            })?;
+            let entry_bytes = serde_json::to_vec(&entry)
+                .map_err(|_| serialization_error())?
+                .len();
+            let bytes = page_bytes + entry_bytes + usize::from(!result.tools.is_empty());
+            if bytes > TOOL_PAGE_BYTES {
+                if result.tools.is_empty() {
+                    return Err(ErrorData::internal_error(
+                        "An active tool exceeds the discovery page byte budget",
+                        None,
+                    ));
+                }
+                result.next_cursor = Some(format!("{TOOL_CURSOR_PREFIX}{index}"));
+                break;
+            }
+            result.tools.push(entry);
+            page_bytes = bytes;
+        }
         let envelope = serde_json::json!({"jsonrpc":"2.0","id":&context.id,"result":&result});
         let envelope_bytes = serde_json::to_vec(&envelope)
             .map_err(|_| ErrorData::internal_error("Tool response serialization failed", None))?
             .len();
         // Reserve the actual stdio newline in addition to the complete JSON-RPC envelope.
-        if result_bytes > commands::MAX_RESULT_BYTES || envelope_bytes >= commands::MAX_RESULT_BYTES
-        {
+        if envelope_bytes >= commands::MAX_RESULT_BYTES {
             return Err(ErrorData::internal_error(
-                "Tool discovery exceeds the complete response byte budget",
+                "Tool discovery page exceeds the response byte budget",
                 None,
             ));
         }
         tracing::debug!(
-            result_bytes,
             envelope_bytes,
-            "Complete MCP tool discovery byte budget verified"
+            tools = result.tools.len(),
+            "MCP tool discovery page byte budget verified"
         );
         Ok(result)
     }

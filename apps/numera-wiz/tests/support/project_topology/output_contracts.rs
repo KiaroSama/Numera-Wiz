@@ -22,25 +22,21 @@ pub(super) fn capture(batch: &schema_validation::Batch) -> Vec<Observation> {
 }
 
 async fn documents(client: &RunningService<RoleClient, ()>) -> Vec<Value> {
-    // A new dedicated SDK peer supplies this first, uncached complete page.
-    let page = client
-        .list_tools(None)
+    // A new dedicated SDK peer enumerates every page of the active registry.
+    let tools = client
+        .list_all_tools()
         .await
         .expect("MCP_OUTPUT_DISCOVERY_FAILED");
-    bounded(&page);
-    assert!(page.next_cursor.is_none(), "MCP_OUTPUT_UNEXPECTED_PAGE");
-    let ids: BTreeSet<_> = page.tools.iter().map(|tool| tool.name.as_ref()).collect();
+    let ids: BTreeSet<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
     assert!(
-        ids.len() == page.tools.len()
+        ids.len() == tools.len()
             && ids == nw_service::ACTIVE_COMMANDS.iter().copied().collect(),
         "MCP_OUTPUT_ACTIVE_IDS"
     );
     schema_validation::COMMANDS
         .into_iter()
         .map(|id| {
-            let tool = page
-                .tools
-                .iter()
+            let tool = tools.iter()
                 .find(|tool| tool.name == id)
                 .expect("MCP_OUTPUT_TOOL_MISSING");
             Value::Object(

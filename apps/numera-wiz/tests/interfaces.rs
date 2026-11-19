@@ -102,9 +102,22 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
     let _logs = retain_owner_logs(data.path(), "discovery");
     command.arg("--data-dir").arg(data.path()).arg("bridge");
     let client = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
-    // Capture the complete standard page from a fresh SDK session before list_all_tools flattens it.
+    // Capture every wire page before list_all_tools flattens the same discovery.
     let first_page = client.list_tools(None).await.unwrap();
+    let mut pages = vec![first_page];
+    let mut cursors = std::collections::BTreeSet::new();
+    while let Some(cursor) = pages.last().unwrap().next_cursor.clone() {
+        assert!(cursors.insert(cursor.clone()), "MCP_REPEATED_CURSOR");
+        assert!(pages.len() < nw_service::ACTIVE_COMMANDS.len());
+        let params = rmcp::model::PaginatedRequestParams::default().with_cursor(Some(cursor));
+        pages.push(client.list_tools(Some(params)).await.unwrap());
+    }
     let tools = client.list_all_tools().await.unwrap();
+    let paged: Vec<_> = pages.iter().flat_map(|page| &page.tools).collect();
+    assert_eq!(
+        tools.iter().map(|tool| tool.name.as_ref()).collect::<Vec<_>>(),
+        paged.iter().map(|tool| tool.name.as_ref()).collect::<Vec<_>>()
+    );
     assert!(tools.iter().any(|tool| tool.name == "jobs.submit"));
     assert!(!tools.iter().any(|tool| tool.name == "shell.execute"));
     let listed = client
@@ -134,8 +147,8 @@ async fn official_stdio_discovery_is_clean_and_does_not_inherit_owner() {
         value["structuredContent"]["error"]["code"],
         "PERMISSION_DENIED"
     );
-    project_mcp_output_contract(&first_page);
-    project_mcp_wire_page(data.path(), &first_page).await;
+    project_mcp_output_contract(&pages);
+    project_mcp_wire_pages(data.path(), &pages).await;
     let owner_profiles =
         native_owner_mcp_query(data.path(), "access.profiles.list", serde_json::json!({})).await;
     assert_eq!(owner_profiles["ok"], true);
@@ -425,19 +438,21 @@ async fn reject_ambiguous_owner_bridge() {
     }
 }
 
-fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
+fn project_mcp_output_contract(pages: &[rmcp::model::ListToolsResult]) {
     use serde_json::Value;
     use std::collections::BTreeSet;
-    assert!(page.next_cursor.is_none(), "MCP_UNEXPECTED_TOOL_PAGINATION");
-    let encoded = serde_json::to_vec(page).unwrap();
-    assert!(
-        encoded.len() <= nw_domain::commands::MAX_RESULT_BYTES,
-        "MCP_COMPLETE_TOOL_PAGE_BYTE_BOUND"
-    );
-    let actual: BTreeSet<_> = page.tools.iter().map(|tool| tool.name.as_ref()).collect();
+    assert!(pages.len() > 1, "MCP_TOOL_PAGINATION_REGRESSION_NOT_EXERCISED");
+    for (index, page) in pages.iter().enumerate() {
+        assert!(!page.tools.is_empty());
+        assert_eq!(page.next_cursor.is_some(), index + 1 < pages.len());
+        assert!(serde_json::to_vec(page).unwrap().len() <= nw_domain::commands::MAX_RESULT_BYTES,
+            "MCP_TOOL_PAGE_BYTE_BOUND");
+    }
+    let tools: Vec<_> = pages.iter().flat_map(|page| &page.tools).collect();
+    let actual: BTreeSet<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
     let expected: BTreeSet<_> = nw_service::ACTIVE_COMMANDS.iter().copied().collect();
     assert!(
-        page.tools.len() == actual.len() && actual == expected,
+        tools.len() == actual.len() && actual == expected,
         "MCP_COMPLETE_ACTIVE_ID_SET"
     );
     let family = [
@@ -456,7 +471,7 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         "history.redo",
     ];
     for id in family {
-        let tool = page.tools.iter().find(|tool| tool.name == id).unwrap();
+        let tool = tools.iter().find(|tool| tool.name == id).unwrap();
         let schema = tool
             .output_schema
             .as_ref()
@@ -486,8 +501,8 @@ fn project_mcp_output_contract(page: &rmcp::model::ListToolsResult) {
         );
     }
     eprintln!(
-        "MCP_SCHEMA_SIZE kind=standard_list_tools_result bytes={} project_outputs={}",
-        encoded.len(),
+        "MCP_SCHEMA_SIZE kind=standard_list_tools_result pages={} project_outputs={}",
+        pages.len(),
         family.len()
     );
     let literal_data = serde_json::json!({
@@ -559,7 +574,7 @@ fn project_mcp_local_references(root: &serde_json::Value) -> Result<(), &'static
     Ok(())
 }
 
-async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::ListToolsResult) {
+async fn project_mcp_wire_pages(root: &std::path::Path, expected: &[rmcp::model::ListToolsResult]) {
     use tokio::io::AsyncWriteExt;
     tokio::time::timeout(std::time::Duration::from_secs(20), async {
         let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_numera-wiz"))
@@ -574,19 +589,39 @@ async fn project_mcp_wire_page(root: &std::path::Path, expected: &rmcp::model::L
         let initialized: serde_json::Value = serde_json::from_slice(&initialized).unwrap();
         assert_eq!(initialized["id"], "r4-initialize");
         assert!(initialized.get("error").is_none() && initialized["result"].is_object());
-        input.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":\"r4-tools\",\"method\":\"tools/list\"}\n").await.unwrap();
-        input.flush().await.unwrap();
-        let frame = project_mcp_wire_line(&mut output).await;
-        let value: serde_json::Value = serde_json::from_slice(&frame).unwrap();
-        assert_eq!(value["jsonrpc"], "2.0");
-        assert_eq!(value["id"], "r4-tools");
-        assert!(value.get("error").is_none());
-        assert!(value["result"] == serde_json::to_value(expected).unwrap(), "MCP_ACTUAL_WIRE_STATIC_PAGE_DIFFERS");
-        eprintln!("MCP_SCHEMA_SIZE kind=actual_stdio_jsonrpc_line bytes={}", frame.len());
+        input.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.unwrap();
         let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/interface-evidence/mcp-list-tools-wire.json");
         std::fs::create_dir_all(evidence.parent().unwrap()).unwrap();
-        std::fs::write(evidence, &frame).unwrap();
+        let mut cursor = None::<String>;
+        for (index, page) in expected.iter().enumerate() {
+            let mut request = serde_json::json!({"jsonrpc":"2.0","id":"r4-tools","method":"tools/list"});
+            if let Some(cursor) = cursor.as_deref() {
+                request["params"] = serde_json::json!({"cursor": cursor});
+            }
+            let mut payload = serde_json::to_vec(&request).unwrap();
+            payload.push(b'\n');
+            input.write_all(&payload).await.unwrap();
+            input.flush().await.unwrap();
+            let frame = project_mcp_wire_line(&mut output).await;
+            let value: serde_json::Value = serde_json::from_slice(&frame).unwrap();
+            assert_eq!(value["jsonrpc"], "2.0");
+            assert_eq!(value["id"], "r4-tools");
+            assert!(value.get("error").is_none());
+            assert!(value["result"] == serde_json::to_value(page).unwrap(), "MCP_ACTUAL_WIRE_STATIC_PAGE_DIFFERS");
+            cursor = value["result"]["nextCursor"].as_str().map(str::to_owned);
+            eprintln!("MCP_SCHEMA_SIZE kind=actual_stdio_jsonrpc_line bytes={}", frame.len());
+            if index == 0 {
+                std::fs::write(&evidence, &frame).unwrap();
+            }
+        }
+        assert!(cursor.is_none());
+        input.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":\"bad-cursor\",\"method\":\"tools/list\",\"params\":{\"cursor\":\"invalid\"}}\n").await.unwrap();
+        input.flush().await.unwrap();
+        let frame = project_mcp_wire_line(&mut output).await;
+        let value: serde_json::Value = serde_json::from_slice(&frame).unwrap();
+        assert_eq!(value["id"], "bad-cursor");
+        assert_eq!(value["error"]["code"], -32602);
         drop(input);
         assert!(child.wait().await.unwrap().success(), "MCP_WIRE_BRIDGE_DID_NOT_EXIT");
     }).await.expect("MCP_ACTUAL_WIRE_DEADLINE");

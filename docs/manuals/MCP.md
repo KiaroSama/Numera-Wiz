@@ -68,7 +68,11 @@ publication or compensation. Forced disconnects still leave outcome uncertainty.
 
 ## Typed calls and retries
 
-`tools/list` is generated from the active shared registry. Tool input uses
+`tools/list` is generated from the active shared registry. Follow each
+`nextCursor` with a `tools/list` request containing that `cursor` until the
+response omits `nextCursor`. The official Rust SDK's `list_all_tools()` does
+this automatically. Each JSON-RPC page fits within the 256 KiB response budget.
+Tool input uses
 `{"params":{...}}` and optional `context`. For example, discovery is
 `{"params":{}}`. A durable call has this shape:
 
