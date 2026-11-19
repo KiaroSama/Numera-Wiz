@@ -206,6 +206,15 @@
           "asserted_domain": "CPU H.264 with selected AAC to MP4 and Matroska",
           "platforms": ["ubuntu-24.04"],
           "observed_outcome": "Both published files retained the same six original presentation times and 4:3 sample aspect. Output used the authenticated CPU component."
+        },
+        {
+          "boundary": "avc_geometry_and_decoded_clock",
+          "commit": "816999d539579e7a3ed373946ab3390c770c070a",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44502162908/job/135492145287",
+          "artifact_sha256": "175c5251ce3c1de4887ca4d87077e69387e97a48cad1cdf871b7f9bf43bcd446",
+          "asserted_domain": "CPU H.264 crop, rotation, fit, color and reordered original picture clocks",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "The qualifying outputs retained six original presentation times. The reordered MP4 was checked in decoded order. The grayscale and padded-frame pixel assertions passed."
         }
       ]
     },
@@ -224,6 +233,15 @@
             "ubuntu-24.04"
           ],
           "observed_outcome": "The hosted owner journey exercised the typed 40-key FFmWiz import through CLI and both official MCP transports. Deterministic compilation of the full imported job family remains open."
+        },
+        {
+          "boundary": "ffmwiz_imported_avc_rates",
+          "commit": "816999d539579e7a3ed373946ab3390c770c070a",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44502162908/job/135492145287",
+          "artifact_sha256": "175c5251ce3c1de4887ca4d87077e69387e97a48cad1cdf871b7f9bf43bcd446",
+          "asserted_domain": "FFmWiz CPU H.264 quality_vbr and strict_size imports",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "Typed import and direct export produced the same plan identities. Both bitrate profiles ran and verified the selected video and AAC audio."
         }
       ]
     },
@@ -297,6 +315,15 @@
           "asserted_domain": "Independent selected-stream outputs",
           "platforms": ["ubuntu-24.04"],
           "observed_outcome": "Two outputs kept packet timing and bytes. Stdio and HTTP matched the review. The report retained one unmatched selector."
+        },
+        {
+          "boundary": "retained_folder_original_stream_extraction",
+          "commit": "816999d539579e7a3ed373946ab3390c770c070a",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44502162908/job/135492145287",
+          "artifact_sha256": "175c5251ce3c1de4887ca4d87077e69387e97a48cad1cdf871b7f9bf43bcd446",
+          "asserted_domain": "Original track extraction from a retained folder",
+          "platforms": ["ubuntu-24.04"],
+          "observed_outcome": "CLI, stdio and HTTP produced the same review. One output retained the original packets and a missing track remained rejected. A failed source probe stayed visible in the intake exclusions."
         }
       ]
     },

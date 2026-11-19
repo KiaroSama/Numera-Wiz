@@ -1337,7 +1337,7 @@ async fn cpu_avc_export(parent: &Path) -> Value {
                     .any(|&byte| byte > 32)
             );
         } else {
-            assert!(rgb.chunks_exact(3).all(|pixel| {
+            assert!(rgb.as_chunks::<3>().0.iter().all(|pixel| {
                 // A few codes of chroma rounding survive the lossy CPU profile.
                 pixel.iter().max().unwrap() - pixel.iter().min().unwrap() <= 8
             }));
