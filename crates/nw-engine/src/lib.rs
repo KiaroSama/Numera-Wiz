@@ -340,7 +340,9 @@ impl Engine {
         if !output
             .extension()
             .and_then(|value| value.to_str())
-            .is_some_and(|value| value.eq_ignore_ascii_case("mkv") || value.eq_ignore_ascii_case("mka"))
+            .is_some_and(|value| {
+                value.eq_ignore_ascii_case("mkv") || value.eq_ignore_ascii_case("mka")
+            })
         {
             return Err(DomainError::new(
                 "CONTAINER_UNQUALIFIED",
@@ -1405,7 +1407,11 @@ pub fn plan_digest(plan: &Plan) -> Result<String> {
 fn admit_matroska(output: &Path, streams: &[Stream]) -> Result<()> {
     let extension = output.extension().and_then(|value| value.to_str());
     if extension.is_some_and(|value| value.eq_ignore_ascii_case("mka")) {
-        if streams.is_empty() || streams.iter().any(|stream| stream.kind != StreamKind::Audio) {
+        if streams.is_empty()
+            || streams
+                .iter()
+                .any(|stream| stream.kind != StreamKind::Audio)
+        {
             return Err(DomainError::new(
                 "INCOMPATIBLE_PRESERVATION",
                 "A Matroska audio .mka output requires an audio-only stream selection",

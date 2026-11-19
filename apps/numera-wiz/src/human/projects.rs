@@ -414,8 +414,15 @@ pub enum Tracks {
 
 impl Tracks {
     pub(super) fn prepare(self) -> Result<Request> {
-        let Self::SetEnabled { context, track, enabled } = self;
-        context.request("tracks.set_enabled", json!({"track_id":track,"enabled":enabled}))
+        let Self::SetEnabled {
+            context,
+            track,
+            enabled,
+        } = self;
+        context.request(
+            "tracks.set_enabled",
+            json!({"track_id":track,"enabled":enabled}),
+        )
     }
 }
 

@@ -105,7 +105,10 @@ fn asset_clock(asset: &Asset, selected_index: u32) -> Result<(Rational, Rational
 }
 
 /// Return the probe-declared interval on the same asset clock used by timeline renders.
-pub fn declared_relative_stream_window(asset: &Asset, stream_index: u32) -> Result<Option<TimeRange>> {
+pub fn declared_relative_stream_window(
+    asset: &Asset,
+    stream_index: u32,
+) -> Result<Option<TimeRange>> {
     let Some(row) = asset.probe.stream_details.get(&stream_index) else {
         return Ok(None);
     };

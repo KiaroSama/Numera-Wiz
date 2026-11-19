@@ -279,12 +279,23 @@ impl WizApp {
         {
             self.project_next_page(Phase::NextTracks, ui.ctx());
         }
-        if let Some(track) = group.tracks.items.iter().find(|track| {
-            Some(track.id.as_str()) == group.view.track.as_deref()
-        }) {
-            let label = if track.enabled { "Disable track" } else { "Enable track" };
+        if let Some(track) = group
+            .tracks
+            .items
+            .iter()
+            .find(|track| Some(track.id.as_str()) == group.view.track.as_deref())
+        {
+            let label = if track.enabled {
+                "Disable track"
+            } else {
+                "Enable track"
+            };
             if ui.add_enabled(ready, egui::Button::new(label)).clicked() {
-                self.mutate_project("tracks.set_enabled", json!({"track_id":track.id,"enabled":!track.enabled}), ui.ctx());
+                self.mutate_project(
+                    "tracks.set_enabled",
+                    json!({"track_id":track.id,"enabled":!track.enabled}),
+                    ui.ctx(),
+                );
             }
         }
     }
@@ -694,7 +705,10 @@ impl WizApp {
                     if let Some(sequence) = &group.sequence {
                         for (frames, label) in [(-1, "Previous frame"), (1, "Next frame")] {
                             let adjacent = at.stepped_frame(sequence.settings.frame_rate, frames);
-                            if ui.add_enabled(adjacent.is_ok(), egui::Button::new(label)).clicked() {
+                            if ui
+                                .add_enabled(adjacent.is_ok(), egui::Button::new(label))
+                                .clicked()
+                            {
                                 request = Some(adjacent);
                             }
                         }
@@ -702,12 +716,18 @@ impl WizApp {
                 });
                 match request {
                     Some(Ok(time)) => {
-                        *at = ExactForm::new(&time.numerator().to_string(), &time.denominator().to_string());
+                        *at = ExactForm::new(
+                            &time.numerator().to_string(),
+                            &time.denominator().to_string(),
+                        );
                         self.projects.preview_frame = None;
                         self.query_with_project(
                             "timeline.preview_frame",
                             json!({"sequence_id":sequence,"revision":group.key.revision,"at":time}),
-                            Some(ProjectRef { id: group.key.project.clone(), expected_revision: None }),
+                            Some(ProjectRef {
+                                id: group.key.project.clone(),
+                                expected_revision: None,
+                            }),
                             self.project_action(Phase::PreviewFrame),
                             ui.ctx(),
                         );
@@ -719,8 +739,11 @@ impl WizApp {
             if let Some((at, texture)) = &self.projects.preview_frame
                 && self.projects.forms.preview_at.value().ok() == Some(*at)
             {
-                let width = ui.available_width().clamp(1.0, (nw_domain::preview::WIDTH * 2) as f32);
-                let height = width * nw_domain::preview::HEIGHT as f32 / nw_domain::preview::WIDTH as f32;
+                let width = ui
+                    .available_width()
+                    .clamp(1.0, (nw_domain::preview::WIDTH * 2) as f32);
+                let height =
+                    width * nw_domain::preview::HEIGHT as f32 / nw_domain::preview::WIDTH as f32;
                 ui.image((texture.id(), egui::vec2(width, height)));
             }
         });

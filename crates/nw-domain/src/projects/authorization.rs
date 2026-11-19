@@ -94,8 +94,9 @@ pub fn requirements(command: &str) -> Option<AuthorizationRequirements> {
         | "timeline.render_mixed" => Some(ProjectAction::Read),
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-        | "markers.place" | "markers.remove"
-        | "history.undo" | "history.redo" => Some(ProjectAction::Edit),
+        | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
+            Some(ProjectAction::Edit)
+        }
         _ => return None,
     };
     let write = project_action == Some(ProjectAction::Edit);

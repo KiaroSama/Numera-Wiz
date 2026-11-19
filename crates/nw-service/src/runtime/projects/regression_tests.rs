@@ -809,9 +809,11 @@ pub(in crate::runtime) async fn linked_edits() {
         assert_eq!(fixture.raw(id), raw);
     }
     let before_slip: Vec<_> = right_ids.iter().map(|id| fixture.raw(id)).collect();
-    let slip = |num: &str, den: &str| json!({
-        "clip_ids":[right_ids[0]],"delta":{"num":num,"den":den},"link_policy":"expand"
-    });
+    let slip = |num: &str, den: &str| {
+        json!({
+            "clip_ids":[right_ids[0]],"delta":{"num":num,"den":den},"link_policy":"expand"
+        })
+    };
     for (key, offset, error) in [
         ("slip-before-source", slip("-1", "1"), "VALIDATION_ERROR"),
         ("slip-off-grid", slip("1", "8"), "OFF_GRID"),
@@ -829,7 +831,10 @@ pub(in crate::runtime) async fn linked_edits() {
         let original: Clip = original.payload("clip").unwrap();
         let current: Clip = fixture.entity(id).payload("clip").unwrap();
         assert_eq!(current.source_range.start, quarter);
-        assert_eq!(current.source_range.end, nw_domain::time::Rational::new(3, 4).unwrap());
+        assert_eq!(
+            current.source_range.end,
+            nw_domain::time::Rational::new(3, 4).unwrap()
+        );
         assert_eq!(current.sequence_start, original.sequence_start);
         assert_eq!(current.duration, original.duration);
         assert_eq!(current.occurrence_id, original.occurrence_id);
@@ -846,7 +851,10 @@ pub(in crate::runtime) async fn linked_edits() {
         assert_eq!(fixture.raw(id), raw);
     }
     let track_fixture = Fixture::new().await;
-    let clip: Clip = track_fixture.entity(&track_fixture.clips[0]).payload("clip").unwrap();
+    let clip: Clip = track_fixture
+        .entity(&track_fixture.clips[0])
+        .payload("clip")
+        .unwrap();
     let original_track = track_fixture.raw(&clip.track_id);
     let disable = json!({"track_id":clip.track_id,"enabled":false});
     let changed = track_fixture
@@ -854,13 +862,27 @@ pub(in crate::runtime) async fn linked_edits() {
         .await;
     assert_eq!(changed["changed_ids"], json!([clip.track_id]));
     assert!(!track_fixture.entity(&clip.track_id).enabled);
-    let read = track_fixture.service.store.project_read(track_fixture.project.as_str()).unwrap();
-    let tracks = read.track_page(&clip.sequence_id, None, 16, 64 * 1024).unwrap();
-    let track = tracks.items.iter().find(|row| row["id"] == clip.track_id.as_str()).unwrap();
+    let read = track_fixture
+        .service
+        .store
+        .project_read(track_fixture.project.as_str())
+        .unwrap();
+    let tracks = read
+        .track_page(&clip.sequence_id, None, 16, 64 * 1024)
+        .unwrap();
+    let track = tracks
+        .items
+        .iter()
+        .find(|row| row["id"] == clip.track_id.as_str())
+        .unwrap();
     assert_eq!(track["enabled"], false);
     let capture = nw_domain::media::capture_mixed_frame(
-        &read, &clip.sequence_id, read.header().revision, clip.sequence_start,
-    ).unwrap();
+        &read,
+        &clip.sequence_id,
+        read.header().revision,
+        clip.sequence_start,
+    )
+    .unwrap();
     assert!(capture.tracks.iter().all(|track| track.id != clip.track_id));
     drop(read);
     let noop = track_fixture

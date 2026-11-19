@@ -74,8 +74,12 @@ impl WizApp {
         ui.collapsing("Encode video", |ui| {
             ui.add_enabled_ui(idle, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    changed |= ui.radio_value(&mut self.avc_export.codec, VideoCodec::H264, "H.264").changed();
-                    changed |= ui.radio_value(&mut self.avc_export.codec, VideoCodec::Hevc, "HEVC").changed();
+                    changed |= ui
+                        .radio_value(&mut self.avc_export.codec, VideoCodec::H264, "H.264")
+                        .changed();
+                    changed |= ui
+                        .radio_value(&mut self.avc_export.codec, VideoCodec::Hevc, "HEVC")
+                        .changed();
                 });
                 let chosen = self.avc_export.picture.get_or_insert(pictures[0].index);
                 egui::ComboBox::from_id_salt("avc-picture")

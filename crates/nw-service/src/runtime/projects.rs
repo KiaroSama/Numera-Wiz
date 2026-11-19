@@ -353,18 +353,21 @@ impl Service {
         // Preserve preparation errors until replay is rechecked under the acceptance mutex.
         let preparation = (|| -> Result<_> {
             let mut held = Vec::new();
-            let source_permit = if matches!(request.command.id.as_str(), "clips.place" | "clips.slip") {
-                Some(
-                    self.batch_preflights
-                        .clone()
-                        .try_acquire_owned()
-                        .map_err(|_| {
-                            domain::limit("Source preflight capacity is busy; retry this request")
-                        })?,
-                )
-            } else {
-                None
-            };
+            let source_permit =
+                if matches!(request.command.id.as_str(), "clips.place" | "clips.slip") {
+                    Some(
+                        self.batch_preflights
+                            .clone()
+                            .try_acquire_owned()
+                            .map_err(|_| {
+                                domain::limit(
+                                    "Source preflight capacity is busy; retry this request",
+                                )
+                            })?,
+                    )
+                } else {
+                    None
+                };
             let history_command =
                 ["history.undo", "history.redo"].contains(&request.command.id.as_str());
             let intent = if history_command {
@@ -597,7 +600,8 @@ impl Service {
                 probe_sha256,
                 stream_index,
                 ..
-            } = binding else {
+            } = binding
+            else {
                 continue;
             };
             let (verified, source) = match held.entry((asset_id.clone(), stream_index)) {
@@ -616,13 +620,18 @@ impl Service {
                     "Registered source differs from the committed clip binding",
                 ));
             }
-            let bounds = nw_domain::media::declared_relative_stream_window(&source.asset, stream_index)?
-                .ok_or_else(|| DomainError::new(
-                    "SOURCE_EXTENT_UNAVAILABLE",
-                    "Slip requires a declared interval for the registered stream",
-                ))?;
+            let bounds =
+                nw_domain::media::declared_relative_stream_window(&source.asset, stream_index)?
+                    .ok_or_else(|| {
+                        DomainError::new(
+                            "SOURCE_EXTENT_UNAVAILABLE",
+                            "Slip requires a declared interval for the registered stream",
+                        )
+                    })?;
             if range.start < bounds.start || range.end > bounds.end {
-                return Err(domain::invalid("Slipped source span exceeds the declared stream interval"));
+                return Err(domain::invalid(
+                    "Slipped source span exceeds the declared stream interval",
+                ));
             }
         }
         Ok(held.into_values().map(|(_, source)| source).collect())
@@ -635,15 +644,26 @@ fn slip_source_checks(
 ) -> Result<Vec<(SourceBinding, SourceSpan)>> {
     let mut checks = Vec::new();
     let mut streams = std::collections::BTreeSet::new();
-    for after in patch.changes.iter().filter_map(|change| change.after.as_ref()) {
+    for after in patch
+        .changes
+        .iter()
+        .filter_map(|change| change.after.as_ref())
+    {
         let entity: EntityEnvelope =
             serde_json::from_str(after).map_err(|error| domain::invalid(error.to_string()))?;
         let clip: Clip = entity.payload("clip")?;
         let bound: SourceBinding = read.entity(&clip.source_id)?.payload("source_binding")?;
-        if let SourceBinding::Registered { asset_id, stream_index, .. } = &bound {
+        if let SourceBinding::Registered {
+            asset_id,
+            stream_index,
+            ..
+        } = &bound
+        {
             streams.insert((asset_id.clone(), *stream_index));
             if streams.len() > 8 {
-                return Err(domain::limit("Slip requires at most eight registered streams"));
+                return Err(domain::limit(
+                    "Slip requires at most eight registered streams",
+                ));
             }
             checks.push((bound, clip.source_range));
         }

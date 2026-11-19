@@ -145,7 +145,9 @@ impl ImportedJob {
 
     fn cpu_encode_codec(&self) -> Option<crate::avc_export::VideoCodec> {
         use crate::avc_export::VideoCodec;
-        let Some(Setting::Encoder { name }) = self.get("video_codec") else { return None; };
+        let Some(Setting::Encoder { name }) = self.get("video_codec") else {
+            return None;
+        };
         match name.as_str() {
             "h264" | "libx264" => Some(VideoCodec::H264),
             "hevc" | "libx265" => Some(VideoCodec::Hevc),
@@ -346,7 +348,10 @@ impl ImportedJob {
         asset: &crate::records::Asset,
     ) -> Result<crate::avc_export::EncodeInput> {
         use crate::avc_export::{Audio, Bitrate, Container, Encode, EncodeInput, Preset, RateMode};
-        let Some(codec) = self.cpu_encode_codec().filter(|_| self.version == 1 && self.settings.len() <= FIELDS.len()) else {
+        let Some(codec) = self
+            .cpu_encode_codec()
+            .filter(|_| self.version == 1 && self.settings.len() <= FIELDS.len())
+        else {
             return Err(DomainError::new(
                 "INVALID_JOB_DOCUMENT",
                 "Use a version 1 FFmWiz profile with CPU H.264 or HEVC",

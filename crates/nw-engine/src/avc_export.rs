@@ -250,7 +250,9 @@ fn resolution(streams: &[Stream], settings: &Encode) -> Result<CleanResolution> 
         || picture.attached_picture()
         || !matches!(picture.codec.as_str(), "ffv1" | "h264" | "hevc")
     {
-        return Err(unavailable("Choose an original SDR FFV1, H.264 or HEVC picture"));
+        return Err(unavailable(
+            "Choose an original SDR FFV1, H.264 or HEVC picture",
+        ));
     }
     if let Audio::Aac { stream_index, .. } = settings.audio {
         let audio = streams
@@ -399,8 +401,10 @@ impl Engine {
         }
         let source_picture = stream(&plan.source.probe, encode.video_stream)?;
         let output_picture = stream(observed, primary.index)?;
-        let original_is_compressed = matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc");
-        if encode.codec == VideoCodec::Hevc && encode.container == Container::Mp4
+        let original_is_compressed =
+            matches!(plan.resolution.streams[0].codec.as_str(), "h264" | "hevc");
+        if encode.codec == VideoCodec::Hevc
+            && encode.container == Container::Mp4
             && output_picture["codec_tag_string"] != "hvc1"
         {
             return Err(invalid());

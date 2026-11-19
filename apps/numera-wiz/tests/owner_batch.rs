@@ -595,7 +595,10 @@ async fn multirange_audio_edits(parent: &Path) -> Value {
     .await
     .unwrap()
     .stdout;
-    assert!(flac_pcm == expected, "FLAC differs from the original edited samples");
+    assert!(
+        flac_pcm == expected,
+        "FLAC differs from the original edited samples"
+    );
     let flac_probe = fixture::probe(&components, &matroska).await;
     assert_eq!(flac_probe["streams"].as_array().unwrap().len(), 1);
     assert_eq!(flac_probe["streams"][0]["codec_name"], "flac");
@@ -1271,20 +1274,36 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             "video_stream":0,"container":container,"codec":"hevc","preset":"balanced",
             "bitrate":{"average_kbps":700,"mode":"quality_vbr"},"audio":{"kind":"drop"}
         });
-        let plan = cli.query("media.encode", json!({
-            "asset_id":original["id"],"output":output,"settings":settings
-        })).await;
+        let plan = cli
+            .query(
+                "media.encode",
+                json!({
+                    "asset_id":original["id"],"output":output,"settings":settings
+                }),
+            )
+            .await;
         let legacy = format!(
             "input_path={}\noutput_path={}\noutput_format={extension}\nvideo_codec=HEVC\nuse_gpu=n\nvideo_bitrate_kbps=700\naudio_tracks=none\nsubtitle_tracks=none\nkeep_source_metadata=n\n",
-            path.display(), output.display(),
+            path.display(),
+            output.display(),
         );
-        let imported = cli.query("config.import.ffmwiz", json!({
-            "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
-        })).await;
+        let imported = cli
+            .query(
+                "config.import.ffmwiz",
+                json!({
+                    "source":legacy,"base_directory":directory,"compatibility_profile":"ffmwiz_v1"
+                }),
+            )
+            .await;
         assert_eq!(imported["input_valid"], true, "{imported}");
-        let imported_plan = cli.query("jobs.plan", json!({
-            "asset_id":original["id"],"job_document":imported["job"]
-        })).await;
+        let imported_plan = cli
+            .query(
+                "jobs.plan",
+                json!({
+                    "asset_id":original["id"],"job_document":imported["job"]
+                }),
+            )
+            .await;
         assert_eq!(imported_plan["hash"], plan["hash"]);
         let accepted = accepted(
             &cli,
@@ -1292,7 +1311,8 @@ async fn cpu_avc_export(parent: &Path) -> Value {
             &format!("run-hevc-{extension}"),
             "jobs.submit",
             json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
-        ).await;
+        )
+        .await;
         succeeded(&cli, &accepted).await;
         let observed = fixture::probe(&components, &output).await;
         let picture = &observed["streams"][0];
@@ -1304,8 +1324,10 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         }
         let clock = pts(&packets(&components, &output).await[&0]);
         assert_eq!(clock, [0, 32, 120, 224, 376, 512]);
-        results.push(json!({"job":accepted["job_id"],"container":container,"codec":"hevc",
-          "presentation_ms":clock,"matching_import_plan":true}));
+        results.push(
+            json!({"job":accepted["job_id"],"container":container,"codec":"hevc",
+          "presentation_ms":clock,"matching_import_plan":true}),
+        );
     }
 
     for (mode, peak, buffer, crop, resize) in [
@@ -2298,7 +2320,10 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     assert_eq!(extraction["items"][2]["error"]["code"], "STREAM_NOT_FOUND");
     assert!(extraction["items"][2]["extraction"]["source_index"].is_null());
     assert_eq!(extraction["items"][3]["extraction"]["source_index"], 2);
-    assert_eq!(extraction["items"][4]["error"]["code"], "INCOMPATIBLE_PRESERVATION");
+    assert_eq!(
+        extraction["items"][4]["error"]["code"],
+        "INCOMPATIBLE_PRESERVATION"
+    );
     let extract_submit = cli
         .mutation(
             &scope,

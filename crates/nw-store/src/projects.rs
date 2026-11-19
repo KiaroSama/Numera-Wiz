@@ -706,7 +706,8 @@ impl ProjectReadSnapshot {
         )?;
         for item in &mut page.items {
             if item.get("enabled").is_none() {
-                let summary: TrackSummary = serde_json::from_value(item.clone()).map_err(storage)?;
+                let summary: TrackSummary =
+                    serde_json::from_value(item.clone()).map_err(storage)?;
                 let entity = self.entity(&summary.id)?;
                 if entity.kind != "track" || entity.owner_id.as_ref() != Some(sequence) {
                     return Err(domain::invalid("Track index points to a different entity"));

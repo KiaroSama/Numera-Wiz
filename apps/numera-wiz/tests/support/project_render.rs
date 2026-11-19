@@ -467,10 +467,26 @@ async fn sequence_markers(cli: &Cli, project: &str, sequence: &str) {
 async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super::fixture::Media) {
     let original = media.directory.path().join("slip-nonzero-clock.mp4");
     let args = [
-        "-v", "error", "-nostdin", "-f", "lavfi", "-i", "testsrc2=size=64x48:rate=4:duration=2",
-        "-vf", "setpts=PTS+1/TB", "-c:v", "mpeg4", "-threads:v", "1", "-bf", "0",
-        "-video_track_timescale", "16384", original.to_str().unwrap(),
-    ].map(str::to_owned);
+        "-v",
+        "error",
+        "-nostdin",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=64x48:rate=4:duration=2",
+        "-vf",
+        "setpts=PTS+1/TB",
+        "-c:v",
+        "mpeg4",
+        "-threads:v",
+        "1",
+        "-bf",
+        "0",
+        "-video_track_timescale",
+        "16384",
+        original.to_str().unwrap(),
+    ]
+    .map(str::to_owned);
     nw_platform::process::run(
         &media.bin.join("ffmpeg"),
         &args,
@@ -480,7 +496,14 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
     )
     .await
     .unwrap();
-    let asset = cli.mutation(scope, "slip-clock-register", "assets.register", json!({"path":original})).await;
+    let asset = cli
+        .mutation(
+            scope,
+            "slip-clock-register",
+            "assets.register",
+            json!({"path":original}),
+        )
+        .await;
     assert_eq!(asset["ok"], true, "{asset}");
     let asset_id = asset["result"]["id"].as_str().unwrap();
     let inspected = cli.query("assets.inspect", json!({"id":asset_id})).await;
@@ -488,7 +511,14 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
     assert_eq!(clock["time_base"], "1/16384");
     assert_eq!(clock["start_pts"], 16384);
     assert_eq!(clock["duration_ts"], 32768);
-    let created = cli.mutation(scope, "slip-clock-project", "projects.create", json!({"name":"Slip on original clock"})).await;
+    let created = cli
+        .mutation(
+            scope,
+            "slip-clock-project",
+            "projects.create",
+            json!({"name":"Slip on original clock"}),
+        )
+        .await;
     assert_eq!(created["ok"], true, "{created}");
     let project = created["result"]["project_id"].as_str().unwrap();
     let sequence = edit(cli, scope, project, "0", "slip-create-sequence", "sequences.create", json!({
@@ -496,30 +526,82 @@ async fn verify_slipped_registered_picture(cli: &Cli, scope: &str, media: &super
         "tracks":[{"kind":"video","name":"Video"}]
     })).await;
     let sequence_id = sequence["created"]["sequence_id"].as_str().unwrap();
-    let placed = edit(cli, scope, project, "1", "slip-place-original", "clips.place", json!({
-        "sequence_id":sequence_id,"track_id":sequence["created"]["tracks"][0]["id"],
-        "source":{"kind":"registered","asset_id":asset_id,"stream_index":0},
-        "source_range":{"start":{"num":"1","den":"1"},"end":{"num":"3","den":"2"}},
-        "sequence_start":{"num":"0","den":"1"},"collision":"reject"
-    })).await;
+    let placed = edit(
+        cli,
+        scope,
+        project,
+        "1",
+        "slip-place-original",
+        "clips.place",
+        json!({
+            "sequence_id":sequence_id,"track_id":sequence["created"]["tracks"][0]["id"],
+            "source":{"kind":"registered","asset_id":asset_id,"stream_index":0},
+            "source_range":{"start":{"num":"1","den":"1"},"end":{"num":"3","den":"2"}},
+            "sequence_start":{"num":"0","den":"1"},"collision":"reject"
+        }),
+    )
+    .await;
     let clip = placed["created"]["clip_ids"][0].as_str().unwrap();
-    let (slipped, exit) = cli.human(&[
-        "clips", "slip", "--clip", clip, "--delta", "-1", "--project", project,
-        "--expected-revision", "2", "--replay-scope", scope, "--idempotency-key", "slip-clock-earlier",
-    ]).await;
+    let (slipped, exit) = cli
+        .human(&[
+            "clips",
+            "slip",
+            "--clip",
+            clip,
+            "--delta",
+            "-1",
+            "--project",
+            project,
+            "--expected-revision",
+            "2",
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "slip-clock-earlier",
+        ])
+        .await;
     assert_eq!(exit, 0, "{slipped}");
     assert_eq!(slipped["result"]["changed_ids"], json!([clip]));
-    let earlier = cli.query("media.preview_frame", json!({"asset_id":asset_id,"stream_index":0,"frame":0})).await;
-    let later = cli.query("media.preview_frame", json!({"asset_id":asset_id,"stream_index":0,"frame":4})).await;
+    let earlier = cli
+        .query(
+            "media.preview_frame",
+            json!({"asset_id":asset_id,"stream_index":0,"frame":0}),
+        )
+        .await;
+    let later = cli
+        .query(
+            "media.preview_frame",
+            json!({"asset_id":asset_id,"stream_index":0,"frame":4}),
+        )
+        .await;
     assert_ne!(earlier["rgba_base64"], later["rgba_base64"]);
     for (revision, frame) in [("3", &earlier), ("4", &later)] {
         if revision == "4" {
-            edit(cli, scope, project, "3", "slip-clock-undo", "history.undo", json!({})).await;
+            edit(
+                cli,
+                scope,
+                project,
+                "3",
+                "slip-clock-undo",
+                "history.undo",
+                json!({}),
+            )
+            .await;
         }
-        let (observed, status) = cli.human(&[
-            "timeline", "preview-frame", "--project", project, "--revision", revision,
-            "--sequence", sequence_id, "--at", "0",
-        ]).await;
+        let (observed, status) = cli
+            .human(&[
+                "timeline",
+                "preview-frame",
+                "--project",
+                project,
+                "--revision",
+                revision,
+                "--sequence",
+                sequence_id,
+                "--at",
+                "0",
+            ])
+            .await;
         assert_eq!(status, 0, "{observed}");
         assert_eq!(observed["result"]["origin"]["clip_id"], clip);
         assert_eq!(observed["result"]["rgba_base64"], frame["rgba_base64"]);

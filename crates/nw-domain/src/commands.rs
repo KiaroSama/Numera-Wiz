@@ -208,8 +208,9 @@ fn project_context(id: &str) -> ProjectContextRule {
         | "timeline.render_mixed" => ProjectContextRule::RequiredRead,
         "sequences.create" | "clips.place" | "clips.move" | "clips.link" | "clips.unlink"
         | "clips.split" | "clips.trim" | "clips.slip" | "clips.remove" | "tracks.set_enabled"
-        | "markers.place" | "markers.remove"
-        | "history.undo" | "history.redo" => ProjectContextRule::RequiredWrite,
+        | "markers.place" | "markers.remove" | "history.undo" | "history.redo" => {
+            ProjectContextRule::RequiredWrite
+        }
         _ => ProjectContextRule::Forbidden,
     }
 }

@@ -596,7 +596,11 @@ mod tests {
             }
             if matches!(
                 id,
-                "markers.place" | "markers.remove" | "clips.trim" | "clips.slip" | "tracks.set_enabled"
+                "markers.place"
+                    | "markers.remove"
+                    | "clips.trim"
+                    | "clips.slip"
+                    | "tracks.set_enabled"
             ) {
                 let requirement = &row["authorization_requirements"];
                 assert_eq!(requirement["command_id"], id);

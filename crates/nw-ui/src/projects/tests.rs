@@ -838,8 +838,14 @@ fn full_projection_and_exact_forms() {
     app.scope = Some(scope());
     let rate = Rational::new(30000, 1001).unwrap();
     let step = |num, den, frames| forms::ExactForm::new(num, den).stepped_frame(rate, frames);
-    assert_eq!(step("0", "1", 1).unwrap(), Rational::new(1001, 30000).unwrap());
-    assert_eq!(step("1001", "30000", 1).unwrap(), Rational::new(1001, 15000).unwrap());
+    assert_eq!(
+        step("0", "1", 1).unwrap(),
+        Rational::new(1001, 30000).unwrap()
+    );
+    assert_eq!(
+        step("1001", "30000", 1).unwrap(),
+        Rational::new(1001, 15000).unwrap()
+    );
     assert_eq!(step("1001", "30000", -1).unwrap(), Rational::ZERO);
     assert!(step("0", "1", -1).is_err());
     assert!(step("1", "30000", 1).is_err());

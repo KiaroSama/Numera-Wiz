@@ -30,14 +30,16 @@ impl ExactForm {
     }
 
     pub fn stepped_frame(&self, rate: Rational, frames: i64) -> Result<Rational, String> {
-        let current = nw_domain::projects::grid_tick(self.value()?, rate)
-            .map_err(|error| error.message)?;
+        let current =
+            nw_domain::projects::grid_tick(self.value()?, rate).map_err(|error| error.message)?;
         let target = current
             .checked_add_signed(frames)
             .and_then(|index| i64::try_from(index).ok())
             .ok_or("Frame position exceeds the sequence clock")?;
         Rational::new(target, 1)
-            .and_then(|index| index.checked_mul(Rational::new(rate.denominator(), rate.numerator())?))
+            .and_then(|index| {
+                index.checked_mul(Rational::new(rate.denominator(), rate.numerator())?)
+            })
             .map_err(|error| error.message)
     }
 }
