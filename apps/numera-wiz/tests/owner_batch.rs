@@ -101,8 +101,8 @@ async fn packets(bin: &Path, path: &Path) -> BTreeMap<u64, Vec<Value>> {
 }
 async fn accepted(cli: &Cli, scope: &str, key: &str, command: &str, params: Value) -> Value {
     let response = cli.mutation(scope, key, command, params).await;
-    assert_eq!(response["ok"], true, "{command}: {response}");
-    assert!(response["receipt_id"].is_string(), "{command}: {response}");
+    assert_eq!(response["ok"], true, "{command}/{key}: {response}");
+    assert!(response["receipt_id"].is_string(), "{command}/{key}: {response}");
     response["result"].clone()
 }
 

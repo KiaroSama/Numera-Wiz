@@ -85,7 +85,19 @@ pub enum Quality {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SubtitleSource {
     Embedded { stream_index: u32 },
-    External { source: Box<Asset> },
+    External {
+        #[serde(deserialize_with = "deserialize_registered_asset")]
+        source: Box<Asset>,
+    },
+}
+
+fn deserialize_registered_asset<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Box<Asset>, D::Error> {
+    // The tag's intermediate decoder does not interpret JSON object keys as
+    // the numeric original stream indices in Asset::probe.stream_details.
+    let value = serde_json::Value::deserialize(deserializer)?;
+    serde_json::from_value(value).map_err(serde::de::Error::custom)
 }
 impl SubtitleSource {
     pub fn external(&self) -> Option<&Asset> {

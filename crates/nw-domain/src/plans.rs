@@ -443,6 +443,17 @@ mod tests {
             decode(serde_json::to_value(second).unwrap()).unwrap().hash,
             first.hash
         );
+
+        let mut source = first.source;
+        let details = serde_json::json!({"codec_name":"subrip"});
+        source.probe.stream_details.insert(7, details.clone());
+        let subtitle = crate::subtitle_burn::SubtitleSource::External {
+            source: Box::new(source),
+        };
+        let wire = serde_json::to_value(&subtitle).unwrap();
+        let read: crate::subtitle_burn::SubtitleSource = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(read.external().unwrap().probe.stream_details[&7], details);
+        assert_eq!(serde_json::to_value(read).unwrap(), wire);
     }
     #[test]
     fn media_and_required_purposes_are_semantic_but_policy_revisions_are_not() {
