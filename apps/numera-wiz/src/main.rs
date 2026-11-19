@@ -1,5 +1,6 @@
 //! Thin development CLI/MCP/GUI composition; domain behavior stays in the service.
 mod access;
+mod agents_cli;
 mod artifacts_cli;
 mod client;
 mod config_cli;
@@ -41,6 +42,11 @@ enum Mode {
         json: bool,
         #[command(subcommand)]
         command: access::AccessCommand,
+    },
+    /// Prepare scoped client configuration for the current executable.
+    Agents {
+        #[command(subcommand)]
+        command: agents_cli::Command,
     },
     #[command(name = "__owner", hide = true)]
     Owner,
@@ -196,6 +202,13 @@ async fn main() -> std::process::ExitCode {
 }
 async fn run() -> Result<()> {
     let args = Args::parse();
+    if let Some(Mode::Agents { command }) = &args.command {
+        return command.run(
+            args.data_dir.as_deref(),
+            args.components_dir.as_deref(),
+            args.access_profile.as_deref(),
+        );
+    }
     if let Some(Mode::Bridge {
         transport,
         token_file,
@@ -439,6 +452,7 @@ async fn run() -> Result<()> {
                     );
                     Ok(())
                 }
+                Some(Mode::Agents { .. }) => unreachable!("local setup was already dispatched"),
                 None | Some(Mode::Owner | Mode::Bridge { .. } | Mode::Serve { .. }) => {
                     unreachable!("long-lived modes were dispatched outside one-shot finish")
                 }

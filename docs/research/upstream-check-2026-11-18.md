@@ -212,3 +212,20 @@ Libraries adds OpenPGP message signature and key inspection alongside a
 format-only AAF regression edit. That mail signature crate has no opt-in
 or package trust integration in Numera.
 [FFmpeg comparison](https://github.com/FFmpeg/FFmpeg/compare/4da74f951349f82e77cebc00be64423ccf8f6844...cd39c36377fcdac674fea5905cf633e6b8b8a471) · [Craft Libraries comparison](https://github.com/storytold/craft-libs/compare/1acd07f6bc48b04df49aa00e1c3852b159151d63...a9949872bd91ecf6bcec4e86339e3f50ad007fb9)
+
+### November 19 update at 13:52 UTC
+
+FFmWiz, MuxCls, FilmCraft, EffectCraft and Shotcut retained the reviewed
+revisions. FFmpeg Skill 3.15.0 adds single-command setup with local agent
+detection and platform dependency handling. Numera's installed Rust binary
+generates the exact configured client fragment in one command. It uses the
+identified app and access-profile arguments and lets the user merge the
+fragment in the chosen client. [FFmpeg Skill 3.15.0 changes](https://github.com/kajisho5/ffmpeg-skill/compare/216124e596b4c7e8ae8943f3a0046594708995cc...5055a42e1cc3c9443cab74313814325de3022ee8)
+
+The FFmpeg development changes cover HTTP clean EOF and libcurl HEAD. The
+selected FFmpeg release processes held local inputs, and the Numera artifact
+route has its own authenticated HTTP delivery. The pinned stable component
+remains 9.0.2. Craft Libraries returned a diverged history for the two sampled
+commits. The sampled tip's structured palette errors affect its CMS palette
+consumer API. Numera continues to use the admitted FFmpeg color path.
+[FFmpeg HTTP changes](https://github.com/FFmpeg/FFmpeg/compare/cd39c36377fcdac674fea5905cf633e6b8b8a471...1328c5613e33dafcc9f48e67db08047087d96b15) · [Craft palette change](https://github.com/storytold/craft-libs/commit/50b0ee7bf811e363b5f238382b5c77318cf33e46)

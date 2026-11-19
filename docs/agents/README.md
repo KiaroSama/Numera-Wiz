@@ -50,6 +50,24 @@ paths. The selected component directory needs both FFmpeg and ffprobe. Missing
 components do not prevent discovery but block media work with a typed error.
 This is not evidence that the required standard offline payload is delivered.
 
+## Generate a local MCP configuration
+
+Run the installed binary with the client name and the owner's data directory.
+
+```text
+numera-wiz --data-dir /absolute/numera-data agents setup --client codex
+numera-wiz --data-dir /absolute/numera-data agents setup --client cursor
+```
+
+The command prints Codex TOML or Claude, Cursor and generic JSON with the
+absolute command path and explicit stdio arguments. Choose `--output PATH`
+to write a new file under a private directory. Existing files stay intact.
+Merge the fragment in your client and start a new client session. The default
+`agent` profile exposes discovery. Use `--access-profile NAME` for an operating
+profile that the owner has already created. Pass `--components-dir` for a
+specific admitted FFmpeg and ffprobe pair. Setup generates the fragment before
+opening any data root and requires only the installed Rust executable.
+
 ## Claude Code
 
 From the repository root, validate and load for one session:
