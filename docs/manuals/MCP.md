@@ -561,3 +561,10 @@ and a source color policy. The current request profile is
 `quality: "lossless_ffv1"` with a new Matroska destination. Use
 `commands.schema` for the complete typed request and submit the returned
 ID and hash with `jobs.submit`.
+
+
+`audio.edit` reviews ordered sample intervals and per-piece reversal and
+tempo for one registered PCM s16le stream. It returns exact unity-tempo
+sample counts and a reviewed duration tolerance for tempo changes. It
+produces one signed 16-bit WAVE stream. Use `commands.schema` to inspect
+the typed input and `jobs.submit` to execute a reviewed plan.

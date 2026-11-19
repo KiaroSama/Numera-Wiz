@@ -331,3 +331,9 @@ an embedded SubRip track or register and select a UTF-8 SRT file. Select
 the audio tracks you want to copy. For a tagged PQ or HLG source, choose
 the BT.709 tone map and enter the source peak in nits. Enter a new
 Matroska destination, review the plan, and run the job.
+
+
+In **Edit PCM audio samples**, select the original audio stream, enter a
+new WAVE destination, and specify the playback order of the sample
+intervals. Choose reverse and tempo independently for each interval.
+Review the output sample count and run the job.

@@ -124,6 +124,11 @@ pub enum Media {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review an ordered sample-domain edit for one original PCM audio stream.
+    EditAudio {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Measure and review independent loudness normalization of selected PCM tracks.
     Normalize {
         #[arg(long)]
@@ -631,6 +636,11 @@ pub fn prepare(command: Command) -> Result<Request> {
             input.color.validate()?;
             input.output = native_path(Path::new(&input.output))?;
             query("subtitles.burn", serde_json::to_value(input)?)
+        }
+        Command::Media(Media::EditAudio { file }) => {
+            let mut input: nw_domain::audio_edit::EditInput = commands::parse(document(&file)?)?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("audio.edit", serde_json::to_value(input)?)
         }
         Command::Media(Media::Split { file }) => {
             let mut input: nw_domain::packet_cut::SplitInput = commands::parse(document(&file)?)?;

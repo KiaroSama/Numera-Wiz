@@ -1,5 +1,6 @@
 //! FFmpeg-only media work. Utilities share the same planner and verifier.
 mod admission;
+mod audio_edit;
 mod audio_normalization;
 mod budget;
 mod capabilities;
@@ -428,6 +429,7 @@ impl Engine {
             audio_normalization: Vec::new(),
             packet_cut: None,
             subtitle_burn: None,
+            audio_edit: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -474,6 +476,9 @@ impl Engine {
         } else {
             OutputProfile::Matroska
         };
+        if profile == OutputProfile::WavePcm && plan.audio_edit.is_none() {
+            return Err(DomainError::new("INVALID_PLAN", "WAVE output requires a reviewed PCM sample edit"));
+        }
         let expected_scope = if plan.subtitle_burn.is_some() {
             subtitle_burn::SCOPE
         } else if plan.audio_normalization.is_empty() {
@@ -501,7 +506,9 @@ impl Engine {
         }
         track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux {
-            let expected = if plan.subtitle_burn.is_some() {
+            let expected = if plan.audio_edit.is_some() {
+                audio_edit::invocation(plan, profile)?
+            } else if plan.subtitle_burn.is_some() {
                 subtitle_burn::invocation(plan, profile)?
             } else if plan.packet_cut.is_some() {
                 packet_cut::invocation(plan, profile)?
@@ -783,7 +790,10 @@ impl Engine {
             )
             .await?;
         verify_structure(plan, &observed)?;
-        let mut verification = preservation::verify(
+        let mut verification = if plan.audio_edit.is_some() {
+            self.verify_audio_edit(plan, staging.path(), &observed, cancel.clone()).await?
+        } else {
+            preservation::verify(
             self,
             plan,
             staging.path(),
@@ -795,7 +805,8 @@ impl Engine {
             cancel.clone(),
             &observer,
         )
-        .await?;
+        .await?
+        };
         for input in &additions {
             input.revalidate()?;
         }

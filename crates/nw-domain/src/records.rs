@@ -59,6 +59,8 @@ pub struct Asset {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_edit: Option<crate::audio_edit::Edit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subtitle_burn: Option<crate::subtitle_burn::Burn>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audio_normalization: Vec<crate::audio_normalization::Track>,

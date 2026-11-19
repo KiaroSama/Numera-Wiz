@@ -510,6 +510,26 @@ fn validate_cut(ledger: &Ledger, probe: &MediaProbe, range: TimeRange) -> Result
     Ok(())
 }
 
+pub(super) async fn pcm_frames(
+    engine: &Engine,
+    path: &Path,
+    probe: &MediaProbe,
+    index: u32,
+    channels: u8,
+    cancel: CancellationToken,
+) -> Result<u32> {
+    let observer: Observer = Arc::new(|_| Box::pin(async { Ok(()) }));
+    let ledger = scan(engine, path, probe, cancel, &observer,
+        nw_domain::execution::CleanupLimits::default().operation, None).await?;
+    let frame_bytes = u64::from(channels) * 2;
+    let bytes = ledger.streams.get(&index).filter(|stream| stream.bytes > 0)
+        .ok_or_else(|| invalid("Source PCM has no observed sample bytes"))?.bytes;
+    if frame_bytes == 0 || bytes % frame_bytes != 0 {
+        return Err(invalid("Observed PCM bytes do not align with original sample frames"));
+    }
+    u32::try_from(bytes / frame_bytes).map_err(|_| invalid("PCM sample count exceeds the admitted range"))
+}
+
 pub async fn verify(
     engine: &Engine,
     plan: &Plan,

@@ -240,7 +240,7 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport))
                 .expect("schema"),
         ),
-        "audio.normalize" | "subtitles.burn" | "media.cut" | "streams.add" | "streams.replace"
+        "audio.edit" | "audio.normalize" | "subtitles.burn" | "media.cut" | "streams.add" | "streams.replace"
         | "streams.extract" | "jobs.plan" => {
             Some(serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"))
         }
@@ -913,6 +913,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Measure EBU R128 integrated loudness, true peak, range and gate on one registered audio stream",
             Query,
             crate::audio_analysis::VolumeInput
+        ),
+        row!(
+            "audio.edit",
+            "Review ordered PCM cuts, per-piece reversal and pitch-preserving tempo",
+            Query,
+            crate::audio_edit::EditInput
         ),
         row!(
             "audio.normalize",
@@ -1791,6 +1797,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "media.split_plan",
     "media.analyze.volume",
     "media.analyze.loudness",
+    "audio.edit",
     "audio.normalize",
     "media.analyze.reference",
     "media.analyze.stream",

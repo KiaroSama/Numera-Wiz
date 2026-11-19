@@ -10,6 +10,7 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputProfile {
     Matroska,
+    WavePcm,
     QuickTimeMpeg4,
     IsoMp4Mpeg4,
 }
@@ -22,6 +23,7 @@ impl OutputProfile {
             .as_deref()
         {
             Some("mkv") => Ok(Self::Matroska),
+            Some("wav") => Ok(Self::WavePcm),
             Some("mov") => Ok(Self::QuickTimeMpeg4),
             Some("mp4" | "m4v") => Ok(Self::IsoMp4Mpeg4),
             _ => Err(DomainError::new(
@@ -33,6 +35,7 @@ impl OutputProfile {
     pub fn muxer(self) -> &'static str {
         match self {
             Self::Matroska => "matroska",
+            Self::WavePcm => "wav",
             Self::QuickTimeMpeg4 => "mov",
             Self::IsoMp4Mpeg4 => "mp4",
         }
@@ -40,6 +43,7 @@ impl OutputProfile {
     pub fn scope(self) -> &'static str {
         match self {
             Self::Matroska => crate::preservation::SCOPE,
+            Self::WavePcm => crate::audio_edit::SCOPE,
             Self::QuickTimeMpeg4 | Self::IsoMp4Mpeg4 => ISO_SCOPE,
         }
     }
@@ -70,6 +74,17 @@ impl OutputProfile {
         if self == Self::Matroska {
             return Ok(());
         }
+        if self == Self::WavePcm {
+            return if matches!(admission::frozen_demuxer(&source.probe.format)?, "matroska" | "wav")
+                && matches!(outcome.streams.as_slice(), [stream] if stream.kind == StreamKind::Audio && stream.codec == "pcm_s16le")
+                && !outcome.preservation.global_tags && !outcome.preservation.stream_tags
+                && !outcome.preservation.dispositions && !outcome.preservation.chapters
+            {
+                Ok(())
+            } else {
+                Err(incompatible("WAVE output requires the reviewed sample-domain PCM route"))
+            };
+        }
         if admission::frozen_demuxer(&source.probe.format)? != "mov" {
             return Err(incompatible(
                 "This MOV/MP4 route requires an original self-contained MOV-family source",
@@ -82,7 +97,7 @@ impl OutputProfile {
         let same_family = match self {
             Self::QuickTimeMpeg4 => extension.as_deref() == Some("mov"),
             Self::IsoMp4Mpeg4 => matches!(extension.as_deref(), Some("mp4" | "m4v")),
-            Self::Matroska => unreachable!(),
+            Self::Matroska | Self::WavePcm => unreachable!(),
         };
         if !same_family {
             return Err(incompatible(
@@ -92,7 +107,7 @@ impl OutputProfile {
         let (brand, compatible, vendor) = match self {
             Self::QuickTimeMpeg4 => ("qt  ", "qt  ", Some("FFMP")),
             Self::IsoMp4Mpeg4 => ("isom", "isomiso2mp41", None),
-            Self::Matroska => unreachable!(),
+            Self::Matroska | Self::WavePcm => unreachable!(),
         };
         let tags = &source.probe.global_tags;
         for (key, expected) in [

@@ -76,6 +76,7 @@ pub fn digest(plan: &Plan) -> Result<String> {
             && plan.audio_normalization.is_empty()
             && plan.packet_cut.is_none()
             && plan.subtitle_burn.is_none()
+            && plan.audio_edit.is_none()
             && plan.added_tracks.is_empty()
             && plan.creation_audit.is_none()
             && plan.file_times.is_none()
@@ -109,6 +110,15 @@ pub fn digest(plan: &Plan) -> Result<String> {
 pub fn validate_requirements(plan: &Plan) -> Result<&RequiredRights> {
     if plan.schema_version != 2 {
         return Err(invalid("Review a fresh version 2 execution plan"));
+    }
+    if let Some(edit) = &plan.audio_edit {
+        edit.output_samples()?;
+        if plan.resolution.action != crate::mux::CleanAction::Remux
+            || plan.packet_cut.is_some() || plan.subtitle_burn.is_some()
+            || !plan.audio_normalization.is_empty() || !plan.added_tracks.is_empty()
+        {
+            return Err(invalid("Sample-domain edits require one original source and one audio output"));
+        }
     }
     if let Some(burn) = &plan.subtitle_burn {
         burn.color.validate()?;
@@ -294,6 +304,7 @@ mod tests {
             audio_normalization: Vec::new(),
             packet_cut: None,
             subtitle_burn: None,
+            audio_edit: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

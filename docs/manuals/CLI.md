@@ -888,3 +888,29 @@ limited-range BT.2020 PQ or HLG, choose
 peak. The graph uses a 100-nit reference and linear-light Mobius tone
 mapping before encoding limited-range BT.709. Inspect the plan and submit
 its ID and hash through the usual job commands.
+
+
+### Edit PCM audio in sample order
+
+Use `numera-wiz media edit-audio --file edit.json` with a registered
+WAVE or Matroska source and a new WAVE destination. The ordered pieces
+use zero-based sample positions and exclusive ends.
+
+```json
+{
+  "asset_id": "<registered audio or video asset id>",
+  "output": "/exports/edited.wav",
+  "stream_index": 1,
+  "pieces": [
+    {"start_sample": 4800, "end_sample": 24000, "reverse": false, "tempo_hundredths": 100},
+    {"start_sample": 26000, "end_sample": 42000, "reverse": true, "tempo_hundredths": 100}
+  ]
+}
+```
+
+The route produces one original-rate signed 16-bit PCM stream, preserving
+mono, stereo or an explicitly labeled 5.1 layout. Standard tempo is 100.
+A tempo change requires a source interval of at least one second. Review
+the expected output frame count and the declared tolerance for
+pitch-preserving tempo processing. Use the returned plan ID and hash
+with the ordinary job commands.

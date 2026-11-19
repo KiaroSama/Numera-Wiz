@@ -347,11 +347,105 @@ async fn caption_burn(parent: &Path) -> Value {
     json!(cases)
 }
 
+async fn multirange_audio_edits(parent: &Path) -> Value {
+    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
+        .expect("Hosted sample edits need the authenticated FFmpeg tools"));
+    let directory = parent.join("sample-domain-edit");
+    std::fs::create_dir(&directory).unwrap();
+    let raw_path = directory.join("numbered-samples.raw");
+    let original = directory.join("sample-order-5.1.wav");
+    let output = directory.join("ترتیب-ویرایش.wav");
+    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
+    let samples: Vec<u8> = (0..15000).flat_map(|frame| {
+        (0..6).flat_map(move |channel| {
+            i16::try_from((frame * 37 + 4096 * channel) % 30000 - 15000).unwrap().to_le_bytes()
+        })
+    }).collect();
+    std::fs::write(&raw_path, &samples).unwrap();
+    let args = [
+        "-v", "error", "-f", "s16le", "-ar", "48000", "-ch_layout", "5.1",
+        "-i", raw_path.to_str().unwrap(), "-c:a", "pcm_s16le", original.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
+        4096, CancellationToken::new()).await.unwrap();
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let registered = cli.mutation(&scope, "register-sample-order", "assets.register", json!({"path":original})).await;
+    let pieces = [(120,2560,false),(5700,9801,true),(11000,11047,false)];
+    let params = json!({"asset_id":registered["id"],"output":output,"stream_index":0,
+        "pieces":pieces.iter().map(|(start,end,reverse)| json!({"start_sample":start,"end_sample":end,
+            "reverse":reverse,"tempo_hundredths":100})).collect::<Vec<_>>()});
+    let review = cli.query("audio.edit", params.clone()).await;
+    assert_eq!(review["audio_edit"]["source_samples"], 15000);
+    assert_eq!(review["audio_edit"]["channel_layout"], "5.1");
+    let document = directory.join("audio-edit.json");
+    std::fs::write(&document, serde_json::to_vec(&params).unwrap()).unwrap();
+    let (checked, code) = cli.human(&["media", "edit-audio", "--file", document.to_str().unwrap()]).await;
+    assert_eq!(code, 0, "{checked}");
+    assert_eq!(checked["result"]["hash"], review["hash"]);
+    let job = cli.mutation(&scope, "execute-numbered-sample-edit", "jobs.submit",
+        json!({"plan_id":review["id"],"plan_hash":review["hash"]})).await;
+    cli.completed(job["job_id"].as_str().unwrap()).await;
+    let decoded = [
+        "-v", "error", "-i", output.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
+    ].map(str::to_owned);
+    let output_bytes = nw_platform::process::run(&components.join("ffmpeg"), &decoded, Duration::from_secs(30),
+        128 * 1024, CancellationToken::new()).await.unwrap().stdout;
+    let mut expected = Vec::new();
+    for (begin,end,reverse) in pieces {
+        if reverse {
+            for frame in (begin..end).rev() { expected.extend_from_slice(&samples[frame * 12..(frame + 1) * 12]); }
+        } else {
+            expected.extend_from_slice(&samples[begin * 12..end * 12]);
+        }
+    }
+    assert_eq!(output_bytes.len(), 6588 * 12);
+    assert!(output_bytes == expected, "Incorrect sample or channel order");
+    let probe = fixture::probe(&components, &output).await;
+    assert_eq!(probe["streams"][0]["channel_layout"], "5.1");
+    assert_eq!(probe["streams"][0]["sample_rate"], "48000");
+    assert_eq!(probe["streams"][0]["bits_per_sample"], 16);
+    let tone = directory.join("tone-1000.wav");
+    let make_tone = [
+        "-v", "error", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:duration=2",
+        "-c:a", "pcm_s16le", tone.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &make_tone, Duration::from_secs(30),
+        4096, CancellationToken::new()).await.unwrap();
+    let tone_asset = cli.mutation(&scope, "register-tone-original", "assets.register", json!({"path":tone})).await;
+    let mut tempo_facts = Vec::new();
+    for percent in [10u16, 800] {
+        let target = directory.join(format!("tone-{percent}.wav"));
+        let params = json!({"asset_id":tone_asset["id"],"output":target,"stream_index":0,
+            "pieces":[{"start_sample":0,"end_sample":96000,"reverse":true,"tempo_hundredths":percent}]});
+        let reviewed = cli.query("audio.edit", params).await;
+        let tempo_job = cli.mutation(&scope, &format!("execute-tempo-{percent}"), "jobs.submit",
+            json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]})).await;
+        cli.completed(tempo_job["job_id"].as_str().unwrap()).await;
+        let decoded = [
+            "-v", "error", "-i", target.to_str().unwrap(), "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
+        ].map(str::to_owned);
+        let actual = nw_platform::process::run(&components.join("ffmpeg"), &decoded, Duration::from_secs(30),
+            2 * 1024 * 1024, CancellationToken::new()).await.unwrap().stdout;
+        let (chunks, remainder) = actual.as_chunks::<2>();
+        assert!(remainder.is_empty());
+        let tones: Vec<_> = chunks.iter().map(|sample| i16::from_le_bytes(*sample)).collect();
+        let middle = &tones[tones.len() / 4..tones.len() * 3 / 4];
+        let cycles = middle.windows(2).filter(|pair| pair[0] <= 0 && pair[1] > 0).count();
+        let measured = cycles * 48000 / middle.len();
+        let nominal = 96000 * 100 / usize::from(percent);
+        assert!(tones.len().abs_diff(nominal) * 100 < nominal * 4);
+        assert!(measured.abs_diff(1000) <= 15);
+        tempo_facts.push(json!({"tempo_percent":percent,"observed_hz":measured,"output_samples":tones.len()}));
+    }
+    json!({"job":job["job_id"],"samples":6588,"channel_layout":"5.1","bit_exact_expected_pcm":true,"tempo":tempo_facts})
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
     let media = fixture::generate().await;
     let caption_facts = caption_burn(media.directory.path()).await;
+    let sample_edit_facts = multirange_audio_edits(media.directory.path()).await;
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -1852,6 +1946,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "packet_cut":{"job":cut_job["job_id"],"original_clock_packets":8,"non_keyframe_start_refused":true},
         "packet_split":{"batch":split_batch["batch_id"],"verified_parts":2,"original_clock_packets":16,"rejected_member_blocks_batch":true},
         "caption_burn":caption_facts,
+        "sample_edit":sample_edit_facts,
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},

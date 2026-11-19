@@ -594,6 +594,7 @@ async fn unrelated_inventories() {
             audio_normalization: Vec::new(),
             packet_cut: None,
             subtitle_burn: None,
+            audio_edit: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

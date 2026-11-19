@@ -630,6 +630,16 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
+                if let Some(edit) = &plan.audio_edit {
+                    ui.label(format!("Original PCM audio {} at {} Hz, {}", edit.stream_index, edit.sample_rate, edit.channel_layout));
+                    for piece in &edit.pieces {
+                        ui.label(format!("Samples {}–{} · {}% tempo{}", piece.start_sample, piece.end_sample,
+                            piece.tempo_hundredths, if piece.reverse { " · reverse" } else { "" }));
+                    }
+                    if let Ok((nominal, tolerance)) = edit.output_samples() {
+                        ui.label(format!("Output {nominal} sample frames, permitted deviation {tolerance}"));
+                    }
+                }
                 if let Some(burn) = &plan.subtitle_burn {
                     ui.label(format!(
                         "Burn into picture {} with DejaVu Sans",
