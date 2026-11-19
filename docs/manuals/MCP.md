@@ -138,6 +138,14 @@ resolved original index or rejection. Set `failure_policy` to `reject_all`
 or `continue_with_rejected`. With both extraction commands granted, review
 the batch and submit its ID and hash through `batches.submit`.
 
+For a retained scan, call `streams.extract.folder_batch_plan` with
+`snapshot_id`, `snapshot_hash`, `output_root`, `selector` and
+`failure_policy`. The engine derives one Matroska destination per registered
+file in the existing, granted output directory. Track ordinals are resolved
+independently. Inspect the excluded intake rows and child rejections before
+submitting `plan.id` and `plan.hash`. The route requires
+`assets.folder_inspect` and `streams.extract` in the same access profile.
+
 Call `config.import.ffmwiz` with the UTF-8 configuration text as `source`,
 an absolute `base_directory` and `compatibility_profile` set to `ffmwiz_v1`.
 Review the returned diagnostics. For an admitted packet-copy configuration,

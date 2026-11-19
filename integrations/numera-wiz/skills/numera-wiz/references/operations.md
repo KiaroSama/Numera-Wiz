@@ -24,7 +24,7 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
 | `streams.extract` | Review packet-copy extraction of one registered stream to a fresh Matroska path. |
-| `streams.extract.batch_plan` | Review separate Matroska outputs with a per-file track type and ordinal. Submit the approved ID and hash via `batches.submit`. |
+| `streams.extract.batch_plan`, `streams.extract.folder_batch_plan` | Review separate Matroska outputs using track types and ordinals. For a folder snapshot inspect the excluded rows and derived destinations. Submit the approved ID and hash via `batches.submit`. |
 | `streams.add`, `streams.replace`, `audio.normalize` | Add or replace registered tracks with a verified stream plan, or normalize selected PCM tracks from independently measured loudness. |
 | `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
 | `jobs.plan` | Review admitted FFmWiz packet-copy or short FFV1 picture-retiming settings against the matching registered source. |

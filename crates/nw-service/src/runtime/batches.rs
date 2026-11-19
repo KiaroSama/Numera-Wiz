@@ -2,9 +2,9 @@
 use super::*;
 use nw_domain::batches::{
     Batch, BatchPlan, BatchPlanReview, BatchResult, CleanBatchInput, CleanFolderBatchInput,
-    ExtractBatchInput, ExtractSelector, FailurePolicy, FolderBatchExclusion, FolderBatchReview,
-    ItemInput, ItemResult, PlanReference, PlannedItem, PlannedItemView, ReviewedExtraction,
-    UnresolvedIndex, UnresolvedPolicy,
+    ExtractBatchInput, ExtractFolderBatchInput, ExtractSelector, FailurePolicy,
+    FolderBatchExclusion, FolderBatchReview, ItemInput, ItemResult, PlanReference, PlannedItem,
+    PlannedItemView, ReviewedExtraction, UnresolvedIndex, UnresolvedPolicy,
 };
 use nw_domain::ingest::{FolderEntryOutcome, FolderSnapshot};
 
@@ -572,21 +572,7 @@ impl Service {
                 .iter()
                 .map(|item| (&item.target, Some(item.selector))),
             cancel,
-            |item, selector, _| {
-                let selector = selector.ok_or_else(|| {
-                    DomainError::new("INVALID_PLAN", "Batch extraction has no track selector")
-                })?;
-                self.prepare_native_copy(
-                    context,
-                    &item.asset_id,
-                    &item.output,
-                    Default::default(),
-                    |engine, asset, output| {
-                        let index = selector.resolve(&asset.probe.streams)?;
-                        engine.extract_plan_at(asset, output, index, &context.principal, now)
-                    },
-                )
-            },
+            |item, selector, _| self.prepare_extraction(context, item, selector, now),
         )?;
         self.confirm_batch_policy(context, revision, "streams.extract.batch_plan")?;
         self.retain_batch_plan(
@@ -597,6 +583,125 @@ impl Service {
             Vec::new(),
             items,
         )
+    }
+
+    fn prepare_extraction(
+        &self,
+        context: &Context,
+        item: &ItemInput,
+        selector: Option<ExtractSelector>,
+        now: u64,
+    ) -> Result<Plan> {
+        let selector = selector.ok_or_else(|| {
+            DomainError::new("INVALID_PLAN", "Batch extraction has no track selector")
+        })?;
+        self.prepare_native_copy(
+            context,
+            &item.asset_id,
+            &item.output,
+            Default::default(),
+            |engine, asset, output| {
+                let index = selector.resolve(&asset.probe.streams)?;
+                engine.extract_plan_at(asset, output, index, &context.principal, now)
+            },
+        )
+    }
+
+    pub(super) fn prepare_folder_extraction(
+        &self,
+        context: &Context,
+        input: ExtractFolderBatchInput,
+        now: u64,
+        cancel: &CancellationToken,
+    ) -> Result<FolderBatchReview> {
+        const COMMAND: &str = "streams.extract.folder_batch_plan";
+        input.validate()?;
+        let revision = self
+            .policy(context)?
+            .as_ref()
+            .map_or(0, |policy| policy.revision);
+        self.batch_child_command(context, "assets.folder_inspect")?;
+        self.batch_child_command(context, "streams.extract")?;
+        let snapshot = self.read_folder(context, &input.snapshot_id)?;
+        if snapshot.hash != input.snapshot_hash {
+            return Err(DomainError::new(
+                "FOLDER_SNAPSHOT_MISMATCH",
+                "Folder snapshot hash differs from the retained intake",
+            ));
+        }
+        if !snapshot.complete {
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_INCOMPLETE",
+                "Folder enumeration was incomplete; inspect and rescan before review",
+            ));
+        }
+        let _preflight = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+            DomainError::new("RESOURCE_LIMIT", "Folder extraction review capacity is full")
+        })?;
+        let FolderTargets {
+            source,
+            output,
+            items,
+            excluded,
+        } = self.folder_targets(context, &snapshot, &input.output_root, Some("mkv"), cancel)?;
+        if items.is_empty() || items.len() > nw_domain::batches::MAX_BATCH_ITEMS {
+            return Err(DomainError::new(
+                "VALIDATION_ERROR",
+                "Folder extraction requires one to sixty-four registered sources",
+            ));
+        }
+        if input.failure_policy == FailurePolicy::RejectAll
+            && excluded.iter().any(|entry| {
+                matches!(
+                    entry.outcome,
+                    FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+                )
+            })
+        {
+            return Err(DomainError::new(
+                "FOLDER_INTAKE_FAILED",
+                "Review failed intake entries before a reject-all folder extraction",
+            ));
+        }
+        let items = self.review_batch_items(
+            context,
+            items.iter().map(|item| (item, Some(input.selector))),
+            cancel,
+            |item, selector, _| {
+                let plan = self.prepare_extraction(context, item, selector, now)?;
+                let rights = nw_domain::plans::validate_requirements(&plan)?;
+                let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
+                    DomainError::new("INVALID_PLAN", "Folder extraction has no reviewed output parent")
+                })?;
+                output.require_object(parent)?;
+                if plan.output != item.output {
+                    return Err(DomainError::new(
+                        "TARGET_CHANGED",
+                        "Folder extraction resolved outside its derived destination",
+                    ));
+                }
+                Ok(plan)
+            },
+        )?;
+        source.revalidate()?;
+        output.revalidate()?;
+        self.root_authority(context, source.path(), false)?;
+        self.root_authority(context, output.path(), true)?;
+        self.confirm_batch_policy(context, revision, COMMAND)?;
+        let plan = self.retain_batch_plan(
+            context,
+            now,
+            input.failure_policy,
+            UnresolvedPolicy::PerFileNoMatch,
+            Vec::new(),
+            items,
+        )?;
+        Ok(FolderBatchReview {
+            snapshot_id: snapshot.id,
+            snapshot_hash: snapshot.hash,
+            excluded,
+            plan: self.batch_review(context, &plan)?,
+        })
     }
 
     pub(super) fn prepare_packet_split(

@@ -1,9 +1,9 @@
 //! Shared folder intake uses authorized engine paths and retained owner snapshots.
-use crate::{Action, WizApp};
+use crate::{Action, WizApp, batches::FolderBatchKind};
 use eframe::egui;
 use nw_domain::{
     avc_export::{Container, FolderAudio, FolderEncodeInput, Preset},
-    batches::{CleanFolderBatchInput, FolderBatchReview},
+    batches::{CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector, FolderBatchReview},
     commands::Request,
     ingest::{
         CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits,
@@ -27,6 +27,7 @@ pub(super) struct FolderUi {
     encode_crf: u8,
     encode_preset: Preset,
     encode_audio: bool,
+    extract: ExtractSelector,
     review: Option<Arc<FolderReview>>,
     tab: FolderTab,
     focus: Option<FolderFocus>,
@@ -59,6 +60,10 @@ impl Default for FolderUi {
             encode_crf: 18,
             encode_preset: Preset::Balanced,
             encode_audio: true,
+            extract: ExtractSelector {
+                kind: ExtractKind::Audio,
+                ordinal: 1,
+            },
             review: None,
             tab: FolderTab::Source,
             focus: None,
@@ -227,15 +232,23 @@ impl WizApp {
         request: &Request,
         result: Value,
     ) -> Result<(), String> {
-        let encode = request.command.id == "media.encode_folder_plan";
-        let (snapshot_id, snapshot_hash, output_root) = if encode {
-            let input: FolderEncodeInput = serde_json::from_value(request.params.clone())
-                .map_err(|error| error.to_string())?;
-            (input.snapshot_id, input.snapshot_hash, input.output_root)
-        } else {
-            let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone())
-                .map_err(|error| error.to_string())?;
-            (input.snapshot_id, input.snapshot_hash, input.output_root)
+        let (kind, snapshot_id, snapshot_hash, output_root) = match request.command.id.as_str() {
+            "media.encode_folder_plan" => {
+                let input: FolderEncodeInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (FolderBatchKind::Encode, input.snapshot_id, input.snapshot_hash, input.output_root)
+            }
+            "streams.extract.folder_batch_plan" => {
+                let input: ExtractFolderBatchInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (FolderBatchKind::Extract, input.snapshot_id, input.snapshot_hash, input.output_root)
+            }
+            "streams.clean.folder_batch_plan" => {
+                let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (FolderBatchKind::Cleanup, input.snapshot_id, input.snapshot_hash, input.output_root)
+            }
+            _ => return Err("Unexpected folder batch request".into()),
         };
         let review: FolderBatchReview =
             serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -262,7 +275,7 @@ impl WizApp {
         {
             return Err("Folder batch does not account for the captured snapshot entries".into());
         }
-        self.open_folder_batch(generation, snapshot, output_root, review, encode);
+        self.open_folder_batch(generation, snapshot, output_root, review, kind);
         Ok(())
     }
 
@@ -585,17 +598,8 @@ impl WizApp {
     fn folder_batch_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
         ui.separator();
         ui.strong("Folder cleanup batch");
-        if !snapshot.complete
-            || snapshot.entries.iter().any(|entry| {
-                matches!(
-                    entry.outcome,
-                    FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
-                )
-            })
-        {
-            ui.label(
-                "Resolve failed or incomplete intake and scan again before folder batch review.",
-            );
+        if !snapshot.complete {
+            ui.label("Scan again to complete the snapshot before folder batch review.");
             return;
         }
         if !snapshot
@@ -619,17 +623,28 @@ impl WizApp {
             );
             self.batch_policy_controls(ui, true);
         });
-        ui.small("The current cleanup stream selection, file times and execution limits apply.");
-        let review = ui.add_enabled(
-            idle && !self.folder.batch_output_root.is_empty(),
-            egui::Button::new("Review folder cleanup batch"),
-        );
-        self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
-        if review.clicked() {
-            let root = self.folder.batch_output_root.clone();
-            self.review_folder_batch(snapshot, &root, ui.ctx());
+        let intake_failed = snapshot.entries.iter().any(|entry| {
+            matches!(
+                entry.outcome,
+                FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+            )
+        });
+        if intake_failed {
+            ui.label("Resolve failed intake before reviewing folder cleanup or H.264 export.");
+        } else {
+            ui.small("The current cleanup stream selection, file times and execution limits apply.");
+            let review = ui.add_enabled(
+                idle && !self.folder.batch_output_root.is_empty(),
+                egui::Button::new("Review folder cleanup batch"),
+            );
+            self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
+            if review.clicked() {
+                let root = self.folder.batch_output_root.clone();
+                self.review_folder_batch(snapshot, &root, ui.ctx());
+            }
+            self.folder_encode_controls(ui, snapshot, idle);
         }
-        self.folder_encode_controls(ui, snapshot, idle);
+        self.folder_extract_controls(ui, snapshot, idle);
     }
 
     fn folder_encode_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
@@ -685,6 +700,38 @@ impl WizApp {
                         failure_policy: nw_domain::batches::FailurePolicy::RejectAll,
                     };
                     self.review_folder_encoding(settings, ui.ctx());
+                }
+            });
+        });
+    }
+
+    fn folder_extract_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.collapsing("Extract a track from each file", |ui| {
+            ui.add_enabled_ui(idle, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let selector = &mut self.folder.extract;
+                    ui.radio_value(&mut selector.kind, ExtractKind::Video, "Video");
+                    ui.radio_value(&mut selector.kind, ExtractKind::Audio, "Audio");
+                    ui.radio_value(&mut selector.kind, ExtractKind::Subtitle, "Subtitle");
+                    ui.add(egui::DragValue::new(&mut selector.ordinal).range(1..=256).prefix("Track "));
+                });
+                if ui.add_enabled(
+                    !self.folder.batch_output_root.is_empty(),
+                    egui::Button::new("Review folder extraction"),
+                ).clicked() {
+                    let input = ExtractFolderBatchInput {
+                        snapshot_id: snapshot.id.clone(),
+                        snapshot_hash: snapshot.hash.clone(),
+                        output_root: self.folder.batch_output_root.clone(),
+                        selector: self.folder.extract,
+                        failure_policy: self.batch.failure,
+                    };
+                    self.query(
+                        "streams.extract.folder_batch_plan",
+                        json!(input),
+                        Action::FolderBatchPlan(self.batch.generation),
+                        ui.ctx(),
+                    );
                 }
             });
         });

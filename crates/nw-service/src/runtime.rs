@@ -1196,6 +1196,7 @@ impl Service {
                 "streams.replace",
                 "streams.extract",
                 "streams.extract.batch_plan",
+                "streams.extract.folder_batch_plan",
                 "streams.clean.batch_plan",
                 "streams.clean.folder_batch_plan",
             ]
@@ -2281,6 +2282,12 @@ impl Service {
                 let plan = self.prepare_extract_batch(&context, input, now, &cancellation)?;
                 value(&self.batch_review(&context, &plan)?)?
             }
+            "streams.extract.folder_batch_plan" => value(&self.prepare_folder_extraction(
+                &context,
+                commands::parse(params)?,
+                now,
+                &cancellation,
+            )?)?,
             "batches.plan_inspect" => {
                 let input: IdInput = commands::parse(params)?;
                 let plan = self.read_batch_plan(&context, &input.id, ObjectAction::Read)?;

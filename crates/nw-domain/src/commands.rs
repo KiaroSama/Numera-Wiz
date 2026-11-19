@@ -248,7 +248,8 @@ fn result_schema(id: &str) -> Option<Value> {
         "streams.extract.batch_plan" | "media.split_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
         ),
-        "media.encode_folder_plan" | "streams.clean.folder_batch_plan" => Some(
+        "media.encode_folder_plan" | "streams.clean.folder_batch_plan"
+        | "streams.extract.folder_batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
         ),
         "media.preview_frame" => {
@@ -1096,6 +1097,12 @@ fn build_registry() -> Vec<Descriptor> {
             crate::batches::ExtractBatchInput
         ),
         row!(
+            "streams.extract.folder_batch_plan",
+            "Review extraction of a track ordinal per source in a retained folder snapshot",
+            Query,
+            crate::batches::ExtractFolderBatchInput
+        ),
+        row!(
             "jobs.plan",
             "Review an imported FFmWiz packet-copy job against its registered media source",
             Query,
@@ -1862,6 +1869,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "streams.replace",
     "streams.extract",
     "streams.extract.batch_plan",
+    "streams.extract.folder_batch_plan",
     "plans.inspect",
     "jobs.plan",
     "jobs.submit",

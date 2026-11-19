@@ -316,6 +316,11 @@ track type and one-based ordinal for each row, and enter a distinct new
 source. Review the resolved original indices and the rejected rows before
 running the batch. The batch shows each completed output on its own row.
 
+For a retained folder scan, enter the separate output directory and expand
+**Extract a track from each file**. Choose the track type and ordinal, then
+review the generated Matroska names and any missing tracks. The ordinary
+batch run and inspection controls apply.
+
 ## Review a configuration
 
 Select a registered source and expand **Import FFmWiz settings**. Paste the

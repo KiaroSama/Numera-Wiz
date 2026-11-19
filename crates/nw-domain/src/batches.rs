@@ -204,6 +204,23 @@ impl ExtractBatchInput {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractFolderBatchInput {
+    pub snapshot_id: String,
+    pub snapshot_hash: String,
+    pub output_root: String,
+    pub selector: ExtractSelector,
+    pub failure_policy: FailurePolicy,
+}
+
+impl ExtractFolderBatchInput {
+    pub fn validate(&self) -> Result<()> {
+        validate_folder_reference(&self.snapshot_id, &self.snapshot_hash, &self.output_root)?;
+        self.selector.validate()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewedExtraction {

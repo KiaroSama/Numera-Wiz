@@ -2242,6 +2242,82 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
             std::fs::read(source).unwrap()
         );
     }
+    let extraction_root = media.directory.path().join("retained-folder-extraction");
+    std::fs::create_dir(&extraction_root).unwrap();
+    let folder_extraction = json!({
+        "snapshot_id":sdk_folder["id"],"snapshot_hash":sdk_folder["hash"],
+        "output_root":extraction_root,"selector":{"kind":"audio","ordinal":2},
+        "failure_policy":"continue_with_rejected"
+    });
+    let mut reject_intake = folder_extraction.clone();
+    reject_intake["failure_policy"] = json!("reject_all");
+    assert_eq!(
+        sdk!(stdio, "streams.extract.folder_batch_plan", reject_intake, json!({}))
+            ["error"]["code"],
+        "FOLDER_INTAKE_FAILED"
+    );
+    let extraction_document = media.directory.path().join("retained-folder-extraction.json");
+    std::fs::write(
+        &extraction_document,
+        serde_json::to_vec(&folder_extraction).unwrap(),
+    )
+    .unwrap();
+    let (typed_folder_extraction, status) = cli
+        .human(&[
+            "--access-profile",
+            "batch-operator",
+            "streams",
+            "extract-folder",
+            "--file",
+            extraction_document.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(status, 0, "{typed_folder_extraction}");
+    let folder_extraction_stdio = call!(
+        stdio,
+        "streams.extract.folder_batch_plan",
+        folder_extraction.clone(),
+        json!({})
+    );
+    let folder_extraction_http = call!(
+        http,
+        "streams.extract.folder_batch_plan",
+        folder_extraction,
+        json!({})
+    );
+    let folder_extract_plan = &folder_extraction_http["plan"];
+    assert_eq!(folder_extract_plan["hash"], folder_extraction_stdio["plan"]["hash"]);
+    assert_eq!(
+        folder_extract_plan["hash"],
+        typed_folder_extraction["result"]["plan"]["hash"]
+    );
+    assert_eq!(folder_extract_plan["items"].as_array().unwrap().len(), 2);
+    assert_eq!(folder_extract_plan["items"][0]["extraction"]["source_index"], 2);
+    assert_eq!(
+        folder_extract_plan["items"][1]["error"]["code"],
+        "STREAM_NOT_FOUND"
+    );
+    assert!(folder_extraction_http["excluded"].as_array().unwrap().iter().any(
+        |entry| entry["outcome"] == "probe_failed"
+    ));
+    assert_eq!(std::fs::read_dir(&extraction_root).unwrap().count(), 0);
+    let folder_extract_batch = call!(
+        http,
+        "batches.submit",
+        json!({"plan_id":folder_extract_plan["id"],"plan_hash":folder_extract_plan["hash"]}),
+        json!({"replay_scope":http_scope,"idempotency_key":"retained-folder-extract"})
+    );
+    let extraction_result = finished!(http, folder_extract_batch["batch_id"]);
+    assert_eq!(extraction_result["succeeded"], 1);
+    assert_eq!(extraction_result["failed"], 1);
+    let extracted = extraction_root.join(
+        folder_extract_plan["items"][0]["output_name"].as_str().unwrap(),
+    );
+    let mut expected_audio = packets(&media.bin, &media.source).await[&2].clone();
+    for packet in &mut expected_audio {
+        packet["stream_index"] = json!(0);
+    }
+    assert_eq!(packets(&media.bin, &extracted).await[&0], expected_audio);
     let destination_entries = || {
         std::fs::read_dir(&folder_destination)
             .unwrap()
@@ -2781,6 +2857,8 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "independent_retained_packet_equality":true,"copy_full_byte_equality":true,
         "partial_exit":9,"confirmed_cancelled":cancelled["cancelled"],"skipped":skipped["skipped"],
         "stream_extraction":{"batch":extract_submit["result"]["batch_id"],"published":2,"missing_selector":1,
+            "folder_snapshot_batch":folder_extract_batch["batch_id"],"folder_published":1,
+            "folder_missing_selector":1,"folder_retained_intake_failure":true,
             "independent_packet_equality":true,"matching_stdio_and_http_review":true},
         "folder_intake":{"native_cli":owner_folder["id"],"official_sdk_stdio":sdk_folder["id"],
             "same_normalized_outcomes":true,"retained_probe_failures":1,"registered_media":2,

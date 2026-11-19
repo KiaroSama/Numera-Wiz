@@ -414,6 +414,11 @@ pub enum Streams {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review one track ordinal per asset in a retained folder snapshot.
+    ExtractFolder {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Preview candidate and retained stream counts for 1-64 assets.
     Report {
         #[arg(long = "asset", required = true)]
@@ -913,6 +918,13 @@ pub fn prepare(command: Command) -> Result<Request> {
                 item.target.output = native_path(Path::new(&item.target.output))?;
             }
             query("streams.extract.batch_plan", serde_json::to_value(input)?)
+        }
+        Command::Streams(Streams::ExtractFolder { file }) => {
+            let mut input: nw_domain::batches::ExtractFolderBatchInput =
+                commands::parse(document(&file)?)?;
+            input.validate()?;
+            input.output_root = native_path(Path::new(&input.output_root))?;
+            query("streams.extract.folder_batch_plan", serde_json::to_value(input)?)
         }
         Command::Streams(Streams::Report {
             assets,

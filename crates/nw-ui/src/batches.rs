@@ -55,7 +55,14 @@ struct FolderBatchMode {
     snapshot: Arc<FolderReview>,
     requested_output_root: String,
     excluded: Vec<FolderBatchExclusion>,
-    encode: bool,
+    kind: FolderBatchKind,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum FolderBatchKind {
+    Cleanup,
+    Encode,
+    Extract,
 }
 
 pub(super) struct Candidate {
@@ -68,9 +75,9 @@ pub(super) struct Candidate {
 pub(super) struct BatchUi {
     pub open: bool,
     pub candidates: Vec<Candidate>,
-    generation: u64,
+    pub(super) generation: u64,
     extract: bool,
-    failure: FailurePolicy,
+    pub(super) failure: FailurePolicy,
     unresolved: UnresolvedPolicy,
     plan: Option<Arc<BatchPlanReview>>,
     folder: Option<FolderBatchMode>,
@@ -327,7 +334,7 @@ impl WizApp {
         snapshot: Arc<FolderReview>,
         requested_output_root: String,
         review: FolderBatchReview,
-        encode: bool,
+        kind: FolderBatchKind,
     ) {
         if generation != self.batch.generation {
             self.status =
@@ -339,7 +346,7 @@ impl WizApp {
             snapshot,
             requested_output_root,
             excluded: review.excluded,
-            encode,
+            kind,
         });
         self.batch.plan = Some(Arc::new(review.plan));
         self.batch.open = true;
@@ -599,22 +606,14 @@ impl WizApp {
         }
         let mut open = true;
         let folder_mode = self.batch.is_folder_review();
-        let folder_encode = self
-            .batch
-            .folder
-            .as_ref()
-            .is_some_and(|folder| folder.encode);
         let split_mode = self.batch.packet_split;
-        let title = if folder_encode {
-            "Folder H.264 export"
-        } else if folder_mode {
-            "Folder cleanup batch"
-        } else if split_mode {
-            "Packet split"
-        } else if self.batch.extract {
-            "Stream extraction batch"
-        } else {
-            "Cleanup batch"
+        let title = match self.batch.folder.as_ref().map(|folder| folder.kind) {
+            Some(FolderBatchKind::Encode) => "Folder H.264 export",
+            Some(FolderBatchKind::Extract) => "Folder stream extraction",
+            Some(FolderBatchKind::Cleanup) => "Folder cleanup batch",
+            None if split_mode => "Packet split",
+            None if self.batch.extract => "Stream extraction batch",
+            None => "Cleanup batch",
         };
         egui::Window::new(title).id(egui::Id::unique("Cleanup batch"))
             .default_pos(egui::pos2(24.0,160.0)).default_width(1040.0)
