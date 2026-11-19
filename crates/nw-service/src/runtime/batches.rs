@@ -98,6 +98,25 @@ fn folder_output_name(index: u32, source: &Path) -> Result<String> {
     ))
 }
 
+fn validate_folder_destination(
+    output: &files::DirectoryStamp,
+    item: &ItemInput,
+    plan: &Plan,
+) -> Result<()> {
+    let rights = nw_domain::plans::validate_requirements(plan)?;
+    let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
+        DomainError::new("INVALID_PLAN", "Folder batch child has no reviewed output parent")
+    })?;
+    output.require_object(parent)?;
+    if plan.output != item.output {
+        return Err(DomainError::new(
+            "TARGET_CHANGED",
+            "Folder batch child resolved outside its derived destination",
+        ));
+    }
+    Ok(())
+}
+
 impl Service {
     pub(super) fn batch_child_command(&self, context: &Context, command: &str) -> Result<()> {
         if self
@@ -410,20 +429,7 @@ impl Service {
                         engine.avc_plan_at(source, path, settings, &context.principal, now)
                     },
                 )?;
-                let rights = nw_domain::plans::validate_requirements(&plan)?;
-                let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
-                    DomainError::new(
-                        "INVALID_PLAN",
-                        "Folder encode child has no reviewed output parent",
-                    )
-                })?;
-                output.require_object(parent)?;
-                if plan.output != item.output {
-                    return Err(DomainError::new(
-                        "TARGET_CHANGED",
-                        "Folder encode child resolved outside its derived destination",
-                    ));
-                }
+                validate_folder_destination(&output, item, &plan)?;
                 Ok(plan)
             },
         )?;
@@ -507,20 +513,7 @@ impl Service {
             |item, _, _| {
                 let plan = self.prepare_cleanup(context, input.clean_input(item), now)?;
                 if let Some((_, output, _)) = folder {
-                    let rights = nw_domain::plans::validate_requirements(&plan)?;
-                    let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
-                        DomainError::new(
-                            "INVALID_PLAN",
-                            "Folder batch child has no reviewed output directory identity",
-                        )
-                    })?;
-                    output.require_object(parent)?;
-                    if plan.output != item.output {
-                        return Err(DomainError::new(
-                            "TARGET_CHANGED",
-                            "Folder batch child resolved outside its derived destination",
-                        ));
-                    }
+                    validate_folder_destination(output, item, &plan)?;
                 }
                 Ok(plan)
             },
@@ -669,17 +662,7 @@ impl Service {
             cancel,
             |item, selector, _| {
                 let plan = self.prepare_extraction(context, item, selector, now)?;
-                let rights = nw_domain::plans::validate_requirements(&plan)?;
-                let parent = rights.output_create.parent_object.as_ref().ok_or_else(|| {
-                    DomainError::new("INVALID_PLAN", "Folder extraction has no reviewed output parent")
-                })?;
-                output.require_object(parent)?;
-                if plan.output != item.output {
-                    return Err(DomainError::new(
-                        "TARGET_CHANGED",
-                        "Folder extraction resolved outside its derived destination",
-                    ));
-                }
+                validate_folder_destination(&output, item, &plan)?;
                 Ok(plan)
             },
         )?;
