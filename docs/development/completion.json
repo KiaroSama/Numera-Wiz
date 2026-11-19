@@ -141,6 +141,19 @@
           "asserted_domain": "Exact-source Rust builds, 179 inventoried test entrypoints, and all 13 expanded jobs",
           "platforms": ["ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel"],
           "observed_outcome": "All jobs passed. The run retained native and browser interaction, real CLI and SDK transport media, large HTTP transfer and the first-launch CPU exercises. The same source passed Gitleaks."
+        },
+        {
+          "boundary": "native_browser_transport_and_portable_checkpoint",
+          "commit": "a7f01b50247c9709a291a7ca44067c0fd9dffc66",
+          "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/44491743131",
+          "asserted_domain": "Exact-source CI, including four native targets, 179 inventoried test entry points and 13 expanded jobs",
+          "platforms": [
+            "ubuntu-24.04",
+            "windows-2025",
+            "macos-15",
+            "macos-15-intel"
+          ],
+          "observed_outcome": "The Rust CI run and Gitleaks passed. The actual Chrome and native desktop journeys, official MCP transports, media batches and large HTTP artifact transfer completed. All four standalone CI archives verified the embedded CPU tools on first launch."
         }
       ]
     },
