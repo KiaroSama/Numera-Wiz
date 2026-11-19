@@ -18,10 +18,13 @@ mod wave_cues;
 pub use media::BrowserSegment;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
 pub use media::mixed_ffmpeg::{
-    MixedProcessLimits, MixedPublishRequest, MixedSignalProof, StagedMixedInput,
+    MixedProcessLimits, MixedPublishRequest, MixedSignalProof, NativePreviewOutput, StagedMixedInput,
     VerifiedMixedCandidate,
 };
-pub use media::normalized_pair::NormalizedWindow;
+pub use media::normalized_pair::{
+    NormalizedWindow,
+    presentation::{NativePreviewPacket, NativePreviewPipe, NativePreviewProfile, NativePreviewStats},
+};
 pub use media::preview::ObservedPng;
 use nw_domain::{
     DomainError, Result,

@@ -232,16 +232,21 @@ pub type ChunkConsumer = Box<dyn FnMut(&[u8]) -> Result<()> + Send>;
 const LEGACY_STREAM_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 pub const MAX_VERIFIED_STREAM_BYTES: u64 = 64 * 1024 * 1024 * 1024;
 
+enum StreamConsumer {
+    Synchronous(ChunkConsumer),
+    Asynchronous(Box<dyn AsyncChunkSink>),
+}
+
 struct StreamedOutput {
     max_bytes: u64,
-    consumer: ChunkConsumer,
+    consumer: StreamConsumer,
 }
 
 impl StreamedOutput {
     fn legacy(consumer: ChunkConsumer) -> Self {
         Self {
             max_bytes: LEGACY_STREAM_BYTES,
-            consumer,
+            consumer: StreamConsumer::Synchronous(consumer),
         }
     }
 }
@@ -265,6 +270,36 @@ pub async fn stream_with_output_limits(
         },
         Stdio::null(),
         Some(StreamedOutput::legacy(consumer)),
+        cancel,
+    )
+    .await
+}
+
+/// Drive a bounded asynchronous consumer under the same process-tree supervisor.
+pub async fn stream_with_sink(
+    program: &Path,
+    args: &[String],
+    deadline: Duration,
+    limits: StreamLimits,
+    sink: Box<dyn AsyncChunkSink>,
+    cancel: CancellationToken,
+) -> Result<RunOutput> {
+    if !(1..=MAX_VERIFIED_STREAM_BYTES).contains(&limits.stdout_bytes) {
+        return Err(DomainError::new(
+            "RESOURCE_LIMIT",
+            "Reviewed streamed stdout budget is outside its supported range",
+        ));
+    }
+    run_with_stdin(
+        program,
+        args,
+        Some(deadline),
+        CaptureLimits { stdout: 0, stderr: limits.stderr_bytes },
+        Stdio::null(),
+        Some(StreamedOutput {
+            max_bytes: limits.stdout_bytes,
+            consumer: StreamConsumer::Asynchronous(sink),
+        }),
         cancel,
     )
     .await
@@ -333,7 +368,7 @@ pub async fn stream_verified_readonly(
         Stdio::from(input),
         Some(StreamedOutput {
             max_bytes: limits.stdout_bytes,
-            consumer,
+            consumer: StreamConsumer::Synchronous(consumer),
         }),
         cancel,
     )
@@ -400,6 +435,7 @@ async fn consume<R: AsyncRead + Unpin>(
         max_bytes,
         mut consumer,
     }: StreamedOutput,
+    cancel: CancellationToken,
 ) -> Result<(Vec<u8>, u64)> {
     let mut buffer = [0; 8192];
     let mut total = 0u64;
@@ -409,6 +445,12 @@ async fn consume<R: AsyncRead + Unpin>(
             .await
             .map_err(crate::files::io_error)?;
         if count == 0 {
+            if let StreamConsumer::Asynchronous(sink) = &mut consumer {
+                tokio::select! {
+                    result = sink.finish() => result?,
+                    _ = cancel.cancelled() => return Err(DomainError::new("CANCELLED", "Stream consumption was cancelled")),
+                }
+            }
             return Ok((Vec::new(), total));
         }
         total = total.checked_add(count as u64).ok_or_else(|| {
@@ -420,7 +462,15 @@ async fn consume<R: AsyncRead + Unpin>(
                 "Streamed verification stdout exceeded the reviewed byte budget",
             ));
         }
-        consumer(&buffer[..count])?;
+        match &mut consumer {
+            StreamConsumer::Synchronous(handle) => handle(&buffer[..count])?,
+            StreamConsumer::Asynchronous(sink) => {
+                tokio::select! {
+                    result = sink.write(&buffer[..count]) => result?,
+                    _ = cancel.cancelled() => return Err(DomainError::new("CANCELLED", "Stream consumption was cancelled")),
+                }
+            }
+        }
     }
 }
 
@@ -481,9 +531,11 @@ async fn run_with_stdin(
     let output_failed = CancellationToken::new();
     let failed = output_failed.clone();
     let streamed = consumer.is_some();
+    let sink_cancel = cancel.child_token();
+    let reader_cancel = sink_cancel.clone();
     let mut out_task = tokio::spawn(async move {
         let result = if let Some(consumer) = consumer {
-            consume(stdout, consumer).await
+            consume(stdout, consumer, reader_cancel).await
         } else {
             capture(stdout, stdout_limit, false)
                 .await
@@ -501,6 +553,9 @@ async fn run_with_stdin(
         _=output_failed.cancelled()=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_OUTPUT_REJECTED","The streamed consumer rejected stdout")),Err(error)=>Err(error)}},
         _=async { match deadline { Some(value) => tokio::time::sleep(value).await, None => std::future::pending::<()>().await } }=>{match terminate(&mut child).await {Ok(())=>Err(DomainError::new("PROCESS_TIMEOUT","Owned process exceeded its reviewed deadline and was reaped")),Err(error)=>Err(error)}},
     };
+    if result.is_err() {
+        sink_cancel.cancel();
+    }
     let out = tokio::time::timeout(Duration::from_secs(5), &mut out_task).await;
     if out.is_err() {
         out_task.abort();

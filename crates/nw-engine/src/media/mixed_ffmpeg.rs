@@ -2,7 +2,7 @@
 use super::{
     BrowserSegment, Listing,
     browser_preview::{append_browser_audio, append_browser_output},
-    identities, listing,
+    identities, listing, normalized_pair::presentation::NativePreviewProfile,
 };
 use crate::{
     Engine, Observer, OutputDestination, PublicationStaging, VerifiedOutput, admission, blocking,
@@ -20,7 +20,7 @@ use nw_domain::{
 };
 use nw_platform::{
     files::{self, DirectoryStamp, SourceStamp},
-    process,
+    process::{self, AsyncChunkSink, StreamLimits},
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -120,6 +120,12 @@ pub struct MixedProcessLimits<'a> {
     pub cancel: CancellationToken,
 }
 
+pub struct NativePreviewOutput<'a> {
+    pub profile: NativePreviewProfile,
+    pub sink: Box<dyn AsyncChunkSink>,
+    pub limits: MixedProcessLimits<'a>,
+}
+
 pub struct MixedPublishRequest<'a> {
     pub candidate: VerifiedMixedCandidate,
     pub originals: Vec<StagedMixedInput>,
@@ -169,6 +175,17 @@ fn retain_candidate_on_error<T>(
                 );
             }
             Err(error)
+        }
+    }
+}
+
+fn retain_preview_inputs(sidecar: tempfile::NamedTempFile, staged: Vec<StagedMixedInput>) {
+    if sidecar.keep().is_err() {
+        tracing::error!("Could not retain the preview composition graph for process settlement");
+    }
+    for input in staged {
+        if input.retain().is_err() {
+            tracing::error!("Could not retain a preview composition input for process settlement");
         }
     }
 }
@@ -496,18 +513,7 @@ impl Engine {
             Ok(output) => output,
             Err(error) => {
                 if uncertain(&error) {
-                    if sidecar.keep().is_err() {
-                        tracing::error!(
-                            "Could not retain the browser composition graph for process settlement"
-                        );
-                    }
-                    for input in staged {
-                        if input.retain().is_err() {
-                            tracing::error!(
-                                "Could not retain a browser composition input for process settlement"
-                            );
-                        }
-                    }
+                    retain_preview_inputs(sidecar, staged);
                 }
                 return Err(error);
             }
@@ -516,6 +522,87 @@ impl Engine {
         workspace.revalidate()?;
         identities(self, cancel.clone()).await?;
         BrowserSegment::verify(output.stdout, true)
+    }
+
+    /// Feed native presentation from the same exact sequence composition.
+    pub async fn stream_native_program(
+        &self,
+        capture: &MixedCapture,
+        sources: &[BoundSource],
+        assets: &[&Asset],
+        staged: Vec<StagedMixedInput>,
+        output: NativePreviewOutput<'_>,
+    ) -> Result<()> {
+        let NativePreviewOutput { profile, sink, limits } = output;
+        let MixedProcessLimits { workspace, max_bytes, deadline, cancel } = limits;
+        let picture_bytes = profile.validate()?;
+        if profile.range != capture.range || profile.frame_rate != capture.settings.frame_rate
+            || capture.settings.width > 3840 || capture.settings.height > 2160
+        {
+            return Err(invalid("Native preview clock or raster differs from its captured limits"));
+        }
+        let started = Instant::now();
+        let remaining = || deadline.checked_sub(started.elapsed()).filter(|left| !left.is_zero())
+            .ok_or_else(|| DomainError::new("PROCESS_TIMEOUT", "Native program preview exceeded its complete deadline"));
+        let graph = compile_mixed_graph(capture)?;
+        let frames = nw_domain::media_execution::exact(&graph.output_frames)?;
+        let duration = capture.range.end.checked_sub(capture.range.start)?;
+        let sample_frames = if profile.audio {
+            nw_domain::projects::grid_tick(duration, Rational::new(48_000, 1)?)?
+        } else {
+            0
+        };
+        let decoded_bytes = frames * picture_bytes as u64 + sample_frames * 8;
+        if max_bytes <= decoded_bytes {
+            return Err(DomainError::new("RESOURCE_LIMIT", "Native preview exceeds its stdout budget"));
+        }
+        let stdout_bytes = (decoded_bytes + 1024 * 1024).min(max_bytes);
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        let MixedFiltergraph { mut script, audio_extents } =
+            compose_filtergraph(capture, &graph, sources, assets)?;
+        self.verify_mixed_extents(&staged, audio_extents, remaining, &cancel).await?;
+        let NativePreviewProfile { width, height, .. } = profile;
+        script.push_str(&format!(
+            ";\n[outv]scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=rgba[viewv]"
+        ));
+        if !profile.audio {
+            script.push_str(";\n[outa]anullsink");
+        }
+        let (sidecar, mut args) = composition_invocation(workspace, &staged, &script)?;
+        args.extend([
+            "-map", "[viewv]", "-c:v", "rawvideo", "-threads:v", "1", "-pix_fmt", "rgba",
+            "-fps_mode:v", "passthrough", "-enc_time_base:v", "filter",
+        ].map(str::to_owned));
+        if profile.audio {
+            args.extend([
+                "-map", "[outa]", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", "2",
+                "-bsf:a", "pcm_rechunk=n=480:p=0",
+            ].map(str::to_owned));
+        }
+        args.extend([
+            "-map_metadata", "-1", "-map_chapters", "-1", "-avoid_negative_ts", "disabled",
+            "-f", "nut", "-write_index", "0", "-syncpoints", "default", "pipe:1",
+        ].map(str::to_owned));
+        workspace.revalidate()?;
+        identities(self, cancel.clone()).await?;
+        let ticket = self.process_budget.acquire(&cancel).await?;
+        let left = match remaining() {
+            Ok(left) => left,
+            Err(error) => return ticket.finish(Err(error)),
+        };
+        let result = process::stream_with_sink(
+            Path::new(&self.ffmpeg.path), &args, left,
+            StreamLimits { stdout_bytes, stderr_bytes: 4096 }, sink, cancel.clone(),
+        ).await;
+        if let Err(error) = ticket.finish(result) {
+            if uncertain(&error) {
+                retain_preview_inputs(sidecar, staged);
+            }
+            return Err(error);
+        }
+        validate_staged_inputs(sources, assets, &staged, &cancel).await?;
+        workspace.revalidate()?;
+        identities(self, cancel).await
     }
 
     /// Compose verified normalized inputs into one owned candidate. The caller

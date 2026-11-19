@@ -6,6 +6,8 @@ use tokio_util::sync::CancellationToken;
 mod fixture;
 #[path = "support/mixed_render.rs"]
 mod mixed_render;
+#[path = "support/native_preview.rs"]
+mod native_preview;
 use fixture::rules;
 
 async fn check_registered_stills(
@@ -566,6 +568,7 @@ async fn actual_copy_and_order_metadata_remux() {
     check_registered_stills(&engine, &media, &token).await;
     check_normalized_pair(&engine, &media, &token).await;
     mixed_render::exercise(&engine, &media, &token).await;
+    native_preview::exercise(&engine, &token).await;
     let seek_source = directory.path().join("seek-index-é-索引.mp4");
     nw_platform::process::run(
         &ffmpeg,

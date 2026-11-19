@@ -1,5 +1,6 @@
 //! Bounded NUT candidates for registered windows and verified input pairs.
 mod nut;
+pub(crate) mod presentation;
 mod reference;
 use super::{identities, verification::ratio};
 use crate::{Engine, admission, blocking, preservation};
