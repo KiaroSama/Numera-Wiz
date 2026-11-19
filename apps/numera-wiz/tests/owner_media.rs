@@ -435,7 +435,7 @@ async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
         "Heading\r\nFIELD_DELIM\tTABS\r\nVIDEO_FORMAT\t1080\r\n",
         "AUDIO_FORMAT\t48kHz\r\nFPS\t24\r\n\r\nColumn\r\n",
         "Name\tTracks\tStart\tEnd\tTape\tScene\tTake\tComments\tSource File\r\n\r\nData\r\n",
-        "rf64-cue.wav\tA1\t00:00:00:00\t00:00:01:00\t\t\t\trf64-cue.wav\r\n"
+        "rf64-cue.wav\tA1\t00:00:00:00\t00:00:01:00\t\t\t\t\trf64-cue.wav\r\n"
     );
     assert_eq!(ale["document"], expected);
     assert_eq!(std::fs::read_to_string(&ale_path).unwrap(), expected);
