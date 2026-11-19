@@ -1017,6 +1017,8 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         json!({"path":path}),
     )
     .await;
+    let original_probe = fixture::probe(&components, &path).await;
+    assert_eq!(original_probe["streams"][0]["color_range"], "tv");
     let mut results = Vec::new();
     for (container, extension) in [("mp4", "mp4"), ("matroska", "mkv")] {
         let output = directory.join(format!("avc-export.{extension}"));
@@ -1044,6 +1046,11 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         let probe = fixture::probe(&components, &output).await;
         assert_eq!(probe["streams"][0]["codec_name"], "h264");
         assert_eq!(probe["streams"][0]["sample_aspect_ratio"], "4:3");
+        let range = &probe["streams"][0]["color_range"];
+        assert!(
+            range == "tv" || (container == "mp4" && (range.is_null() || range == "unknown")),
+            "Unexpected AVC color range: {range}"
+        );
         assert_eq!(probe["streams"][1]["codec_name"], "aac");
         assert_eq!(probe["streams"][1]["sample_rate"], "48000");
         let time_base = probe["streams"][0]["time_base"].as_str().unwrap();

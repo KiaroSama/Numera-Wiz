@@ -450,10 +450,14 @@ impl Engine {
     ) -> Result<StagedCaption> {
         let burn = plan.subtitle_burn.as_ref().expect("Reviewed caption");
         let prefix = color_filter(source_picture(&plan.source.probe, burn)?, burn.color)?;
-        let directory = tempfile::Builder::new()
-            .prefix("caption-input-")
-            .tempdir_in(parent)
-            .map_err(io_error)?;
+        let mut builder = tempfile::Builder::new();
+        builder.prefix("caption-input-");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            builder.permissions(std::fs::Permissions::from_mode(0o700));
+        }
+        let directory = builder.tempdir_in(parent).map_err(io_error)?;
         let font_dir = nw_platform::security::private_directory(&directory.path().join("fonts"))?;
         let mut originals = Vec::new();
         let output = directory.path().join("captions.srt");

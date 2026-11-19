@@ -218,8 +218,20 @@ impl Engine {
             let expected = &source_picture[field];
             let actual = &output_picture[field];
             let missing = |value: &serde_json::Value| value.is_null() || value == "unknown";
-            if expected != actual && !(missing(expected) && missing(actual)) {
-                return Err(invalid());
+            // MP4 can omit the optional color box and AVC defaults an absent
+            // video_full_range_flag to limited. Full range must be signaled.
+            let implicit_limited_range = field == "color_range"
+                && encode.container == Container::Mp4
+                && expected == "tv"
+                && missing(actual);
+            if !(expected == actual
+                || missing(expected) && missing(actual)
+                || implicit_limited_range)
+            {
+                return Err(DomainError::new(
+                    "VERIFICATION_FAILED",
+                    format!("Encoded AVC picture differs from the reviewed {field}"),
+                ));
             }
         }
         if let Audio::Aac { stream_index, .. } = encode.audio {
