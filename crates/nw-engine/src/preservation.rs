@@ -409,7 +409,7 @@ async fn consume_packets(
         cancel,
     )
     .await;
-    ticket.finish(process)
+    ticket.finish(process).map(|_| ())
 }
 
 pub(super) async fn check_cut(
