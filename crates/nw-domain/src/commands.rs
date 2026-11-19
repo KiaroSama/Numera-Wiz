@@ -883,13 +883,13 @@ fn build_registry() -> Vec<Descriptor> {
         ),
         row!(
             "media.encode_folder_plan",
-            "Review AVC batch export of a retained folder intake into a separate directory",
+            "Review H.264 or HEVC export of a retained folder into a separate directory",
             Query,
             crate::avc_export::FolderEncodeInput
         ),
         row!(
             "media.encode",
-            "Review CPU AVC export with original SDR picture timing and optional AAC",
+            "Review CPU H.264 or HEVC export with original SDR picture timing and optional AAC",
             Query,
             crate::avc_export::EncodeInput
         ),
