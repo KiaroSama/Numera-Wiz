@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/numera-wiz.png" width="240" height="240" alt="Numera Wiz official logo">
+  <img src="assets/branding/numera-wiz.png" width="160" height="160" alt="Numera Wiz official logo">
 </p>
 
 # Numera Wiz

@@ -246,3 +246,9 @@ helper for resuming reads. Numera's artifact downloader already checks the
 start, end and total against the accepted length and verifies every byte
 with the manifest digest.
 [EffectCraft cache changes](https://github.com/storytold/effectcraft/commit/13e6e6c67e805f443a87e3bd3160095d30b5cf3a) · [Craft range parser](https://github.com/storytold/craft-libs/compare/50b0ee7bf811e363b5f238382b5c77318cf33e46...48c57b5fafa170eb9c77c1d9fef0be0f09876f1f)
+
+The redb 5.0.0 update adapts the existing bounded backend to the current
+file backend and table APIs. The project compatibility suite still verifies
+opening databases created by earlier native executables and checks that the
+current writer preserves the stored project and receipt data. The registry
+checksum for the new crate matches `Cargo.lock`. [redb 5.0.0 release](https://github.com/cberner/redb/releases/tag/v5.0.0)
