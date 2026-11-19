@@ -64,6 +64,10 @@ enum Mode {
         #[command(subcommand)]
         command: human::Projects,
     },
+    Bins {
+        #[command(subcommand)]
+        command: human::Bins,
+    },
     Sequences {
         #[command(subcommand)]
         command: human::Sequences,
@@ -369,6 +373,9 @@ async fn run() -> Result<()> {
                 Some(Mode::Config { command }) => config_cli::run(&client, command).await,
                 Some(Mode::Projects { command }) => {
                     human::run(&client, human::Command::Projects(command)).await
+                }
+                Some(Mode::Bins { command }) => {
+                    human::run(&client, human::Command::Bins(command)).await
                 }
                 Some(Mode::Sequences { command }) => {
                     human::run(&client, human::Command::Sequences(command)).await

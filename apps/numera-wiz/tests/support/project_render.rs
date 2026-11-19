@@ -817,6 +817,28 @@ async fn verify_slid_registered_picture(
     let summary = cli.raw(&summary).await;
     assert_eq!(summary["ok"], true, "{summary}");
     let base = summary["result"]["project_revision"].as_str().unwrap();
+    let parent = summary["result"]["root_bin_id"].as_str().unwrap();
+    let (bin, status) = cli
+        .human(&[
+            "bins",
+            "add",
+            "--parent",
+            parent,
+            "--name",
+            "Exchange reviews",
+            "--project",
+            project,
+            "--expected-revision",
+            base,
+            "--replay-scope",
+            scope,
+            "--idempotency-key",
+            "exchange-review-bin",
+        ])
+        .await;
+    assert_eq!(status, 0, "{bin}");
+    assert!(bin["result"]["created"]["bin_id"].is_string());
+    let base = bin["result"]["revision"].as_str().unwrap();
     let sequence = edit(cli, scope, project, base, "slide-sequence", "sequences.create", json!({
         "name":"Slide picture","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"mono"},
         "tracks":[{"kind":"video","name":"Picture"}]
