@@ -16,6 +16,7 @@ mod projects;
 mod reference;
 mod subtitle_burn;
 mod track_append;
+mod video_retime;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
@@ -167,6 +168,7 @@ pub struct WizApp {
     normalize: normalize::NormalizeUi,
     caption_burn: subtitle_burn::CaptionBurnUi,
     media_join: media_join::JoinUi,
+    video_retime: video_retime::RetimeUi,
     audio_edit: audio_edit::AudioEditUi,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
@@ -363,6 +365,7 @@ impl WizApp {
             normalize: Default::default(),
             caption_burn: Default::default(),
             media_join: Default::default(),
+            video_retime: Default::default(),
             audio_edit: Default::default(),
             wave_cues: None,
             artifact_manifest: None,
@@ -407,6 +410,7 @@ impl WizApp {
             self.normalize = Default::default();
             self.caption_burn = Default::default();
             self.media_join = Default::default();
+            self.video_retime = Default::default();
             self.audio_edit = Default::default();
             self.compare_audio_indices = asset
                 .probe
@@ -1601,6 +1605,7 @@ impl eframe::App for WizApp {
                 self.audio_edit_panel(ui, &asset);
                 self.subtitle_burn_panel(ui, &asset);
                 self.media_join_panel(ui, &asset);
+                self.video_retime_panel(ui, &asset);
             }
         });
         if !self.folder.open {

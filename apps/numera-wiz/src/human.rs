@@ -114,6 +114,11 @@ pub enum Media {
         #[arg(long)]
         drop_chapters: bool,
     },
+    /// Review a lossless FFV1 picture retime or reversal.
+    Retime {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review a copy-only ordered join of compatible registered Matroska files.
     Join {
         #[arg(long)]
@@ -646,6 +651,11 @@ pub fn prepare(command: Command) -> Result<Request> {
             let mut input: nw_domain::audio_edit::EditInput = commands::parse(document(&file)?)?;
             input.output = native_path(Path::new(&input.output))?;
             query("audio.edit", serde_json::to_value(input)?)
+        }
+        Command::Media(Media::Retime { file }) => {
+            let mut input: nw_domain::video_retime::RetimeInput = commands::parse(document(&file)?)?;
+            input.output = native_path(Path::new(&input.output))?;
+            query("media.retime", serde_json::to_value(input)?)
         }
         Command::Media(Media::Join { file }) => {
             let mut input: nw_domain::media_join::JoinInput = commands::parse(document(&file)?)?;

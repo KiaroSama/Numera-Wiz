@@ -574,3 +574,9 @@ the typed input and `jobs.submit` to execute a reviewed plan.
 inputs in `inputs_in_order` using `strategy: "copy"`. Review the
 individual source durations and offsets before `jobs.submit`. Use
 `audio: "drop"` for a picture-only verified copy join.
+
+
+`media.retime` reviews one short FFV1 picture, an exclusive-end
+source range, and tempo from 10 to 800 percent. Set `reverse: true`
+to reverse the frame order and `audio: "drop"` for this picture-only
+profile. The verified result retains the exact variable frame clock.

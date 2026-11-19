@@ -936,3 +936,27 @@ is retained, PCM s16le with matching stream indices and clock parameters.
 Choose `audio: "drop"` for a picture-only output or `metadata: "strip"`
 to remove authored tags. The route drops chapter, subtitle and attachment
 streams. Review each segment's offset and submit the returned plan and hash.
+
+
+### Change picture speed or reverse a short clip
+
+Use `numera-wiz media retime --file retime.json` to review one
+registered Matroska FFV1 picture. The original clip may have up to
+64 decoded frames. Pick the original frame time as the inclusive start
+and enter the exclusive end.
+
+```json
+{
+  "asset_id": "<registered asset id>",
+  "output": "/exports/reversed.mkv",
+  "video_stream": 0,
+  "range": {"start": {"num": "0", "den": "1"}, "end": {"num": "1", "den": "2"}},
+  "tempo_hundredths": 100,
+  "reverse": true,
+  "audio": "drop"
+}
+```
+
+The output verifies every decoded FFV1 picture and its retimed,
+variable-rate millisecond timestamp. Audio and chapters are dropped.
+Review the clock before submitting the plan ID and hash.

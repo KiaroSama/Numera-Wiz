@@ -59,6 +59,8 @@ pub struct Asset {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_retime: Option<crate::video_retime::Retime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub media_join: Option<crate::media_join::Join>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio_edit: Option<crate::audio_edit::Edit>,

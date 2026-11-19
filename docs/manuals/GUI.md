@@ -342,3 +342,9 @@ Review the output sample count and run the job.
 Open the first input and expand **Join compatible media in order**.
 Select the remaining inputs in playback order. Choose whether to drop
 audio or strip metadata. Review the segment offsets, then run the job.
+
+
+Use **Change picture speed or reverse** for a registered short
+Matroska FFV1 clip. Choose the original frame time, exclusive end,
+tempo and playback direction. Review the output frame count and
+presentation clock before running the job.

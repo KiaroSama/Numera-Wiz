@@ -596,6 +596,7 @@ async fn unrelated_inventories() {
             subtitle_burn: None,
             audio_edit: None,
             media_join: None,
+            video_retime: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,

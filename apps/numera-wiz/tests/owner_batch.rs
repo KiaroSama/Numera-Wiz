@@ -506,6 +506,67 @@ async fn packet_join(parent: &Path) -> Value {
     json!({"outputs":runs,"sar_mismatch_refused":true})
 }
 
+async fn variable_picture_retime(parent: &Path) -> Value {
+    let components = std::path::PathBuf::from(std::env::var_os("NW_CAPTION_COMPONENTS")
+        .expect("Hosted picture retiming needs authenticated media tools"));
+    let directory = parent.join("variable-picture-clock");
+    std::fs::create_dir(&directory).unwrap();
+    let cli = Cli { data: directory.join("state"), components: components.clone(), request_timeout: Duration::from_secs(60) };
+    let scope = cli.query("access.replay_scope.create", json!({})).await["replay_scope"].as_str().unwrap().to_owned();
+    let path = directory.join("vfr-original.mkv");
+    let args = [
+        "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=96x64:rate=1000:duration=0.520",
+        "-vf", r"select=eq(n\,0)+eq(n\,32)+eq(n\,120)+eq(n\,224)+eq(n\,376)+eq(n\,512)",
+        "-fps_mode", "passthrough", "-enc_time_base:v", "1/1000", "-c:v", "ffv1",
+        path.to_str().unwrap(),
+    ].map(str::to_owned);
+    nw_platform::process::run(&components.join("ffmpeg"), &args, Duration::from_secs(30),
+        4096, CancellationToken::new()).await.unwrap();
+    let original = cli.mutation(&scope,"register-vfr-original","assets.register",json!({"path":path})).await;
+    let decode = |path: &Path| {
+        ["-v","error","-i",path.to_str().unwrap(),"-map","0:v:0","-fps_mode","passthrough",
+         "-pix_fmt","yuv420p","-c:v","rawvideo","-threads","1","-f","rawvideo","pipe:1"].map(str::to_owned)
+    };
+    let input = nw_platform::process::run(&components.join("ffmpeg"),&decode(&path),Duration::from_secs(30),
+        64*1024,CancellationToken::new()).await.unwrap().stdout;
+    let size=96*64*3/2;
+    assert_eq!(input.len(),size*6);
+    let mut decisions=Vec::new();
+    for (tempo,reverse) in [(10, false),(100, false),(800,false),(100,true)] {
+        let output = directory.join(format!("retime-{tempo}-{reverse}.mkv"));
+        let range = json!({"start":{"num":"0","den":"1"},"end":{"num":"513","den":"1000"}});
+        let params=json!({"asset_id":original["id"],"output":output,"range":range,
+            "video_stream":0,"tempo_hundredths":tempo,"reverse":reverse,"audio":"drop"});
+        let plan=cli.query("media.retime",params.clone()).await;
+        let doc=directory.join(format!("retime-{tempo}-{reverse}.json"));
+        std::fs::write(&doc,serde_json::to_vec(&params).unwrap()).unwrap();
+        let (typed,status)=cli.human(&["media","retime","--file",doc.to_str().unwrap()]).await;
+        assert_eq!(status,0,"{typed}");
+        assert_eq!(typed["result"]["hash"],plan["hash"]);
+        let job=cli.mutation(&scope,&format!("run-retime-{tempo}-{reverse}"),"jobs.submit",
+            json!({"plan_id":plan["id"],"plan_hash":plan["hash"]})).await;
+        cli.completed(job["job_id"].as_str().unwrap()).await;
+        let picture=packets(&components,&output).await;
+        let observed:Vec<_>=picture[&0].iter().map(|packet|packet["pts"].as_i64().unwrap()).collect();
+        let expected = if reverse {
+            vec![0,1,137,289,393,481]
+        } else {
+            [0,32,120,224,376,512].map(|ticks|ticks*100/tempo).to_vec()
+        };
+        assert_eq!(observed,expected);
+        let data = nw_platform::process::run(&components.join("ffmpeg"),&decode(&output),Duration::from_secs(30),
+            64*1024,CancellationToken::new()).await.unwrap().stdout;
+        assert_eq!(data.len(),input.len());
+        for (index,picture) in data.chunks_exact(size).enumerate() {
+            let original_index=if reverse {5-index} else {index};
+            assert!(picture==&input[original_index*size..(original_index+1)*size], "Lossless frame changed");
+        }
+        decisions.push(json!({"job":job["job_id"],"tempo":tempo,"reverse":reverse,
+            "exact_variable_clock_ms":observed,"lossless_picture_equality":true}));
+    }
+    json!(decisions)
+}
+
 #[tokio::test]
 #[ignore = "Actual hosted FFmpeg, durable owner, typed CLI and official SDK batch journeys"]
 async fn real_batches_preserve_members_retries_partial_results_and_confirmed_cancellation() {
@@ -513,6 +574,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
     let caption_facts = caption_burn(media.directory.path()).await;
     let sample_edit_facts = multirange_audio_edits(media.directory.path()).await;
     let join_facts = packet_join(media.directory.path()).await;
+    let retime_facts = variable_picture_retime(media.directory.path()).await;
     let second = media.directory.path().join("second-é.mkv");
     let args = [
         "-hide_banner",
@@ -2015,6 +2077,7 @@ async fn real_batches_preserve_members_retries_partial_results_and_confirmed_can
         "caption_burn":caption_facts,
         "sample_edit":sample_edit_facts,
         "packet_join":join_facts,
+        "picture_retime":retime_facts,
         "track_replacement":{"job":replace_job["job_id"],"metadata_only_job":strip_job["job_id"],"relative_track_replacement_verified":true},
         "normalization":{"job":normalized_job["job_id"],"output":independently_measured,
             "unchanged_picture_and_unselected_audio_packets":true,"original_pcm_sample_counts":true},

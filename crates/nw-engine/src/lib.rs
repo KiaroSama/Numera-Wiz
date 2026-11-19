@@ -12,6 +12,7 @@ mod preservation;
 mod progress;
 mod subtitle_burn;
 mod track_append;
+mod video_retime;
 mod wave_cues;
 pub use media::BrowserSegment;
 pub use media::execution::{MediaExecutionRequest, MediaObserver};
@@ -432,6 +433,7 @@ impl Engine {
             subtitle_burn: None,
             audio_edit: None,
             media_join: None,
+            video_retime: None,
             added_tracks: Vec::new(),
             execution_limits: Some(nw_domain::execution::CleanupLimits::default()),
             file_times,
@@ -481,7 +483,9 @@ impl Engine {
         if profile == OutputProfile::WavePcm && plan.audio_edit.is_none() {
             return Err(DomainError::new("INVALID_PLAN", "WAVE output requires a reviewed PCM sample edit"));
         }
-        let expected_scope = if plan.media_join.is_some() {
+        let expected_scope = if plan.video_retime.is_some() {
+            video_retime::SCOPE
+        } else if plan.media_join.is_some() {
             media_join::SCOPE
         } else if plan.subtitle_burn.is_some() {
             subtitle_burn::SCOPE
@@ -510,7 +514,9 @@ impl Engine {
         }
         track_append::validate_track_additions(plan, profile)?;
         if plan.resolution.action == CleanAction::Remux {
-            let expected = if plan.media_join.is_some() {
+            let expected = if plan.video_retime.is_some() {
+                video_retime::invocation(plan, profile)?
+            } else if plan.media_join.is_some() {
                 media_join::invocation(plan, profile)?
             } else if plan.audio_edit.is_some() {
                 audio_edit::invocation(plan, profile)?
@@ -805,7 +811,9 @@ impl Engine {
             )
             .await?;
         verify_structure(plan, &observed)?;
-        let mut verification = if plan.media_join.is_some() {
+        let mut verification = if plan.video_retime.is_some() {
+            self.verify_video_retime(plan, staging.path(), &observed, cancel.clone()).await?
+        } else if plan.media_join.is_some() {
             preservation::verify_join(self, plan, staging.path(), &observed, cancel.clone(), &observer).await?
         } else if plan.audio_edit.is_some() {
             self.verify_audio_edit(plan, staging.path(), &observed, cancel.clone()).await?

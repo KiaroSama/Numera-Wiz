@@ -630,6 +630,11 @@ impl WizApp {
                         range.end.denominator()
                     ));
                 }
+                if let Some(retime) = &plan.video_retime && let Ok(clock) = retime.output_clock() {
+                    ui.label(format!("{} pictures at {}% tempo{}", clock.len(), retime.tempo_hundredths,
+                        if retime.reverse { " · reverse order" } else { "" }));
+                    ui.label(format!("Presentation clock at 0 through {} ms", clock.last().copied().unwrap_or_default()));
+                }
                 for segment in &plan.media_join {
                     let label = self.assets.iter().find(|source| source.id == segment.asset_id)
                         .map_or(segment.asset_id.as_str(), |source| source.display_name.as_str());

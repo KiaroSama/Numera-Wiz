@@ -1162,6 +1162,7 @@ impl Service {
                 "media.probe",
                 "media.cut",
                 "media.join",
+                "media.retime",
                 "subtitles.burn",
                 "media.split_plan",
                 "media.analyze.volume",
@@ -1973,6 +1974,42 @@ impl Service {
                     value(&self.plan_review(&context, &plan)?)?,
                 )
                 .bounded();
+                if response.ok {
+                    self.store.put(&named("plan", &plan.id)?, &plan)?;
+                }
+                return Ok(response);
+            }
+            "media.retime" => {
+                let input: nw_domain::video_retime::RetimeInput = commands::parse(params)?;
+                let frozen: Asset = self.store.get(&named("asset", &input.asset_id)?)?
+                    .ok_or_else(DomainError::object_not_found)?;
+                self.object(&context, &frozen.id, &frozen.creator)?;
+                self.path(&context, Path::new(&frozen.identity.path), false)?;
+                self.path(&context, Path::new(&input.output), true)?;
+                let _permit = self.batch_preflights.clone().try_acquire_owned().map_err(|_| {
+                    DomainError::new("RESOURCE_LIMIT", "Picture retime review capacity is full")
+                })?;
+                drop(guard);
+                let (stamp, retime) = runtime.block_on(self.engine()?.inspect_video_retime(
+                    &frozen, &input, cancellation.clone(),
+                ))?;
+                let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+                if cancellation.is_cancelled() {
+                    return Err(DomainError::new("CANCELLED", "Picture retime review cancelled"));
+                }
+                if self.policy(&context)?.is_some_and(|profile| !profile.allows_command("media.retime")) {
+                    return Err(DomainError::new("PERMISSION_DENIED", "Picture retime access changed during observation"));
+                }
+                stamp.revalidate()?;
+                let plan = self.prepare_native_copy(&context, &input.asset_id, &input.output, Default::default(),
+                    |engine, current, output| {
+                        if current.identity != frozen.identity || current.source_object != frozen.source_object {
+                            return Err(DomainError::new("SOURCE_CHANGED", "Original retime input changed during observation"));
+                        }
+                        engine.video_retime_plan_at(current, output, retime, &context.principal, self.clock.now()?)
+                    })?;
+                stamp.revalidate()?;
+                let response = Response::success(&request.request_id, value(&self.plan_review(&context, &plan)?)?).bounded();
                 if response.ok {
                     self.store.put(&named("plan", &plan.id)?, &plan)?;
                 }
@@ -3898,6 +3935,7 @@ mod tests {
             subtitle_burn: None,
             audio_edit: None,
             media_join: None,
+            video_retime: None,
             added_tracks: Vec::new(),
             execution_limits: None,
             file_times: None,
