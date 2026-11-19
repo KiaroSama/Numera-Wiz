@@ -1,6 +1,6 @@
 ---
 name: numera-wiz
-description: Use when a user wants to inspect media or a bounded folder, select or reorder original streams, clean or remux files, review and submit Numera Wiz plans or batches, observe or cancel accepted work, retrieve verified outputs, or explicitly administer Numera Wiz access. Uses the local Rust CLI or MCP bridge and the live command registry.
+description: Use to inspect registered media or folders, edit project clips, cut and join media, manage tracks and subtitles, review conversions and batches, control jobs, retrieve verified files, or explicitly administer Numera Wiz access through the local Rust CLI or MCP registry.
 ---
 
 # Numera Wiz
@@ -30,6 +30,11 @@ The Rust MCP adapter derives every advertised tool from the active registry.
 Use newly registered operations only after inspecting their actual schema,
 rights and qualification. [Operation routes](references/operations.md) maps
 the currently implemented domains to workflows and records the CLI-only edges.
+
+Choose the planner that matches the operation. Packet copy preserves admitted
+original packets at keyframe boundaries. Sample edits, retiming, burned captions
+and encoding each have their own review and verification rules. Linked timeline
+edits use the committed project revision and the project mutation contract.
 
 ## Probe, plan and run
 

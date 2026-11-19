@@ -12,11 +12,11 @@ to each operation/media/transport/package boundary separately.
 | `media.probe` | Inspect authorized native media with a finite probe budget. |
 | `media.analyze.volume`, `media.analyze.loudness`, `media.analyze.audio_tracks` | Measure peak, RMS or EBU R128 loudness, or compare decoded signals across selected original tracks. |
 | `media.analyze.reference`, `media.analyze.stream` | Measure PSNR and SSIM on aligned video frames or inspect original packets and decoded frames with exact timestamps. |
-| `media.analyze.reference` | Measure PSNR and SSIM for two authorized video windows on the same decoded frame grid. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
 | `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |
 | `timeline.render_mixed` | Review a committed sequence range for a mixed FFV1/PCM export on an enabled MediaV2 generation. |
+| `clips.place`, `clips.move`, `clips.link`, `clips.unlink`, `clips.split`, `clips.trim`, `clips.remove` | Edit exact project clips at the reviewed revision. Trim shortens each linked clip at its start, end or both and keeps later clips at their positions. |
 | `assets.register` | Durably register one native path or verified upload. |
 | `assets.register_folder`, `assets.folder_inspect` | Durable bounded native folder snapshot and immutable creator-scoped inspection, including per-file failures/companion inventory. |
 | `assets.list`, `assets.inspect`, `assets.output_suggest` | Authorized inventory, details and proposed absent output. |
@@ -25,8 +25,13 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
 | `streams.extract` | Review packet-copy extraction of one registered stream to a fresh Matroska path. |
 | `streams.extract.batch_plan` | Review separate Matroska outputs with a per-file track type and ordinal. Submit the approved ID and hash via `batches.submit`. |
+| `streams.add`, `streams.replace`, `audio.normalize` | Add or replace registered tracks with a verified stream plan, or normalize selected PCM tracks from independently measured loudness. |
 | `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
-| `jobs.plan` | Review an imported packet-copy configuration against the matching registered source. |
+| `jobs.plan` | Review admitted FFmWiz packet-copy or short FFV1 picture-retiming settings against the matching registered source. |
+| `media.cut`, `media.split_plan`, `media.join` | Review original-keyframe cuts, split batches or ordered joins of compatible Matroska segments. |
+| `audio.edit`, `media.retime` | Review ordered PCM sample ranges or change a registered short FFV1 picture's speed and direction. |
+| `subtitles.burn` | Review embedded or registered SubRip, explicit SDR preservation or HDR tone mapping, and the retained audio tracks. |
+| `media.encode`, `media.encode_folder_plan` | Review CPU H.264 export with optional AAC, individually or from a retained folder snapshot. |
 | `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
 | `chapters.wave_cues` | Read original RIFF or RF64 cue offsets, lengths and labels from an authorized asset. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
@@ -98,6 +103,14 @@ artifact. Read the current schema for the exact tagged-variant fields.
   and output profile. Submit the exact plan JSON as `jobs.submit`'s
   `media_plan_json` and retain it with the replay identity. Use
   `artifacts.manifest` for the accepted job's verified output.
+- To trim timeline clips, call `clips.trim` with exact `head` and `tail`
+  rational durations and `link_policy: "expand"`. Use a project context with
+  the expected revision and a retained mutation identity. Reinspect the
+  accepted revision before using its clips in a new plan.
+- To encode a folder, capture it with `assets.register_folder`, then use
+  `media.encode_folder_plan` with its exact ID and hash. Inspect the excluded
+  entries and derived output paths. Pass the nested plan ID and hash to
+  `batches.submit` and inspect each child job.
 
 Keep-everything can plan a verified Rust byte copy. Current admitted remux uses
 FFmpeg and bounded packet/structure/tag assertions with exact rational clocks;

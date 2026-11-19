@@ -177,6 +177,11 @@ native-client operation, while MCP transfers use manifest/chunk tools. There is
 no invented MCP `save`, `watch` or generic `run` tool. Commands without a CLI
 shorthand use canonical `request --file`; live discovery is authoritative.
 
+The packaged route map now covers reviewed cuts and joins, sample edits and
+picture retiming, subtitles, CPU encoding, folder exports and linked project
+trim. Inspect live tool schemas for the media and project contract.
+[Packaged route map](../../integrations/numera-wiz/skills/numera-wiz/references/operations.md)
+
 Bounded folder intake uses durable `assets.register_folder` and immutable
 `assets.folder_inspect`, with per-file probe failures and inventory-only or
 excluded companions. Its 32-entry manifest limit and partial-snapshot facts
