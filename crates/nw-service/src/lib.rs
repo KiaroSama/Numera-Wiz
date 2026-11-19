@@ -178,7 +178,8 @@ mod tests {
             .collect();
         assert_eq!(listed_commands, &expected);
         assert_eq!(
-            list.get("registry_fingerprint").and_then(serde_json::Value::as_str),
+            list.get("registry_fingerprint")
+                .and_then(serde_json::Value::as_str),
             Some(commands::registry_fingerprint().as_str())
         );
         for id in ["projects.create", "clips.link"] {
@@ -902,9 +903,8 @@ mod tests {
                     .iter()
                     .all(|key| keys.contains(&key.as_str().expect("required key")))
         }
-        let schema = |id: &str| -> &Value {
-            result_schemas.get(id).expect("published result schema")
-        };
+        let schema =
+            |id: &str| -> &Value { result_schemas.get(id).expect("published result schema") };
         let catalog = schema("projects.list");
         fields(
             catalog,

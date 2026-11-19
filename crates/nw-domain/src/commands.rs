@@ -348,7 +348,8 @@ pub struct CommandCatalogEntry<'a> {
     state_class: StateClass,
     qualification: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    authorization_requirements: Option<&'a crate::projects::authorization::AuthorizationRequirements>,
+    authorization_requirements:
+        Option<&'a crate::projects::authorization::AuthorizationRequirements>,
     #[serde(skip_serializing_if = "ProjectContextRule::forbidden")]
     project_context: ProjectContextRule,
 }
