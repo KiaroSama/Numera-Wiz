@@ -317,7 +317,7 @@ impl WizApp {
         } else {
             "Cleanup batch"
         };
-        egui::Window::new(title).id(egui::Id::new("Cleanup batch"))
+        egui::Window::new(title).id(egui::Id::unique("Cleanup batch"))
             .default_pos(egui::pos2(24.0,160.0)).default_width(1040.0)
             .default_height(540.0).open(&mut open).show(ctx, |ui| {
                 let idle = !self.waiting && self.pending.is_none();

@@ -2,7 +2,7 @@
 use super::*;
 use nw_domain::{
     access::{AccessProfile, ExecutionAuthorization, ObjectAction, ObjectKind, Publication},
-    records::{FileIdentity, JobState},
+    records::{FileIdentity, JobState, Plan},
 };
 use serde_json::Value;
 
