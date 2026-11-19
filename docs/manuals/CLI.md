@@ -11,10 +11,11 @@ and `--access-profile <name>`. For CLI requests the last option selects the
 effective caller; without it native CLI uses protected local-owner authority.
 Stdio defaults to agent, while serve defaults to browser. In serve/HTTP bridge
 the option selects the stored profile hosted by the owner-controlled listener.
-The selected components directory must contain both `ffmpeg` and `ffprobe` (with
-`.exe` on Windows). The current fixture payload is Linux-only development evidence,
-not the required standard distribution. Processing without an admitted component
-selection returns `COMPONENT_UNAVAILABLE`; discovery still works.
+Standalone CPU packages use their embedded FFmpeg and ffprobe helpers. For a
+bare development executable, select an admitted `--components-dir` containing
+both tools (`ffmpeg.exe` and `ffprobe.exe` on Windows). The Linux-only fixture
+profile serves the hosted regression jobs. Discovery remains available when
+media preparation reports `COMPONENT_UNAVAILABLE`.
 
 Portable executables default to the executable directory. The macOS app bundle
 uses `~/Library/Application Support/Numera Wiz`. An explicit `--data-dir` takes
