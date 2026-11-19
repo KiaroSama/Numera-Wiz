@@ -105,9 +105,8 @@ impl Projects {
                 let mut params = json!({"projection":projection,"entity_id":entity,"bin_id":bin,"limit":limit,"cursor":cursor});
                 if let Some(query) = query {
                     if projection != "bin_page" {
-                        return Err(model::invalid(
-                            "A name query requires the bin_page projection",
-                        ));
+                        let error = model::invalid("Bin name search requires bin_page");
+                        return Err(error.into());
                     }
                     model::label(&query)?;
                     params["query"] = json!(query);

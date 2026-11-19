@@ -1169,7 +1169,7 @@ mod tests {
                         ),
                         _ => unreachable!(),
                     }
-                    if matches!(projection, "marker_page" | "viewport") {
+                    if matches!(projection, "bin_page" | "marker_page" | "viewport") {
                         assert_eq!(
                             branch["properties"]["count_accuracy"]["enum"],
                             serde_json::json!(["exact", "lower_bound"])
