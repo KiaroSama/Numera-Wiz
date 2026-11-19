@@ -8,6 +8,23 @@ and no-close policies below are historical and superseded by the owner's explici
 request to consolidate other branches/PRs and remove local-only planning/source
 files from Git history. A local pre-cleanup Git bundle preserves recovery.
 
+## Verified package checkpoint
+
+[CI379](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44471710173#artifacts)
+built standalone packages for Windows x64, Linux x64, macOS Apple Silicon and
+macOS Intel at `fd71c4c`. Each hosted first launch exercised its embedded CPU
+FFmpeg. Independent archive checks matched the architecture, SHA-256 and size
+of the application and both media helpers, and the corresponding source archive.
+
+[CI380](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44476059887) at
+`91bafa1` passed the browser build and real Chrome journey, Gitleaks, the official
+CLI/MCP transport journey, the Linux workspace tests, and the signed Ubuntu
+capture. The external-subtitle plan failed when reopened for job submission.
+The new decoder preserves the stored plan while restoring the integer stream
+indices. A macOS cancellation regression also exposed a race between observing
+the original child and signaling its process group. The revised supervisor keeps
+the child waitable through that race and requires the group to settle.
+
 ## Metadata, preview and hosted evidence
 
 The same owner registration and source preview now admit single-file PNG and
