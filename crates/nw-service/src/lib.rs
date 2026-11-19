@@ -890,20 +890,25 @@ mod tests {
             panic!("Result schema reference cycle");
         }
         fn fields(root: &Value, node: &Value, expected: &[&str]) {
+            fields_with_optional(root, node, expected, &[]);
+        }
+        fn fields_with_optional(root: &Value, node: &Value, expected: &[&str], optional: &[&str]) {
             let node = resolve(root, node);
             assert_eq!(node["type"], "object");
             assert_eq!(node["additionalProperties"], false);
             let properties = node["properties"].as_object().expect("finite properties");
             let actual: std::collections::BTreeSet<_> =
                 properties.keys().map(String::as_str).collect();
-            let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
-            assert_eq!(actual, expected);
+            let declared: std::collections::BTreeSet<_> =
+                expected.iter().chain(optional).copied().collect();
+            assert_eq!(actual, declared);
             let required: std::collections::BTreeSet<_> = node["required"]
                 .as_array()
                 .expect("required fields")
                 .iter()
                 .map(|value| value.as_str().expect("required field name"))
                 .collect();
+            let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
             assert_eq!(required, expected);
         }
         // Observe only object-key admission, with no claim about scalar validation.
@@ -1058,7 +1063,18 @@ mod tests {
                     match projection {
                         "bin_page" => fields(root, item, &["id", "kind", "name"]),
                         "track_page" => {
-                            fields(root, item, &["id", "kind", "name", "order", "clip_count"]);
+                            let required = ["id", "kind", "name", "order", "clip_count"];
+                            fields_with_optional(root, item, &required, &["enabled"]);
+                            assert!(permits_keys(root, item, &required));
+                            assert!(permits_keys(
+                                root,
+                                item,
+                                &["id", "kind", "name", "order", "clip_count", "enabled"]
+                            ));
+                            assert_eq!(
+                                resolve(root, item)["properties"]["enabled"]["type"],
+                                "boolean"
+                            );
                             assert_eq!(
                                 resolve(root, item)["properties"]["kind"]["enum"],
                                 serde_json::json!(["video", "audio"])
