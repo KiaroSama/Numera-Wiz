@@ -1169,6 +1169,7 @@ impl Service {
                 "media.probe",
                 "media.cut",
                 "media.encode",
+                "media.encode_folder_plan",
                 "media.join",
                 "media.retime",
                 "subtitles.burn",
@@ -2255,6 +2256,9 @@ impl Service {
                 let plan = self.prepare_batch(&context, input, now, &cancellation)?;
                 value(&self.batch_review(&context, &plan)?)?
             }
+            "media.encode_folder_plan" => value(&self.prepare_folder_encode(
+                &context, commands::parse(params)?, now, &cancellation,
+            )?)?,
             "streams.clean.folder_batch_plan" => value(&self.prepare_folder_batch(
                 &context,
                 commands::parse(params)?,

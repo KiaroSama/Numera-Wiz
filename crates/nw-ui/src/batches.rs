@@ -55,6 +55,7 @@ struct FolderBatchMode {
     snapshot: Arc<FolderReview>,
     requested_output_root: String,
     excluded: Vec<FolderBatchExclusion>,
+    encode: bool,
 }
 
 pub(super) struct Candidate {
@@ -306,12 +307,18 @@ impl WizApp {
             Err(error) => self.error = Some(error),
         }
     }
+    pub(super) fn review_folder_encoding(&mut self, settings: nw_domain::avc_export::FolderEncodeInput, ctx: &egui::Context) {
+        if self.cleanup_actions_allowed(ctx) {
+            self.query("media.encode_folder_plan", json!(settings), Action::FolderBatchPlan(self.batch.generation), ctx);
+        }
+    }
     pub(super) fn open_folder_batch(
         &mut self,
         generation: u64,
         snapshot: Arc<FolderReview>,
         requested_output_root: String,
         review: FolderBatchReview,
+        encode: bool,
     ) {
         if generation != self.batch.generation {
             self.status =
@@ -323,6 +330,7 @@ impl WizApp {
             snapshot,
             requested_output_root,
             excluded: review.excluded,
+            encode,
         });
         self.batch.plan = Some(Arc::new(review.plan));
         self.batch.open = true;
@@ -582,8 +590,11 @@ impl WizApp {
         }
         let mut open = true;
         let folder_mode = self.batch.is_folder_review();
+        let folder_encode = self.batch.folder.as_ref().is_some_and(|folder| folder.encode);
         let split_mode = self.batch.packet_split;
-        let title = if folder_mode {
+        let title = if folder_encode {
+            "Folder H.264 export"
+        } else if folder_mode {
             "Folder cleanup batch"
         } else if split_mode {
             "Packet split"
@@ -646,7 +657,12 @@ impl WizApp {
                     egui::ScrollArea::vertical().id_salt("batch-preview").max_height(170.0).show(ui,|ui| {
                         for item in &plan.items {
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}. {} | {} | {} bytes",item.index+1,item.output_name,action_label(&item.action),item.source_bytes));
+                                let action = if folder_encode && item.plan.is_some() {
+                                    "Encode H.264"
+                                } else {
+                                    action_label(&item.action)
+                                };
+                                ui.label(format!("{}. {} | {} | {} bytes",item.index+1,item.output_name,action,item.source_bytes));
                                 if let Some(reference) = &item.plan
                                     && ui.add_enabled(idle,egui::Button::new("Plan details")).clicked() {
                                     self.query("plans.inspect",json!({"id":reference.id}),Action::Inspect,ui.ctx());

@@ -248,7 +248,7 @@ fn result_schema(id: &str) -> Option<Value> {
         "streams.extract.batch_plan" | "media.split_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::BatchPlanReview)).expect("schema"),
         ),
-        "streams.clean.folder_batch_plan" => Some(
+        "media.encode_folder_plan" | "streams.clean.folder_batch_plan" => Some(
             serde_json::to_value(schema_for!(crate::batches::FolderBatchReview)).expect("schema"),
         ),
         "media.preview_frame" => {
@@ -878,6 +878,12 @@ fn build_registry() -> Vec<Descriptor> {
             "Review text captions with the offline font, explicit SDR policy and original audio selection",
             Query,
             crate::subtitle_burn::BurnInput
+        ),
+        row!(
+            "media.encode_folder_plan",
+            "Review AVC batch export of a retained folder intake into a separate directory",
+            Query,
+            crate::avc_export::FolderEncodeInput
         ),
         row!(
             "media.encode",
@@ -1819,6 +1825,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.credentials.issue",
     "media.probe",
     "media.cut",
+    "media.encode_folder_plan",
     "media.encode",
     "media.retime",
     "media.join",

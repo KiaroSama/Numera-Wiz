@@ -480,6 +480,11 @@ pub enum Batches {
         #[arg(long)]
         file: PathBuf,
     },
+    /// Review AVC encoding from a retained folder snapshot.
+    EncodeFolder {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Review cleanup from a retained folder snapshot and a separate existing directory.
     PlanFolder {
         #[arg(long)]
@@ -981,6 +986,12 @@ pub fn prepare(command: Command) -> Result<Request> {
                 item.output = native_path(Path::new(&item.output))?;
             }
             query("streams.clean.batch_plan", serde_json::to_value(input)?)
+        }
+        Command::Batches(Batches::EncodeFolder { file }) => {
+            let mut input: nw_domain::avc_export::FolderEncodeInput = commands::parse(document(&file)?)?;
+            input.output_root = native_path(Path::new(&input.output_root))?;
+            nw_domain::batches::validate_folder_reference(&input.snapshot_id, &input.snapshot_hash, &input.output_root)?;
+            query("media.encode_folder_plan", serde_json::to_value(input)?)
         }
         Command::Batches(Batches::PlanFolder { file }) => {
             let mut input: nw_domain::batches::CleanFolderBatchInput =

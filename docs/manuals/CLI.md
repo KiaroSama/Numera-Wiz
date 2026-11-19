@@ -999,3 +999,25 @@ The CPU preset offers fast, balanced and slow settings. Use
 presentation times and dimensions. Selected AAC retains the original
 mono or stereo rate and verifies the coded timing. Review and submit
 the returned plan ID and hash.
+
+### Encode a registered folder
+
+Capture a folder with `assets register-folder`, then run
+`numera-wiz batches encode-folder --file folder-encode.json`.
+
+```json
+{
+  "snapshot_id": "<folder snapshot id>",
+  "snapshot_hash": "<folder snapshot hash>",
+  "output_root": "/exports/encoded",
+  "container": "mp4",
+  "crf": 18,
+  "preset": "balanced",
+  "audio": {"kind": "aac", "ordinal": 1, "bitrate_kbps": 128},
+  "failure_policy": "reject_all"
+}
+```
+
+The output directory must already exist outside the intake tree. Inspect
+each proposed file and any excluded intake entry. Submit the returned batch
+plan ID and hash with `batches submit`, then inspect progress with `batches wait`.

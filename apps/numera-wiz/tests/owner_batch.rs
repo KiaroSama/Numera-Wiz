@@ -986,7 +986,52 @@ async fn cpu_avc_export(parent: &Path) -> Value {
         results.push(json!({"job":job["job_id"],"container":container,"source_presentation_ms":clock,
             "picture":"h264","audio":"aac","sample_aspect_ratio":"4:3"}));
     }
-    json!(results)
+    let intake = directory.join("encode-intake");
+    let output_root = directory.join("encode-outputs");
+    std::fs::create_dir_all(intake.join("second")).unwrap();
+    std::fs::create_dir(&output_root).unwrap();
+    std::fs::copy(&path, intake.join("first.mkv")).unwrap();
+    std::fs::copy(&path, intake.join("second/first.mkv")).unwrap();
+    std::fs::write(intake.join("notes.txt"), b"Inventory only").unwrap();
+    let snapshot = accepted(&cli, &scope, "capture-encode-folder", "assets.register_folder", json!({
+        "path":intake,"recursive":true,"exclude_relative":[],"companion_policy":"inventory",
+        "probe_timeout":{"mode":"finite","seconds":30}
+    })).await;
+    assert_eq!(snapshot["complete"], true);
+    let input = json!({"snapshot_id":snapshot["id"],"snapshot_hash":snapshot["hash"],
+        "output_root":output_root,"container":"mp4","crf":18,"preset":"balanced",
+        "audio":{"kind":"aac","ordinal":1,"bitrate_kbps":128},"failure_policy":"reject_all"});
+    let review = cli.query("media.encode_folder_plan", input.clone()).await;
+    let document = directory.join("folder-encode.json");
+    std::fs::write(&document, serde_json::to_vec(&input).unwrap()).unwrap();
+    let (typed, code) = cli.human(&["batches", "encode-folder", "--file", document.to_str().unwrap()]).await;
+    assert_eq!(code, 0, "{typed}");
+    assert_eq!(typed["result"]["plan"]["hash"], review["plan"]["hash"]);
+    assert_eq!(review["excluded"].as_array().unwrap().len(), 1);
+    assert_eq!(review["excluded"][0]["outcome"], "companion_inventoried");
+    let candidates = review["plan"]["items"].as_array().unwrap();
+    assert_eq!(candidates.len(), 2);
+    let outputs: Vec<_> = candidates.iter().map(|item| {
+        let output = Path::new(item["output_path"].as_str().unwrap());
+        assert!(output.starts_with(&output_root) && !output.exists());
+        assert!(item["plan"].is_object(), "{item}");
+        output
+    }).collect();
+    assert_ne!(outputs[0], outputs[1]);
+    let batch = accepted(&cli, &scope, "run-folder-encode", "batches.submit", json!({
+        "plan_id":review["plan"]["id"],"plan_hash":review["plan"]["hash"]
+    })).await;
+    let id = batch["batch_id"].as_str().unwrap();
+    let (finished, code) = cli.human(&["batches", "wait", id]).await;
+    assert_eq!(code, 0, "{finished}");
+    assert_eq!(finished["result"]["succeeded"], 2, "{finished}");
+    for output in outputs {
+        let report = fixture::probe(&components, output).await;
+        assert_eq!(report["streams"][0]["codec_name"], "h264");
+        assert_eq!(report["streams"][0]["sample_aspect_ratio"], "4:3");
+        assert_eq!(report["streams"][1]["codec_name"], "aac");
+    }
+    json!({"single":results,"folder":{"batch":id,"verified_h264_outputs":2,"companions_excluded":1}})
 }
 
 #[tokio::test]

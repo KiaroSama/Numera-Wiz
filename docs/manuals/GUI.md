@@ -358,3 +358,8 @@ presentation clock before running the job.
 Use **Encode H.264 video** on a registered SDR Matroska FFV1 asset.
 Choose the picture, optional AAC audio, quality and CPU preset. Enter a
 new MP4 or Matroska destination, then review and run the job.
+
+For a registered folder, open **Encode the folder as H.264** in the folder
+review. Set an existing destination outside the intake folder, choose the
+container, quality and audio handling, and use **Review folder encode**.
+The batch preview lists each proposed output and its verification job.

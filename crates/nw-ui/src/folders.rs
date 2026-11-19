@@ -2,6 +2,7 @@
 use crate::{Action, WizApp};
 use eframe::egui;
 use nw_domain::{
+    avc_export::{Container, FolderAudio, FolderEncodeInput, Preset},
     batches::{CleanFolderBatchInput, FolderBatchReview},
     commands::Request,
     ingest::{
@@ -22,6 +23,10 @@ pub(super) struct FolderUi {
     inventory_companions: bool,
     snapshot_id: String,
     batch_output_root: String,
+    encode_container: Container,
+    encode_crf: u8,
+    encode_preset: Preset,
+    encode_audio: bool,
     review: Option<Arc<FolderReview>>,
     tab: FolderTab,
     focus: Option<FolderFocus>,
@@ -50,6 +55,10 @@ impl Default for FolderUi {
             inventory_companions: true,
             snapshot_id: String::new(),
             batch_output_root: String::new(),
+            encode_container: Container::Mp4,
+            encode_crf: 18,
+            encode_preset: Preset::Balanced,
+            encode_audio: true,
             review: None,
             tab: FolderTab::Source,
             focus: None,
@@ -218,8 +227,14 @@ impl WizApp {
         request: &Request,
         result: Value,
     ) -> Result<(), String> {
-        let input: CleanFolderBatchInput =
-            serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+        let encode = request.command.id == "media.encode_folder_plan";
+        let (snapshot_id, snapshot_hash, output_root) = if encode {
+            let input: FolderEncodeInput = serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+            (input.snapshot_id, input.snapshot_hash, input.output_root)
+        } else {
+            let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone()).map_err(|error| error.to_string())?;
+            (input.snapshot_id, input.snapshot_hash, input.output_root)
+        };
         let review: FolderBatchReview =
             serde_json::from_value(result).map_err(|error| error.to_string())?;
         let snapshot = self
@@ -227,7 +242,7 @@ impl WizApp {
             .review
             .clone()
             .filter(|snapshot| {
-                snapshot.id == input.snapshot_id && snapshot.hash == input.snapshot_hash
+                snapshot.id == snapshot_id && snapshot.hash == snapshot_hash
             })
             .ok_or("Folder batch review requires the captured snapshot")?;
         if review.snapshot_id != snapshot.id || review.snapshot_hash != snapshot.hash {
@@ -247,7 +262,7 @@ impl WizApp {
         {
             return Err("Folder batch does not account for the captured snapshot entries".into());
         }
-        self.open_folder_batch(generation, snapshot, input.output_root, review);
+        self.open_folder_batch(generation, snapshot, output_root, review, encode);
         Ok(())
     }
 
@@ -614,5 +629,37 @@ impl WizApp {
             let root = self.folder.batch_output_root.clone();
             self.review_folder_batch(snapshot, &root, ui.ctx());
         }
+        self.folder_encode_controls(ui, snapshot, idle);
+    }
+
+    fn folder_encode_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.collapsing("Encode the folder as H.264", |ui| {
+            ui.add_enabled_ui(idle, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
+                    ui.radio_value(&mut self.folder.encode_container, Container::Matroska, "Matroska");
+                    ui.label("Quality CRF");
+                    ui.add(egui::DragValue::new(&mut self.folder.encode_crf).range(1..=51));
+                    egui::ComboBox::from_id_salt("folder-encode-preset")
+                        .selected_text(format!("{:?}", self.folder.encode_preset))
+                        .show_ui(ui, |ui| {
+                            for preset in [Preset::Fast, Preset::Balanced, Preset::Slow] {
+                                ui.selectable_value(&mut self.folder.encode_preset, preset, format!("{preset:?}"));
+                            }
+                        });
+                });
+                ui.checkbox(&mut self.folder.encode_audio, "Encode the first audio track as AAC");
+                if ui.add_enabled(!self.folder.batch_output_root.is_empty(), egui::Button::new("Review folder encode")).clicked() {
+                    let settings = FolderEncodeInput {
+                        snapshot_id: snapshot.id.clone(), snapshot_hash: snapshot.hash.clone(),
+                        output_root: self.folder.batch_output_root.clone(), container: self.folder.encode_container,
+                        crf: self.folder.encode_crf, preset: self.folder.encode_preset,
+                        audio: if self.folder.encode_audio { FolderAudio::Aac { ordinal: 1, bitrate_kbps: 128 } } else { FolderAudio::Drop {} },
+                        failure_policy: nw_domain::batches::FailurePolicy::RejectAll,
+                    };
+                    self.review_folder_encoding(settings, ui.ctx());
+                }
+            });
+        });
     }
 }

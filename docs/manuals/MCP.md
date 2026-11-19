@@ -598,3 +598,8 @@ profile.
 with optional AAC in MP4 or Matroska. Set the preset and CRF in
 `settings`. Use `commands.schema` for the complete contract and
 `jobs.submit` to run the reviewed plan.
+
+`media.encode_folder_plan` reviews a frozen folder snapshot with the same CPU
+encoder. The review lists derived destinations and excluded entries. Pass its
+nested plan ID and hash to `batches.submit` and track every child through
+`batches.inspect`.

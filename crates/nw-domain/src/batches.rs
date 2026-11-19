@@ -105,21 +105,25 @@ pub struct CleanFolderBatchInput {
 }
 impl CleanFolderBatchInput {
     pub fn validate(&self) -> Result<()> {
-        if !identifier(&self.snapshot_id) || !sha(&self.snapshot_hash) {
-            return Err(DomainError::new(
-                "VALIDATION_ERROR",
-                "Folder batch review requires a retained snapshot ID and SHA-256",
-            ));
-        }
-        if self.output_root.is_empty() || self.output_root.len() > 4096 {
-            return Err(DomainError::new(
-                "VALIDATION_ERROR",
-                "Folder batch review needs a bounded native output directory",
-            )
-            .field("output_root"));
-        }
-        Ok(())
+        validate_folder_reference(&self.snapshot_id, &self.snapshot_hash, &self.output_root)
     }
+}
+
+pub fn validate_folder_reference(snapshot_id: &str, snapshot_hash: &str, output_root: &str) -> Result<()> {
+    if !identifier(snapshot_id) || !sha(snapshot_hash) {
+        return Err(DomainError::new(
+            "VALIDATION_ERROR",
+            "Folder batch review requires a retained snapshot ID and SHA-256",
+        ));
+    }
+    if output_root.is_empty() || output_root.len() > 4096 {
+        return Err(DomainError::new(
+            "VALIDATION_ERROR",
+            "Folder batch review needs a bounded native output directory",
+        )
+        .field("output_root"));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
