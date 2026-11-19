@@ -895,13 +895,24 @@ pub(in crate::runtime) async fn linked_edits() {
         .chain(right_ids.iter())
         .map(|id| (id.clone(), through.raw(id)))
         .collect();
-    let roll = |num: &str, den: &str| json!({
-        "left_id":first_ids[0],"right_id":right,"delta":{"num":num,"den":den},"link_policy":"expand"
-    });
-    through.reject_unchanged(through.request("clips.roll", "roll-off-grid", roll("1", "8")), "OFF_GRID").await;
-    let unchanged = through.accept(through.request("clips.roll", "roll-zero", roll("0", "1"))).await;
+    let roll = |num: &str, den: &str| {
+        json!({
+            "left_id":first_ids[0],"right_id":right,"delta":{"num":num,"den":den},"link_policy":"expand"
+        })
+    };
+    through
+        .reject_unchanged(
+            through.request("clips.roll", "roll-off-grid", roll("1", "8")),
+            "OFF_GRID",
+        )
+        .await;
+    let unchanged = through
+        .accept(through.request("clips.roll", "roll-zero", roll("0", "1")))
+        .await;
     assert_eq!(unchanged["no_change"], true);
-    let rolled = through.accept(through.request("clips.roll", "roll-linked-cut", roll("1", "4"))).await;
+    let rolled = through
+        .accept(through.request("clips.roll", "roll-linked-cut", roll("1", "4")))
+        .await;
     assert_eq!(rolled["changed_ids"].as_array().unwrap().len(), 4);
     let cut = nw_domain::time::Rational::new(3, 4).unwrap();
     for (id, raw) in &split_images {
@@ -921,7 +932,9 @@ pub(in crate::runtime) async fn linked_edits() {
             assert_eq!(current.source_range.start, cut);
         }
     }
-    through.accept(through.request("history.undo", "undo-linked-roll", json!({}))).await;
+    through
+        .accept(through.request("history.undo", "undo-linked-roll", json!({})))
+        .await;
     for (id, raw) in &split_images {
         assert_eq!(through.raw(id), *raw);
     }

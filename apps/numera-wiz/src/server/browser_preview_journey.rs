@@ -454,11 +454,19 @@ pub(super) async fn run(client: &reqwest::Client, base: &str, route: &str, evide
         reqwest::Method::POST,
         &format!("{route}/execute/async"),
         json!({"script":CHROME_CONTINUOUS,"args":[bearer,playback_input]}),
-    ).await;
-    assert_eq!(long_browser["ok"], true, "Chrome continuous playback: {long_browser}");
+    )
+    .await;
+    assert_eq!(
+        long_browser["ok"], true,
+        "Chrome continuous playback: {long_browser}"
+    );
     assert_eq!(long_browser["at"], 5.5);
     assert!((5.9..=6.1).contains(&long_browser["duration"].as_f64().unwrap()));
-    assert!(long_browser["pixel"].as_array().unwrap()[..3].iter().all(|channel| channel.as_u64().unwrap() <= 8));
+    assert!(
+        long_browser["pixel"].as_array().unwrap()[..3]
+            .iter()
+            .all(|channel| channel.as_u64().unwrap() <= 8)
+    );
 
     let revision = project_edit(
         service,

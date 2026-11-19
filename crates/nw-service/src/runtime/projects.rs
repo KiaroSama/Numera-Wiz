@@ -726,13 +726,18 @@ fn source_window_checks(
     let mut streams = std::collections::BTreeSet::new();
     for change in &patch.changes {
         let parse_clip = |raw: &Option<String>| -> Result<Clip> {
-            let raw = raw.as_deref().ok_or_else(|| domain::invalid("A source-window edit must update an existing clip"))?;
-            let entity: EntityEnvelope = serde_json::from_str(raw).map_err(|error| domain::invalid(error.to_string()))?;
+            let raw = raw.as_deref().ok_or_else(|| {
+                domain::invalid("A source-window edit must update an existing clip")
+            })?;
+            let entity: EntityEnvelope =
+                serde_json::from_str(raw).map_err(|error| domain::invalid(error.to_string()))?;
             entity.payload("clip")
         };
         let before = parse_clip(&change.before)?;
         let clip = parse_clip(&change.after)?;
-        if clip.source_range.start >= before.source_range.start && clip.source_range.end <= before.source_range.end {
+        if clip.source_range.start >= before.source_range.start
+            && clip.source_range.end <= before.source_range.end
+        {
             continue;
         }
         let bound: SourceBinding = read.entity(&clip.source_id)?.payload("source_binding")?;

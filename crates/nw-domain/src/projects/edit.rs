@@ -800,10 +800,12 @@ pub fn resolve_edit<R: ProjectRead>(
             json!({})
         }
         ProjectEditIntent::Roll(input) => {
-            let boundary_error = || DomainError::new(
-                "ROLL_BOUNDARY_REQUIRED",
-                "Select one adjacent clip pair on every linked track",
-            );
+            let boundary_error = || {
+                DomainError::new(
+                    "ROLL_BOUNDARY_REQUIRED",
+                    "Select one adjacent clip pair on every linked track",
+                )
+            };
             let side = |seed| -> Result<BTreeMap<EntityId, (EntityEnvelope, Clip)>> {
                 let selected = match input.link_policy {
                     LinkPolicy::Expand => expand_links(read, std::slice::from_ref(seed))?,
@@ -826,10 +828,13 @@ pub fn resolve_edit<R: ProjectRead>(
                 return Err(limit("Roll exceeds the paired clip change budget"));
             }
             for (track, (mut left_entity, mut left_clip)) in left {
-                let (mut right_entity, mut right_clip) = right.remove(&track).ok_or_else(boundary_error)?;
+                let (mut right_entity, mut right_clip) =
+                    right.remove(&track).ok_or_else(boundary_error)?;
                 edit.clip_context(&left_clip)?;
                 edit.clip_context(&right_clip)?;
-                if left_clip.sequence_id != right_clip.sequence_id || left_clip.end()? != right_clip.sequence_start {
+                if left_clip.sequence_id != right_clip.sequence_id
+                    || left_clip.end()? != right_clip.sequence_start
+                {
                     return Err(boundary_error());
                 }
                 if input.delta == Rational::ZERO {
@@ -839,7 +844,8 @@ pub fn resolve_edit<R: ProjectRead>(
                 left_clip.source_range.end = left_clip.source_range.end.checked_add(input.delta)?;
                 left_clip.duration = left_clip.source_range.duration()?;
                 right_clip.sequence_start = left_clip.end()?;
-                right_clip.source_range.start = right_clip.source_range.start.checked_add(input.delta)?;
+                right_clip.source_range.start =
+                    right_clip.source_range.start.checked_add(input.delta)?;
                 right_clip.duration = right_clip.source_range.duration()?;
                 edit.clip_context(&left_clip)?;
                 edit.clip_context(&right_clip)?;
