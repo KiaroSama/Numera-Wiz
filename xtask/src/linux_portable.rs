@@ -145,6 +145,7 @@ fn assemble(root: &Path, work: &Path, app_source: &str) -> Result<()> {
             .arg("--data-dir")
             .arg(&state)
             .args(["media", "capabilities", "refresh", "--force"]),
+        work,
     )?;
     for name in TOOLS {
         ensure!(

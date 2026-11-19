@@ -444,6 +444,7 @@ fn bundle_app(root: &Path, work: &Path, profile: &Path, system32: &Path) -> Resu
             .arg("--data-dir")
             .arg(&isolated_state)
             .args(["media", "capabilities", "refresh", "--force"]),
+        work,
     )?;
     let profile_manifest: Value =
         serde_json::from_slice(&fs::read(profile.join("embed-profile.json"))?)?;

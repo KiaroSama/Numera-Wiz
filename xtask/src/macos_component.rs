@@ -905,6 +905,7 @@ fn deliver(
             .arg("--data-dir")
             .arg(home.join("state"))
             .args(["media", "capabilities", "refresh", "--force"]),
+        work,
     )?;
     let files = manifest["files"]
         .as_array()

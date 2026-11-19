@@ -95,12 +95,30 @@ pub(crate) fn build_portable_executable(root: &Path, profile: &Path) -> Result<s
     target_os = "macos",
     all(target_os = "linux", target_arch = "x86_64")
 ))]
-pub(crate) fn qualify_portable_application(command: &mut Command) -> Result<Value> {
+pub(crate) fn qualify_portable_application(command: &mut Command, work: &Path) -> Result<Value> {
+    use std::io::{Seek, SeekFrom};
+
+    // Own the response file separately from the stderr pipe. A detached owner
+    // must never determine when the one-shot CLI's response becomes readable.
+    let mut receipt = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(work.join("first-launch-response.json"))
+        .context("Create the private first-launch response file")?;
     let process = command
         .stdin(std::process::Stdio::null())
+        .stdout(receipt.try_clone()?)
         .output()
         .context("Start the packaged application with its embedded media")?;
-    let response = serde_json::from_slice::<Value>(&process.stdout);
+    receipt.seek(SeekFrom::Start(0))?;
+    let mut bytes = Vec::new();
+    receipt.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    anyhow::ensure!(
+        bytes.len() <= 1024 * 1024,
+        "Portable first-launch response exceeded its byte limit"
+    );
+    let response = serde_json::from_slice::<Value>(&bytes);
     if process.status.success()
         && let Ok(report) = &response
         && report["ok"] == true
@@ -122,10 +140,21 @@ pub(crate) fn qualify_portable_application(command: &mut Command) -> Result<Valu
             })
             .unwrap_or("unavailable")
     };
+    let response_status = match &response {
+        Ok(report) => format!("JSON envelope ok={:?}", report["ok"].as_bool()),
+        Err(error) => format!(
+            "JSON {:?} at line {}, column {}",
+            error.classify(),
+            error.line(),
+            error.column(),
+        ),
+    };
     let diagnostics = &process.stderr[process.stderr.len().saturating_sub(2048)..];
     bail!(
-        "Portable application first launch failed ({}), response code {}, CPU FFV1 result {}\n{}",
+        "Portable application first launch failed ({}), response bytes {} ({}), response code {}, CPU FFV1 result {}\n{}",
         process.status,
+        bytes.len(),
+        response_status,
         safe_code("/error/code"),
         safe_code("/result/cpu_round_trip"),
         String::from_utf8_lossy(diagnostics)
