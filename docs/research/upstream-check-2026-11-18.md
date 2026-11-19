@@ -229,3 +229,20 @@ remains 9.0.2. Craft Libraries returned a diverged history for the two sampled
 commits. The sampled tip's structured palette errors affect its CMS palette
 consumer API. Numera continues to use the admitted FFmpeg color path.
 [FFmpeg HTTP changes](https://github.com/FFmpeg/FFmpeg/compare/cd39c36377fcdac674fea5905cf633e6b8b8a471...1328c5613e33dafcc9f48e67db08047087d96b15) · [Craft palette change](https://github.com/storytold/craft-libs/commit/50b0ee7bf811e363b5f238382b5c77318cf33e46)
+
+### November 19 update at 15:40 UTC
+
+FFmWiz, MuxCls, FilmCraft, Shotcut, FFmpeg and FFmpeg Skill retain their
+reviewed revisions. The current FilmCraft key tables keep Undo, Redo, Add
+Edit and clip selection at the playhead. The Numera project workspace uses
+those bindings with text-field focus protection and revision-checked edits.
+[FilmCraft key tables](https://github.com/storytold/filmcraft/blob/f67d38b35cc5af6853ef5a6921ccba014512694b/crates/engine/src/shortcut_presets.rs)
+
+EffectCraft adds per-frame source tracking and shared memory accounting for
+cached render data. Continuous Numera preview checks the exact captured
+revision and held media identity before delivering fragments. The producer
+and browser retain bounded queues. Craft Libraries adds a Content-Range
+helper for resuming reads. Numera's artifact downloader already checks the
+start, end and total against the accepted length and verifies every byte
+with the manifest digest.
+[EffectCraft cache changes](https://github.com/storytold/effectcraft/commit/13e6e6c67e805f443a87e3bd3160095d30b5cf3a) · [Craft range parser](https://github.com/storytold/craft-libs/compare/50b0ee7bf811e363b5f238382b5c77318cf33e46...48c57b5fafa170eb9c77c1d9fef0be0f09876f1f)

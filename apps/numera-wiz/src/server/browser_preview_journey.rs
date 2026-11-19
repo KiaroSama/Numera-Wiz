@@ -3,7 +3,7 @@ use super::tests::{driver, fixture_with_components, pairing};
 use nw_domain::commands::{ProjectRef, Request};
 use nw_service::{Context, Service};
 use serde_json::{Value, json};
-use std::{io::Write, path::Path, time::Duration};
+use std::{io::Write, path::Path, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 const COMPONENTS: &str = "NW_BROWSER_PREVIEW_COMPONENTS";
@@ -436,7 +436,7 @@ struct ProgramFixture {
 }
 
 async fn program_fixture(
-    service: &Service,
+    service: &Arc<Service>,
     context: &Context,
     scope: &str,
     asset: &Value,
@@ -524,7 +524,7 @@ fn color_place(sequence: &str, picture: &str, rgba: [f32; 4], at: u32) -> Value 
 }
 
 async fn project_edit(
-    service: &Service,
+    service: &Arc<Service>,
     context: &Context,
     scope: &str,
     key: &str,
