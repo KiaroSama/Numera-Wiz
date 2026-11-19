@@ -272,13 +272,13 @@ fn capture_mixed_range<R: RenderRead>(
                 "Compiler interval count exceeds declared track clip count",
             ));
         }
+        let gain_centidb = entity.track_gain_centidb()?;
         for clip_id in &clip_ids {
             if !in_range.insert(clip_id.clone()) {
                 return Err(corrupt("Compiler interval index repeats identity"));
             }
             closure.queue(clip_id)?;
         }
-        let gain_centidb = entity.track_gain_centidb()?;
         tracks.push((id, track, clip_ids, gain_centidb));
     }
     drain_and_check_root(&mut closure, header)?;
