@@ -481,6 +481,8 @@ jobs:
           name: numera-wiz-portable-windows-x64
           path: target/windows-component/build-*/delivery/
           if-no-files-found: error
+          # The staging directory contains the packaged Claude, Codex and Cursor manifests.
+          include-hidden-files: true
           compression-level: 0
       - name: Build and exercise the macOS app with embedded CPU media
         id: macos-portable
