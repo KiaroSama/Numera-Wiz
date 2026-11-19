@@ -1,4 +1,5 @@
 //! Observe actual identified components through the shared supervised process budget.
+mod audio_tracks;
 pub(super) mod execution;
 pub(super) mod mixed_ffmpeg;
 pub(super) mod normalized_pair;

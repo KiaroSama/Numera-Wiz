@@ -94,6 +94,12 @@ and reports peak and RMS to six decimal places as integer millionths of a dBFS.
 A silent signal is represented as `{"kind":"silence"}`. The response includes
 the registered source digest and a decimal-string sample count per channel.
 
+`media.analyze.audio_tracks` accepts `asset_id` and two to sixteen distinct
+original audio indices in `stream_indices`. It compares SHA-256 measurements
+over packed `pcm_f64le` samples, sample rate and channel layout. The response
+returns original indices grouped by exact decoded matches. Tracks whose
+multichannel layout is unavailable retain their signatures for inspection.
+
 `streams.extract` reviews one registered video, audio or subtitle stream for
 packet copy to a new Matroska path. Pass `asset_id`, the original `stream_index`,
 and the granted `output` path. Inspect the plan and submit its exact ID and

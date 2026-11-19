@@ -11,7 +11,7 @@ mod projects;
 pub use client::{CommandClient, Reply, SaveReply};
 use eframe::egui;
 use nw_domain::{
-    audio_analysis::{Decibels, VolumeMeasurement},
+    audio_analysis::{AudioTrackReport, Decibels, MAX_TRACKS, VolumeMeasurement},
     commands::{ProjectRef, Request, Response},
     mux::{CleanIntent, NoMatch, Preservation, Selection, Selector},
     records::Asset,
@@ -19,6 +19,7 @@ use nw_domain::{
 };
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeSet,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -42,6 +43,7 @@ enum Action {
     ImportConfig,
     SourcePreview,
     VolumeMeasurement,
+    CompareAudio,
     WaveCues,
     ClearCapabilities,
     ArtifactManifest,
@@ -139,6 +141,8 @@ pub struct WizApp {
     config_import: config_import::ConfigImportUi,
     source_preview: preview::SourcePreview,
     volume_measurement: Option<VolumeMeasurement>,
+    compare_audio_indices: BTreeSet<u32>,
+    audio_track_report: Option<AudioTrackReport>,
     wave_cues: Option<nw_domain::chapters::WaveCueInventory>,
     artifact_manifest: Option<nw_domain::artifacts::ArtifactManifest>,
     save_control: Option<Arc<nw_domain::download::SaveControl>>,
@@ -324,6 +328,8 @@ impl WizApp {
             config_import: Default::default(),
             source_preview: Default::default(),
             volume_measurement: None,
+            compare_audio_indices: BTreeSet::new(),
+            audio_track_report: None,
             wave_cues: None,
             artifact_manifest: None,
             save_control: None,
@@ -356,6 +362,10 @@ impl WizApp {
             self.chapter_global_tags = false;
             self.source_preview = Default::default();
             self.volume_measurement = None;
+            self.audio_track_report = None;
+            self.compare_audio_indices = asset.probe.streams.iter()
+                .filter(|stream| stream.kind == nw_domain::mux::StreamKind::Audio)
+                .take(2).map(|stream| stream.index).collect();
             self.wave_cues = None;
         }
         self.selected = Some(asset.id.clone());
@@ -812,6 +822,15 @@ impl WizApp {
                         self.volume_measurement = Some(measurement);
                     }
                 }
+                Action::CompareAudio => {
+                    let report: AudioTrackReport =
+                        serde_json::from_value(result).map_err(|error| error.to_string())?;
+                    if self.selected_asset().is_some_and(|asset| {
+                        asset.id == report.asset_id && asset.identity.sha256 == report.source_sha256
+                    }) {
+                        self.audio_track_report = Some(report);
+                    }
+                }
                 Action::WaveCues => {
                     let cues: nw_domain::chapters::WaveCueInventory =
                         serde_json::from_value(result).map_err(|error| error.to_string())?;
@@ -891,11 +910,22 @@ impl WizApp {
         if audio.peek().is_none() {
             return;
         }
+        let comparable = audio.clone().take(2).count() == 2;
         egui::CollapsingHeader::new("Audio levels").show(ui, |ui| {
             egui::ScrollArea::vertical()
                 .max_height(150.0)
                 .show(ui, |ui| {
                     for stream in audio {
+                        ui.horizontal(|ui| {
+                        if comparable {
+                            let mut selected = self.compare_audio_indices.contains(&stream.index);
+                            if ui.add_enabled(self.request_idle() && (selected || self.compare_audio_indices.len() < MAX_TRACKS),
+                                egui::Checkbox::new(&mut selected, format!("Compare {}", stream.index))).changed() {
+                                if selected { self.compare_audio_indices.insert(stream.index); }
+                                else { self.compare_audio_indices.remove(&stream.index); }
+                                self.audio_track_report = None;
+                            }
+                        }
                         if ui
                             .add_enabled(
                                 self.request_idle(),
@@ -911,8 +941,24 @@ impl WizApp {
                                 ui.ctx(),
                             );
                         }
+                        });
                     }
                 });
+            if comparable && ui.add_enabled(self.request_idle() && self.compare_audio_indices.len() >= 2,
+                egui::Button::new("Compare selected audio tracks")).clicked() {
+                self.audio_track_report = None;
+                self.query("media.analyze.audio_tracks", json!({"asset_id":asset.id,"stream_indices":self.compare_audio_indices}),
+                    Action::CompareAudio, ui.ctx());
+            }
+            if let Some(report) = &self.audio_track_report {
+                if report.duplicate_groups.is_empty() {
+                    ui.label("No matching signals among streams with a known channel layout.");
+                }
+                for group in &report.duplicate_groups {
+                    let indices = group.iter().map(u32::to_string).collect::<Vec<_>>().join(", ");
+                    ui.label(format!("Matching streams {indices}"));
+                }
+            }
             if let Some(measurement) = &self.volume_measurement {
                 let display = |level: &Decibels| match level {
                     Decibels::Finite { micro_db } => {

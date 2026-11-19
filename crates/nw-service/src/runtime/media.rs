@@ -11,19 +11,28 @@ pub(super) mod mixed;
 mod timeline_preview;
 
 impl Service {
+    fn analysis_source(
+        &self,
+        context: &Context,
+        asset_id: &str,
+    ) -> Result<(Asset, files::SourceStamp)> {
+        let asset: Asset = self
+            .store
+            .get(&named("asset", asset_id)?)?
+            .ok_or_else(DomainError::object_not_found)?;
+        self.object(context, &asset.id, &asset.creator)?;
+        let path = self.path(context, Path::new(&asset.identity.path), false)?;
+        let source = files::SourceStamp::capture_resolved(&path)?;
+        Ok((asset, source))
+    }
+
     pub(super) fn source_volume(
         &self,
         context: &Context,
         input: nw_domain::audio_analysis::VolumeInput,
         cancel: CancellationToken,
     ) -> Result<nw_domain::audio_analysis::VolumeMeasurement> {
-        let asset: Asset = self
-            .store
-            .get(&named("asset", &input.asset_id)?)?
-            .ok_or_else(DomainError::object_not_found)?;
-        self.object(context, &asset.id, &asset.creator)?;
-        let path = self.path(context, Path::new(&asset.identity.path), false)?;
-        let source = files::SourceStamp::capture_resolved(&path)?;
+        let (asset, source) = self.analysis_source(context, &input.asset_id)?;
         let result = tokio::runtime::Handle::current().block_on(self.engine()?.measure_volume(
             &asset,
             source,
@@ -46,6 +55,28 @@ impl Service {
                 "PERMISSION_DENIED",
                 "Volume measurement grant changed during analysis",
             ));
+        }
+        self.object(context, &asset.id, &asset.creator)?;
+        self.path(context, Path::new(&asset.identity.path), false)?;
+        Ok(result)
+    }
+
+    pub(super) fn compare_source_audio(
+        &self,
+        context: &Context,
+        input: nw_domain::audio_analysis::TrackSelection,
+        cancel: CancellationToken,
+    ) -> Result<nw_domain::audio_analysis::AudioTrackReport> {
+        let (asset, source) = self.analysis_source(context, &input.asset_id)?;
+        let result = tokio::runtime::Handle::current().block_on(self.engine()?.compare_audio_tracks(
+            &asset, source, &input.stream_indices, cancel.clone(),
+        ))?;
+        let _delivery = self.mutation.lock().map_err(|_| lock_error())?;
+        if cancel.is_cancelled() {
+            return Err(DomainError::new("CANCELLED", "Audio comparison cancelled before delivery"));
+        }
+        if self.policy(context)?.as_ref().is_some_and(|policy| !policy.allows_command("media.analyze.audio_tracks")) {
+            return Err(DomainError::new("PERMISSION_DENIED", "Audio comparison grant changed during analysis"));
         }
         self.object(context, &asset.id, &asset.creator)?;
         self.path(context, Path::new(&asset.identity.path), false)?;

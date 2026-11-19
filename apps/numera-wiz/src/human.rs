@@ -120,6 +120,13 @@ pub enum Media {
         #[arg(long)]
         stream: u32,
     },
+    /// Compare decoded signal signatures for two or more original audio tracks.
+    CompareAudio {
+        #[arg(long)]
+        asset: String,
+        #[arg(long = "stream", required = true)]
+        streams: Vec<u32>,
+    },
 }
 #[derive(Subcommand)]
 pub enum Capabilities {
@@ -508,6 +515,10 @@ pub fn prepare(command: Command) -> Result<Request> {
         Command::Media(Media::AnalyzeVolume { asset, stream }) => query(
             "media.analyze.volume",
             json!({"asset_id":asset,"stream_index":stream}),
+        ),
+        Command::Media(Media::CompareAudio { asset, streams }) => query(
+            "media.analyze.audio_tracks",
+            json!({"asset_id":asset,"stream_indices":streams}),
         ),
         Command::Media(Media::Capabilities(Capabilities::Inspect)) => {
             query("capabilities.inspect", json!({"scope":"components"}))

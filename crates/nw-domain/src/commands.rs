@@ -225,6 +225,9 @@ fn result_schema(id: &str) -> Option<Value> {
             serde_json::to_value(schema_for!(crate::audio_analysis::VolumeMeasurement))
                 .expect("schema"),
         ),
+        "media.analyze.audio_tracks" => Some(
+            serde_json::to_value(schema_for!(crate::audio_analysis::AudioTrackReport)).expect("schema"),
+        ),
         "streams.extract" => Some(
             serde_json::to_value(schema_for!(crate::views::PlanReview)).expect("schema"),
         ),
@@ -803,6 +806,12 @@ pub fn registry() -> Vec<Descriptor> {
             "Measure peak and RMS for an explicitly selected registered audio stream",
             Query,
             crate::audio_analysis::VolumeInput
+        ),
+        row!(
+            "media.analyze.audio_tracks",
+            "Compare decoded audio signatures for selected registered streams",
+            Query,
+            crate::audio_analysis::TrackSelection
         ),
         row!(
             "capabilities.refresh",
@@ -1622,6 +1631,7 @@ pub const ACTIVE_COMMANDS: &[&str] = &[
     "access.credentials.issue",
     "media.probe",
     "media.analyze.volume",
+    "media.analyze.audio_tracks",
     "media.preview_frame",
     "capabilities.inspect",
     "capabilities.refresh",

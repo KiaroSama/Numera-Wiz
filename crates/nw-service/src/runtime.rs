@@ -1081,6 +1081,7 @@ impl Service {
                 "timeline.preview_frame",
                 "media.probe",
                 "media.analyze.volume",
+                "media.analyze.audio_tracks",
                 "media.preview_frame",
                 "capabilities.refresh",
                 "chapters.remove",
@@ -1440,6 +1441,11 @@ impl Service {
                 let volume =
                     self.source_volume(&context, commands::parse(params)?, cancellation.clone())?;
                 return Ok(Response::success(&request.request_id, value(&volume)?).bounded());
+            }
+            "media.analyze.audio_tracks" => {
+                drop(guard);
+                let report = self.compare_source_audio(&context, commands::parse(params)?, cancellation.clone())?;
+                return Ok(Response::success(&request.request_id, value(&report)?).bounded());
             }
             "media.probe" => {
                 let input: PathInput = commands::parse(params)?;

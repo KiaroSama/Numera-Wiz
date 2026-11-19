@@ -248,6 +248,8 @@ playback, resources/fault coverage and full version 1 remain required.
 Select a registered file in Stream Cleanup and expand **Audio levels**. Choose
 the original audio stream to measure. Numera Wiz displays its decoded peak,
 RMS, and sample count per channel from FFmpeg.
+Select at least two tracks in the same panel to compare their decoded signals.
+The result groups matching streams by their original indices.
 
 ## Extract a stream
 

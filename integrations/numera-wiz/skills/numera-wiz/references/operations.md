@@ -10,6 +10,7 @@ to each operation/media/transport/package boundary separately.
 | `commands.list`, `commands.schema` | Live implementation/schema discovery. |
 | `access.replay_scope.create` | Bootstrap own durable retry identity. |
 | `media.probe` | Inspect authorized native media with a finite probe budget. |
+| `media.analyze.volume`, `media.analyze.audio_tracks` | Measure a registered audio stream or compare decoded signals across selected original audio tracks. |
 | `capabilities.inspect`, `capabilities.refresh`, `capabilities.clear` | Read or refresh FFmpeg/ffprobe observations and clear a matching component cache entry. |
 | `media.preview_frame` | Decode one frame of an authorized registered video stream when the active registry provides this command. |
 | `timeline.preview_frame` | Read one exact visible timeline frame when available, with project-context and source grants. |
@@ -20,6 +21,8 @@ to each operation/media/transport/package boundary separately.
 | `streams.clean.resolve` | Pure explicit original-stream inventory resolution. |
 | `streams.clean.report` | Bounded registered-asset selection report. |
 | `streams.clean`, `plans.inspect` | Prepare/review one immutable cleanup plan. |
+| `streams.extract` | Review packet-copy extraction of one registered stream to a fresh Matroska path. |
+| `config.import.ffmwiz` | Parse FFmWiz settings and read field diagnostics from the versioned import report. |
 | `chapters.inspect`, `chapters.export`, `chapters.import`, `chapters.remove` | Inspect exact chapter ticks, export FFmetadata or review chapter replacement or removal. |
 | `chapters.wave_cues` | Read original RIFF or RF64 cue offsets, lengths and labels from an authorized asset. |
 | `disposition.patch` | Review a stream-copy plan with explicit audio or subtitle flag changes. |
