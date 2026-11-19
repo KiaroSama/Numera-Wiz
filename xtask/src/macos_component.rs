@@ -125,6 +125,10 @@ fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
         .context("Locked macOS input byte count")?;
     let sha = field(row, "sha256")?;
     let url = field(row, "url")?;
+    let alternate = row
+        .get("alternate_url")
+        .map(|_| field(row, "alternate_url"))
+        .transpose()?;
     ensure!(
         (1..=180 * 1024 * 1024).contains(&bytes)
             && sha.len() == 64
@@ -132,6 +136,12 @@ fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
             && url.starts_with("https://"),
         "Unexpected locked macOS input identity"
     );
+    if let Some(next) = alternate {
+        ensure!(
+            bottle.is_none() && next.starts_with("https://") && next != url,
+            "Unexpected alternate location for a locked macOS input"
+        );
+    }
     let mut request = http();
     if let Some(name) = bottle {
         let repository = format!("homebrew/core/{}", name.replace('@', "/"));
@@ -160,27 +170,37 @@ fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
         .and_then(|name| name.to_str())
         .context("macOS input filename")?;
     ensure!(basename(filename), "Unexpected macOS input filename");
-    // curl removes the scoped registry authorization when redirected to the CDN.
-    execute(
-        request
-            .args([
-                "--location",
-                "--max-redirs",
-                "5",
-                "--max-filesize",
-                &bytes.to_string(),
-                "--output",
-            ])
-            .arg(path)
-            .arg("--")
-            .arg(url),
-        &format!("Download {filename}"),
-    )?;
-    ensure!(
-        digest(path)? == json!({"bytes": bytes, "sha256": sha}),
-        "Downloaded macOS input failed its digest check: {filename}"
-    );
-    Ok(())
+    // A small public source with alternate delivery can tolerate a larger HTTP response.
+    // The file can enter the source archive only after its exact locked length and hash match.
+    let limit = alternate.map_or(bytes, |_| bytes.max(4096)).to_string();
+    let fetch = |mut request: Command, endpoint: &str| -> Result<()> {
+        if alternate.is_some() {
+            request.args(["--http1.1", "--header", "Accept-Encoding: identity"]);
+        }
+        // curl removes the scoped registry authorization when redirected to the CDN.
+        execute(
+            request
+                .args(["--location", "--max-redirs", "5", "--max-filesize"])
+                .arg(&limit)
+                .arg("--output")
+                .arg(path)
+                .arg("--")
+                .arg(endpoint),
+            &format!("Download {filename}"),
+        )?;
+        ensure!(
+            digest(path)? == json!({"bytes": bytes, "sha256": sha}),
+            "Downloaded macOS input failed its digest check: {filename}"
+        );
+        Ok(())
+    };
+    fetch(request, url).or_else(|error| {
+        let Some(endpoint) = alternate else {
+            return Err(error);
+        };
+        fetch(http(), endpoint)
+            .with_context(|| format!("Primary download failed for {filename}: {error}"))
+    })
 }
 
 fn unpack(archive: &Path, root: &Path, prefix: &str) -> Result<()> {

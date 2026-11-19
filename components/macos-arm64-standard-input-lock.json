@@ -585,7 +585,8 @@
     },
     {
       "filename": "libsamplerate-1.patch",
-      "url": "https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1",
+      "url": "https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1&download=1",
+      "alternate_url": "https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1&plain=1",
       "bytes": 909,
       "sha256": "0826fb59d733188645f3dc207c938580970700381b9bc87058b137723cb30bba"
     },
