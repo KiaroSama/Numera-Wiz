@@ -62,8 +62,8 @@ fn pure(deadline: Deadline) -> Result<()> {
         json!({"RuleID":"generic-api-key","File":DOCUMENTS[4].path,"StartLine":7,"Commit":commit}),
         json!({"RuleID":"generic-api-key","File":DOCUMENTS[4].path,"StartLine":8,"Commit":commit}),
     ];
-    let bytes = serde_json::to_vec(&lock_rows).private("SECURITY_FIXTURE_IO")?;
-    let lock_plan = mock_plan(&bytes, deadline)?;
+    let lock_report = serde_json::to_vec(&lock_rows).private("SECURITY_FIXTURE_IO")?;
+    let lock_plan = mock_plan(&lock_report, deadline)?;
     require(
         lock_plan.total() == 3 && lock_plan.unknown() == 1 && lock_plan.resolutions() == 1,
         "SECURITY_PUBLIC_COMPONENT_LOCATION_FAILED",
