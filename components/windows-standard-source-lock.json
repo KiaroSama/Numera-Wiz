@@ -1350,6 +1350,24 @@
       ]
     },
     {
+      "name": "libz-1.dll",
+      "package": "mingw-w64-ucrt-x86_64-zlib",
+      "version": "1.4-2",
+      "bytes": 148154,
+      "sha256": "934103c50623302548a1cf66fbc22f0029e4eb4556343252a505e2fc005e835f",
+      "imports": [
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "kernel32.dll"
+      ]
+    },
+    {
       "name": "libzimg-2.dll",
       "package": "mingw-w64-ucrt-x86_64-zimg",
       "version": "3.0.6-3",
