@@ -119,6 +119,24 @@ fn http() -> Command {
     curl
 }
 
+fn expand_patch_index(path: &Path, before: &str, after: &str) -> Result<()> {
+    for hash in [before, after] {
+        ensure!(
+            hash.len() == 40 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "Invalid Git blob identity for the pinned source patch"
+        );
+    }
+    let short = format!("\nindex {}..{} ", &before[..8], &after[..8]);
+    let full = format!("\nindex {before}..{after} ");
+    let patch = fs::read_to_string(path)?;
+    ensure!(
+        patch.matches(short.as_str()).count() == 1,
+        "Expected one abbreviated Git index line in the source patch"
+    );
+    fs::write(path, patch.replacen(short.as_str(), &full, 1))?;
+    Ok(())
+}
+
 fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
     let bytes = row["bytes"]
         .as_u64()
@@ -173,34 +191,71 @@ fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
     // A small public source with alternate delivery can tolerate a larger HTTP response.
     // The file can enter the source archive only after its exact locked length and hash match.
     let limit = alternate.map_or(bytes, |_| bytes.max(4096)).to_string();
-    let fetch = |mut request: Command, endpoint: &str| -> Result<()> {
-        if alternate.is_some() {
-            request.args(["--http1.1", "--header", "Accept-Encoding: identity"]);
-        }
+    let transfer = |mut request: Command, endpoint: &str, ceiling: &str| -> Result<()> {
         // curl removes the scoped registry authorization when redirected to the CDN.
         execute(
             request
                 .args(["--location", "--max-redirs", "5", "--max-filesize"])
-                .arg(&limit)
+                .arg(ceiling)
                 .arg("--output")
                 .arg(path)
                 .arg("--")
                 .arg(endpoint),
             &format!("Download {filename}"),
         )?;
+        Ok(())
+    };
+    let verify = || -> Result<()> {
         ensure!(
             digest(path)? == json!({"bytes": bytes, "sha256": sha}),
             "Downloaded macOS input failed its digest check: {filename}"
         );
         Ok(())
     };
-    fetch(request, url).or_else(|error| {
+    let api_attempt = row.get("github_patch_api").map(|patch| -> Result<()> {
+        let endpoint = field(patch, "url")?;
+        ensure!(
+            bottle.is_none()
+                && filename.ends_with(".patch")
+                && bytes <= 4096
+                && endpoint.starts_with("https://api.github.com/repos/"),
+            "Unexpected commit API location for a pinned source patch"
+        );
+        let mut api = http();
+        api.args([
+            "--header",
+            "Accept: application/vnd.github.patch",
+            "--header",
+            "Accept-Encoding: identity",
+        ]);
+        transfer(api, endpoint, "4096")?;
+        expand_patch_index(path, field(patch, "before")?, field(patch, "after")?)?;
+        verify()?;
+        tracing::info!(filename, "Verified the full-index source patch from the commit API");
+        Ok(())
+    });
+    if api_attempt.as_ref().is_some_and(|result| result.is_ok()) {
+        return Ok(());
+    }
+    let fetch = |mut request: Command, endpoint: &str| -> Result<()> {
+        if alternate.is_some() {
+            request.args(["--http1.1", "--header", "Accept-Encoding: identity"]);
+        }
+        transfer(request, endpoint, &limit)?;
+        verify()
+    };
+    let result = fetch(request, url).or_else(|error| {
         let Some(endpoint) = alternate else {
             return Err(error);
         };
         fetch(http(), endpoint)
             .with_context(|| format!("Primary download failed for {filename}: {error}"))
-    })
+    });
+    if let Some(Err(error)) = api_attempt {
+        result.with_context(|| format!("Commit API failed for {filename}: {error}"))
+    } else {
+        result
+    }
 }
 
 fn unpack(archive: &Path, root: &Path, prefix: &str) -> Result<()> {

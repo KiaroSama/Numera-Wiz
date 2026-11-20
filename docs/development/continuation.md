@@ -2679,3 +2679,12 @@ creation of nested bins with journaled Undo. Project inspection can search
 bin names through the current authenticated snapshot and its existing page
 budgets. The desktop, browser, CLI and MCP share the relevant project writes
 and read projections.
+
+The Apple Silicon packaging job reached its corresponding-source stage after
+passing compilation and regression tests. GitHub's web patch endpoint rejected
+the locked transfer bound for the second libsamplerate patch. The commit API
+delivers the same patch with abbreviated Git blob IDs. The packager now
+restores the pinned full IDs for both patches, verifies the original byte counts
+and SHA-256 values, and retains the two web locations as alternatives. Both API
+representations reproduced their original locked bytes independently.
+[Apple Silicon diagnosis](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44642160288/job/135977484537)
