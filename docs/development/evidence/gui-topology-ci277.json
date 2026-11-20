@@ -1,0 +1,307 @@
+{
+  "schema_version": 1,
+  "scope": "Actual finite solid-color Link/Unlink/Undo/Redo and frontend reopen on Chrome and Linux native input; full v1 unfinished",
+  "source": "05d2a3184470d22828f6a180c4524e2cf2b0b872",
+  "rust_run": 43422058359,
+  "run_number": 277,
+  "whole_workflow": {
+    "all13_terminal": true,
+    "passed": 12,
+    "failed": 1,
+    "jobs": [
+      {
+        "id": 131874231952,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131874232286,
+        "name": "dependency-lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131874232504,
+        "name": "formatting",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 131874232586,
+        "name": "media",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493457,
+        "name": "checks (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493518,
+        "name": "checks (windows-2025)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493566,
+        "name": "checks (macos-15)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493747,
+        "name": "checks (macos-15-intel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238653,
+        "name": "owner-transports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238707,
+        "name": "owner-batch",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238807,
+        "name": "browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131884331379,
+        "name": "native-ui",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131886323151,
+        "name": "artifact-http",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "browser": {
+    "source": "05d2a3184470d22828f6a180c4524e2cf2b0b872",
+    "run": 43422058359,
+    "job": 131876238807,
+    "artifact": 14034434019,
+    "zip_bytes": 5534588,
+    "zip_sha256": "a6b03b509f2be0c48020c1585c3c408f4a75f02c6fd3397605988f5f9a3edb33",
+    "members_verified": 59,
+    "old_journey_ms": "52073",
+    "new_tail_ms": "26544",
+    "sequential_common_ms": 78617,
+    "full_test_seconds": 119.09,
+    "observations": [
+      {
+        "code": "OK",
+        "command": "clips.place",
+        "expected_revision": "11",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "2b4d53c8-5b5f-4570-9c37-267d12e7ed5a",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-31",
+        "revision": "12"
+      },
+      {
+        "code": "OK",
+        "command": "clips.place",
+        "expected_revision": "12",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "51780afc-52e2-44ef-a45c-98610651cac3",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-42",
+        "revision": "13"
+      },
+      {
+        "code": "OK",
+        "command": "clips.link",
+        "expected_revision": "13",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "722fede9-7b3f-4c84-9325-29b9036dc5be",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-52",
+        "revision": "14"
+      },
+      {
+        "code": "OK",
+        "command": "clips.unlink",
+        "expected_revision": "14",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "2c9f0ba4-6950-4350-85ca-acc6f15e54ea",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-80",
+        "revision": "15"
+      },
+      {
+        "code": "OK",
+        "command": "history.undo",
+        "expected_revision": "15",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "00482e83-af35-4cd6-a3d2-68790589f782",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-108",
+        "revision": "16"
+      },
+      {
+        "code": "OK",
+        "command": "history.redo",
+        "expected_revision": "16",
+        "project": "bff9dfca-999b-41f9-98c7-f165e81d8618",
+        "receipt": "8499fe9d-e7e2-421b-881d-472bd3e4a87b",
+        "request_id": "2d3d94193f387eadaf4e05bc1a224a0c-136",
+        "revision": "17"
+      },
+      {
+        "principal": "54970a38-af56-4ae8-a5b1-f5724ffa645e",
+        "profile_id": "browser",
+        "re_pairing": false,
+        "registry": "dddb355609767196cd23687321226533e5904170489f5392c423252d20575ca3",
+        "reopen": "actual Chrome page in the same tab/session",
+        "root_id": "9e3e5ba4-9f4c-4b1a-be59-aaec871d4f1c",
+        "source": "05d2a3184470d22828f6a180c4524e2cf2b0b872",
+        "unknown_pending_reload_claimed": false
+      }
+    ],
+    "exact_six_nonobserver_receipts_revision_chain": true,
+    "exact_group_undo": "34154ef9-0117-4f57-b6c9-aedfa9d509a1",
+    "source_variant": "two finite solid_color bindings on one video track",
+    "not_qualified": [
+      "mixed registered audio/video",
+      "direct-link components",
+      "cross-track selection input",
+      "full C_M1",
+      "decoded preview",
+      "full editor",
+      "full v1"
+    ],
+    "pngs_to_view": [
+      "browser-project-group-linked.png",
+      "browser-project-group-reopened-unlinked.png"
+    ],
+    "root_viewed_exact_linked_and_reopened_PNGs": true,
+    "root_visual_observation": "linked screenshot revision14 shows genuine inspected group34154ef9-0117-4f57-b6c9-aedfa9d509a1 and clearedseeds; reopened screenshotrevision17 shows samefixturerows/project withnoinspectedgroup. Bothactualsource05d2 screenshots."
+  },
+  "native": {
+    "source": "05d2a3184470d22828f6a180c4524e2cf2b0b872",
+    "run": 43422058359,
+    "job": 131884331379,
+    "artifact": 14036946607,
+    "zip_bytes": 6412034,
+    "zip_sha256": "b268e13b4e4a575f86fe1ef1fcedfe04945f74f401f513b9400f6621ace099c1",
+    "members_verified": 69,
+    "old_journey_ms": "29553",
+    "new_tail_ms": "19614",
+    "sequential_common_ms": 49167,
+    "full_test_seconds": 79.04,
+    "revision_chain": [
+      "10",
+      "16"
+    ],
+    "exact_six_nonobserver_receipts_revision_chain": true,
+    "observations": [
+      {
+        "code": "OK",
+        "command": "clips.place",
+        "expected_revision": "10",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "f60fb620-6132-460c-8e60-5e81403bd386",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-31",
+        "revision": "11"
+      },
+      {
+        "code": "OK",
+        "command": "clips.place",
+        "expected_revision": "11",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "aefe4ebe-99bd-4a44-94bb-825ef7d6719c",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-42",
+        "revision": "12"
+      },
+      {
+        "code": "OK",
+        "command": "clips.link",
+        "expected_revision": "12",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "3babde9a-9b35-48a1-b7ef-011abf23e127",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-52",
+        "revision": "13"
+      },
+      {
+        "code": "OK",
+        "command": "clips.unlink",
+        "expected_revision": "13",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "29031f60-13e3-4c07-9cf7-19a0635b0b97",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-80",
+        "revision": "14"
+      },
+      {
+        "code": "OK",
+        "command": "history.undo",
+        "expected_revision": "14",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "500049af-a3d8-47a0-bb94-2122c5c8e233",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-108",
+        "revision": "15"
+      },
+      {
+        "code": "OK",
+        "command": "history.redo",
+        "expected_revision": "15",
+        "project": "cb9e8caa-677c-425f-9775-9be807fd33c4",
+        "receipt": "19ddf432-6aec-4bff-ac5c-5324ce7549ee",
+        "request_id": "8415e952f6cc47a8856c2725df75bcda-136",
+        "revision": "16"
+      },
+      {
+        "build": "e71bb7712a6487a9b2f5eb8aab3f70f457e1eccc1cc983cff4f6ca8714ac6ec1",
+        "elapsed_ms": "693",
+        "owner_restart_claimed": false,
+        "reopen": "actual native frontend process",
+        "root_id": "13f9440a-5fc8-418d-9fae-5e1827705224"
+      }
+    ],
+    "exact_group_undo": "60c6ecda-1244-4eef-9d41-f1f0166bed48",
+    "source_variant": "two finite solid_color bindings on one video track",
+    "not_qualified": [
+      "mixed registered audio/video",
+      "direct-link components",
+      "cross-track selection input",
+      "full C_M1",
+      "decoded preview",
+      "full editor",
+      "full v1"
+    ],
+    "verification_note": "Initial verifier assumed browser-only observer_capacity and browser revision11. Corrected to actual native identity240/5/10 and independently captured native baseline10\u219216. No artifact/application/test rerun occurred.",
+    "root_visual_inspection": {
+      "images": [
+        "native-project-group-linked.png",
+        "native-project-group-reopened-unlinked.png"
+      ],
+      "linked": "revision13, three solid-color clip rows, genuine inspected group60c6ecda-1244-4eef-9d41-f1f0166bed48",
+      "reopened": "revision16, same three rows; selected clip has no group recorded",
+      "original_pixels": true
+    }
+  },
+  "limits_preserved": {
+    "whole_journey_seconds": 240,
+    "input_seconds": 5,
+    "command_seconds": 10,
+    "snapshot_query_bindings": 8,
+    "selection_clips": 128
+  },
+  "not_qualified": [
+    "source pressure change ff105/bdca",
+    "mixed registered A/V",
+    "cross-track input",
+    "full C_M1",
+    "continuous decoded preview",
+    "full editor",
+    "full v1"
+  ]
+}

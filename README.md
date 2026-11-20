@@ -1,2 +1,196 @@
-# Numera-Wiz
-Rust-first media editor and utilities powered by a local FFmpeg engine, with shared desktop/browser UI, CLI and MCP.
+<p align="center">
+  <img src="assets/branding/numera-wiz.png" width="160" height="160" alt="Numera Wiz official logo">
+</p>
+
+# Numera Wiz
+
+[![Rust CI](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml?query=branch%3Arewrite%2Frust-completion)
+[![Gitleaks](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml/badge.svg?branch=rewrite%2Frust-completion)](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/gitleaks.yml?query=branch%3Arewrite%2Frust-completion)
+[![Rust](https://img.shields.io/badge/Rust-1.99.1-DEA584?logo=rust&style=flat-square)](rust-toolchain.toml)
+[![Platforms](https://img.shields.io/badge/builds-Windows%20%7C%20Linux%20%7C%20macOS-2868a9?style=flat-square)](.github/workflows/ci.yml)
+[![MCP](https://img.shields.io/badge/MCP-stdio%20%2B%20HTTP-6853a3?style=flat-square)](docs/agents/README.md)
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-31643b?style=flat-square)](LICENSE)
+[![Repository size](https://img.shields.io/github/repo-size/KiaroSama/Numera-Wiz?style=flat-square&color=64748b)](https://github.com/KiaroSama/Numera-Wiz)
+[![Donations](https://img.shields.io/badge/Support-donations-d04a9a?style=flat-square)](https://github.com/KiaroSama/FFmWiz#donate)
+
+A **Pure Rust** media application with a local **FFmpeg/ffprobe** engine, shared
+native/browser workspace, CLI and official MCP transports. FFmWiz and MuxCls
+supply behavioral references for media utilities and the CLI; their Python or
+PowerShell runtimes are not part of this repository or application.
+
+**Version 1 is in development.** The review branch contains working cleanup,
+registration, planning, job and artifact flows. The complete editor, utility
+families and offline portable release described by the
+[implementation mandate](docs/research-pack/Numera-Wiz-Implementation-Mandate-EN.md)
+remain unfinished. A green development CI is evidence for its exercised scope.
+Current work and required gaps are recorded in the
+[continuation record](docs/development/continuation.md) and
+[completion ledger](docs/development/completion.json).
+The [owned two-input media stage](docs/development/continuation.md#owned-two-input-session-qualification)
+has hosted native transport and real FFmpeg fixture evidence. General media
+export and continuous preview remain in development.
+
+## Implemented workflows
+
+- Native and streamed browser media intake; exact original-index stream selection
+  and metadata/tag/order resolution, using the shared MuxCls rules.
+- Remove audio or subtitle tracks by their position within each stream type.
+  Cleanup plans, reports and batches resolve the positions for each file.
+- Inspect FFmpeg component declarations and verify a CPU FFV1 round trip.
+  An explicit native-owner request can check H.264 and HEVC NVENC encoding.
+- Import FFmWiz settings into a typed, versioned document with field diagnostics.
+- Measure peak, RMS and decoded sample count for a selected audio stream in the
+  shared GUI, CLI and MCP interface.
+- Inspect exact chapter ranges, exchange FFmetadata and review chapter
+  replacement or removal in a stream-copy plan.
+- Inspect original RIFF and RF64 cue offsets, region lengths and labels.
+- Set or remove selected container and stream tags in a verified Matroska copy.
+- Add or replace authorized Matroska audio and SubRip tracks with verified
+  original packet timing. Normalize supported PCM tracks from independently
+  measured loudness.
+- Cut or split compatible Matroska files at original keyframes and review
+  ordered copy joins of compatible sources.
+- Export registered SDR FFV1, H.264, HEVC, AV1, VP9 or MPEG-4 media as CPU H.264,
+  HEVC, AV1, VP9 or MPEG-4 Part 2 in MP4 or Matroska, with optional AAC and
+  verified presentation times.
+- Burn embedded or external SubRip with the offline DejaVu Sans font. Review
+  lossless FFV1 output with original SDR signaling or a PQ/HLG-to-BT.709 tone map.
+- Edit ordered PCM sample ranges with independent reversal and tempo controls.
+  Retime or reverse short FFV1 clips on a variable-rate presentation clock.
+- Decode a single frame from a registered video stream in the shared GUI, CLI
+  and MCP interface. The browser can also play and seek a bounded authorized
+  two-second source excerpt with optional audio.
+- Preview one exact frame of an opaque layered sequence, including its
+  registered picture or an uncovered background.
+- Authorized folder intake with deterministic relative paths, retained probe
+  failures, explicit bounds/exclusions and companion inventories. A reviewed
+  cleanup batch can preserve relative paths and copy the inventoried companion
+  bytes into a separate tree.
+- Immutable command review, exactly-once durable acceptance, bounded FFmpeg/copy
+  execution, cancellation, recovery and verified no-replace output publication.
+- CLI, shared Rust native/WASM controls, stdio and loopback HTTP MCP, scoped
+  operator profiles, bounded artifact transfer and verified client Save As.
+- [Track and asset exchange](docs/manuals/PROJECTS.md#exchange-a-track-with-opentimelineio)
+  includes selected-track CMX 3600, OpenTimelineIO, Final Cut Pro 7 XML,
+  Final Cut Pro XML, linked AAF picture or audio, linked OMF 2 audio, and
+  Avid Log Exchange metadata for registered sources.
+- [Project state editing](docs/manuals/PROJECTS.md) through shared CLI/MCP commands:
+  authorized catalog discovery, nested bins and display-name search, exact
+  sequence grids, place/move/split/lift, linked Slip, Roll, Slide and clip locks,
+  atomic history and bounded revision snapshots. Shared
+  native/browser controls implement catalog discovery, project/sequence creation,
+  solid-color/registered-source placement, move/split/lift, bounded clip selection,
+  Link/Unlink, Undo/Redo, explicit stale-view Refresh and catalog reopen.
+  [Native and Chrome input checks](docs/development/evidence/gui-topology-ci277.json)
+  passed finite solid-color Link/Unlink, Undo/Redo and frontend reopen. Mixed
+  audio/video, cross-track input, decoded preview and the complete editor remain
+  unfinished.
+- Shared finite project input/result schemas and captured Read/Edit/command
+  observations; discovery keeps static requirements separate from live policy
+  facts. Validation and pending MCP wire evidence are recorded in the
+  [project contract guide](docs/manuals/PROJECTS.md#command-contracts-and-qualification).
+- [Finite timeline render reviews](docs/manuals/CLI.md#finite-timeline-review-in-development)
+  capture a committed revision and check actual FFmpeg components. The initial
+  solid-color/silence route returns a separate media plan. Its first generated
+  media job passed [full signal/publication checks on Linux](docs/development/evidence/media-v1-first-output-ci257.json).
+  [Four-native checks](docs/development/evidence/media-v1-native-ci263.json) passed
+  the current CLI lifecycle and original prior/current package journey, including
+  the existing Windows startup/restoration deadlines. Later changes need their own CI.
+  The [adopted-r1 package lifecycle](docs/development/evidence/media-v1-package-ci265.json)
+  also passed on all four targets: actual old-package refusal, restoration,
+  one old-package edit and current-package receipt replay preserved the original source.
+  [Fresh-root and migrated-r0 package cases](docs/development/evidence/media-origin-packages-ci277.json)
+  subsequently passed on all four native targets, alongside the original and
+  adopted-r1 journeys, under the unchanged shared deadline. Resource/RSS and
+  fault-cut qualification remain open. Preview, general export and the complete
+  editor remain under construction.
+- [Mixed timeline export](docs/manuals/CLI.md#mixed-timeline-export) is in
+  hosted qualification. It reviews registered picture and audio windows,
+  composites opaque video and mixes overlapping audio to verified FFV1/PCM.
+  Native and browser Projects controls use the same plans and jobs as the
+  CLI and MCP.
+- Rust repository automation; no first-party Python, shell, C, Go or JavaScript
+  source. Browser glue is generated during the hosted WASM build.
+
+## Human setup and builds
+
+[GitHub Actions](https://github.com/KiaroSama/Numera-Wiz/actions/workflows/ci.yml)
+checks out the exact source HEAD and builds Windows x64, Linux x64, macOS ARM64
+and macOS Intel artifacts with matching embedded browser assets. Native builds
+run before ordinary regression/lint checks; a failed prerequisite build remains
+a failure. [The review PR checks](https://github.com/KiaroSama/Numera-Wiz/pull/2/checks)
+show each check for the latest review commit.
+
+Development packages include the executable, manuals, source/dependency records
+and SHA-256 manifests. Ordinary compilation and media tests run in hosted CI.
+Owner hardware qualification uses matching prebuilt artifacts.
+
+The [Linux x64 CPU component build](docs/development/linux-cpu-component.md)
+produces a separate relocatable FFmpeg/ffprobe package with private libraries,
+offline fonts, matching source archives and executable qualification evidence.
+The standalone development packages from `bf775d6` passed the first-launch
+FFV1 round trip and the documented H.264 export. Each downloaded archive
+matched its recorded application, FFmpeg and ffprobe digests, corresponding
+sources and six agent configuration manifests.
+
+| Target | Standalone CI artifact |
+| --- | --- |
+| Linux x64 | [Linux package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14538652390) |
+| Windows x64 | [Windows package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14539936743) |
+| macOS Apple Silicon | [Apple Silicon package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14539209573) |
+| macOS Intel | [Intel package](https://github.com/KiaroSama/Numera-Wiz/actions/runs/44539126206/artifacts/14543050027) |
+
+The macOS app bundle stores application state in
+`~/Library/Application Support/Numera Wiz`. Pass `--data-dir` to select another
+writable location for the native GUI, CLI or MCP bridge.
+
+Run the [first export walkthrough](docs/manuals/QUICKSTART.md) with the bundled
+one-second sample, then see the [GUI guide](docs/manuals/GUI.md), [CLI manual](docs/manuals/CLI.md),
+[MCP manual](docs/manuals/MCP.md) and [agent setup](docs/agents/README.md).
+The CLI exposes `commands list`, `commands schema <id>`, `media probe`, `media capabilities`,
+`assets register-folder`, `streams clean`, `jobs submit`, `jobs wait`,
+`jobs cancel`, batch controls and `artifacts save`. Parameters, access grants
+and durable retry identities are documented in those manuals.
+
+## Skills, plugins and MCP
+
+The [Numera Wiz plugin](integrations/numera-wiz/README.md) contains the project's
+own skill, native Claude Code/Codex/Cursor packaging and portable MCP client
+configurations. It calls the same Rust `numera-wiz bridge` executable. No Node
+or Python service is introduced. Native client loading/qualification is reported
+separately from manifest validation and the official-SDK hosted tests.
+
+MCP uses stdio or direct loopback HTTP on configurable port `1578`. Discovery
+comes from actual shared command descriptors. The default `agent` profile can
+discover capabilities; the owner must explicitly grant operation, object and
+filesystem rights before an agent changes media. The skill explains how to probe,
+review, submit, observe, cancel/retry and read authorized results.
+For deliberate local owner automation, the [stdio owner option](docs/manuals/MCP.md#stdio)
+uses the same owner authority as the native CLI; shipped client defaults stay scoped.
+[Four-native MCP checks](docs/development/evidence/native-owner-mcp-ci269.json)
+passed protected credential-file delivery, actual authentication/revocation and
+known pre-issuance cancellation. The [later four-native evidence](docs/development/evidence/media-origin-packages-ci277.json)
+retains the same actual65-tool discovery frame with SDK3.10 and qualifies the
+specified package-origin journeys. Named-client loading remains unfinished.
+
+## Source policy and contributing
+
+Spec Kit, feature specifications and private `.ai/` memory are local-only and
+ignored. Third-party executable source snapshots are excluded, including from
+compressed repository archives. Pinned source URLs and original hashes remain
+under [research provenance](docs/research/README.md); the original supplied
+research companion is kept outside this repository. Offline FFmpeg manuals and
+licenses remain in `docs/vendor/ffmpeg/n9.0.2`.
+
+The [upstream review](docs/research/upstream-review-2026-11-11.md) identifies
+actual source changes and compatibility gates. The [November13 follow-up](docs/research/upstream-semantic-status-2026-11-13.md)
+separates source reading, selected releases and pending hosted qualification.
+`xtask verify-research` checks
+retained document hashes, the tracked Pure Rust boundary and the original Rust
+test inventory. [Contributing](CONTRIBUTING.md) describes review and validation.
+
+## License
+
+First-party code: **GPL-3.0-or-later**. See [LICENSE](LICENSE) and
+[third-party notices](THIRD-PARTY-NOTICES.md). The official owner-supplied logo
+is preserved byte for byte; its hash is recorded in [branding](assets/branding/README.md).

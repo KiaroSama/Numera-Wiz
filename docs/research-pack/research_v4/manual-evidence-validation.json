@@ -1,0 +1,8 @@
+{
+  "scope": "Document evidence validation only; no app build, media job or runtime test",
+  "manual_files": 48,
+  "leaf_sections": 1962,
+  "source_lines": 67566,
+  "sha256_and_full_read_range_validation": "pass",
+  "errors": []
+}

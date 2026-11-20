@@ -1,0 +1,11 @@
+{
+  "name": "numera-wiz",
+  "version": "0.1.0",
+  "description": "Use the local Numera Wiz Rust MCP bridge for granted media workflows and reviewed plans; default access is discovery-only.",
+  "author": { "name": "Numera Wiz contributors" },
+  "homepage": "https://github.com/KiaroSama/Numera-Wiz",
+  "repository": "https://github.com/KiaroSama/Numera-Wiz",
+  "license": "GPL-3.0-or-later",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json"
+}

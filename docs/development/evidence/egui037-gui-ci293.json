@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "source_head": "89e6e7e2ca1a7872b42c5d49753bd08b631e8f7b",
+  "workflow_run_id": 43481292992,
+  "workflow_run_number": 293,
+  "scope": "finite_cleanup_save_batch_GUI_prefix_and_native_builds_not_full_v1",
+  "terminal_census": {
+    "required": 13,
+    "success": 10,
+    "failure": 3,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "jobs": [
+    {
+      "job_id": 132078162603,
+      "name": "formatting",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132078163133,
+      "name": "web",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132078163223,
+      "name": "media",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132078163592,
+      "name": "dependency-lock",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132079380673,
+      "name": "checks (windows-2025)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132079380720,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132079380762,
+      "name": "checks (macos-15)",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132079381175,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Capture authenticated frozen Linux toolchain metadata without installation"
+      ]
+    },
+    {
+      "job_id": 132080150980,
+      "name": "owner-transports",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132080151098,
+      "name": "browser",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Boot real shared UI in the runner's Chrome"
+      ]
+    },
+    {
+      "job_id": 132080151121,
+      "name": "owner-batch",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132094652734,
+      "name": "native-ui",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Exercise the real native workspace and file controls"
+      ]
+    },
+    {
+      "job_id": 132096624184,
+      "name": "artifact-http",
+      "conclusion": "success",
+      "failed_steps": []
+    }
+  ],
+  "gitleaks": {
+    "run_id": 43481588648,
+    "run_number": 159,
+    "conclusion": "success"
+  },
+  "actual_gui_prefix": [
+    "Selection report genuine nonlocal command correlation",
+    "Review cleanup plan and Run",
+    "Verified finite cleanup output",
+    "Client file saving",
+    "Native actual OS Save picker",
+    "Two-source cleanup batch"
+  ],
+  "failures": [
+    "Browser Folder intake launcher old point hits status label; complete journey fails.",
+    "Native Folder intake launcher old point hits status label; complete journey fails.",
+    "Strict Linux APT metadata update is killed under existing supervision; full capture remains incomplete."
+  ],
+  "limits": [
+    "Corrected launcher source needs its own exact-head hosted execution.",
+    "Earlier successful CI291 metadata prerequisite does not qualify the failed CI293 capture.",
+    "Metadata capture success does not qualify payload download, installation, compiler bootstrap or standard FFmpeg profile.",
+    "Finite cleanup and batch GUI prefix do not qualify general MediaV2, continuous decoded preview or full v1.",
+    "Windows historical filesystem failure cause remains unknown despite current native ordinary checks passing."
+  ]
+}

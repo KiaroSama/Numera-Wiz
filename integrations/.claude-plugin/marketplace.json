@@ -1,0 +1,11 @@
+{
+  "name": "numera-wiz-local",
+  "owner": { "name": "Numera Wiz contributors" },
+  "plugins": [
+    {
+      "name": "numera-wiz",
+      "source": "./numera-wiz",
+      "description": "Local Rust media commands through MCP with explicit grants."
+    }
+  ]
+}

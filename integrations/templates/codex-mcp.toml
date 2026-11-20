@@ -1,0 +1,5 @@
+# Merge this table into the target client's MCP configuration only when requested.
+# Use an absolute executable path if numera-wiz is not on that client's PATH.
+[mcp_servers.numera-wiz]
+command = "numera-wiz"
+args = ["--access-profile", "agent", "bridge", "--transport", "stdio"]

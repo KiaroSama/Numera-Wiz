@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-11-13 10:05:54 UTC",
+  "method": "Connected GitHub main commit metadata/diff reads; pinned commit IDs equal the complete source comparisons reviewed on2026-11-12.",
+  "repositories": [
+    {
+      "repository": "KiaroSama/FFmWiz",
+      "branch": "main",
+      "source": "b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+      "url": "https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+      "committed_at": "2026-11-11T19:43:01Z",
+      "unchanged_since_2026_11_12": true,
+      "disposition": "Same exact previously reviewed source; no new CLI/media delta or new source import."
+    },
+    {
+      "repository": "KiaroSama/MuxCls",
+      "branch": "main",
+      "source": "1269bd71712466469d539fbf279432659ccaa6a2",
+      "url": "https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2",
+      "committed_at": "2026-11-11T19:41:09Z",
+      "unchanged_since_2026_11_12": true,
+      "disposition": "Same exact previously reviewed source; no new CLI/media delta or new source import."
+    }
+  ],
+  "previous_review": "upstream-donor-update-2026-11-12.json",
+  "scope": "Only the two explicitly requested FFmWiz and MuxCls donor heads. No claim that every library/release/donor repository was refreshed or that the full v1 baseline is implemented."
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "run_id": 40104749530,
+  "branch_head": "b2116a15995b9e095ac26d9e71ba9de857a38a69",
+  "passed": [
+    "four complete native regression/Clippy/desktop targets",
+    "WASM/lock",
+    "actual engine preservation/remux-progress and larger-than-memory isolated reader"
+  ],
+  "media_failed": {
+    "test": "cli_and_both_official_mcp_transports_share_real_verified_jobs",
+    "assertion": "equivalent native-file requirements have equal plan hashes across principals",
+    "cause": "CLI source probe selected 30 seconds; SDK source probe used 120 seconds; completed probe timeout was incorrectly included in future execution identity",
+    "correction": "retain timeout in probe/asset/review audit; exclude only that named completed-observation field from semantic projection; keep all future execution limits and the original transport parity assertion"
+  },
+  "formatting": {
+    "exact_hosted_hunks_applied": 13
+  },
+  "not_qualified": [
+    "remainder of owner/HTTP/GUI suite, skipped after failure",
+    "full batch/product/package/resource/manual/owner gates"
+  ]
+}

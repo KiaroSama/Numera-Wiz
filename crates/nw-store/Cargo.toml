@@ -1,0 +1,24 @@
+[package]
+name = "nw-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[lints]
+workspace = true
+[dependencies]
+nw-domain.workspace = true
+nw-platform.workspace = true
+redb.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+hex.workspace = true
+hmac = "0.12"
+base64 = "0.22"
+tracing.workspace = true
+fs2.workspace = true
+tokio-util.workspace = true
+[dev-dependencies]
+tempfile.workspace = true

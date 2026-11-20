@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "repository": "KiaroSama/Numera-Wiz",
+  "source_sha": "9a171e9fea96eb756d346972d9a8b392f6977294",
+  "run_id": 43026539369,
+  "run_attempt": 1,
+  "workflow_path": ".github/workflows/ci.yml",
+  "required_expanded_jobs": 13,
+  "provenance_origin": "Independently inspected development package executable entry and matching files entry; executable SHA256, not artifact ZIP SHA256. See docs/development/evidence/rust-completion-43026539369.json.",
+  "native_features": [
+    "desktop",
+    "embedded-web"
+  ],
+  "targets": [
+    {
+      "runner": "ubuntu-24.04",
+      "target": "linux-x64",
+      "native_artifact": "numera-wiz-development-ubuntu-24.04",
+      "native_artifact_id": 13857247788,
+      "package_provenance_artifact_id": 13856999452,
+      "executable_bytes": 140982368,
+      "executable_sha256": "dc5be51afa4c39c4d2b2be5de2bf3314f2c2c1c59a6527893ce9b2aede988b8f"
+    },
+    {
+      "runner": "windows-2025",
+      "target": "windows-x64",
+      "native_artifact": "numera-wiz-development-windows-2025",
+      "native_artifact_id": 13858885624,
+      "package_provenance_artifact_id": 13859260410,
+      "executable_bytes": 83190784,
+      "executable_sha256": "dfb9ddffce0da01f26522593641c2e6f37e611e41a277a5fc410d61272623362"
+    },
+    {
+      "runner": "macos-15",
+      "target": "macos-arm64",
+      "native_artifact": "numera-wiz-development-macos-15",
+      "native_artifact_id": 13857796230,
+      "package_provenance_artifact_id": 13857980656,
+      "executable_bytes": 114177376,
+      "executable_sha256": "c625b73032878a4a47cf14c96e314ecc1f9c129a8d3ac4e8f0a4f237ef330a87"
+    },
+    {
+      "runner": "macos-15-intel",
+      "target": "macos-x64",
+      "native_artifact": "numera-wiz-development-macos-15-intel",
+      "native_artifact_id": 13859085981,
+      "package_provenance_artifact_id": 13858751358,
+      "executable_bytes": 128093064,
+      "executable_sha256": "d254fb3221f595b845bb0b8f370d7666193aee79f3db7955f89c547c903feb8a"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-10-22T21:35:15.230418+00:00",
+  "mode": "public source/advisory read-only; no app/media execution",
+  "ffmpeg_release": "9.0.2",
+  "ffmpeg_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "entries": [
+    {
+      "local_file": "ffmpeg-9.0.2-libavformat-rtsp.c",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/rtsp.c",
+      "repository": "FFmpeg/FFmpeg",
+      "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "source_path": "libavformat/rtsp.c",
+      "body_kind": "complete upstream UTF-8 source file",
+      "sha256": "7ed3d7cd85feee1a63737054dbf9d2e7294f8a9e7851aaf72c829082987b4495",
+      "git_blob_sha1": "f3c76e8e4d9089906af0b6530c712ec790f1a874",
+      "expected_upstream_git_blob_sha1": "f3c76e8e4d9089906af0b6530c712ec790f1a874",
+      "byte_count": 108720,
+      "line_count": 2875,
+      "completeness_verified_by_git_blob_hash": true
+    },
+    {
+      "local_file": "ffmpeg-9.0.2-libavformat-hls.c",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/946fcce07b6dcd0331c8cc609192aeff5e1924f8/libavformat/hls.c",
+      "repository": "FFmpeg/FFmpeg",
+      "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "source_path": "libavformat/hls.c",
+      "body_kind": "complete upstream UTF-8 source file",
+      "sha256": "fd08aae89dc14520501ffa231597a0e47dd959e3fa62d264d2dbfb8298bcaaa9",
+      "git_blob_sha1": "0e1a1ba49cf1456582c51cce5508acb9b14b8460",
+      "expected_upstream_git_blob_sha1": "0e1a1ba49cf1456582c51cce5508acb9b14b8460",
+      "byte_count": 111499,
+      "line_count": 3090,
+      "completeness_verified_by_git_blob_hash": true
+    },
+    {
+      "local_file": "commit-01044d04536eec6e2f5f48ef404cf45d15feb461.json",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/commit/01044d04536eec6e2f5f48ef404cf45d15feb461",
+      "commit": "01044d04536eec6e2f5f48ef404cf45d15feb461",
+      "body_kind": "connector-normalized complete commit metadata and returned patch; not raw API response",
+      "sha256": "dea4948cc5cc32e15332af6a11ec569273dd5ce1cc2f67c51b2a1e93b2817c37",
+      "byte_count": 2677,
+      "changed_files": [
+        "libavformat/hls.c"
+      ],
+      "patch_present": true
+    },
+    {
+      "local_file": "commit-191715f0232cee64402c3e7733f28ff4061224b6.json",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/commit/191715f0232cee64402c3e7733f28ff4061224b6",
+      "commit": "191715f0232cee64402c3e7733f28ff4061224b6",
+      "body_kind": "connector-normalized complete commit metadata and returned patch; not raw API response",
+      "sha256": "31410336da45b074d3d5a00ebd2b6e2ab27dcd6f45215053bc5c18e50635168b",
+      "byte_count": 2677,
+      "changed_files": [
+        "libavformat/hls.c"
+      ],
+      "patch_present": true
+    },
+    {
+      "local_file": "commit-ea9e85e54981b8402368d0f21648836d6738f1b1.json",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/commit/ea9e85e54981b8402368d0f21648836d6738f1b1",
+      "commit": "ea9e85e54981b8402368d0f21648836d6738f1b1",
+      "body_kind": "connector-normalized complete commit metadata and returned patch; not raw API response",
+      "sha256": "9b40cd8002138e2bd9c6dbef6fead11605bb900db036965f159945ba40a6fabc",
+      "byte_count": 1957,
+      "changed_files": [
+        "libavformat/rtsp.c"
+      ],
+      "patch_present": true
+    }
+  ],
+  "advisory_links": [
+    "https://security-tracker.debian.org/tracker/CVE-2026-107698",
+    "https://security-tracker.debian.org/tracker/CVE-2026-107697",
+    "https://security-tracker.debian.org/tracker/CVE-2026-107696",
+    "https://github.com/advisories/GHSA-hhvh-2vr7-77mx",
+    "https://www.ffmpeg.org/security.html"
+  ],
+  "advisory_archive_note": "Advisory pages were read through web retrieval; this directory archives exact FFmpeg source bodies and connector-normalized upstream commit records, not full advisory HTML."
+}

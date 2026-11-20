@@ -1,0 +1,41 @@
+{
+  "artifact_bytes": "268633400",
+  "artifact_id": "job-31c9035a-1773-45c6-97bf-cb10291b1a02",
+  "cancelled_index_cleanup": true,
+  "components": {
+    "ffmpeg": {
+      "bytes": "5132352",
+      "file_name": "ffmpeg",
+      "sha256": "57027bd7d6aacfafa1b31e8ceef2e41e1f5c4ba685ae69dd17274c692fadeec6"
+    },
+    "ffprobe": {
+      "bytes": "4911104",
+      "file_name": "ffprobe",
+      "sha256": "e3cb5b229af9be9e31e8fb18f6ab8a92bfab17762fa47166325268159732f8f5"
+    }
+  },
+  "credential_revoked_delivered_bytes": "3145728",
+  "executable": {
+    "bytes": "224304296",
+    "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/debug/numera-wiz",
+    "sha256": "bf36071cdadbcbbcdc66a74f83db65aa5377b45887ac4b893f177a664dc32253"
+  },
+  "job_id": "31c9035a-1773-45c6-97bf-cb10291b1a02",
+  "job_revoked_delivered_bytes": "3801088",
+  "owner_before_high_kib": 35916,
+  "owner_high_kib": 35916,
+  "owner_process_id": 9796,
+  "plan_hash": "4921f9a2c44c4b6d3fac973256f417927fa497f1d1f94ffab2fc2401b1d4d097",
+  "plan_id": "c92f616a-8250-46d8-b1ae-23b617e88c71",
+  "registry": "f8f5a8a9bbd5999dc9dcdc7d3b1b5d8acd0def1344b0a5d8570328f2ecb01142",
+  "schema_version": 1,
+  "scope": "Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification.",
+  "selected_owner_rss_ceiling_kib": 131072,
+  "sha256": "fe9acf90145760f86e3d5b1f0d16e39fb9976bb3136590850d6d1edea4f04a86",
+  "source": "2145e8c4b99060e5d8a26f3dda7240d364721b84",
+  "status": "passed",
+  "branch_head": "d9ff1906c55e079138dbb22c54a06b972170ba04",
+  "run_id": 40079710323,
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40079710323",
+  "report_observation": "Existing bounded nonsecret test report retrieved from completed real media job log; GitHub artifact ZIP not downloaded"
+}

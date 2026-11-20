@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "scope": "Actual adopted-r1, fresh and migrated-r0 package lifecycles on four native targets; full v1 unfinished",
+  "source": "05d2a3184470d22828f6a180c4524e2cf2b0b872",
+  "rust_run": 43422058359,
+  "run_number": 277,
+  "prior_package_source": "9a171e9fea96eb756d346972d9a8b392f6977294",
+  "four_target_observations": [
+    {
+      "target": "ubuntu-24.04",
+      "artifact": 14035920546,
+      "zip_bytes": 224017,
+      "zip_sha256": "e2210c3d9a0c5b5c2790c2a28cf3426d2fa04334f554026929d0e3609dfa66f9",
+      "verified_members": 44,
+      "current_executable": {
+        "bytes": 155895104,
+        "sha256": "e71bb7712a6487a9b2f5eb8aab3f70f457e1eccc1cc983cff4f6ca8714ac6ec1"
+      },
+      "prior_executable": {
+        "bytes": 140982368,
+        "sha256": "dc5be51afa4c39c4d2b2be5de2bf3314f2c2c1c59a6527893ce9b2aede988b8f"
+      },
+      "old_seven_ms": 233826,
+      "adopted_r1_total_ms": 299014,
+      "same_aggregate_ms": 299043,
+      "adopted_r1_guard": [
+        "1",
+        "2"
+      ],
+      "fresh_and_r0_guard": [
+        "0",
+        "1"
+      ],
+      "distinct_real_roots": 3,
+      "distinct_actual_owner_epochs": 20,
+      "origins": [
+        {
+          "origin": "fresh",
+          "event_count": 42,
+          "owner_epochs": 4,
+          "elapsed_journey_ms": 63926,
+          "root_id": "c9de44e2-c9b7-4563-8ff9-78d1aa3ad809",
+          "caller_initialization_replayed": false,
+          "bootstrap_scope_boundary": "internal accepted Request/Scope unavailable; genuine inspect identity plus raw receipt preservation",
+          "completion": "passed"
+        },
+        {
+          "origin": "migrated-r0",
+          "event_count": 62,
+          "owner_epochs": 5,
+          "elapsed_journey_ms": 85049,
+          "root_id": "fbc758d4-bf41-4980-b451-c1e690fb873d",
+          "caller_initialization_replayed": true,
+          "bootstrap_scope_boundary": "caller-issued Scope retained privately and genuine accepted Request/Response replayed",
+          "completion": "passed"
+        }
+      ],
+      "record_hashes": {
+        "preservation.json": "fa3b4ee9fea0af97305675a4def4d628982d168bf2e3d1ce28db7e15c96d4039",
+        "media-fresh.json": "aba5de5c0ccb3a76c1654de7b9dae6952a30f4afdc7610408eed6c69696552c8",
+        "media-migrated-r0.json": "5aa83221bfffc7342a8de1755dd974e2d913c8345488426efcf97b3063a054a6",
+        "preparation.json": "7397004fcae41eb7a03b6c098ec3eedef9764b5093018f338b4b05dcd43073ba",
+        "current-package-provenance.json": "d9032dd943455358019d28663e584b1bcdfa75cf298742888cbf01065140047e"
+      }
+    },
+    {
+      "target": "windows-2025",
+      "artifact": 14036130736,
+      "zip_bytes": 224956,
+      "zip_sha256": "6f87ab049ccb008208d175e637dfe8ba82a9cf3346e70fa7b9ee05801dcf9468",
+      "verified_members": 44,
+      "current_executable": {
+        "bytes": 92409856,
+        "sha256": "1804d7f1f92b71fa4fae7c4b8c1155fb5b869c38e538a4d6044a928ba50ea03f"
+      },
+      "prior_executable": {
+        "bytes": 83190784,
+        "sha256": "dfb9ddffce0da01f26522593641c2e6f37e611e41a277a5fc410d61272623362"
+      },
+      "old_seven_ms": 227664,
+      "adopted_r1_total_ms": 293146,
+      "same_aggregate_ms": 293171,
+      "adopted_r1_guard": [
+        "1",
+        "2"
+      ],
+      "fresh_and_r0_guard": [
+        "0",
+        "1"
+      ],
+      "distinct_real_roots": 3,
+      "distinct_actual_owner_epochs": 20,
+      "origins": [
+        {
+          "origin": "fresh",
+          "event_count": 42,
+          "owner_epochs": 4,
+          "elapsed_journey_ms": 65634,
+          "root_id": "d10fc134-eb44-4126-a115-9d9db8e1714d",
+          "caller_initialization_replayed": false,
+          "bootstrap_scope_boundary": "internal accepted Request/Scope unavailable; genuine inspect identity plus raw receipt preservation",
+          "completion": "passed"
+        },
+        {
+          "origin": "migrated-r0",
+          "event_count": 62,
+          "owner_epochs": 5,
+          "elapsed_journey_ms": 84811,
+          "root_id": "2c53cbad-aab6-4909-9ee0-4406e37cf2b3",
+          "caller_initialization_replayed": true,
+          "bootstrap_scope_boundary": "caller-issued Scope retained privately and genuine accepted Request/Response replayed",
+          "completion": "passed"
+        }
+      ],
+      "record_hashes": {
+        "preservation.json": "64a9f9c98a8ad5cb7638f7c8f7b10d99d14c5fd2021d123f9694811c7721c0ee",
+        "media-fresh.json": "b54128f9a92b3a79798d5fac5a815932edff8b3ad044743f534b1d4c49ff47ea",
+        "media-migrated-r0.json": "cc13f333cee59b5b150fff06545f7e7120fc6107b482d917f19945425dfe06ed",
+        "preparation.json": "73ea4a3b2b410fc2cf23318cf0a05eddc28088ee33bfd2ff07e37bc91933529c",
+        "current-package-provenance.json": "6e0205511885a757384427dcf03be844ec6fd93236f3b67ca30c4e840645f792"
+      }
+    },
+    {
+      "target": "macos-15",
+      "artifact": 14036685561,
+      "zip_bytes": 225083,
+      "zip_sha256": "18891296e3fe36e3b035f0b40fc5e22ed243f36802356efc1f6bd7d09c19634e",
+      "verified_members": 44,
+      "current_executable": {
+        "bytes": 128806608,
+        "sha256": "39e0992539426c97ef14abebe53be63697dd140eef11c8def750a0745fe62388"
+      },
+      "prior_executable": {
+        "bytes": 114177376,
+        "sha256": "c625b73032878a4a47cf14c96e314ecc1f9c129a8d3ac4e8f0a4f237ef330a87"
+      },
+      "old_seven_ms": 323261,
+      "adopted_r1_total_ms": 401813,
+      "same_aggregate_ms": 401866,
+      "adopted_r1_guard": [
+        "1",
+        "2"
+      ],
+      "fresh_and_r0_guard": [
+        "0",
+        "1"
+      ],
+      "distinct_real_roots": 3,
+      "distinct_actual_owner_epochs": 20,
+      "origins": [
+        {
+          "origin": "fresh",
+          "event_count": 42,
+          "owner_epochs": 4,
+          "elapsed_journey_ms": 78581,
+          "root_id": "67755f30-7392-44b3-9c7b-448e82e26486",
+          "caller_initialization_replayed": false,
+          "bootstrap_scope_boundary": "internal accepted Request/Scope unavailable; genuine inspect identity plus raw receipt preservation",
+          "completion": "passed"
+        },
+        {
+          "origin": "migrated-r0",
+          "event_count": 62,
+          "owner_epochs": 5,
+          "elapsed_journey_ms": 119455,
+          "root_id": "4ac08f5a-4941-4729-95ff-63ce7c08ae65",
+          "caller_initialization_replayed": true,
+          "bootstrap_scope_boundary": "caller-issued Scope retained privately and genuine accepted Request/Response replayed",
+          "completion": "passed"
+        }
+      ],
+      "record_hashes": {
+        "preservation.json": "b6a93cb6c96070732d150c679621bba83b73a2eb3b734b8bae5c919762e20fe3",
+        "media-fresh.json": "6d4a1f472873fa704ac7bc4fa32e5cf0d4acabe383f95594b822ad1c6b2488c5",
+        "media-migrated-r0.json": "8a3fd1fed546d25dff07012aa6e8177c7e3da69d33957c954427401966c3a9e3",
+        "preparation.json": "534b953cf273978aa45776769c4f7bbfd2620c2f664f3644bd403eadc80deb40",
+        "current-package-provenance.json": "223ab087ee00c2814b013d27cf271fac1619219476c883262a9eac751e8108a9"
+      }
+    },
+    {
+      "target": "macos-15-intel",
+      "artifact": 14036675866,
+      "zip_bytes": 225205,
+      "zip_sha256": "b0f8333f7593c60e5a4d55ecabfbbc538176bdfc547b3426232603105a428ed6",
+      "verified_members": 44,
+      "current_executable": {
+        "bytes": 142672824,
+        "sha256": "0e7b74117aaf8ea654d4905418d738a9a06200cb4595c82412f9bfe9fba492b3"
+      },
+      "prior_executable": {
+        "bytes": 128093064,
+        "sha256": "d254fb3221f595b845bb0b8f370d7666193aee79f3db7955f89c547c903feb8a"
+      },
+      "old_seven_ms": 321189,
+      "adopted_r1_total_ms": 403306,
+      "same_aggregate_ms": 403346,
+      "adopted_r1_guard": [
+        "1",
+        "2"
+      ],
+      "fresh_and_r0_guard": [
+        "0",
+        "1"
+      ],
+      "distinct_real_roots": 3,
+      "distinct_actual_owner_epochs": 20,
+      "origins": [
+        {
+          "origin": "fresh",
+          "event_count": 42,
+          "owner_epochs": 4,
+          "elapsed_journey_ms": 79878,
+          "root_id": "85564a66-bdba-47c4-85dd-54f3820a67a6",
+          "caller_initialization_replayed": false,
+          "bootstrap_scope_boundary": "internal accepted Request/Scope unavailable; genuine inspect identity plus raw receipt preservation",
+          "completion": "passed"
+        },
+        {
+          "origin": "migrated-r0",
+          "event_count": 62,
+          "owner_epochs": 5,
+          "elapsed_journey_ms": 119524,
+          "root_id": "f9128b42-52d1-4800-9d5a-f0eff1d2c314",
+          "caller_initialization_replayed": true,
+          "bootstrap_scope_boundary": "caller-issued Scope retained privately and genuine accepted Request/Response replayed",
+          "completion": "passed"
+        }
+      ],
+      "record_hashes": {
+        "preservation.json": "8ceb08396c9b97208d5406aa9bc984ae93bc5539bc310e4d01d0910d00b6d742",
+        "media-fresh.json": "c8a3f5df57db0a08791aa1b389a9960eb91e7429b3b633381145c79ce65a2d5d",
+        "media-migrated-r0.json": "ee409dd32b9808935ef9f9e124398d34684b4fa5a7681a1b5a0e16e904fd8cdc",
+        "preparation.json": "9f030bd107b52f940c21df43c0610dc5ea80658971d8efbed193937c669e2de1",
+        "current-package-provenance.json": "c463029e3f471c36e5f2bec2a91fe20a73413c0826e20c7a74442665174283ed"
+      }
+    }
+  ],
+  "verification": "Existing downloaded ZIPs and all 176 members rehashed locally; exact source/executable/aggregate/epochs/roots/refusal/preservation/replay completion flags checked. No package/application rerun.",
+  "mcp_wire": {
+    "tools": 65,
+    "bytes": 184764,
+    "sha256": "88601ca01feee3f66a241af4b0b657fe13e21ab010cbab0e74ca4a6e6ac9ed11"
+  },
+  "unqualified": [
+    "later snapshot pressure source ff105/bdca",
+    "internal opaque bootstrap Scope replay for fresh origin",
+    "resource and RSS combined qualification",
+    "fault cuts and unknown writers",
+    "general registered/mixed media",
+    "full D12",
+    "named clients",
+    "owner hardware",
+    "full v1"
+  ],
+  "whole_workflow": {
+    "all13_terminal": true,
+    "passed": 12,
+    "failed": 1,
+    "jobs": [
+      {
+        "id": 131874231952,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131874232286,
+        "name": "dependency-lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131874232504,
+        "name": "formatting",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 131874232586,
+        "name": "media",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493457,
+        "name": "checks (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493518,
+        "name": "checks (windows-2025)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493566,
+        "name": "checks (macos-15)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131875493747,
+        "name": "checks (macos-15-intel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238653,
+        "name": "owner-transports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238707,
+        "name": "owner-batch",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131876238807,
+        "name": "browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131884331379,
+        "name": "native-ui",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131886323151,
+        "name": "artifact-http",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "gitleaks": {
+    "run_numbers": [
+      133,
+      134
+    ],
+    "conclusion": "success"
+  },
+  "formatting": {
+    "failed": true,
+    "entire_artifact_applied_once_in": "bdca8010dbb1b61f8a5063d7657413920366b4fe",
+    "normalized_rust_ast_equal": true,
+    "earlier_run_remains_failed": true
+  }
+}

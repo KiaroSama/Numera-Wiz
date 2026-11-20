@@ -1,0 +1,85 @@
+{
+  "sources": [
+    {
+      "path": "research_v3/sources/filmcraft-Cargo.lock",
+      "url": "https://raw.githubusercontent.com/storytold/filmcraft/d643a886650bfbf16f24762274054575aa1e8f20/Cargo.lock",
+      "retrieved_at": "2026-10-21",
+      "sha256": "877e2ce2c0741fe359f57975fef929c04bd0002ebce548d32394683a29734ef4",
+      "bytes": 181963,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-Cargo.toml",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/rmcp-v3.6.0/crates/rmcp/Cargo.toml",
+      "retrieved_at": "2026-10-21",
+      "sha256": "2e7626ce3296dbd607f33c2ce8dbe338df5dbbc7ffd716972c51165f0a6ee7b8",
+      "bytes": 14125,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-workspace.toml",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/rmcp-v3.6.0/Cargo.toml",
+      "retrieved_at": "2026-10-21",
+      "sha256": "ac4ca0071b4b3d57b21ff8b9d8126cccbaf5c989c70d79eae1c6251723145731",
+      "bytes": 843,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/rmcp-3.6.0-release.json",
+      "url": "https://api.github.com/repos/modelcontextprotocol/rust-sdk/releases/tags/rmcp-v3.6.0",
+      "retrieved_at": "2026-10-21",
+      "sha256": "62e0ffcef38e263e93d60365931019ec38e9e4b6f4de6bcf757e95fae6e0844c",
+      "bytes": 4935,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/rmcp-LICENSE",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/rmcp-v3.6.0/LICENSE",
+      "retrieved_at": "2026-10-21",
+      "sha256": "4b802970ed0a9ed99b49d821e85907b4fad6ed61199c4d513df29a0720e9d93b",
+      "bytes": 12228,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-Cargo.toml",
+      "url": "https://raw.githubusercontent.com/cberner/redb/v4.4.0/Cargo.toml",
+      "retrieved_at": "2026-10-21",
+      "sha256": "101c183ca61f8543fd477e64b78fca72a24f5dd0d2ca76e6adf687b8aab26c54",
+      "bytes": 2983,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-db.rs",
+      "url": "https://raw.githubusercontent.com/cberner/redb/v4.4.0/src/db.rs",
+      "retrieved_at": "2026-10-21",
+      "sha256": "5a11af67fb8c7c4936533b849475c6a4964bd52f72423fcdfbf0c90669ee5876",
+      "bytes": 171331,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/redb-4.4.0-release.json",
+      "url": "https://api.github.com/repos/cberner/redb/releases/tags/v4.4.0",
+      "retrieved_at": "2026-10-21",
+      "sha256": "ccb77c3c493860171fcf0b1f9978c00bd144757161a42247e7ce1db74583bf34",
+      "bytes": 3890,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/redb-LICENSE-MIT",
+      "url": "https://raw.githubusercontent.com/cberner/redb/v4.4.0/LICENSE-MIT",
+      "retrieved_at": "2026-10-21",
+      "sha256": "493315a4e2070843f78b0c10de9ace79fd9eccda99d527767360f2e4b3850bd9",
+      "bytes": 1062,
+      "status": "retrieved-and-inspected-source-not-built"
+    },
+    {
+      "path": "research_v3/sources/redb-LICENSE-APACHE",
+      "url": "https://raw.githubusercontent.com/cberner/redb/v4.4.0/LICENSE-APACHE",
+      "retrieved_at": "2026-10-21",
+      "sha256": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
+      "bytes": 11358,
+      "status": "retrieved-and-inspected-source-not-built"
+    }
+  ],
+  "release_json_note": "API JSON formatted locally without changing field values; /latest lookup resolved to the named release."
+}

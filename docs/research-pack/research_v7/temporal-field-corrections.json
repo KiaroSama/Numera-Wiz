@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "finding_id": "MF7-01",
+  "date": "2026-10-21",
+  "scope": "Exact temporal upstream-input and clock corrections only; source/document work, no runtime execution.",
+  "corrections": [
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_id": "echo",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "source_function_observed": {
+          "old": "Composite current plus earlier/later layer frames with starting intensity, decay and chosen echo operator.",
+          "new": "Composite the current processed layer with earlier/later layers sampled in clip/timeline seconds, applying preceding non-temporal effects to off-time taps; the donor deliberately skips preceding temporal effects."
+        },
+        "target_functional_definition": {
+          "old": "Composite finite earlier/later samples of the layer with decay and a chosen blend operator.",
+          "new": "Composite finite earlier/later samples of the preceding processed layer in clip time, with decay and a chosen blend operator."
+        },
+        "ffmpeg_route": {
+          "old": "Resolve a finite set of earlier/later source windows; share decode where possible; align each tap using trim/setpts and combine with the selected blend/overlay operator and decay. Plan bounded temporal queues or staged source windows; no unbounded whole-input buffering.",
+          "new": "Sample bounded windows of the immediate upstream processed layer in clip time; share the preceding graph output and align finite taps with trim/setpts before the selected weighted blend/overlay. Retain earlier temporal nodes as acyclic upstream dependencies. Animated delays require an admitted sample schedule or bounded staged upstream regions; raw-source taps and unbounded whole-input buffering are not the default route."
+        },
+        "target_schema_boundary": {
+          "old": "Signed time offset; tap count; initial intensity/decay; add/max/min/screen/front/back/average. Rational rate; source/output clock; speed curve; hold/reverse; interpolation mode; dependent audio policy; finite ranges.",
+          "new": "Signed clip-time delay; additional tap count; starting intensity/decay; add/max/min/screen/front/back/average with declared average normalization; sample mode; endpoint/tail policy; admitted animation schedule. Parameter evaluation anchors are distinct from the tap clock. Echo does not retime audio or change clip duration implicitly."
+        },
+        "parameter_or_algorithm_difference": {
+          "old": "Temporal dependencies and end behavior explicit; no recursive effect evaluation. Nearest/blended/motion-interpolated retime are distinct capabilities. Reverse and temporal taps cannot buffer an unbounded input.",
+          "new": "Numera samples the complete finite acyclic upstream prefix, excluding this node and later nodes; FilmCraft off-time taps skip preceding temporal effects. Declare endpoint, sample-schedule and finite history/lookahead limits. A source-clock alternative requires a named variant and explicit time-map inversion/hold/reverse semantics."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121",
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs#L20-L52"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    },
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_id": "posterize_time",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "source_function_observed": {
+          "old": "Hold the source at the floor-quantized effect frame time.",
+          "new": "Hold the preceding processed layer at floor-quantized clip-relative times; off-time layer reads apply preceding non-temporal effects and deliberately skip preceding temporal effects."
+        },
+        "target_functional_definition": {
+          "old": "Hold source samples at a chosen effect frame rate.",
+          "new": "Hold the preceding processed layer at quantized clip-relative sample times while preserving output cadence and clip duration."
+        },
+        "ffmpeg_route": {
+          "old": "trim/select/setpts/fps/concat and bounded reverse; exact project time map controls source samples and effect clock.",
+          "new": "Evaluate the immediate upstream processed layer at clip-relative quantized sample times and hold those results at the unchanged output cadence. Use an admitted fps/setpts/hold route for a constant schedule; animated rate or phase requires an explicit bounded sample schedule or staged upstream regions. Earlier temporal nodes remain acyclic upstream dependencies; raw-source holding does not stand in for this effect."
+        },
+        "target_schema_boundary": {
+          "old": "Rational sample rate; phase; source/effect clock; floor/nearest policy. Rational rate; source/output clock; speed curve; hold/reverse; interpolation mode; dependent audio policy; finite ranges.",
+          "new": "Rational sample rate and phase; clip-relative sample clock; floor or explicitly selected nearest rule; sample/endpoint policy; admitted animation schedule. Parameter evaluation anchors remain independent of the sample clock; no inherited speed-curve, reverse or dependent-audio controls."
+        },
+        "parameter_or_algorithm_difference": {
+          "old": "Nearest/blended/motion-interpolated retime are distinct capabilities. Reverse and temporal taps cannot buffer an unbounded input.",
+          "new": "Numera holds the complete finite acyclic upstream processed prefix, including earlier temporal nodes; FilmCraft off-time taps skip preceding temporal effects. Upstream animation follows sampled time and downstream animation follows its own current-time anchor. This is distinct from decoded-source freeze, intrinsic retime and output-cadence conversion."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121",
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs#L20-L52"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_id": "ec.time.echo",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "target_semantics_and_differences": {
+          "old": "Temporal echo/trails with signed offsets and compositing modes.",
+          "new": "Temporal echo/trails from the preceding processed layer with signed clip-clock offsets and selected composition; prior effects remain in the sampled input. Parameter evaluation anchors are independent of the tap clock."
+        },
+        "ffmpeg_route_design": {
+          "old": "Shift a bounded set of source-time branches, weight by initial intensity/decay and combine by add/max/min/screen/over.",
+          "new": "Share the immediate upstream processed-layer output and align a bounded set of branches at explicit clip-time offsets; weight by starting intensity/decay and combine with the selected add/max/min/screen/over or declared-average operation. Retain earlier temporal nodes as acyclic dependencies. Animated delay uses an admitted bounded sample schedule or staged upstream regions, not an assumed static raw-source offset."
+        },
+        "inputs_and_component_qualification": {
+          "old": "Actual requested source times, frame-hold/interpolation and EOF policy.",
+          "new": "Actual requested upstream-layer times, independently anchored parameters, frame-hold/interpolation, finite history/lookahead and handle/EOF policy. Qualify clip-speed and preceding-effect order; default missing taps are transparent unless edge hold is explicitly selected."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L264-L318"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.csv",
+      "key_field": "source_id",
+      "row_id": "ec.time.posterizetime",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "target_semantics_and_differences": {
+          "old": "Low-frame-rate/posterized motion without changing clip duration.",
+          "new": "Hold the preceding processed layer at quantized clip-relative sample times while preserving output cadence and clip duration; the existing alias resolves this proposal to nw.video.time.hold_rate."
+        },
+        "ffmpeg_route_design": {
+          "old": "Reduce sampling to an explicit rational rate using selected rounding, then hold frames at output cadence.",
+          "new": "Quantize clip-relative sampling of the immediate upstream processed layer at an explicit rational rate and phase, then hold the sampled results at unchanged output cadence. A constant schedule can use the admitted fps/setpts/hold route; animated rate or phase requires an explicit bounded sample schedule. Do not substitute raw-source sampling or bypass preceding effects."
+        },
+        "inputs_and_component_qualification": {
+          "old": "Exact timeline origin and boundary/rounding policy.",
+          "new": "Exact clip-clock origin, rational rate/phase, floor or explicitly selected nearest rule, endpoint behavior, prior-effect input identity and independent parameter anchors. Qualify upstream versus downstream animation and clip retiming; animated schedules require separate admission."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L323-L342"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    },
+    {
+      "file": "research_v7/cross-donor-capability-aliases.csv",
+      "key_field": "source_target_capability_id",
+      "row_id": "nw.video.time.echo",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "unified_contract": {
+          "old": "Finite earlier/later layer samples with decay and selected composition.",
+          "new": "Finite earlier/later samples of the complete acyclic upstream processed layer in clip time, with decay and selected composition; exclude the current node and all later processing."
+        },
+        "required_variant_or_parameter_migration": {
+          "old": "Signed source-time offsets, tap count, sample mode, finite handle/EOF policy.",
+          "new": "Signed clip-clock delay; additional tap count; sample mode; explicit average normalization; finite endpoint/tail policy; admitted animated sample schedule. Parameter anchors are independent of the tap clock. Source-clock behavior requires a named variant with explicit time-map inversion/hold/reverse semantics; FilmCraft skipping prior temporal nodes is not inherited."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121",
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs#L20-L52",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L264-L318"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    },
+    {
+      "file": "research_v7/cross-donor-capability-aliases.csv",
+      "key_field": "source_target_capability_id",
+      "row_id": "nw.video.time.posterize",
+      "finding_id": "MF7-01",
+      "field_replacements": {
+        "unified_contract": {
+          "old": "Hold samples at an authored lower effect rate while preserving clip duration.",
+          "new": "Hold the preceding processed layer at authored quantized clip-relative sample times while preserving output cadence and clip duration."
+        },
+        "required_variant_or_parameter_migration": {
+          "old": "Rational sample rate,phase,source/effect clock,endpoint policy.",
+          "new": "Rational sample rate and phase; explicit clip-relative sample clock; floor or explicitly selected nearest rule; endpoint policy and admitted animated sample schedule. Preserve all preceding effects as acyclic upstream dependencies and keep parameter anchors independent; do not inherit FilmCraft skipping prior temporal nodes."
+        }
+      },
+      "primary_source_evidence": [
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121",
+        "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs#L20-L52",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220",
+        "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L323-L342"
+      ],
+      "selected_design_difference": "Complete finite acyclic upstream-prefix sampling includes earlier temporal nodes; FilmCraft off-time sampling deliberately omits them. Preserve donor provenance without requiring donor numerical identity.",
+      "runtime_status_change": false
+    }
+  ],
+  "markdown_replacements": [
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.md",
+      "old": "| `posterize_time` | `nw.video.time.hold_rate` | C | Hold source samples at a chosen effect frame rate. |",
+      "new": "| `posterize_time` | `nw.video.time.hold_rate` | C | Hold the preceding processed layer at quantized clip-relative sample times while preserving output cadence and clip duration. |"
+    },
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.md",
+      "old": "| `echo` | `nw.video.time.echo` | C | Composite finite earlier/later samples of the layer with decay and a chosen blend operator. |",
+      "new": "| `echo` | `nw.video.time.echo` | C | Composite finite earlier/later samples of the preceding processed layer in clip time, with decay and a chosen blend operator. |"
+    },
+    {
+      "file": "research_v7/filmcraft-functional-mapping-final.md",
+      "old": "## Findings that materially change the implementation\n",
+      "new": "## Findings that materially change the implementation\n\nThe bounded v7 temporal correction defines Echo and Posterize Time over the preceding processed layer in clip time, with parameter anchors kept separate from requested sample times. The source samples preceding non-temporal effects and skips earlier temporal nodes; Numera deliberately selects complete finite acyclic upstream-prefix sampling, excluding the current and downstream nodes. Animated offsets/rates require an admitted bounded sample schedule. The CSV removes unrelated inherited speed/reverse/audio controls from these two schemas. IDs, dispositions, counts and unqualified runtime status are unchanged. [Pinned temporal environment](https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121) · [Pinned temporal effects](https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/temporal.rs#L20-L52)\n"
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.md",
+      "old": "## 2. Functional corrections that materially change the project scope\n",
+      "new": "## 2. Functional corrections that materially change the project scope\n\nThe bounded v7 temporal correction makes `ec.time.echo` sample the preceding processed layer at explicit clip-clock offsets, and `ec.time.posterizetime` hold that layer at quantized clip-relative times without changing output cadence or duration. Prior effects remain in the sampled input; animated offsets/rates need an admitted bounded sample schedule. The existing Posterize Time proposal still resolves through the alias ledger to `nw.video.time.hold_rate`; this is one canonical implementation, not another effect or an ID migration in the source ledger. IDs, counts, dispositions, filter lists and unqualified runtime status remain unchanged. [Pinned temporal frame access](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220) · [Pinned Echo and Posterize Time](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L264-L342)\n"
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.md",
+      "old": "| 276 | [Echo](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L32) | `nw.video.time.echo` | composed / core | `split,trim,setpts,tpad,blend` |",
+      "new": "| 276 | [Echo](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L32) | `nw.video.time.echo` | composed / core | `split,trim,setpts,tpad,blend`; preceding processed layer, clip-clock taps |"
+    },
+    {
+      "file": "research_v7/effectcraft-functional-mapping-final.md",
+      "old": "| 278 | [Posterize Time](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L48) | `nw.video.time.posterize` | composed / core | `fps,setpts,tpad` |",
+      "new": "| 278 | [Posterize Time](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L48) | `nw.video.time.posterize` | composed / core | `fps,setpts,tpad`; clip-relative hold of preceding processed layer; canonical `nw.video.time.hold_rate` |"
+    },
+    {
+      "file": "research_v7/cross-donor-capability-aliases.md",
+      "old": "## Examples that must not lose semantics\n",
+      "new": "## Examples that must not lose semantics\n\nThe v7 temporal correction replaces the unqualified source-time Echo alias with explicit clip-clock sampling of the preceding processed layer. Posterize Time uses the same upstream-input contract and retains its existing `nw.video.time.posterize` to `nw.video.time.hold_rate` resolution. Parameter clocks and requested sample clocks are distinct. Numera deliberately includes earlier temporal nodes in an acyclic upstream prefix; FilmCraft's skipped-prior-temporal limitation is source provenance, not an inherited canonical restriction. No alias ID, resolution, count or runtime status changes. [FilmCraft frame access](https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/render/src/vfx/mod.rs#L38-L121) · [EffectCraft temporal input](https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220)\n"
+    },
+    {
+      "file": "research_v7/cross-donor-capability-aliases.md",
+      "old": "| Compared entries | Concrete decision |\n|---|---|",
+      "new": "| Compared entries | Concrete decision |\n|---|---|\n| Echo | One processed-layer echo with signed clip-clock taps, explicit average normalization, finite endpoints and admitted sample schedules; source-clock behavior requires a named variant. |\n| Posterize Time / hold rate | One upstream-layer hold capability at quantized clip-relative times; preserve output cadence and duration, with explicit phase/rounding/endpoints and admitted animated schedules. |"
+    }
+  ],
+  "effectcraft_posterize_review": {
+    "source_row_count": 1,
+    "source_id": "ec.time.posterizetime",
+    "source_proposal_id": "nw.video.time.posterize",
+    "existing_canonical_target": "nw.video.time.hold_rate",
+    "decision": "Correct the same missing upstream-prefix and clip-clock semantics in the single source proposal. Preserve the existing alias; do not add, merge, rename or delete source rows.",
+    "confirmed_evidence": [
+      "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L159-L220",
+      "https://github.com/storytold/effectcraft/blob/9db7f3b21700fd821f215782ed1c82afe077880f/crates/effects/src/time_fx.rs#L323-L342"
+    ],
+    "not_changed": [
+      "target_capability_id",
+      "original_proposed_capability_id",
+      "implementation_owner_task",
+      "alias_resolution",
+      "filter_list",
+      "disposition",
+      "runtime_status"
+    ]
+  },
+  "invariants": {
+    "ids_preserved": true,
+    "counts_preserved": true,
+    "row_order_preserved": true,
+    "all_unrelated_csv_fields_preserved": true,
+    "dispositions_preserved": true,
+    "statuses_preserved": true,
+    "no_runtime_execution": true
+  }
+}

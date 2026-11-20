@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "run_id": 40085147422,
+  "branch_head": "ca32eea45fd1a5894310e1f4084c9456647e5088",
+  "status": "all_jobs_passed",
+  "jobs": [
+    {
+      "id": 120846450858,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846450984,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846451006,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846451028,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846874639,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846874662,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846874708,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120846874709,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120848820970,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120848821038,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "all four native regression/Clippy/desktop targets, dependency lock, formatting and WASM",
+    "complete actual original-family MOV/MP4 first/second remux and existing media/CLI/official SDK/lost-response/large HTTP journeys",
+    "actual native report and output controls",
+    "actual Chrome report pointer/network response and subsequent reviewed output"
+  ],
+  "personally_inspected_images": [
+    "native-selection-report.png",
+    "browser-selection-report.png"
+  ],
+  "artifacts": [
+    {
+      "id": 12557410885,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:203afc4778b8d99d286a00007e2d36b13b1b34261c6bd429d781a0d7aff48f5e",
+      "downloaded": false
+    },
+    {
+      "id": 12557091595,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:1d4e9ed4b1dcff9e6ff282edf9c1d9e7e5acfcd814e2a294cf78b35b650107cf",
+      "downloaded": false
+    },
+    {
+      "id": 12556373581,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:e3b10d3d08ae92a12d43ff6e932ac5d382e8b4feba2745122fc89e7483e07ba1",
+      "downloaded": false
+    },
+    {
+      "id": 12555734885,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:2d2725a7834a5ec1405d2d52677edb9c809071f64c19e6f68e061dfe86fad3ab",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "new client Save As implementation added after this run",
+    "complete F01-F15/editor/effects/migration/packages/resources/manuals/owner gates",
+    "MOV/MP4-specific five-surface variants and broader codecs/categories"
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "scope": "Initial finite generated MediaV1 physical signal and common durable job on hosted Linux; full version1 remains unfinished",
+  "source": "37edaab9bba615464b18dfed15c49409937e83f9",
+  "rust_run": 43372690610,
+  "rust_run_number": 257,
+  "completed_job": 131713467910,
+  "target": "x86_64-unknown-linux-gnu",
+  "whole_workflow": {
+    "all13_terminal": true,
+    "passed": 8,
+    "failed": 5,
+    "failures": "formatting and all four native check jobs; no overall passing claim"
+  },
+  "owner_suite": {
+    "passed": true,
+    "elapsed_seconds": "93.19",
+    "original_finite_review_phase_timeout_seconds": 40,
+    "separate_added_helper_timings": "not captured in this source; next evidence revision instruments them without budget changes"
+  },
+  "artifact": {
+    "id": 14014045505,
+    "zip_bytes": 20299,
+    "zip_sha256": "7b5314248016b7ee94e5264ac3db0cf0f102d5cbb554bd4e4514926882b8a446",
+    "members_verified": 15,
+    "selected_members": [
+      {
+        "path": "target/owner-evidence/schema-validator/finite-compiler-media.json",
+        "bytes": 1804,
+        "sha256": "8559c24448474dc5a7e34274ae1ca4f3d4cf8fe62258721ece6bc09483694e4d"
+      },
+      {
+        "path": "target/owner-evidence/schema-validator/finite-media-job.json",
+        "bytes": 4431,
+        "sha256": "73338dd5ee8fc33a967f6dac3e82b11c3255016fcf0c7ba3ccda0a7a8c12f44c"
+      },
+      {
+        "path": "target/owner-evidence/schema-validator/suite-18.json",
+        "bytes": 1083,
+        "sha256": "ce1c00707781c8cb1c3b2cdc11f67a478ebc02787f30e0a43a2999320f91d788"
+      }
+    ]
+  },
+  "physical_signal": {
+    "plan_hash": "c03105bc020e3fb1140b5f129b398bae7fc33644a72d0cd4c82e8381646b2298",
+    "tools": {
+      "encoders": [
+        "ffv1",
+        "pcm_s16le"
+      ],
+      "ffmpeg": {
+        "bytes": "5165120",
+        "sha256": "f795072a23cb276fc293eff9c9d6ab4b752037aba396bee0d6f5469dc60561be"
+      },
+      "ffprobe": {
+        "bytes": "4947968",
+        "sha256": "016fd4835ff71eca140af5f0220bd6b05b003cd31c03bdb5e573a6b916bfd0a9"
+      },
+      "filters": [
+        "color",
+        "trim",
+        "setpts",
+        "settb",
+        "concat",
+        "anullsrc",
+        "atrim",
+        "asetpts",
+        "format",
+        "aformat",
+        "setparams"
+      ],
+      "muxers": [
+        "matroska"
+      ]
+    },
+    "video_frames": 10,
+    "audio_samples": 120000,
+    "decoded_bgr0_bytes": 122880,
+    "decoded_bgr0_sha256": "5500125d1627a3caa9942a06e6548fc600f57dac617ba7d5cd415e3d78b985dd",
+    "decoded_pcm_s16le_bytes": 480000,
+    "decoded_pcm_s16le_sha256": "baf1862a3e57a773bc10ba4920cffaa69d698720cf8c6ae105ae307533ba5a29",
+    "output_bytes": 483018,
+    "output_sha256": "33b525ab6e2859725d4b15c412cd44309c15fba5c60cc3c98b4f92487f85a23c"
+  },
+  "common_job": {
+    "state": "succeeded",
+    "artifact_state": "published",
+    "actual_bytes": "483018",
+    "actual_sha256": "c421d3f7b3b6195efc9cfa0ffcdef5839531e63f7f915a3c2cc195a9b0f993b6",
+    "exact_raw_payload_sha256": "801c2e16b7bee973c25040bc6cd4281da73b955bdd8e494cdbda54aebae19e85",
+    "stage_invocation_counts": {
+      "render": 1,
+      "verify": 3,
+      "publish": 0
+    },
+    "manifest_and_physical_hashes_match": true,
+    "accepted_replay_after_real_project_drift": true,
+    "changed_raw_bytes_conflict": true,
+    "fresh_stale_acceptance_refused": true,
+    "observed_peak_memory_bytes": null,
+    "reservation_is_estimate": true
+  },
+  "independent_schema": {
+    "suite": 18,
+    "passed": 15,
+    "failed": 0,
+    "elapsed_ms": 14,
+    "timeline_result_sha256": "7668e9219629e47d009ea72888a91fa416c2e4a5a1062857382ad1f1153021dc"
+  },
+  "actual_discovery": {
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin"
+    ],
+    "tools": 65,
+    "identical_wire_bytes_including_newline": 184390,
+    "wire_sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+    "unchanged_wire_cap": 262144,
+    "windows": "No frame retained because actual owner startup timed out; four-target discovery unqualified"
+  },
+  "not_qualified": [
+    "Current source after37edaab; every later edit requires its own hosted checks",
+    "Windows fresh startup20seconddeadline and complete native ordinary/lint success",
+    "Generation maintenance/restoration/fresh fault matrix and actual pinned-old/current package interoperability",
+    "Wider registered/multiple/still/mixedAV media, full editor/preview/audio/voiceover/offlineASRTTS/utilities/checkpoints/interchange",
+    "RSS/OS pressure and full queue/cancellation/revocation/storage cut matrices",
+    "Standard offline distribution/tool/font/TLS/SBOM/license closure, named-client runtime and owner GPU hardware"
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "scope": "Hosted source58 lifecycle corrections and native checks; full v1 unfinished",
+  "source": "58b6b8aff52670054951206313e932bec13db809",
+  "rust_run": 43381437757,
+  "run_number": 261,
+  "all13_terminal": true,
+  "passed": 11,
+  "failed": 2,
+  "jobs": [
+    {
+      "id": 131739895202,
+      "name": "formatting",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 131739895640,
+      "name": "dependency-lock",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131739895690,
+      "name": "media",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131739895729,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131740593043,
+      "name": "checks (macos-15)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131740593059,
+      "name": "checks (windows-2025)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 131740593063,
+      "name": "checks (macos-15-intel)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131740593070,
+      "name": "checks (ubuntu-24.04)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131741528637,
+      "name": "owner-transports",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131741528651,
+      "name": "browser",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131741528698,
+      "name": "owner-batch",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131747846061,
+      "name": "native-ui",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 131749426622,
+      "name": "artifact-http",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "gitleaks": {
+    "run": 43381437529,
+    "conclusion": "success"
+  },
+  "windows": {
+    "job": 131740593059,
+    "platform_tests_passed": 36,
+    "service_tests_passed": 29,
+    "store_tests_passed": 27,
+    "lint_passed": true,
+    "interfaces_passed": 1,
+    "interfaces_failed": 4,
+    "failures": [
+      "Three fresh-owner startup cases exceeded the unchanged20-second deadline",
+      "Typed migration/promotion/restoration exceeded its unchanged180-second aggregate during restoration acceptance"
+    ],
+    "diagnostic_artifact": {
+      "id": 14017008838,
+      "zip_bytes": 117682,
+      "zip_sha256": "a533fab37b414b0e6eebd0d619fe8e70b13884372b3f23b7ebaf297fba56d86c",
+      "members_verified": 39
+    },
+    "observations_ms": {
+      "fresh_attach_range": [
+        7719,
+        7821
+      ],
+      "initialization_review_range": [
+        5822,
+        6568
+      ],
+      "restoration_prepare_independent_authority": 24789
+    },
+    "cause": "Repeated external ACL processes are present in source. Timings do not establish one dominant cause; no performance fix is qualified."
+  },
+  "linux": {
+    "job": 131740593070,
+    "platform_tests_passed": 41,
+    "service_tests_passed": 30,
+    "store_tests_passed": 27,
+    "interfaces_passed": 5,
+    "interfaces_elapsed_seconds": "370.39",
+    "lint_passed": true
+  },
+  "same_backend_dirty_fault_control": "Actual Windows Store suite passed, including the genuine same-owning-backend dirty capture and retained refusal/no-mutation controls. This is not the complete cut-point matrix.",
+  "preserved_inventory": {
+    "total": 179,
+    "unit": 131,
+    "async": 48,
+    "ignored": 8,
+    "expanded_jobs": 13,
+    "native_targets": 4
+  },
+  "later_source": "bc8951659508226fdaadbb0f8f102d18d189b4c1 replaces identity/DACL transport with native APIs and removes the unsuccessful redb dev optimization experiment; this run does not qualify that source.",
+  "remaining": [
+    "Current-head all-four-target compile/lint/runtime and complete required CI",
+    "Actual new native ACL transport and original20/60/180-second outcomes",
+    "Pinned-old/current MediaV1 floor/restoration/fresh and full recovery/fault/resource matrices",
+    "All remaining editor/media/offline-distribution/named-client/owner-hardware version1 requirements"
+  ]
+}

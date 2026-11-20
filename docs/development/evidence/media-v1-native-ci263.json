@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "scope": "Actual four-native build/tests/lint, current CLI lifecycle, original prior/current preservation and65tool discovery; fullv1 unfinished",
+  "source": "334b38903ad925ebd207f35ba4ffab47f94594cb",
+  "rust_run": 43388298900,
+  "run_number": 263,
+  "whole_workflow": {
+    "status": "completed",
+    "all13_terminal": true,
+    "passed": 12,
+    "failed": 1,
+    "jobs": [
+      {
+        "id": 131761906525,
+        "name": "media",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131761906862,
+        "name": "dependency-lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131761906901,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131761906952,
+        "name": "formatting",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 131762817239,
+        "name": "checks (macos-15)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131762817255,
+        "name": "checks (windows-2025)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131762817305,
+        "name": "checks (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131762817336,
+        "name": "checks (macos-15-intel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131763443467,
+        "name": "browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131763443522,
+        "name": "owner-transports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131763443547,
+        "name": "owner-batch",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131771923325,
+        "name": "native-ui",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131773437021,
+        "name": "artifact-http",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "failure": "formatting; exact entire hosted patch applied in later9ea7d5e with all2 normalized AST equal. No all13-green claim for source334."
+  },
+  "native_checks": {
+    "ubuntu-24.04": {
+      "job": 131762817305,
+      "conclusion": "success"
+    },
+    "macos-15": {
+      "job": 131762817239,
+      "conclusion": "success"
+    },
+    "macos-15-intel": {
+      "job": 131762817336,
+      "conclusion": "success"
+    },
+    "windows-2025": {
+      "job": 131762817255,
+      "conclusion": "success",
+      "platform_tests_passed": 36,
+      "service_tests_passed": 29,
+      "store_tests_passed": 27,
+      "interfaces_passed": 5,
+      "lint_passed": true
+    }
+  },
+  "gitleaks": {
+    "run": 43388363448,
+    "run_number": 114,
+    "conclusion": "success",
+    "earlier113": "Naturally superseded/cancelled by PR edited event concurrency; no manual cancellation or rerun"
+  },
+  "artifacts": [
+    {
+      "target": "windows-2025",
+      "id": 14020786351,
+      "zip_bytes": 187644,
+      "zip_sha256": "7129e3520f8ed849f588b65498c1970267a73bae44721cc24782aa11f7161c44"
+    },
+    {
+      "target": "ubuntu-24.04",
+      "id": 14019753560,
+      "zip_bytes": 186899,
+      "zip_sha256": "fc4ddfc8127338d34984bb862f1f20fc2e2245af2a33390b199fa2b5fd34d7f4"
+    },
+    {
+      "target": "macos-15",
+      "id": 14019604640,
+      "zip_bytes": 187721,
+      "zip_sha256": "3ad6a691970e89d341e8ef91a2189ef6f5affe98b7be84e53d8049334b314662"
+    },
+    {
+      "target": "macos-15-intel",
+      "id": 14020368323,
+      "zip_bytes": 187803,
+      "zip_sha256": "425589029909067cc6e7cacd31168dba9c8e9611b510353b6bcd8db33c159dbf"
+    }
+  ],
+  "all_native_artifact_members_verified": 168,
+  "native_observations": [
+    {
+      "target": "windows-2025",
+      "wire_bytes": 184390,
+      "wire_sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+      "tools": 65,
+      "native_lifecycle_added_ms": 3340,
+      "original_prior_current_elapsed_ms": 235458,
+      "original_prior_current_epochs": 7
+    },
+    {
+      "target": "ubuntu-24.04",
+      "wire_bytes": 184390,
+      "wire_sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+      "tools": 65,
+      "native_lifecycle_added_ms": 4627,
+      "original_prior_current_elapsed_ms": 244680,
+      "original_prior_current_epochs": 7
+    },
+    {
+      "target": "macos-15",
+      "wire_bytes": 184390,
+      "wire_sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+      "tools": 65,
+      "native_lifecycle_added_ms": 8930,
+      "original_prior_current_elapsed_ms": 310522,
+      "original_prior_current_epochs": 7
+    },
+    {
+      "target": "macos-15-intel",
+      "wire_bytes": 184390,
+      "wire_sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+      "tools": 65,
+      "native_lifecycle_added_ms": 8519,
+      "original_prior_current_elapsed_ms": 331586,
+      "original_prior_current_epochs": 7
+    }
+  ],
+  "wire": {
+    "all4_identical": true,
+    "tools": 65,
+    "bytes_including_newline": 184390,
+    "sha256": "eeba9adc157ca33d61a4d747154948d584c6998797aac94f5adbe6f389338696",
+    "unchanged_cap": 262144,
+    "all65_generated_params_and_requirements_correspond": true,
+    "typed_Result_schemas_correspond": 18,
+    "normalization": "Only generated Result schema positions rebased under #/$defs/Result, removing inherited $schema exactly as shared envelope contract; enum/default/example data untouched. Input only lifts root $defs."
+  },
+  "preserved_limits": {
+    "test_identities": 179,
+    "unit": 131,
+    "async": 48,
+    "ignored": 8,
+    "expanded_jobs": 13,
+    "fresh_owner_seconds": 20,
+    "native_cli_step_seconds": 60,
+    "native_cli_aggregate_seconds": 180,
+    "original_prior_current_seconds": 600
+  },
+  "not_qualified": [
+    "Later2d5 genuine native creation-collision fixture and842 selected-read/API plus new MediaV1 prior/current journey",
+    "FullD12 fresh/r0/fault/cut-point/unknown-writer/storage/RSS matrices",
+    "Actual named Claude/Codex/Cursor loading and owner-opt-in/full agent parity",
+    "General multi-source/still/mixed A/V/editor/preview/offline distribution/owner hardware/fullv1"
+  ]
+}

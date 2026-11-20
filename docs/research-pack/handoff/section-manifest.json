@@ -1,0 +1,136 @@
+{
+  "revision": "7.0",
+  "authoritative_file": "Numera-Wiz-Implementation-Mandate-EN.md",
+  "authoritative_sha256": "126c8aa8aa7f874802a09600040a1986cff650ad70b70f58f30a441d87fbef06",
+  "view_transform": "Prepend provenance banner; qualify fragment links to the authoritative document. Normative text is unchanged.",
+  "sections": [
+    {
+      "file": "00-front-matter-and-fixed-requirements.md",
+      "title": "Front matter and fixed requirements",
+      "source_body_sha256": "fe5f009b9823176301f836ca5bcc00d75195a0627cb0cc2b7bdcc19a87b848ef",
+      "view_body_sha256": "e8d65f85da0b6f06b43ab8bc6eba2c6f1f5cf21ced19dc2c379a66363bc4153e",
+      "view_sha256": "c79bafd215525b4889db8ca3a6a41b075d7130c1739d4f141c1a334c129d09a3",
+      "source_words": 2110
+    },
+    {
+      "file": "01-1-workflow-and-research.md",
+      "title": "1. Workflow and research",
+      "source_body_sha256": "22f6adab2960a99f365787f787c1f6a05268fd140384c109055105523b57cd34",
+      "view_body_sha256": "22f6adab2960a99f365787f787c1f6a05268fd140384c109055105523b57cd34",
+      "view_sha256": "f895a601f8b9578d322e63ed85a7f026cd66fbac8152ac9b56bbcc2f8a8f810a",
+      "source_words": 1297
+    },
+    {
+      "file": "02-2-functional-scope-and-migration.md",
+      "title": "2. Functional scope and migration",
+      "source_body_sha256": "fd7d809742d1021022b54fcc96983c7aeb532d6d91b42e09af4a111d5ec7c763",
+      "view_body_sha256": "fd7d809742d1021022b54fcc96983c7aeb532d6d91b42e09af4a111d5ec7c763",
+      "view_sha256": "02a9a4eb5a09d04d089dfbf25728af963772af8016a6cc62495c5358ec1d4bed",
+      "source_words": 3173
+    },
+    {
+      "file": "03-3-editing-and-command-domains.md",
+      "title": "3. Editing and command domains",
+      "source_body_sha256": "75dac0cce855d7566038fbf95235e2de35d6e7d89f974e28965ee9c19f5b9bf7",
+      "view_body_sha256": "75dac0cce855d7566038fbf95235e2de35d6e7d89f974e28965ee9c19f5b9bf7",
+      "view_sha256": "d6ce82e24a4e750fd4711df5500e458c44ff46d2359cb6dc9ec0ebc6927aaa73",
+      "source_words": 4262
+    },
+    {
+      "file": "04-4-engine-ownership-and-durable-state.md",
+      "title": "4. Engine ownership and durable state",
+      "source_body_sha256": "f1806b09dbd7c9f7d34da67c31f96543b455744c9fd6ca77b41fcd4d0ac766e6",
+      "view_body_sha256": "f1806b09dbd7c9f7d34da67c31f96543b455744c9fd6ca77b41fcd4d0ac766e6",
+      "view_sha256": "3455086ec6963b1e11becb53df36411879c26a04a079cb012ba0711d85a937c5",
+      "source_words": 9127
+    },
+    {
+      "file": "05-5-domain-model-and-interface-contracts.md",
+      "title": "5. Domain model and interface contracts",
+      "source_body_sha256": "16dc8c206059febcf49d138dff6ab4506e88efe472fa119cb866efd027128c39",
+      "view_body_sha256": "16dc8c206059febcf49d138dff6ab4506e88efe472fa119cb866efd027128c39",
+      "view_sha256": "01c780f92cebe1e2f50c2b880a76cfd658c6bc1613804533f0884adf912b00f4",
+      "source_words": 12624
+    },
+    {
+      "file": "06-6-ffmpeg-execution-and-preview.md",
+      "title": "6. FFmpeg execution and preview",
+      "source_body_sha256": "a22e4646aa6e36fd4f3338577ae35ff224e9c5518689826488fb76109d68a5df",
+      "view_body_sha256": "a22e4646aa6e36fd4f3338577ae35ff224e9c5518689826488fb76109d68a5df",
+      "view_sha256": "60d31255f2192964726dbb92b3dc2755b4f310a73ce4092f13a72ef3ef5617fc",
+      "source_words": 10707
+    },
+    {
+      "file": "07-7-shared-editor-and-shortcuts.md",
+      "title": "7. Shared editor and shortcuts",
+      "source_body_sha256": "a4b586f486c2b0531151ed1bb456d3b4f5c4b98392da167956195824b1e15be0",
+      "view_body_sha256": "a4b586f486c2b0531151ed1bb456d3b4f5c4b98392da167956195824b1e15be0",
+      "view_sha256": "081c25e8ae0d39f8a7a30f55de945a272e52143426f063b447ad2a5392c0d42c",
+      "source_words": 3204
+    },
+    {
+      "file": "08-8-resources-security-distribution-and-ci.md",
+      "title": "8. Resources, security, distribution and CI",
+      "source_body_sha256": "c2f87f17cbabaa619d43cb6668b91b6edef090e973d17005793feefbf2bedc50",
+      "view_body_sha256": "c2f87f17cbabaa619d43cb6668b91b6edef090e973d17005793feefbf2bedc50",
+      "view_sha256": "4b920452c461cf23e17e8bc6e2c1fd8d6cf7a43a701fa48ce8a30160c71fed6c",
+      "source_words": 7599
+    },
+    {
+      "file": "09-9-implementation-sequence.md",
+      "title": "9. Implementation sequence",
+      "source_body_sha256": "6f9672d32ce718ab39b608373e4589bbf5e3863fbf874619a752007a921d1732",
+      "view_body_sha256": "6f9672d32ce718ab39b608373e4589bbf5e3863fbf874619a752007a921d1732",
+      "view_sha256": "788faca4fe8922126235dc13b7b419f983c1bb9a10b54196bf8f46665fd622bc",
+      "source_words": 740
+    },
+    {
+      "file": "10-10-additional-project-research.md",
+      "title": "10. Additional project research",
+      "source_body_sha256": "9204b8fc70715eb3ecbe38bd135bd80a48a64df33c47548fe3c200b17cefd3c8",
+      "view_body_sha256": "9204b8fc70715eb3ecbe38bd135bd80a48a64df33c47548fe3c200b17cefd3c8",
+      "view_sha256": "0cf5dd64622d7ceb099a14ecb4641fdb1f11b11d1a6f9d89d4b009c8d05933ae",
+      "source_words": 603
+    },
+    {
+      "file": "11-11-work-packages-traceability-and-acceptance.md",
+      "title": "11. Work packages, traceability and acceptance",
+      "source_body_sha256": "5a839446f6a0b4decb0e6b9d543625b9fb4b2e663363d87e8d7946f002aa2dab",
+      "view_body_sha256": "5a839446f6a0b4decb0e6b9d543625b9fb4b2e663363d87e8d7946f002aa2dab",
+      "view_sha256": "d953d44dd86996de6cf72470d3e8a1a8363fda13f9f13ed6ce1a301c87b86395",
+      "source_words": 6761
+    },
+    {
+      "file": "12-annex-a-complete-ffmwiz-behavior.md",
+      "title": "Annex A. Complete FFmWiz behavior",
+      "source_body_sha256": "04fb4709e238c3c99baadc3fe2a8852796e9b46f77628cbb3121c67db14b3927",
+      "view_body_sha256": "04fb4709e238c3c99baadc3fe2a8852796e9b46f77628cbb3121c67db14b3927",
+      "view_sha256": "86712f36140999edf618aed313c8d8f8d151cea2abfa6ed0667a7be9febcaffa",
+      "source_words": 10231
+    },
+    {
+      "file": "13-annex-b-donor-capability-decisions.md",
+      "title": "Annex B. Donor capability decisions",
+      "source_body_sha256": "66f2f09d9d19ff630b922c4107e34ed9a1a432738226f62f165aefa5cb5cf98c",
+      "view_body_sha256": "66f2f09d9d19ff630b922c4107e34ed9a1a432738226f62f165aefa5cb5cf98c",
+      "view_sha256": "4a0bead935b0672d6455426e0fc5405cebb351a665a0d388a38bbc2e1bd50ff3",
+      "source_words": 18772
+    },
+    {
+      "file": "14-annex-c-source-command-closure.md",
+      "title": "Annex C. Source-command closure",
+      "source_body_sha256": "9f402406b83d9c816ccdfe4b9ddfd8726ea04ecea7ec6c6078e9afb12806aafd",
+      "view_body_sha256": "9f402406b83d9c816ccdfe4b9ddfd8726ea04ecea7ec6c6078e9afb12806aafd",
+      "view_sha256": "cb841f3c2517882cc2c1cc29fd398cdd4fbb71b8d2fae3bdfb742304c5cbe4d2",
+      "source_words": 2264
+    },
+    {
+      "file": "15-annex-d-complete-muxcls-rust-rewrite.md",
+      "title": "Annex D. Complete MuxCls Rust rewrite",
+      "source_body_sha256": "84a7bd546988a975f0f68e8bc668ebfe1540327f9053e7a02e6a43cc470ab55d",
+      "view_body_sha256": "84a7bd546988a975f0f68e8bc668ebfe1540327f9053e7a02e6a43cc470ab55d",
+      "view_sha256": "47d01bdd33a2c9d852d0d5a484aa8a092c52572ffc6168061776a8a6ad7378fa",
+      "source_words": 4720
+    }
+  ]
+}

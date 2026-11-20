@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "run_id": 40082246721,
+  "branch_head": "0a4073d26b485e3fb87cf3ef321e73e7dc59f44b",
+  "jobs": [
+    {
+      "id": 120838006282,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120838006479,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838006491,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838006538,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838321803,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838321804,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838321870,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120838321979,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120839615498,
+      "name": "browser",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120840037520,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "all four native regression/Clippy/desktop targets, dependency lock and WASM",
+    "actual original MOV and MP4 first cleanup with video removal and exact language/title",
+    "actual MOV/MP4 second registration and language-only remux retaining exact title",
+    "independent raw track-name and original brand assertions",
+    "full packet payload/exact original clocks/flags/codec/extradata/exposed side-data verification",
+    "unchanged case-varied-extension full byte copies",
+    "legacy raw-name/current-title lowering units and exact MP4 vendor-absence admission negatives",
+    "complete existing CLI/official SDK/lost-response and large HTTP/revocation/disconnect-index cleanup journey",
+    "actual native report/Escape/Review/Run/manifest journey"
+  ],
+  "native_visual_review": {
+    "personally_inspected": true,
+    "encoded_png_characters": 152528,
+    "observed": [
+      "Selection report: Files 1, Ready 1, Skipped 0, Rejected 0",
+      "three correct original-language/source/retained rows",
+      "updated preservation-profile hint and report/review controls remain visible"
+    ]
+  },
+  "failures": [
+    "five exact hosted formatting hunks applied in the following revision",
+    "Chrome actual Selection report network-response observation timed out; exact cause not established by that run"
+  ],
+  "browser_follow_up": [
+    "retain at most 64 completed network IDs across log batches independent of event order",
+    "repeat only the real nonmutating report pointer input while no report request is observed and final form readiness may still be pending",
+    "unchanged 15-second observation deadline",
+    "retain bounded actual failure PNG and nonsecret request-seen/attempt counters"
+  ],
+  "not_asserted": [
+    "all-green workflow",
+    "Chrome pass for this run",
+    "MOV/MP4-specific native/browser/CLI/SDK variant journeys",
+    "complete MOV/MP4 codecs/categories, F08, migration, packages, aggregate resources or GPU"
+  ],
+  "artifacts": [
+    {
+      "id": 12556385012,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "5816e309315511b1fa828f499906ff7f7231381ac0d3bc833b0fd9b0ae2319be",
+      "downloaded": false
+    },
+    {
+      "id": 12555871616,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "4dad6098f23be244904483df399570c40b27e83647a7d31704cf18ae67047259",
+      "downloaded": false
+    },
+    {
+      "id": 12555034618,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "1d4c3325778e5bfb3f07c8d8659b76cb5bce25bccdd9df59460b0000136eba32",
+      "downloaded": false
+    },
+    {
+      "id": 12554674812,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "b4dea52fbe322b04062ab8a04635d10f393034f6c70a764f9fd9186bb2a67225",
+      "downloaded": false
+    }
+  ]
+}

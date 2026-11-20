@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "subject": "development_schema2_to3_migration_and_preserved_runtime_regressions",
+  "branch_head": "d72937bb8b96936eb2665644dd53dd27288cc0e6",
+  "compiled_pr_merge": "4a974625a62aaf1de88a02e3740e758bacc75b91",
+  "workflow_run": 40129735497,
+  "workflow_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40129735497",
+  "workflow_result": "success",
+  "all_jobs": [
+    {
+      "id": 120978690300,
+      "name": "dependency-lock",
+      "result": "success"
+    },
+    {
+      "id": 120978690472,
+      "name": "web",
+      "result": "success"
+    },
+    {
+      "id": 120978690475,
+      "name": "media",
+      "result": "success"
+    },
+    {
+      "id": 120978690515,
+      "name": "formatting",
+      "result": "success"
+    },
+    {
+      "id": 120979190207,
+      "name": "checks (windows-2025)",
+      "result": "success"
+    },
+    {
+      "id": 120979190250,
+      "name": "checks (macos-15)",
+      "result": "success"
+    },
+    {
+      "id": 120979190258,
+      "name": "checks (macos-15-intel)",
+      "result": "success"
+    },
+    {
+      "id": 120979190284,
+      "name": "checks (ubuntu-24.04)",
+      "result": "success"
+    },
+    {
+      "id": 120979253000,
+      "name": "owner-batch",
+      "result": "success"
+    },
+    {
+      "id": 120979253019,
+      "name": "browser",
+      "result": "success"
+    },
+    {
+      "id": 120979253059,
+      "name": "artifact-http",
+      "result": "success"
+    },
+    {
+      "id": 120979253081,
+      "name": "owner-transports",
+      "result": "success"
+    },
+    {
+      "id": 120981454589,
+      "name": "native-ui",
+      "result": "success"
+    }
+  ],
+  "observed": {
+    "store_regressions_per_native_target": 24,
+    "service_regressions_per_native_target": 30,
+    "native_targets": [
+      "ubuntu-24.04",
+      "windows-2025",
+      "macos-15",
+      "macos-15-intel"
+    ],
+    "store_cases": [
+      "raw receipts and exact numeric strings",
+      "manifest-bound complete copy/restart",
+      "live-owner/unproven-file refusal",
+      "retained source/target generation locks",
+      "atomic reader floor with ordinary receipt",
+      "injected accepted/copy/activation interruption recovery",
+      "stale raw-record review refusal"
+    ],
+    "service_case": "Real Service owner admission, owner-only plan/migrate, same principal/profile revision and old/new receipts after selected-generation restart",
+    "visual_review": [
+      "Linux native genuine-picker Save result",
+      "Linux native two-source batch success",
+      "Chrome genuine-picker Save result",
+      "Chrome two-source batch success"
+    ],
+    "preserved_archive": "Hosted xtask verify-research passes the original manifest; no archive edits in this slice"
+  },
+  "reports": {
+    "http": {
+      "artifact_bytes": "268633400",
+      "artifact_id": "job-a6ce6279-e395-4ad1-b857-4f1b252b1287",
+      "cancelled_index_cleanup": true,
+      "client_copy_bytes": "268633400",
+      "client_copy_cancel_setup_ms": "31305",
+      "client_copy_cancelled_before_publication": true,
+      "client_copy_elapsed_ms": "42811",
+      "client_copy_peak_kib": 26632,
+      "client_copy_profile": "job-read-only; no general filesystem roots",
+      "client_copy_sha256": "d8308b3aa09adf923a947b633a935c23e42acf3ab1f2295461819da6722460de",
+      "components": {
+        "ffmpeg": {
+          "bytes": "5132352",
+          "file_name": "ffmpeg",
+          "sha256": "57027bd7d6aacfafa1b31e8ceef2e41e1f5c4ba685ae69dd17274c692fadeec6"
+        },
+        "ffprobe": {
+          "bytes": "4911104",
+          "file_name": "ffprobe",
+          "sha256": "e3cb5b229af9be9e31e8fb18f6ab8a92bfab17762fa47166325268159732f8f5"
+        }
+      },
+      "credential_revoked_delivered_bytes": "3145728",
+      "executable": {
+        "bytes": "233514072",
+        "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/debug/numera-wiz",
+        "sha256": "15231c96ecb8f9a929fc242e844a20502e745844e28af9eb3265688d59fe48a5"
+      },
+      "job_id": "a6ce6279-e395-4ad1-b857-4f1b252b1287",
+      "job_revoked_delivered_bytes": "5242880",
+      "owner_before_high_kib": 31964,
+      "owner_high_kib": 32924,
+      "owner_process_id": 2559,
+      "plan_hash": "7709539493bb2ddc8c1a6a1cbb9893bba3082dbcc2e3d000677cb23edc8cfe04",
+      "plan_id": "b4006b01-054a-4aa0-b1cf-2b3423db6076",
+      "registry": "bf92c31d60757a3a1fb140fc08f175574606e1cca6ce1d58dfbf2c7d2ff1df72",
+      "schema_version": 1,
+      "scope": "Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification.",
+      "selected_owner_rss_ceiling_kib": 131072,
+      "sha256": "d8308b3aa09adf923a947b633a935c23e42acf3ab1f2295461819da6722460de",
+      "source": "4a974625a62aaf1de88a02e3740e758bacc75b91",
+      "status": "passed"
+    },
+    "client_copy": {
+      "artifact_id": "job-a6ce6279-e395-4ad1-b857-4f1b252b1287",
+      "bytes": "268633400",
+      "client_peak_kib": 26632,
+      "elapsed_ms": "42811",
+      "not_qualified": [
+        "later cancellation/revocation assertions",
+        "other platforms/packages",
+        "aggregate R20"
+      ],
+      "profile": "job read only; no general filesystem roots",
+      "schema_version": 1,
+      "selected_client_ceiling_kib": 131072,
+      "sha256": "d8308b3aa09adf923a947b633a935c23e42acf3ab1f2295461819da6722460de",
+      "source": "4a974625a62aaf1de88a02e3740e758bacc75b91",
+      "status": "full_client_copy_passed"
+    },
+    "batch": {
+      "case": "two_source_cleanup_batch",
+      "cli_batch": "5823e2ce-df22-46e4-a322-677c79837b1a",
+      "confirmed_cancelled": 2,
+      "copy_full_byte_equality": true,
+      "http_batch": "13b2f0c7-f7d1-4b96-a733-3d47ef357c54",
+      "independent_retained_packet_equality": true,
+      "partial_exit": 9,
+      "scope": "Explicit candidates only; directory expansion, companions, replacement and GUI batching remain separate qualification",
+      "sdk_batch": "0c37596b-9cc8-49d7-a1ec-7cce57f3a166",
+      "skipped": 2,
+      "source_commit": "4a974625a62aaf1de88a02e3740e758bacc75b91",
+      "transports": [
+        "typed_cli",
+        "official_sdk_stdio",
+        "official_sdk_streamable_http"
+      ]
+    },
+    "sdk_lost_batch_response": {
+      "accepted_identity": "72d1c4c7-42d4-4113-b254-c91245024185",
+      "automatic_retry_request_unchanged": true,
+      "boundary": "actual_owner_official_sdk_stdio",
+      "command": "batches.submit",
+      "durable_job_count": 2,
+      "lost_accepted_responses": 2,
+      "member_ids": [
+        "a1130e44-8be0-4be4-aeee-0110c7393d54",
+        "93d2bff3-2207-4428-86a7-6ae0ecf68203"
+      ],
+      "output_bytes": "197983",
+      "output_sha256": "aeef818020595d89796f44c413966dfe23647183b132f1cf90218091604a856b",
+      "owner_epoch_changed": true,
+      "owner_log_only": true,
+      "root_and_principal_unchanged": true,
+      "same_job_after_restart": true,
+      "same_member_set_after_restart": true,
+      "same_receipt_after_restart": true,
+      "schema_version": 1,
+      "source_commit": "4a974625a62aaf1de88a02e3740e758bacc75b91"
+    }
+  },
+  "artifacts": [
+    {
+      "id": 12575021270,
+      "name": "resolved-dependencies",
+      "zip_sha256_reported_by_github": "sha256:fc4430032e1c09916369677eb5001228dd20c5cecf3848177ff4c3c93cf304ce",
+      "zip_bytes": 28821,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12575011727,
+      "name": "owner-batch-evidence-linux",
+      "zip_sha256_reported_by_github": "sha256:e0a9e59dbba55a42e913098ad6452323dcc717450a868c1b30da5d3dedb5eef2",
+      "zip_bytes": 2909,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574877294,
+      "name": "development-evidence-windows-2025",
+      "zip_sha256_reported_by_github": "sha256:2774687cbbd780507a0cd55c29d27cbf2f33165a617c70c0f2d60526d93504a4",
+      "zip_bytes": 50556,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574831732,
+      "name": "ffmpeg-development-fixture-profile-linux",
+      "zip_sha256_reported_by_github": "sha256:8992c295a87ab8919a649cddac251bbd5f7355f72bc38d2c47757451e706e57f",
+      "zip_bytes": 7390679,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574779457,
+      "name": "native-ui-evidence-linux",
+      "zip_sha256_reported_by_github": "sha256:0a0a0fae872fff305bfa3bfcce509bdb207415a41cdd0edb7c55e8fba4b198b2",
+      "zip_bytes": 1750904,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574594237,
+      "name": "owner-media-evidence-linux",
+      "zip_sha256_reported_by_github": "sha256:e5619aabb1e8a7dc9c46f236996b1b2ce54dce1546a023ba09dbffa5383b0440",
+      "zip_bytes": 2196,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574593592,
+      "name": "development-evidence-ubuntu-24.04",
+      "zip_sha256_reported_by_github": "sha256:74c83f13be22c84ec45a46f16fb2b3871b7ae5acc9af0351e2bd00f750b89760",
+      "zip_bytes": 50526,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574524180,
+      "name": "development-evidence-macos-15-intel",
+      "zip_sha256_reported_by_github": "sha256:0c74f7efaa584f81014404062ce0c100d9daf0223c257070aef9bd0eac57548a",
+      "zip_bytes": 50535,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574507499,
+      "name": "numera-wiz-development-windows-2025",
+      "zip_sha256_reported_by_github": "sha256:c0026253cc156e269208ab93ccd6ff79f5f0bfde6cb15fefb25b44f5917d8717",
+      "zip_bytes": 25075660,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574492391,
+      "name": "numera-wiz-development-macos-15",
+      "zip_sha256_reported_by_github": "sha256:ffee84d4671c320524143535ab3793e4845e2d9d7d201c31bed70f5346451c6c",
+      "zip_bytes": 29294360,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574448704,
+      "name": "numera-wiz-development-ubuntu-24.04",
+      "zip_sha256_reported_by_github": "sha256:87e7c51f961465ebad41cb7257bd5ba16d770f369455156e58313f8d2d64e8c9",
+      "zip_bytes": 33109672,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574349342,
+      "name": "numera-wiz-development-macos-15-intel",
+      "zip_sha256_reported_by_github": "sha256:b0d88084cf31bd1ab5fe707945aa2ff9fca693bdeff229cac926e959c54c86ef",
+      "zip_bytes": 31446371,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574323875,
+      "name": "artifact-http-evidence-linux",
+      "zip_sha256_reported_by_github": "sha256:59a51df8e44dff2ad3daf113c9f92a5ec5b587cd282b1524b8b41b955896d894",
+      "zip_bytes": 4410,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574272951,
+      "name": "source-formatting",
+      "zip_sha256_reported_by_github": "sha256:f0cb4749f335d3e40aef5c69cfd29fd69923758a18103c61be5954008e6e07cb",
+      "zip_bytes": 148,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574248679,
+      "name": "browser-boot-evidence-linux-chrome",
+      "zip_sha256_reported_by_github": "sha256:aea8ffb5e9f99e011c1434bf0a6a34566277c985621d78a80deaf82d0bfdf642",
+      "zip_bytes": 1174198,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12574063378,
+      "name": "embedded-web",
+      "zip_sha256_reported_by_github": "sha256:628ea26aefae7ecd58d911be65a635a5bb3435a93f92448a425c0309228c32e8",
+      "zip_bytes": 2333038,
+      "downloaded_or_independently_hashed": false
+    },
+    {
+      "id": 12573962566,
+      "name": "development-evidence-macos-15",
+      "zip_sha256_reported_by_github": "sha256:13875adf8aa4785b0e35a3c6a0092801d93719f9cd8dbf905766c4f4041e0816",
+      "zip_bytes": 50528,
+      "downloaded_or_independently_hashed": false
+    }
+  ],
+  "not_qualified": [
+    "actual new typed migration CLI invocation (new journey added next)",
+    "actual previous/new packaged binaries and hard-process crash migration matrix",
+    "adoption-aware rollback (next change)",
+    "retired command version catalogue/digest replay",
+    "project journals and unsaved edit heads",
+    "retention root-set collection",
+    "full F01-F15/editor/DAG/effects/preview/mixer/captions/interchange/closure",
+    "standard offline portable packages and aggregate resource budgets",
+    "matching owner hardware harness/GPU qualification"
+  ],
+  "full_release": "blocked"
+}

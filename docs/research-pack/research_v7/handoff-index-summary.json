@@ -1,0 +1,13 @@
+{
+  "revision": "7.0",
+  "original_numbered_items_and_subitems": 25,
+  "clarifications_and_setup_preferences": 11,
+  "traceability_rows": 36,
+  "cross_domain_scenarios": 63,
+  "review_findings": 39,
+  "application_runtime_claims": false,
+  "new_revision_7_findings": 12,
+  "new_revision_7_scenarios": 29,
+  "architecture_scenarios": 3,
+  "muxcls_scenarios": 12
+}

@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "run_id": 40078904727,
+  "branch_head": "f4d6ff05336c9f3f5ecdd77571bb55c58d92851d",
+  "jobs": [
+    {
+      "id": 120828149172,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120828149291,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120828149350,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120828149382,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120828584585,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120828584656,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120828584750,
+      "name": "checks (macos-15)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120828584933,
+      "name": "checks (windows-2025)",
+      "conclusion": "failure",
+      "ordinary_regressions": "success"
+    },
+    {
+      "id": 120829630287,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120829872989,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "asserted": [
+    "new source report grouping, original-index, language, cover-picture, skip/rejection and budget units",
+    "current command/asset/path rights and mixed invisible/absent non-disclosure units",
+    "all four ordinary native regression suites passed before UI source-order lint failure",
+    "actual CLI and official SDK stdio/both HTTP lifecycle report assertions",
+    "complete actual engine/media/CLI/official SDK/lost-response and large owner HTTP/revocation/disconnect cleanup journey",
+    "retained payload/proof exact names and original output object assertions"
+  ],
+  "browser_visual_review": {
+    "personally_inspected": true,
+    "job_id": 120829630287,
+    "encoded_png_characters": 138076,
+    "source": "actual Chrome screenshot from completed real pointer/network-response journey",
+    "observed": [
+      "Selection report window opened from shared control",
+      "one candidate, one ready, no skipped/rejected candidates",
+      "three unique rows: ffv1 video/und and pcm_s16le audio/eng and fas",
+      "source and retained counts both one per row",
+      "Original indices view control and per-file detail disclosure visible"
+    ],
+    "not_asserted": [
+      "Original indices control activation",
+      "native report GUI in this run",
+      "large report page navigation"
+    ]
+  },
+  "failures": [
+    "formatting: 38 exact hosted hunks applied in the following revision",
+    "Clippy items_after_test_module: report UI implementation moved before the validation test module in the following revision"
+  ],
+  "native_gui": "skipped by native lint prerequisites",
+  "artifacts": [
+    {
+      "id": 12554615659,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "d73e06a12b2ccaf748329f3205615d6e364839f4af020e8d186e566506ecdcf6",
+      "downloaded": false
+    },
+    {
+      "id": 12554502758,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "a59fbb2007b8dce40017e2be122c6b842fd770cf0b9713c3f25105f259f0a9cd",
+      "downloaded": false
+    },
+    {
+      "id": 12554247491,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "1a686db5f1de85862b51d69ebc7e286480e504a908b41a191bc6ff792af15ed8",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "complete F08 or all report control/batch variants",
+    "full native desktop build gates in this run",
+    "complete store migration, filesystem packages, aggregate resources or owner GPU"
+  ]
+}

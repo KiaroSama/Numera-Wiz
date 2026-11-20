@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "scope": "Actual four-native explicit local-owner MCP, protected-file credential delivery and known pre-issuance cancellation; fullv1 unfinished",
+  "source": "fb4e4c9bb29530296361b8af6dbea442e553d19a",
+  "rust_run": 43405770462,
+  "run_number": 269,
+  "sdk_version_exercised": "3.9.0",
+  "whole_workflow": {
+    "all13_terminal": true,
+    "passed": 12,
+    "failed": 1,
+    "jobs": [
+      {
+        "id": 131819665167,
+        "name": "formatting",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 131819665468,
+        "name": "media",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131819665533,
+        "name": "dependency-lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131819665624,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131820839837,
+        "name": "checks (macos-15-intel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131820839866,
+        "name": "checks (windows-2025)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131820839907,
+        "name": "checks (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131820839931,
+        "name": "checks (macos-15)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131821410682,
+        "name": "owner-batch",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131821410701,
+        "name": "browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131821410717,
+        "name": "owner-transports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131832078076,
+        "name": "native-ui",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 131834131049,
+        "name": "artifact-http",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "gitleaks": {
+    "run": 43405828009,
+    "number": 122,
+    "conclusion": "success"
+  },
+  "formatting": {
+    "only_failed_job": true,
+    "entire_hosted_patch_applied_once_in": "49d7762668e00fd133f3385adf485c92b01cdd36",
+    "all_six_normalized_rust_asts_equal": true,
+    "artifact": 14027047569,
+    "zip_sha256": "43816a4c5571de72b43f6eb9fbb0f01c38c6b6b957c525e9ec8d1ab3eb37e5e5",
+    "patch_sha256": "1d05173d95a1f781422cc85182cb1e913831503308be33fc84c49f37adc82956"
+  },
+  "artifacts": [
+    {
+      "target": "ubuntu-24.04",
+      "id": 14027843071,
+      "zip_bytes": 210945,
+      "zip_sha256": "50ddb1bc1224ef918b3638a2de8667ab639644c304d2aa68bee5dc0ddb8eb9c1",
+      "verified_members": 42
+    },
+    {
+      "target": "windows-2025",
+      "id": 14028286525,
+      "zip_bytes": 211847,
+      "zip_sha256": "afec48eb0cf170ec06d1ea447498b8d385a41cf5e8128f5995d7e4fc5f7aefe4",
+      "verified_members": 42
+    },
+    {
+      "target": "macos-15",
+      "id": 14028705349,
+      "zip_bytes": 211817,
+      "zip_sha256": "e5370a78b413306118bbe61c4b0b2a60d2a2f95f1749e2d65fd78616db972b40",
+      "verified_members": 42
+    },
+    {
+      "target": "macos-15-intel",
+      "id": 14029270383,
+      "zip_bytes": 212268,
+      "zip_sha256": "e87d8b1e358b8923ae35cfa9dafd5a2503a79173e7a489e55bf73fd542bfb77c",
+      "verified_members": 42
+    }
+  ],
+  "all168_members_verified": true,
+  "wire": {
+    "source": "fb4e4c9bb29530296361b8af6dbea442e553d19a",
+    "run": 43405770462,
+    "scope": "Actual four-native65tool discovery and generated-schema correspondence onfb4/269, two credential-file envelopes. LaterSDK3.10/fresh-r0 origins/hygiene changes unqualified.",
+    "unchanged_cap": 262144,
+    "targets": [
+      {
+        "target": "ubuntu-24.04",
+        "artifact_members_reverified": 42,
+        "tools": 65,
+        "wire_bytes_including_newline": 184764,
+        "wire_sha256": "88601ca01feee3f66a241af4b0b657fe13e21ab010cbab0e74ca4a6e6ac9ed11",
+        "all65_inputs_and_requirements_correspond": true,
+        "only_two_adapter_credential_file_envelopes_added": true,
+        "typed_result_schema_correspondence": 18,
+        "exact_actual_frame_and_generated_descriptor_bytes_equal_verified_linux": true,
+        "actual_package_source_matches": true
+      },
+      {
+        "target": "windows-2025",
+        "artifact_members_reverified": 42,
+        "tools": 65,
+        "wire_bytes_including_newline": 184764,
+        "wire_sha256": "88601ca01feee3f66a241af4b0b657fe13e21ab010cbab0e74ca4a6e6ac9ed11",
+        "all65_inputs_and_requirements_correspond": true,
+        "only_two_adapter_credential_file_envelopes_added": true,
+        "typed_result_schema_correspondence": 18,
+        "exact_actual_frame_and_generated_descriptor_bytes_equal_verified_linux": true,
+        "actual_package_source_matches": true
+      },
+      {
+        "target": "macos-15",
+        "artifact_members_reverified": 42,
+        "tools": 65,
+        "wire_bytes_including_newline": 184764,
+        "wire_sha256": "88601ca01feee3f66a241af4b0b657fe13e21ab010cbab0e74ca4a6e6ac9ed11",
+        "all65_inputs_and_requirements_correspond": true,
+        "only_two_adapter_credential_file_envelopes_added": true,
+        "typed_result_schema_correspondence": 18,
+        "exact_actual_frame_and_generated_descriptor_bytes_equal_verified_linux": true,
+        "actual_package_source_matches": true
+      },
+      {
+        "target": "macos-15-intel",
+        "artifact_members_reverified": 42,
+        "tools": 65,
+        "wire_bytes_including_newline": 184764,
+        "wire_sha256": "88601ca01feee3f66a241af4b0b657fe13e21ab010cbab0e74ca4a6e6ac9ed11",
+        "all65_inputs_and_requirements_correspond": true,
+        "only_two_adapter_credential_file_envelopes_added": true,
+        "typed_result_schema_correspondence": 18,
+        "exact_actual_frame_and_generated_descriptor_bytes_equal_verified_linux": true,
+        "actual_package_source_matches": true
+      }
+    ],
+    "all168_members_verified": true
+  },
+  "qualified_controls": [
+    "Explicit native-owner stdio shares actual native CLI authority; the same default agent connection remains denied",
+    "Both actual credential commands require a protected client-side file; missing targets refuse and issued secrets do not appear in serialized MCP responses",
+    "Protected delivered credentials authenticate actual private/public endpoints, no-overwrite preserves bytes, HTTP/default issuance refuses before path effects, actual revocation succeeds",
+    "Actual known-cancelled owner issue sends no issuance wire request, changes no credential rows and creates no output parent",
+    "All four invalid CLI combinations refuse before root creation with clean protocol stdout",
+    "Actual independently captured CLI/MCP promotion plans validate their own hashes and compare full logical source/ancestry/target; untouched CLI plan accepts/replays/restores"
+  ],
+  "preserved_limits": {
+    "original_test_identities": 179,
+    "unit": 131,
+    "async": 48,
+    "ignored": 8,
+    "expanded_jobs": 13,
+    "native_targets": 4,
+    "discovery_bytes": 262144,
+    "invalid_config_seconds": 5,
+    "credential_sdk_helper_seconds": 40,
+    "native_cli_step_seconds": 60,
+    "native_cli_aggregate_seconds": 180,
+    "package_aggregate_seconds": 600
+  },
+  "not_qualified": [
+    "Later SDK3.10 pin/lock, fresh/r0 package journeys and corrected source-boundary guard",
+    "Exact physical-size cause of the earlier Linux267 hash difference; current logical correspondence passes but does not reconstruct prior observations",
+    "Post-start cancellation/forced disconnect/lost issue response/publication or compensation failure matrices",
+    "Actual named-client loading and full agent/native/browser parity",
+    "Full resource/RSS/fault/storage/general media/editor/offline/ownerhardware/fullv1"
+  ]
+}

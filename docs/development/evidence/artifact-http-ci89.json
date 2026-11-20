@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "source_head": "303524aff82fe6c40c0f6945a58d416d75b33213",
+  "compiled_merge": "5e70d0feec2995e8b424667239872182e72985f4",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40118215359",
+  "job": 120944512119,
+  "report": {
+    "artifact_bytes": "268633400",
+    "artifact_id": "job-5fa14f33-4e8c-4429-bc95-08063be7e0e8",
+    "cancelled_index_cleanup": true,
+    "client_copy_bytes": "268633400",
+    "client_copy_cancel_setup_ms": "44885",
+    "client_copy_cancelled_before_publication": true,
+    "client_copy_elapsed_ms": "66437",
+    "client_copy_peak_kib": 26980,
+    "client_copy_profile": "job-read-only; no general filesystem roots",
+    "client_copy_sha256": "736ad8b0ecbd87b820a065652e7dd660c1caa6c318ecf496ca7b855d752668e0",
+    "components": {
+      "ffmpeg": {
+        "bytes": "5132352",
+        "file_name": "ffmpeg",
+        "sha256": "57027bd7d6aacfafa1b31e8ceef2e41e1f5c4ba685ae69dd17274c692fadeec6"
+      },
+      "ffprobe": {
+        "bytes": "4911104",
+        "file_name": "ffprobe",
+        "sha256": "e3cb5b229af9be9e31e8fb18f6ab8a92bfab17762fa47166325268159732f8f5"
+      }
+    },
+    "credential_revoked_delivered_bytes": "3145728",
+    "executable": {
+      "bytes": "231247712",
+      "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/debug/numera-wiz",
+      "sha256": "3ff89146a6212be8408ea7edf67d8984f18a6624021140daf6d8e5b2d638bb9c"
+    },
+    "job_id": "5fa14f33-4e8c-4429-bc95-08063be7e0e8",
+    "job_revoked_delivered_bytes": "3801088",
+    "owner_before_high_kib": 31092,
+    "owner_high_kib": 31900,
+    "owner_process_id": 2878,
+    "plan_hash": "2afbeca69af4c330ee0d227150897bdebb3f2846cf89c41e6f6b811c1787ae25",
+    "plan_id": "35636cdc-3ef2-4f32-9431-3592bef0fedc",
+    "registry": "d988c40df4f7e53658e49577b8a91215a0b6f5373f55a4f527cd419ec0a21db6",
+    "schema_version": 1,
+    "scope": "Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification.",
+    "selected_owner_rss_ceiling_kib": 131072,
+    "sha256": "736ad8b0ecbd87b820a065652e7dd660c1caa6c318ecf496ca7b855d752668e0",
+    "source": "5e70d0feec2995e8b424667239872182e72985f4",
+    "status": "passed"
+  },
+  "scope": "Independent actual Linux job now creates its own diagnostics directory.268633400-byte full verified client save, measured cancellation before publication, jobRead/bearer revocation and cleanup pass. Observed HWM client26980KiB/owner31900KiB; not aggregateR20, standard package or owner hardware evidence."
+}

@@ -1,0 +1,822 @@
+//! Shared folder intake uses authorized engine paths and retained owner snapshots.
+use crate::{Action, WizApp, batches::FolderBatchKind};
+use eframe::egui;
+use nw_domain::{
+    avc_export::{Container, FolderAudio, FolderEncodeInput, Preset, VideoCodec},
+    batches::{
+        CleanFolderBatchInput, ExtractFolderBatchInput, ExtractKind, ExtractSelector,
+        FolderBatchReview, FolderOutputLayout,
+    },
+    commands::Request,
+    ingest::{
+        CompanionIntakePolicy, FolderEntryKind, FolderEntryOutcome, FolderIntakeLimits,
+        FolderReview, RegisterFolderInput,
+    },
+    records::Asset,
+    views::{AssetSummary, ErrorView},
+};
+use serde_json::{Value, json};
+use std::sync::Arc;
+
+pub(super) struct FolderUi {
+    pub open: bool,
+    path: String,
+    recursive: bool,
+    exclusions: String,
+    inventory_companions: bool,
+    snapshot_id: String,
+    batch_output_root: String,
+    cleanup_output_layout: FolderOutputLayout,
+    cleanup_copy_companions: bool,
+    encode_container: Container,
+    encode_codec: VideoCodec,
+    encode_crf: u8,
+    encode_quantizer: u8,
+    encode_preset: Preset,
+    encode_audio: bool,
+    extract: ExtractSelector,
+    review: Option<Arc<FolderReview>>,
+    tab: FolderTab,
+    focus: Option<FolderFocus>,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FolderTab {
+    Source,
+    Snapshot,
+}
+#[derive(Clone, PartialEq, Eq)]
+enum FolderFocus {
+    Path,
+    Scan,
+    Inspect,
+    Open(String),
+    ReviewBatch,
+    Retry,
+}
+impl Default for FolderUi {
+    fn default() -> Self {
+        Self {
+            open: false,
+            path: String::new(),
+            recursive: false,
+            exclusions: String::new(),
+            inventory_companions: true,
+            snapshot_id: String::new(),
+            batch_output_root: String::new(),
+            cleanup_output_layout: FolderOutputLayout::Indexed,
+            cleanup_copy_companions: false,
+            encode_container: Container::Mp4,
+            encode_codec: VideoCodec::H264,
+            encode_crf: 18,
+            encode_quantizer: 4,
+            encode_preset: Preset::Balanced,
+            encode_audio: true,
+            extract: ExtractSelector {
+                kind: ExtractKind::Audio,
+                ordinal: 1,
+            },
+            review: None,
+            tab: FolderTab::Source,
+            focus: None,
+        }
+    }
+}
+
+fn kind_label(kind: FolderEntryKind) -> &'static str {
+    match kind {
+        FolderEntryKind::Media => "Media candidate",
+        FolderEntryKind::Companion => "Companion",
+        FolderEntryKind::Directory => "Directory",
+        FolderEntryKind::Other => "Other entry",
+    }
+}
+pub(super) fn outcome_label(outcome: FolderEntryOutcome) -> &'static str {
+    match outcome {
+        FolderEntryOutcome::Registered => "Registered",
+        FolderEntryOutcome::ProbeFailed => "Probe failed",
+        FolderEntryOutcome::CompanionInventoried => "Inventoried only",
+        FolderEntryOutcome::CompanionExcluded => "Companion excluded",
+        FolderEntryOutcome::Excluded => "Excluded",
+        FolderEntryOutcome::Rejected => "Rejected",
+    }
+}
+fn limits(ui: &mut egui::Ui, limits: &FolderIntakeLimits) {
+    ui.small(format!(
+        "Limits: {} manifest rows, {} filesystem entries, {} directories, depth {}.",
+        limits.manifest_entries, limits.filesystem_entries, limits.directories, limits.depth,
+    ));
+    ui.small(format!(
+        "Aggregate source size: {} bytes; directory names: {} bytes; {} s before the next entry. An active probe keeps its own deadline.",
+        limits.aggregate_source_bytes, limits.directory_name_bytes, limits.seconds_before_next_entry,
+    ));
+}
+fn error(ui: &mut egui::Ui, error: &ErrorView) {
+    ui.colored_label(
+        egui::Color32::YELLOW,
+        format!(
+            "{}: {}",
+            error.code,
+            error
+                .message
+                .as_deref()
+                .unwrap_or("Diagnostic details require current owner access"),
+        ),
+    );
+}
+fn deadline_label(policy: nw_domain::execution::DeadlinePolicy) -> String {
+    match policy {
+        nw_domain::execution::DeadlinePolicy::Finite { seconds } => format!("{seconds} s"),
+        nw_domain::execution::DeadlinePolicy::Disabled => "Disabled by owner policy".into(),
+    }
+}
+fn reveal_focus(response: &egui::Response) {
+    if response.gained_focus() {
+        response.scroll_to_me(Some(egui::Align::Center));
+    }
+}
+
+impl WizApp {
+    fn register_folder(&mut self, ctx: &egui::Context) {
+        if !self.cleanup_actions_allowed(ctx) {
+            return;
+        }
+        let input = RegisterFolderInput {
+            path: self.folder.path.clone(),
+            recursive: self.folder.recursive,
+            exclude_relative: self
+                .folder
+                .exclusions
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(str::to_owned)
+                .collect(),
+            companion_policy: if self.folder.inventory_companions {
+                CompanionIntakePolicy::Inventory
+            } else {
+                CompanionIntakePolicy::Exclude
+            },
+            probe_timeout: Some(self.execution_limits.probe),
+        };
+        if let Err(error) = input.validate() {
+            self.error = Some(format!("{}: {}", error.code, error.message));
+            return;
+        }
+        self.status = "Scanning an authorized engine folder. No cleanup job has started.".into();
+        self.mutate(
+            "assets.register_folder",
+            json!(input),
+            Action::FolderRegister,
+            ctx,
+        );
+    }
+
+    pub(super) fn receive_folder(
+        &mut self,
+        action: Action,
+        result: Value,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
+        match action {
+            Action::FolderRegister | Action::FolderInspect => {
+                let review: FolderReview =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let registered = review
+                    .entries
+                    .iter()
+                    .filter(|entry| entry.outcome == FolderEntryOutcome::Registered)
+                    .count();
+                self.status = format!(
+                    "Folder snapshot {} loaded: {registered} registered media; {}. Review every entry before reusing media.",
+                    review.id,
+                    if review.complete {
+                        "enumeration complete"
+                    } else {
+                        "enumeration incomplete"
+                    },
+                );
+                self.folder.snapshot_id = review.id.clone();
+                self.folder.tab = FolderTab::Snapshot;
+                self.folder.focus = Some(if matches!(action, Action::FolderInspect) {
+                    review
+                        .entries
+                        .iter()
+                        .find_map(|entry| entry.asset_id.clone())
+                        .map(FolderFocus::Open)
+                        .unwrap_or(FolderFocus::Inspect)
+                } else {
+                    FolderFocus::Inspect
+                });
+                self.folder.review = Some(Arc::new(review));
+            }
+            Action::FolderOpenAsset => {
+                let asset: Asset =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                self.select_asset(&asset, ctx);
+                self.status = format!(
+                    "Registered media {} opened without a new scan or cleanup job.",
+                    asset.display_name
+                );
+                self.close_folder();
+            }
+            Action::FolderBatchAsset => {
+                let asset: Asset =
+                    serde_json::from_value(result).map_err(|error| error.to_string())?;
+                let summary = AssetSummary::from(&asset);
+                self.batch_select(&summary, true);
+                self.status = if self.batch.contains(&asset.id) {
+                    format!(
+                        "Registered media {} selected for batch review; no new scan or cleanup job was started.",
+                        asset.id,
+                    )
+                } else {
+                    "The cleanup batch is full. This media was not included; remove a candidate before trying again.".into()
+                };
+            }
+            _ => return Err("Unexpected folder response action".into()),
+        }
+        Ok(())
+    }
+
+    pub(super) fn receive_folder_batch_plan(
+        &mut self,
+        generation: u64,
+        request: &Request,
+        result: Value,
+    ) -> Result<(), String> {
+        let (kind, snapshot_id, snapshot_hash, output_root) = match request.command.id.as_str() {
+            "media.encode_folder_plan" => {
+                let input: FolderEncodeInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (
+                    FolderBatchKind::Encode,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
+            }
+            "streams.extract.folder_batch_plan" => {
+                let input: ExtractFolderBatchInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (
+                    FolderBatchKind::Extract,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
+            }
+            "streams.clean.folder_batch_plan" => {
+                let input: CleanFolderBatchInput = serde_json::from_value(request.params.clone())
+                    .map_err(|error| error.to_string())?;
+                (
+                    FolderBatchKind::Cleanup,
+                    input.snapshot_id,
+                    input.snapshot_hash,
+                    input.output_root,
+                )
+            }
+            _ => return Err("Unexpected folder batch request".into()),
+        };
+        let review: FolderBatchReview =
+            serde_json::from_value(result).map_err(|error| error.to_string())?;
+        let snapshot = self
+            .folder
+            .review
+            .clone()
+            .filter(|snapshot| snapshot.id == snapshot_id && snapshot.hash == snapshot_hash)
+            .ok_or("Folder batch review requires the captured snapshot")?;
+        if review.snapshot_id != snapshot.id || review.snapshot_hash != snapshot.hash {
+            return Err("Folder batch proposed a different snapshot".into());
+        }
+        let excluded = snapshot
+            .entries
+            .iter()
+            .filter(|entry| entry.outcome != FolderEntryOutcome::Registered)
+            .map(|entry| (entry.index, entry.outcome));
+        let registered = snapshot
+            .entries
+            .iter()
+            .filter_map(|entry| entry.asset_id.as_deref());
+        if !excluded.eq(review.excluded.iter().map(|row| (row.index, row.outcome)))
+            || !registered.eq(review.plan.items.iter().map(|item| item.asset_id.as_str()))
+        {
+            return Err("Folder batch does not account for the captured snapshot entries".into());
+        }
+        self.open_folder_batch(generation, snapshot, output_root, review, kind);
+        Ok(())
+    }
+
+    pub(super) fn folder_controls(&mut self, ui: &mut egui::Ui) {
+        if self.projects.active {
+            return;
+        }
+        if ui
+            .button("Folder intake (authorized engine path)")
+            .clicked()
+        {
+            self.folder.open = true;
+            self.folder.tab = if self.folder.review.is_some() {
+                FolderTab::Snapshot
+            } else {
+                FolderTab::Source
+            };
+            self.folder.focus = Some(if self.folder.review.is_some() {
+                FolderFocus::Inspect
+            } else {
+                FolderFocus::Path
+            });
+        }
+    }
+
+    pub(super) fn close_folder(&mut self) {
+        self.folder.open = false;
+        self.folder.focus = None;
+    }
+
+    pub(super) fn folder_request_failed(&mut self, action: Action) {
+        if matches!(
+            action,
+            Action::FolderRegister
+                | Action::FolderInspect
+                | Action::FolderOpenAsset
+                | Action::FolderBatchAsset
+                | Action::FolderBatchPlan(_)
+        ) {
+            self.folder.focus = Some(if self.pending.is_some() {
+                FolderFocus::Retry
+            } else if matches!(action, Action::FolderBatchPlan(_)) {
+                FolderFocus::ReviewBatch
+            } else if self.folder.review.is_some() {
+                FolderFocus::Inspect
+            } else {
+                FolderFocus::Path
+            });
+        }
+    }
+
+    fn folder_focus(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        target: FolderFocus,
+        enabled: bool,
+    ) {
+        if enabled && self.folder.focus.as_ref() == Some(&target) {
+            response.scroll_to_me(Some(egui::Align::Center));
+            if ui.is_rect_visible(response.rect) {
+                response.request_focus();
+                if response.has_focus() {
+                    self.folder.focus = None;
+                }
+            }
+            response.ctx.request_repaint();
+        } else {
+            reveal_focus(response);
+        }
+    }
+
+    pub(super) fn folder_window(&mut self, ctx: &egui::Context) {
+        if self.projects.active || !self.folder.open {
+            return;
+        }
+        let mut open = true;
+        egui::Window::new("Folder intake")
+            .id(egui::Id::unique("folder-intake-window"))
+            .order(egui::Order::Foreground)
+            .default_pos(egui::pos2(280.0, 70.0))
+            .default_width(860.0)
+            .default_height(640.0)
+            .min_width(560.0)
+            .min_height(360.0)
+            .resizable(true)
+            .collapsible(false)
+            .vscroll(true)
+            .open(&mut open)
+            .show(ctx, |ui| self.folder_body(ui));
+        if !open {
+            self.close_folder();
+        }
+    }
+
+    fn folder_body(&mut self, ui: &mut egui::Ui) {
+        let idle = !self.waiting && self.pending.is_none();
+        ui.label("Use an absolute path on the engine computer, explicitly granted by its owner.");
+        ui.label("Browser file selection uploads bytes. It does not grant a host folder or reveal its path.");
+        ui.label("Intake records media failures and inventories companions. It does not start cleanup or copy companions.");
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled_ui(idle, |ui| {
+                    ui.selectable_value(&mut self.folder.tab, FolderTab::Source, "Folder source")
+                })
+                .inner
+                .clicked()
+            {
+                self.folder.focus = Some(FolderFocus::Path);
+            }
+            if ui
+                .add_enabled_ui(idle, |ui| {
+                    ui.selectable_value(
+                        &mut self.folder.tab,
+                        FolderTab::Snapshot,
+                        "Retained snapshot",
+                    )
+                })
+                .inner
+                .clicked()
+            {
+                self.folder.focus = Some(FolderFocus::Inspect);
+            }
+        });
+        ui.label(if self.waiting {
+            "Working with the local engine..."
+        } else {
+            &self.status
+        });
+        if let Some(error) = &self.error {
+            ui.colored_label(egui::Color32::YELLOW, error);
+        }
+        if !self.waiting
+            && let Some(pending) = &self.pending
+        {
+            let request = pending.request.clone();
+            let action = pending.action;
+            let retry = ui.button("Reconnect and retry the same request");
+            self.folder_focus(ui, &retry, FolderFocus::Retry, true);
+            if retry.clicked() {
+                self.dispatch(request, action, ui.ctx());
+            }
+        }
+        ui.separator();
+        match self.folder.tab {
+            FolderTab::Source => self.folder_source(ui, idle),
+            FolderTab::Snapshot => self.folder_snapshot(ui, idle),
+        }
+    }
+
+    fn folder_source(&mut self, ui: &mut egui::Ui, idle: bool) {
+        limits(ui, &FolderIntakeLimits::default());
+        ui.small(format!(
+            "Probe deadline for a new scan: {}.",
+            deadline_label(self.execution_limits.probe),
+        ));
+        ui.add_enabled_ui(idle, |ui| {
+            let path = ui.add(
+                egui::TextEdit::singleline(&mut self.folder.path)
+                    .id(egui::Id::unique("folder-intake-path"))
+                    .char_limit(4096)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("Absolute owner-granted engine folder path"),
+            );
+            self.folder_focus(ui, &path, FolderFocus::Path, idle);
+            reveal_focus(&ui.checkbox(&mut self.folder.recursive, "Include subdirectories"));
+            reveal_focus(&ui.checkbox(
+                &mut self.folder.inventory_companions,
+                "Inventory companion files without copying them",
+            ));
+            ui.label("Exclude relative paths, one per line, using / between components. Blank lines are ignored; names are kept exactly as entered.");
+            reveal_focus(&ui.add(
+                egui::TextEdit::multiline(&mut self.folder.exclusions)
+                    .char_limit(32768)
+                    .desired_rows(2)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("Output\nSubfolder/Already processed"),
+            ));
+        });
+        let scan = ui.add_enabled(
+            idle && !self.folder.path.trim().is_empty(),
+            egui::Button::new("Scan and register folder"),
+        );
+        self.folder_focus(ui, &scan, FolderFocus::Scan, idle);
+        if scan.clicked() {
+            self.register_folder(ui.ctx());
+        }
+        ui.small("The current cleanup probe deadline applies to this scan. A completed enumeration can still contain failed probes; inspect the recorded outcomes.");
+    }
+
+    fn folder_snapshot(&mut self, ui: &mut egui::Ui, idle: bool) {
+        ui.label("Inspect a retained snapshot by ID to reuse its registered media without scanning again.");
+        let snapshot_id = ui.add_enabled(
+            idle,
+            egui::TextEdit::singleline(&mut self.folder.snapshot_id)
+                .id(egui::Id::unique("folder-intake-snapshot-id"))
+                .char_limit(128)
+                .desired_width(f32::INFINITY)
+                .hint_text("Retained folder snapshot ID"),
+        );
+        reveal_focus(&snapshot_id);
+        let inspect = ui.add_enabled(
+            idle && !self.folder.snapshot_id.trim().is_empty(),
+            egui::Button::new("Inspect retained snapshot"),
+        );
+        self.folder_focus(ui, &inspect, FolderFocus::Inspect, idle);
+        if inspect.clicked() {
+            self.query(
+                "assets.folder_inspect",
+                json!({"id":self.folder.snapshot_id}),
+                Action::FolderInspect,
+                ui.ctx(),
+            );
+        }
+        if let Some(review) = self.folder.review.clone() {
+            self.folder_review(ui, &review, idle);
+        }
+    }
+
+    fn folder_review(&mut self, ui: &mut egui::Ui, review: &FolderReview, idle: bool) {
+        ui.separator();
+        ui.strong(if review.complete {
+            "Retained snapshot: enumeration complete"
+        } else {
+            "Retained snapshot: incomplete; additional entries may be missing"
+        });
+        ui.monospace(format!("Snapshot ID: {}", review.id));
+        ui.label(format!("Engine root: {}", review.root));
+        ui.small(format!(
+            "Captured at {} seconds since Unix epoch; {} manifest rows, {} filesystem entries and {} directories visited.",
+            review.created_at, review.entries.len(), review.visited_entries, review.visited_directories,
+        ));
+        ui.label("Immutable retained snapshot SHA-256:");
+        ui.monospace(&review.hash);
+        ui.collapsing("Recorded scan settings", |ui| {
+            ui.label(if review.input.recursive {
+                "Subdirectories included"
+            } else {
+                "Top-level entries only"
+            });
+            ui.label(match review.input.companion_policy {
+                CompanionIntakePolicy::Inventory => "Companion files inventoried without copying",
+                CompanionIntakePolicy::Exclude => "Companion files excluded",
+            });
+            if let Some(deadline) = review.input.probe_timeout {
+                ui.label(format!(
+                    "Recorded probe deadline: {}",
+                    deadline_label(deadline)
+                ));
+            } else {
+                ui.label("Probe deadline used the engine default at registration");
+            }
+            if review.input.exclude_relative.is_empty() {
+                ui.label("No explicit relative exclusions");
+            } else {
+                for path in &review.input.exclude_relative {
+                    ui.monospace(path);
+                }
+            }
+        });
+        limits(ui, &review.limits);
+        if let Some(scan_error) = &review.scan_error {
+            error(ui, scan_error);
+        }
+        if review.entries.is_empty() {
+            ui.label("No entries were retained. Check completeness and any scan error above.");
+        }
+        for entry in &review.entries {
+            ui.push_id(entry.index, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.strong(format!("{}. {}", entry.index + 1, entry.relative_path));
+                    ui.label(kind_label(entry.kind));
+                    ui.label(outcome_label(entry.outcome));
+                });
+                if let Some(entry_error) = &entry.error {
+                    error(ui, entry_error);
+                }
+                if let Some(identity) = &entry.identity {
+                    ui.small(format!("{} bytes; source SHA-256:", identity.bytes));
+                    ui.monospace(&identity.sha256);
+                }
+                if let Some(id) = &entry.asset_id {
+                    ui.monospace(format!("Registered asset ID: {id}"));
+                    ui.horizontal(|ui| {
+                        let open = ui.add_enabled(idle, egui::Button::new("Open registered media"));
+                        self.folder_focus(ui, &open, FolderFocus::Open(id.clone()), idle);
+                        if open.clicked() {
+                            self.query(
+                                "assets.inspect",
+                                json!({"id":id}),
+                                Action::FolderOpenAsset,
+                                ui.ctx(),
+                            );
+                        }
+                        if ui
+                            .add_enabled(
+                                idle && !self.batch.is_folder_review() && !self.batch.contains(id),
+                                egui::Button::new("Include in cleanup batch"),
+                            )
+                            .clicked()
+                        {
+                            self.query(
+                                "assets.inspect",
+                                json!({"id":id}),
+                                Action::FolderBatchAsset,
+                                ui.ctx(),
+                            );
+                        }
+                    });
+                }
+                if entry.outcome == FolderEntryOutcome::CompanionInventoried {
+                    ui.small("Inventory only: no registered media asset or copied output was created for this companion.");
+                }
+                ui.separator();
+            });
+        }
+        self.folder_batch_controls(ui, review, idle);
+    }
+
+    fn folder_batch_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.separator();
+        ui.strong("Folder cleanup batch");
+        if !snapshot.complete {
+            ui.label("Scan again to complete the snapshot before folder batch review.");
+            return;
+        }
+        if !snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == FolderEntryOutcome::Registered)
+        {
+            ui.label("This snapshot has no registered video to review.");
+            return;
+        }
+        let has_companions = snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == FolderEntryOutcome::CompanionInventoried);
+        ui.label("Existing authorized engine directory in a separate tree");
+        ui.add_enabled_ui(idle, |ui| {
+            reveal_focus(
+                &ui.add(
+                    egui::TextEdit::singleline(&mut self.folder.batch_output_root)
+                        .id(egui::Id::unique("folder-batch-output-directory"))
+                        .char_limit(4096)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("Absolute output directory"),
+                ),
+            );
+            ui.horizontal_wrapped(|ui| {
+                ui.radio_value(
+                    &mut self.folder.cleanup_output_layout,
+                    FolderOutputLayout::Indexed,
+                    "Indexed filenames",
+                );
+                ui.radio_value(
+                    &mut self.folder.cleanup_output_layout,
+                    FolderOutputLayout::PreserveTree,
+                    "Preserve source tree",
+                );
+            });
+            if has_companions
+                && self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree
+            {
+                ui.checkbox(
+                    &mut self.folder.cleanup_copy_companions,
+                    "Copy inventoried companion files",
+                );
+            }
+            self.batch_policy_controls(ui, true);
+        });
+        let intake_failed = snapshot.entries.iter().any(|entry| {
+            matches!(
+                entry.outcome,
+                FolderEntryOutcome::ProbeFailed | FolderEntryOutcome::Rejected
+            )
+        });
+        if intake_failed && self.batch.failure == nw_domain::batches::FailurePolicy::RejectAll {
+            ui.label("Resolve failed intake or allow the registered files to proceed.");
+        } else {
+            ui.small(
+                "The current cleanup stream selection, file times and execution limits apply.",
+            );
+            if self.folder.cleanup_output_layout == FolderOutputLayout::PreserveTree {
+                ui.small("Create the matching output subdirectories before review.");
+            }
+            let review = ui.add_enabled(
+                idle && !self.folder.batch_output_root.is_empty(),
+                egui::Button::new("Review folder cleanup batch"),
+            );
+            self.folder_focus(ui, &review, FolderFocus::ReviewBatch, idle);
+            if review.clicked() {
+                let root = self.folder.batch_output_root.clone();
+                let layout = self.folder.cleanup_output_layout;
+                let companions = has_companions
+                    && self.folder.cleanup_copy_companions
+                    && layout == FolderOutputLayout::PreserveTree;
+                self.review_folder_batch(snapshot, &root, layout, companions, ui.ctx());
+            }
+        }
+        if !intake_failed {
+            self.folder_encode_controls(ui, snapshot, idle);
+        }
+        self.folder_extract_controls(ui, snapshot, idle);
+    }
+
+    fn folder_encode_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.collapsing("Encode folder video", |ui| {
+            ui.add_enabled_ui(idle, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::H264, "H.264");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Hevc, "HEVC");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Av1, "AV1");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Vp9, "VP9");
+                    ui.radio_value(&mut self.folder.encode_codec, VideoCodec::Mpeg4, "MPEG-4");
+                    ui.radio_value(&mut self.folder.encode_container, Container::Mp4, "MP4");
+                    ui.radio_value(
+                        &mut self.folder.encode_container,
+                        Container::Matroska,
+                        "Matroska",
+                    );
+                    if self.folder.encode_codec == VideoCodec::Mpeg4 {
+                        ui.label("Quantizer");
+                        ui.add(
+                            egui::DragValue::new(&mut self.folder.encode_quantizer).range(1..=31),
+                        );
+                    } else {
+                        ui.label("Quality CRF");
+                        ui.add(egui::DragValue::new(&mut self.folder.encode_crf).range(1..=51));
+                    }
+                    egui::ComboBox::from_id_salt("folder-encode-preset")
+                        .selected_text(format!("{:?}", self.folder.encode_preset))
+                        .show_ui(ui, |ui| {
+                            for preset in [Preset::Fast, Preset::Balanced, Preset::Slow] {
+                                ui.selectable_value(
+                                    &mut self.folder.encode_preset,
+                                    preset,
+                                    format!("{preset:?}"),
+                                );
+                            }
+                        });
+                });
+                ui.checkbox(
+                    &mut self.folder.encode_audio,
+                    "Encode the first audio track as AAC",
+                );
+                if ui
+                    .add_enabled(
+                        !self.folder.batch_output_root.is_empty(),
+                        egui::Button::new("Review folder encode"),
+                    )
+                    .clicked()
+                {
+                    let quantized = self.folder.encode_codec == VideoCodec::Mpeg4;
+                    let settings = FolderEncodeInput {
+                        snapshot_id: snapshot.id.clone(),
+                        snapshot_hash: snapshot.hash.clone(),
+                        output_root: self.folder.batch_output_root.clone(),
+                        container: self.folder.encode_container,
+                        codec: self.folder.encode_codec,
+                        crf: (!quantized).then_some(self.folder.encode_crf),
+                        quantizer: quantized.then_some(self.folder.encode_quantizer),
+                        preset: self.folder.encode_preset,
+                        audio: if self.folder.encode_audio {
+                            FolderAudio::Aac {
+                                ordinal: 1,
+                                bitrate_kbps: 128,
+                            }
+                        } else {
+                            FolderAudio::Drop {}
+                        },
+                        failure_policy: nw_domain::batches::FailurePolicy::RejectAll,
+                    };
+                    self.review_folder_encoding(settings, ui.ctx());
+                }
+            });
+        });
+    }
+
+    fn folder_extract_controls(&mut self, ui: &mut egui::Ui, snapshot: &FolderReview, idle: bool) {
+        ui.collapsing("Extract a track from each file", |ui| {
+            ui.add_enabled_ui(idle, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let selector = &mut self.folder.extract;
+                    ui.radio_value(&mut selector.kind, ExtractKind::Video, "Video");
+                    ui.radio_value(&mut selector.kind, ExtractKind::Audio, "Audio");
+                    ui.radio_value(&mut selector.kind, ExtractKind::Subtitle, "Subtitle");
+                    ui.add(
+                        egui::DragValue::new(&mut selector.ordinal)
+                            .range(1..=256)
+                            .prefix("Track "),
+                    );
+                });
+                if ui
+                    .add_enabled(
+                        !self.folder.batch_output_root.is_empty(),
+                        egui::Button::new("Review folder extraction"),
+                    )
+                    .clicked()
+                {
+                    let input = ExtractFolderBatchInput {
+                        snapshot_id: snapshot.id.clone(),
+                        snapshot_hash: snapshot.hash.clone(),
+                        output_root: self.folder.batch_output_root.clone(),
+                        selector: self.folder.extract,
+                        failure_policy: self.batch.failure,
+                    };
+                    self.query(
+                        "streams.extract.folder_batch_plan",
+                        json!(input),
+                        Action::FolderBatchPlan(self.batch.generation),
+                        ui.ctx(),
+                    );
+                }
+            });
+        });
+    }
+}

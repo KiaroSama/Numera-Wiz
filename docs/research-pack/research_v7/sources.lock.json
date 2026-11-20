@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "research_date": "2026-10-21",
+  "purpose": "Researched inputs, not a future application Cargo.lock or binary qualification manifest",
+  "update_policy": "Verify official releases/advisories at implementation start, record a coherent supported update, then pin actual source/dependency/profile closure.",
+  "sources": {
+    "ffmwiz": {
+      "repository": "https://github.com/KiaroSama/FFmWiz",
+      "revision": "661a0d240ee29ca7cda496b635ae8c50e43d916b"
+    },
+    "filmcraft": {
+      "repository": "https://github.com/storytold/filmcraft",
+      "revision": "d643a886650bfbf16f24762274054575aa1e8f20"
+    },
+    "effectcraft": {
+      "repository": "https://github.com/storytold/effectcraft",
+      "revision": "9db7f3b21700fd821f215782ed1c82afe077880f"
+    },
+    "vidonex": {
+      "repository": "https://github.com/farshidrezaei/vidonex",
+      "revision": "ae04a3a4e7e455dd3f5f8a954fd2ff0c668fa4c6"
+    },
+    "ffmpeg": {
+      "repository": "https://github.com/FFmpeg/FFmpeg",
+      "tag": "n9.0.2",
+      "revision": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "release_reference": "https://ffmpeg.org/download.html",
+      "source_security_disposition": "RTSP scheme and HLS child-open fixes present at pin; direct RTSP redirect loop remains, so corrected component/route qualification is required before enabling that route.",
+      "security_evidence_manifest": "research_v7/security-sources/manifest.json"
+    },
+    "ffmpeg_sidecar": {
+      "repository": "https://github.com/nathanbabcock/ffmpeg-sidecar",
+      "revision": "958985bfd064a671d15f547e768f61ce1610861b"
+    },
+    "shotcut": {
+      "repository": "https://github.com/mltframework/shotcut",
+      "revision": "2b943b01b5b5ed0754a94b5f26ba0581b17d4035"
+    },
+    "av1an": {
+      "repository": "https://github.com/rust-av/Av1an",
+      "revision": "50f9ea6b6867288c1c287ec9a6787ec708fb8fb2"
+    },
+    "losslesscut": {
+      "repository": "https://github.com/mifi/lossless-cut",
+      "revision": "9a38272d36b249df2ffcdb65b4b4d42101953735"
+    },
+    "spec_kit": {
+      "repository": "https://github.com/github/spec-kit",
+      "tag": "v1.2.2"
+    },
+    "rust": {
+      "version": "1.99.1",
+      "edition": "2024",
+      "reference": "https://blog.rust-lang.org/2026/10/15/Rust-1.99.1/"
+    },
+    "egui_eframe": {
+      "version": "0.36.2",
+      "reference": "https://docs.rs/eframe/0.36.2/eframe/"
+    },
+    "mcp_rust_sdk": {
+      "repository": "https://github.com/modelcontextprotocol/rust-sdk",
+      "tag": "rmcp-v3.6.0"
+    },
+    "mcp": {
+      "current_specification": "https://modelcontextprotocol.io/specification/2026-07-28",
+      "legacy_profile_to_qualify": "https://modelcontextprotocol.io/specification/2025-11-25"
+    },
+    "redb": {
+      "repository": "https://github.com/cberner/redb",
+      "version": "4.4.0"
+    },
+    "muxcls": {
+      "repository": "https://github.com/KiaroSama/MuxCls",
+      "revision": "0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "purpose": "Complete standalone source compared with embedded FFmWiz F08; mandatory Rust rewrite and shared integration",
+      "source_manifest": "research_v7/muxcls-sources/manifest.json"
+    }
+  },
+  "archive_manifest": "research-pack-manifest.json",
+  "runtime_verification": "NOT_PERFORMED",
+  "review_date": "2026-10-23",
+  "directive_revision": "7.0"
+}

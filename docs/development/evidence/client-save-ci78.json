@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "run_id": 40093194869,
+  "branch_head": "a49054ee162246cacc14ff902c722e0dcfa08e5d",
+  "jobs": [
+    {
+      "id": 120869928757,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120869928817,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120869928826,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120869928923,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120870242060,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120870242110,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120870242117,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120870242160,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120872995253,
+      "name": "browser",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120872995306,
+      "name": "native-ui",
+      "conclusion": "failure"
+    }
+  ],
+  "asserted": [
+    "all four native regression/Clippy/desktop targets, WASM and lock",
+    "new deterministic client cleanup redirect/unknown-empty-directory preservation regression on Unix",
+    "complete actual original MOV/MP4 and owner/official SDK/lost-response suite",
+    "268633400-byte scoped CLI copy, observed process HWM 26016 KiB, partial SIGINT/drain and all HTTP revocation/disconnect assertions",
+    "actual native typed-destination Save passed before the subsequent OS-picker oracle failure"
+  ],
+  "actual_large_copy": {
+    "bytes": "268633400",
+    "observed_client_hwm_kib": 26016,
+    "elapsed_ms": "67490",
+    "cancel_preparation_ms": "45979",
+    "owner_hwm_kib": 30272
+  },
+  "native_picker": {
+    "opened": true,
+    "personally_inspected_image": true,
+    "actual_ui_status": "197983 verified bytes saved to a path ending native-picker-saved-copy.mkv.mkv",
+    "independent_expected_path_oracle": "failed",
+    "cause_follow_up": "Select the whole filename, including its existing extension, after Ctrl+L before entering the absolute path",
+    "full_picker_pass": false
+  },
+  "browser": {
+    "actual_report_visible": true,
+    "personally_inspected_timeout_image": true,
+    "request_seen": true,
+    "cancelled_network_event": true,
+    "debugger_body_attempts": 141,
+    "exact_event_cause": "unresolved",
+    "save_reached": false
+  },
+  "next_source": [
+    "OS pickers use Ctrl+A after Ctrl+L to replace the complete filename",
+    "test-only bounded HTTP response observer forwards original response status/headers/body unchanged and checks correlation to the actual Chrome-observed UI request",
+    "actual pointer input, report assertions, 15-second bound and real file-picker/save oracles remain",
+    "15 exact hosted formatter hunks"
+  ],
+  "artifacts": [
+    {
+      "id": 12560610131,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:1fded33542c26f7df65fdeecdc4b46eda82075b1528bb9f267bb7a47d6338a29",
+      "downloaded": false
+    },
+    {
+      "id": 12560516432,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:6e6fab4ad311eeb996e2875c7de73a990010ada1991dc98de188105c4382d074",
+      "downloaded": false
+    },
+    {
+      "id": 12560491564,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:98e54b71a4bd02496eb7e521611cf5b48fb83fb5569b41dce5c0dd70417aaaaa",
+      "downloaded": false
+    },
+    {
+      "id": 12559837195,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:4cc84fd6315140ba77d3858599aa9de3833be7db616382f5d5735abd6f872288",
+      "downloaded": false
+    }
+  ],
+  "complete_product": "blocked"
+}

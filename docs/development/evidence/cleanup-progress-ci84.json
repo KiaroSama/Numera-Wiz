@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "run_id": 40103257764,
+  "branch_head": "472efde4ca2c43e7a24c7be5fadd87f31fcbd453",
+  "ordinary_regressions": {
+    "platforms": [
+      "ubuntu-24.04",
+      "windows-2025",
+      "macos-15",
+      "macos-15-intel"
+    ],
+    "result": "passed",
+    "observed": [
+      "strict disabled/selector/tag variant rejection",
+      "frozen limits and legacy plan hashes",
+      "measured full-pass copy progress and drained deadline/cancellation",
+      "real finite/disabled child timeout and confirmed cancellation",
+      "all existing workspace ordinary regressions"
+    ]
+  },
+  "other_passed": [
+    "WASM/lock",
+    "actual CPU engine preservation suite including real FFmpeg remux progress and independent output assertions",
+    "actual larger-than-memory isolated artifact reader",
+    "actual typed CLI/official SDK/lost-ack suite",
+    "complete actual larger-than-memory HTTP byte/revocation/disconnect/index cleanup suite",
+    "actual headed Chrome cleanup/report/review/run/output details and genuine OS Save As; independently equal 197983-byte source and saved copy"
+  ],
+  "failed_gate": {
+    "name": "native lint",
+    "reason": "UI helper appeared after its test module; helper moved before tests; domain progress types moved before tests too"
+  },
+  "formatting": {
+    "exact_hunks_applied": 30
+  },
+  "not_claimed": [
+    "native desktop build/package/GUI gates after lint failure",
+    "new source-probe selection source in next commit",
+    "complete product/package/resource/manual/owner qualification"
+  ],
+  "compiled_merge_source": "78cd2bbc07aca74f1917f25cf655ba487fbdacc1",
+  "large_copy": {
+    "bytes": "268633400",
+    "client_observed_peak_kib": 26268,
+    "owner_observed_peak_kib": 31396,
+    "cancelled_before_publication": true,
+    "report": "artifact-http-ci84.json"
+  },
+  "artifacts": [
+    {
+      "id": 12564645123,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:986d07a3498cd302c7449d96431da7fea8e19179cf98c81e767937c7da105f59",
+      "downloaded": false
+    },
+    {
+      "id": 12564530630,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:2f89eab8eef09acfcc5f3324e95b0c97db1e886634faab4a2a4a8d26b1096c32",
+      "downloaded": false
+    },
+    {
+      "id": 12563900979,
+      "name": "development-evidence-macos-15",
+      "github_reported_zip_sha256": "sha256:56a95486f35b49f5c8f02d54bd2aa7058a9ed2fe7f6e3942164e30d1d7ac2c98",
+      "downloaded": false
+    },
+    {
+      "id": 12563696388,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:86c113eee7650ee61a87c7985a83b19cfee7392ca120b35168bccae34f00273f",
+      "downloaded": false
+    },
+    {
+      "id": 12563598430,
+      "name": "development-evidence-windows-2025",
+      "github_reported_zip_sha256": "sha256:dc42f97383487a7093f5718f3a79ecfee9ddda646f82284d8e3e5ca0d0a721ee",
+      "downloaded": false
+    },
+    {
+      "id": 12563552278,
+      "name": "development-evidence-ubuntu-24.04",
+      "github_reported_zip_sha256": "sha256:62fa6b784021c6900a118d0558385567d19d0e6fded9f2cd2baf39d3dd4e1816",
+      "downloaded": false
+    },
+    {
+      "id": 12562989226,
+      "name": "development-evidence-macos-15-intel",
+      "github_reported_zip_sha256": "sha256:271052bc2cdc791b2885902058e22040783f28f49f235311262dcfed1098b1ed",
+      "downloaded": false
+    }
+  ],
+  "personally_inspected_images": [
+    "browser-client-saved.png"
+  ],
+  "native_gui": "skipped after failed native lint; no pass inferred"
+}

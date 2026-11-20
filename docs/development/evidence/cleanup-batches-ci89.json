@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "full_release": "blocked",
+  "source_head": "303524aff82fe6c40c0f6945a58d416d75b33213",
+  "compiled_merge": "5e70d0feec2995e8b424667239872182e72985f4",
+  "ci_run_url": "https://github.com/KiaroSama/Numera-Wiz/actions/runs/40118215359",
+  "all13_jobs_passed": true,
+  "batch_report": {
+    "case": "two_source_cleanup_batch",
+    "cli_batch": "d30ca857-d96b-44b8-a26c-a3263824afe6",
+    "confirmed_cancelled": 2,
+    "copy_full_byte_equality": true,
+    "http_batch": "ed3eee85-82a8-429f-a0e5-394c9348d3aa",
+    "independent_retained_packet_equality": true,
+    "partial_exit": 9,
+    "scope": "Explicit candidates only; directory expansion, companions, replacement and GUI batching remain separate qualification",
+    "sdk_batch": "b6cde51f-0cb6-4879-95d6-775882f29a71",
+    "skipped": 2,
+    "source_commit": "5e70d0feec2995e8b424667239872182e72985f4",
+    "transports": [
+      "typed_cli",
+      "official_sdk_stdio",
+      "official_sdk_streamable_http"
+    ]
+  },
+  "batch_lost_accepted_response_restart": {
+    "accepted_identity": "74afc4b7-31d4-492b-8c27-766617e57fc0",
+    "automatic_retry_request_unchanged": true,
+    "boundary": "actual_owner_official_sdk_stdio",
+    "command": "batches.submit",
+    "durable_job_count": 2,
+    "lost_accepted_responses": 2,
+    "member_ids": [
+      "73f8ba9a-5a8d-46dc-920a-1e1904914e8d",
+      "a52484d6-d15c-4f34-862b-b572b64fbe97"
+    ],
+    "output_bytes": "197983",
+    "output_sha256": "b71cc38009155216d8b1d309ba12644eb72ae312522c55cb439cb240cd77e2eb",
+    "owner_epoch_changed": true,
+    "owner_log_only": true,
+    "root_and_principal_unchanged": true,
+    "same_job_after_restart": true,
+    "same_member_set_after_restart": true,
+    "same_receipt_after_restart": true,
+    "schema_version": 1,
+    "source_commit": "5e70d0feec2995e8b424667239872182e72985f4"
+  },
+  "single_lost_accepted_response_restart": {
+    "accepted_identity": "6cf70398-88ec-43bf-b8d1-604a54ea7462",
+    "automatic_retry_request_unchanged": true,
+    "boundary": "actual_owner_official_sdk_stdio",
+    "command": "jobs.submit",
+    "durable_job_count": 1,
+    "lost_accepted_responses": 2,
+    "member_ids": [
+      "6cf70398-88ec-43bf-b8d1-604a54ea7462"
+    ],
+    "output_bytes": "197983",
+    "output_sha256": "92e054be65b10684af30bc497a1dc6829bb22c5758e94e2bb8858f6cf4e16bda",
+    "owner_epoch_changed": true,
+    "owner_log_only": true,
+    "root_and_principal_unchanged": true,
+    "same_job_after_restart": true,
+    "same_member_set_after_restart": true,
+    "same_receipt_after_restart": true,
+    "schema_version": 1,
+    "source_commit": "5e70d0feec2995e8b424667239872182e72985f4"
+  },
+  "human_journeys": {
+    "native_job": 120946351886,
+    "browser_job": 120944512130,
+    "actual_second_source_intake": true,
+    "two_actual_checkboxes": true,
+    "review_then_run_pointer_input": true,
+    "review_starts_no_media_jobs": true,
+    "independent_full_source_output_bytes_per_child": true,
+    "terminal_children": 2,
+    "final_producer_jobs": 3,
+    "original_single_producer_save_checks_retained": true,
+    "genuine_os_save_source_bytes": "197983",
+    "native_save_and_completed_batch_pngs_personally_inspected": true,
+    "browser_save_and_completed_batch_pngs_personally_inspected": true
+  },
+  "complete_ordinary_targets": [
+    "ubuntu-24.04",
+    "windows-2025",
+    "macos-15",
+    "macos-15-intel"
+  ],
+  "research_integrity": "The actual verifier checks807 manifest-listed preserved files. No research-pack member was edited.",
+  "artifacts": [
+    {
+      "id": 12570571758,
+      "name": "browser-boot-evidence-linux-chrome",
+      "zip_bytes": 1100298,
+      "github_reported_zip_digest": "sha256:41d24939ab676b97d2c703cb2c181134519931130672244cfc25f26a1f321d2f",
+      "downloaded": false
+    },
+    {
+      "id": 12570153886,
+      "name": "artifact-http-evidence-linux",
+      "zip_bytes": 4524,
+      "github_reported_zip_digest": "sha256:7e0008b75c3544c5343342aa50fc126d89ae249ee8092e4cb0ae17ed1cdf4112",
+      "downloaded": false
+    },
+    {
+      "id": 12569903310,
+      "name": "native-ui-evidence-linux",
+      "zip_bytes": 1739569,
+      "github_reported_zip_digest": "sha256:7bb22477f2d085780e7391734872fae1adca32c5b984ea32830516bc5334ec50",
+      "downloaded": false
+    },
+    {
+      "id": 12569457944,
+      "name": "owner-batch-evidence-linux",
+      "zip_bytes": 2987,
+      "github_reported_zip_digest": "sha256:e9d0bbd17f1dac533a47bfe08c18ac1b8e0aa89218cbbc1e2a2a36dc52c77a14",
+      "downloaded": false
+    }
+  ],
+  "scope_limitations": [
+    "Explicit registered-asset batches only",
+    "Directory/probe-failure intake, companions and reviewed replacement remain mandatory",
+    "GUI cancellation remains to be exercised with real human input",
+    "Other native/browser input platforms remain unqualified",
+    "Full F01-F15/project/editor/effects/DAG/preview/mixer/captions/interchange remain mandatory",
+    "Full command/donor closure, retention/generation migration, portable standard packages/resources/manuals and matching owner hardware harness remain mandatory"
+  ]
+}

@@ -1,0 +1,2897 @@
+//! Actual media, durable owner and official MCP transport integration, hosted CI only.
+#[path = "../../../test-support/media.rs"]
+mod fixture;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use nw_domain::{
+    commands::Request,
+    mux::{StreamKind, StreamTagPatch, TagPatch},
+};
+use rmcp::{
+    ClientLifecycleMode, ClientServiceExt, ServiceExt,
+    model::{CallToolRequestParams, ProtocolVersion},
+    transport::{
+        StreamableHttpClientTransport, TokioChildProcess,
+        streamable_http_client::StreamableHttpClientTransportConfig,
+    },
+};
+use serde_json::{Value, json};
+use std::{process::Stdio, time::Duration};
+
+#[path = "support/owner.rs"]
+mod owner;
+use owner::Cli;
+
+fn legacy_catalog_fields(row: &Value) -> Value {
+    let decoded: nw_domain::projects::views::ProjectSummary =
+        serde_json::from_value(row.clone()).unwrap();
+    assert!(
+        decoded.known_authorization().is_some(),
+        "R2_TRANSPORT_AUTHORIZATION_UNKNOWN"
+    );
+    let mut legacy = row.clone();
+    assert!(
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("authorization")
+            .is_some()
+    );
+    legacy
+}
+
+fn assert_volume(result: &Value, asset: &Value) {
+    assert_eq!(result["asset_id"], asset["id"]);
+    assert_eq!(result["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(result["stream_index"], 1);
+    assert_eq!(result["samples_per_channel"], "48000");
+    assert_eq!(
+        result["peak"],
+        json!({"kind":"finite","micro_db":-18063656})
+    );
+    assert_eq!(result["rms"], json!({"kind":"finite","micro_db":-21073778}));
+}
+
+fn assert_loudness(result: &Value, asset: &Value) {
+    assert_eq!(result["asset_id"], asset["id"]);
+    assert_eq!(result["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(result["stream_index"], 1);
+    assert_eq!(result["integrated_centi_lufs"], -2175);
+    assert_eq!(result["true_peak_centi_dbtp"], -1806);
+    assert_eq!(result["range_centi_lu"], 0);
+    assert_eq!(result["gate_centi_lufs"], -3175);
+}
+
+fn frame_observation_input(asset: &Value) -> Value {
+    json!({"asset_id":asset["id"],"stream_index":0,"kind":"frames","first":1,"limit":2})
+}
+
+fn assert_frame_observations(report: &Value, asset: &Value) {
+    assert_eq!(report["selection"], frame_observation_input(asset));
+    assert_eq!(report["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(report["time_base"], json!({"num":"1","den":"1000"}));
+    assert_eq!(report["observed"], "4");
+    let rows = report["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["ordinal"], "1");
+    assert_eq!(rows[0]["pts"], json!({"num":"1","den":"4"}));
+    assert_eq!(rows[0]["detail"]["width"], 64);
+    assert_eq!(rows[0]["detail"]["height"], 48);
+    assert_eq!(rows[0]["detail"]["kind"], "frame");
+    assert_eq!(rows[1]["pts"], json!({"num":"1","den":"2"}));
+}
+
+fn still_observation_input(asset: &Value) -> Value {
+    json!({
+        "kind":"still",
+        "target":{"kind":"registered_source","asset_id":asset["id"],"stream_index":0,"frame_index":2},
+        "frame_selection":"decoded_index","source_policy":"original_required",
+        "display_profile":"source_monitor_rgba8","fit":"contain",
+        "encoding":{"format":"png"},"delivery":"inline",
+    })
+}
+
+fn audio_observation_input(asset: &Value) -> Value {
+    json!({
+        "kind":"audio","target":{"asset_id":asset["id"],"stream_index":1},
+        "range":{"start":155,"end":4151},"sample_rate":48000,"channel_layout":"mono",
+        "source_policy":"original_required","encoding":{"format":"wave_pcm16"},"delivery":"inline"
+    })
+}
+
+fn assert_mcp_audio(result: Value, asset: &Value, expected: &Value) {
+    let response = &result["structuredContent"];
+    assert_eq!(response["ok"], true, "{}", response["error"]);
+    let content = result["content"].as_array().unwrap();
+    assert_eq!(content.len(), 1);
+    assert_eq!(content[0]["type"], "audio");
+    assert_eq!(content[0]["mimeType"], "audio/wav");
+    assert!(content[0]["data"] == expected["audio_base64"]);
+    let metadata = &response["result"];
+    assert_eq!(metadata["target"]["asset_id"], asset["id"]);
+    for field in [
+        "sample_rate",
+        "channel_layout",
+        "range",
+        "frames",
+        "source_sha256",
+        "graph_sha256",
+        "encoded_sha256",
+        "encoded_byte_count",
+    ] {
+        assert_eq!(metadata[field], expected["metadata"][field]);
+    }
+}
+
+fn assert_mcp_still(result: Value, asset: &Value, expected: &Value) {
+    let response = &result["structuredContent"];
+    assert_eq!(response["ok"], true, "{}", response["error"]);
+    let content = result["content"].as_array().unwrap();
+    assert_eq!(content.len(), 1);
+    assert_eq!(content[0]["type"], "image");
+    assert_eq!(content[0]["mimeType"], "image/png");
+    assert!(content[0]["data"] == expected["png_base64"]);
+    let mut metadata = response["result"].clone();
+    assert_eq!(metadata["target"]["asset_id"], asset["id"]);
+    metadata["target"]["asset_id"] = expected["metadata"]["target"]["asset_id"].clone();
+    let mut expected = expected["metadata"].clone();
+    let id = metadata
+        .as_object_mut()
+        .unwrap()
+        .remove("observation_id")
+        .unwrap();
+    uuid::Uuid::parse_str(id.as_str().unwrap()).unwrap();
+    expected.as_object_mut().unwrap().remove("observation_id");
+    assert_eq!(metadata, expected);
+    assert!(serde_json::to_vec(&result).unwrap().len() < 768 * 1024);
+}
+
+fn reference_input(asset: &Value) -> Value {
+    let selection = json!({"asset_id":asset["id"],"stream_index":0,"start_frame":0});
+    json!({"reference":selection,"candidate":selection,"frame_count":4})
+}
+
+async fn reference_variant(
+    cli: &Cli,
+    media: &fixture::Media,
+    scope: &str,
+    name: &str,
+    filter: &str,
+) -> Value {
+    let path = media.directory.path().join(format!("{name}.mkv"));
+    let output = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-nostdin", "-i"])
+        .arg(&media.source)
+        .args([
+            "-map",
+            "0:v:0",
+            "-vf",
+            filter,
+            "-c:v",
+            "ffv1",
+            "-threads",
+            "1",
+            "-fps_mode",
+            "passthrough",
+            "-enc_time_base:v",
+            "filter",
+        ])
+        .arg(&path)
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let response = cli
+        .mutation(scope, name, "assets.register", json!({"path":path}))
+        .await;
+    assert_eq!(response["ok"], true, "{response}");
+    response["result"].clone()
+}
+
+fn assert_identical_video(result: &Value, asset: &Value) {
+    assert_eq!(
+        result["reference"]["source_sha256"],
+        asset["identity"]["sha256"]
+    );
+    assert_eq!(
+        result["candidate"]["source_sha256"],
+        asset["identity"]["sha256"]
+    );
+    assert_eq!(result["width"], 64);
+    assert_eq!(result["height"], 48);
+    assert_eq!(result["sample_basis"], "decoded_rgb8");
+    let frames = result["frames"].as_array().unwrap();
+    assert_eq!(frames.len(), 4);
+    assert_eq!(frames[1]["offset"], json!({"num":"1","den":"4"}));
+    for (index, row) in frames.iter().enumerate() {
+        assert_eq!(row["reference_frame"], index as u64);
+        assert_eq!(row["candidate_frame"], index as u64);
+        assert_eq!(row["psnr"]["kind"], "identical");
+        assert_eq!(row["ssim_millionths"], 1_000_000);
+    }
+}
+
+fn assert_audio_extraction(review: &Value) {
+    let resolution = &review["resolution"];
+    assert_eq!(resolution["action"], "remux");
+    let streams = resolution["streams"].as_array().unwrap();
+    assert_eq!(streams.len(), 1);
+    assert_eq!(streams[0]["kind"], "audio");
+    assert_eq!(streams[0]["index"], 1);
+    let outcomes = resolution["outcomes"].as_array().unwrap();
+    assert_eq!(outcomes.len(), 3);
+    assert!(outcomes[0]["output_index"].is_null());
+    assert_eq!(outcomes[1]["output_index"], 0);
+    assert!(outcomes[2]["output_index"].is_null());
+}
+
+macro_rules! call {
+    ($client:expr, $id:expr, $params:expr, $context:expr) => {{
+        let args = json!({"params":$params,"context":$context});
+        let result = $client.call_tool(CallToolRequestParams::new($id).with_arguments(args.as_object().unwrap().clone())).await.unwrap();
+        let value = serde_json::to_value(result).unwrap();
+        assert_eq!(value["structuredContent"]["ok"], true, "{value}");
+        value["structuredContent"]["result"].clone()
+    }};
+}
+// These SDK mutations use distinct scope/key identities and real registered source facts.
+macro_rules! project_sdk {
+    ($client:expr, $scope:expr, $asset:expr, $tag:expr) => {{
+        let project = call!($client,"projects.create",json!({"name":format!("SDK project {}",$tag)}),json!({"replay_scope":$scope,"idempotency_key":format!("project-create-{}",$tag)}));
+        let id = project["project_id"].as_str().unwrap();
+        let tools = $client.list_all_tools().await.unwrap();
+        let tool = tools.iter().find(|tool| tool.name == "projects.list").expect("Catalog must be exposed by the official MCP registry");
+        let schema = serde_json::to_value(tool).unwrap();
+        assert_eq!(schema["inputSchema"]["properties"]["context"]["type"], "object");
+        assert!(schema["inputSchema"]["properties"]["context"]["properties"].get("project").is_none());
+        assert!(schema["inputSchema"]["properties"]["params"]["properties"].get("replace_snapshot").is_some());
+        let response = $client.call_tool(CallToolRequestParams::new("projects.list").with_arguments(rmcp::object!({"params":{"limit":64},"context":{}}))).await.unwrap();
+        let response = serde_json::to_value(response).unwrap();
+        assert_eq!(response["structuredContent"]["ok"], true, "{response}");
+        assert!(response["structuredContent"]["receipt_id"].is_null());
+        let catalog = &response["structuredContent"]["result"];
+        assert_eq!(catalog["projection"], "projects.summary.v1");
+        assert!(catalog["next_cursor"].is_null());
+        let row = catalog["items"].as_array().unwrap().iter().find(|row| row["id"] == id).expect("SDK-created project must be discoverable by its creator");
+        assert_eq!(legacy_catalog_fields(row), json!({"id":id,"name":format!("SDK project {}",$tag),"revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"}));
+        let sequence = call!($client,"sequences.create",json!({"name":"Sequence","settings":{"width":64,"height":48,"frame_rate":{"num":"4","den":"1"},"sample_rate":48000,"audio_layout":"stereo"},"tracks":[{"kind":"video","name":"Video"}]}),json!({"project":{"id":id,"expected_revision":"0"},"replay_scope":$scope,"idempotency_key":format!("project-sequence-{}",$tag)}));
+        let placed = call!($client,"clips.place",json!({"sequence_id":sequence["created"]["sequence_id"],"track_id":sequence["created"]["tracks"][0]["id"],"source":{"kind":"registered","asset_id":$asset["id"],"stream_index":0},"source_range":{"start":{"num":"0","den":"1"},"end":{"num":"1","den":"1"}},"sequence_start":{"num":"0","den":"1"},"collision":"reject"}),json!({"project":{"id":id,"expected_revision":"1"},"replay_scope":$scope,"idempotency_key":format!("project-place-{}",$tag)}));
+        let inspected = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["clip_ids"][0],"revision":"2"}),json!({"project":{"id":id}}));
+        let source = call!($client,"projects.inspect",json!({"projection":"entity","entity_id":placed["created"]["source_id"],"revision":"2"}),json!({"project":{"id":id}}));
+        assert_eq!(inspected["snapshot_id"],source["snapshot_id"]);
+        assert_eq!(source["entity"]["asset_id"],$asset["id"]);
+        assert_eq!(source["entity"]["content_sha256"],$asset["identity"]["sha256"]);
+        assert_eq!(source["entity"]["extent_verification"],"pending");
+        assert!(source["entity"].get("identity").is_none() && source["entity"].get("probe").is_none());
+        json!({"start":inspected["entity"]["sequence_start"],"duration":inspected["entity"]["duration"],"source_range":inspected["entity"]["source_range"],"content_sha256":source["entity"]["content_sha256"],"stream_index":source["entity"]["stream_index"],"media_kind":source["entity"]["media_kind"]})
+    }};
+}
+#[path = "support/chapter_roundtrip.rs"]
+mod chapter_roundtrip;
+#[path = "support/lost_ack.rs"]
+mod lost_ack;
+#[path = "support/project_render.rs"]
+mod project_render;
+#[path = "support/project_topology.rs"]
+mod project_topology;
+
+const FFM_WIZ_CONFIG: &str = "input_path=source.mkv\noutput_path=converted.mkv\noutput_format=n\nvideo_codec=H265\nuse_gpu=y\ncrop=n\ncrop_top=0\ncrop_left=0\ncrop_right=0\ncrop_bottom=0\nvideo_bitrate_kbps=n\nvideo_bitrate_mode=quality_vbr\nresolution=n\nfps=n\nvideo_look=90cw,bright=-0.25,fadein=1.5\nvideo_quick=n\naudio_volume=n\nraw_ffmpeg_args=n\nraw_ffmpeg_valued_args=n\naudio_tracks=de\naudio_codec=aac\naudio_bitrate_kbps=n\naudio_sample_rate=n\nkeep_source_metadata=y\nsubtitle_tracks=none\nkeep_embedded_attachments=n\ndetect_duplicate_audio=y\nloudnorm=off\nloudnorm_target_i=-16\nnvenc_multipass=disabled\ncpu_two_pass=n\ncolor_range=source\nvideo_speed=n\nreverse_video=n\naudio_speed=n\nreverse_audio=n\nlogging_enabled=y\nlog_retention_days=0\nlog_level=debug\ngui_engine=classic\n";
+
+#[tokio::test]
+#[ignore = "Uses the CI-built CPU profile, actual owner processes and SDK clients"]
+async fn cli_and_both_official_mcp_transports_share_real_verified_jobs() {
+    nw_platform::init_logging();
+    let media = fixture::generate().await;
+    let cli = Cli {
+        data: media.directory.path().join("data"),
+        components: media.bin.clone(),
+        request_timeout: Duration::from_secs(40),
+    };
+    let config_directory = media.directory.path().canonicalize().unwrap();
+    let config_file = config_directory.join("ffmwiz.env");
+    let config_output = config_directory.join("imported-config.json");
+    std::fs::write(&config_file, FFM_WIZ_CONFIG).unwrap();
+    let (imported, exit) = cli
+        .human(&[
+            "config",
+            "import-ffmwiz",
+            "--input",
+            config_file.to_str().unwrap(),
+            "--out",
+            config_output.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{imported}");
+    let imported = imported["result"].clone();
+    assert_eq!(imported["input_valid"], true);
+    assert_eq!(imported["job"]["settings"].as_object().unwrap().len(), 40);
+    assert_eq!(
+        imported["job"]["settings"]["video_look"]["value"]["value"][1]["amount"],
+        json!({"num":"-1","den":"4"})
+    );
+    assert_eq!(
+        imported["job"]["settings"]["audio_tracks"]["value"]["selection"],
+        json!({"kind":"analyze","duplicates":true,"silence":true})
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(&config_output).unwrap()).unwrap(),
+        imported
+    );
+    let config_import = json!({"source":FFM_WIZ_CONFIG,"base_directory":config_directory,"compatibility_profile":"ffmwiz_v1"});
+    let (scope, exit) = cli
+        .human(&["access", "replay-scope", "create", "--json"])
+        .await;
+    assert_eq!(exit, 0, "{scope}");
+    let scope = scope["result"]["replay_scope"].as_str().unwrap().to_owned();
+    let (chapter_asset, chapter_export) = chapter_roundtrip::verify(&cli, &media, &scope).await;
+    let (wave_asset, wave_cues) = chapter_roundtrip::verify_wave_cues(&cli, &media, &scope).await;
+    let silent = cli
+        .query(
+            "media.analyze.loudness",
+            json!({"asset_id":wave_asset,"stream_index":0}),
+        )
+        .await;
+    assert_eq!(silent["asset_id"], wave_asset);
+    assert!(silent["integrated_centi_lufs"].is_null());
+    assert!(silent["true_peak_centi_dbtp"].is_null());
+    assert_eq!(silent["range_centi_lu"], 0);
+    assert_eq!(silent["gate_centi_lufs"], -7000);
+    let (before, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{before}");
+    assert!(before["result"]["advertised"].is_null());
+    let (doctor, exit) = cli.human(&["doctor"]).await;
+    assert_eq!(exit, 0, "{doctor}");
+    assert_eq!(doctor["media_components"]["status"], "identified");
+    assert_eq!(doctor["media_components"]["report"], before["result"]);
+    assert_eq!(doctor["media_gpu_initialized"], false);
+    let (observed, exit) = cli
+        .human(&["media", "capabilities", "refresh", "--force"])
+        .await;
+    assert_eq!(exit, 0, "{observed}");
+    let capabilities = &observed["result"];
+    assert_eq!(capabilities["cpu_round_trip"], "exercised");
+    assert_eq!(capabilities["advertised"]["license"], "LGPL-2.1-or-later");
+    assert_eq!(capabilities["hardware"], "unknown");
+    assert!(capabilities["nvenc"].is_null());
+    assert!(
+        capabilities["advertised"]["encoders"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("ffv1"))
+    );
+    assert!(
+        capabilities["advertised"]["pixel_formats"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("yuv420p"))
+    );
+    assert!(
+        capabilities["advertised"]["sample_formats"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("s16"))
+    );
+    let fingerprint = capabilities["fingerprint"].as_str().unwrap();
+    let devices = cli
+        .query(
+            "capabilities.refresh",
+            json!({"devices":true,"components":false}),
+        )
+        .await;
+    assert_eq!(devices["fingerprint"], fingerprint);
+    assert_eq!(devices["cpu_round_trip"], "exercised");
+    assert_eq!(devices["hardware"], "unavailable");
+    assert_eq!(
+        devices["nvenc"],
+        json!({"h264_nvenc":"unavailable","hevc_nvenc":"unavailable"})
+    );
+    let mut owner_bridge = cli.command();
+    owner_bridge.args(["bridge", "--native-owner"]);
+    let owner_bridge = ().serve(TokioChildProcess::new(owner_bridge).unwrap()).await.unwrap();
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "capabilities.refresh",
+            json!({"devices":true,"components":false}),
+            json!({})
+        ),
+        devices
+    );
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "chapters.export",
+            json!({"asset_id":chapter_asset}),
+            json!({})
+        ),
+        chapter_export
+    );
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "chapters.wave_cues",
+            json!({"id":wave_asset}),
+            json!({})
+        ),
+        wave_cues
+    );
+    let ale_path = media.directory.path().join("selected-assets.ale");
+    let (ale, exit) = cli
+        .human(&[
+            "interchange",
+            "export-ale",
+            "--asset",
+            &wave_asset,
+            "--out",
+            ale_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{ale}");
+    let ale = &ale["result"];
+    let expected = concat!(
+        "Heading\r\nFIELD_DELIM\tTABS\r\nVIDEO_FORMAT\t1080\r\n",
+        "AUDIO_FORMAT\t48kHz\r\nFPS\t24\r\n\r\nColumn\r\n",
+        "Name\tTracks\tStart\tEnd\tTape\tScene\tTake\tComments\tSource File\r\n\r\nData\r\n",
+        "rf64-cue.wav\tA1\t00:00:00:00\t00:00:01:00\t\t\t\t\trf64-cue.wav\r\n"
+    );
+    assert_eq!(ale["document"], expected);
+    assert_eq!(std::fs::read_to_string(&ale_path).unwrap(), expected);
+    if let Some(evidence_dir) = std::env::var_os("NW_SCHEMA_VALIDATOR_EVIDENCE_DIR") {
+        std::fs::copy(
+            &ale_path,
+            std::path::PathBuf::from(evidence_dir).join("selected-assets.ale"),
+        )
+        .unwrap();
+    }
+    let duplicates = cli
+        .raw(&Request::query(
+            "interchange.ale.export",
+            json!({"asset_ids":[wave_asset,wave_asset]}),
+        ))
+        .await;
+    assert_eq!(duplicates["error"]["code"], "ALE_UNREPRESENTABLE");
+    assert_eq!(
+        call!(
+            owner_bridge,
+            "interchange.ale.export",
+            json!({"asset_ids":[wave_asset]}),
+            json!({})
+        ),
+        *ale
+    );
+    let metadata = json!({"asset_id":chapter_asset,"output":media.directory.path().join("sdk-metadata-review.mkv"),"patch":{
+        "target":{"scope":"stream","index":2},"set":{"title":"Reviewed by MCP"}
+    }});
+    let cli_metadata = cli.query("metadata.patch", metadata.clone()).await;
+    let sdk_metadata = call!(owner_bridge, "metadata.patch", metadata, json!({}));
+    assert_eq!(cli_metadata["hash"], sdk_metadata["hash"]);
+    assert_eq!(
+        sdk_metadata["resolution"]["streams"][2]["tags"]["title"],
+        "Reviewed by MCP"
+    );
+    owner_bridge.cancel().await.unwrap();
+    let no_source = cli
+        .raw(&Request::query(
+            "capabilities.refresh",
+            json!({"components":false}),
+        ))
+        .await;
+    assert_eq!(no_source["error"]["code"], "VALIDATION_ERROR");
+    let other = "0".repeat(64);
+    let (unrelated, exit) = cli
+        .human(&["media", "capabilities", "clear", "--fingerprint", &other])
+        .await;
+    assert_eq!(exit, 0, "{unrelated}");
+    assert_eq!(unrelated["result"]["cleared"], false);
+    let (retained, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{retained}");
+    assert_eq!(&retained["result"], capabilities);
+    let (cleared, exit) = cli
+        .human(&[
+            "media",
+            "capabilities",
+            "clear",
+            "--fingerprint",
+            fingerprint,
+        ])
+        .await;
+    assert_eq!(exit, 0, "{cleared}");
+    assert_eq!(cleared["result"]["cleared"], true);
+    let (empty, exit) = cli.human(&["media", "capabilities", "inspect"]).await;
+    assert_eq!(exit, 0, "{empty}");
+    assert_eq!(empty["result"], before["result"]);
+    let (schema, exit) = cli.human(&["commands", "schema", "streams.clean"]).await;
+    assert_eq!(exit, 0, "{schema}");
+    let (probe, exit) = cli
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--probe-timeout-seconds",
+            "30",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{probe}");
+    assert_eq!(probe["result"]["streams"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        probe["result"]["probe_timeout"],
+        json!({"mode":"finite","seconds":30})
+    );
+    let (unbounded, exit) = cli
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--disable-probe-timeout",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{unbounded}");
+    assert_eq!(
+        unbounded["result"]["probe_timeout"],
+        json!({"mode":"disabled"})
+    );
+    let (invalid_probe, exit) = cli
+        .human(&[
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--probe-timeout-seconds",
+            "0",
+        ])
+        .await;
+    assert_eq!(exit, 2, "{invalid_probe}");
+    assert_eq!(invalid_probe["error"]["code"], "VALIDATION_ERROR");
+    let intent_file = media.directory.path().join("cli-intent.json");
+    std::fs::write(&intent_file, serde_json::to_vec(&fixture::rules()).unwrap()).unwrap();
+    let (created, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "create",
+            "--name",
+            "human-setup",
+            "--read-root",
+            media.directory.path().to_str().unwrap(),
+            "--write-root",
+            media.directory.path().to_str().unwrap(),
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 0, "{created}");
+    assert_eq!(created["result"]["mode"], "operate");
+    assert_eq!(created["result"]["owned_object_access"], true);
+    assert!(
+        created["result"]["allowed_command_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|id| !id.as_str().unwrap().starts_with("access.profiles")
+                && !id.as_str().unwrap().starts_with("access.tokens"))
+    );
+    let (duplicate, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "create",
+            "--name",
+            "human-setup",
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 4);
+    assert_eq!(duplicate["error"]["code"], "OBJECT_CONFLICT");
+    let grants_file = media.directory.path().join("auth/replacement-grants.json");
+    let (inspected, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "inspect",
+            "--name",
+            "human-setup",
+            "--grants-out",
+            grants_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 0);
+    assert_eq!(
+        inspected["result"]["principal"],
+        created["result"]["principal"]
+    );
+    let (denied, status) = cli
+        .human(&[
+            "--access-profile",
+            "human-setup",
+            "access",
+            "profiles",
+            "inspect",
+            "--name",
+            "human-setup",
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 5);
+    assert_eq!(
+        denied["error"]["code"], "PERMISSION_DENIED",
+        "Scoped CLI never borrows its native bootstrap's owner authority"
+    );
+    let mut grants: Value = serde_json::from_slice(
+        &nw_platform::security::read_private(&grants_file, 1024 * 1024).unwrap(),
+    )
+    .unwrap();
+    grants["owned_object_access"] = json!(false);
+    std::fs::write(&grants_file, serde_json::to_vec(&grants).unwrap()).unwrap();
+    let (updated, status) = cli
+        .human(&[
+            "access",
+            "profiles",
+            "update",
+            "--name",
+            "human-setup",
+            "--expected-revision",
+            "1",
+            "--grants-file",
+            grants_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 0, "{updated}");
+    assert_eq!(updated["result"]["revision"], 2);
+    assert_eq!(updated["result"]["owned_object_access"], false);
+    assert_eq!(
+        updated["result"]["principal"],
+        created["result"]["principal"]
+    );
+    let (denied_probe, exit) = cli
+        .human(&[
+            "--access-profile",
+            "human-setup",
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+            "--disable-probe-timeout",
+        ])
+        .await;
+    assert_eq!(exit, 5, "{denied_probe}");
+    assert_eq!(denied_probe["error"]["code"], "PERMISSION_DENIED");
+    let registration_args = [
+        "assets",
+        "register",
+        media.source.to_str().unwrap(),
+        "--probe-timeout-seconds",
+        "30",
+        "--replay-scope",
+        &scope,
+        "--idempotency-key",
+        "register-cli",
+    ];
+    let (registered, exit) = cli.human(&registration_args).await;
+    assert_eq!(exit, 0, "{registered}");
+    let (retried, exit) = cli.human(&registration_args).await;
+    assert_eq!(exit, 0, "{retried}");
+    assert_eq!(registered["request_id"], retried["request_id"]);
+    assert_eq!(registered["result"]["id"], retried["result"]["id"]);
+    let (invalid, exit) = cli
+        .raw_with_exit(&Request::query("media.probe", json!({"path":true})))
+        .await;
+    assert_eq!(invalid["error"]["code"], "VALIDATION_ERROR");
+    assert_eq!(
+        exit, 2,
+        "A typed CLI validation failure retains parseable JSON and the stable usage exit"
+    );
+    let mut conflicting = Request::query("assets.register", json!({"path":"different-source.mkv"}));
+    conflicting.replay_scope = Some(scope.clone());
+    conflicting.idempotency_key = Some("register-cli".into());
+    let (conflict, exit) = cli.raw_with_exit(&conflicting).await;
+    assert_eq!(conflict["error"]["code"], "IDEMPOTENCY_CONFLICT");
+    assert_eq!(
+        exit, 4,
+        "A durable conflict is distinguishable from a media execution failure"
+    );
+    assert_eq!(registered["ok"], true, "{registered}");
+    let asset = registered["result"].clone();
+    let declarative = cli.query(
+        "config.import.ffmwiz",
+        json!({"source":"input_path=source.mkv\noutput_path=config-copy.mkv\noutput_format=n\nvideo_codec=copy\naudio_codec=copy\naudio_tracks=1,0\nsubtitle_tracks=none\n",
+            "base_directory":config_directory,"compatibility_profile":"ffmwiz_v1"}),
+    ).await;
+    assert_eq!(declarative["input_valid"], true);
+    let job_file = config_directory.join("copy-job.json");
+    std::fs::write(&job_file, serde_json::to_vec(&declarative).unwrap()).unwrap();
+    let (config_plan, exit) = cli
+        .human(&[
+            "jobs",
+            "plan",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--file",
+            job_file.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{config_plan}");
+    let config_plan = &config_plan["result"];
+    let mut equivalent = nw_domain::mux::CleanIntent::preserving_all();
+    equivalent.audio_selection.selector =
+        nw_domain::mux::Selector::SourceIndices { values: vec![2, 1] };
+    equivalent.audio_selection.no_match = nw_domain::mux::NoMatch::Reject;
+    equivalent.audio_order = vec![2, 1];
+    equivalent.subtitle_selection.selector = nw_domain::mux::Selector::None;
+    let planned_output = config_directory.join("config-copy.mkv");
+    let ordinary = cli
+        .query(
+            "streams.clean",
+            json!({"asset_id":asset["id"],"intent":equivalent,"output":planned_output}),
+        )
+        .await;
+    assert_eq!(ordinary["hash"], config_plan["hash"]);
+    assert_eq!(
+        config_plan["resolution"]["streams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|stream| stream["index"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        [0_u64, 2, 1]
+    );
+    let mut incomplete = declarative["job"].clone();
+    incomplete["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("output_path");
+    let (incomplete, _) = cli
+        .raw_with_exit(&Request::query(
+            "jobs.plan",
+            json!({"asset_id":asset["id"],"job_document":incomplete}),
+        ))
+        .await;
+    assert_eq!(incomplete["error"]["code"], "JOB_FIELD_REQUIRED");
+    assert_eq!(
+        incomplete["error"]["field"],
+        "job_document.settings.output_path"
+    );
+    assert!(!planned_output.exists());
+    let (volume, exit) = cli
+        .human(&[
+            "media",
+            "analyze-volume",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "1",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{}", volume["error"]);
+    assert_volume(&volume["result"], &asset);
+    let (loudness, exit) = cli
+        .human(&[
+            "media",
+            "analyze-loudness",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "1",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{loudness}");
+    assert_loudness(&loudness["result"], &asset);
+    let asset_id = asset["id"].as_str().unwrap();
+    let (audio, exit) = cli
+        .human(&[
+            "previews",
+            "observe-audio",
+            "--asset",
+            asset_id,
+            "--stream",
+            "1",
+            "--start-sample",
+            "155",
+            "--end-sample",
+            "4151",
+            "--sample-rate",
+            "48000",
+            "--channel-layout",
+            "mono",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{}", audio["error"]);
+    let audio = &audio["result"];
+    assert_eq!(audio["metadata"]["frames"], 3996);
+    assert_eq!(
+        audio["metadata"]["source_sha256"],
+        asset["identity"]["sha256"]
+    );
+    let wave = STANDARD
+        .decode(audio["audio_base64"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(
+        audio["metadata"]["encoded_sha256"],
+        nw_domain::projects::hash(&wave)
+    );
+    let decoded = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-i"])
+        .arg(&media.source)
+        .args(["-map", "0:1", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        decoded.status.success(),
+        "{}",
+        String::from_utf8_lossy(&decoded.stderr)
+    );
+    assert_eq!(wave.len(), 44 + 3996 * 2);
+    assert!(
+        wave[44..] == decoded.stdout[155 * 2..4151 * 2],
+        "WAVE changes original PCM samples"
+    );
+    let mut oversized = audio_observation_input(&asset);
+    oversized["range"]["end"] = json!(50000);
+    let rejected_audio = cli
+        .raw(&Request::query("previews.observe", oversized))
+        .await;
+    assert_eq!(rejected_audio["error"]["code"], "INLINE_BUDGET_EXCEEDED");
+    let (packets, exit) = cli
+        .human(&[
+            "media",
+            "analyze-stream",
+            "--asset",
+            asset_id,
+            "--stream",
+            "0",
+            "--kind",
+            "packets",
+            "--first",
+            "1",
+            "--limit",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{packets}");
+    let packet_report = &packets["result"];
+    assert_eq!(packet_report["observed"], "4");
+    let rows = packet_report["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    let independent = tokio::process::Command::new(media.bin.join("ffprobe"))
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "0",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-of",
+            "json",
+        ])
+        .arg(&media.source)
+        .output()
+        .await
+        .unwrap();
+    assert!(independent.status.success());
+    let original: Value = serde_json::from_slice(&independent.stdout).unwrap();
+    for (index, row) in rows.iter().enumerate() {
+        let packet = &original["packets"][index + 1];
+        assert_eq!(row["ordinal"], (index + 1).to_string());
+        assert_eq!(row["detail"]["bytes"], packet["size"]);
+        assert_eq!(
+            row["detail"]["data_sha256"],
+            packet["data_hash"]
+                .as_str()
+                .unwrap()
+                .strip_prefix("SHA256:")
+                .unwrap()
+        );
+    }
+    let frames = cli
+        .query("media.analyze.stream", frame_observation_input(&asset))
+        .await;
+    assert_frame_observations(&frames, &asset);
+    let (quality, exit) = cli
+        .human(&[
+            "media",
+            "compare-video",
+            "--reference",
+            asset_id,
+            "--reference-stream",
+            "0",
+            "--candidate",
+            asset_id,
+            "--candidate-stream",
+            "0",
+            "--frames",
+            "4",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{quality}");
+    assert_identical_video(&quality["result"], &asset);
+    let cut_asset = reference_variant(
+        &cli,
+        &media,
+        &scope,
+        "reference-cut",
+        "trim=start_frame=1:end_frame=3,setpts=PTS-STARTPTS",
+    )
+    .await;
+    let cut_alignment = cli
+        .query(
+            "media.analyze.reference",
+            json!({
+                "reference":{"asset_id":asset["id"],"stream_index":0,"start_frame":1},
+                "candidate":{"asset_id":cut_asset["id"],"stream_index":0,"start_frame":0},
+                "frame_count":2,
+            }),
+        )
+        .await;
+    assert_ne!(
+        cut_alignment["reference"]["source_sha256"],
+        cut_alignment["candidate"]["source_sha256"]
+    );
+    assert_eq!(cut_alignment["frames"][0]["reference_frame"], 1);
+    assert_eq!(cut_alignment["frames"][0]["candidate_frame"], 0);
+    assert_eq!(
+        cut_alignment["frames"][1]["offset"],
+        json!({"num":"1","den":"4"})
+    );
+    assert!(
+        cut_alignment["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| {
+                row["psnr"]["kind"] == "identical" && row["ssim_millionths"] == 1_000_000
+            })
+    );
+    let irregular = reference_variant(
+        &cli,
+        &media,
+        &scope,
+        "reference-irregular",
+        r"setpts=PTS+if(eq(N\,2)\,3\,0)",
+    )
+    .await;
+    let mut unequal_grid = reference_input(&asset);
+    unequal_grid["candidate"]["asset_id"] = irregular["id"].clone();
+    let (unequal_grid, _) = cli
+        .raw_with_exit(&Request::query("media.analyze.reference", unequal_grid))
+        .await;
+    assert_eq!(
+        unequal_grid["error"]["code"],
+        "REFERENCE_ALIGNMENT_REQUIRED"
+    );
+    assert!(
+        unequal_grid["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("relative presentation grid")
+    );
+    let mut shifted = reference_input(&asset);
+    shifted["candidate"]["start_frame"] = 1.into();
+    shifted["frame_count"] = 2.into();
+    let shifted = cli.query("media.analyze.reference", shifted).await;
+    assert_eq!(shifted["frames"][0]["candidate_frame"], 1);
+    assert_eq!(shifted["frames"][1]["candidate_frame"], 2);
+    assert!(shifted["frames"].as_array().unwrap().iter().any(|row| {
+        row["psnr"]["kind"] == "finite"
+            && row["ssim_millionths"]
+                .as_i64()
+                .is_some_and(|score| score < 1_000_000)
+    }));
+    let mut partial_quality = reference_input(&asset);
+    partial_quality["candidate"]["start_frame"] = 1.into();
+    let (partial_quality, _) = cli
+        .raw_with_exit(&Request::query("media.analyze.reference", partial_quality))
+        .await;
+    assert_eq!(
+        partial_quality["error"]["code"],
+        "REFERENCE_ALIGNMENT_REQUIRED"
+    );
+    let (source_preview, exit) = cli
+        .human(&[
+            "media",
+            "preview-frame",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "0",
+            "--frame",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{}", source_preview["error"]);
+    let source_preview = &source_preview["result"];
+    assert_eq!(source_preview["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(source_preview["width"], nw_domain::preview::WIDTH);
+    assert_eq!(source_preview["height"], nw_domain::preview::HEIGHT);
+    assert_eq!(source_preview["frame"], 2);
+    assert_eq!(
+        STANDARD
+            .decode(source_preview["rgba_base64"].as_str().unwrap())
+            .unwrap()
+            .len(),
+        nw_domain::preview::RGBA_BYTES
+    );
+    let (observed_still, exit) = cli
+        .human(&[
+            "previews",
+            "observe",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--stream",
+            "0",
+            "--frame",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{}", observed_still["error"]);
+    let observed_still = &observed_still["result"];
+    let metadata = &observed_still["metadata"];
+    assert_eq!(
+        metadata["target"],
+        still_observation_input(&asset)["target"]
+    );
+    assert_eq!(metadata["actual_frame_index"], 2);
+    assert_eq!(metadata["source_sha256"], asset["identity"]["sha256"]);
+    assert_eq!(
+        metadata["timing"]["time_base"],
+        json!({"num":"1","den":"1000"})
+    );
+    assert_eq!(metadata["timing"]["pts"], json!({"num":"1","den":"2"}));
+    assert_eq!(metadata["timing"]["duration"], json!({"num":"1","den":"4"}));
+    assert_eq!(metadata["width"], nw_domain::preview::WIDTH);
+    assert_eq!(metadata["height"], nw_domain::preview::HEIGHT);
+    let observed_png = STANDARD
+        .decode(observed_still["png_base64"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(metadata["encoded_byte_count"], observed_png.len());
+    assert_eq!(
+        metadata["encoded_sha256"],
+        nw_domain::projects::hash(&observed_png)
+    );
+    let observed_path = media.directory.path().join("observed-still.png");
+    std::fs::write(&observed_path, observed_png).unwrap();
+    let rgba = tokio::process::Command::new(media.bin.join("ffmpeg"))
+        .args(["-v", "error", "-f", "png_pipe", "-i"])
+        .arg(&observed_path)
+        .args([
+            "-map",
+            "0:0",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        rgba.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rgba.stderr)
+    );
+    assert!(STANDARD.encode(rgba.stdout) == source_preview["rgba_base64"]);
+    let mut unsupported = still_observation_input(&asset);
+    unsupported["encoding"] = json!({"format":"jpeg","quality":85});
+    let (unsupported, _) = cli
+        .raw_with_exit(&Request::query("previews.observe", unsupported))
+        .await;
+    assert_eq!(unsupported["error"]["code"], "VALIDATION_ERROR");
+    assert!(unsupported.get("result").is_none());
+    let mut still_sources = Vec::new();
+    for (name, format, codec) in [
+        ("owner-picture.png", "png_pipe", "png"),
+        ("owner-picture.jpg", "jpeg_pipe", "mjpeg"),
+    ] {
+        let path = fixture::generate_still(&media, name, codec, "64x48").await;
+        let (registered, exit) = cli
+            .human(&[
+                "assets",
+                "register",
+                path.to_str().unwrap(),
+                "--replay-scope",
+                &scope,
+                "--idempotency-key",
+                name,
+            ])
+            .await;
+        assert_eq!(exit, 0, "{registered}");
+        let still = &registered["result"];
+        assert_eq!(still["probe"]["format"], format);
+        assert_eq!(still["probe"]["streams"][0]["codec"], codec);
+        let (preview, exit) = cli
+            .human(&[
+                "media",
+                "preview-frame",
+                "--asset",
+                still["id"].as_str().unwrap(),
+                "--stream",
+                "0",
+                "--frame",
+                "0",
+            ])
+            .await;
+        assert_eq!(exit, 0, "{}", preview["error"]);
+        let preview = preview["result"].clone();
+        assert_eq!(preview["source_sha256"], still["identity"]["sha256"]);
+        assert_eq!(preview["frame"], 0);
+        let mut input = still_observation_input(still);
+        input["target"]["frame_index"] = 0.into();
+        let observation = cli.query("previews.observe", input).await;
+        assert_eq!(observation["metadata"]["actual_frame_index"], 0);
+        assert!(observation["metadata"]["timing"].is_null());
+        still_sources.push((path, still["probe"].clone(), preview));
+    }
+    assert_eq!(
+        asset["probe"]["probe_timeout"],
+        json!({"mode":"finite","seconds":30})
+    );
+    let (project_created, exit) = cli
+        .human(&[
+            "projects",
+            "create",
+            "--name",
+            "CLI project",
+            "--replay-scope",
+            &scope,
+            "--idempotency-key",
+            "project-create-cli",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{project_created}");
+    let cli_project = project_created["result"]["project_id"].as_str().unwrap();
+    let (catalog, exit) = cli.human(&["projects", "list", "--limit", "64"]).await;
+    assert_eq!(exit, 0, "{catalog}");
+    assert!(catalog["receipt_id"].is_null());
+    assert_eq!(catalog["result"]["projection"], "projects.summary.v1");
+    let row = catalog["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == cli_project)
+        .unwrap();
+    assert_eq!(
+        legacy_catalog_fields(row),
+        json!({"id":cli_project,"name":"CLI project","revision":"0","schema_major":1,"envelope_version":1,"compatibility":"supported"})
+    );
+    let (project_sequence, exit) = cli
+        .human(&[
+            "sequences",
+            "create",
+            "--project",
+            cli_project,
+            "--expected-revision",
+            "0",
+            "--name",
+            "Sequence",
+            "--width",
+            "64",
+            "--height",
+            "48",
+            "--frame-rate",
+            "4/1",
+            "--video-track",
+            "Video",
+            "--replay-scope",
+            &scope,
+            "--idempotency-key",
+            "project-sequence-cli",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{project_sequence}");
+    let sequence_id = project_sequence["result"]["created"]["sequence_id"]
+        .as_str()
+        .unwrap();
+    let track_id = project_sequence["result"]["created"]["tracks"][0]["id"]
+        .as_str()
+        .unwrap();
+    let place_args = [
+        "clips",
+        "place",
+        "--project",
+        cli_project,
+        "--expected-revision",
+        "1",
+        "--sequence",
+        sequence_id,
+        "--track",
+        track_id,
+        "--asset",
+        asset["id"].as_str().unwrap(),
+        "--stream-index",
+        "0",
+        "--source-start",
+        "0",
+        "--source-end",
+        "1",
+        "--sequence-start",
+        "0",
+        "--replay-scope",
+        &scope,
+        "--idempotency-key",
+        "project-place-cli",
+    ];
+    let (project_placed, exit) = cli.human(&place_args).await;
+    assert_eq!(exit, 0, "{project_placed}");
+    let (project_retried, exit) = cli.human(&place_args).await;
+    assert_eq!(exit, 0, "{project_retried}");
+    assert_eq!(project_placed["receipt_id"], project_retried["receipt_id"]);
+    let clip_id = project_placed["result"]["created"]["clip_ids"][0]
+        .as_str()
+        .unwrap();
+    let binding_id = project_placed["result"]["created"]["source_id"]
+        .as_str()
+        .unwrap();
+    let (clip, exit) = cli
+        .human(&[
+            "projects",
+            "inspect",
+            "--project",
+            cli_project,
+            "--projection",
+            "entity",
+            "--entity",
+            clip_id,
+            "--revision",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{clip}");
+    let (binding, exit) = cli
+        .human(&[
+            "projects",
+            "inspect",
+            "--project",
+            cli_project,
+            "--projection",
+            "entity",
+            "--entity",
+            binding_id,
+            "--revision",
+            "2",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{binding}");
+    assert_eq!(binding["result"]["entity"]["asset_id"], asset["id"]);
+    let cli_project_semantics = json!({"start":clip["result"]["entity"]["sequence_start"],"duration":clip["result"]["entity"]["duration"],"source_range":clip["result"]["entity"]["source_range"],"content_sha256":binding["result"]["entity"]["content_sha256"],"stream_index":binding["result"]["entity"]["stream_index"],"media_kind":binding["result"]["entity"]["media_kind"]});
+    let reader = json!({"name":"project-only-reader","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":false,"allowed_command_ids":["projects.inspect","assets.inspect","media.probe"],"object_grants":[{"kind":"project","id":cli_project,"actions":["read"]}],"read_roots":[],"write_roots":[]});
+    assert_eq!(
+        cli.mutation(
+            &scope,
+            "project-reader-profile",
+            "access.profiles.put",
+            reader
+        )
+        .await["ok"],
+        true
+    );
+    let (project_visible, exit) = cli
+        .human(&[
+            "--access-profile",
+            "project-only-reader",
+            "projects",
+            "inspect",
+            "--project",
+            cli_project,
+            "--projection",
+            "entity",
+            "--entity",
+            binding_id,
+        ])
+        .await;
+    assert_eq!(exit, 0, "{project_visible}");
+    assert_eq!(project_visible["result"]["entity"]["asset_id"], asset["id"]);
+    assert!(
+        !project_visible
+            .to_string()
+            .contains(media.source.to_str().unwrap())
+    );
+    let (source_denied, exit) = cli
+        .human(&[
+            "--access-profile",
+            "project-only-reader",
+            "assets",
+            "inspect",
+            asset["id"].as_str().unwrap(),
+        ])
+        .await;
+    assert_ne!(exit, 0);
+    assert_eq!(source_denied["error"]["code"], "OBJECT_NOT_FOUND");
+    let (path_denied, exit) = cli
+        .human(&[
+            "--access-profile",
+            "project-only-reader",
+            "media",
+            "probe",
+            media.source.to_str().unwrap(),
+        ])
+        .await;
+    assert_ne!(exit, 0);
+    assert_eq!(path_denied["error"]["code"], "PATH_DENIED");
+    let (report, exit) = cli
+        .human(&[
+            "streams",
+            "report",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--intent-file",
+            intent_file.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{report}");
+    let report = report["result"].clone();
+    assert_eq!(report["resolved_files"], 1);
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
+    assert_eq!(report["unique_streams"].as_array().unwrap().len(), 3);
+    let output = media.directory.path().join("cli-copy.mkv");
+    let limits_file = media.directory.path().join("cli-limits.json");
+    std::fs::write(
+        &limits_file,
+        serde_json::to_vec(&nw_domain::execution::CleanupLimits::default()).unwrap(),
+    )
+    .unwrap();
+    let (plan, exit) = cli
+        .human(&[
+            "streams",
+            "clean",
+            "--asset",
+            asset["id"].as_str().unwrap(),
+            "--out",
+            output.to_str().unwrap(),
+            "--intent-file",
+            intent_file.to_str().unwrap(),
+            "--limits-file",
+            limits_file.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{plan}");
+    let plan = plan["result"].clone();
+    assert_eq!(
+        plan["execution_limits"],
+        serde_json::to_value(nw_domain::execution::CleanupLimits::default()).unwrap()
+    );
+    let (inspected, exit) = cli
+        .human(&["plans", "inspect", plan["id"].as_str().unwrap()])
+        .await;
+    assert_eq!(exit, 0, "{inspected}");
+    assert_eq!(inspected["result"]["hash"], plan["hash"]);
+    let submit = json!({"plan_id":plan["id"],"plan_hash":plan["hash"]});
+    let submission_args = [
+        "jobs",
+        "submit",
+        "--plan",
+        plan["id"].as_str().unwrap(),
+        "--plan-hash",
+        plan["hash"].as_str().unwrap(),
+        "--replay-scope",
+        &scope,
+        "--idempotency-key",
+        "submit-cli",
+    ];
+    let (accepted, exit) = cli.human(&submission_args).await;
+    assert_eq!(exit, 0, "{accepted}");
+    let (repeated, exit) = cli.human(&submission_args).await;
+    assert_eq!(exit, 0, "{repeated}");
+    assert_eq!(accepted["request_id"], repeated["request_id"]);
+    assert_eq!(accepted["result"]["job_id"], repeated["result"]["job_id"]);
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    let id = accepted["result"]["job_id"].as_str().unwrap();
+    let job = cli.completed(id).await;
+    assert_eq!(job["state"], "succeeded", "{job}");
+    assert_eq!(job["progress"]["stage"], "verify_source_bytes");
+    assert_eq!(job["progress"]["completed_bytes"], job["artifact"]["bytes"]);
+    assert_eq!(job["progress"]["total_bytes"], job["artifact"]["bytes"]);
+    assert_eq!(job["file_times"]["policy"], "preserve_best_effort");
+    assert_eq!(job["file_times"]["preserved"], true);
+    assert_eq!(
+        std::fs::read(&media.source).unwrap(),
+        std::fs::read(&output).unwrap()
+    );
+    let artifact_id = format!("job-{id}");
+    let (manifest, exit) = cli
+        .human(&["artifacts", "manifest", "--artifact-id", &artifact_id])
+        .await;
+    assert_eq!(exit, 0, "{manifest}");
+    let manifest = manifest["result"].clone();
+    assert_eq!(manifest["sha256"], job["artifact"]["sha256"]);
+    assert_eq!(manifest["suggested_name"], "cli-copy.mkv");
+    assert!(
+        !manifest
+            .to_string()
+            .contains(media.directory.path().to_str().unwrap())
+    );
+    let saved_path = media.directory.path().join("client-saved-copy.mkv");
+    let (saved, exit) = cli
+        .human(&[
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            manifest["sha256"].as_str().unwrap(),
+            "--out",
+            saved_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_eq!(exit, 0, "{saved}");
+    assert_eq!(saved["result"]["sha256"], manifest["sha256"]);
+    assert_eq!(
+        saved["result"]["encoded_byte_count"],
+        manifest["encoded_byte_count"]
+    );
+    assert_eq!(
+        std::fs::read(&saved_path).unwrap(),
+        std::fs::read(&output).unwrap()
+    );
+    let (collision, exit) = cli
+        .human(&[
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            manifest["sha256"].as_str().unwrap(),
+            "--out",
+            saved_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_ne!(exit, 0);
+    assert_eq!(collision["error"]["code"], "OUTPUT_COLLISION");
+    assert_eq!(
+        std::fs::read(&saved_path).unwrap(),
+        std::fs::read(&output).unwrap()
+    );
+    let wrong_path = media.directory.path().join("wrong-client-digest.mkv");
+    let (changed, exit) = cli
+        .human(&[
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            &"0".repeat(64),
+            "--out",
+            wrong_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_ne!(exit, 0);
+    assert_eq!(changed["error"]["code"], "ARTIFACT_CHANGED");
+    assert!(!wrong_path.exists());
+    let denied_path = media.directory.path().join("foreign-client-copy.mkv");
+    let (denied, exit) = cli
+        .human(&[
+            "--access-profile",
+            "human-setup",
+            "artifacts",
+            "save",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            manifest["sha256"].as_str().unwrap(),
+            "--out",
+            denied_path.to_str().unwrap(),
+        ])
+        .await;
+    assert_ne!(exit, 0);
+    assert_eq!(denied["error"]["code"], "OBJECT_NOT_FOUND");
+    assert!(!denied_path.exists());
+    let (chunk, exit) = cli
+        .human(&[
+            "artifacts",
+            "read-chunk",
+            "--artifact-id",
+            &artifact_id,
+            "--expected-sha256",
+            manifest["sha256"].as_str().unwrap(),
+            "--offset",
+            "3",
+            "--length",
+            "29",
+        ])
+        .await;
+    assert_eq!(exit, 0, "{chunk}");
+    let chunk = chunk["result"].clone();
+    assert_eq!(
+        STANDARD
+            .decode(chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[3..32]
+    );
+    let replay = cli
+        .mutation(&scope, "submit-cli", "jobs.submit", submit)
+        .await;
+    assert_eq!(accepted["receipt_id"], replay["receipt_id"]);
+    assert_eq!(accepted["result"]["job_id"], replay["result"]["job_id"]);
+    assert_eq!(
+        cli.query("jobs.list", json!({})).await["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    chapter_roundtrip::remove(&cli, &media, &scope, &chapter_asset).await;
+    chapter_roundtrip::import(&cli, &media, &scope, &chapter_export).await;
+    chapter_roundtrip::verify_dispositions(&cli, &media, &scope, &chapter_asset).await;
+    chapter_roundtrip::verify_metadata(&cli, &media, &scope, &chapter_asset).await;
+
+    {
+        let extraction = media.directory.path().join("extracted-primary-audio.mkv");
+        let (reviewed, exit) = cli
+            .human(&[
+                "streams",
+                "extract",
+                "--asset",
+                asset["id"].as_str().unwrap(),
+                "--stream",
+                "1",
+                "--out",
+                extraction.to_str().unwrap(),
+            ])
+            .await;
+        assert_eq!(exit, 0, "{reviewed}");
+        let reviewed = &reviewed["result"];
+        assert_audio_extraction(reviewed);
+        assert!(!extraction.exists());
+        let accepted = cli
+            .mutation(
+                &scope,
+                "extract-primary-audio",
+                "jobs.submit",
+                json!({"plan_id":reviewed["id"],"plan_hash":reviewed["hash"]}),
+            )
+            .await;
+        assert_eq!(accepted["ok"], true, "{accepted}");
+        let job = cli
+            .completed(accepted["result"]["job_id"].as_str().unwrap())
+            .await;
+        assert_eq!(job["state"], "succeeded", "{job}");
+        let output_probe = fixture::probe(&media.bin, &extraction).await;
+        let output_streams = output_probe["streams"].as_array().unwrap();
+        assert_eq!(output_streams.len(), 1);
+        assert_eq!(output_streams[0]["codec_name"], "pcm_s16le");
+        assert_eq!(output_streams[0]["tags"]["language"], "eng");
+    }
+
+    {
+        let reference = media.directory.path().join("duplicate-audio-tracks.mkv");
+        let helper = media.bin.join(if cfg!(windows) {
+            "ffmpeg.exe"
+        } else {
+            "ffmpeg"
+        });
+        let result = tokio::process::Command::new(helper)
+            .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
+            .arg(&media.source)
+            .args([
+                "-map", "0:1", "-map", "0:2", "-map", "0:1", "-c", "copy", "-f", "matroska",
+            ])
+            .arg(&reference)
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let registered = cli
+            .mutation(
+                &scope,
+                "register-decode-comparison",
+                "assets.register",
+                json!({"path":reference}),
+            )
+            .await;
+        assert_eq!(registered["ok"], true, "{registered}");
+        let (comparison, exit) = cli
+            .human(&[
+                "media",
+                "compare-audio",
+                "--asset",
+                registered["result"]["id"].as_str().unwrap(),
+                "--stream",
+                "0",
+                "--stream",
+                "1",
+                "--stream",
+                "2",
+            ])
+            .await;
+        assert_eq!(exit, 0, "{comparison}");
+        let report = &comparison["result"];
+        assert_eq!(report["duplicate_groups"], json!([[0, 2]]));
+        assert_eq!(
+            report["source_sha256"],
+            registered["result"]["identity"]["sha256"]
+        );
+        let tracks = report["tracks"].as_array().unwrap();
+        assert_eq!(tracks.len(), 3);
+        assert_eq!(
+            tracks[0]["decoded_pcm_sha256"],
+            tracks[2]["decoded_pcm_sha256"]
+        );
+        assert_ne!(
+            tracks[0]["decoded_pcm_sha256"],
+            tracks[1]["decoded_pcm_sha256"]
+        );
+    }
+
+    let profile = json!({"name":"operator","expected_revision":null,"enabled":true,"mode":"operate","owned_object_access":true,"allowed_command_ids":["projects.list","projects.create","projects.inspect","sequences.create","sequences.inspect","clips.place","clips.move","clips.split","clips.remove","history.undo","history.redo","commands.list","commands.schema","access.replay_scope.create","media.probe","media.preview_frame","previews.observe","media.analyze.volume","media.analyze.loudness","media.analyze.reference","media.analyze.stream","media.analyze.audio_tracks","capabilities.inspect","capabilities.refresh","config.import.ffmwiz","assets.register","interchange.ale.export","streams.clean","streams.extract","streams.clean.report","plans.inspect","jobs.plan","jobs.submit","jobs.inspect","jobs.list","jobs.cancel","artifacts.list","artifacts.manifest","artifacts.read_chunk"],"object_grants":[],"read_roots":[media.directory.path()],"write_roots":[media.directory.path()]});
+    assert_eq!(
+        cli.mutation(
+            &scope,
+            "create-operator",
+            "access.profiles.put",
+            profile.clone()
+        )
+        .await["ok"],
+        true
+    );
+    let mut command = cli.command();
+    command.args(["bridge", "--access-profile", "operator"]);
+    let stdio = ().serve(TokioChildProcess::new(command).unwrap()).await.unwrap();
+    assert_eq!(
+        call!(
+            stdio,
+            "config.import.ffmwiz",
+            config_import.clone(),
+            json!({})
+        ),
+        imported
+    );
+    let mut blocked = config_import.clone();
+    blocked["source"] = json!(format!(
+        "{FFM_WIZ_CONFIG}raw_ffmpeg_args=-i unexpected.mkv\n"
+    ));
+    let blocked = call!(stdio, "config.import.ffmwiz", blocked, json!({}));
+    assert_eq!(blocked["input_valid"], false);
+    assert_eq!(
+        blocked["diagnostics"].as_array().unwrap().last().unwrap()["code"],
+        "expert_options_require_typed_review"
+    );
+
+    assert_eq!(
+        &call!(stdio, "capabilities.refresh", json!({}), json!({})),
+        capabilities
+    );
+    let device_denied = stdio
+        .call_tool(
+            CallToolRequestParams::new("capabilities.refresh")
+                .with_arguments(rmcp::object!({"params":{"devices":true}})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(device_denied).unwrap()["structuredContent"]["error"]["code"],
+        "PERMISSION_DENIED"
+    );
+    let private_preview = stdio
+        .call_tool(
+            CallToolRequestParams::new("media.preview_frame").with_arguments(
+                rmcp::object!({"params":{"asset_id":asset["id"],"stream_index":0,"frame":2}}),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(private_preview).unwrap()["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
+    let private_still = stdio
+        .call_tool(
+            CallToolRequestParams::new("previews.observe")
+                .with_arguments(rmcp::object!({"params": still_observation_input(&asset)})),
+        )
+        .await
+        .unwrap();
+    let private_still = serde_json::to_value(private_still).unwrap();
+    assert_eq!(
+        private_still["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
+    assert_eq!(private_still["content"][0]["type"], "text");
+    let observed = call!(
+        stdio,
+        "media.probe",
+        json!({"path":media.source}),
+        json!({})
+    );
+    assert_eq!(observed["streams"].as_array().unwrap().len(), 3);
+    // A path grant does not authorize an object created by another principal.
+    let denied = stdio
+        .call_tool(
+            CallToolRequestParams::new("jobs.inspect")
+                .with_arguments(rmcp::object!({"params":{"id":id}})),
+        )
+        .await
+        .unwrap();
+    let denied = serde_json::to_value(denied).unwrap();
+    assert_eq!(
+        denied["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
+    let absent = stdio
+        .call_tool(
+            CallToolRequestParams::new("jobs.inspect")
+                .with_arguments(rmcp::object!({"params":{"id":"absent-job"}})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        denied["structuredContent"]["error"],
+        serde_json::to_value(absent).unwrap()["structuredContent"]["error"],
+        "Official MCP must not disclose unauthorized object existence"
+    );
+    let operator_scope =
+        call!(stdio, "access.replay_scope.create", json!({}), json!({}))["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+    let operator_asset = call!(
+        stdio,
+        "assets.register",
+        json!({"path":media.source}),
+        json!({"replay_scope":operator_scope,"idempotency_key":"register-stdio"})
+    );
+    assert_eq!(
+        call!(
+            stdio,
+            "jobs.plan",
+            json!({"asset_id":operator_asset["id"],"job_document":declarative["job"]}),
+            json!({})
+        )["hash"],
+        config_plan["hash"],
+    );
+    let compared = call!(
+        stdio,
+        "media.analyze.audio_tracks",
+        json!({"asset_id":operator_asset["id"],"stream_indices":[1,2]}),
+        json!({})
+    );
+    assert_eq!(compared["duplicate_groups"], json!([]));
+    assert_eq!(compared["tracks"].as_array().unwrap().len(), 2);
+    assert_audio_extraction(&call!(
+        stdio,
+        "streams.extract",
+        json!({"asset_id":operator_asset["id"],"stream_index":1,
+        "output":media.directory.path().join("stdio-extraction.mkv")}),
+        json!({})
+    ));
+    let volume = call!(
+        stdio,
+        "media.analyze.volume",
+        json!({"asset_id":operator_asset["id"],"stream_index":1}),
+        json!({})
+    );
+    assert_volume(&volume, &operator_asset);
+    assert_loudness(
+        &call!(
+            stdio,
+            "media.analyze.loudness",
+            json!({"asset_id":operator_asset["id"],"stream_index":1}),
+            json!({})
+        ),
+        &operator_asset,
+    );
+    assert_identical_video(
+        &call!(
+            stdio,
+            "media.analyze.reference",
+            reference_input(&operator_asset),
+            json!({})
+        ),
+        &operator_asset,
+    );
+    assert_frame_observations(
+        &call!(
+            stdio,
+            "media.analyze.stream",
+            frame_observation_input(&operator_asset),
+            json!({})
+        ),
+        &operator_asset,
+    );
+    let wrong_stream = stdio
+        .call_tool(
+            CallToolRequestParams::new("media.analyze.volume").with_arguments(
+                rmcp::object!({"params":{"asset_id":operator_asset["id"],"stream_index":0}}),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(wrong_stream).unwrap()["structuredContent"]["error"]["code"],
+        "INPUT_DENIED"
+    );
+    let stdio_preview = call!(
+        stdio,
+        "media.preview_frame",
+        json!({"asset_id":operator_asset["id"],"stream_index":0,"frame":2}),
+        json!({})
+    );
+    assert!(
+        stdio_preview["rgba_base64"] == source_preview["rgba_base64"],
+        "stdio preview pixels differ"
+    );
+    let stdio_still = stdio
+        .call_tool(
+            CallToolRequestParams::new("previews.observe").with_arguments(
+                rmcp::object!({"params": still_observation_input(&operator_asset)}),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_mcp_still(
+        serde_json::to_value(stdio_still).unwrap(),
+        &operator_asset,
+        observed_still,
+    );
+    let stdio_audio = stdio
+        .call_tool(
+            CallToolRequestParams::new("previews.observe")
+                .with_arguments(rmcp::object!({"params":audio_observation_input(&operator_asset)})),
+        )
+        .await
+        .unwrap();
+    assert_mcp_audio(
+        serde_json::to_value(stdio_audio).unwrap(),
+        &operator_asset,
+        audio,
+    );
+    for (ordinal, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
+        let still = call!(
+            stdio,
+            "assets.register",
+            json!({"path":path}),
+            json!({"replay_scope":operator_scope,"idempotency_key":format!("register-still-stdio-{ordinal}")})
+        );
+        assert_eq!(&still["probe"], probe);
+        let preview = call!(
+            stdio,
+            "media.preview_frame",
+            json!({"asset_id":still["id"],"stream_index":0,"frame":0}),
+            json!({})
+        );
+        assert_eq!(preview["source_sha256"], cli_preview["source_sha256"]);
+        assert!(preview["rgba_base64"] == cli_preview["rgba_base64"]);
+    }
+    let stdio_project_semantics = project_sdk!(stdio, operator_scope, operator_asset, "stdio");
+    assert_eq!(stdio_project_semantics, cli_project_semantics);
+    let report = call!(
+        stdio,
+        "streams.clean.report",
+        json!({"asset_ids":[operator_asset["id"]],"intent":fixture::rules()}),
+        json!({})
+    );
+    assert_eq!(report["resolved_files"], 1);
+    assert_eq!(
+        report["files"][0]["selected_original_indices"],
+        json!([0, 1, 2])
+    );
+    let mut rules = fixture::rules();
+    rules.audio_order = vec![2, 1];
+    rules.stream_tag_patches = vec![StreamTagPatch {
+        kind: StreamKind::Audio,
+        source_indices: vec![2],
+        original_languages: vec![],
+        language: TagPatch::Keep,
+        title: TagPatch::Set {
+            value: "SDK stdio first".into(),
+        },
+    }];
+    let output = media.directory.path().join("stdio-remux.mkv");
+    let plan = call!(
+        stdio,
+        "streams.clean",
+        json!({"asset_id":operator_asset["id"],"output":output,"intent":rules,"file_times":"require_reviewed"}),
+        json!({})
+    );
+    let accepted = call!(
+        stdio,
+        "jobs.submit",
+        json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        json!({"replay_scope":operator_scope,"idempotency_key":"submit-stdio"})
+    );
+    let job = cli.completed(accepted["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "succeeded", "{job}");
+    assert_eq!(job["file_times"]["policy"], "require_reviewed");
+    assert_eq!(job["file_times"]["preserved"], true);
+    assert_eq!(job["file_times"]["desired"], job["file_times"]["observed"]);
+    let observed = fixture::probe(&media.bin, &output).await;
+    assert_eq!(observed["streams"][1]["tags"]["language"], "fas");
+    assert_eq!(observed["streams"][1]["tags"]["title"], "SDK stdio first");
+
+    let stdio_artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
+    let stdio_manifest = call!(
+        stdio,
+        "artifacts.manifest",
+        json!({"artifact_id":stdio_artifact_id}),
+        json!({})
+    );
+    let resource = stdio
+        .read_resource(rmcp::model::ReadResourceRequestParams::new(
+            stdio_manifest["manifest_uri"].as_str().unwrap(),
+        ))
+        .await
+        .unwrap();
+    let resource = serde_json::to_value(resource).unwrap();
+    assert_eq!(resource["contents"][0]["mimeType"], "application/json");
+    let contents: Value =
+        serde_json::from_str(resource["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(contents["sha256"], job["artifact"]["sha256"]);
+    assert_eq!(contents["suggested_name"], "stdio-remux.mkv");
+    let chunk = call!(
+        stdio,
+        "artifacts.read_chunk",
+        json!({"artifact_id":stdio_artifact_id,"expected_sha256":contents["sha256"],"offset":"131067","length":31}),
+        json!({})
+    );
+    assert_eq!(
+        STANDARD
+            .decode(chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[131067..131098]
+    );
+    {
+        let mut scoped_cli_finish_rules = fixture::rules();
+        scoped_cli_finish_rules.audio_order = vec![2, 1];
+        scoped_cli_finish_rules.stream_tag_patches = vec![StreamTagPatch {
+            kind: StreamKind::Audio,
+            source_indices: vec![2],
+            original_languages: vec![],
+            language: TagPatch::Keep,
+            title: TagPatch::Set {
+                value: "Scoped CLI finish".into(),
+            },
+        }];
+        let scoped_cli_finish_output = media.directory.path().join("scoped-cli-finish-remux.mkv");
+        let scoped_cli_finish_plan = call!(
+            stdio,
+            "streams.clean",
+            json!({"asset_id":operator_asset["id"],"output":scoped_cli_finish_output,"intent":scoped_cli_finish_rules,"file_times":"require_reviewed"}),
+            json!({})
+        );
+        assert_eq!(
+            scoped_cli_finish_plan["output_path"],
+            json!(scoped_cli_finish_output)
+        );
+        let scoped_cli_finish_parent: nw_domain::records::NativeObjectIdentity =
+            serde_json::from_value(
+                scoped_cli_finish_plan["required_rights"]["output_create"]["parent_object"].clone(),
+            )
+            .unwrap();
+        let scoped_cli_finish_claims = nw_platform::claims::DestinationClaims::try_acquire(vec![
+            nw_platform::claims::Destination::reviewed(
+                &scoped_cli_finish_output,
+                &scoped_cli_finish_parent,
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        assert!(!scoped_cli_finish_output.exists());
+
+        // The OS claim excludes publication until after the selected CLI exits.
+        let (scoped_cli_finish_accepted, scoped_cli_finish_exit) = cli
+            .human(&[
+                "--access-profile",
+                "operator",
+                "jobs",
+                "submit",
+                "--plan",
+                scoped_cli_finish_plan["id"].as_str().unwrap(),
+                "--plan-hash",
+                scoped_cli_finish_plan["hash"].as_str().unwrap(),
+                "--replay-scope",
+                &operator_scope,
+                "--idempotency-key",
+                "submit-scoped-cli-finish",
+                "--request-id",
+                "scoped-cli-finish-request",
+            ])
+            .await;
+        assert_eq!(scoped_cli_finish_exit, 0, "{scoped_cli_finish_accepted}");
+        assert_eq!(scoped_cli_finish_accepted["ok"], true);
+        assert_eq!(
+            scoped_cli_finish_accepted["request_id"],
+            "scoped-cli-finish-request"
+        );
+        assert!(
+            scoped_cli_finish_accepted["receipt_id"]
+                .as_str()
+                .is_some_and(|scoped_cli_finish_receipt| !scoped_cli_finish_receipt.is_empty())
+        );
+        let scoped_cli_finish_job_id = scoped_cli_finish_accepted["result"]["job_id"]
+            .as_str()
+            .filter(|scoped_cli_finish_id| !scoped_cli_finish_id.is_empty())
+            .unwrap();
+        let scoped_cli_finish_pending = call!(
+            stdio,
+            "jobs.inspect",
+            json!({"id":scoped_cli_finish_job_id}),
+            json!({})
+        );
+        assert!(
+            ["queued", "running", "verifying"]
+                .contains(&scoped_cli_finish_pending["state"].as_str().unwrap()),
+            "{scoped_cli_finish_pending}"
+        );
+        assert!(scoped_cli_finish_pending["artifact"].is_null());
+        assert!(!scoped_cli_finish_output.exists());
+        drop(scoped_cli_finish_claims);
+
+        let mut scoped_cli_finish_command = cli.command();
+        scoped_cli_finish_command.args(["bridge", "--access-profile", "operator"]);
+        let scoped_cli_finish_stdio =
+            ().serve(TokioChildProcess::new(scoped_cli_finish_command).unwrap())
+                .await
+                .unwrap();
+        let scoped_cli_finish_replay = scoped_cli_finish_stdio
+            .call_tool(
+                CallToolRequestParams::new("jobs.submit").with_arguments(
+                    json!({"params":{"plan_id":scoped_cli_finish_plan["id"],"plan_hash":scoped_cli_finish_plan["hash"]},"context":{"request_id":"scoped-cli-finish-request","replay_scope":operator_scope,"idempotency_key":"submit-scoped-cli-finish"}})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                ),
+            )
+            .await
+            .unwrap();
+        let scoped_cli_finish_replay = serde_json::to_value(scoped_cli_finish_replay).unwrap();
+        assert_eq!(
+            scoped_cli_finish_replay["structuredContent"],
+            scoped_cli_finish_accepted
+        );
+        let scoped_cli_finish_job = cli.completed(scoped_cli_finish_job_id).await;
+        assert_eq!(
+            scoped_cli_finish_job["state"], "succeeded",
+            "{scoped_cli_finish_job}"
+        );
+        assert_eq!(
+            scoped_cli_finish_job["file_times"]["policy"],
+            "require_reviewed"
+        );
+        assert_eq!(scoped_cli_finish_job["file_times"]["preserved"], true);
+        assert_eq!(
+            scoped_cli_finish_job["file_times"]["desired"],
+            scoped_cli_finish_job["file_times"]["observed"]
+        );
+        let scoped_cli_finish_artifact_id = format!("job-{scoped_cli_finish_job_id}");
+        let scoped_cli_finish_manifest = call!(
+            scoped_cli_finish_stdio,
+            "artifacts.manifest",
+            json!({"artifact_id":scoped_cli_finish_artifact_id}),
+            json!({})
+        );
+        assert_eq!(
+            scoped_cli_finish_manifest["sha256"],
+            scoped_cli_finish_job["artifact"]["sha256"]
+        );
+        assert_eq!(
+            scoped_cli_finish_manifest["suggested_name"],
+            "scoped-cli-finish-remux.mkv"
+        );
+        let scoped_cli_finish_chunk = call!(
+            scoped_cli_finish_stdio,
+            "artifacts.read_chunk",
+            json!({"artifact_id":scoped_cli_finish_artifact_id,"expected_sha256":scoped_cli_finish_manifest["sha256"],"offset":"0","length":29}),
+            json!({})
+        );
+        assert_eq!(
+            STANDARD
+                .decode(scoped_cli_finish_chunk["data_base64"].as_str().unwrap())
+                .unwrap(),
+            std::fs::read(&scoped_cli_finish_output).unwrap()[..29]
+        );
+        let scoped_cli_finish_observed =
+            fixture::probe(&media.bin, &scoped_cli_finish_output).await;
+        assert_eq!(
+            scoped_cli_finish_observed["streams"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+        assert_eq!(
+            scoped_cli_finish_observed["streams"][1]["tags"]["language"],
+            "fas"
+        );
+        assert_eq!(
+            scoped_cli_finish_observed["streams"][1]["tags"]["title"],
+            "Scoped CLI finish"
+        );
+        scoped_cli_finish_stdio.cancel().await.unwrap();
+    }
+    // Delegation is an explicit object action; it never borrows the creator's authority.
+    let delegated_output = media.directory.path().join("delegated-copy.mkv");
+    let delegated_plan = cli.query("streams.clean", json!({"asset_id":registered["result"]["id"],"output":delegated_output,"intent":fixture::rules()})).await;
+    let equivalent = call!(
+        stdio,
+        "streams.clean",
+        json!({"asset_id":operator_asset["id"],"output":delegated_output,"intent":fixture::rules()}),
+        json!({})
+    );
+    assert_ne!(equivalent["id"], delegated_plan["id"]);
+    assert_eq!(equivalent["schema_version"], 2);
+    assert_eq!(
+        equivalent["hash"], delegated_plan["hash"],
+        "Equivalent native-file requirements must not hash creation principal, profile revision, registration ID or review timestamp"
+    );
+    assert_eq!(
+        equivalent["required_rights"],
+        delegated_plan["required_rights"]
+    );
+    let mut delegated_policy = profile.clone();
+    delegated_policy["expected_revision"] = json!(1);
+    delegated_policy["object_grants"] = json!([
+        {"kind":"plan","id":delegated_plan["id"],"actions":["read","submit"]},
+        {"kind":"job","id":id,"actions":["read"]}
+    ]);
+    assert_eq!(
+        cli.mutation(
+            &scope,
+            "delegate-plan-and-job",
+            "access.profiles.put",
+            delegated_policy.clone()
+        )
+        .await["ok"],
+        true
+    );
+    let inspected = call!(
+        stdio,
+        "plans.inspect",
+        json!({"id":delegated_plan["id"]}),
+        json!({})
+    );
+    assert_eq!(inspected["hash"], delegated_plan["hash"]);
+    assert!(
+        inspected["argv_template"].is_null(),
+        "Scoped views omit private invocation internals"
+    );
+    let shared_job = call!(stdio, "jobs.inspect", json!({"id":id}), json!({}));
+    assert!(shared_job["prepared_stages"].is_null());
+    assert!(shared_job["plan"]["ffmpeg"].get("path").is_none());
+    assert!(shared_job["plan"]["ffmpeg"]["sha256"].is_string());
+    let control = stdio.call_tool(CallToolRequestParams::new("jobs.cancel").with_arguments(json!({"params":{"id":id},"context":{"replay_scope":operator_scope,"idempotency_key":"denied-shared-control"}}).as_object().unwrap().clone())).await.unwrap();
+    assert_eq!(
+        serde_json::to_value(control).unwrap()["structuredContent"]["error"]["code"],
+        "OBJECT_NOT_FOUND"
+    );
+    let delegated_job = call!(
+        stdio,
+        "jobs.submit",
+        json!({"plan_id":delegated_plan["id"],"plan_hash":delegated_plan["hash"]}),
+        json!({"replay_scope":operator_scope,"idempotency_key":"delegated-submit"})
+    );
+    assert_eq!(
+        cli.completed(delegated_job["job_id"].as_str().unwrap())
+            .await["state"],
+        "succeeded"
+    );
+    assert_eq!(
+        std::fs::read(&media.source).unwrap(),
+        std::fs::read(&delegated_output).unwrap()
+    );
+    delegated_policy["expected_revision"] = json!(2);
+    delegated_policy["owned_object_access"] = json!(false);
+    delegated_policy["object_grants"][0]["actions"] = json!(["read"]);
+    assert_eq!(
+        cli.mutation(
+            &scope,
+            "withdraw-inherited-and-submit",
+            "access.profiles.put",
+            delegated_policy
+        )
+        .await["ok"],
+        true
+    );
+    let visible = call!(stdio, "jobs.list", json!({}), json!({}));
+    assert_eq!(
+        visible["total_count"], 1,
+        "Only the explicit read grant survives withdrawal of inherited creator access"
+    );
+    assert_eq!(visible["items"][0]["id"], id);
+    let replay = stdio.call_tool(CallToolRequestParams::new("assets.register").with_arguments(json!({"params":{"path":media.source},"context":{"replay_scope":operator_scope,"idempotency_key":"register-stdio"}}).as_object().unwrap().clone())).await.unwrap();
+    let replay = serde_json::to_value(replay).unwrap();
+    assert_eq!(
+        replay["structuredContent"]["error"]["code"],
+        "RECEIPT_RESULT_RESTRICTED"
+    );
+    assert!(
+        replay["structuredContent"]["result"]
+            .get("identity")
+            .is_none()
+    );
+    let mut restored = profile.clone();
+    restored["expected_revision"] = json!(3);
+    assert_eq!(
+        cli.mutation(
+            &scope,
+            "restore-operator-for-http",
+            "access.profiles.put",
+            restored
+        )
+        .await["ok"],
+        true
+    );
+    stdio.cancel().await.unwrap();
+
+    let mut modern_command = cli.command();
+    modern_command.args(["bridge", "--access-profile", "operator"]);
+    let modern_stdio = ()
+        .serve_with_lifecycle(
+            TokioChildProcess::new(modern_command).unwrap(),
+            ClientLifecycleMode::Discover {
+                preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+            },
+        )
+        .await
+        .unwrap();
+    let modern_manifest = modern_stdio
+        .read_resource(rmcp::model::ReadResourceRequestParams::new(
+            stdio_manifest["manifest_uri"].as_str().unwrap(),
+        ))
+        .await
+        .unwrap();
+    let modern_manifest = serde_json::to_value(modern_manifest).unwrap();
+    assert_eq!(
+        modern_manifest["contents"][0]["mimeType"],
+        "application/json"
+    );
+    let modern_chunk = call!(
+        modern_stdio,
+        "artifacts.read_chunk",
+        json!({"artifact_id":stdio_artifact_id,"expected_sha256":stdio_manifest["sha256"],"offset":"0","length":29}),
+        json!({})
+    );
+    assert_eq!(
+        STANDARD
+            .decode(modern_chunk["data_base64"].as_str().unwrap())
+            .unwrap(),
+        std::fs::read(&output).unwrap()[..29]
+    );
+    modern_stdio.cancel().await.unwrap();
+
+    let bind = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = bind.local_addr().unwrap().port();
+    drop(bind);
+    let token_file = media.directory.path().join("auth/http-token");
+    let evidence =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/owner-evidence");
+    std::fs::create_dir_all(&evidence).unwrap();
+    let server_log = evidence.join("http-controller-stderr.log");
+    let mut server = cli
+        .command()
+        .args([
+            "serve",
+            "--port",
+            &port.to_string(),
+            "--access-profile",
+            "operator",
+            "--token-file",
+        ])
+        .arg(&token_file)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&server_log).unwrap())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    loop {
+        if token_file.exists() {
+            break;
+        }
+        if let Some(status) = server.try_wait().unwrap() {
+            panic!(
+                "HTTP controller exited before protected credential export: {status}; {}",
+                std::fs::read_to_string(&server_log).unwrap()
+            );
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(45),
+            "HTTP controller startup deadline exceeded; {}",
+            std::fs::read_to_string(&server_log).unwrap()
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let token =
+        String::from_utf8(nw_platform::security::read_private(&token_file, 256).unwrap()).unwrap();
+    let issued_file = media.directory.path().join("auth/revocation-token");
+    let selected_port = port.to_string();
+    let issue_args = [
+        "access",
+        "tokens",
+        "issue",
+        "--for-access-profile",
+        "operator",
+        "--port",
+        &selected_port,
+        "--out",
+        issued_file.to_str().unwrap(),
+        "--json",
+    ];
+    let (issued, status) = cli.human(&issue_args).await;
+    assert_eq!(status, 0, "{issued}");
+    let issued_bearer =
+        String::from_utf8(nw_platform::security::read_private(&issued_file, 256).unwrap()).unwrap();
+    assert!(
+        !issued.to_string().contains(&issued_bearer),
+        "Token stdout contains metadata only"
+    );
+    let (collision, status) = cli.human(&issue_args).await;
+    assert_eq!(status, 4);
+    assert_eq!(collision["error"]["code"], "OUTPUT_COLLISION");
+    assert_eq!(
+        nw_platform::security::read_private(&issued_file, 256).unwrap(),
+        issued_bearer.as_bytes()
+    );
+    let direct = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let endpoint = format!("http://127.0.0.1:{port}/api/v1/commands");
+    let response = direct
+        .post(&endpoint)
+        .bearer_auth(&issued_bearer)
+        .json(&Request::query("commands.list", json!({})))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let (revoked, status) = cli
+        .human(&[
+            "access",
+            "tokens",
+            "revoke",
+            "--token-id",
+            issued["token_id"].as_str().unwrap(),
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 0, "{revoked}");
+    assert_eq!(revoked["result"]["revoked"], true);
+    assert_eq!(
+        direct
+            .post(&endpoint)
+            .bearer_auth(&issued_bearer)
+            .json(&Request::query("commands.list", json!({})))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    for (ordinal, lifecycle) in [
+        ClientLifecycleMode::Initialize,
+        ClientLifecycleMode::Discover {
+            preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let transport = StreamableHttpClientTransport::with_client(
+            reqwest::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
+            StreamableHttpClientTransportConfig::with_uri(format!("http://127.0.0.1:{port}/mcp"))
+                .auth_header(&token),
+        );
+        let http = ().serve_with_lifecycle(transport, lifecycle).await.unwrap();
+        assert_eq!(
+            call!(
+                http,
+                "config.import.ffmwiz",
+                config_import.clone(),
+                json!({})
+            ),
+            imported
+        );
+
+        assert_eq!(
+            &call!(http, "capabilities.refresh", json!({}), json!({})),
+            capabilities
+        );
+        let probed = call!(http, "media.probe", json!({"path":media.source}), json!({}));
+        assert_eq!(probed["streams"].as_array().unwrap().len(), 3);
+        assert_eq!(probed["streams"][1]["tags"]["language"], "eng");
+        let scope = call!(http, "access.replay_scope.create", json!({}), json!({}))["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let scoped_wave = call!(
+            http,
+            "assets.register",
+            json!({"path":media.directory.path().join("rf64-cue.wav")}),
+            json!({"replay_scope":scope,"idempotency_key":format!("register-ale-http-{ordinal}")})
+        );
+        let scoped_ale = call!(
+            http,
+            "interchange.ale.export",
+            json!({"asset_ids":[scoped_wave["id"]]}),
+            json!({})
+        );
+        assert_eq!(scoped_ale["document_sha256"], ale["document_sha256"]);
+        assert_eq!(scoped_ale["document"], expected);
+        let asset = call!(
+            http,
+            "assets.register",
+            json!({"path":media.source}),
+            json!({"replay_scope":scope,"idempotency_key":format!("register-http-{ordinal}")})
+        );
+        assert_eq!(
+            call!(
+                http,
+                "jobs.plan",
+                json!({"asset_id":asset["id"],"job_document":declarative["job"]}),
+                json!({})
+            )["hash"],
+            config_plan["hash"],
+        );
+        let compared = call!(
+            http,
+            "media.analyze.audio_tracks",
+            json!({"asset_id":asset["id"],"stream_indices":[1,2]}),
+            json!({})
+        );
+        assert_eq!(compared["duplicate_groups"], json!([]));
+        assert_eq!(compared["tracks"].as_array().unwrap().len(), 2);
+        assert_audio_extraction(&call!(
+            http,
+            "streams.extract",
+            json!({"asset_id":asset["id"],"stream_index":1,
+            "output":media.directory.path().join(format!("http-extraction-{ordinal}.mkv"))}),
+            json!({})
+        ));
+        let volume = call!(
+            http,
+            "media.analyze.volume",
+            json!({"asset_id":asset["id"],"stream_index":1}),
+            json!({})
+        );
+        assert_volume(&volume, &asset);
+        assert_loudness(
+            &call!(
+                http,
+                "media.analyze.loudness",
+                json!({"asset_id":asset["id"],"stream_index":1}),
+                json!({})
+            ),
+            &asset,
+        );
+        assert_identical_video(
+            &call!(
+                http,
+                "media.analyze.reference",
+                reference_input(&asset),
+                json!({})
+            ),
+            &asset,
+        );
+        assert_frame_observations(
+            &call!(
+                http,
+                "media.analyze.stream",
+                frame_observation_input(&asset),
+                json!({})
+            ),
+            &asset,
+        );
+        let http_project_semantics = project_sdk!(http, scope, asset, format!("http-{ordinal}"));
+        assert_eq!(http_project_semantics, cli_project_semantics);
+        let http_preview = call!(
+            http,
+            "media.preview_frame",
+            json!({"asset_id":asset["id"],"stream_index":0,"frame":2}),
+            json!({})
+        );
+        assert!(
+            http_preview["rgba_base64"] == source_preview["rgba_base64"],
+            "HTTP preview pixels differ"
+        );
+        let http_still = http
+            .call_tool(
+                CallToolRequestParams::new("previews.observe")
+                    .with_arguments(rmcp::object!({"params": still_observation_input(&asset)})),
+            )
+            .await
+            .unwrap();
+        assert_mcp_still(
+            serde_json::to_value(http_still).unwrap(),
+            &asset,
+            observed_still,
+        );
+        let http_audio = http
+            .call_tool(
+                CallToolRequestParams::new("previews.observe")
+                    .with_arguments(rmcp::object!({"params":audio_observation_input(&asset)})),
+            )
+            .await
+            .unwrap();
+        assert_mcp_audio(serde_json::to_value(http_audio).unwrap(), &asset, audio);
+        for (index, (path, probe, cli_preview)) in still_sources.iter().enumerate() {
+            let still = call!(
+                http,
+                "assets.register",
+                json!({"path":path}),
+                json!({"replay_scope":scope,"idempotency_key":format!("register-still-http-{ordinal}-{index}")})
+            );
+            assert_eq!(&still["probe"], probe);
+            let preview = call!(
+                http,
+                "media.preview_frame",
+                json!({"asset_id":still["id"],"stream_index":0,"frame":0}),
+                json!({})
+            );
+            assert_eq!(preview["source_sha256"], cli_preview["source_sha256"]);
+            assert!(preview["rgba_base64"] == cli_preview["rgba_base64"]);
+        }
+        let report = call!(
+            http,
+            "streams.clean.report",
+            json!({"asset_ids":[asset["id"]],"intent":fixture::rules()}),
+            json!({})
+        );
+        assert_eq!(report["resolved_files"], 1);
+        assert_eq!(
+            report["files"][0]["selected_original_indices"],
+            json!([0, 1, 2])
+        );
+        let output = media.directory.path().join(format!("http-{ordinal}.mkv"));
+        let plan = call!(
+            http,
+            "streams.clean",
+            json!({"asset_id":asset["id"],"output":output,"intent":fixture::rules()}),
+            json!({})
+        );
+        let submit = json!({"plan_id":plan["id"],"plan_hash":plan["hash"]});
+        let identity =
+            json!({"replay_scope":scope,"idempotency_key":format!("submit-http-{ordinal}")});
+        let accepted = call!(http, "jobs.submit", submit.clone(), identity.clone());
+        let repeated = call!(http, "jobs.submit", submit, identity);
+        assert_eq!(accepted["job_id"], repeated["job_id"]);
+        let job = cli.completed(accepted["job_id"].as_str().unwrap()).await;
+        assert_eq!(job["state"], "succeeded", "{job}");
+        assert_eq!(
+            std::fs::read(&media.source).unwrap(),
+            std::fs::read(output).unwrap()
+        );
+        let artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
+        let manifest = call!(
+            http,
+            "artifacts.manifest",
+            json!({"artifact_id":artifact_id}),
+            json!({})
+        );
+        assert_eq!(manifest["suggested_name"], format!("http-{ordinal}.mkv"));
+        let resource = http
+            .read_resource(rmcp::model::ReadResourceRequestParams::new(
+                manifest["manifest_uri"].as_str().unwrap(),
+            ))
+            .await
+            .unwrap();
+        let resource = serde_json::to_value(resource).unwrap();
+        assert_eq!(resource["contents"][0]["mimeType"], "application/json");
+        let chunk = call!(
+            http,
+            "artifacts.read_chunk",
+            json!({"artifact_id":artifact_id,"expected_sha256":manifest["sha256"],"offset":"0","length":31}),
+            json!({})
+        );
+        assert_eq!(
+            STANDARD
+                .decode(chunk["data_base64"].as_str().unwrap())
+                .unwrap(),
+            std::fs::read(&media.source).unwrap()[..31]
+        );
+        http.cancel().await.unwrap();
+    }
+    let configured = cli
+        .mutation(
+            &scope,
+            "configured-copy",
+            "jobs.submit",
+            json!({"plan_id":config_plan["id"],"plan_hash":config_plan["hash"]}),
+        )
+        .await;
+    assert_eq!(configured["ok"], true, "{configured}");
+    let completed_config = cli
+        .completed(configured["result"]["job_id"].as_str().unwrap())
+        .await;
+    assert_eq!(completed_config["state"], "succeeded", "{completed_config}");
+    let projected = fixture::probe(&media.bin, &planned_output).await;
+    assert_eq!(projected["streams"][1]["tags"]["language"], "fas");
+    assert_eq!(projected["streams"][2]["tags"]["language"], "eng");
+
+    // Browser intake bytes use their own bounded route; canonical registration/job
+    // acceptance still uses the same official SDK and durable receipt contracts.
+    let browser_token_file = media.directory.path().join("auth/browser-token");
+    let (issued, status) = cli
+        .human(&[
+            "access",
+            "tokens",
+            "issue",
+            "--for-access-profile",
+            "browser",
+            "--port",
+            &port.to_string(),
+            "--out",
+            browser_token_file.to_str().unwrap(),
+            "--json",
+        ])
+        .await;
+    assert_eq!(status, 0, "{issued}");
+    let browser_bearer =
+        String::from_utf8(nw_platform::security::read_private(&browser_token_file, 256).unwrap())
+            .unwrap();
+    assert!(
+        !issued.to_string().contains(&browser_bearer),
+        "Token issuance must never print a bearer"
+    );
+    let bearer = browser_bearer.as_str();
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let endpoint = format!("http://127.0.0.1:{port}");
+    let fixture_bytes = std::fs::read(&media.source).unwrap();
+    let ticket: Value = client
+        .post(format!("{endpoint}/api/v1/uploads"))
+        .bearer_auth(bearer)
+        .json(
+            &json!({"display_name":"Browser original.mkv","bytes":fixture_bytes.len().to_string()}),
+        )
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let completed: Value = client
+        .put(format!(
+            "{endpoint}/api/v1/uploads/{}",
+            ticket["upload_id"].as_str().unwrap()
+        ))
+        .bearer_auth(bearer)
+        .header("Content-Type", "application/octet-stream")
+        .body(fixture_bytes.clone())
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(completed["upload_id"], ticket["upload_id"]);
+    let transport = StreamableHttpClientTransport::with_client(
+        client.clone(),
+        StreamableHttpClientTransportConfig::with_uri(format!("{endpoint}/mcp"))
+            .auth_header(bearer),
+    );
+    let browser = ().serve(transport).await.unwrap();
+    let browser_scope =
+        call!(browser, "access.replay_scope.create", json!({}), json!({}))["replay_scope"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+    let identity =
+        json!({"replay_scope":browser_scope,"idempotency_key":"register-browser-intake"});
+    let asset = call!(
+        browser,
+        "assets.register",
+        json!({"upload_id":ticket["upload_id"]}),
+        identity.clone()
+    );
+    let retry = call!(
+        browser,
+        "assets.register",
+        json!({"upload_id":ticket["upload_id"]}),
+        identity
+    );
+    assert_eq!(asset["id"], retry["id"]);
+    assert_eq!(asset["display_name"], "Browser original.mkv");
+    let denied: Value = client
+        .post(format!("{endpoint}/api/v1/commands"))
+        .bearer_auth(&token)
+        .json(&Request::query(
+            "media.probe",
+            json!({"path":asset["identity"]["path"]}),
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(denied["ok"], false);
+    assert_eq!(denied["error"]["code"], "PERMISSION_DENIED");
+    let destination = call!(
+        browser,
+        "assets.output_suggest",
+        json!({"id":asset["id"]}),
+        json!({})
+    );
+    let plan = call!(
+        browser,
+        "streams.clean",
+        json!({"asset_id":asset["id"],"output":destination["output"],"intent":fixture::rules()}),
+        json!({})
+    );
+    let accepted = call!(
+        browser,
+        "jobs.submit",
+        json!({"plan_id":plan["id"],"plan_hash":plan["hash"]}),
+        json!({"replay_scope":browser_scope,"idempotency_key":"submit-browser-intake"})
+    );
+    let job = cli.completed(accepted["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "succeeded");
+    assert_eq!(
+        std::fs::read(destination["output"].as_str().unwrap()).unwrap(),
+        fixture_bytes
+    );
+    // The browser profile has write-only exports. Its job purpose still admits exact output reads.
+    let artifact_id = format!("job-{}", accepted["job_id"].as_str().unwrap());
+    let manifest = call!(
+        browser,
+        "artifacts.manifest",
+        json!({"artifact_id":artifact_id}),
+        json!({})
+    );
+    assert!(!manifest.to_string().contains(cli.data.to_str().unwrap()));
+    let bytes_url = format!("{endpoint}{}", manifest["bytes_route"].as_str().unwrap());
+    let etag = format!("\"{}\"", manifest["sha256"].as_str().unwrap());
+    let response = client
+        .get(&bytes_url)
+        .bearer_auth(bearer)
+        .header("If-Match", &etag)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert_eq!(response.headers()["etag"], etag);
+    assert_eq!(response.bytes().await.unwrap().as_ref(), fixture_bytes);
+    for (range, start, end) in [
+        ("bytes=3-19", 3, 20),
+        ("bytes=-13", fixture_bytes.len() - 13, fixture_bytes.len()),
+        ("bytes=131067-131097", 131067, 131098),
+    ] {
+        let response = client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("Range", range)
+            .header("If-Match", &etag)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::PARTIAL_CONTENT);
+        assert_eq!(
+            response.bytes().await.unwrap().as_ref(),
+            &fixture_bytes[start..end]
+        );
+    }
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("Range", "bytes=0-1,4-5")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::RANGE_NOT_SATISFIABLE
+    );
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .header("If-Match", format!("\"{}\"", "0".repeat(64)))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::PRECONDITION_FAILED
+    );
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::NOT_FOUND,
+        "A copied output route supplies no object authority"
+    );
+    let original = std::path::Path::new(destination["output"].as_str().unwrap());
+    std::fs::rename(original, original.with_extension("retained-original")).unwrap();
+    std::fs::write(original, &fixture_bytes).unwrap();
+    assert_eq!(
+        client
+            .get(&bytes_url)
+            .bearer_auth(bearer)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::PRECONDITION_FAILED,
+        "Identical replacement bytes are not the published physical object"
+    );
+    browser.cancel().await.unwrap();
+    let topology_bearer = tokio::time::timeout(
+        Duration::from_secs(120),
+        project_topology::run(
+            &cli,
+            &scope,
+            port,
+            &media.directory.path().join("auth/topology-token"),
+        ),
+    )
+    .await
+    .expect("Whole public topology transport phase exceeded 120 seconds");
+    let status = cli.query("logs.status", json!({})).await;
+    assert_eq!(status["configured"], true);
+    assert_eq!(status["writer_healthy"], true);
+    assert_eq!(status["retained_file_limit"], 5);
+    let logs = std::path::Path::new(status["directory"].as_str().unwrap());
+    let mut events = 0;
+    for entry in std::fs::read_dir(logs).unwrap() {
+        let path = entry.unwrap().path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "jsonl")
+        {
+            let bytes = nw_platform::security::read_private(&path, 2 * 1024 * 1024 + 1024).unwrap();
+            let text = String::from_utf8(bytes.clone()).unwrap();
+            for value in [&token, &issued_bearer, &browser_bearer, &topology_bearer] {
+                assert!(
+                    !text.contains(value.as_str()),
+                    "Protected logs must not contain a transport bearer"
+                );
+            }
+            for line in bytes
+                .split(|byte| *byte == b'\n')
+                .filter(|line| !line.is_empty())
+            {
+                let row = nw_domain::commands::decode_json(line).unwrap();
+                assert!(
+                    ["INFO", "WARNING", "ERROR", "DEBUG"].contains(&row["level"].as_str().unwrap())
+                );
+                assert!(row["timestamp"].is_string());
+                if row.get("fields").is_some() {
+                    events += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        events > 0,
+        "Actual detached-owner work must produce protected structured events"
+    );
+    server.kill().await.unwrap();
+    server.wait().await.unwrap();
+    lost_ack::verify(&media, None).await;
+    let finite = tokio::time::timeout(
+        Duration::from_secs(40),
+        project_render::review(&cli, &scope),
+    )
+    .await
+    .expect("Whole finite compiler review exceeded 40 seconds");
+    project_render::registered_timeline_frame(&cli, &scope, &media, &finite, &wave_asset).await;
+}

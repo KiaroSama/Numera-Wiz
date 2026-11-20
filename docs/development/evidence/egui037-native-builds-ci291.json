@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "source_head": "0df538deadc573fd3d463f758c688a59175d304c",
+  "workflow_run_id": 43474222550,
+  "workflow_run_number": 291,
+  "scope": "development_native_builds_and_selected_hosted_gates_not_full_v1",
+  "terminal_census": {
+    "required": 13,
+    "success": 10,
+    "failure": 3,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "jobs": [
+    {
+      "job_id": 132053734796,
+      "name": "media",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132053735164,
+      "name": "formatting",
+      "status": "completed",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Enforce source formatting"
+      ]
+    },
+    {
+      "job_id": 132053735293,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132053735583,
+      "name": "dependency-lock",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132055361670,
+      "name": "checks (windows-2025)",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132055361731,
+      "name": "checks (macos-15-intel)",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132055361743,
+      "name": "checks (ubuntu-24.04)",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132055361775,
+      "name": "checks (macos-15)",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132056338140,
+      "name": "owner-batch",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132056338262,
+      "name": "owner-transports",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    },
+    {
+      "job_id": 132056338298,
+      "name": "browser",
+      "status": "completed",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Boot real shared UI in the runner's Chrome"
+      ]
+    },
+    {
+      "job_id": 132071462443,
+      "name": "native-ui",
+      "status": "completed",
+      "conclusion": "failure",
+      "failed_steps": [
+        "Exercise the real native workspace and file controls"
+      ]
+    },
+    {
+      "job_id": 132073142233,
+      "name": "artifact-http",
+      "status": "completed",
+      "conclusion": "success",
+      "failed_steps": []
+    }
+  ],
+  "gitleaks": {
+    "run_id": 43474582183,
+    "run_number": 156,
+    "conclusion": "success"
+  },
+  "limits": [
+    "Later source corrections require their own exact-head hosted qualification.",
+    "Both original GUI Selection report controls succeed; later Review cleanup plan input fails.",
+    "Windows ordinary checks pass; the concrete historical filesystem failure cause remains unknown.",
+    "Linux capture contains package metadata only; no package payload download, installation, compiler bootstrap or standard profile qualification.",
+    "Four native development packages and fixture media do not qualify the complete version 1 distribution."
+  ]
+}

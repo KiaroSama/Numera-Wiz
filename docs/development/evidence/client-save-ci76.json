@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "run_id": 40089645393,
+  "branch_head": "0d75fb8374c823a49b06a855ad47eb1dbe2309ae",
+  "jobs": [
+    {
+      "id": 120859530483,
+      "name": "media",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120859530626,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120859530704,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120859530717,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120859954710,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120859954712,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120859954715,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120859954756,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120862054342,
+      "name": "browser",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 120862054458,
+      "name": "native-ui",
+      "conclusion": "skipped"
+    }
+  ],
+  "asserted_before_failure": [
+    "four full native regression/Clippy/desktop targets, WASM and lock",
+    "complete actual engine original MOV/MP4 and existing CLI/official SDK/lost-response journeys",
+    "new full job-read-only client copy larger than 268435456 bytes, exact independent file identity, positive sampled process HWM below 131072 KiB and owned staging cleanup"
+  ],
+  "failure": {
+    "test": "large_published_output_streams_with_bounded_owner_memory_and_revocation",
+    "point": "40-second preparation deadline before partial client staging was observed; process was still active",
+    "exact_phase": "not established",
+    "full_media_job": "failure"
+  },
+  "not_reached": [
+    "partial-transfer SIGINT/drain and following HTTP revocation assertions",
+    "actual new native Save controls",
+    "actual headed Chrome OS save picker"
+  ],
+  "next_source": [
+    "remove redundant native full-manifest scan; actual byte GET retains current authorization, full server verification, strong If-Match, exact length and client digest checks",
+    "separate bounded preparation diagnostics and immediate successful-copy checkpoint",
+    "unchanged 20-second confirmed cancellation drain and 128 MiB memory ceilings",
+    "23 exact hosted formatter hunks"
+  ],
+  "artifacts": [
+    {
+      "id": 12558662887,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:54bfc861a0ac9410bcea0e718b6624b247e0a2f2d69b941e77ebd2bf3aa56078",
+      "downloaded": false
+    },
+    {
+      "id": 12558526964,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:216e4081c52f1b935646f2e62c9bd9febb30c58024064ee397ce51635349c3c8",
+      "downloaded": false
+    }
+  ],
+  "complete_product": "blocked"
+}

@@ -1,0 +1,611 @@
+{
+  "schema_version": 1,
+  "target": "aarch64-apple-darwin",
+  "ffmpeg_source_commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "font_sha256": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954",
+  "bottles": [
+    {
+      "name": "brotli",
+      "keg": "1.2.1",
+      "url": "https://ghcr.io/v2/homebrew/core/brotli/blobs/sha256:7b92f3978056e44ac3f4bb6f5fc1ec31278a6b5972706236e8988e7c255cb3d4",
+      "bytes": 793765,
+      "sha256": "7b92f3978056e44ac3f4bb6f5fc1ec31278a6b5972706236e8988e7c255cb3d4"
+    },
+    {
+      "name": "cairo",
+      "keg": "1.18.6",
+      "url": "https://ghcr.io/v2/homebrew/core/cairo/blobs/sha256:2eb1ea8f47088a4bddf68c052eef3ef5e52a5bc1369118d432db6bea2e363853",
+      "bytes": 1642832,
+      "sha256": "2eb1ea8f47088a4bddf68c052eef3ef5e52a5bc1369118d432db6bea2e363853"
+    },
+    {
+      "name": "dav1d",
+      "keg": "1.5.5",
+      "url": "https://ghcr.io/v2/homebrew/core/dav1d/blobs/sha256:fb6c682102acf636d05f80ce535e9dbc3963d3940051c27fb1c51dd526b4a125",
+      "bytes": 394718,
+      "sha256": "fb6c682102acf636d05f80ce535e9dbc3963d3940051c27fb1c51dd526b4a125"
+    },
+    {
+      "name": "flac",
+      "keg": "1.5.0",
+      "url": "https://ghcr.io/v2/homebrew/core/flac/blobs/sha256:c9698bcebe8e99ab84adf49a347cad5a9f122c45b80622a9fe2acbaeab902545",
+      "bytes": 555276,
+      "sha256": "c9698bcebe8e99ab84adf49a347cad5a9f122c45b80622a9fe2acbaeab902545"
+    },
+    {
+      "name": "fontconfig",
+      "keg": "2.18.4",
+      "url": "https://ghcr.io/v2/homebrew/core/fontconfig/blobs/sha256:cec32d9ebf57d27a1c7e7b306d6fa3fdbbaeccfeec06d14ab5a6d46662b1820b",
+      "bytes": 454565,
+      "sha256": "cec32d9ebf57d27a1c7e7b306d6fa3fdbbaeccfeec06d14ab5a6d46662b1820b"
+    },
+    {
+      "name": "freetype",
+      "keg": "2.15.0",
+      "url": "https://ghcr.io/v2/homebrew/core/freetype/blobs/sha256:74ee3577ff475f019e379070f89dca205e9d90742fe18623722ea455482a4d05",
+      "bytes": 1054473,
+      "sha256": "74ee3577ff475f019e379070f89dca205e9d90742fe18623722ea455482a4d05"
+    },
+    {
+      "name": "fribidi",
+      "keg": "1.0.18",
+      "url": "https://ghcr.io/v2/homebrew/core/fribidi/blobs/sha256:a6b2601a1cfa7c14ecc0b98a2018a5ec1b11a8ca939918442b770964abf601ca",
+      "bytes": 159888,
+      "sha256": "a6b2601a1cfa7c14ecc0b98a2018a5ec1b11a8ca939918442b770964abf601ca"
+    },
+    {
+      "name": "gettext",
+      "keg": "1.0",
+      "url": "https://ghcr.io/v2/homebrew/core/gettext/blobs/sha256:98a116d35792ccd730360ffc8c0d8fc5799b2282b96bb7696192c573f064a331",
+      "bytes": 10296282,
+      "sha256": "98a116d35792ccd730360ffc8c0d8fc5799b2282b96bb7696192c573f064a331"
+    },
+    {
+      "name": "glib",
+      "keg": "2.90.1",
+      "url": "https://ghcr.io/v2/homebrew/core/glib/blobs/sha256:ce9568a335281cb6bd12c48fd89d7a118a046f9df16761c120826fdae116e468",
+      "bytes": 9479231,
+      "sha256": "ce9568a335281cb6bd12c48fd89d7a118a046f9df16761c120826fdae116e468"
+    },
+    {
+      "name": "graphite2",
+      "keg": "1.3.15",
+      "url": "https://ghcr.io/v2/homebrew/core/graphite2/blobs/sha256:bcbf8282acc59c6ed6a0c9a7cf076935735c21de1495bb4e22c3d6bf32f31ee0",
+      "bytes": 92947,
+      "sha256": "bcbf8282acc59c6ed6a0c9a7cf076935735c21de1495bb4e22c3d6bf32f31ee0"
+    },
+    {
+      "name": "harfbuzz",
+      "keg": "15.1.0",
+      "url": "https://ghcr.io/v2/homebrew/core/harfbuzz/blobs/sha256:91c3542c8e6b0e7b1b35af3d24118a0c3f2fd29cef8013e279861ae8f108547d",
+      "bytes": 4464827,
+      "sha256": "91c3542c8e6b0e7b1b35af3d24118a0c3f2fd29cef8013e279861ae8f108547d"
+    },
+    {
+      "name": "icu4c@79",
+      "keg": "79.1",
+      "url": "https://ghcr.io/v2/homebrew/core/icu4c/79/blobs/sha256:7d05da26db392a008abe89706adcf8b089e08d3431535ac95a5c984ceda88153",
+      "bytes": 32072432,
+      "sha256": "7d05da26db392a008abe89706adcf8b089e08d3431535ac95a5c984ceda88153"
+    },
+    {
+      "name": "json-c",
+      "keg": "0.19",
+      "url": "https://ghcr.io/v2/homebrew/core/json-c/blobs/sha256:5624048dbb067f1a6d3784081029c3d738edeefd57188ce6724bb93d01aa53aa",
+      "bytes": 106627,
+      "sha256": "5624048dbb067f1a6d3784081029c3d738edeefd57188ce6724bb93d01aa53aa"
+    },
+    {
+      "name": "lame",
+      "keg": "4.0",
+      "url": "https://ghcr.io/v2/homebrew/core/lame/blobs/sha256:552d24d56ff0d3255e9a3519a368d0ce45de86b5b2967b338209c1a22cd12969",
+      "bytes": 669415,
+      "sha256": "552d24d56ff0d3255e9a3519a368d0ce45de86b5b2967b338209c1a22cd12969"
+    },
+    {
+      "name": "libass",
+      "keg": "0.17.5_1",
+      "url": "https://ghcr.io/v2/homebrew/core/libass/blobs/sha256:b893a0f114554c1b9ea3e046d8102d59c6cf98106936da144835310cab2878f3",
+      "bytes": 234526,
+      "sha256": "b893a0f114554c1b9ea3e046d8102d59c6cf98106936da144835310cab2878f3"
+    },
+    {
+      "name": "libogg",
+      "keg": "1.3.6",
+      "url": "https://ghcr.io/v2/homebrew/core/libogg/blobs/sha256:2423ff6b931f0393cd314052a7328a61fdd6f1d8519b65c4dff5ab560f82c52d",
+      "bytes": 234688,
+      "sha256": "2423ff6b931f0393cd314052a7328a61fdd6f1d8519b65c4dff5ab560f82c52d"
+    },
+    {
+      "name": "libpng",
+      "keg": "1.6.59",
+      "url": "https://ghcr.io/v2/homebrew/core/libpng/blobs/sha256:6461c4dde6a693b559c531357b32126bd649ab67f53db5a5b70c25a5c12de4f1",
+      "bytes": 460683,
+      "sha256": "6461c4dde6a693b559c531357b32126bd649ab67f53db5a5b70c25a5c12de4f1"
+    },
+    {
+      "name": "libsamplerate",
+      "keg": "0.2.2",
+      "url": "https://ghcr.io/v2/homebrew/core/libsamplerate/blobs/sha256:d51907988e3ab62f6e49ddd1253a723fd5964b78a0361453e8d9b75a2106b4e7",
+      "bytes": 2747365,
+      "sha256": "d51907988e3ab62f6e49ddd1253a723fd5964b78a0361453e8d9b75a2106b4e7"
+    },
+    {
+      "name": "libsndfile",
+      "keg": "1.2.2_1",
+      "url": "https://ghcr.io/v2/homebrew/core/libsndfile/blobs/sha256:2d6a8173ef41359c3da4c78a5d5eb402846e480c509b868f671b80a17726f9c4",
+      "bytes": 616476,
+      "sha256": "2d6a8173ef41359c3da4c78a5d5eb402846e480c509b868f671b80a17726f9c4"
+    },
+    {
+      "name": "libunibreak",
+      "keg": "8.0.1",
+      "url": "https://ghcr.io/v2/homebrew/core/libunibreak/blobs/sha256:840390fa9037b1a870aa8c703a8040c137b2699eb80a59f207b1548b4e2d7a04",
+      "bytes": 71564,
+      "sha256": "840390fa9037b1a870aa8c703a8040c137b2699eb80a59f207b1548b4e2d7a04"
+    },
+    {
+      "name": "libunistring",
+      "keg": "1.5",
+      "url": "https://ghcr.io/v2/homebrew/core/libunistring/blobs/sha256:5001abe192babcfaf0f97ad322e2e59958d0d991de3da9f2e941b24924b8a2b8",
+      "bytes": 1901828,
+      "sha256": "5001abe192babcfaf0f97ad322e2e59958d0d991de3da9f2e941b24924b8a2b8"
+    },
+    {
+      "name": "libvidstab",
+      "keg": "1.1.2",
+      "url": "https://ghcr.io/v2/homebrew/core/libvidstab/blobs/sha256:1499410c829a5312dd38682273c2778295491d91432d4b7eb6cb6e52250c35f4",
+      "bytes": 106639,
+      "sha256": "1499410c829a5312dd38682273c2778295491d91432d4b7eb6cb6e52250c35f4"
+    },
+    {
+      "name": "libvorbis",
+      "keg": "1.3.7",
+      "url": "https://ghcr.io/v2/homebrew/core/libvorbis/blobs/sha256:c28d1e0b461a4cf6f5aee72e664ac6f5f6f3efaab44f15b91924f08474cfafe1",
+      "bytes": 590222,
+      "sha256": "c28d1e0b461a4cf6f5aee72e664ac6f5f6f3efaab44f15b91924f08474cfafe1"
+    },
+    {
+      "name": "libvpx",
+      "keg": "1.17.0",
+      "url": "https://ghcr.io/v2/homebrew/core/libvpx/blobs/sha256:dd7924c0a05fa5f840f17ab9f5fac72d8672d75b2a7d44dbbf811274f70d17d6",
+      "bytes": 1914170,
+      "sha256": "dd7924c0a05fa5f840f17ab9f5fac72d8672d75b2a7d44dbbf811274f70d17d6"
+    },
+    {
+      "name": "libx11",
+      "keg": "1.8.14",
+      "url": "https://ghcr.io/v2/homebrew/core/libx11/blobs/sha256:fdc6503c67fb5814bf7de665629b8dbda0807eda7b07d3c2668807768b4ae103",
+      "bytes": 2240089,
+      "sha256": "fdc6503c67fb5814bf7de665629b8dbda0807eda7b07d3c2668807768b4ae103"
+    },
+    {
+      "name": "libxau",
+      "keg": "1.0.12",
+      "url": "https://ghcr.io/v2/homebrew/core/libxau/blobs/sha256:e8a5fedbd9e5c49f10006171decc5b1e56c48fbd4267e7668f813e47c0da984f",
+      "bytes": 33445,
+      "sha256": "e8a5fedbd9e5c49f10006171decc5b1e56c48fbd4267e7668f813e47c0da984f"
+    },
+    {
+      "name": "libxcb",
+      "keg": "1.17.0",
+      "url": "https://ghcr.io/v2/homebrew/core/libxcb/blobs/sha256:cce8d9e12c3f0b2fdbffbb3f7ba02f7e25cf3fa495b3e759d34a6264599543b3",
+      "bytes": 1002427,
+      "sha256": "cce8d9e12c3f0b2fdbffbb3f7ba02f7e25cf3fa495b3e759d34a6264599543b3"
+    },
+    {
+      "name": "libxdmcp",
+      "keg": "1.1.5",
+      "url": "https://ghcr.io/v2/homebrew/core/libxdmcp/blobs/sha256:b09a915dae5b45371a86f20a4ccce13c16c7a8eadc843b665e91bc5b2d2143ce",
+      "bytes": 37179,
+      "sha256": "b09a915dae5b45371a86f20a4ccce13c16c7a8eadc843b665e91bc5b2d2143ce"
+    },
+    {
+      "name": "libxext",
+      "keg": "1.3.7",
+      "url": "https://ghcr.io/v2/homebrew/core/libxext/blobs/sha256:71225436c92940977248a28433951e8e26732d3a9eed954ce1999a770f93f98e",
+      "bytes": 109657,
+      "sha256": "71225436c92940977248a28433951e8e26732d3a9eed954ce1999a770f93f98e"
+    },
+    {
+      "name": "libxrender",
+      "keg": "0.9.13",
+      "url": "https://ghcr.io/v2/homebrew/core/libxrender/blobs/sha256:d281b755455ee77f28bcf83c93501b525d7eb2c7a4b8eb8fdf640ee2c6e4b69b",
+      "bytes": 55204,
+      "sha256": "d281b755455ee77f28bcf83c93501b525d7eb2c7a4b8eb8fdf640ee2c6e4b69b"
+    },
+    {
+      "name": "lzo",
+      "keg": "2.10",
+      "url": "https://ghcr.io/v2/homebrew/core/lzo/blobs/sha256:6bb0401c41a18fd37071ec9591fe053a808f07552ff7ea22542faa470eb8e589",
+      "bytes": 148301,
+      "sha256": "6bb0401c41a18fd37071ec9591fe053a808f07552ff7ea22542faa470eb8e589"
+    },
+    {
+      "name": "mpg123",
+      "keg": "1.33.7",
+      "url": "https://ghcr.io/v2/homebrew/core/mpg123/blobs/sha256:80869bcfed43252f222be16fd652b8e691cb4a144778681853ed76e1d45a7143",
+      "bytes": 651368,
+      "sha256": "80869bcfed43252f222be16fd652b8e691cb4a144778681853ed76e1d45a7143"
+    },
+    {
+      "name": "nasm",
+      "keg": "3.02",
+      "url": "https://ghcr.io/v2/homebrew/core/nasm/blobs/sha256:be638eb35844e4292072b1fe70de30211aa9f189b81eb2801a78be0b253f3fc9",
+      "bytes": 634457,
+      "sha256": "be638eb35844e4292072b1fe70de30211aa9f189b81eb2801a78be0b253f3fc9"
+    },
+    {
+      "name": "opus",
+      "keg": "1.6.1",
+      "url": "https://ghcr.io/v2/homebrew/core/opus/blobs/sha256:85d6f1e885117016478e468f92033f648d9bab05210708fe195cacefe5be8266",
+      "bytes": 505331,
+      "sha256": "85d6f1e885117016478e468f92033f648d9bab05210708fe195cacefe5be8266"
+    },
+    {
+      "name": "pcre2",
+      "keg": "10.49",
+      "url": "https://ghcr.io/v2/homebrew/core/pcre2/blobs/sha256:0ec47d18c50f5770db2b3f07b5b85644284cc6ee8e07e23b11d2727e95932b77",
+      "bytes": 2465167,
+      "sha256": "0ec47d18c50f5770db2b3f07b5b85644284cc6ee8e07e23b11d2727e95932b77"
+    },
+    {
+      "name": "pixman",
+      "keg": "0.46.4",
+      "url": "https://ghcr.io/v2/homebrew/core/pixman/blobs/sha256:86f5fc013d2b22bbe41c1c14661287bf8e8e4c3ac95cd05b08b886d24918fe34",
+      "bytes": 416288,
+      "sha256": "86f5fc013d2b22bbe41c1c14661287bf8e8e4c3ac95cd05b08b886d24918fe34"
+    },
+    {
+      "name": "pkgconf",
+      "keg": "3.0.11",
+      "url": "https://ghcr.io/v2/homebrew/core/pkgconf/blobs/sha256:984325551072d74b5c32e4c0a48464250612eaf835c39f8b23425fbaf7d3cbc1",
+      "bytes": 195448,
+      "sha256": "984325551072d74b5c32e4c0a48464250612eaf835c39f8b23425fbaf7d3cbc1"
+    },
+    {
+      "name": "rubberband",
+      "keg": "4.0.0",
+      "url": "https://ghcr.io/v2/homebrew/core/rubberband/blobs/sha256:5ac29718f68b181de61e81dd42bc85cc74cb1fc4ed5fdca541a94224bc43feaa",
+      "bytes": 637803,
+      "sha256": "5ac29718f68b181de61e81dd42bc85cc74cb1fc4ed5fdca541a94224bc43feaa"
+    },
+    {
+      "name": "svt-av1",
+      "keg": "4.3.0",
+      "url": "https://ghcr.io/v2/homebrew/core/svt-av1/blobs/sha256:99c39895e407e8a344ceb3d4139b102cab2c35e1b380051b19b3896ad82975bc",
+      "bytes": 1438541,
+      "sha256": "99c39895e407e8a344ceb3d4139b102cab2c35e1b380051b19b3896ad82975bc"
+    },
+    {
+      "name": "x264",
+      "keg": "r3222",
+      "url": "https://ghcr.io/v2/homebrew/core/x264/blobs/sha256:a613d44ead5d3999270970f41283eadfad8001061faf063945def6b8fb5145f4",
+      "bytes": 2009287,
+      "sha256": "a613d44ead5d3999270970f41283eadfad8001061faf063945def6b8fb5145f4"
+    },
+    {
+      "name": "x265",
+      "keg": "4.3",
+      "url": "https://ghcr.io/v2/homebrew/core/x265/blobs/sha256:18e89a5822e2f4f91f919c5bf2fbac31433a561c48174fc15e13b4911a1232ac",
+      "bytes": 5556691,
+      "sha256": "18e89a5822e2f4f91f919c5bf2fbac31433a561c48174fc15e13b4911a1232ac"
+    },
+    {
+      "name": "xorgproto",
+      "keg": "2026.1",
+      "url": "https://ghcr.io/v2/homebrew/core/xorgproto/blobs/sha256:8327b24ee8a0d4b3cd9dfb6d49eb20a80484c0f25535be6e726d1b908f444514",
+      "bytes": 720426,
+      "sha256": "8327b24ee8a0d4b3cd9dfb6d49eb20a80484c0f25535be6e726d1b908f444514"
+    },
+    {
+      "name": "zimg",
+      "keg": "3.0.6",
+      "url": "https://ghcr.io/v2/homebrew/core/zimg/blobs/sha256:ee8314ce01c48102e3f977540d6095a444ceb8bce71f1868199c47cad4ce12e4",
+      "bytes": 353631,
+      "sha256": "ee8314ce01c48102e3f977540d6095a444ceb8bce71f1868199c47cad4ce12e4"
+    }
+  ],
+  "sources": [
+    {
+      "filename": "brotli-1.2.1.tar.gz",
+      "url": "https://github.com/google/brotli/archive/refs/tags/v1.2.1.tar.gz",
+      "bytes": 646598,
+      "sha256": "98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f"
+    },
+    {
+      "filename": "cairo-1.18.6.tar.xz",
+      "url": "https://cairographics.org/releases/cairo-1.18.6.tar.xz",
+      "bytes": 32725456,
+      "sha256": "1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4"
+    },
+    {
+      "filename": "dav1d-1.5.5.tar.bz2",
+      "url": "https://code.videolan.org/videolan/dav1d/-/archive/1.5.5/dav1d-1.5.5.tar.bz2",
+      "bytes": 1240285,
+      "sha256": "afc5378daba30eafd11d7b4f0ec863270d7b175f38393a2e1e0ff76f3a45c8b9"
+    },
+    {
+      "filename": "flac-1.5.0.tar.xz",
+      "url": "https://ftp.osuosl.org/pub/xiph/releases/flac/flac-1.5.0.tar.xz",
+      "bytes": 1078872,
+      "sha256": "f2c1c76592a82ffff8413ba3c4a1299b6c7ab06c734dee03fd88630485c2b920"
+    },
+    {
+      "filename": "fontconfig-2.18.4.tar.gz",
+      "url": "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.4/fontconfig-2.18.4.tar.gz",
+      "bytes": 676378,
+      "sha256": "cecf4125622ed674d5630b6deaeff43e3695afe197bdcc560363a1820d858112"
+    },
+    {
+      "filename": "freetype-2.15.0.tar.xz",
+      "url": "https://downloads.sourceforge.net/project/freetype/freetype2/2.15.0/freetype-2.15.0.tar.xz",
+      "bytes": 2716928,
+      "sha256": "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5"
+    },
+    {
+      "filename": "fribidi-1.0.18.tar.xz",
+      "url": "https://github.com/fribidi/fribidi/releases/download/v1.0.18/fribidi-1.0.18.tar.xz",
+      "bytes": 1222656,
+      "sha256": "1de5e8073d035388b71d0b2d452b1da1f8caeea8a7702997b401fe1b6250727f"
+    },
+    {
+      "filename": "gettext-1.0.tar.gz",
+      "url": "https://ftp.gnu.org/gnu/gettext/gettext-1.0.tar.gz",
+      "bytes": 32694085,
+      "sha256": "85d99b79c981a404874c02e0342176cf75c7698e2b51fe41031cf6526d974f1a"
+    },
+    {
+      "filename": "glib-2.90.1.tar.xz",
+      "url": "https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz",
+      "bytes": 5871112,
+      "sha256": "93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396"
+    },
+    {
+      "filename": "graphite2-1.3.15.tgz",
+      "url": "https://github.com/silnrsi/graphite/releases/download/1.3.15/graphite2-1.3.15.tgz",
+      "bytes": 13674849,
+      "sha256": "c6bc8b4252724665297f7cad0c55897285c673f9b8e6db3522ace833593fe0b1"
+    },
+    {
+      "filename": "harfbuzz-15.1.0.tar.xz",
+      "url": "https://github.com/harfbuzz/harfbuzz/releases/download/15.1.0/harfbuzz-15.1.0.tar.xz",
+      "bytes": 20515628,
+      "sha256": "0fc7c565443a5f4be7da65ac5ee5bd737d9b158dc908708b7689a0a5796b0c8d"
+    },
+    {
+      "filename": "icu4c@79-79.1.tgz",
+      "url": "https://github.com/unicode-org/icu/releases/download/release-79.1/icu4c-79.1-sources.tgz",
+      "bytes": 28162455,
+      "sha256": "06fa63ecb521048f8082f12ad988f6b678d90cbd88aafce24cbc94902b191d99"
+    },
+    {
+      "filename": "json-c-0.19.tar.gz",
+      "url": "https://s3.amazonaws.com/json-c_releases/releases/json-c-0.19.tar.gz",
+      "bytes": 462232,
+      "sha256": "37ad0249902e301bd9052bf712e511fcc6acff4ecaad4b5900aad9ce564e26de"
+    },
+    {
+      "filename": "lame-4.0.tar.gz",
+      "url": "https://downloads.sourceforge.net/project/lame/lame/4.0/lame-4.0.tar.gz",
+      "bytes": 1496810,
+      "sha256": "3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb"
+    },
+    {
+      "filename": "libass-0.17.5.tar.xz",
+      "url": "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz",
+      "bytes": 460148,
+      "sha256": "2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc"
+    },
+    {
+      "filename": "libogg-1.3.6.tar.gz",
+      "url": "https://ftp.osuosl.org/pub/xiph/releases/ogg/libogg-1.3.6.tar.gz",
+      "bytes": 604469,
+      "sha256": "83e6704730683d004d20e21b8f7f55dcb3383cdf84c0daedf30bde175f774638"
+    },
+    {
+      "filename": "libpng-1.6.59.tar.xz",
+      "url": "https://downloads.sourceforge.net/project/libpng/libpng16/1.6.59/libpng-1.6.59.tar.xz",
+      "bytes": 1074540,
+      "sha256": "d80dd2a38a37f803cb9b6ac7b14bd6e74ddc3b654780a8380bdf93523fdb4389"
+    },
+    {
+      "filename": "libsamplerate-0.2.2.tar.xz",
+      "url": "https://github.com/libsndfile/libsamplerate/releases/download/0.2.2/libsamplerate-0.2.2.tar.xz",
+      "bytes": 3319468,
+      "sha256": "3258da280511d24b49d6b08615bbe824d0cacc9842b0e4caf11c52cf2b043893"
+    },
+    {
+      "filename": "libsndfile-1.2.2.tar.xz",
+      "url": "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz",
+      "bytes": 730760,
+      "sha256": "3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e"
+    },
+    {
+      "filename": "libunibreak-8.0.1.tar.gz",
+      "url": "https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0_1/libunibreak-8.0.1.tar.gz",
+      "bytes": 1110719,
+      "sha256": "ac0dcc96c395bc86ff7f86f6b91d8b45bc8c39db775f3f1e73f947a11520737b"
+    },
+    {
+      "filename": "libunistring-1.5.tar.gz",
+      "url": "https://ftp.gnu.org/gnu/libunistring/libunistring-1.5.tar.gz",
+      "bytes": 5144661,
+      "sha256": "5b0ecd46cbf225375f20ab4056197e66a7ac590e2684c069af407ae3383c9d81"
+    },
+    {
+      "filename": "libvidstab-1.1.2.tar.gz",
+      "url": "https://github.com/georgmartius/vid.stab/archive/refs/tags/v1.1.2.tar.gz",
+      "bytes": 131556,
+      "sha256": "96db34d48a9e3aa13736a48744b56dfb76731ac9bb5193c716de8534c9fd709d"
+    },
+    {
+      "filename": "libvorbis-1.3.7.tar.xz",
+      "url": "https://ftp.osuosl.org/pub/xiph/releases/vorbis/libvorbis-1.3.7.tar.xz",
+      "bytes": 1203792,
+      "sha256": "b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b"
+    },
+    {
+      "filename": "libvpx-1.17.0.tar.gz",
+      "url": "https://github.com/webmproject/libvpx/archive/refs/tags/v1.17.0.tar.gz",
+      "bytes": 5670546,
+      "sha256": "1020f184046187baa2985dbde38e0691f49c44088bca7a1842b0236c6081dc0a"
+    },
+    {
+      "filename": "libx11-1.8.14.tar.gz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.14.tar.gz",
+      "bytes": 3223041,
+      "sha256": "ebb8a58549ddde50aa2e742b3b256557f451053d173be8dbfc2e8ac078eee1d6"
+    },
+    {
+      "filename": "libxau-1.0.12.tar.xz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libXau-1.0.12.tar.xz",
+      "bytes": 282624,
+      "sha256": "74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb"
+    },
+    {
+      "filename": "libxcb-1.17.0.tar.xz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz",
+      "bytes": 455208,
+      "sha256": "599ebf9996710fea71622e6e184f3a8ad5b43d0e5fa8c4e407123c88a59a6d55"
+    },
+    {
+      "filename": "libxdmcp-1.1.5.tar.xz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libXdmcp-1.1.5.tar.xz",
+      "bytes": 297596,
+      "sha256": "d8a5222828c3adab70adf69a5583f1d32eb5ece04304f7f8392b6a353aa2228c"
+    },
+    {
+      "filename": "libxext-1.3.7.tar.gz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libXext-1.3.7.tar.gz",
+      "bytes": 526087,
+      "sha256": "6564608dc3b816b0cfddf0c7ddc62bc579055dd70b2f28113a618df2acb64189"
+    },
+    {
+      "filename": "libxrender-0.9.13.tar.gz",
+      "url": "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.13.tar.gz",
+      "bytes": 460608,
+      "sha256": "bf264b683d1e49ff9a6bc03af13baa430a556d943731a2b1ac2439dae4fea205"
+    },
+    {
+      "filename": "lzo-2.10.tar.gz",
+      "url": "https://www.oberhumer.com/opensource/lzo/download/lzo-2.10.tar.gz",
+      "bytes": 600622,
+      "sha256": "c0f892943208266f9b6543b3ae308fab6284c5c90e627931446fb49b4221a072"
+    },
+    {
+      "filename": "mpg123-1.33.7.tar.bz2",
+      "url": "https://www.mpg123.de/download/mpg123-1.33.7.tar.bz2",
+      "bytes": 1126376,
+      "sha256": "31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee"
+    },
+    {
+      "filename": "nasm-3.02.tar.xz",
+      "url": "https://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.xz",
+      "bytes": 1531636,
+      "sha256": "87336eba53b4acfe917424ab5d500d2b0054d9f5148d35c2273ccf2cfb712f0d"
+    },
+    {
+      "filename": "opus-1.6.1.tar.gz",
+      "url": "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz",
+      "bytes": 10472813,
+      "sha256": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
+    },
+    {
+      "filename": "pcre2-10.49.tar.bz2",
+      "url": "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.bz2",
+      "bytes": 2185271,
+      "sha256": "53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384"
+    },
+    {
+      "filename": "pixman-0.46.4.tar.gz",
+      "url": "https://cairographics.org/releases/pixman-0.46.4.tar.gz",
+      "bytes": 827198,
+      "sha256": "d09c44ebc3bd5bee7021c79f922fe8fb2fb57f7320f55e97ff9914d2346a591c"
+    },
+    {
+      "filename": "pkgconf-3.0.11.tar.xz",
+      "url": "https://distfiles.ariadne.space/pkgconf/pkgconf-3.0.11.tar.xz",
+      "bytes": 429908,
+      "sha256": "d0cd841bc8e55b9da888106c00dc256d05b7d1d8e5a46f4be4eb4c5125bd2dc4"
+    },
+    {
+      "filename": "rubberband-4.0.0.tar.bz2",
+      "url": "https://breakfastquay.com/files/releases/rubberband-4.0.0.tar.bz2",
+      "bytes": 236705,
+      "sha256": "af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9"
+    },
+    {
+      "filename": "svt-av1-4.3.0.tar.bz2",
+      "url": "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v4.3.0/SVT-AV1-v4.3.0.tar.bz2",
+      "bytes": 10415789,
+      "sha256": "9223ce06e6172ad41357ed23b3b00f036e03794b86b0e20ea9ccb3f648b8955d"
+    },
+    {
+      "filename": "x264-r3222.tar.gz",
+      "url": "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz",
+      "bytes": 1040327,
+      "sha256": "cd71a7515b0e9a012e1ac9b1f8415bebcaf6fc97d4db32286642ac4c0fbe24f9"
+    },
+    {
+      "filename": "x265-4.3.tar.gz",
+      "url": "https://github.com/Multicorewareinc/x265/releases/download/4.3/x265_4.3.tar.gz",
+      "bytes": 2052112,
+      "sha256": "83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121"
+    },
+    {
+      "filename": "xorgproto-2026.1.tar.gz",
+      "url": "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2026.1.tar.gz",
+      "bytes": 1167646,
+      "sha256": "7fa90e48cbaca6bc4c99d176e88c5c147ab0ed42358e14a0869ee9c8a610ae7e"
+    },
+    {
+      "filename": "zimg-3.0.6.tar.gz",
+      "url": "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz",
+      "bytes": 326725,
+      "sha256": "be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577"
+    },
+    {
+      "filename": "ffmpeg-9.0.2.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "bytes": 12040788,
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+    },
+    {
+      "filename": "dejavu-sans-ttf-2.37.zip",
+      "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-sans-ttf-2.37.zip",
+      "bytes": 417746,
+      "sha256": "5c6e497a2f36552cb5ffb112c413a6af39c0f3c47653662b90b4fa6499822fd7"
+    },
+    {
+      "filename": "glib-hardcoded-paths.diff",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-core/e5dc74822aa15381956359dce9d850e08e4ddfed/Patches/glib/hardcoded-paths.diff",
+      "bytes": 1523,
+      "sha256": "d846efd0bf62918350da94f850db33b0f8727fece9bfaf8164566e3094e80c97"
+    },
+    {
+      "filename": "libsamplerate-1.patch",
+      "url": "https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1&download=1",
+      "alternate_url": "https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1&plain=1",
+      "github_patch_api": {
+        "url": "https://api.github.com/repos/libsndfile/libsamplerate/commits/e4a0ab46887029e0f65f145ba3987cc592f18200?output=patch&full_index=1",
+        "before": "734d48fa556901750aa0f4382a62b71abe3c2d7b",
+        "after": "7d8371c3d5eb03a9fc996e06da2bbaa115e22469"
+      },
+      "bytes": 909,
+      "sha256": "0826fb59d733188645f3dc207c938580970700381b9bc87058b137723cb30bba"
+    },
+    {
+      "filename": "libsamplerate-2.patch",
+      "url": "https://github.com/libsndfile/libsamplerate/commit/1abc639420b2df8b9ff2e0bdcc28cf6613c7c0d0.patch?full_index=1",
+      "alternate_url": "https://github.com/libsndfile/libsamplerate/commit/1abc639420b2df8b9ff2e0bdcc28cf6613c7c0d0.patch?full_index=1&download=1",
+      "github_patch_api": {
+        "url": "https://api.github.com/repos/libsndfile/libsamplerate/commits/1abc639420b2df8b9ff2e0bdcc28cf6613c7c0d0?output=patch&full_index=1",
+        "before": "f5431dab645f3150e0af336c2f07f38dbb612b7c",
+        "after": "06f39a0b5b237ce99436327417591a03b7d0626e"
+      },
+      "bytes": 1575,
+      "sha256": "b6fb61c763a0f072ef2ebb3a311037d2429a5e294141f6d5e552ccd25efabdc0"
+    }
+  ]
+}

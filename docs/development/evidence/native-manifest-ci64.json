@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "run_id": 40071636236,
+  "branch_head": "9f33c8eccc546851b4929b33cf6eedea5b55c6cb",
+  "all_jobs": "success",
+  "jobs": [
+    {
+      "id": 120806135237,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806135392,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806135407,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806135411,
+      "name": "formatting",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806543943,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806543966,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806543978,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120806544033,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120808579802,
+      "name": "native-ui",
+      "conclusion": "success"
+    },
+    {
+      "id": 120808579839,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "native_visual_review": {
+    "personally_inspected": true,
+    "boundary": "actual Linux X11/Glow CI executable and human input",
+    "viewport": [
+      1440,
+      861
+    ],
+    "observed": [
+      "Succeeded job row",
+      "Output details dialog opened",
+      "197983 verified bytes displayed",
+      "complete SHA-256 displayed across wrapped lines",
+      "job identity and manifest URI copy control visible"
+    ],
+    "encoded_png_characters": 165596,
+    "source": "bounded actual PNG emitted by completed native harness; no generated illustration"
+  },
+  "artifacts": [
+    {
+      "id": 12551941061,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "a772cd6d7d98cd2f341fa5e0a8772d7f8a48e3dde16b58a6b79eabaaf7e5b46e",
+      "downloaded": false
+    },
+    {
+      "id": 12551867359,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "56d2a3f8335c223a32d2b20619b42d7a8b827bd0702a6a08857ff8c1301d2ae7",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "new timestamp feature added after this run",
+    "complete F08",
+    "project/editor/preview",
+    "all package/resource gates",
+    "owner GPU"
+  ]
+}

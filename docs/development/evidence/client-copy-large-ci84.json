@@ -1,0 +1,17 @@
+{
+  "artifact_id": "job-fab7493e-f328-49a2-86dc-f4b3aa5df638",
+  "bytes": "268633400",
+  "client_peak_kib": 26268,
+  "elapsed_ms": "57207",
+  "not_qualified": [
+    "later cancellation/revocation assertions",
+    "other platforms/packages",
+    "aggregate R20"
+  ],
+  "profile": "job read only; no general filesystem roots",
+  "schema_version": 1,
+  "selected_client_ceiling_kib": 131072,
+  "sha256": "08d2e067bb79587935881ba2af9c61912f72c8d181fe41b0bbbf1d5977c85a77",
+  "source": "78cd2bbc07aca74f1917f25cf655ba487fbdacc1",
+  "status": "full_client_copy_passed"
+}

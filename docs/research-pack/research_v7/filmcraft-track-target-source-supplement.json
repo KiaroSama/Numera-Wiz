@@ -1,0 +1,248 @@
+{
+  "revision": "d643a886650bfbf16f24762274054575aa1e8f20",
+  "role": "Source-observation supplement; no compiled runtime registry claim",
+  "source_path": "research_v2/sources/filmcraft/crates/engine/src/keyboard.rs",
+  "source_sha256": "6164b41a513e117c068a6c838703a2c19b34e3ec878a0351ecc6b87f7bab49bd",
+  "commands": [
+    {
+      "id": "timeline.toggleTargetV1",
+      "label": "Toggle Target Video 1",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 829,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L829",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 1,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV2",
+      "label": "Toggle Target Video 2",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 830,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L830",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 2,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV3",
+      "label": "Toggle Target Video 3",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 831,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L831",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 3,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV4",
+      "label": "Toggle Target Video 4",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 832,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L832",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 4,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV5",
+      "label": "Toggle Target Video 5",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 833,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L833",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 5,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV6",
+      "label": "Toggle Target Video 6",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 834,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L834",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 6,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV7",
+      "label": "Toggle Target Video 7",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 835,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L835",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 7,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetV8",
+      "label": "Toggle Target Video 8",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 836,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L836",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Video",
+        "one_based_track_index": 8,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA1",
+      "label": "Toggle Target Audio 1",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 837,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L837",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 1,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA2",
+      "label": "Toggle Target Audio 2",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 838,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L838",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 2,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA3",
+      "label": "Toggle Target Audio 3",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 839,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L839",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 3,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA4",
+      "label": "Toggle Target Audio 4",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 840,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L840",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 4,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA5",
+      "label": "Toggle Target Audio 5",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 841,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L841",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 5,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA6",
+      "label": "Toggle Target Audio 6",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 842,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L842",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 6,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA7",
+      "label": "Toggle Target Audio 7",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 843,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L843",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 7,
+        "runtime_executed": false
+      }
+    },
+    {
+      "id": "timeline.toggleTargetA8",
+      "label": "Toggle Target Audio 8",
+      "constructor": "tt! -> spec",
+      "default_shortcut_expression": "None",
+      "path": "crates/engine/src/keyboard.rs",
+      "line": 844,
+      "url": "https://github.com/storytold/filmcraft/blob/d643a886650bfbf16f24762274054575aa1e8f20/crates/engine/src/keyboard.rs#L844",
+      "source_derivation": {
+        "registered_via": "commands() extends target_toggles()",
+        "kind": "Audio",
+        "one_based_track_index": 8,
+        "runtime_executed": false
+      }
+    }
+  ]
+}

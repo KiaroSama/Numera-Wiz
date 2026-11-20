@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "run_id": 40100432221,
+  "branch_head": "d66fc711f72eb837e30b12a3e407e4f10748387d",
+  "compiled_merge_source": "95f9c868b8b8dcda6926e8accfb065fef2b061fb",
+  "jobs": [
+    {
+      "id": 120891291155,
+      "name": "media",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891291282,
+      "name": "web",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891291307,
+      "name": "formatting",
+      "conclusion": "failure"
+    },
+    {
+      "id": 120891291313,
+      "name": "dependency-lock",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891564320,
+      "name": "checks (macos-15)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891564392,
+      "name": "checks (macos-15-intel)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891564418,
+      "name": "checks (windows-2025)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120891564480,
+      "name": "checks (ubuntu-24.04)",
+      "conclusion": "success"
+    },
+    {
+      "id": 120894588472,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 120894588477,
+      "name": "native-ui",
+      "conclusion": "success"
+    }
+  ],
+  "asserted": [
+    "four complete native regression/Clippy/desktop targets, WASM/lock",
+    "actual typed CLI media probe/register/report/plan/inspect/submit/manifest/chunk, separate-process durable retries, all existing official SDK/lost-ack/media/authorization regressions",
+    "actual Linux native typed destination Save and genuine OS Save As; actual Chrome genuine OS Save As; independent full 197983-byte saved/source equality; one producer job; normal native close and lease teardown",
+    "large scoped 268633400-byte CLI client copy and confirmed partial cancellation; HTTP jobRead/bearer revocation and disconnect/index cleanup"
+  ],
+  "personally_inspected_images": [
+    "browser-client-saved.png",
+    "native-picker-saved.png"
+  ],
+  "browser_correction": "matcher includes the genuine observed Chrome warning title; same production File System Access path and actual OS input, no test replacement of picker/writer",
+  "formatting": {
+    "exact_hosted_hunks_applied_in_next_source": 22
+  },
+  "artifacts": [
+    {
+      "id": 12563211629,
+      "name": "native-ui-evidence-linux",
+      "github_reported_zip_sha256": "sha256:bfd0f93c3333660b122ec24e78abb584f7d2f2a394d2b22aa93190c66ff0986f",
+      "downloaded": false
+    },
+    {
+      "id": 12562832785,
+      "name": "owner-media-evidence-linux",
+      "github_reported_zip_sha256": "sha256:56345ae8464cccf92c4e76e01dfb7bd1756184773b331b75991fdc2e81e7c859",
+      "downloaded": false
+    },
+    {
+      "id": 12562712362,
+      "name": "browser-boot-evidence-linux-chrome",
+      "github_reported_zip_sha256": "sha256:5729284030f13cacc6ec7cf48944867e15c83bd37e72e7a1c5ad6c85489b70bb",
+      "downloaded": false
+    },
+    {
+      "id": 12561739043,
+      "name": "source-formatting",
+      "github_reported_zip_sha256": "sha256:c1545bd434b048e55bd0721588fbcee631ed4a814205493935137531ce3064b4",
+      "downloaded": false
+    }
+  ],
+  "not_qualified": [
+    "other browser/platform/package variants",
+    "new explicit timeout/progress source in next commit",
+    "full product/package/resource/manual/owner gates"
+  ]
+}

@@ -1,0 +1,821 @@
+# Projects and timeline state — development
+
+The implemented project commands store acknowledged edits in the application
+database and share one service across CLI, MCP and the shared native/browser
+workspace. Human controls provide authorized catalog discovery, project and
+sequence creation, solid-color and registered-source placement, move/split/lift,
+bounded clip selection, Link/Unlink, Undo/Redo, explicit stale-view Refresh and
+catalog reopen. Link and Unlink passed hosted native and Chrome input
+journeys at the review checkpoint. Portable project files, full checkpoints,
+continuous playback, general export and the complete editor remain required work.
+
+## Commands and identity
+
+| Canonical command | Typed CLI | Behavior |
+| --- | --- | --- |
+| `projects.list` | `projects list` | Page authorized common project headers in ascending UUID order. |
+| `projects.create` | `projects create` | Create a project and root bin at revision `0`. |
+| `projects.inspect` | `projects inspect` | Read summary, one entity or a bin page. |
+| `bins.add` | `bins add` | Create a child bin in the current project. |
+| `sequences.create` | `sequences create` | Create explicit sequence settings and video/audio tracks. |
+| `sequences.inspect` | `sequences inspect` | Read sequence detail, tracks or a bounded clip viewport. |
+| `tracks.set_enabled` | `tracks set-enabled` | Include or exclude one track from preview and render at the expected revision. |
+| `tracks.set_locked` | `tracks set-locked` | Prevent track and clip edits until the track is unlocked. |
+| `clips.place` | `clips place` | Place a registered physical stream or finite solid-color source. |
+| `clips.move` | `clips move` | Move the selected/link-expanded clips by one exact delta. |
+| `clips.link` | `clips link` | Expand complete clip topology and assign one shared opaque group. |
+| `clips.unlink` | `clips unlink` | Expand complete clip topology and clear its groups and known link references. |
+| `clips.split` | `clips split` | Split the selected/link-expanded clips at an exact sequence time. |
+| `clips.trim` | `clips trim` | Shorten linked clips from the beginning or end. |
+| `clips.slip` | `clips slip` | Move linked source windows while retaining timeline positions and durations. |
+| `clips.remove` | `clips remove` | Lift clips without moving neighboring material. |
+| `previews.program_segment` | `timeline preview-segment` | Prepare a short picture and sound window from one captured sequence revision. |
+| `history.undo` | `history undo` | Apply the retained original inverse at a new revision. |
+| `history.redo` | `history redo` | Reapply the retained original at a new revision. |
+
+All writes require a retained replay scope and idempotency key. Except creation,
+they also require the project UUID and its expected decimal-string revision.
+Every accepted change advances that revision. Undo restores entity identities and
+content at a new revision; it does not rewind the revision counter.
+
+After a lost response, repeat the original command, scope, key, project, expected
+revision and parameters. Replay returns its recorded receipt before checking a new
+revision or source. Changing the expected revision on that retry changes the
+request and produces `IDEMPOTENCY_CONFLICT`. After `STALE_REVISION`, inspect the
+current state and deliberately submit a new operation identity.
+
+Project/sequence inspection queries carry `project.id` without
+`project.expected_revision`; omit the latter entirely rather than setting it to
+null. The catalog query has no project context. A captured read revision belongs in
+`params.revision`. For example, a canonical write has this shape:
+
+```json
+{
+  "api_version": 1,
+  "request_id": "move-1",
+  "command": {"id": "clips.move", "version": 1},
+  "project": {"id": "<project-uuid>", "expected_revision": "5"},
+  "replay_scope": "<retained-scope>",
+  "idempotency_key": "move-1",
+  "params": {
+    "clip_ids": ["<clip-uuid>"],
+    "delta": {"num": "1", "den": "4"},
+    "collision": "reject",
+    "link_policy": "expand"
+  }
+}
+```
+
+## A small state-editing walkthrough
+
+Use one absolute writable `DATA` directory throughout. Replace uppercase IDs and
+`SCOPE` with actual returned values; these are placeholders, not shell variables.
+Keep each command and its original retry identity privately.
+
+```text
+numera-wiz --data-dir DATA access replay-scope create --json
+numera-wiz --data-dir DATA projects create --name "First project" --replay-scope SCOPE --idempotency-key project-1
+```
+
+Creation returns `project_id`, `root_bin_id` and revision `"0"`. Retain the project
+ID or rediscover it with `numera-wiz --data-dir DATA projects list --limit 64`.
+The shared GUI also provides project and sequence creation. For this CLI
+walkthrough, create a four-frame-per-second sequence, retaining
+`created.sequence_id` and `created.tracks[0].id`:
+
+```text
+numera-wiz --data-dir DATA sequences create --project PROJECT --expected-revision 0 --name "Sequence" --width 64 --height 48 --frame-rate 4/1 --sample-rate 48000 --audio-layout stereo --video-track Video --replay-scope SCOPE --idempotency-key sequence-1
+numera-wiz --data-dir DATA clips place --project PROJECT --expected-revision 1 --sequence SEQUENCE --track TRACK --rgba 0,0,0,1 --source-duration 4/1 --source-start 0/1 --source-end 4/1 --sequence-start 0/1 --replay-scope SCOPE --idempotency-key place-1
+```
+
+Placement returns revision `"2"`, `created.source_id` and `created.clip_ids[0]`.
+Call that clip `LEFT`. Split at two seconds; retain the returned right clip as
+`RIGHT`. The left ID remains unchanged:
+
+```text
+numera-wiz --data-dir DATA clips split --project PROJECT --expected-revision 2 --clip LEFT --at 2/1 --replay-scope SCOPE --idempotency-key split-1
+numera-wiz --data-dir DATA history undo --project PROJECT --expected-revision 3 --replay-scope SCOPE --idempotency-key undo-1
+numera-wiz --data-dir DATA history redo --project PROJECT --expected-revision 4 --replay-scope SCOPE --idempotency-key redo-1
+numera-wiz --data-dir DATA clips move --project PROJECT --expected-revision 5 --clip LEFT --clip RIGHT --delta 1/1 --replay-scope SCOPE --idempotency-key move-1
+numera-wiz --data-dir DATA clips remove --project PROJECT --expected-revision 6 --clip RIGHT --replay-scope SCOPE --idempotency-key lift-1
+numera-wiz --data-dir DATA projects inspect --project PROJECT
+numera-wiz --data-dir DATA sequences inspect --project PROJECT --sequence SEQUENCE --projection viewport --track TRACK --start 0/1 --end 6/1 --limit 128
+```
+
+With no competing edits, the final revision is `"7"`. The remaining left clip
+occupies `[1,3)` seconds; lift leaves its neighbors in place. Query a clip's entity
+projection for its exact source range. A zero-delta move or supported boundary
+split returns an accepted `no_change:true` receipt without changing revision,
+entity bytes, history or redo. Locks, grids and compatibility still apply.
+
+## Link and unlink topology
+
+The native and browser workspaces share the same Rust Link/Unlink controls.
+Use Select beside visible clip rows to build a separate group selection, up to
+128 distinct clips. Inspecting a clip still opens its own details and Move/Split/
+Lift controls. The group-selection count, Clear selection, Link and Unlink follow
+those controls. Link needs at least two selected clips. Unlink uses the selected
+clips, or the inspected clip when it has a recorded group. The inspected group's
+actual identity is displayed; the current page does not establish its membership.
+
+Selections belong to one captured project, sequence and revision. Same-revision
+paging and track changes retain captured selections; changing context or revision,
+explicit Refresh, or leaving clears them. Existing linked companions are included
+across pages and tracks. The owner validates that expansion, locks, access and
+binding facts. While loading, stale or awaiting a response, the controls cannot
+submit. Accepted results reload the normal captured projections and show the
+actual receipt/revision. A denied or stale edit leaves the displayed topology
+unchanged and requires explicit Refresh before another edit. Stored profiles must
+explicitly allow both command IDs; the UI does not grant itself those rights.
+
+`clips.link` and `clips.unlink` use the same canonical service through the shared
+GUI, typed CLI and MCP. Both accept 1–128 distinct seed `clip_ids` and require
+`link_policy:"expand"`; the typed CLI supplies that policy. Repeated `--clip`
+flags select seeds. Duplicate seeds reject. Expansion includes complete group
+membership and both incoming and outgoing direct clip links, up to 128 resolved
+clips, all in the same sequence. Existing locks, compatibility, frozen binding
+validation and edit budgets still apply before any no-change acceptance.
+
+Link requires at least two resolved clips, even when one seed reaches the whole
+component. It assigns one fresh collision-checked opaque `link_group_id`, retaining
+direct links, geometry and source bindings. The ID is not a Group entity. If all
+resolved clips already share one non-null group, Link returns that same ID as a
+validated no-change without allocating another ID. Unlink needs at least one
+resolved clip, expands the whole component, and clears only group values and known
+`role:"link"` references. It allocates no IDs; already unlinked members retain
+their raw bytes.
+
+The following is an illustration, not a recorded CLI execution, and is independent
+of the preceding walkthrough. Starting state: project `PROJECT` is at revision
+`"8"`, with distinct unlinked clips `CLIP_A` and `CLIP_B` in one sequence, no direct
+links and no other group members. `DATA`, `PROJECT`, `CLIP_A`, `CLIP_B` and `SCOPE`
+are placeholders; replace them with an absolute data directory, returned IDs and
+a privately retained replay scope. The operation keys/request IDs below are
+illustrative, fresh identities in that scope.
+
+```text
+numera-wiz --data-dir DATA clips link --project PROJECT --expected-revision 8 --clip CLIP_A --clip CLIP_B --replay-scope SCOPE --idempotency-key topology-link-1 --request-id topology-link-1
+numera-wiz --data-dir DATA clips link --project PROJECT --expected-revision 9 --clip CLIP_A --replay-scope SCOPE --idempotency-key topology-link-noop-1 --request-id topology-link-noop-1
+numera-wiz --data-dir DATA clips unlink --project PROJECT --expected-revision 9 --clip CLIP_A --clip CLIP_B --replay-scope SCOPE --idempotency-key topology-unlink-1 --request-id topology-unlink-1
+numera-wiz --data-dir DATA history undo --project PROJECT --expected-revision 10 --replay-scope SCOPE --idempotency-key topology-undo-1 --request-id topology-undo-1
+numera-wiz --data-dir DATA history redo --project PROJECT --expected-revision 11 --replay-scope SCOPE --idempotency-key topology-redo-1 --request-id topology-redo-1
+```
+
+With no competing edits, Link advances to `"9"`; the second Link is no-change at
+`"9"`. Unlink advances to `"10"`, Undo to `"11"` and Redo to `"12"`. Undo restores
+the same group ID and retained entity images; Redo reapplies the stored images,
+without generating a replacement group.
+
+Link's `created` value is exactly `{link_group_id, clip_ids}`; Unlink's is exactly
+`{clip_ids}`. In each, `clip_ids` is the sorted complete resolved selection,
+including unchanged members. These fields describe the resolved topology;
+`changed_ids` contains only actual changes. A validated no-change returns an
+accepted, replayable receipt with `no_change:true` and empty `changed_ids`, while
+revision, raw project/entity bytes, history and redo remain unchanged. Retrying a
+lost response uses the exact original identity, expected revision and parameters,
+including for no-change; it is different from the fresh second Link above.
+
+## Rejoin a through edit
+
+Inspect the left clip and open **Trim linked clips**. Choose **Join with next
+through edit** when the adjacent right clip is visible and shares the source.
+Both timeline and source boundaries must meet exactly on every linked track.
+The join keeps each left clip and its group identity. Undo restores both halves
+and their original link groups.
+
+```text
+numera-wiz clips join-through-edit --project PROJECT --expected-revision REVISION --left LEFT --right RIGHT --replay-scope SCOPE --idempotency-key join-through-edit
+```
+
+MCP uses `clips.join_through_edit` with `left_id` and `right_id`. The current
+route accepts unchanged clip semantics and opaque link groups. Effects,
+unmatched linked tracks and discontinuous source windows refuse the edit.
+
+## Slip a source window
+
+In Projects, inspect a clip, open **Slip linked clips**, and enter a signed
+source offset in seconds. A positive offset selects later source material.
+Source windows move together across linked tracks. Timeline ranges, clip IDs
+and link groups retain their identities. Undo restores the original windows.
+
+```text
+numera-wiz clips slip --clip CLIP --delta -1/4 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key slip-clip
+```
+
+MCP uses `clips.slip` with `clip_ids`, a rational `delta` and
+`link_policy: "expand"`. The offset must land on every affected track's grid.
+Slip accepts finite solid colors and up to eight distinct registered streams
+in one edit. Each registered stream needs a probe-declared interval. The
+engine checks the resulting range, current access and the registered source
+identity before committing the edit. A zero offset returns a no-change receipt.
+
+## Close an empty timeline range
+
+Open **Visible sequence range (exact seconds)** and enter the start and
+exclusive end of an empty region. Use **Close gap on selected track** or
+**Close gap across all tracks**. The edit shifts later clips left by the gap
+length. Source ranges, clip IDs, link groups and sequence markers retain their
+values. Undo restores the complete original timeline positions.
+
+```text
+numera-wiz timeline remove-gap --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track VIDEO --track AUDIO --start 1 --end 4 --replay-scope SCOPE --idempotency-key close-gap
+```
+
+MCP uses `timeline.remove_gap` with `sequence_id`, `track_ids` and the
+half-open `range`. Both endpoints must be on each selected track's grid.
+Include every linked companion in the later clips through the selected tracks.
+An occupied range returns `GAP_NOT_EMPTY`. One operation covers up to 16
+tracks and 128 clips. An empty tail returns a no-change receipt.
+
+## Track participation
+
+In Projects, select an audio or video track and choose **Disable track**.
+Preview and render omit that track's clips. Choose **Enable track** to include
+them again. The track, clip positions and link groups retain their identities.
+Undo restores the previous enabled state.
+
+```text
+numera-wiz tracks set-enabled TRACK --enabled false --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key disable-track
+```
+
+MCP exposes the same edit as `tracks.set_enabled` with `track_id` and
+`enabled` parameters. Use its ordinary project write context. The
+`sequences.inspect` track page includes each track's committed `enabled` state.
+
+## Lock a track
+
+Select a track and choose **Lock track**. The track stays visible and audible
+according to its existing settings. The owner refuses moves, trims, placement
+and track settings changes that affect the locked track. Choose **Unlock track**
+or Undo to restore editability. A locked sequence protects its tracks.
+
+```text
+numera-wiz tracks set-locked TRACK --locked true --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key lock-track
+```
+
+The MCP command is `tracks.set_locked` with `track_id` and `locked`.
+The track page includes `locked: true` for a committed lock.
+
+## Lock or unlock clips
+
+Select a clip and choose **Lock clip** or **Unlock clip** in **Selected detail**.
+The command applies to the clip and its linked companions. A locked track or
+sequence blocks the operation. Unlock the enclosing track before changing a
+clip lock. Locked clips continue to play and render, and the lock change can be
+undone or redone.
+
+```text
+numera-wiz clips set-locked --clip CLIP --locked true --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key lock-clip
+```
+
+Repeat `--clip` for multiple selections. Use `--locked false` to unlock.
+MCP `clips.set_locked` takes `clip_ids`, `locked` and `link_policy:"expand"`.
+
+## Roll a cut between adjacent clips
+
+Select the clip before the cut and open **Roll cut to next clip**. Enter a
+signed offset on the track's exact clock. The two clips retain their IDs and
+combined timeline extent. The longer side uses more of its original source.
+Every linked track must have a corresponding adjacent pair. Undo restores
+the whole cut.
+
+```text
+numera-wiz clips roll --left LEFT --right RIGHT --delta 1/24 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key roll-cut
+```
+
+MCP `clips.roll` uses `left_id`, `right_id`, `delta` and `link_policy:"expand"`.
+
+## Slide a clip between its neighbors
+
+Select a clip with both adjacent neighbors visible on its timeline track. Open
+**Slide clip between neighbors** and enter a signed offset on the exact frame or
+sample grid. Negative moves earlier. Positive moves later. The selected clip
+keeps its duration and source window. Its neighbors absorb the change at the two
+cut points so the outer endpoints stay fixed.
+
+With linked clips, each affected track needs a matching left, center and right
+clip in the respective linked groups. This edit supports clips at normal,
+forward speed. A gap, a locked clip or track, or insufficient source handles
+blocks the whole edit. Undo restores all three clips on every affected track
+together.
+
+```text
+numera-wiz clips slide --left LEFT --clip CENTER --right RIGHT --delta -1/24 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key slide-left
+```
+
+MCP `clips.slide` takes `left_id`, `clip_id`, `right_id`, `delta` and
+`link_policy:"expand"`.
+
+## Project keyboard shortcuts
+
+Use Command on macOS and Ctrl on Windows or Linux. Command/Ctrl+Z undoes
+the current project edit and Command/Ctrl+Shift+Z redoes it. Both follow the
+same revision and access checks as the buttons.
+
+Click the timeline to activate its shortcuts. `D` selects the clip under the
+exact time shown in **Timeline frame**. Command/Ctrl+K splits there when the
+position is inside an editable clip. Backspace or Delete lifts the selected
+clip. Edit fields retain their keyboard input. If the browser captures the
+split shortcut, **Split selected clip** accepts the same exact time.
+
+## Play a continuous range
+
+Set the visible range and choose **Timeline frame → Play visible range**.
+One local FFmpeg process produces the selected picture and sound. The desktop
+monitor starts playback immediately and accepts up to two minutes. In a browser,
+click Play in the monitor. It accepts up to ten minutes at once, keeps a few
+seconds buffered and releases older frames. Close the monitor or select a new
+range to start at a different position. Playback follows the selected project
+revision and source permissions.
+
+`timeline preview-segment --continuous` and MCP `previews.program_playback`
+return the request for a selected project revision. An authenticated
+`POST /api/v1/previews/program` returns the AVC/AAC fragmented MP4 stream.
+Grant `previews.program_segment` to the paired reader and
+`previews.program_playback` to clients that request the stream description.
+
+## Export a CMX 3600 cut list
+
+Select an enabled picture track in a sequence at 24, 25 or 30 fps. Set an
+exact visible range, open **Export picture track as EDL**, and prepare the
+cut list. **Copy EDL** copies the file text. **Copy reel map** attaches each
+short reel name to the registered asset ID, physical stream index and source
+digest for relinking.
+
+```text
+numera-wiz timeline export-edl --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 8 --out cuts.edl
+```
+
+`--out` saves the checked document to a new client-side file. Existing
+files are preserved. The CLI and MCP `interchange.edl.export` return the same document and reel
+map under `document` and `reels`. Record timecodes use sequence time and source
+timecodes use the registered asset origin. The export uses non-drop timecode,
+unit-rate cuts and black events for gaps. Color generators and timing outside
+the admitted grid return an error. The selected-track export covers picture cuts.
+
+### Import a cut list
+
+Select the destination picture track at the same frame rate. Open **Import
+picture cut list**, paste the EDL and its JSON reel map, and choose **Apply cut
+list**. Black events become opaque black clips. Every media reel must identify
+an authorized registered asset, stream and matching SHA-256 digest. The selected
+track must have free space at the original record times. The import accepts up
+to 63 contiguous non-drop picture cuts. One Undo or Redo applies to the entire
+list.
+
+```text
+numera-wiz timeline import-edl --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --fps 24 --file cuts.edl --reels reels.json --replay-scope SCOPE --idempotency-key import-cuts
+```
+
+Save the export's `reels` array as `reels.json`. Omit `--reels` for a black-only
+list. The MCP command `interchange.edl.import` accepts the UTF-8 `document` and
+the `reels` array directly, along with the destination sequence, track and frame
+rate. The receipt includes the document digest and the created clip IDs in cut
+order.
+
+## Exchange a track with OpenTimelineIO
+
+Select an enabled video or audio track at unity gain and open
+**OpenTimelineIO**. Prepare the visible range, then copy the OTIO document
+and its media bindings. Paste both values on a matching destination track
+and choose **Import at range start**. A single Undo or Redo covers the import.
+
+```text
+numera-wiz timeline export-otio --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 8 --out timeline.otio
+numera-wiz timeline import-otio --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --start 0 --file timeline.otio --sources sources.json --replay-scope SCOPE --idempotency-key import-otio
+```
+
+The export returns the document, its SHA-256 digest and a `sources` array.
+Save the array as `sources.json`. The CLI verifies the document digest before
+saving it to a new file. MCP offers the same operations through
+`interchange.otio.export` and `interchange.otio.import`.
+
+Every external reference needs a binding from the exact `target_url` to an
+authorized registered asset, its physical stream index and content SHA-256.
+Numera exports opaque `urn:numera-wiz:asset:` references so an interchange
+file carries no local paths. Bind or relink these references in another editor.
+Import resolves the explicit binding and checks the held media digest. The URL
+itself is treated as an identifier throughout import.
+
+The supported subset includes a `Timeline.1` with one flat video or audio
+track, `Clip.1` or `Clip.2` cuts, `Gap.1` and the Numera Wiz solid-color
+generator. It accepts integer ticks and positive integer or standard
+24000/1001, 30000/1001, 60000/1001 and 120000/1001 rates. Cuts and the full
+destination interval must align to the destination track grid. The interval
+must be empty, including its gaps. The `--start` option sets the destination
+offset. OTIO's `global_start_time` is timecode metadata. Use the exported
+range length when selecting a range that includes trailing empty space.
+
+Each import admits up to 63 cuts and a 96 KiB document. Nested tracks,
+transitions, effects, markers, alternate references and unresolved media
+require separate conversion. The format follows the official OTIO schema.
+[OpenTimelineIO schema](https://opentimelineio.readthedocs.io/en/v0.18.1/tutorials/otio-serialized-schema.html)
+
+## Exchange a track with Final Cut Pro 7 XML
+
+Open **Final Cut Pro 7 XML** on a selected track in the Projects workspace.
+Prepare the visible range, then copy the XML and its media bindings. The CLI
+uses the same selection with `timeline export-fcp7` and `timeline import-fcp7`.
+The request parameters match those of the corresponding OTIO commands. MCP
+uses `interchange.fcp7.export` and `interchange.fcp7.import`.
+
+The supported xmeml v4 and v5 subset contains one video or audio track with
+registered-media cuts on a whole-frame grid. Record positions and duration
+preserve the gaps, including trailing empty space. Every imported `pathurl`
+must match an explicit registered media binding. The exporter supplies an
+opaque placeholder for each source. Relink the files in the receiving editor.
+The 96 KiB document and 63-cut limits also apply to this format.
+[Apple Final Cut Pro XML reference](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/)
+
+## Exchange a track with Final Cut Pro XML
+
+In the Projects workspace, select a track and open **Final Cut Pro XML**.
+Prepare the visible range and copy both the document and media bindings. The
+CLI uses `timeline export-fcpxml` and `timeline import-fcpxml` with the same
+arguments as OTIO. MCP uses `interchange.fcpxml.export` and
+`interchange.fcpxml.import`.
+
+V1.10 export writes a single primary story of registered-media cuts and gaps.
+Import accepts that subset in versions 1.8–1.14, including projects in an event.
+It reads exact rational seconds and honors the sequence timecode origin, media
+start offsets, and leading and trailing gaps. Pick one audio or video component
+per clip. The destination grid and the entire empty placement range are checked
+before any edit. The URL in each original-media reference requires an explicit
+registered binding and is never opened. Relink exported placeholder URLs in
+the receiving editor. Each document admits up to 63 cuts and 96 KiB.
+[Apple FCPXML documentation](https://developer.apple.com/documentation/professional-video-applications/fcpxml-reference)
+
+## Exchange linked AAF and OMF 2 tracks
+
+Choose **AAF** or **OMF 2** on the selected track in Projects and copy the
+Base64 document and its media bindings. Use the CLI to store an actual binary
+file and apply it to an empty range.
+
+```text
+numera-wiz timeline export-aaf --project PROJECT --revision REVISION --sequence SEQUENCE --track TRACK --start 0 --end 1 --out cuts.aaf
+numera-wiz timeline import-aaf --project PROJECT --expected-revision REVISION --sequence SEQUENCE --track TRACK --start 2 --file cuts.aaf --sources sources.json --replay-scope SCOPE --idempotency-key import-cuts
+```
+
+Use `export-omf` and `import-omf` for OMF 2. Save the returned `sources` array
+as a separate UTF-8 JSON file. MCP uses `interchange.aaf.export`,
+`interchange.aaf.import`, `interchange.omf.export` and
+`interchange.omf.import` with `document_base64` for the binary document.
+The SHA-256 covers the decoded file bytes and `--out` saves only after verifying
+the digest.
+
+The linked subset preserves one track of unit-rate cuts and gaps, with up to
+63 registered cuts. AAF accepts constant-rate picture or integer PCM WAVE/AIFF
+audio. OMF 2 accepts audio with matching source and timeline sample rates.
+Linked audio export uses mono or stereo and preserves sample positions.
+Select a range aligned to the sequence's picture grid for the timecode track.
+Export writes portable basenames for relinking. Import treats locators as
+registered media binding keys and opens only the authorized registered source
+verified by its digest. Embedded essence, effects, transitions and nested
+compositions are outside the supported subset. Import accepts up to 512 KiB and
+export produces up to 160 KiB to fit the command result envelope.
+
+## Export an Avid clip log
+
+In the media workspace, select a source and open **Avid Log Exchange**. Set
+**Log FPS**, prepare the document and choose **Copy ALE**. To export several
+registered sources in one file, repeat `--asset` on the CLI. The optional
+`--out` verifies the digest and writes to a new path.
+
+```text
+numera-wiz interchange export-ale --asset FIRST --asset SECOND --frame-rate 25 --out selected.ale
+```
+
+MCP uses `interchange.ale.export` with `asset_ids` and optional `frame_rate`.
+The log uses UTF-8, tab-separated fields and CRLF. Each row describes picture
+and audio channels, its Start and exclusive End, source filename and known
+tape, scene, take and comment metadata. Pick the log FPS that matches the
+source's non-drop timecode. Sources without timecode start at zero and end
+at the first log frame that covers their full registered duration. Select
+up to 64 assets with a common audio sample rate. The supported rates are
+22.05, 24, 44.1 and 48 kHz. Source filenames support manual relinking without
+exposing absolute paths. [Avid log specification, Appendix D](https://resources.avid.com/SupportFiles/attach/XpressSupplement_v5_0.pdf)
+
+## Audio track gain
+
+Select an audio track and open **Track gain**. Set the gain in hundredths of a
+decibel. For example, `-600` is −6.00 dB and `0` restores unity. The committed
+value affects all clips on the track before overlapping audio is mixed for
+export. Undo restores the original gain.
+
+```text
+numera-wiz tracks set-gain TRACK --centidb -600 --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key attenuate-track
+```
+
+MCP uses `mixer.set_track_gain` with `track_id` and `gain_centidb`, from −9,600
+to +2,400. The track page includes the gain for tracks with an adjustment.
+Current mixed exports use the FFmpeg `volume` filter for an adjusted track.
+The track record carries a codec version that requires gain support from the reader.
+
+## Native timeline playback
+
+Open **Timeline frame**, set the exact sequence time, then choose **Play
+timeline window**. The native owner sends decoded RGBA and optional stereo
+48 kHz PCM on separate local streams. When **Sound** is selected, the display
+follows the output device's predicted playout timestamp. Turn off Sound for
+picture playback on the monotonic display clock.
+
+The selected window runs for up to two seconds. The owner needs an audio
+device that supports stereo output at 48 kHz when Sound is selected.
+**Stop playback**, a new frame inspection or a project edit closes the active
+view. Native OS audio playback still needs hosted device qualification.
+
+## Browser timeline playback
+
+Open **Timeline frame** in the browser workspace, set **Sequence time (seconds)**
+and choose **Prepare timeline playback**. The browser presents a play control
+once the selected window is ready. The start and exclusive endpoint share the
+sequence's frame and sample grids. The window runs for up to two seconds.
+
+The owner composes enabled tracks with the same graph used by mixed export.
+Playback uses 320 × 180 limited-range BT.709 AVC and stereo 48 kHz AAC when the
+browser supports that MediaSource profile. The original material and export
+settings stay attached to the project. This short-window route accepts up to
+four registered originals, a 1920 × 1080 sequence and 60 frames per second.
+Continuous playback and native audio playback remain in development.
+
+The typed CLI returns the browser playback manifest.
+
+```text
+numera-wiz timeline preview-segment --project PROJECT --revision REVISION --sequence SEQUENCE --start 0 --end 2
+```
+
+MCP exposes `previews.program_segment` with the project context, exact range
+and revision. The same principal fetches the short-lived bytes from
+`/api/v1/previews/{segment_id}/mp4` with its HTTP bearer. The owner checks
+project revision and source authority again at delivery. An existing access
+profile needs an explicit grant for the new command.
+
+## Timeline markers
+
+Select a sequence and open **Timeline markers** in Projects to add or remove
+an annotation. A marker has a name, color, position and length. A zero length
+marks one point. Position and the end of a region must lie on the sequence
+frame grid. Markers stay at their sequence positions when unrelated clips
+move. Undo and Redo restore the marker and its original identity.
+
+Use `numera-wiz markers place` with `--project`, `--sequence`,
+`--expected-revision`, `--name`, `--at` and the retained mutation identity.
+`--length` defaults to zero and `--color` defaults to blue. `markers remove`
+takes the owning sequence and exact marker ID. The `marker_page` projection of
+`sequences.inspect` lists markers in frame order, then by ID. The CLI and MCP
+use the same project authority and replay rules.
+
+Select a registered WAVE audio clip and choose **Read WAVE cues in selected
+clip**. The CLI equivalent is
+`numera-wiz markers wave-projection --project ID --clip ID --revision N`.
+MCP exposes the same query as `markers.wave_projection`. Results retain the
+original sample offset, region length and label, plus exact source and
+sequence intervals. A point at the clip's exclusive out-point is omitted,
+and a region that crosses the in-point or out-point is clipped to the selected
+source span. The query requires project and source access and leaves the
+project's frame-aligned markers unchanged.
+
+## Sources, time and authorization
+
+Times use exact integer fractions. Video positions must lie on the declared frame
+grid and audio positions on the sample grid. Registered source spans may include
+negative source PTS; timeline positions stay nonnegative. Current mappings are
+forward unit-rate and reject collisions. Existing explicit/incoming/group links
+expand together; a linked interior split must be interior to every member.
+
+For registered media, replace `--rgba`/`--source-duration` with
+`--asset ASSET --stream-index INDEX`. Use the physical original stream index,
+including valid index `0`. Registration and placement require the current asset
+and native source rights. The binding captures asset ID, content/probe digests,
+physical index and media kind; `extent_verification:"pending"` is not decoded
+coverage proof. Project reads expose no copied native source path or full probe.
+Move/lift/history operate on retained project facts; undo can restore a binding
+whose external file is offline without granting access to its bytes. Both Link and
+Unlink are topology-only edits over frozen admitted binding facts. They require
+current command permission and Project Edit at acceptance, but do not open source
+bytes, add a fresh Asset Read/path-grant check or establish current-byte validity
+or decoded extent. Registered placement and media-consuming operations retain
+their current source rights and held-source preflight requirements.
+
+Command permission and Project Read/Edit are separate. Native owner and browser
+profiles are different principals. A browser's owned-object access does not grant
+an owner-created project. The owner can explicitly add a project object grant with
+`actions:["read","edit"]` through revision-checked profile update, preserving its
+other grants. Project access does not add asset or filesystem rights. Existing
+profiles do not automatically receive newly registered command IDs. The owner
+must explicitly review and add `clips.link` and `clips.unlink` to a stored profile's
+command allowlist while preserving its unrelated grants; discovery never widens
+it. Project Edit grants no filesystem authority. See the
+[CLI authority instructions](CLI.md#authority-and-errors).
+
+One cooperating writer holds a user-scoped lease for each project UUID, independent
+of data directory. Summary writer availability is advisory, not Edit permission.
+Unknown project majors remain readable within supported projections and reject
+writes; unsupported enabled semantics block their affected closure. Admitted
+opaque payload text is retained; duplicate members and unsafe overlays are rejected.
+
+## Project catalog
+
+`numera-wiz projects list` lowers to the canonical `projects.list` query used by
+MCP. It accepts `--limit` (default 128, range 1 through 512), `--cursor` and
+`--replace-snapshot`. It takes no ProjectRef, replay scope or idempotency key and
+returns no durable receipt. For example, a canonical request is:
+
+```json
+{
+  "api_version": 1,
+  "request_id": "catalog-1",
+  "command": {"id": "projects.list", "version": 1},
+  "params": {"limit": 64}
+}
+```
+
+Each item retains `id`, `name`, decimal-string `revision`, `schema_major`,
+`envelope_version` and `compatibility`, and adds `authorization` as described below.
+Items are ordered by ascending canonical
+project UUID (`id`); there is no arbitrary sorting or recency order. Compatibility
+is `supported` or `read_only_unsupported`, describing common schema/envelope
+readability. Unsupported common headers can remain visible without promising
+editing support. Effective authority, enabled semantics and writer availability
+have their own checks. The catalog reads headers, not entities, history, source
+paths or writer leases. Its outer `project_revision` and `event_cursor` are null;
+row revisions are independent captured facts.
+
+Current Project Read rights filter rows before items and exact counts are
+computed. The current store limit is 64 projects, so `--limit 64` returns the
+complete authorized catalog in one unretained page. Smaller pages can retain a
+continuation bound to principal, profile, policy revision, projection and limit
+for an absolute 30 seconds. Pass the exact `next_cursor` with the same limit;
+expiry or a policy change requires a fresh query. Paged queries are ordinary
+queries without a durable exact-replay guarantee: a lost-response retry can
+allocate another retained snapshot, subject to quota and expiry.
+
+For this catalog command alone, `--replace-snapshot SNAPSHOT_ID` may retire an
+owned catalog snapshot or project read ticket, including one for another project
+or an older policy revision. Ownership requires the exact principal and profile;
+native owner has no bypass for another caller's ticket. Current `projects.list`
+permission is required, but current Read on the old project is not. The returned
+catalog is always filtered under current rights. Same-profile tabs share this
+ownership boundary and can expire each other's handles. Cursor and replacement
+cannot be supplied together. Unknown, foreign and expired replacement tokens
+return no existence information; removing a real owned ticket can legitimately
+free quota. Other inventories and inspect replacement behavior are unchanged.
+
+Catalog and project tickets share four retained snapshots per principal, 32
+globally and a 16 MiB metadata/serialization reserve. Results remain bounded to
+240 KiB inside the 256 KiB response envelope. An unretained catalog does not need
+a count slot, even at capacity; it still undergoes byte-budget checks.
+
+Stored operating profiles must deliberately add `projects.list` to their command
+allowlist. Use the existing [owner-reviewed grant update](CLI.md#authority-and-errors):
+inspect with `--grants-out`, preserve principal/profile, roots and unrelated rights,
+then update with the captured `--expected-revision`. Discovery and adapters never
+silently widen grants. Command permission and Project Read remain separate.
+
+## Current authorization observations
+
+Catalog rows and every project/sequence inspection result include an additive
+`authorization` object with `schema_version:1`. It contains canonical decimal
+strings `policy_revision` and `observed_project_revision`, independent
+`current_read` and `current_edit` observations, and 11 project-target `actions`.
+Each right/action is either `unavailable` or `requires_request_validation`.
+The latter means that the observed predicates pass; it never means an edit is
+ready or already authorized. Each action names its exact command and reports
+finite `reasons` and `unchecked_gates`.
+
+Command allowance, Read and Edit remain separate. A Read-only profile can see
+Link as unavailable for `project_edit_not_granted` even when `clips.link` is
+allowed. Granting Edit does not add `clips.link` to its command allowlist.
+Unsupported headers or an already-observed busy writer can block write actions
+without changing the independent Edit observation. Summary reuses its existing
+writer observation; catalog and other projections do not probe writer leases.
+Even an available writer leaves `writer_lease` unchecked. Source rights/path,
+revision, selection/affected scope and history are validated by the actual fresh
+request where applicable, rather than by catalog discovery.
+
+One captured policy filters and annotates a page. A policy change before
+publication rejects the response instead of publishing mixed old/new rights.
+Retained content remains at its captured `project_revision`; its authorization
+can observe a newer `observed_project_revision`. Missing metadata or an unknown
+authorization schema version means unknown authority. Clients must not derive an
+Edit grant from legacy `read_only`, compatibility or writer-status fields.
+
+The 13 project-family descriptors also publish static
+`authorization_requirements`. These describe project action and request gates,
+without caller facts. Authenticated runtime `commands.list` adds a separate
+13-action `authorization` overlay that observes exact command allowance only;
+without a project context, Read/Edit remain unchecked. `commands.schema` returns
+the full static descriptor for a single catalog entry. Pure static discovery and MCP tool metadata never
+manufacture owner authority. Live observations do not enter the static registry
+fingerprint.
+
+## Command contracts and qualification
+
+The command table above lists 13 implemented project-family handlers.
+All 13 publish `result_schema` through `descriptor_schema_version:2`; historical
+descriptors without that additive member remain readable. Result documents are
+self-contained and describe the emitted result, including flattened entity
+payloads, explicit nullable fields and omitted no-change flags.
+[Run 43288625608](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43288625608)
+validated six service batches on all four native targets plus actual typed CLI,
+official stdio and both HTTP transport journeys with a separately locked JSON
+Schema validator. Its whole CI run was not green; these are scoped result-contract
+observations before the newer authorization/input changes.
+
+Input descriptors declare finite projection/sort/edit-policy values, query-specific
+required fields, page/selection bounds and explicit sequence settings. They retain
+existing optional nulls and defaults. JSON Schema character lengths do not replace
+runtime UTF-8 byte bounds, and exact time/grid/closure/source validation remains
+runtime work. Noncanonical accepted input fraction strings are not normalized in
+the original request or its retry digest.
+
+[Run 43315700376](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43315700376)
+validated 94 independent literal input cases and 34 authorization-output cases
+against the 13 published schemas on each of the four native targets. Existing
+parser, public-profile and final-publication race assertions passed in the shared
+service tests. These are scoped observations; the whole run later failed at an
+unrelated MCP test-module path. Later source changes still require current checks.
+
+The MCP tools now publish whole-Response output schemas. Actual CLI, official
+stdio and both HTTP lifecycle responses passed their independent schema batches
+in [run 43324562802](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43324562802).
+The same run retained and independently checked actual stdio frames on all four
+native targets: a complete 52-tool standard list result of 144107 bytes and its
+144151-byte JSON-RPC line, including the newline. All 13 project output-schema
+hashes matched the actual CLI, stdio and HTTP validation documents. This evidence
+is for source `438b06c`; the run still failed at the new media-promotion regression
+and formatting. Later source changes require fresh checks, and full v1 remains
+unfinished.
+
+## Bounded reads and history
+
+Project inspection offers `summary`, `entity` and `bin_page`. Sequence inspection
+offers `entity`, `track_page` and `viewport`. Pages default to 128/max512 and target
+240 KiB inside the 256 KiB response envelope. Pass the exact cursor with the same
+query fields and limit. A live ticket captures one revision for 30 seconds and
+supports eight query bindings. Project and inventory tickets share 32 global/four
+per-principal limits and a 16 MiB metadata/serialization reserve.
+
+Open a parent bin in the Projects workspace. Choose **New bin**, enter its
+name, and select **Create bin**. The edit uses the current committed project
+revision and joins its Undo history.
+
+```text
+numera-wiz bins add --parent PARENT --name "Clips" --project PROJECT --expected-revision REVISION --replay-scope SCOPE --idempotency-key create-clips-bin
+```
+
+MCP uses `bins.add` with `parent_id` and `name`.
+
+To search the direct children of a bin by display name, use **Search** in the
+project bin panel or set `query` on the `bin_page` projection. Matching uses a
+case-insensitive substring and preserves label/ID ordering. The query accepts
+1–128 UTF-8 bytes without control characters. **Clear search** restores browsing.
+
+```sh
+numera-wiz --data-dir DATA projects inspect --project PROJECT --projection bin_page --bin BIN --query "assembly"
+```
+
+A filtered page can be empty while a cursor remains. Each request examines at
+most `limit` bin summaries within the existing byte budget, plus one index entry
+to detect the next page. Follow the cursor with the same query and limit until
+`next_cursor` is null. Search totals are cumulative lower bounds until the last
+page reports the exact count.
+
+Use the same captured `--revision` for coherent projections. For project/sequence
+inspection, `--replace-snapshot`
+can retire an owned same-project ticket before a fresh capture. Expired cursors
+require an explicit refresh; a revision without a live ticket is not reconstructed
+from the latest head. Observed file growth and conservative write estimates can
+expire tickets early; they are not hard instantaneous disk or RSS limits.
+
+Edits admit at most 128 entity changes, 512 index/reference writes and a 128 KiB
+original forward/inverse patch pair. History retains at most 256 originals/32 MiB
+and 128 distinct source identities; complete oldest originals may be evicted earlier
+to keep branch edits bounded. New edits clear redo atomically. Live bindings remain
+referenced independently of retained history. The operation journal has its own
+512-record/8 MiB bound, reported separately from the history floor.
+
+The historical [backend evidence](../development/evidence/project-core-43056099112.json)
+records four-target state regressions and that source's 13-job CI checkpoint.
+Actual prior/current packaged-binary preservation has qualified the unlinked
+project scenario and the positive group-only Link/Move/Unlink/Undo fixture within
+their exercised scope. In run 43288625608, the pinned old/current packages passed
+seven owner epochs on each native target, preserving the same group, two exact
+dependency rows, eight receipts and original raw/rollback checks. This does not
+qualify mixed audio/video, registered sources or other dependency roles.
+Shared native/Chrome project input journeys
+passed in [run 43232250861](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43232250861)
+for the controls described above. That run also reached the integrated Link/Unlink
+assertions on all four native targets before a separate later Split failure;
+[run 43237451380](https://github.com/KiaroSama/Numera-Wiz/actions/runs/43237451380)
+subsequently exercised the complete focused Split model on all four targets.
+These are scoped observations, not claims that those whole runs or current CI
+are green. The newly appended shared native/Chrome journey uses actual pointer/
+keyboard input to place two finite solid-color clips, select them, Link, Unlink,
+Undo/Redo and reopen, with independent entity and source-binding observations.
+It has not yet executed on HOST for this source. Earlier GUI runs do not qualify
+these new controls. Its solid pair does not qualify mixed registered audio/video,
+full C_M1, or the complete editor. Linked GUI HOST qualification, mixed audio/video
+and media variants, portable project files/full checkpoints,
+decoded preview/export, named external agent runtimes and the complete
+media/editor release remain open.

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-11-12",
+  "method": "GitHub default-head, comparison and file-content API observations; both workflow files were downloaded outside the repository and their full byte counts, SHA-256 and Git blob identities verified. The complete FFmWiz workflow and the complete MuxCls difference were read; the only difference between the two workflows is the weekly cron schedule.",
+  "source_baseline_file": "upstream-sources-2026-11-11.json",
+  "scope": "Focused follow-up for KiaroSama/FFmWiz and KiaroSama/MuxCls only. Earlier observations remain historical. Other repositories, releases and dependencies were not refreshed by this record.",
+  "repositories": [
+    {
+      "name": "FFmWiz",
+      "repository": "KiaroSama/FFmWiz",
+      "url": "https://github.com/KiaroSama/FFmWiz",
+      "default_branch": "main",
+      "prior_observed_commit": "661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "behavior_reference_commit": "661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "prior_commit_url": "https://github.com/KiaroSama/FFmWiz/commit/661a0d240ee29ca7cda496b635ae8c50e43d916b",
+      "default_head": {
+        "commit": "b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+        "committed_at": "2026-11-11T19:43:01Z",
+        "url": "https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6"
+      },
+      "commits": [
+        {
+          "commit": "640061cac27a264ce63ef719dfcc75dce0cd69b5",
+          "url": "https://github.com/KiaroSama/FFmWiz/commit/640061cac27a264ce63ef719dfcc75dce0cd69b5"
+        },
+        {
+          "commit": "b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+          "url": "https://github.com/KiaroSama/FFmWiz/commit/b4968cafb3dcce15b1c4313763d74c9fd07748a6"
+        }
+      ],
+      "comparison": {
+        "url": "https://github.com/KiaroSama/FFmWiz/compare/661a0d240ee29ca7cda496b635ae8c50e43d916b...b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+        "api_url": "https://api.github.com/repos/KiaroSama/FFmWiz/compare/661a0d240ee29ca7cda496b635ae8c50e43d916b...b4968cafb3dcce15b1c4313763d74c9fd07748a6",
+        "status": "ahead",
+        "ahead_by": 2,
+        "behind_by": 0,
+        "file_list_complete": true,
+        "changed_files": [
+          {
+            "filename": ".github/workflows/gitleaks.yml",
+            "status": "added",
+            "additions": 238,
+            "deletions": 0,
+            "lines": 238,
+            "bytes": 12946,
+            "sha256": "877e9b17948917f77e15e6b80046abd53e9699d7bba204caba992d90352b4172",
+            "git_blob_sha": "8902fc9516816310221d1a08c22762b1a3d30f05",
+            "url": "https://github.com/KiaroSama/FFmWiz/blob/b4968cafb3dcce15b1c4313763d74c9fd07748a6/.github/workflows/gitleaks.yml",
+            "schedule_cron": "18 4 * * 2",
+            "schedule_utc": "Tuesday 04:18 UTC"
+          }
+        ]
+      },
+      "interpretation": "The complete comparison adds only the CI workflow. No CLI, media, or application source file changed, so the historical CLI behavior reference remains unchanged; the observed default head is recorded separately."
+    },
+    {
+      "name": "MuxCls",
+      "repository": "KiaroSama/MuxCls",
+      "url": "https://github.com/KiaroSama/MuxCls",
+      "default_branch": "main",
+      "prior_observed_commit": "0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "behavior_reference_commit": "0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "prior_commit_url": "https://github.com/KiaroSama/MuxCls/commit/0cf9596f7510f894babf36595efbc827fbbfaf04",
+      "default_head": {
+        "commit": "1269bd71712466469d539fbf279432659ccaa6a2",
+        "committed_at": "2026-11-11T19:41:09Z",
+        "url": "https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2"
+      },
+      "commits": [
+        {
+          "commit": "eb269f445a860906dda9f1adda4c8dbf900fece2",
+          "url": "https://github.com/KiaroSama/MuxCls/commit/eb269f445a860906dda9f1adda4c8dbf900fece2"
+        },
+        {
+          "commit": "1269bd71712466469d539fbf279432659ccaa6a2",
+          "url": "https://github.com/KiaroSama/MuxCls/commit/1269bd71712466469d539fbf279432659ccaa6a2"
+        }
+      ],
+      "comparison": {
+        "url": "https://github.com/KiaroSama/MuxCls/compare/0cf9596f7510f894babf36595efbc827fbbfaf04...1269bd71712466469d539fbf279432659ccaa6a2",
+        "api_url": "https://api.github.com/repos/KiaroSama/MuxCls/compare/0cf9596f7510f894babf36595efbc827fbbfaf04...1269bd71712466469d539fbf279432659ccaa6a2",
+        "status": "ahead",
+        "ahead_by": 2,
+        "behind_by": 0,
+        "file_list_complete": true,
+        "changed_files": [
+          {
+            "filename": ".github/workflows/gitleaks.yml",
+            "status": "added",
+            "additions": 238,
+            "deletions": 0,
+            "lines": 238,
+            "bytes": 12946,
+            "sha256": "9ec18e1c85765036ef8c9686d3c67879c30bce2023bcdfcf124292275327bedd",
+            "git_blob_sha": "d69aad7039c2cefa91a23728d1de75db62b709c0",
+            "url": "https://github.com/KiaroSama/MuxCls/blob/1269bd71712466469d539fbf279432659ccaa6a2/.github/workflows/gitleaks.yml",
+            "schedule_cron": "37 4 * * 1",
+            "schedule_utc": "Monday 04:37 UTC"
+          }
+        ]
+      },
+      "interpretation": "The complete comparison adds only the CI workflow. No CLI, media, or application source file changed, so the historical CLI behavior reference remains unchanged; the observed default head is recorded separately."
+    }
+  ],
+  "observed_workflow_protections": [
+    "Checksum-pinned Gitleaks 8.30.1",
+    "Quiet, redacted diagnostics",
+    "Verification of Git child-process exit status"
+  ],
+  "integration": {
+    "evidence_file": "../../SECURITY.md",
+    "disposition": "Numera Wiz already retains equivalent protections in its reviewed Rust scan controller, as documented in SECURITY.md. This observation imports no donor Python workflow or executable source and requires no application behavior change."
+  },
+  "limitations": [
+    "A source comparison is not a new implementation or security qualification.",
+    "This record makes no blanket clean, universal credential coverage, full-history coverage, full version 1, media, release, or current CI success claim."
+  ]
+}

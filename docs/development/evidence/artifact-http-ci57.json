@@ -1,0 +1,43 @@
+{
+  "artifact_bytes": "268633400",
+  "artifact_id": "job-7a6195f1-5e5b-4f87-8581-cf5ff7ed0be3",
+  "cancelled_index_cleanup": true,
+  "components": {
+    "ffmpeg": {
+      "bytes": "5132352",
+      "file_name": "ffmpeg",
+      "sha256": "57027bd7d6aacfafa1b31e8ceef2e41e1f5c4ba685ae69dd17274c692fadeec6"
+    },
+    "ffprobe": {
+      "bytes": "4911104",
+      "file_name": "ffprobe",
+      "sha256": "e3cb5b229af9be9e31e8fb18f6ab8a92bfab17762fa47166325268159732f8f5"
+    }
+  },
+  "credential_revoked_delivered_bytes": "3145728",
+  "executable": {
+    "bytes": "220062024",
+    "path": "/home/runner/work/Numera-Wiz/Numera-Wiz/target/debug/numera-wiz",
+    "sha256": "ca386886ad66597586d5970687dc7eab4d84e97145cf31dc40ef592df6a8d2ac"
+  },
+  "job_id": "7a6195f1-5e5b-4f87-8581-cf5ff7ed0be3",
+  "job_revoked_delivered_bytes": "3801088",
+  "owner_before_high_kib": 27864,
+  "owner_high_kib": 28816,
+  "owner_process_id": 15067,
+  "plan_hash": "62712011fc1e90fdaa8a72c10b0999f0d2ad475a42be2958a255a437ae13c766",
+  "plan_id": "0b91e3b4-e4be-48d7-9d21-846b084bcf8b",
+  "registry": "b8e5644f6fcf3c35a5080aef818754a9b8f9d8fe9ae2451d4d1dbf393e00a31e",
+  "schema_version": 1,
+  "scope": "Actual CI-built Linux headless owner, real FFmpeg-created valid large container, reviewed byte-copy job, authenticated HTTP. This is not complete aggregate R20, other-platform or packaged qualification.",
+  "selected_owner_rss_ceiling_kib": 131072,
+  "sha256": "440d306dcbfdda4a1fa8540193594deaf3a4720bc30c2e75e930cd6533ae6c96",
+  "source": "343bbdc315bebb5c7f4c2e92a34a626b0007889b",
+  "status": "passed",
+  "hosted_evidence": {
+    "run_id": 40063449245,
+    "branch_head": "2de4a99f264f62ab649c1e55e94a89abd0cc705a",
+    "artifact_id": 12549215020,
+    "zip_sha256": "77ffdc094a7d730ac8eacfda25b2cb6df476bf4ce61830481a01c017e28422e6"
+  }
+}

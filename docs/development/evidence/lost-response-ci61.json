@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_id": 40067320046,
+  "branch_head": "949feccda6a2450e46d3bbb944452be2b439479b",
+  "boundary": "actual Linux owner and official SDK stdio through bounded transport response loss",
+  "job_id": 120793183529,
+  "test": "cli_and_both_official_mcp_transports_share_real_verified_jobs",
+  "result": "passed",
+  "asserted": [
+    "both real accepted jobs.submit responses withheld",
+    "automatic retry retained exact request bytes",
+    "same SDK stdio process after real idle owner restart",
+    "same original scope, key, body, receipt and job",
+    "one stored job",
+    "same root and principal",
+    "new owner epoch",
+    "independent complete source/output byte equality"
+  ],
+  "artifact": {
+    "id": 12549757211,
+    "github_reported_zip_sha256": "a564bf6101216568f6665a31d6a2225a6ac133d20498d885ea2c1a37393702c6",
+    "downloaded": false
+  },
+  "not_qualified": [
+    "retired command replay",
+    "crash/fence/migration recovery",
+    "full D6-J02",
+    "packages",
+    "owner GPU"
+  ]
+}
