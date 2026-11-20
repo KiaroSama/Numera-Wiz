@@ -231,7 +231,10 @@ fn download(row: &Value, path: &Path, bottle: Option<&str>) -> Result<()> {
         transfer(api, endpoint, "4096")?;
         expand_patch_index(path, field(patch, "before")?, field(patch, "after")?)?;
         verify()?;
-        tracing::info!(filename, "Verified the full-index source patch from the commit API");
+        tracing::info!(
+            filename,
+            "Verified the full-index source patch from the commit API"
+        );
         Ok(())
     });
     if api_attempt.as_ref().is_some_and(|result| result.is_ok()) {
